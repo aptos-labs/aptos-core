@@ -69,10 +69,7 @@ impl Experiment for AccurateMeasurement {
         let mut txn_emitter = TxnEmitter::new(
             &mut context.treasury_compliance_account,
             &mut context.designated_dealer_account,
-            context
-                .cluster
-                .random_validator_instance()
-                .json_rpc_client(),
+            context.cluster.random_validator_instance().rest_client(),
             TransactionFactory::new(context.cluster.chain_id),
             StdRng::from_seed(OsRng.gen()),
         );
@@ -85,7 +82,7 @@ impl Experiment for AccurateMeasurement {
             let tps = self.base_tps + self.step_length * i;
             let window = self.duration / self.step_num as u32;
             let emit_job_request =
-                EmitJobRequest::new(instances.iter().map(Instance::json_rpc_client).collect())
+                EmitJobRequest::new(instances.iter().map(Instance::rest_client).collect())
                     .fixed_tps(tps.try_into().unwrap());
             let emit_txn = txn_emitter.emit_txn_for(window, emit_job_request).boxed();
             let stats = emit_txn.await?;

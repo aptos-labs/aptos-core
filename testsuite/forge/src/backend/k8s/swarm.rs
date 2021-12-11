@@ -56,7 +56,7 @@ impl K8sSwarm {
         let validators = get_validators(kube_client.clone(), init_image_tag).await?;
         let fullnodes = get_fullnodes(kube_client.clone(), init_image_tag, era).await?;
 
-        let client = validators.values().next().unwrap().json_rpc_client();
+        let client = validators.values().next().unwrap().rest_client();
         let key = load_root_key(root_key);
         let account_key = AccountKey::from_private_key(key);
         let address = diem_sdk::types::account_config::diem_root_address();

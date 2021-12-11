@@ -88,10 +88,7 @@ impl Experiment for ValidatorVersioning {
         let mut txn_emitter = TxnEmitter::new(
             &mut context.treasury_compliance_account,
             &mut context.designated_dealer_account,
-            context
-                .cluster
-                .random_validator_instance()
-                .json_rpc_client(),
+            context.cluster.random_validator_instance().rest_client(),
             TransactionFactory::new(context.cluster.chain_id),
             StdRng::from_seed(OsRng.gen()),
         );
@@ -129,7 +126,7 @@ impl Experiment for ValidatorVersioning {
 
         // grab a validator node
         let old_validator_node = context.cluster.random_validator_instance();
-        let old_client = old_validator_node.json_rpc_client();
+        let old_client = old_validator_node.rest_client();
 
         info!("1. Send a transaction using the new feature to a validator node");
         let txn1 = txn_gen(&mut account, &secondary_signer_account);
@@ -158,7 +155,7 @@ impl Experiment for ValidatorVersioning {
             .first_batch
             .get(0)
             .expect("getting an updated validator instance requires a non-empty list");
-        let new_client = new_validator_node.json_rpc_client();
+        let new_client = new_validator_node.rest_client();
 
         info!("3. Send the transaction using the new feature to an updated validator node");
         let txn3 = txn_gen(&mut account, &secondary_signer_account);

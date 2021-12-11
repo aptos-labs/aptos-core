@@ -5,12 +5,12 @@
 
 use crate::{instance::Instance, query_sequence_numbers};
 use anyhow::{format_err, Result};
-use diem_client::Client as JsonRpcClient;
 use diem_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
     Uniform,
 };
+use diem_rest_client::Client as RestClient;
 use diem_sdk::{
     move_types::account_address::AccountAddress,
     types::{
@@ -78,7 +78,7 @@ impl Cluster {
 
     async fn load_account_with_mint_key(
         &self,
-        client: &JsonRpcClient,
+        client: &RestClient,
         address: AccountAddress,
     ) -> Result<LocalAccount> {
         let sequence_number = query_sequence_numbers(client, &[address])
@@ -98,22 +98,22 @@ impl Cluster {
         ))
     }
 
-    pub async fn load_diem_root_account(&self, client: &JsonRpcClient) -> Result<LocalAccount> {
+    pub async fn load_diem_root_account(&self, client: &RestClient) -> Result<LocalAccount> {
         self.load_account_with_mint_key(client, diem_root_address())
             .await
     }
 
-    pub async fn load_faucet_account(&self, client: &JsonRpcClient) -> Result<LocalAccount> {
+    pub async fn load_faucet_account(&self, client: &RestClient) -> Result<LocalAccount> {
         self.load_account_with_mint_key(client, testnet_dd_account_address())
             .await
     }
 
-    pub async fn load_tc_account(&self, client: &JsonRpcClient) -> Result<LocalAccount> {
+    pub async fn load_tc_account(&self, client: &RestClient) -> Result<LocalAccount> {
         self.load_account_with_mint_key(client, treasury_compliance_account_address())
             .await
     }
 
-    pub async fn load_dd_account(&self, client: &JsonRpcClient) -> Result<LocalAccount> {
+    pub async fn load_dd_account(&self, client: &RestClient) -> Result<LocalAccount> {
         let mint_key: Ed25519PrivateKey = generate_key::load_key(DD_KEY);
         let account_key = AccountKey::from_private_key(mint_key);
         let address = account_key.authentication_key().derived_address();

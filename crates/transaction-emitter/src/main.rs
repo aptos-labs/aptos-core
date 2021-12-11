@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err, Result};
-use diem_config::config::DEFAULT_JSON_RPC_PORT;
+use diem_config::config::DEFAULT_PORT;
 use diem_sdk::{
     transaction_builder::TransactionFactory,
     types::{chain_id::ChainId, LocalAccount},
@@ -88,7 +88,7 @@ async fn emit_tx(cluster: &Cluster, args: &Args) -> Result<()> {
         wait_committed: !args.burst,
     };
     let duration = Duration::from_secs(args.duration);
-    let client = cluster.random_instance().json_rpc_client();
+    let client = cluster.random_instance().rest_client();
     let (mut treasury_compliance_account, mut designated_dealer_account) = if args.vasp {
         (
             LocalAccount::generate(&mut rand::rngs::OsRng),
@@ -110,15 +110,11 @@ async fn emit_tx(cluster: &Cluster, args: &Args) -> Result<()> {
         TransactionFactory::new(cluster.chain_id),
         StdRng::from_seed(OsRng.gen()),
     );
-    let mut emit_job_request = EmitJobRequest::new(
-        cluster
-            .all_instances()
-            .map(Instance::json_rpc_client)
-            .collect(),
-    )
-    .accounts_per_client(args.accounts_per_client)
-    .thread_params(thread_params)
-    .invalid_transaction_ratio(args.invalid_tx);
+    let mut emit_job_request =
+        EmitJobRequest::new(cluster.all_instances().map(Instance::rest_client).collect())
+            .accounts_per_client(args.accounts_per_client)
+            .thread_params(thread_params)
+            .invalid_transaction_ratio(args.invalid_tx);
     if let Some(workers_per_endpoint) = args.workers_per_ac {
         emit_job_request = emit_job_request.workers_per_endpoint(workers_per_endpoint);
     }
@@ -136,7 +132,7 @@ async fn emit_tx(cluster: &Cluster, args: &Args) -> Result<()> {
 fn parse_host_port(s: &str) -> Result<(String, u32, Option<u32>)> {
     let v = s.split(':').collect::<Vec<&str>>();
     if v.len() == 1 {
-        let default_port = DEFAULT_JSON_RPC_PORT as u32;
+        let default_port = DEFAULT_PORT as u32;
         return Ok((v[0].to_string(), default_port, None));
     }
     if v.len() != 2 && v.len() != 3 {
@@ -175,7 +171,7 @@ impl BasicSwarmUtil {
     }
 
     pub async fn diag(&self, vasp: bool) -> Result<()> {
-        let client = self.cluster.random_instance().json_rpc_client();
+        let client = self.cluster.random_instance().rest_client();
         let (mut treasury_compliance_account, mut designated_dealer_account) = if vasp {
             (
                 LocalAccount::generate(&mut rand::rngs::OsRng),
@@ -200,7 +196,7 @@ impl BasicSwarmUtil {
         let mut faucet_account: Option<LocalAccount> = None;
         let instances: Vec<_> = self.cluster.all_instances().collect();
         for instance in &instances {
-            let client = instance.json_rpc_client();
+            let client = instance.rest_client();
             print!("Getting faucet account sequence number on {}...", instance);
             let account = if vasp {
                 self.cluster
@@ -235,7 +231,7 @@ impl BasicSwarmUtil {
             print!("Submitting txn through {}...", instance);
             let deadline = emitter
                 .submit_single_transaction(
-                    &instance.json_rpc_client(),
+                    &instance.rest_client(),
                     &mut faucet_account,
                     &faucet_account_address,
                     10,
@@ -251,7 +247,7 @@ impl BasicSwarmUtil {
                 let addresses = &[faucet_account_address];
                 let clients = instances
                     .iter()
-                    .map(|instance| instance.json_rpc_client())
+                    .map(|instance| instance.rest_client())
                     .collect::<Vec<_>>();
                 let futures = clients
                     .iter()

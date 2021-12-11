@@ -45,18 +45,19 @@ impl NetworkTest for ReconfigurationTest {
         let validator_clients = ctx
             .swarm()
             .validators()
-            .map(|n| n.async_json_rpc_client())
+            .map(|n| (n.rest_client(), n.async_json_rpc_client()))
             .collect::<Vec<_>>();
         let tx_factory = TransactionFactory::new(ctx.swarm().chain_info().chain_id);
         let mut diem_root_account = ctx.swarm().chain_info().root_account;
         let allowed_nonce = 0;
         let rt = Runtime::new()?;
-        let full_node_client = validator_clients.iter().choose(&mut rng).unwrap();
+        let (full_node_client, full_node_jsonrpc_client) =
+            validator_clients.iter().choose(&mut rng).unwrap();
         let timer = Instant::now();
         let count = 101;
 
         rt.block_on(async {
-            let mut version = expect_epoch(full_node_client, 0, 1).await.unwrap();
+            let mut version = expect_epoch(full_node_jsonrpc_client, 0, 1).await.unwrap();
             {
                 println!("Remove and add back {}.", affected_pod_name);
                 let validator_name = affected_pod_name.as_bytes().to_vec();
@@ -74,7 +75,9 @@ impl NetworkTest for ReconfigurationTest {
                 )
                 .await
                 .unwrap();
-                version = expect_epoch(full_node_client, version, 2).await.unwrap();
+                version = expect_epoch(full_node_jsonrpc_client, version, 2)
+                    .await
+                    .unwrap();
                 let add_txn = diem_root_account.sign_with_transaction_builder(
                     tx_factory.add_validator_and_reconfigure(
                         allowed_nonce,
@@ -89,7 +92,9 @@ impl NetworkTest for ReconfigurationTest {
                 )
                 .await
                 .unwrap();
-                version = expect_epoch(full_node_client, version, 3).await.unwrap();
+                version = expect_epoch(full_node_jsonrpc_client, version, 3)
+                    .await
+                    .unwrap();
             }
 
             {
@@ -115,7 +120,7 @@ impl NetworkTest for ReconfigurationTest {
                     )
                     .await
                     .unwrap();
-                    version = expect_epoch(full_node_client, version, (i + 1) * 2)
+                    version = expect_epoch(full_node_jsonrpc_client, version, (i + 1) * 2)
                         .await
                         .unwrap();
                     let downgrade_txn = diem_root_account.sign_with_transaction_builder(
@@ -131,7 +136,7 @@ impl NetworkTest for ReconfigurationTest {
                     )
                     .await
                     .unwrap();
-                    version = expect_epoch(full_node_client, version, (i + 1) * 2 + 1)
+                    version = expect_epoch(full_node_jsonrpc_client, version, (i + 1) * 2 + 1)
                         .await
                         .unwrap();
                 }
@@ -150,7 +155,7 @@ impl NetworkTest for ReconfigurationTest {
                 )
                 .await
                 .unwrap();
-                expect_epoch(full_node_client, version, count + 1)
+                expect_epoch(full_node_jsonrpc_client, version, count + 1)
                     .await
                     .unwrap();
             }

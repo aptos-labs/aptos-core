@@ -1,17 +1,18 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, format_err, Context, Result};
+use anyhow::{format_err, Context, Result};
+use diem_client::Response;
 use diem_logger::*;
+use diem_rest_client::{Client as RestClient, PendingTransaction};
 use diem_sdk::{
-    client::{views::AmountView, Client as JsonRpcClient, MethodRequest},
-    crypto::hash::CryptoHash,
+    client::views::AmountView,
     move_types::account_address::AccountAddress,
     transaction_builder::{Currency, TransactionFactory},
     types::{
         account_config::XUS_NAME,
         chain_id::ChainId,
-        transaction::{authenticator::AuthenticationKey, SignedTransaction, Transaction},
+        transaction::{authenticator::AuthenticationKey, SignedTransaction},
         LocalAccount,
     },
 };
@@ -32,7 +33,7 @@ use std::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
     },
-    time::{Duration, Instant, SystemTime},
+    time::{Duration, Instant},
 };
 use tokio::{runtime::Handle, task::JoinHandle, time};
 
@@ -71,7 +72,7 @@ impl Default for EmitThreadParams {
 
 #[derive(Clone)]
 pub struct EmitJobRequest {
-    json_rpc_clients: Vec<JsonRpcClient>,
+    rest_clients: Vec<RestClient>,
     accounts_per_client: usize,
     workers_per_endpoint: Option<usize>,
     thread_params: EmitThreadParams,
@@ -83,7 +84,7 @@ pub struct EmitJobRequest {
 impl Default for EmitJobRequest {
     fn default() -> Self {
         Self {
-            json_rpc_clients: Vec::new(),
+            rest_clients: Vec::new(),
             accounts_per_client: 15,
             workers_per_endpoint: None,
             thread_params: EmitThreadParams::default(),
@@ -95,12 +96,12 @@ impl Default for EmitJobRequest {
 }
 
 impl EmitJobRequest {
-    pub fn new(json_rpc_clients: Vec<JsonRpcClient>) -> Self {
-        Self::default().json_rpc_clients(json_rpc_clients)
+    pub fn new(rest_clients: Vec<RestClient>) -> Self {
+        Self::default().rest_clients(rest_clients)
     }
 
-    pub fn json_rpc_clients(mut self, json_rpc_clients: Vec<JsonRpcClient>) -> Self {
-        self.json_rpc_clients = json_rpc_clients;
+    pub fn rest_clients(mut self, rest_clients: Vec<RestClient>) -> Self {
+        self.rest_clients = rest_clients;
         self
     }
 
@@ -130,7 +131,7 @@ impl EmitJobRequest {
     }
 
     pub fn fixed_tps(self, target_tps: NonZeroU64) -> Self {
-        let clients_count = self.json_rpc_clients.len() as u64;
+        let clients_count = self.rest_clients.len() as u64;
         let num_workers = target_tps.get() / clients_count + 1;
         let wait_time = clients_count * num_workers * 1000 / target_tps.get();
 
@@ -187,7 +188,7 @@ pub struct EmitJob {
 
 struct SubmissionWorker {
     accounts: Vec<LocalAccount>,
-    client: JsonRpcClient,
+    client: RestClient,
     all_addresses: Arc<Vec<AccountAddress>>,
     stop: Arc<AtomicBool>,
     params: EmitThreadParams,
@@ -318,7 +319,7 @@ pub struct TxnEmitter<'t, 'd> {
     txn_factory: TransactionFactory,
     treasury_compliance_account: &'t mut LocalAccount,
     designated_dealer_account: &'d mut LocalAccount,
-    client: JsonRpcClient,
+    client: RestClient,
     rng: ::rand::rngs::StdRng,
 }
 
@@ -326,7 +327,7 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
     pub fn new(
         treasury_compliance_account: &'t mut LocalAccount,
         designated_dealer_account: &'d mut LocalAccount,
-        client: JsonRpcClient,
+        client: RestClient,
         transaction_factory: TransactionFactory,
         rng: ::rand::rngs::StdRng,
     ) -> Self {
@@ -375,7 +376,7 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
 
     pub async fn load_vasp_account(
         &self,
-        client: &JsonRpcClient,
+        client: &RestClient,
         index: usize,
     ) -> Result<LocalAccount> {
         let file = "vasp".to_owned() + index.to_string().as_str() + ".key";
@@ -396,7 +397,7 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
 
     pub async fn get_seed_accounts(
         &mut self,
-        json_rpc_clients: &[JsonRpcClient],
+        rest_clients: &[RestClient],
         seed_account_num: usize,
         vasp: bool,
     ) -> Result<Vec<LocalAccount>> {
@@ -405,7 +406,7 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
         let mut seed_accounts = vec![];
         // load vasp account created by AOS directly
         if vasp {
-            let client = self.pick_mint_client(json_rpc_clients).clone();
+            let client = self.pick_mint_client(rest_clients).clone();
             info!("Loading VASP account as seed accounts");
             let load_account_num = min(seed_account_num, MAX_VASP_ACCOUNT_NUM);
             for i in 0..load_account_num {
@@ -416,7 +417,7 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
             return Ok(seed_accounts);
         }
         while i < seed_account_num {
-            let client = self.pick_mint_client(json_rpc_clients).clone();
+            let client = self.pick_mint_client(rest_clients).clone();
             let batch_size = min(MAX_TXN_BATCH_SIZE, seed_account_num - i);
             let mut rng = self.from_rng();
             let mut batch = gen_random_accounts(batch_size, &mut rng);
@@ -460,20 +461,20 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
             return Ok(());
         }
         let expected_num_seed_accounts =
-            if total_requested_accounts / req.json_rpc_clients.len() > MAX_CHILD_VASP_NUM {
+            if total_requested_accounts / req.rest_clients.len() > MAX_CHILD_VASP_NUM {
                 total_requested_accounts / MAX_CHILD_VASP_NUM + 1
             } else {
-                req.json_rpc_clients.len()
+                req.rest_clients.len()
             };
         let num_accounts = total_requested_accounts - self.accounts.len(); // Only minting extra accounts
         let coins_per_account = SEND_AMOUNT * MAX_TXNS * 10; // extra coins for secure to pay none zero gas price
         let coins_total = coins_per_account * num_accounts as u64;
         let txn_factory = self.txn_factory.clone();
-        let client = self.pick_mint_client(&req.json_rpc_clients);
+        let client = self.pick_mint_client(&req.rest_clients);
 
         // Create seed accounts with which we can create actual accounts concurrently
         let seed_accounts = self
-            .get_seed_accounts(&req.json_rpc_clients, expected_num_seed_accounts, req.vasp)
+            .get_seed_accounts(&req.rest_clients, expected_num_seed_accounts, req.vasp)
             .await?;
         let rng = self.from_rng();
         let faucet_account = self.get_money_source(coins_total).await?;
@@ -502,8 +503,8 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
             .enumerate()
             .map(|(i, seed_account)| {
                 // Spawn new threads
-                let index = i % req.json_rpc_clients.len();
-                let cur_client = req.json_rpc_clients[index].clone();
+                let index = i % req.rest_clients.len();
+                let cur_client = req.rest_clients[index].clone();
                 create_new_accounts(
                     seed_account,
                     num_new_child_accounts,
@@ -546,10 +547,10 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
                 // We want to have equal numbers of threads for each endpoint, so that they are equally loaded
                 // Otherwise things like flamegrap/perf going to show different numbers depending on which endpoint is chosen
                 // Also limiting number of threads as max 10 per endpoint for use cases with very small number of nodes or use --peers
-                min(10, max(1, target_threads / req.json_rpc_clients.len()))
+                min(10, max(1, target_threads / req.rest_clients.len()))
             }
         };
-        let num_clients = req.json_rpc_clients.len() * workers_per_endpoint;
+        let num_clients = req.rest_clients.len() * workers_per_endpoint;
         println!(
             "Will use {} workers per endpoint with total {} endpoint clients",
             workers_per_endpoint, num_clients
@@ -568,7 +569,7 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
         let stop = Arc::new(AtomicBool::new(false));
         let stats = Arc::new(StatsAccumulator::default());
         let tokio_handle = Handle::current();
-        for client in req.json_rpc_clients {
+        for client in req.rest_clients {
             for _ in 0..workers_per_endpoint {
                 let accounts = (&mut all_accounts).take(req.accounts_per_client).collect();
                 let all_addresses = all_addresses.clone();
@@ -651,7 +652,7 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
         Ok(stats)
     }
 
-    fn pick_mint_client<'a>(&mut self, clients: &'a [JsonRpcClient]) -> &'a JsonRpcClient {
+    fn pick_mint_client<'a>(&mut self, clients: &'a [RestClient]) -> &'a RestClient {
         clients
             .choose(self.rng())
             .expect("json-rpc clients can not be empty")
@@ -659,7 +660,7 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
 
     pub async fn submit_single_transaction(
         &self,
-        client: &JsonRpcClient,
+        client: &RestClient,
         sender: &mut LocalAccount,
         receiver: &AccountAddress,
         num_coins: u64,
@@ -679,49 +680,45 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
 }
 
 async fn retrieve_account_balance(
-    client: &JsonRpcClient,
+    client: &RestClient,
     address: AccountAddress,
 ) -> Result<Vec<AmountView>> {
-    let resp = client
-        .get_account(address)
-        .await
-        .map_err(|e| format_err!("[{:?}] get_accounts failed: {:?} ", client, e))?
-        .into_inner();
-    Ok(resp
-        .ok_or_else(|| format_err!("account does not exist"))?
-        .balances)
+    Ok(client
+        .get_account_balances(address)
+        .await?
+        .into_inner()
+        .into_iter()
+        .map(|b| AmountView {
+            amount: b.amount,
+            currency: b.currency_code(),
+        })
+        .collect())
 }
 
 pub async fn execute_and_wait_transactions(
-    client: &JsonRpcClient,
+    client: &RestClient,
     account: &mut LocalAccount,
-    txn: Vec<SignedTransaction>,
+    txns: Vec<SignedTransaction>,
 ) -> Result<()> {
     debug!(
         "[{:?}] Submitting transactions {} - {} for {}",
         client,
-        account.sequence_number() - txn.len() as u64,
+        account.sequence_number() - txns.len() as u64,
         account.sequence_number(),
         account.address()
     );
 
-    // Batch submit all the txns
-    for txn_batch in txn.chunks(20) {
-        client
-            .batch(
-                txn_batch
-                    .iter()
-                    .map(MethodRequest::submit)
-                    .collect::<Result<_, _>>()?,
-            )
-            .await?
-            .into_iter()
-            .map(|r| r.and_then(|response| response.into_inner().try_into_submit()))
-            .collect::<Result<Vec<()>, _>>()
-            .context("failed to submit transactions")?;
-    }
+    let pending_txns: Vec<Response<PendingTransaction>> =
+        try_join_all(txns.iter().map(|t| client.submit(t)))
+            .await
+            .context("submit transactions failed")?;
 
-    wait_for_signed_transactions(client, &txn).await?;
+    for pt in pending_txns {
+        client
+            .wait_for_transaction(&pt.into_inner())
+            .await
+            .context("wait for transactions failed")?;
+    }
 
     debug!(
         "[{:?}] Account {} is at sequence number {} now",
@@ -732,74 +729,8 @@ pub async fn execute_and_wait_transactions(
     Ok(())
 }
 
-async fn wait_for_signed_transactions(
-    client: &JsonRpcClient,
-    txns: &[SignedTransaction],
-) -> Result<()> {
-    let deadline = Instant::now()
-        + txns
-            .iter()
-            .map(SignedTransaction::expiration_timestamp_secs)
-            .max()
-            .map(Duration::from_secs)
-            .ok_or_else(|| anyhow!("Expected at least 1 txn"))?
-            .saturating_sub(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?);
-
-    #[allow(clippy::mutable_key_type)]
-    let mut uncommitted_txns = txns.iter().collect::<HashSet<_>>();
-
-    while Instant::now() < deadline {
-        if uncommitted_txns.is_empty() {
-            return Ok(());
-        }
-
-        let (batch, queried_txns): (Vec<MethodRequest>, Vec<&SignedTransaction>) = uncommitted_txns
-            .iter()
-            .take(20)
-            .map(|txn| {
-                (
-                    MethodRequest::get_account_transaction(
-                        txn.sender(),
-                        txn.sequence_number(),
-                        false,
-                    ),
-                    txn,
-                )
-            })
-            .unzip();
-        let responses = client
-            .batch(batch)
-            .await
-            .context("failed to query account transactions")?
-            .into_iter()
-            .map(|r| {
-                r.and_then(|response| response.into_inner().try_into_get_account_transaction())
-            })
-            .collect::<Result<Vec<_>, _>>()
-            .context("failed to query account transactions")?;
-
-        for (response, txn) in responses.into_iter().zip(queried_txns) {
-            if let Some(txn_view) = response {
-                if !txn_view.vm_status.is_executed() {
-                    return Err(anyhow!("txn failed to execute"));
-                }
-
-                if txn_view.hash != Transaction::UserTransaction(txn.clone()).hash() {
-                    return Err(anyhow!("txn hash mismatch"));
-                }
-
-                uncommitted_txns.remove(txn);
-            }
-        }
-
-        time::sleep(Duration::from_millis(100)).await;
-    }
-
-    Err(anyhow!("timed out waiting for transactions"))
-}
-
 async fn wait_for_accounts_sequence(
-    client: &JsonRpcClient,
+    client: &RestClient,
     accounts: &mut [LocalAccount],
 ) -> Result<(), Vec<AccountAddress>> {
     let deadline = Instant::now() + Duration::from_secs(TXN_EXPIRATION_SECONDS); //TXN_MAX_WAIT;
@@ -834,33 +765,17 @@ async fn wait_for_accounts_sequence(
 }
 
 pub async fn query_sequence_numbers(
-    client: &JsonRpcClient,
+    client: &RestClient,
     addresses: &[AccountAddress],
 ) -> Result<Vec<u64>> {
-    let mut result = vec![];
-    for addresses_batch in addresses.chunks(20) {
-        let resp = client
-            .batch(
-                addresses_batch
-                    .iter()
-                    .map(|a| MethodRequest::get_account(*a))
-                    .collect(),
-            )
-            .await?
+    Ok(
+        try_join_all(addresses.iter().map(|address| client.get_account(*address)))
+            .await
+            .context("get accounts failed")?
             .into_iter()
-            .map(|r| r.map_err(anyhow::Error::new))
-            .map(|r| r.map(|response| response.into_inner().unwrap_get_account()))
-            .collect::<Result<Vec<_>>>()
-            .map_err(|e| format_err!("[{:?}] get_accounts failed: {:?} ", client, e))?;
-
-        for item in resp.into_iter() {
-            result.push(
-                item.ok_or_else(|| format_err!("account does not exist"))?
-                    .sequence_number,
-            );
-        }
-    }
-    Ok(result)
+            .map(|resp| resp.into_inner().sequence_number)
+            .collect(),
+    )
 }
 
 /// Create `num_new_accounts` by transferring diem from `source_account`. Return Vec of created
@@ -870,7 +785,7 @@ async fn create_new_accounts<R>(
     num_new_accounts: usize,
     diem_per_new_account: u64,
     max_num_accounts_per_batch: u64,
-    client: JsonRpcClient,
+    client: RestClient,
     txn_factory: &TransactionFactory,
     reuse_account: bool,
     mut rng: R,
@@ -920,7 +835,7 @@ async fn mint_to_new_accounts<R>(
     accounts: &[LocalAccount],
     diem_per_new_account: u64,
     max_num_accounts_per_batch: u64,
-    client: JsonRpcClient,
+    client: RestClient,
     txn_factory: &TransactionFactory,
     mut rng: R,
 ) -> Result<()>
@@ -1139,7 +1054,7 @@ fn gen_rng_for_reusable_account(count: usize) -> Vec<StdRng> {
     rngs
 }
 
-async fn gen_reusable_account<R>(client: &JsonRpcClient, rng: &mut R) -> Result<LocalAccount>
+async fn gen_reusable_account<R>(client: &RestClient, rng: &mut R) -> Result<LocalAccount>
 where
     R: ::rand_core::RngCore + ::rand_core::CryptoRng,
 {
@@ -1153,7 +1068,7 @@ where
 }
 
 async fn gen_reusable_accounts<R>(
-    client: &JsonRpcClient,
+    client: &RestClient,
     num_accounts: usize,
     rng: &mut R,
 ) -> Result<Vec<LocalAccount>>

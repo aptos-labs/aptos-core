@@ -39,10 +39,7 @@ impl Experiment for PerformanceBenchmarkThreeRegionSimulation {
         let mut txn_emitter = TxnEmitter::new(
             &mut context.treasury_compliance_account,
             &mut context.designated_dealer_account,
-            context
-                .cluster
-                .random_validator_instance()
-                .json_rpc_client(),
+            context.cluster.random_validator_instance().rest_client(),
             TransactionFactory::new(context.cluster.chain_id),
             StdRng::from_seed(OsRng.gen()),
         );

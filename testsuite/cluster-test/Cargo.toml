@@ -50,6 +50,7 @@ diem-infallible = { path = "../../crates/diem-infallible" }
 diem-network-address-encryption = { path = "../../config/management/network-address-encryption" }
 diem-node = { path = "../../diem-node" }
 diem-operational-tool = {path = "../../config/management/operational", features = ["testing"] }
+diem-rest-client = { path = "../../crates/diem-rest-client"}
 diem-secure-storage = { path = "../../secure/storage", features = ["testing"] }
 diem-swarm = { path = "../diem-swarm" }
 diem-temppath = { path = "../../crates/diem-temppath" }

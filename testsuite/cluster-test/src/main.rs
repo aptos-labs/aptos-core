@@ -313,7 +313,7 @@ async fn emit_tx(cluster: &Cluster, args: &Args) -> Result<()> {
         wait_committed: !args.burst,
     };
     let duration = Duration::from_secs(args.duration);
-    let client = cluster.random_validator_instance().json_rpc_client();
+    let client = cluster.random_validator_instance().rest_client();
     let mut treasury_compliance_account = cluster.load_tc_account(&client).await?;
     let mut designated_dealer_account = cluster.load_faucet_account(&client).await?;
     let mut emitter = TxnEmitter::new(
@@ -327,7 +327,7 @@ async fn emit_tx(cluster: &Cluster, args: &Args) -> Result<()> {
         cluster
             .validator_instances()
             .iter()
-            .map(Instance::json_rpc_client)
+            .map(Instance::rest_client)
             .collect(),
     )
     .accounts_per_client(args.accounts_per_client)
@@ -383,7 +383,7 @@ impl BasicSwarmUtil {
     }
 
     pub async fn diag(&self, vasp: bool) -> Result<()> {
-        let client = self.cluster.random_validator_instance().json_rpc_client();
+        let client = self.cluster.random_validator_instance().rest_client();
         let mut treasury_compliance_account = self.cluster.load_tc_account(&client).await?;
         let mut designated_dealer_account = self.cluster.load_faucet_account(&client).await?;
         let emitter = TxnEmitter::new(
@@ -396,7 +396,7 @@ impl BasicSwarmUtil {
         let mut faucet_account: Option<LocalAccount> = None;
         let instances: Vec<_> = self.cluster.validator_and_fullnode_instances().collect();
         for instance in &instances {
-            let client = instance.json_rpc_client();
+            let client = instance.rest_client();
             print!("Getting faucet account sequence number on {}...", instance);
             let account = if vasp {
                 self.cluster
@@ -431,7 +431,7 @@ impl BasicSwarmUtil {
             print!("Submitting txn through {}...", instance);
             let deadline = emitter
                 .submit_single_transaction(
-                    &instance.json_rpc_client(),
+                    &instance.rest_client(),
                     &mut faucet_account,
                     &faucet_account_address,
                     10,
@@ -447,7 +447,7 @@ impl BasicSwarmUtil {
                 let addresses = &[faucet_account_address];
                 let clients = instances
                     .iter()
-                    .map(|instance| instance.json_rpc_client())
+                    .map(|instance| instance.rest_client())
                     .collect::<Vec<_>>();
                 let futures = clients
                     .iter()
@@ -533,7 +533,7 @@ impl ClusterTestRunner {
         let slack_changelog_url = env::var("SLACK_CHANGELOG_URL")
             .map(|u| u.parse().expect("Failed to parse SLACK_CHANGELOG_URL"))
             .ok();
-        let client = cluster.random_validator_instance().json_rpc_client();
+        let client = cluster.random_validator_instance().rest_client();
         let root_account = cluster.load_diem_root_account(&client).await?;
         let treasury_compliance_account = cluster.load_tc_account(&client).await?;
         let designated_dealer_account = cluster.load_faucet_account(&client).await?;
@@ -808,7 +808,7 @@ impl ClusterTestRunner {
             let results = join_all(
                 self.cluster
                     .validator_and_fullnode_instances()
-                    .map(Instance::try_json_rpc),
+                    .map(Instance::try_rest_api),
             )
             .await;
 

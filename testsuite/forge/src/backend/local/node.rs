@@ -5,10 +5,7 @@ use crate::{FullNode, HealthCheckError, LocalVersion, Node, NodeExt, Validator, 
 use anyhow::{anyhow, Context, Result};
 use diem_config::config::NodeConfig;
 use diem_logger::{debug, warn};
-use diem_sdk::{
-    client::BlockingClient,
-    types::{account_address::AccountAddress, PeerId},
-};
+use diem_sdk::types::{account_address::AccountAddress, PeerId};
 use std::{
     env,
     fs::{self, OpenOptions},
@@ -118,7 +115,7 @@ impl LocalNode {
     }
 
     pub fn port(&self) -> u16 {
-        self.config.json_rpc.address.port()
+        self.config.api.address.port()
     }
 
     pub fn debug_port(&self) -> u16 {
@@ -172,12 +169,11 @@ impl LocalNode {
         self.debug_client()
             .get_node_metrics()
             .map(|_| ())
-            .map_err(HealthCheckError::RpcFailure)?;
+            .map_err(HealthCheckError::Failure)?;
 
-        BlockingClient::new(self.json_rpc_endpoint())
-            .get_metadata()
-            .map(|_| ())
-            .map_err(|e| HealthCheckError::RpcFailure(e.into()))
+        reqwest::blocking::get(self.rest_api_endpoint())
+            .map_err(|e| HealthCheckError::Failure(e.into()))?;
+        Ok(())
     }
 }
 

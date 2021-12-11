@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{format_err, Result};
-use diem_client::Client as JsonRpcClient;
+use diem_rest_client::Client as RestClient;
 use reqwest::{Client, Url};
 use std::{
     fmt,
@@ -17,6 +17,7 @@ pub struct Instance {
     ip: String,
     ac_port: u32,
     debug_interface_port: Option<u32>,
+    // todo: remove this, no where is using it
     http_client: Client,
 }
 
@@ -37,15 +38,10 @@ impl Instance {
         }
     }
 
-    pub async fn try_json_rpc(&self) -> Result<()> {
-        self.json_rpc_client().batch(Vec::new()).await?;
-        Ok(())
-    }
-
-    pub async fn wait_json_rpc(&self, deadline: Instant) -> Result<()> {
-        while self.try_json_rpc().await.is_err() {
+    pub async fn wait_server_ready(&self, deadline: Instant) -> Result<()> {
+        while self.rest_client().get_ledger_information().await.is_err() {
             if Instant::now() > deadline {
-                return Err(format_err!("wait_json_rpc for {} timed out", self));
+                return Err(format_err!("wait_server_ready for {} timed out", self));
             }
             time::sleep(Duration::from_secs(3)).await;
         }
@@ -64,16 +60,16 @@ impl Instance {
         self.ac_port
     }
 
-    pub fn json_rpc_url(&self) -> Url {
-        Url::from_str(&format!("http://{}:{}/v1", self.ip(), self.ac_port())).expect("Invalid URL.")
+    pub fn api_url(&self) -> Url {
+        Url::from_str(&format!("http://{}:{}", self.ip(), self.ac_port())).expect("Invalid URL.")
     }
 
     pub fn debug_interface_port(&self) -> Option<u32> {
         self.debug_interface_port
     }
 
-    pub fn json_rpc_client(&self) -> JsonRpcClient {
-        JsonRpcClient::new(self.json_rpc_url().to_string())
+    pub fn rest_client(&self) -> RestClient {
+        RestClient::new(self.api_url())
     }
 }
 

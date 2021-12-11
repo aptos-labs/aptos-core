@@ -68,10 +68,7 @@ impl Experiment for StateSyncPerformance {
         let mut txn_emitter = TxnEmitter::new(
             &mut context.treasury_compliance_account,
             &mut context.designated_dealer_account,
-            context
-                .cluster
-                .random_validator_instance()
-                .json_rpc_client(),
+            context.cluster.random_validator_instance().rest_client(),
             TransactionFactory::new(context.cluster.chain_id),
             StdRng::from_seed(OsRng.gen()),
         );
@@ -119,7 +116,7 @@ impl Experiment for StateSyncPerformance {
         );
         self.fullnode_instance.start().await?;
         self.fullnode_instance
-            .wait_json_rpc(Instant::now() + Duration::from_secs(120))
+            .wait_server_ready(Instant::now() + Duration::from_secs(120))
             .await?;
 
         // Wait for the fullnode to catch up to the expected version

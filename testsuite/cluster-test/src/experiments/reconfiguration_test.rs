@@ -98,16 +98,14 @@ impl Experiment for Reconfiguration {
         let mut txn_emitter = TxnEmitter::new(
             &mut context.treasury_compliance_account,
             &mut context.designated_dealer_account,
-            context
-                .cluster
-                .random_validator_instance()
-                .json_rpc_client(),
+            context.cluster.random_validator_instance().rest_client(),
             TransactionFactory::new(context.cluster.chain_id),
             StdRng::from_seed(OsRng.gen()),
         );
         let full_node = context.cluster.random_fullnode_instance();
         let tx_factory = TransactionFactory::new(ChainId::test());
-        let full_node_client = full_node.json_rpc_client();
+        let full_node_client = full_node.rest_client();
+        let full_node_jsonrpc_client = full_node.json_rpc_client();
         let mut diem_root_account = &mut context.root_account;
         let allowed_nonce = 0;
         let emit_job = if self.emit_txn {
@@ -134,7 +132,7 @@ impl Experiment for Reconfiguration {
         };
 
         let timer = Instant::now();
-        let mut version = expect_epoch(&full_node_client, 0, 1).await?;
+        let mut version = expect_epoch(&full_node_jsonrpc_client, 0, 1).await?;
         {
             info!("Remove and add back {}.", self.affected_pod_name);
             let validator_name = self.affected_pod_name.as_bytes().to_vec();
@@ -151,7 +149,7 @@ impl Experiment for Reconfiguration {
                 vec![remove_txn],
             )
             .await?;
-            version = expect_epoch(&full_node_client, version, 2).await?;
+            version = expect_epoch(&full_node_jsonrpc_client, version, 2).await?;
             let add_txn = diem_root_account.sign_with_transaction_builder(
                 tx_factory.add_validator_and_reconfigure(
                     allowed_nonce,
@@ -161,7 +159,7 @@ impl Experiment for Reconfiguration {
             );
             execute_and_wait_transactions(&full_node_client, &mut diem_root_account, vec![add_txn])
                 .await?;
-            version = expect_epoch(&full_node_client, version, 3).await?;
+            version = expect_epoch(&full_node_jsonrpc_client, version, 3).await?;
         }
 
         {
@@ -186,7 +184,7 @@ impl Experiment for Reconfiguration {
                     vec![upgrade_txn],
                 )
                 .await?;
-                version = expect_epoch(&full_node_client, version, (i + 1) * 2).await?;
+                version = expect_epoch(&full_node_jsonrpc_client, version, (i + 1) * 2).await?;
                 let downgrade_txn = diem_root_account.sign_with_transaction_builder(
                     tx_factory.update_diem_consensus_config(
                         allowed_nonce,
@@ -199,7 +197,7 @@ impl Experiment for Reconfiguration {
                     vec![downgrade_txn],
                 )
                 .await?;
-                version = expect_epoch(&full_node_client, version, (i + 1) * 2 + 1).await?;
+                version = expect_epoch(&full_node_jsonrpc_client, version, (i + 1) * 2 + 1).await?;
             }
         }
 
@@ -216,7 +214,7 @@ impl Experiment for Reconfiguration {
                 vec![update_txn],
             )
             .await?;
-            expect_epoch(&full_node_client, version, self.count + 1).await?;
+            expect_epoch(&full_node_jsonrpc_client, version, self.count + 1).await?;
         }
         let elapsed = timer.elapsed();
         if let Some(job) = emit_job {

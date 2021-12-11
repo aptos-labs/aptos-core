@@ -8,6 +8,7 @@ use anyhow::{format_err, Result};
 use debug_interface::AsyncNodeDebugClient;
 use diem_client::Client as JsonRpcClient;
 use diem_config::config::NodeConfig;
+use diem_rest_client::Client as RestClient;
 use reqwest::{Client, Url};
 use serde_json::Value;
 use std::{
@@ -238,20 +239,20 @@ impl Instance {
         }
     }
 
-    pub async fn try_json_rpc(&self) -> Result<()> {
-        self.json_rpc_client().batch(Vec::new()).await?;
+    pub async fn try_rest_api(&self) -> Result<()> {
+        self.rest_client().get_ledger_information().await?;
         Ok(())
     }
 
-    pub async fn wait_json_rpc(&self, deadline: Instant) -> Result<()> {
+    pub async fn wait_server_ready(&self, deadline: Instant) -> Result<()> {
         loop {
-            let ret = self.try_json_rpc().await;
+            let ret = self.try_rest_api().await;
             if ret.is_ok() {
                 break;
             }
             if Instant::now() > deadline {
                 return Err(format_err!(
-                    "wait_json_rpc for {} timed out, last error: {:?}",
+                    "wait_server_ready for {} timed out, last error: {:?}",
                     self,
                     ret.err().unwrap()
                 ));
@@ -281,6 +282,10 @@ impl Instance {
         Url::from_str(&format!("http://{}:{}/v1", self.ip(), self.ac_port())).expect("Invalid URL.")
     }
 
+    pub fn rest_api_url(&self) -> Url {
+        Url::from_str(&format!("http://{}:{}", self.ip(), self.ac_port())).expect("Invalid URL.")
+    }
+
     fn k8s_backend(&self) -> &K8sInstanceInfo {
         if let InstanceBackend::K8S(ref k8s) = self.backend {
             return k8s;
@@ -294,6 +299,10 @@ impl Instance {
 
     pub fn json_rpc_client(&self) -> JsonRpcClient {
         JsonRpcClient::new(self.json_rpc_url().to_string())
+    }
+
+    pub fn rest_client(&self) -> RestClient {
+        RestClient::new(self.json_rpc_url())
     }
 
     pub async fn stop(&self) -> Result<()> {

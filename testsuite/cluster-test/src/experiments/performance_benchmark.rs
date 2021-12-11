@@ -172,10 +172,7 @@ impl Experiment for PerformanceBenchmark {
         let mut txn_emitter = TxnEmitter::new(
             &mut context.treasury_compliance_account,
             &mut context.designated_dealer_account,
-            context
-                .cluster
-                .random_validator_instance()
-                .json_rpc_client(),
+            context.cluster.random_validator_instance().rest_client(),
             TransactionFactory::new(context.cluster.chain_id),
             StdRng::from_seed(OsRng.gen()),
         );
@@ -192,7 +189,7 @@ impl Experiment for PerformanceBenchmark {
         };
         let emit_job_request = match self.tps {
             Some(tps) => {
-                EmitJobRequest::new(instances.into_iter().map(|i| i.json_rpc_client()).collect())
+                EmitJobRequest::new(instances.into_iter().map(|i| i.rest_client()).collect())
                     .fixed_tps(tps.try_into().unwrap())
                     .gas_price(self.gas_price)
                     .invalid_transaction_ratio(self.invalid_tx as usize)

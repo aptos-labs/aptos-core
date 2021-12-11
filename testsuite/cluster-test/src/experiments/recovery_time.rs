@@ -58,10 +58,7 @@ impl Experiment for RecoveryTime {
         let mut txn_emitter = TxnEmitter::new(
             &mut context.treasury_compliance_account,
             &mut context.designated_dealer_account,
-            context
-                .cluster
-                .random_validator_instance()
-                .json_rpc_client(),
+            context.cluster.random_validator_instance().rest_client(),
             TransactionFactory::new(context.cluster.chain_id),
             StdRng::from_seed(OsRng.gen()),
         );
@@ -84,7 +81,7 @@ impl Experiment for RecoveryTime {
         self.instance.start().await?;
         info!("Waiting for instance to be up: {}", self.instance);
         self.instance
-            .wait_json_rpc(Instant::now() + Duration::from_secs(120))
+            .wait_server_ready(Instant::now() + Duration::from_secs(120))
             .await?;
         let start_instant = Instant::now();
         info!(

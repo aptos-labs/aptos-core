@@ -5,6 +5,7 @@ use crate::{Result, Version};
 use anyhow::anyhow;
 use debug_interface::NodeDebugClient;
 use diem_config::{config::NodeConfig, network_id::NetworkId};
+use diem_rest_client::Client as RestClient;
 use diem_sdk::{
     client::{BlockingClient, Client as JsonRpcClient},
     types::PeerId,
@@ -19,7 +20,7 @@ use url::Url;
 #[derive(Debug)]
 pub enum HealthCheckError {
     NotRunning,
-    RpcFailure(anyhow::Error),
+    Failure(anyhow::Error),
     Unknown(anyhow::Error),
 }
 
@@ -129,6 +130,11 @@ pub trait NodeExt: Node {
         JsonRpcClient::new(self.json_rpc_endpoint().to_string())
     }
 
+    /// Return REST API client of this Node
+    fn rest_client(&self) -> RestClient {
+        RestClient::new(self.rest_api_endpoint())
+    }
+
     /// Return JSON-RPC client of this Node
     fn json_rpc_client(&self) -> BlockingClient {
         BlockingClient::new(self.json_rpc_endpoint())
@@ -193,7 +199,7 @@ pub trait NodeExt: Node {
     }
 
     fn liveness_check(&self, seconds: u64) -> Result<()> {
-        let mut url = self.json_rpc_endpoint();
+        let mut url = self.rest_api_endpoint();
         url.set_path("-/healthy");
         url.set_query(Some(&format!("duration_secs={}", seconds)));
 

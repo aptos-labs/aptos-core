@@ -43,6 +43,7 @@ diem-genesis-tool = { path = "../../config/management/genesis" }
 diem-logger = { path = "../../crates/diem-logger" }
 diem-retrier = { path = "../../crates/diem-retrier" }
 diem-sdk = { path = "../../sdk" }
+diem-rest-client = { path = "../../crates/diem-rest-client"}
 diem-secure-storage = { path = "../../secure/storage" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder" }
 diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }

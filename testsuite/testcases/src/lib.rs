@@ -52,7 +52,7 @@ pub fn generate_traffic<'t>(
         .swarm()
         .validators()
         .filter(|v| validators.contains(&v.peer_id()))
-        .map(|n| n.async_json_rpc_client())
+        .map(|n| n.rest_client())
         .collect::<Vec<_>>();
     let mut emit_job_request = ctx.global_job.clone();
     let chain_info = ctx.swarm().chain_info();
@@ -66,7 +66,7 @@ pub fn generate_traffic<'t>(
     );
 
     emit_job_request = emit_job_request
-        .json_rpc_clients(validator_clients)
+        .rest_clients(validator_clients)
         .gas_price(gas_price);
     if let Some(target_tps) = fixed_tps {
         emit_job_request = emit_job_request.fixed_tps(target_tps.try_into().unwrap());

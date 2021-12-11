@@ -16,11 +16,14 @@ itertools = "0.10.0"
 rand = "0.8.3"
 rand_core = "0.6.2"
 reqwest = { version = "0.11.2", features = ["blocking", "json"] }
+serde = { version = "1.0.124", features = ["derive"], default-features = false }
+serde_json = "1.0.64"
 structopt = "0.3.21"
 termion = "1.5.6"
 tokio = { version = "1.8.1", features = ["full"] }
 
 diem-client = { path = "../diem-client"}
+diem-rest-client = { path = "../diem-rest-client"}
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../diem-crypto" }
 diem-logger = { path = "../../crates/diem-logger" }

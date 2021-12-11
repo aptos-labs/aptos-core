@@ -27,13 +27,13 @@ pub mod util {
     ) -> EmitJobRequest {
         let clients = instances
             .into_iter()
-            .map(|instance| instance.json_rpc_client())
+            .map(|instance| instance.rest_client())
             .collect();
 
         global_emit_job_request
             .clone()
             .unwrap_or_default()
-            .json_rpc_clients(clients)
+            .rest_clients(clients)
             .gas_price(gas_price)
             .invalid_transaction_ratio(invalid_tx)
     }

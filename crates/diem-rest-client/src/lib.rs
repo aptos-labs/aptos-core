@@ -2,18 +2,37 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Result};
-use diem_api_types::{MoveModuleBytecode, PendingTransaction, Transaction};
+pub use diem_api_types::{MoveModuleBytecode, PendingTransaction, Transaction};
 use diem_client::{Response, State};
 use diem_crypto::HashValue;
 use diem_types::{account_address::AccountAddress, transaction::SignedTransaction};
-use move_core_types::language_storage::StructTag;
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{StructTag, TypeTag},
+    move_resource::MoveStructType,
+};
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient};
 use serde::Deserialize;
 use std::time::Duration;
 use url::Url;
 
 pub mod types;
+pub use diem_api_types;
 pub use types::{DiemAccount, Resource, RestError};
+
+macro_rules! cfg_dpn {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "dpn")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "dpn")))]
+            $item
+        )*
+    }
+}
+
+cfg_dpn! {
+    pub mod dpn;
+}
 
 const BCS_CONTENT_TYPE: &str = "application/x.diem.signed_transaction+bcs";
 const USER_AGENT: &str = concat!("diem-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
@@ -33,6 +52,41 @@ impl Client {
             .unwrap();
 
         Self { inner, base_url }
+    }
+
+    cfg_dpn! {
+        pub async fn get_account_balances(
+            &self,
+            address: AccountAddress,
+        ) -> Result<Response<Vec<dpn::AccountBalance>>> {
+            let resp = self
+                .get_account_resources_by_type(
+                    address,
+                    dpn::CORE_CODE_ADDRESS,
+                    &dpn::BalanceResource::module_identifier(),
+                    &dpn::BalanceResource::struct_identifier(),
+                )
+                .await?;
+            resp.and_then(|resources| {
+                resources
+                    .into_iter()
+                    .map(|res| {
+                        let currency_tag = res.resource_type.type_params.get(0);
+                        if let Some(TypeTag::Struct(currency)) = currency_tag {
+                            Ok(dpn::AccountBalance {
+                                currency: currency.clone(),
+                                amount: serde_json::from_value::<dpn::Balance>(res.data)?
+                                    .coin
+                                    .value
+                                    .0,
+                            })
+                        } else {
+                            Err(anyhow!("invalid account balance resource: {:?}", &res))
+                        }
+                    })
+                    .collect::<Result<Vec<dpn::AccountBalance>>>()
+            })
+        }
     }
 
     pub async fn get_ledger_information(&self) -> Result<Response<State>> {
@@ -172,6 +226,27 @@ impl Client {
         let response = self.inner.get(url).send().await?;
 
         self.json(response).await
+    }
+
+    pub async fn get_account_resources_by_type(
+        &self,
+        address: AccountAddress,
+        module_address: AccountAddress,
+        module_id: &Identifier,
+        struct_name: &Identifier,
+    ) -> Result<Response<Vec<Resource>>> {
+        self.get_account_resources(address).await.map(|resp| {
+            resp.map(|resources| {
+                resources
+                    .into_iter()
+                    .filter(|res| {
+                        res.resource_type.address == module_address
+                            && (&res.resource_type.module) == module_id
+                            && (&res.resource_type.name) == struct_name
+                    })
+                    .collect()
+            })
+        })
     }
 
     pub async fn get_account_resource(

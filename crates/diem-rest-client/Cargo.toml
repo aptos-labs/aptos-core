@@ -9,6 +9,10 @@ license = "Apache-2.0"
 publish = false
 edition = "2018"
 
+[features]
+default = ["dpn"]
+dpn = []
+
 [dependencies]
 anyhow = "1.0.38"
 bcs = "0.1.2"

@@ -6,10 +6,8 @@ use crate::{
 };
 use anyhow::{format_err, Context};
 use diem_config::config::NodeConfig;
-use diem_sdk::{
-    client::{BlockingClient, Client as JsonRpcClient},
-    types::PeerId,
-};
+use diem_rest_client::Client as RestClient;
+use diem_sdk::types::PeerId;
 use reqwest::Url;
 use serde_json::Value;
 use std::{
@@ -57,8 +55,8 @@ impl K8sNode {
         self.node_id
     }
 
-    pub(crate) fn json_rpc_client(&self) -> JsonRpcClient {
-        JsonRpcClient::new(self.json_rpc_endpoint().to_string())
+    pub(crate) fn rest_client(&self) -> RestClient {
+        RestClient::new(self.rest_api_endpoint())
     }
 
     fn sts_name(&self) -> &str {
@@ -132,17 +130,10 @@ impl Node for K8sNode {
     }
 
     fn health_check(&mut self) -> Result<(), HealthCheckError> {
-        let client = BlockingClient::new(self.json_rpc_endpoint());
-        let results = match client.batch(Vec::new()) {
-            Ok(x) => x,
-            Err(x) => return Err(HealthCheckError::RpcFailure(format_err!(x))),
-        };
-        if results.iter().all(Result::is_ok) {
-            return Ok(());
-        }
-        Err(HealthCheckError::RpcFailure(format_err!(
-            "K8s node health_check failed"
-        )))
+        reqwest::blocking::get(self.rest_api_endpoint()).map_err(|e| {
+            HealthCheckError::Failure(format_err!("K8s node health_check failed: {}", e))
+        })?;
+        Ok(())
     }
 
     fn counter(&self, counter: &str, port: u64) -> Result<f64> {

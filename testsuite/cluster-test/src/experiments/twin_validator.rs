@@ -68,10 +68,7 @@ impl Experiment for TwinValidators {
         let mut txn_emitter = TxnEmitter::new(
             &mut context.treasury_compliance_account,
             &mut context.designated_dealer_account,
-            context
-                .cluster
-                .random_validator_instance()
-                .json_rpc_client(),
+            context.cluster.random_validator_instance().rest_client(),
             TransactionFactory::new(context.cluster.chain_id),
             StdRng::from_seed(OsRng.gen()),
         );
@@ -104,7 +101,7 @@ impl Experiment for TwinValidators {
                 .await?;
             info!("Waiting for twin node to be up: {}", new_inst);
             new_inst
-                .wait_json_rpc(Instant::now() + Duration::from_secs(120))
+                .wait_server_ready(Instant::now() + Duration::from_secs(120))
                 .await?;
             info!("Twin node {} is up", new_inst);
             info!("Restarting origin validator {}", inst);
@@ -142,7 +139,7 @@ impl Experiment for TwinValidators {
 
         for inst in origin_instances.iter() {
             info!("Waiting for origin node to be up: {}", inst);
-            inst.wait_json_rpc(Instant::now() + Duration::from_secs(120))
+            inst.wait_server_ready(Instant::now() + Duration::from_secs(120))
                 .await?;
             info!("Origin node {} is up", inst);
         }
