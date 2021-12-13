@@ -20,8 +20,9 @@ use crate::{
     proof::TransactionInfoListWithProof,
     transaction::{
         ChangeSet, Module, ModuleBundle, RawTransaction, Script, SignatureCheckedTransaction,
-        SignedTransaction, Transaction, TransactionArgument, TransactionListWithProof,
-        TransactionPayload, TransactionStatus, TransactionToCommit, Version, WriteSetPayload,
+        SignedTransaction, Transaction, TransactionArgument, TransactionInfo,
+        TransactionListWithProof, TransactionPayload, TransactionStatus, TransactionToCommit,
+        Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -849,14 +850,21 @@ impl TransactionToCommitGen {
             })
             .collect();
 
+        let txn_info = TransactionInfo::new(
+            HashValue::default(),
+            HashValue::default(),
+            HashValue::default(),
+            self.gas_used,
+            self.status,
+        );
+
         TransactionToCommit::new(
             Transaction::UserTransaction(transaction),
+            txn_info,
             account_states,
             None,
             self.write_set,
             events,
-            self.gas_used,
-            self.status,
         )
     }
 }
