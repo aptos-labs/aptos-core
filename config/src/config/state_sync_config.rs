@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default)]
@@ -160,15 +159,15 @@ impl Default for DataStreamingServiceConfig {
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default)]
 pub struct DiemDataClientConfig {
-    pub response_timeout_ms: Duration, // Timeout (in milliseconds) when waiting for a response
-    pub summary_poll_interval_ms: Duration, // Interval (in milliseconds) between data summary polls
+    pub response_timeout_ms: u64, // Timeout (in milliseconds) when waiting for a response
+    pub summary_poll_interval_ms: u64, // Interval (in milliseconds) between data summary polls
 }
 
 impl Default for DiemDataClientConfig {
     fn default() -> Self {
         Self {
-            response_timeout_ms: Duration::from_millis(3_000),
-            summary_poll_interval_ms: Duration::from_millis(1_000),
+            response_timeout_ms: 3_000,
+            summary_poll_interval_ms: 1_000,
         }
     }
 }

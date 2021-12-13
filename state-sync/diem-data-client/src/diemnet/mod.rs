@@ -95,7 +95,7 @@ impl DiemNetDataClient {
         let poller = DataSummaryPoller::new(
             time_service,
             client.clone(),
-            client.data_client_config.summary_poll_interval_ms,
+            Duration::from_millis(client.data_client_config.summary_poll_interval_ms),
         );
         (client, poller)
     }
@@ -223,7 +223,7 @@ impl DiemNetDataClient {
             .send_request(
                 peer,
                 request.clone(),
-                self.data_client_config.response_timeout_ms,
+                Duration::from_millis(self.data_client_config.response_timeout_ms),
             )
             .await;
 
