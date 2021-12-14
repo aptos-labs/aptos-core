@@ -1,0 +1,14 @@
+# To use smaller machines for the node pool
+
+resource "azurerm_kubernetes_cluster_node_pool" "trusted" {
+  vm_size = "Standard_B2s"
+}
+resource "azurerm_linux_virtual_machine_scale_set" "vault" {
+  sku = "Standard_A1_v2"
+}
+resource "azurerm_monitor_diagnostic_setting" "cluster" {
+  log { category = "kube-apiserver" }
+  log { category = "kube-controller-manager" }
+  log { category = "kube-scheduler" }
+  log { category = "guard" }
+}
