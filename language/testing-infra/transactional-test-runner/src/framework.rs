@@ -7,7 +7,7 @@ use crate::tasks::{
     taskify, InitCommand, PublishCommand, RawAddress, RunCommand, SyntaxChoice, TaskCommand,
     TaskInput, ViewCommand,
 };
-use anyhow::*;
+use anyhow::{anyhow, Result};
 use move_binary_format::{
     binary_views::BinaryIndexedView,
     file_format::{CompiledModule, CompiledScript},

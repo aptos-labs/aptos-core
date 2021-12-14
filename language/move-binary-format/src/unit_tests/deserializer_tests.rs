@@ -222,7 +222,7 @@ fn malformed_simple() {
 }
 
 // Ensure that we can deserialize a script from disk
-static EMPTY_SCRIPT: &[u8] = include_bytes!("../../../../types/src/test_helpers/empty_script.mv");
+static EMPTY_SCRIPT: &[u8] = include_bytes!("empty_script.mv");
 
 #[test]
 fn deserialize_file() {

@@ -7,7 +7,7 @@ use crate::{
     framework::{run_test_impl, CompiledState, MoveTestAdapter},
     tasks::{EmptyCommand, InitCommand, RawAddress, SyntaxChoice, TaskInput},
 };
-use anyhow::*;
+use anyhow::{anyhow, Result};
 use move_binary_format::{
     access::ModuleAccess,
     errors::{Location, VMError, VMResult},
