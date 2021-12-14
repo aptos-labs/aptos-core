@@ -104,6 +104,7 @@ pub enum Transaction {
     UserTransaction(Box<UserTransaction>),
     GenesisTransaction(GenesisTransaction),
     BlockMetadataTransaction(BlockMetadataTransaction),
+    StateCheckpointTransaction(StateCheckpointTransaction),
 }
 
 impl Transaction {
@@ -113,6 +114,7 @@ impl Transaction {
             Transaction::BlockMetadataTransaction(txn) => txn.timestamp.0,
             Transaction::PendingTransaction(_) => 0,
             Transaction::GenesisTransaction(_) => 0,
+            Transaction::StateCheckpointTransaction(txn) => txn.timestamp.0,
         }
     }
 
@@ -122,6 +124,7 @@ impl Transaction {
             Transaction::BlockMetadataTransaction(txn) => txn.info.success,
             Transaction::PendingTransaction(_txn) => false,
             Transaction::GenesisTransaction(txn) => txn.info.success,
+            Transaction::StateCheckpointTransaction(txn) => txn.info.success,
         }
     }
 
@@ -135,6 +138,7 @@ impl Transaction {
             Transaction::BlockMetadataTransaction(txn) => txn.info.vm_status.clone(),
             Transaction::PendingTransaction(_txn) => "pending".to_owned(),
             Transaction::GenesisTransaction(txn) => txn.info.vm_status.clone(),
+            Transaction::StateCheckpointTransaction(txn) => txn.info.vm_status.clone(),
         }
     }
 
@@ -146,6 +150,7 @@ impl Transaction {
                 bail!("pending transaction does not have TransactionInfo")
             }
             Transaction::GenesisTransaction(txn) => &txn.info,
+            Transaction::StateCheckpointTransaction(txn) => &txn.info,
         })
     }
 }
@@ -255,6 +260,13 @@ pub struct UserTransaction {
     #[serde(flatten)]
     pub request: UserTransactionRequest,
     pub events: Vec<Event>,
+    pub timestamp: U64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct StateCheckpointTransaction {
+    #[serde(flatten)]
+    pub info: TransactionInfo,
     pub timestamp: U64,
 }
 

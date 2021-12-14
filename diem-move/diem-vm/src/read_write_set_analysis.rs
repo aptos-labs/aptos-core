@@ -199,6 +199,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
             PreprocessedTransaction::WriteSet(_) | PreprocessedTransaction::WaypointWriteSet(_) => {
                 bail!("Unsupported writeset transaction")
             }
+            PreprocessedTransaction::StateCheckpoint => Ok((vec![], vec![])),
         }
     }
 

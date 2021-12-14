@@ -1049,6 +1049,7 @@ fn replay_trace<P: AsRef<Path>>(
                         replayer.data_store.add_write_set(res.write_set());
                     }
                 }
+                Transaction::StateCheckpoint => {}
             }
         }
     }

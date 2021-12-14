@@ -264,6 +264,7 @@ pub enum PreprocessedTransaction {
     BlockMetadata(BlockMetadata),
     WriteSet(Box<SignatureCheckedTransaction>),
     InvalidSignature,
+    StateCheckpoint,
 }
 
 /// Check the signature (if any) of a transaction. If the signature is OK, the result
@@ -288,6 +289,7 @@ pub(crate) fn preprocess_transaction<A: VMAdapter>(txn: Transaction) -> Preproce
                 _ => PreprocessedTransaction::UserTransaction(Box::new(checked_txn)),
             }
         }
+        Transaction::StateCheckpoint => PreprocessedTransaction::StateCheckpoint,
     }
 }
 

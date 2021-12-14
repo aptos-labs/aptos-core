@@ -1504,6 +1504,10 @@ pub enum Transaction {
 
     /// Transaction to update the block metadata resource at the beginning of a block.
     BlockMetadata(BlockMetadata),
+
+    /// Transaction to let the executor update the global state tree and record the root hash
+    /// in the TransactionInfo
+    StateCheckpoint,
 }
 
 impl Transaction {
@@ -1523,6 +1527,8 @@ impl Transaction {
             Transaction::GenesisTransaction(_write_set) => String::from("genesis"),
             // TODO: display proper information for client
             Transaction::BlockMetadata(_block_metadata) => String::from("block_metadata"),
+            // TODO: display proper information for client
+            Transaction::StateCheckpoint => String::from("state_checkpoint"),
         }
     }
 }

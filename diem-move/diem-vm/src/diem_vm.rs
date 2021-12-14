@@ -912,6 +912,15 @@ impl VMAdapter for DiemVM {
                     discard_error_vm_status(VMStatus::Error(StatusCode::INVALID_SIGNATURE));
                 (vm_status, output, None)
             }
+            PreprocessedTransaction::StateCheckpoint => {
+                let output = TransactionOutput::new(
+                    WriteSet::default(),
+                    Vec::new(),
+                    0,
+                    TransactionStatus::Keep(KeptVMStatus::Executed),
+                );
+                (VMStatus::Executed, output, Some("state_checkpoint".into()))
+            }
         })
     }
 }

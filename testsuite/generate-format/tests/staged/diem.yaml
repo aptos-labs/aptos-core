@@ -238,6 +238,8 @@ Transaction:
       BlockMetadata:
         NEWTYPE:
           TYPENAME: BlockMetadata
+    3:
+      StateCheckpoint: UNIT
 TransactionArgument:
   ENUM:
     0:

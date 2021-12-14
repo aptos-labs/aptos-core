@@ -343,6 +343,7 @@ pub fn process_write_set(
                         }
                         TransactionPayload::WriteSet(_) => (),
                     },
+                    Transaction::StateCheckpoint => {}
                 }
 
                 let mut account_state = Default::default();

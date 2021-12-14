@@ -25,7 +25,7 @@ use move_core_types::{
 };
 use move_resource_viewer::MoveValueAnnotator;
 
-use crate::transaction::ModuleBundlePayload;
+use crate::transaction::{ModuleBundlePayload, StateCheckpointTransaction};
 use anyhow::{ensure, format_err, Result};
 use serde_json::Value;
 use std::{
@@ -87,6 +87,12 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                 (info, payload, events).into()
             }
             BlockMetadata(txn) => (&txn, info).into(),
+            StateCheckpoint => {
+                Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
+                    info,
+                    timestamp: timestamp.into(),
+                })
+            }
         })
     }
 

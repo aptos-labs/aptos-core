@@ -1342,6 +1342,7 @@ fn test_get_transactions() {
                     }
                     _ => panic!("Returned value doesn't match!"),
                 },
+                Transaction::StateCheckpoint => {}
             }
         }
     }
