@@ -495,6 +495,7 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
         .map_err(|e| format_err!("Failed to mint seed_accounts: {}", e))?;
         println!("Completed minting seed accounts");
         println!("Minting additional {} accounts", num_accounts);
+        tokio::time::sleep(Duration::from_secs(10)).await;
 
         let seed_rngs = gen_rng_for_reusable_account(actual_num_seed_accounts);
         // For each seed account, create a future and transfer diem from that seed account to new accounts
@@ -535,6 +536,7 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
             self.accounts.len()
         );
         println!("Mint is done");
+        tokio::time::sleep(Duration::from_secs(60)).await;
         Ok(())
     }
 
