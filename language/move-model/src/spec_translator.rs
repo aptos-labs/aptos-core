@@ -617,7 +617,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
                     )
                 }
             }
-            ExpData::Call(id, Operation::Trace(_), args) => {
+            ExpData::Call(id, Operation::Trace(TraceKind::User), args) => {
                 // Generate an error if a TRACE is applied to an expression where it is not
                 // allowed, i.e. if there are free LocalVar terms, excluding locals from lets.
                 let loc = env.get_node_loc(*id);

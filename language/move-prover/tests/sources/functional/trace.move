@@ -32,4 +32,7 @@ module 0x42::TestTracing {
         let addr = Signer::address_of(s);
         ensures exists<R>(addr) ==> global<R>(addr).x == x;
     }
+
+    // Test whether auto trace on expressions in quantifiers does not trigger error
+    invariant forall addr: address: exists<R>(addr) ==> global<R>(addr).x < 5;
 }

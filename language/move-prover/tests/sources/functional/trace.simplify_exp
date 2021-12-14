@@ -19,6 +19,18 @@ error: post-condition does not hold
    =     at tests/sources/functional/trace.move:18: add_invalid (spec)
    =         `ensures result == a + b;` = <redacted>
 
+error: global memory invariant does not hold
+   ┌─ tests/sources/functional/trace.move:37:5
+   │
+37 │     invariant forall addr: address: exists<R>(addr) ==> global<R>(addr).x < 5;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/trace.move:28: publish_invalid
+   =         s = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/trace.move:29: publish_invalid
+   =     at tests/sources/functional/trace.move:37
+
 error: post-condition does not hold
    ┌─ tests/sources/functional/trace.move:33:9
    │
@@ -34,6 +46,7 @@ error: post-condition does not hold
    =         s = <redacted>
    =         x = <redacted>
    =     at tests/sources/functional/trace.move:29: publish_invalid
+   =     at tests/sources/functional/trace.move:37
    =     at tests/sources/functional/trace.move:30: publish_invalid
    =     at tests/sources/functional/trace.move:32: publish_invalid (spec)
    =     at ../move-stdlib/sources/Signer.move:13: address_of
