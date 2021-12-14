@@ -2,17 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err};
-use diem_temppath::TempPath;
-use move_command_line_common::files::MOVE_EXTENSION;
-use std::{
-    fs, io,
-    io::Write,
-    path::{Path, PathBuf},
-    process::Command,
-};
-
+use diem_rest_client::Client as RestClient;
 use diem_sdk::{
-    client::{views::AmountView, BlockingClient, WaitForTransactionError},
+    client::WaitForTransactionError,
     transaction_builder::{Currency, TransactionFactory},
     types::{
         account_address::AccountAddress,
@@ -20,8 +12,17 @@ use diem_sdk::{
         LocalAccount,
     },
 };
+use diem_temppath::TempPath;
 use forge::{AdminContext, AdminTest, Result, Test};
+use move_command_line_common::files::MOVE_EXTENSION;
 use move_ir_compiler::Compiler;
+use std::{
+    fs, io,
+    io::Write,
+    path::{Path, PathBuf},
+    process::Command,
+};
+use tokio::runtime::Runtime;
 
 pub struct MalformedScript;
 
@@ -33,13 +34,14 @@ impl Test for MalformedScript {
 
 impl AdminTest for MalformedScript {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
-        let client = ctx.client();
+        let client = ctx.rest_client();
         let transaction_factory = ctx.chain_info().transaction_factory();
-        enable_open_publishing(
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on(enable_open_publishing(
             &client,
             &transaction_factory,
             &mut ctx.chain_info().root_account,
-        )?;
+        ))?;
         let mut account = ctx.random_account();
         ctx.chain_info()
             .create_parent_vasp_account(Currency::XUS, account.authentication_key())?;
@@ -93,9 +95,14 @@ impl Test for ExecuteCustomModuleAndScript {
 
 impl AdminTest for ExecuteCustomModuleAndScript {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
-        let client = ctx.client();
+        let client = ctx.rest_client();
         let factory = ctx.chain_info().transaction_factory();
-        enable_open_publishing(&client, &factory, &mut ctx.chain_info().root_account)?;
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on(enable_open_publishing(
+            &client,
+            &factory,
+            ctx.chain_info().root_account,
+        ))?;
 
         let mut account1 = ctx.random_account();
         ctx.chain_info()
@@ -103,17 +110,13 @@ impl AdminTest for ExecuteCustomModuleAndScript {
         ctx.chain_info()
             .fund(Currency::XUS, account1.address(), 100)?;
 
-        assert_eq!(
-            vec![AmountView {
-                amount: 100,
-                currency: "XUS".to_string()
-            }],
-            client
-                .get_account(account1.address())?
-                .into_inner()
-                .unwrap()
-                .balances
-        );
+        let balances = runtime
+            .block_on(client.get_account_balances(account1.address()))?
+            .into_inner();
+        assert_eq!(balances.len(), 1);
+
+        assert_eq!(balances[0].amount, 100);
+        assert_eq!(balances[0].currency_code(), "XUS".to_string());
 
         let account2 = ctx.random_account();
         ctx.chain_info()
@@ -147,8 +150,7 @@ impl AdminTest for ExecuteCustomModuleAndScript {
         let publish_txn = account1.sign_with_transaction_builder(factory.payload(
             TransactionPayload::ModuleBundle(ModuleBundle::singleton(compiled_module)),
         ));
-        client.submit(&publish_txn)?;
-        client.wait_for_signed_transaction(&publish_txn, None, None)?;
+        runtime.block_on(client.submit_and_wait(&publish_txn))?;
 
         // Make a copy of script.move with "{{sender}}" substituted.
         let script_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -179,31 +181,26 @@ impl AdminTest for ExecuteCustomModuleAndScript {
                 ],
             )),
         ));
-        client.submit(&execute_txn)?;
-        client.wait_for_signed_transaction(&execute_txn, None, None)?;
+        runtime.block_on(client.submit_and_wait(&execute_txn))?;
 
         assert_eq!(
-            vec![AmountView {
-                amount: 90,
-                currency: "XUS".to_string()
-            }],
-            client
-                .get_account(account1.address())?
+            vec![(90, "XUS".to_string())],
+            runtime
+                .block_on(client.get_account_balances(account1.address()))?
                 .into_inner()
-                .unwrap()
-                .balances
+                .into_iter()
+                .map(|b| (b.amount, b.currency_code()))
+                .collect::<Vec<(u64, String)>>()
         );
 
         assert_eq!(
-            vec![AmountView {
-                amount: 11,
-                currency: "XUS".to_string()
-            }],
-            client
-                .get_account(account2.address())?
+            vec![(11, "XUS".to_string())],
+            runtime
+                .block_on(client.get_account_balances(account2.address()))?
                 .into_inner()
-                .unwrap()
-                .balances
+                .into_iter()
+                .map(|b| (b.amount, b.currency_code()))
+                .collect::<Vec<(u64, String)>>()
         );
 
         Ok(())
@@ -219,8 +216,8 @@ fn copy_file_with_sender_address(file_path: &Path, sender: AccountAddress) -> io
     Ok(tmp_source_path)
 }
 
-pub fn enable_open_publishing(
-    client: &BlockingClient,
+pub async fn enable_open_publishing(
+    client: &RestClient,
     transaction_factory: &TransactionFactory,
     root_account: &mut LocalAccount,
 ) -> Result<()> {
@@ -246,8 +243,7 @@ pub fn enable_open_publishing(
     let txn = root_account.sign_with_transaction_builder(transaction_factory.payload(
         TransactionPayload::Script(Script::new(script_body, vec![], vec![])),
     ));
-    client.submit(&txn)?;
-    client.wait_for_signed_transaction(&txn, None, None)?;
+    client.submit_and_wait(&txn).await?;
     Ok(())
 }
 

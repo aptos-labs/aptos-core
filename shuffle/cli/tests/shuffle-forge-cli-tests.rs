@@ -10,6 +10,7 @@ use forge::{
 use common::{bootstrap_shuffle_project, ShuffleTestHelper};
 use smoke_test::scripts_and_modules::enable_open_publishing;
 use std::{os::unix::prelude::ExitStatusExt, process::ExitStatus};
+use tokio::runtime::Runtime;
 
 pub const BINARY: &str = env!("CARGO_BIN_EXE_shuffle");
 
@@ -34,9 +35,14 @@ impl AdminTest for TransactionsWithoutAccount {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
         let helper = ShuffleTestHelper::new(ctx.chain_info())?;
         let home_path_string = helper.home_path().to_string_lossy().to_string();
-        let client = ctx.client();
+        let client = ctx.rest_client();
         let factory = ctx.chain_info().transaction_factory();
-        enable_open_publishing(&client, &factory, ctx.chain_info().root_account())?;
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on(enable_open_publishing(
+            &client,
+            &factory,
+            ctx.chain_info().root_account(),
+        ))?;
         let output = std::process::Command::new(BINARY)
             .args([
                 "--home-path",

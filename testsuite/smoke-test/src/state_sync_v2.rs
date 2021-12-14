@@ -7,11 +7,11 @@ use crate::{
     test_utils::{create_and_fund_account, transfer_coins},
 };
 use diem_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
-use diem_sdk::{
-    client::BlockingClient, transaction_builder::TransactionFactory, types::LocalAccount,
-};
+use diem_rest_client::Client as RestClient;
+use diem_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
 use std::time::{Duration, Instant};
+use tokio::runtime::Runtime;
 
 const MAX_CATCH_UP_SECS: u64 = 60; // The max time we'll wait for nodes to catch up
 
@@ -116,10 +116,7 @@ fn test_full_node_sync(full_node_config: NodeConfig, mut swarm: LocalSwarm, epoc
     swarm.fullnode_mut(vfn_peer_id).unwrap().stop();
 
     // Execute a number of transactions on the validator
-    let validator_client = swarm
-        .validator(validator_peer_id)
-        .unwrap()
-        .json_rpc_client();
+    let validator_client = swarm.validator(validator_peer_id).unwrap().rest_client();
     let transaction_factory = swarm.chain_info().transaction_factory();
     let mut account_0 = create_and_fund_account(&mut swarm, 1000);
     let mut account_1 = create_and_fund_account(&mut swarm, 1000);
@@ -157,26 +154,25 @@ fn test_full_node_sync(full_node_config: NodeConfig, mut swarm: LocalSwarm, epoc
 /// force reconfigurations.
 fn execute_transactions(
     swarm: &mut LocalSwarm,
-    json_rpc_client: &BlockingClient,
+    client: &RestClient,
     transaction_factory: &TransactionFactory,
     account_0: &mut LocalAccount,
     account_1: &LocalAccount,
     force_epoch_changes: bool,
 ) {
-    for _ in 0..10 {
-        // Execute simple transfer transactions
-        transfer_coins(
-            json_rpc_client,
-            transaction_factory,
-            account_0,
-            account_1,
-            1,
-        );
+    let root_account = swarm.chain_info().root_account;
+    let runtime = Runtime::new().unwrap();
+    runtime.block_on(async {
+        for _ in 0..10 {
+            // Execute simple transfer transactions
+            transfer_coins(client, transaction_factory, account_0, account_1, 1).await;
 
-        // Cause an epoch change if required
-        if force_epoch_changes {
-            let root_account = swarm.chain_info().root_account;
-            enable_open_publishing(json_rpc_client, transaction_factory, root_account).unwrap();
+            // Cause an epoch change if required
+            if force_epoch_changes {
+                enable_open_publishing(client, transaction_factory, root_account)
+                    .await
+                    .unwrap();
+            }
         }
-    }
+    });
 }

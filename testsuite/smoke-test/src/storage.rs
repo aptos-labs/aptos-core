@@ -11,9 +11,8 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use backup_cli::metadata::view::BackupStorageState;
-use diem_sdk::{
-    client::BlockingClient, transaction_builder::TransactionFactory, types::LocalAccount,
-};
+use diem_rest_client::Client as RestClient;
+use diem_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use diem_temppath::TempPath;
 use diem_types::{transaction::Version, waypoint::Waypoint};
 use forge::{NodeExt, Swarm, SwarmExt};
@@ -24,6 +23,7 @@ use std::{
     process::Command,
     time::{Duration, Instant},
 };
+use tokio::runtime::Runtime;
 
 #[test]
 fn test_db_restore() {
@@ -37,38 +37,45 @@ fn test_db_restore() {
     let client_1 = swarm
         .validator(validator_peer_ids[1])
         .unwrap()
-        .json_rpc_client();
+        .rest_client();
     let transaction_factory = swarm.chain_info().transaction_factory();
 
     // set up: two accounts, a lot of money
     let mut account_0 = create_and_fund_account(&mut swarm, 1000000);
     let account_1 = create_and_fund_account(&mut swarm, 1000000);
-    transfer_coins(
-        &client_1,
-        &transaction_factory,
-        &mut account_0,
-        &account_1,
-        1,
-    );
-
+    let runtime = Runtime::new().unwrap();
     let mut expected_balance_0 = 999999;
     let mut expected_balance_1 = 1000001;
-    assert_balance(&client_1, &account_0, expected_balance_0);
-    assert_balance(&client_1, &account_1, expected_balance_1);
+    runtime.block_on(async {
+        transfer_coins(
+            &client_1,
+            &transaction_factory,
+            &mut account_0,
+            &account_1,
+            1,
+        )
+        .await;
 
-    transfer_and_reconfig(
-        &client_1,
-        &transaction_factory,
-        swarm.chain_info().root_account,
-        &mut account_0,
-        &account_1,
-        20,
-    )
-    .unwrap();
+        assert_balance(&client_1, &account_0, expected_balance_0).await;
+        assert_balance(&client_1, &account_1, expected_balance_1).await;
+    });
+
     expected_balance_0 -= 20;
     expected_balance_1 += 20;
-    assert_balance(&client_1, &account_0, expected_balance_0);
-    assert_balance(&client_1, &account_1, expected_balance_1);
+    runtime.block_on(async {
+        transfer_and_reconfig(
+            &client_1,
+            &transaction_factory,
+            swarm.chain_info().root_account,
+            &mut account_0,
+            &account_1,
+            20,
+        )
+        .await
+        .unwrap();
+        assert_balance(&client_1, &account_0, expected_balance_0).await;
+        assert_balance(&client_1, &account_1, expected_balance_1).await;
+    });
 
     // make a backup from node 1
     let node1_config = swarm.validator(validator_peer_ids[1]).unwrap().config();
@@ -98,7 +105,9 @@ fn test_db_restore() {
     // restore db from backup
     db_restore(backup_path.path(), db_dir.as_path(), &[]);
 
-    {
+    expected_balance_0 -= 20;
+    expected_balance_1 += 20;
+    runtime.block_on(async {
         transfer_and_reconfig(
             &client_1,
             &transaction_factory,
@@ -107,12 +116,11 @@ fn test_db_restore() {
             &account_1,
             20,
         )
+        .await
         .unwrap();
-        expected_balance_0 -= 20;
-        expected_balance_1 += 20;
-        assert_balance(&client_1, &account_0, expected_balance_0);
-        assert_balance(&client_1, &account_1, expected_balance_1);
-    }
+        assert_balance(&client_1, &account_0, expected_balance_0).await;
+        assert_balance(&client_1, &account_1, expected_balance_1).await;
+    });
 
     // start node 0 on top of restored db
     swarm
@@ -130,9 +138,12 @@ fn test_db_restore() {
         .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(60))
         .unwrap();
 
-    let client_0 = swarm.validator(node_to_restart).unwrap().json_rpc_client();
-    assert_balance(&client_0, &account_0, expected_balance_0);
-    assert_balance(&client_0, &account_1, expected_balance_1);
+    let client_0 = swarm.validator(node_to_restart).unwrap().rest_client();
+    let runtime = Runtime::new().unwrap();
+    runtime.block_on(async {
+        assert_balance(&client_0, &account_0, expected_balance_0).await;
+        assert_balance(&client_0, &account_1, expected_balance_1).await;
+    });
 }
 
 fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
@@ -301,8 +312,8 @@ pub(crate) fn db_restore(backup_path: &Path, db_path: &Path, trusted_waypoints: 
     println!("Backup restored in {} seconds.", now.elapsed().as_secs());
 }
 
-fn transfer_and_reconfig(
-    client: &BlockingClient,
+async fn transfer_and_reconfig(
+    client: &RestClient,
     transaction_factory: &TransactionFactory,
     root_account: &mut LocalAccount,
     account0: &mut LocalAccount,
@@ -311,17 +322,17 @@ fn transfer_and_reconfig(
 ) -> Result<()> {
     for _ in 0..transfers {
         if random::<u16>() % 10 == 0 {
-            let current_version = client.get_metadata()?.into_inner().diem_version.unwrap();
+            let diem_version = client.get_diem_version().await?;
+            let current_version = *diem_version.into_inner().payload.major.inner();
             let txn = root_account.sign_with_transaction_builder(
                 transaction_factory.update_diem_version(0, current_version + 1),
             );
-            client.submit(&txn)?;
-            client.wait_for_signed_transaction(&txn, None, None)?;
+            client.submit_and_wait(&txn).await?;
 
             println!("Changing diem version to {}", current_version + 1,);
         }
 
-        transfer_coins(client, transaction_factory, account0, account1, 1);
+        transfer_coins(client, transaction_factory, account0, account1, 1).await;
     }
 
     Ok(())

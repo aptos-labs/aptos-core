@@ -18,6 +18,7 @@ use std::{
     net::Ipv4Addr,
     time::{Duration, Instant},
 };
+use tokio::runtime::Runtime;
 
 #[test]
 fn test_full_node_basic_flow() {
@@ -48,12 +49,9 @@ fn test_full_node_basic_flow() {
     }
 
     // create clients for all nodes
-    let validator_client = swarm
-        .validator(validator_peer_id)
-        .unwrap()
-        .json_rpc_client();
-    let vfn_client = swarm.full_node(vfn_peer_id).unwrap().json_rpc_client();
-    let pfn_client = swarm.full_node(pfn_peer_id).unwrap().json_rpc_client();
+    let validator_client = swarm.validator(validator_peer_id).unwrap().rest_client();
+    let vfn_client = swarm.full_node(vfn_peer_id).unwrap().rest_client();
+    let pfn_client = swarm.full_node(pfn_peer_id).unwrap().rest_client();
 
     let mut account_0 = create_and_fund_account(&mut swarm, 10);
     let account_1 = create_and_fund_account(&mut swarm, 10);
@@ -62,65 +60,65 @@ fn test_full_node_basic_flow() {
         .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(10))
         .unwrap();
 
-    // Send txn to PFN
-    let _txn = transfer_coins(
-        &pfn_client,
-        &transaction_factory,
-        &mut account_0,
-        &account_1,
-        1,
-    );
+    let runtime = Runtime::new().unwrap();
+    runtime.block_on(async {
+        // Send txn to PFN
+        let _txn = transfer_coins(
+            &pfn_client,
+            &transaction_factory,
+            &mut account_0,
+            &account_1,
+            1,
+        )
+        .await;
 
-    assert_balance(&validator_client, &account_0, 9);
-    assert_balance(&validator_client, &account_1, 11);
-    assert_balance(&vfn_client, &account_0, 9);
-    assert_balance(&vfn_client, &account_1, 11);
-    assert_balance(&pfn_client, &account_0, 9);
-    assert_balance(&pfn_client, &account_1, 11);
+        assert_balance(&validator_client, &account_0, 9).await;
+        assert_balance(&validator_client, &account_1, 11).await;
+        assert_balance(&vfn_client, &account_0, 9).await;
+        assert_balance(&vfn_client, &account_1, 11).await;
+        assert_balance(&pfn_client, &account_0, 9).await;
+        assert_balance(&pfn_client, &account_1, 11).await;
 
-    // Send txn to VFN
-    let txn = transfer_coins(
-        &vfn_client,
-        &transaction_factory,
-        &mut account_0,
-        &account_1,
-        1,
-    );
+        // Send txn to VFN
+        let txn = transfer_coins(
+            &vfn_client,
+            &transaction_factory,
+            &mut account_0,
+            &account_1,
+            1,
+        )
+        .await;
 
-    assert_balance(&validator_client, &account_0, 8);
-    assert_balance(&validator_client, &account_1, 12);
-    assert_balance(&vfn_client, &account_0, 8);
-    assert_balance(&vfn_client, &account_1, 12);
+        assert_balance(&validator_client, &account_0, 8).await;
+        assert_balance(&validator_client, &account_1, 12).await;
+        assert_balance(&vfn_client, &account_0, 8).await;
+        assert_balance(&vfn_client, &account_1, 12).await;
 
-    pfn_client
-        .wait_for_signed_transaction(&txn, None, None)
-        .unwrap();
-    assert_balance(&pfn_client, &account_0, 8);
-    assert_balance(&pfn_client, &account_1, 12);
+        pfn_client.wait_for_signed_transaction(&txn).await.unwrap();
+        assert_balance(&pfn_client, &account_0, 8).await;
+        assert_balance(&pfn_client, &account_1, 12).await;
 
-    // Send txn to Validator
-    let txn = transfer_coins(
-        &vfn_client,
-        &transaction_factory,
-        &mut account_0,
-        &account_1,
-        1,
-    );
+        // Send txn to Validator
+        let txn = transfer_coins(
+            &vfn_client,
+            &transaction_factory,
+            &mut account_0,
+            &account_1,
+            1,
+        )
+        .await;
 
-    assert_balance(&validator_client, &account_0, 7);
-    assert_balance(&validator_client, &account_1, 13);
+        assert_balance(&validator_client, &account_0, 7).await;
+        assert_balance(&validator_client, &account_1, 13).await;
 
-    vfn_client
-        .wait_for_signed_transaction(&txn, None, None)
-        .unwrap();
-    assert_balance(&vfn_client, &account_0, 7);
-    assert_balance(&vfn_client, &account_1, 13);
+        vfn_client.wait_for_signed_transaction(&txn).await.unwrap();
+        assert_balance(&vfn_client, &account_0, 7).await;
+        assert_balance(&vfn_client, &account_1, 13).await;
 
-    pfn_client
-        .wait_for_signed_transaction(&txn, None, None)
-        .unwrap();
-    assert_balance(&pfn_client, &account_0, 7);
-    assert_balance(&pfn_client, &account_1, 13);
+        pfn_client.wait_for_signed_transaction(&txn).await.unwrap();
+        assert_balance(&pfn_client, &account_0, 7).await;
+        assert_balance(&pfn_client, &account_1, 13).await;
+    });
 }
 
 #[test]
@@ -162,35 +160,42 @@ fn test_vfn_failover() {
         .unwrap();
 
     // set up client
-    let vfn_client = swarm.full_node(vfn).unwrap().json_rpc_client();
+    let vfn_client = swarm.full_node(vfn).unwrap().rest_client();
 
     // submit client requests directly to VFN of dead V
     swarm.validator_mut(validator).unwrap().stop();
-    transfer_coins(
-        &vfn_client,
-        &transaction_factory,
-        &mut account_0,
-        &account_1,
-        1,
-    );
 
-    for _ in 0..8 {
-        transfer_coins_non_blocking(
+    let runtime = Runtime::new().unwrap();
+    runtime.block_on(async {
+        transfer_coins(
             &vfn_client,
             &transaction_factory,
             &mut account_0,
             &account_1,
             1,
-        );
-    }
+        )
+        .await;
 
-    transfer_coins(
-        &vfn_client,
-        &transaction_factory,
-        &mut account_0,
-        &account_1,
-        1,
-    );
+        for _ in 0..8 {
+            transfer_coins_non_blocking(
+                &vfn_client,
+                &transaction_factory,
+                &mut account_0,
+                &account_1,
+                1,
+            )
+            .await;
+        }
+
+        transfer_coins(
+            &vfn_client,
+            &transaction_factory,
+            &mut account_0,
+            &account_1,
+            1,
+        )
+        .await;
+    });
 }
 
 #[test]
@@ -257,8 +262,8 @@ fn test_private_full_node() {
     }
 
     // read state from full node client
-    let validator_client = swarm.validators().next().unwrap().json_rpc_client();
-    let user_client = swarm.full_node(user).unwrap().json_rpc_client();
+    let validator_client = swarm.validators().next().unwrap().rest_client();
+    let user_client = swarm.full_node(user).unwrap().rest_client();
 
     let mut account_0 = create_and_fund_account(&mut swarm, 100);
     let account_1 = create_and_fund_account(&mut swarm, 10);
@@ -267,18 +272,22 @@ fn test_private_full_node() {
         .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(60))
         .unwrap();
 
-    // send txn from user node and check both validator and user node have correct balance
-    transfer_coins(
-        &user_client,
-        &transaction_factory,
-        &mut account_0,
-        &account_1,
-        10,
-    );
-    assert_balance(&user_client, &account_0, 90);
-    assert_balance(&user_client, &account_1, 20);
-    assert_balance(&validator_client, &account_0, 90);
-    assert_balance(&validator_client, &account_1, 20);
+    let runtime = Runtime::new().unwrap();
+    runtime.block_on(async {
+        // send txn from user node and check both validator and user node have correct balance
+        transfer_coins(
+            &user_client,
+            &transaction_factory,
+            &mut account_0,
+            &account_1,
+            10,
+        )
+        .await;
+        assert_balance(&user_client, &account_0, 90).await;
+        assert_balance(&user_client, &account_1, 20).await;
+        assert_balance(&validator_client, &account_0, 90).await;
+        assert_balance(&validator_client, &account_1, 20).await;
+    });
 }
 
 fn add_node_to_seeds(

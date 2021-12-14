@@ -172,18 +172,22 @@ pub fn new_epoch_event_key() -> EventKey {
 pub fn access_path_for_config(address: AccountAddress, config_name: Identifier) -> AccessPath {
     AccessPath::new(
         address,
-        AccessPath::resource_access_vec(StructTag {
-            address: CORE_CODE_ADDRESS,
-            module: ConfigurationResource::MODULE_NAME.to_owned(),
-            name: ConfigurationResource::MODULE_NAME.to_owned(),
-            type_params: vec![TypeTag::Struct(StructTag {
-                address: CORE_CODE_ADDRESS,
-                module: config_name.clone(),
-                name: config_name,
-                type_params: vec![],
-            })],
-        }),
+        AccessPath::resource_access_vec(config_struct_tag(config_name)),
     )
+}
+
+pub fn config_struct_tag(config_name: Identifier) -> StructTag {
+    StructTag {
+        address: CORE_CODE_ADDRESS,
+        module: ConfigurationResource::MODULE_NAME.to_owned(),
+        name: ConfigurationResource::MODULE_NAME.to_owned(),
+        type_params: vec![TypeTag::Struct(StructTag {
+            address: CORE_CODE_ADDRESS,
+            module: config_name.clone(),
+            name: config_name,
+            type_params: vec![],
+        })],
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]

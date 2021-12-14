@@ -109,6 +109,28 @@ impl Transaction {
             Transaction::GenesisTransaction(_) => 0,
         }
     }
+
+    pub fn success(&self) -> bool {
+        match self {
+            Transaction::UserTransaction(txn) => txn.info.success,
+            Transaction::BlockMetadataTransaction(txn) => txn.info.success,
+            Transaction::PendingTransaction(_txn) => false,
+            Transaction::GenesisTransaction(txn) => txn.info.success,
+        }
+    }
+
+    pub fn is_pending(&self) -> bool {
+        matches!(self, Transaction::PendingTransaction(_))
+    }
+
+    pub fn vm_status(&self) -> String {
+        match self {
+            Transaction::UserTransaction(txn) => txn.info.vm_status.clone(),
+            Transaction::BlockMetadataTransaction(txn) => txn.info.vm_status.clone(),
+            Transaction::PendingTransaction(_txn) => "pending".to_owned(),
+            Transaction::GenesisTransaction(txn) => txn.info.vm_status.clone(),
+        }
+    }
 }
 
 impl From<(SignedTransaction, TransactionPayload)> for Transaction {

@@ -2,10 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use diem_api_types::U64;
-use move_core_types::language_storage::StructTag;
+use move_core_types::{identifier::Identifier, language_storage::StructTag};
 use serde::{Deserialize, Serialize};
 
-pub use diem_types::account_config::{BalanceResource, CORE_CODE_ADDRESS};
+pub use diem_types::account_config::{diem_root_address, BalanceResource, CORE_CODE_ADDRESS};
+pub use diem_types::on_chain_config::{
+    config_struct_tag, DiemVersion as OnChainDiemVersion, OnChainConfig,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Diem {
@@ -27,4 +30,18 @@ impl AccountBalance {
     pub fn currency_code(&self) -> String {
         self.currency.name.to_string()
     }
+}
+
+pub fn diem_version_identifier() -> Identifier {
+    Identifier::new(OnChainDiemVersion::IDENTIFIER).unwrap()
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DiemConfig<T> {
+    pub payload: T,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DiemVersion {
+    pub major: U64,
 }

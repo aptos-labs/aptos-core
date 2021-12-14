@@ -14,6 +14,7 @@ use diem_writeset_generator::{
 };
 use forge::{Node, NodeExt, Swarm};
 use std::collections::BTreeMap;
+use tokio::runtime::Runtime;
 
 #[test]
 fn test_move_release_flow() {
@@ -23,7 +24,7 @@ fn test_move_release_flow() {
     let validator = swarm.validators().next().unwrap();
     let json_rpc_endpoint = validator.json_rpc_endpoint();
     let url = json_rpc_endpoint.to_string();
-    let client = validator.json_rpc_client();
+    let client = validator.rest_client();
 
     let validator_interface = JsonRpcDebuggerInterface::new(&url).unwrap();
 
@@ -55,10 +56,9 @@ fn test_move_release_flow() {
         .sign_with_transaction_builder(
             transaction_factory.payload(TransactionPayload::WriteSet(payload_1.clone())),
         );
-    client.submit(&txn).unwrap();
-    client
-        .wait_for_signed_transaction(&txn, None, None)
-        .unwrap();
+
+    let runtime = Runtime::new().unwrap();
+    runtime.block_on(client.submit_and_wait(&txn)).unwrap();
 
     let latest_version = validator_interface.get_latest_version().unwrap();
     let remote_modules = validator_interface
@@ -81,7 +81,7 @@ fn test_move_release_flow() {
         .chain_info()
         .fund(Currency::XUS, account.address(), 100)
         .unwrap();
-    assert_balance(&client, &account, 200);
+    runtime.block_on(assert_balance(&client, &account, 200));
 
     let latest_version = validator_interface.get_latest_version().unwrap();
     // Now that we have artifact file checked in, we can get rid of the first_release flag
@@ -121,10 +121,7 @@ fn test_move_release_flow() {
         .sign_with_transaction_builder(
             transaction_factory.payload(TransactionPayload::WriteSet(payload_2)),
         );
-    client.submit(&txn).unwrap();
-    client
-        .wait_for_signed_transaction(&txn, None, None)
-        .unwrap();
+    runtime.block_on(client.submit_and_wait(&txn)).unwrap();
 
     let latest_version = validator_interface.get_latest_version().unwrap();
     let remote_modules = validator_interface
@@ -133,8 +130,14 @@ fn test_move_release_flow() {
     // Assert the remote module is the same as the release modules.
 
     assert_eq!(
-        client.get_metadata().unwrap().into_inner().diem_version,
-        Some(DIEM_MAX_KNOWN_VERSION.major + 1)
+        *runtime
+            .block_on(client.get_diem_version())
+            .unwrap()
+            .into_inner()
+            .payload
+            .major
+            .inner(),
+        DIEM_MAX_KNOWN_VERSION.major + 1
     );
 
     assert_eq!(

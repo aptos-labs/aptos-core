@@ -140,27 +140,29 @@ fn write_forge_networks_config_into_toml(
 }
 
 pub fn bootstrap_shuffle_project(ctx: &mut AdminContext<'_>) -> Result<ShuffleTestHelper> {
-    let client = ctx.client();
+    let client = ctx.rest_client();
     let dev_client = DevApiClient::new(
         reqwest::Client::new(),
         Url::from_str(ctx.chain_info().rest_api())?,
     )?;
     let factory = ctx.chain_info().transaction_factory();
-    enable_open_publishing(&client, &factory, ctx.chain_info().root_account())?;
+    let runtime = Runtime::new().unwrap();
+    runtime.block_on(enable_open_publishing(
+        &client,
+        &factory,
+        ctx.chain_info().root_account(),
+    ))?;
 
     let helper = ShuffleTestHelper::new(ctx.chain_info())?;
     helper.create_project()?;
-
-    let rt = Runtime::new().unwrap();
-    let handle = rt.handle().clone();
 
     let mut account_1 = ctx.random_account();
     let account_2 = ctx.random_account();
     let tc = ctx.chain_info().treasury_compliance_account();
 
-    handle.block_on(helper.create_account("latest", tc, &account_1, &factory, &dev_client))?;
-    handle.block_on(helper.create_account("test", tc, &account_2, &factory, &dev_client))?;
-    handle.block_on(helper.deploy_project(&mut account_1, ctx.chain_info().rest_api()))?;
+    runtime.block_on(helper.create_account("latest", tc, &account_1, &factory, &dev_client))?;
+    runtime.block_on(helper.create_account("test", tc, &account_2, &factory, &dev_client))?;
+    runtime.block_on(helper.deploy_project(&mut account_1, ctx.chain_info().rest_api()))?;
     helper.codegen_project(&account_1)?;
     Ok(helper)
 }

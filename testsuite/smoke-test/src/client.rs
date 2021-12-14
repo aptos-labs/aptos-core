@@ -29,8 +29,13 @@ fn test_create_mint_transfer_block_metadata() {
 
     // Test if we commit not only user transactions but also block metadata transactions,
     // assert committed version > # of user transactions
-    let client = swarm.validators().next().unwrap().json_rpc_client();
-    let version = client.get_metadata().unwrap().into_inner().version;
+    let client = swarm.validators().next().unwrap().rest_client();
+    let version = Runtime::new()
+        .unwrap()
+        .block_on(client.get_ledger_information())
+        .unwrap()
+        .into_inner()
+        .version;
     assert!(
         version > 4,
         "BlockMetadata txn not produced, current version: {}",
@@ -163,20 +168,25 @@ fn test_basic_fault_tolerance() {
 #[test]
 fn test_basic_restartability() {
     let mut swarm = new_local_swarm(4);
-    let client = swarm.validators().next().unwrap().json_rpc_client();
+    let client = swarm.validators().next().unwrap().rest_client();
     let transaction_factory = swarm.chain_info().transaction_factory();
 
     let mut account_0 = create_and_fund_account(&mut swarm, 100);
     let account_1 = create_and_fund_account(&mut swarm, 10);
-    transfer_coins(
-        &client,
-        &transaction_factory,
-        &mut account_0,
-        &account_1,
-        10,
-    );
-    assert_balance(&client, &account_0, 90);
-    assert_balance(&client, &account_1, 20);
+
+    let runtime = Runtime::new().unwrap();
+    runtime.block_on(async {
+        transfer_coins(
+            &client,
+            &transaction_factory,
+            &mut account_0,
+            &account_1,
+            10,
+        )
+        .await;
+        assert_balance(&client, &account_0, 90).await;
+        assert_balance(&client, &account_1, 20).await;
+    });
 
     let validator = swarm.validators_mut().next().unwrap();
     validator.restart().unwrap();
@@ -184,41 +194,47 @@ fn test_basic_restartability() {
         .wait_until_healthy(Instant::now() + Duration::from_secs(10))
         .unwrap();
 
-    assert_balance(&client, &account_0, 90);
-    assert_balance(&client, &account_1, 20);
+    runtime.block_on(async {
+        assert_balance(&client, &account_0, 90).await;
+        assert_balance(&client, &account_1, 20).await;
 
-    transfer_coins(
-        &client,
-        &transaction_factory,
-        &mut account_0,
-        &account_1,
-        10,
-    );
-    assert_balance(&client, &account_0, 80);
-    assert_balance(&client, &account_1, 30);
+        transfer_coins(
+            &client,
+            &transaction_factory,
+            &mut account_0,
+            &account_1,
+            10,
+        )
+        .await;
+        assert_balance(&client, &account_0, 80).await;
+        assert_balance(&client, &account_1, 30).await;
+    });
 }
 
 #[test]
 fn test_concurrent_transfers_single_node() {
     let mut swarm = new_local_swarm(1);
-    let client = swarm.validators().next().unwrap().json_rpc_client();
+    let client = swarm.validators().next().unwrap().rest_client();
     let transaction_factory = swarm.chain_info().transaction_factory();
 
     let mut account_0 = create_and_fund_account(&mut swarm, 100);
     let account_1 = create_and_fund_account(&mut swarm, 10);
-    assert_balance(&client, &account_0, 100);
-    assert_balance(&client, &account_1, 10);
 
-    for _ in 0..20 {
-        let txn = account_0.sign_with_transaction_builder(transaction_factory.peer_to_peer(
-            diem_sdk::transaction_builder::Currency::XUS,
-            account_1.address(),
-            1,
-        ));
-        client.submit(&txn).unwrap();
-    }
+    let runtime = Runtime::new().unwrap();
+    runtime.block_on(async {
+        assert_balance(&client, &account_0, 100).await;
+        assert_balance(&client, &account_1, 10).await;
 
-    transfer_coins(&client, &transaction_factory, &mut account_0, &account_1, 1);
-    assert_balance(&client, &account_0, 79);
-    assert_balance(&client, &account_1, 31);
+        for _ in 0..20 {
+            let txn = account_0.sign_with_transaction_builder(transaction_factory.peer_to_peer(
+                diem_sdk::transaction_builder::Currency::XUS,
+                account_1.address(),
+                1,
+            ));
+            client.submit_and_wait(&txn).await.unwrap();
+        }
+        transfer_coins(&client, &transaction_factory, &mut account_0, &account_1, 1).await;
+        assert_balance(&client, &account_0, 79).await;
+        assert_balance(&client, &account_1, 31).await;
+    });
 }

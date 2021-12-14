@@ -34,6 +34,7 @@ use std::{
     thread::sleep,
     time::{Duration, Instant},
 };
+use tokio::runtime::Runtime;
 
 #[test]
 /// This test verifies the flow of a genesis transaction after the chain starts.
@@ -193,29 +194,34 @@ fn test_genesis_transaction_flow() {
     let client_0 = swarm
         .validator(validator_peer_ids[0])
         .unwrap()
-        .json_rpc_client();
-    transfer_coins(
-        &client_0,
-        &transaction_factory,
-        &mut account_0,
-        &account_1,
-        1,
-    );
-    assert_balance(&client_0, &account_0, 9);
-    assert_balance(&client_0, &account_1, 11);
+        .rest_client();
+    let runtime = Runtime::new().unwrap();
+    runtime.block_on(async {
+        transfer_coins(
+            &client_0,
+            &transaction_factory,
+            &mut account_0,
+            &account_1,
+            1,
+        )
+        .await;
+        assert_balance(&client_0, &account_0, 9).await;
+        assert_balance(&client_0, &account_1, 11).await;
+    });
 
     // Create a new epoch to make things more complicated
     let txn = swarm
         .chain_info()
         .root_account
         .sign_with_transaction_builder(transaction_factory.update_diem_version(0, 12345));
-    client_0.submit(&txn).unwrap();
-    client_0
-        .wait_for_signed_transaction(&txn, None, None)
-        .unwrap();
+    runtime.block_on(client_0.submit_and_wait(&txn)).unwrap();
 
     // Make full DB backup for later use. The backup crosses the new genesis.
-    let state_proof = client_0.get_state_proof(0).unwrap();
+    let json_rpc_client_0 = swarm
+        .validator(validator_peer_ids[0])
+        .unwrap()
+        .json_rpc_client();
+    let state_proof = json_rpc_client_0.get_state_proof(0).unwrap();
     let version = state_proof.state().version;
     let epoch_change_proof: EpochChangeProof =
         bcs::from_bytes(state_proof.inner().epoch_change_proof.inner()).unwrap();
@@ -273,10 +279,12 @@ fn test_genesis_transaction_flow() {
         .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(60))
         .unwrap();
 
-    let client = swarm.validator(node_to_kill).unwrap().json_rpc_client();
-    transfer_coins(&client, &transaction_factory, &mut account_0, &account_1, 1);
-    assert_balance(&client_0, &account_0, 8);
-    assert_balance(&client_0, &account_1, 12);
+    let client = swarm.validator(node_to_kill).unwrap().rest_client();
+    runtime.block_on(async {
+        transfer_coins(&client, &transaction_factory, &mut account_0, &account_1, 1).await;
+        assert_balance(&client_0, &account_0, 8).await;
+        assert_balance(&client_0, &account_1, 12).await;
+    });
 
     println!("10. nuke DB on node 0, and run db-restore, test if it rejoins the network okay.");
     swarm.validator_mut(node_to_kill).unwrap().stop();
@@ -298,10 +306,11 @@ fn test_genesis_transaction_flow() {
     swarm
         .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(60))
         .unwrap();
-
-    transfer_coins(&client, &transaction_factory, &mut account_0, &account_1, 1);
-    assert_balance(&client_0, &account_0, 7);
-    assert_balance(&client_0, &account_1, 13);
+    runtime.block_on(async {
+        transfer_coins(&client, &transaction_factory, &mut account_0, &account_1, 1).await;
+        assert_balance(&client_0, &account_0, 7).await;
+        assert_balance(&client_0, &account_1, 13).await;
+    });
 }
 
 fn parse_waypoint(db_bootstrapper_output: &str) -> Waypoint {

@@ -11,7 +11,7 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     move_resource::MoveStructType,
 };
-use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient};
+use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
 use serde::Deserialize;
 use std::time::Duration;
 use url::Url;
@@ -87,6 +87,18 @@ impl Client {
                     .collect::<Result<Vec<dpn::AccountBalance>>>()
             })
         }
+
+        pub async fn get_diem_version(&self) -> Result<Response<dpn::DiemConfig<dpn::DiemVersion>>> {
+            let resp = self.get_account_resource(
+                dpn::diem_root_address(), &dpn::config_struct_tag(dpn::diem_version_identifier())).await?;
+            resp.and_then(|conf| {
+                if let Some(val) = conf {
+                    serde_json::from_value(val).map_err(|e| anyhow!("deserialize DiemConfig<DiemVersion> failed: {}", e))
+                } else {
+                    Err(anyhow!("could not find diem version resource from {}", dpn::diem_root_address()))
+                }
+            })
+        }
     }
 
     pub async fn get_ledger_information(&self) -> Result<Response<State>> {
@@ -125,33 +137,63 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn submit_and_wait(&self, txn: &SignedTransaction) -> Result<Response<Transaction>> {
+        self.submit(txn).await?;
+        self.wait_for_signed_transaction(txn).await
+    }
+
     pub async fn wait_for_transaction(
         &self,
         pending_transaction: &PendingTransaction,
+    ) -> Result<Response<Transaction>> {
+        self.wait_for_transaction_by_hash(
+            pending_transaction.hash.into(),
+            *pending_transaction
+                .request
+                .expiration_timestamp_secs
+                .inner(),
+        )
+        .await
+    }
+
+    pub async fn wait_for_signed_transaction(
+        &self,
+        transaction: &SignedTransaction,
+    ) -> Result<Response<Transaction>> {
+        let expiration_timestamp = transaction.expiration_timestamp_secs();
+        self.wait_for_transaction_by_hash(
+            transaction.clone().committed_hash(),
+            expiration_timestamp,
+        )
+        .await
+    }
+
+    pub async fn wait_for_transaction_by_hash(
+        &self,
+        hash: HashValue,
+        expiration_timestamp_secs: u64,
     ) -> Result<Response<Transaction>> {
         const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
         const DEFAULT_DELAY: Duration = Duration::from_millis(500);
 
         let start = std::time::Instant::now();
-        let hash = pending_transaction.hash.into();
         while start.elapsed() < DEFAULT_TIMEOUT {
-            let (transaction, state) = self.get_transaction(hash).await?.into_parts();
-            match transaction {
-                Transaction::PendingTransaction(_) => {}
-                Transaction::UserTransaction(_)
-                | Transaction::GenesisTransaction(_)
-                | Transaction::BlockMetadataTransaction(_) => {
-                    return Ok(Response::new(transaction, state))
+            let resp = self.get_transaction_inner(hash).await?;
+            if resp.status() != StatusCode::NOT_FOUND {
+                let txn_resp: Response<Transaction> = self.json(resp).await?;
+                let (transaction, state) = txn_resp.into_parts();
+                if !transaction.is_pending() {
+                    if !transaction.success() {
+                        return Err(anyhow!(
+                            "transaction execution failed: {}",
+                            transaction.vm_status()
+                        ));
+                    }
+                    return Ok(Response::new(transaction, state));
                 }
-            }
-
-            if *pending_transaction
-                .request
-                .expiration_timestamp_secs
-                .inner()
-                <= state.timestamp_usecs / 1_000_000
-            {
-                return Err(anyhow!("transaction expired"));
+                if expiration_timestamp_secs <= state.timestamp_usecs / 1_000_000 {
+                    return Err(anyhow!("transaction expired"));
+                }
             }
 
             tokio::time::sleep(DEFAULT_DELAY).await;
@@ -182,13 +224,15 @@ impl Client {
     }
 
     pub async fn get_transaction(&self, hash: HashValue) -> Result<Response<Transaction>> {
+        self.json(self.get_transaction_inner(hash).await?).await
+    }
+
+    async fn get_transaction_inner(&self, hash: HashValue) -> Result<reqwest::Response> {
         let url = self
             .base_url
             .join(&format!("transactions/{}", hash.to_hex_literal()))?;
 
-        let response = self.inner.get(url).send().await?;
-
-        self.json(response).await
+        Ok(self.inner.get(url).send().await?)
     }
 
     pub async fn get_account_transactions(

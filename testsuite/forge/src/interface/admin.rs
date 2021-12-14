@@ -3,7 +3,9 @@
 
 use super::{ChainInfo, CoreContext, Test};
 use crate::{Result, TestReport};
+use diem_rest_client::Client as RestClient;
 use diem_sdk::{client::BlockingClient, types::LocalAccount};
+use reqwest::Url;
 
 /// The testing interface which defines a test written from the perspective of the Admin of the
 /// network. This means that the test will have access to the Root account but do not control any
@@ -40,6 +42,10 @@ impl<'t> AdminContext<'t> {
 
     pub fn client(&self) -> BlockingClient {
         BlockingClient::new(&self.chain_info.json_rpc_url)
+    }
+
+    pub fn rest_client(&self) -> RestClient {
+        RestClient::new(Url::parse(self.chain_info.rest_api()).unwrap())
     }
 
     pub fn chain_info(&mut self) -> &mut ChainInfo<'t> {
