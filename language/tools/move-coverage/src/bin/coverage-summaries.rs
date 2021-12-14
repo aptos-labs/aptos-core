@@ -110,7 +110,7 @@ fn main() {
         let coverage_map = if args.is_raw_trace_file {
             CoverageMap::from_trace_file(&input_trace_path)
         } else {
-            CoverageMap::from_binary_file(&input_trace_path)
+            CoverageMap::from_binary_file(&input_trace_path).unwrap()
         };
         let unified_exec_map = coverage_map.to_unified_exec_map();
         if !args.csv_output {

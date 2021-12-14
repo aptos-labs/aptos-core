@@ -58,8 +58,12 @@ pub struct TraceMap {
 
 impl CoverageMap {
     /// Takes in a file containing a raw VM trace, and returns an updated coverage map.
-    pub fn update_coverage_from_trace_file<P: AsRef<Path>>(mut self, filename: P) -> Self {
-        let file = File::open(filename).unwrap();
+    pub fn update_coverage_from_trace_file<P: AsRef<Path> + std::fmt::Debug>(
+        mut self,
+        filename: P,
+    ) -> Self {
+        let file = File::open(&filename)
+            .unwrap_or_else(|_| panic!("Unable to open coverage trace file '{:?}'", filename));
         for line in BufReader::new(file).lines() {
             let line = line.unwrap();
             let mut splits = line.split(',');
@@ -85,7 +89,7 @@ impl CoverageMap {
     }
 
     /// Takes in a file containing a raw VM trace, and returns a coverage map.
-    pub fn from_trace_file<P: AsRef<Path>>(filename: P) -> Self {
+    pub fn from_trace_file<P: AsRef<Path> + std::fmt::Debug>(filename: P) -> Self {
         let empty_module_map = CoverageMap {
             exec_maps: BTreeMap::new(),
         };
@@ -93,16 +97,14 @@ impl CoverageMap {
     }
 
     /// Takes in a file containing a serialized coverage map and returns a coverage map.
-    pub fn from_binary_file<P: AsRef<Path>>(filename: P) -> Self {
+    pub fn from_binary_file<P: AsRef<Path> + std::fmt::Debug>(filename: P) -> Result<Self> {
         let mut bytes = Vec::new();
-        File::open(filename)
+        File::open(&filename)
+            .map_err(|e| format_err!("{}: Coverage map file '{:?}' doesn't exist", e, filename))?
+            .read_to_end(&mut bytes)
             .ok()
-            .and_then(|mut file| file.read_to_end(&mut bytes).ok())
-            .ok_or_else(|| format_err!("Error while reading in coverage map binary"))
-            .unwrap();
-        bcs::from_bytes(&bytes)
-            .map_err(|_| format_err!("Error deserializing into coverage map"))
-            .unwrap()
+            .ok_or_else(|| format_err!("Unable to read coverage map"))?;
+        bcs::from_bytes(&bytes).map_err(|_| format_err!("Error deserializing coverage map"))
     }
 
     // add entries in a cascading manner

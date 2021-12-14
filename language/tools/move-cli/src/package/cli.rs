@@ -195,7 +195,7 @@ impl From<UnitTestResult> for ExitStatus {
 
 impl CoverageSummaryOptions {
     pub fn handle_command(&self, config: move_package::BuildConfig, path: &Path) -> Result<()> {
-        let coverage_map = CoverageMap::from_binary_file(path.join(".coverage_map.mvcov"));
+        let coverage_map = CoverageMap::from_binary_file(path.join(".coverage_map.mvcov"))?;
         let package = config.compile_package(path, &mut Vec::new())?;
         let modules: Vec<_> = package
             .modules()?

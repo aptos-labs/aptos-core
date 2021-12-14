@@ -35,7 +35,7 @@ fn main() {
     if !args.use_trace_map {
         let coverage_map = if let Some(old_coverage_path) = &args.update {
             let path = Path::new(&old_coverage_path);
-            let old_coverage_map = CoverageMap::from_binary_file(&path);
+            let old_coverage_map = CoverageMap::from_binary_file(&path).unwrap();
             old_coverage_map.update_coverage_from_trace_file(&input_path)
         } else {
             CoverageMap::from_trace_file(&input_path)

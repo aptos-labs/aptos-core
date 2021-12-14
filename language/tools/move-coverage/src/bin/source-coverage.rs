@@ -44,7 +44,7 @@ fn main() {
     let coverage_map = if args.is_raw_trace_file {
         CoverageMap::from_trace_file(&args.input_trace_path)
     } else {
-        CoverageMap::from_binary_file(&args.input_trace_path)
+        CoverageMap::from_binary_file(&args.input_trace_path).unwrap()
     };
 
     let bytecode_bytes = fs::read(&args.module_binary_path).expect("Unable to read bytecode file");
