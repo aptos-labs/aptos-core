@@ -1,10 +1,10 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_api_types::U64;
+use diem_api_types::{Address, U64};
 use diem_types::transaction::authenticator::AuthenticationKey;
 use move_core_types::{language_storage::StructTag, parser::parse_struct_tag};
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::str::FromStr;
 
 #[derive(Clone, Debug, PartialEq, Deserialize)]
@@ -63,4 +63,27 @@ pub struct DiemAccount {
     pub authentication_key: AuthenticationKey,
     #[serde(deserialize_with = "deserialize_from_string")]
     pub sequence_number: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EventHandle {
+    counter: U64,
+    guid: EventHandleGUID,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EventHandleGUID {
+    len_bytes: u8,
+    guid: GUID,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GUID {
+    id: ID,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ID {
+    creation_num: U64,
+    addr: Address,
 }

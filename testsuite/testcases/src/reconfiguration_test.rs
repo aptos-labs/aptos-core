@@ -3,13 +3,10 @@
 
 use anyhow::ensure;
 use diem_operational_tool::json_rpc::JsonRpcClientWrapper;
+use diem_rest_client::Client as RestClient;
 use diem_sdk::{
-    client::Client,
     transaction_builder::TransactionFactory,
-    types::{
-        ledger_info::LedgerInfoWithSignatures,
-        on_chain_config::{ConsensusConfigV2, OnChainConsensusConfig},
-    },
+    types::on_chain_config::{ConsensusConfigV2, OnChainConsensusConfig},
 };
 use forge::{execute_and_wait_transactions, NetworkContext, NetworkTest, NodeExt, Result, Test};
 use rand::{
@@ -45,19 +42,18 @@ impl NetworkTest for ReconfigurationTest {
         let validator_clients = ctx
             .swarm()
             .validators()
-            .map(|n| (n.rest_client(), n.async_json_rpc_client()))
+            .map(|n| n.rest_client())
             .collect::<Vec<_>>();
         let tx_factory = TransactionFactory::new(ctx.swarm().chain_info().chain_id);
         let mut diem_root_account = ctx.swarm().chain_info().root_account;
         let allowed_nonce = 0;
         let rt = Runtime::new()?;
-        let (full_node_client, full_node_jsonrpc_client) =
-            validator_clients.iter().choose(&mut rng).unwrap();
+        let full_node_client = validator_clients.iter().choose(&mut rng).unwrap();
         let timer = Instant::now();
         let count = 101;
 
         rt.block_on(async {
-            let mut version = expect_epoch(full_node_jsonrpc_client, 0, 1).await.unwrap();
+            expect_epoch(full_node_client, 1).await.unwrap();
             {
                 println!("Remove and add back {}.", affected_pod_name);
                 let validator_name = affected_pod_name.as_bytes().to_vec();
@@ -75,9 +71,7 @@ impl NetworkTest for ReconfigurationTest {
                 )
                 .await
                 .unwrap();
-                version = expect_epoch(full_node_jsonrpc_client, version, 2)
-                    .await
-                    .unwrap();
+                expect_epoch(full_node_client, 2).await.unwrap();
                 let add_txn = diem_root_account.sign_with_transaction_builder(
                     tx_factory.add_validator_and_reconfigure(
                         allowed_nonce,
@@ -92,9 +86,7 @@ impl NetworkTest for ReconfigurationTest {
                 )
                 .await
                 .unwrap();
-                version = expect_epoch(full_node_jsonrpc_client, version, 3)
-                    .await
-                    .unwrap();
+                expect_epoch(full_node_client, 3).await.unwrap();
             }
 
             {
@@ -120,9 +112,7 @@ impl NetworkTest for ReconfigurationTest {
                     )
                     .await
                     .unwrap();
-                    version = expect_epoch(full_node_jsonrpc_client, version, (i + 1) * 2)
-                        .await
-                        .unwrap();
+                    expect_epoch(full_node_client, (i + 1) * 2).await.unwrap();
                     let downgrade_txn = diem_root_account.sign_with_transaction_builder(
                         tx_factory.update_diem_consensus_config(
                             allowed_nonce,
@@ -136,7 +126,7 @@ impl NetworkTest for ReconfigurationTest {
                     )
                     .await
                     .unwrap();
-                    version = expect_epoch(full_node_jsonrpc_client, version, (i + 1) * 2 + 1)
+                    expect_epoch(full_node_client, (i + 1) * 2 + 1)
                         .await
                         .unwrap();
                 }
@@ -155,9 +145,7 @@ impl NetworkTest for ReconfigurationTest {
                 )
                 .await
                 .unwrap();
-                expect_epoch(full_node_jsonrpc_client, version, count + 1)
-                    .await
-                    .unwrap();
+                expect_epoch(full_node_client, count + 1).await.unwrap();
             }
         });
 
@@ -172,20 +160,14 @@ impl NetworkTest for ReconfigurationTest {
     }
 }
 
-async fn expect_epoch(
-    client: &Client,
-    known_version: u64,
-    expected_epoch: u64,
-) -> anyhow::Result<u64> {
-    let state_proof = client.get_state_proof(known_version).await?.into_inner();
-    let li: LedgerInfoWithSignatures = bcs::from_bytes(&state_proof.ledger_info_with_signatures)?;
-    let epoch = li.ledger_info().next_block_epoch();
+async fn expect_epoch(client: &RestClient, expected_epoch: u64) -> anyhow::Result<()> {
+    let config = client.get_epoch_configuration().await?.into_inner();
+    let next_block_epoch = *config.next_block_epoch.inner();
     ensure!(
-        epoch == expected_epoch,
-        "Expect epoch {}, actual {}",
+        next_block_epoch == expected_epoch,
+        "Expect next block epoch {}, actual {}",
         expected_epoch,
-        epoch
+        next_block_epoch
     );
-    println!("Epoch {} is committed", epoch);
-    Ok(li.ledger_info().version())
+    Ok(())
 }

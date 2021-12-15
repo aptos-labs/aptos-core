@@ -3,9 +3,13 @@
 
 use std::time::{Duration, Instant};
 
+use anyhow::bail;
 use diem_config::config::NodeConfig;
-use diem_sdk::{client::views::AmountView, transaction_builder::Currency, types::LocalAccount};
+use diem_rest_client::Client as RestClient;
+use diem_sdk::{transaction_builder::Currency, types::LocalAccount};
+use diem_types::account_address::AccountAddress;
 use forge::{NetworkContext, NetworkTest, NodeExt, Result, Test};
+use tokio::runtime::Runtime;
 
 #[derive(Debug)]
 pub struct LaunchFullnode;
@@ -25,7 +29,7 @@ impl NetworkTest for LaunchFullnode {
 
         let fullnode = ctx.swarm().full_node_mut(fullnode_peer_id).unwrap();
         fullnode.wait_until_healthy(Instant::now() + Duration::from_secs(10))?;
-        let client = fullnode.json_rpc_client();
+        let client = fullnode.rest_client();
 
         let factory = ctx.swarm().chain_info().transaction_factory();
         let mut account1 = LocalAccount::generate(ctx.core().rng());
@@ -40,16 +44,8 @@ impl NetworkTest for LaunchFullnode {
             .chain_info()
             .create_parent_vasp_account(Currency::XUS, account2.authentication_key())?;
 
-        loop {
-            if client
-                .get_account(account1.address())?
-                .into_inner()
-                .is_some()
-            {
-                println!("hello");
-                break;
-            }
-        }
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on(wait_for_account(&client, account1.address()))?;
 
         let txn = account1.sign_with_transaction_builder(factory.peer_to_peer(
             Currency::XUS,
@@ -57,21 +53,31 @@ impl NetworkTest for LaunchFullnode {
             10,
         ));
 
-        client.submit(&txn)?;
-        client.wait_for_signed_transaction(&txn, None, None)?;
+        runtime.block_on(client.submit_and_wait(&txn))?;
+        let balances = runtime
+            .block_on(client.get_account_balances(account1.address()))?
+            .into_inner();
 
         assert_eq!(
-            vec![AmountView {
-                amount: 90,
-                currency: "XUS".to_string()
-            }],
-            client
-                .get_account(account1.address())?
-                .into_inner()
-                .unwrap()
-                .balances
+            vec![(90, "XUS".to_string())],
+            balances
+                .into_iter()
+                .map(|b| (b.amount, b.currency_code()))
+                .collect::<Vec<(u64, String)>>()
         );
 
         Ok(())
     }
+}
+
+async fn wait_for_account(client: &RestClient, address: AccountAddress) -> Result<()> {
+    const DEFAULT_WAIT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
+    let start = std::time::Instant::now();
+    while start.elapsed() < DEFAULT_WAIT_TIMEOUT {
+        if client.get_account(address).await.is_ok() {
+            return Ok(());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    bail!("wait for account(address={}) timeout", address,)
 }

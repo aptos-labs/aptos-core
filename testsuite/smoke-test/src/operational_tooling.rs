@@ -27,7 +27,8 @@ use diem_operational_tool::{
     keys::{EncodingType, KeyType},
     test_helper::OperationalTool,
 };
-use diem_sdk::client::{views::VMStatusView, BlockingClient};
+use diem_rest_client::Client as RestClient;
+use diem_sdk::client::views::VMStatusView;
 use diem_secure_storage::{CryptoStorage, KVStorage, Storage};
 use diem_temppath::TempPath;
 use diem_types::{
@@ -48,6 +49,7 @@ use std::{
     str::FromStr,
     time::{Duration, Instant},
 };
+use tokio::runtime::Runtime;
 
 #[test]
 fn test_account_resource() {
@@ -88,7 +90,7 @@ fn test_auto_validate_options() {
     assert!(txn_ctx.execution_result.is_none());
 
     // Now wait for transaction execution
-    let client = swarm.validators().next().unwrap().json_rpc_client();
+    let client = swarm.validators().next().unwrap().rest_client();
     wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number).unwrap();
 
     // Verify that the transaction was executed correctly
@@ -248,7 +250,7 @@ fn test_set_operator_and_add_new_validator() {
         .unwrap();
 
     // Wait for transaction execution
-    let client = validator.json_rpc_client();
+    let client = validator.rest_client();
     wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number).unwrap();
 
     // Verify that the transaction was executed
@@ -591,7 +593,7 @@ fn test_fullnode_network_key_rotation() {
     assert!(txn_ctx.execution_result.is_none());
 
     // Wait for transaction execution
-    let client = env.validators().next().unwrap().json_rpc_client();
+    let client = env.validators().next().unwrap().rest_client();
     wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number).unwrap();
 
     // Verify that the config has been loaded correctly with new key
@@ -713,7 +715,7 @@ fn test_operator_key_rotation() {
     assert!(txn_ctx.execution_result.is_none());
 
     // Wait for transaction execution
-    let client = env.validators().next().unwrap().json_rpc_client();
+    let client = env.validators().next().unwrap().rest_client();
     wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number).unwrap();
 
     // Verify that the transaction was executed correctly
@@ -770,7 +772,7 @@ fn test_operator_key_rotation_recovery() {
     assert_eq!(rotated_operator_key, new_operator_key);
 
     // Wait for transaction execution
-    let client = env.validators().next().unwrap().json_rpc_client();
+    let client = env.validators().next().unwrap().rest_client();
     wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number).unwrap();
 
     // Verify that the transaction was executed correctly
@@ -857,7 +859,7 @@ fn test_validate_transaction() {
 
     // Submit a transaction (rotate the operator key) and validate the transaction execution
     let (txn_ctx, _) = op_tool.rotate_operator_key(&backend, true).unwrap();
-    let client = swarm.validators().next().unwrap().json_rpc_client();
+    let client = swarm.validators().next().unwrap().rest_client();
     wait_for_account_sequence_number(&client, operator_account, txn_ctx.sequence_number).unwrap();
 
     let result = op_tool
@@ -1084,7 +1086,7 @@ fn create_validator_with_file_writer(file_writer: fn(&Ed25519PublicKey, PathBuf)
     let (validator_key, validator_account) = create_new_test_account();
 
     let validator = swarm.validators().next().unwrap();
-    let client = validator.json_rpc_client();
+    let client = validator.rest_client();
     // Verify the corresponding account doesn't exist on-chain
     let diem_json_rpc = JsonRpcDiemInterface::new(validator.json_rpc_endpoint().to_string());
     diem_json_rpc
@@ -1162,27 +1164,20 @@ fn write_key_to_file(
 }
 
 fn wait_for_account_sequence_number(
-    client: &BlockingClient,
+    client: &RestClient,
     address: AccountAddress,
     seq: u64,
 ) -> Result<()> {
     const DEFAULT_WAIT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
 
     let start = std::time::Instant::now();
+    let runtime = Runtime::new().unwrap();
     while start.elapsed() < DEFAULT_WAIT_TIMEOUT {
-        let account_txn = client
-            .get_account_transaction(address, seq, false)?
+        let txns = runtime
+            .block_on(client.get_account_transactions(address, Some(seq), Some(1)))?
             .into_inner();
-        if let Some(txn) = account_txn {
-            if let diem_sdk::client::views::TransactionDataView::UserTransaction {
-                sequence_number,
-                ..
-            } = txn.transaction
-            {
-                if sequence_number >= seq {
-                    return Ok(());
-                }
-            }
+        if txns.len() == 1 {
+            return Ok(());
         }
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
@@ -1199,7 +1194,7 @@ pub fn wait_for_transaction_on_all_nodes(
     sequence_number: u64,
 ) {
     for validator in swarm.validators() {
-        let client = validator.json_rpc_client();
+        let client = validator.rest_client();
         wait_for_account_sequence_number(&client, account, sequence_number).unwrap();
     }
 }

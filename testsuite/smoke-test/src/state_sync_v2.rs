@@ -202,8 +202,9 @@ fn test_validator_sync(mut swarm: LocalSwarm) {
         .unwrap()
         .rest_client();
     let transaction_factory = swarm.chain_info().transaction_factory();
-    let mut account_0 = create_and_fund_account(&mut swarm, 1000);
-    let mut account_1 = create_and_fund_account(&mut swarm, 1000);
+    let runtime = Runtime::new().unwrap();
+    let mut account_0 = runtime.block_on(create_and_fund_account(&mut swarm, 1000));
+    let mut account_1 = runtime.block_on(create_and_fund_account(&mut swarm, 1000));
     execute_transactions(
         &mut swarm,
         &validator_client_0,

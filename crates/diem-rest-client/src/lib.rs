@@ -12,7 +12,7 @@ use move_core_types::{
     move_resource::MoveStructType,
 };
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
-use serde::Deserialize;
+use serde::{de::DeserializeOwned, Deserialize};
 use std::time::Duration;
 use url::Url;
 
@@ -65,8 +65,7 @@ impl Client {
                     dpn::CORE_CODE_ADDRESS,
                     &dpn::BalanceResource::module_identifier(),
                     &dpn::BalanceResource::struct_identifier(),
-                )
-                .await?;
+                ).await?;
             resp.and_then(|resources| {
                 resources
                     .into_iter()
@@ -88,17 +87,16 @@ impl Client {
             })
         }
 
+        // Returns root account DiemAccount::Config<DiemVersion> resource
         pub async fn get_diem_version(&self) -> Result<Response<dpn::DiemConfig<dpn::DiemVersion>>> {
-            let resp = self.get_account_resource(
-                dpn::diem_root_address(), &dpn::config_struct_tag(dpn::diem_version_identifier())).await?;
-            resp.and_then(|conf| {
-                if let Some(val) = conf {
-                    serde_json::from_value(val).map_err(|e| anyhow!("deserialize DiemConfig<DiemVersion> failed: {}", e))
-                } else {
-                    Err(anyhow!("could not find diem version resource from {}", dpn::diem_root_address()))
-                }
-            })
+            self.get_resource::<dpn::DiemConfig<dpn::DiemVersion>>(dpn::diem_root_address(), &dpn::config_struct_tag(dpn::diem_version_identifier())).await
         }
+
+        // Returns root account DiemAccount::Configuration resource
+        pub async fn get_epoch_configuration(&self) -> Result<Response<dpn::Configuration>> {
+            self.get_resource::<dpn::Configuration>(dpn::diem_root_address(), &dpn::ConfigurationResource::struct_tag()).await
+        }
+
     }
 
     pub async fn get_ledger_information(&self) -> Result<Response<State>> {
@@ -290,6 +288,26 @@ impl Client {
                     })
                     .collect()
             })
+        })
+    }
+
+    pub async fn get_resource<T: DeserializeOwned>(
+        &self,
+        address: AccountAddress,
+        resource_type: &StructTag,
+    ) -> Result<Response<T>> {
+        let resp = self.get_account_resource(address, resource_type).await?;
+        resp.and_then(|conf| {
+            if let Some(val) = conf {
+                serde_json::from_value(val)
+                    .map_err(|e| anyhow!("deserialize {} failed: {}", resource_type, e))
+            } else {
+                Err(anyhow!(
+                    "could not find resource {} in account {}",
+                    resource_type,
+                    address
+                ))
+            }
         })
     }
 

@@ -20,6 +20,7 @@ use diem_types::{
 };
 use forge::{LocalSwarm, Node, NodeExt, Swarm};
 use std::{convert::TryInto, str::FromStr};
+use tokio::runtime::Runtime;
 
 #[test]
 fn test_consensus_observer_mode_storage_error() {
@@ -53,20 +54,19 @@ fn test_consensus_observer_mode_storage_error() {
         assert_eq!(VMStatusView::Executed, txn_ctx.execution_result.unwrap());
     }
 
+    let runtime = Runtime::new().unwrap();
     // Verify validator 1 is still able to stay up to date with validator 0 (despite safety rules failing)
-    let client_0 = swarm.validators().next().unwrap().json_rpc_client();
-    let sequence_number_0 = client_0
-        .get_account(txn_ctx.address)
+    let client_0 = swarm.validators().next().unwrap().rest_client();
+    let sequence_number_0 = runtime
+        .block_on(client_0.get_account(txn_ctx.address))
         .unwrap()
         .into_inner()
-        .unwrap()
         .sequence_number;
-    let client_1 = swarm.validators().nth(1).unwrap().json_rpc_client();
-    let sequence_number_1 = client_1
-        .get_account(txn_ctx.address)
+    let client_1 = swarm.validators().nth(1).unwrap().rest_client();
+    let sequence_number_1 = runtime
+        .block_on(client_1.get_account(txn_ctx.address))
         .unwrap()
         .into_inner()
-        .unwrap()
         .sequence_number;
     assert_eq!(sequence_number_0, sequence_number_1);
 }

@@ -192,8 +192,8 @@ fn test_startup_sync_state() {
         .unwrap();
 
     let client_0 = swarm.validator(node_to_restart).unwrap().rest_client();
-    // Wait for the txn to by synced to the restarted node
     runtime.block_on(async {
+        // Wait for the txn to by synced to the restarted node
         client_0.wait_for_signed_transaction(&txn).await.unwrap();
         assert_balance(&client_0, &account_0, 90).await;
         assert_balance(&client_0, &account_1, 20).await;
@@ -291,42 +291,34 @@ fn test_state_sync_multichunk_epoch() {
             ],
         )),
     ));
-    runtime.block_on(client_0.submit_and_wait(&txn)).unwrap();
+    runtime.block_on(async {
+        client_0.submit_and_wait(&txn).await.unwrap();
+        // Bump epoch by trigger a reconfig for multiple epochs
+        for curr_epoch in 2u64..=3 {
+            // bumps epoch from curr_epoch -> curr_epoch + 1
+            enable_open_publishing(
+                &client_0,
+                &transaction_factory,
+                swarm.chain_info().root_account,
+            )
+            .await
+            .unwrap();
+
+            let next_block_epoch = *client_0
+                .get_epoch_configuration()
+                .await
+                .unwrap()
+                .into_inner()
+                .next_block_epoch
+                .inner();
+            assert_eq!(next_block_epoch, curr_epoch + 1);
+        }
+    });
 
     let json_rpc_client_0 = swarm
         .validator(validator_peer_ids[0])
         .unwrap()
         .json_rpc_client();
-    // Bump epoch by trigger a reconfig for multiple epochs
-    for curr_epoch in 2..=3 {
-        // bumps epoch from curr_epoch -> curr_epoch + 1
-        runtime
-            .block_on(enable_open_publishing(
-                &client_0,
-                &transaction_factory,
-                swarm.chain_info().root_account,
-            ))
-            .unwrap();
-
-        let epoch_change_proof: EpochChangeProof = bcs::from_bytes(
-            json_rpc_client_0
-                .get_state_proof(0)
-                .unwrap()
-                .into_inner()
-                .epoch_change_proof
-                .inner(),
-        )
-        .unwrap();
-
-        let ledger_info = epoch_change_proof
-            .ledger_info_with_sigs
-            .last()
-            .unwrap()
-            .ledger_info();
-
-        assert_eq!(ledger_info.epoch(), curr_epoch);
-    }
-
     // bring back dead validator with waypoint
     let epoch_change_proof: EpochChangeProof = bcs::from_bytes(
         json_rpc_client_0

@@ -7,8 +7,10 @@ use serde::{Deserialize, Serialize};
 
 pub use diem_types::account_config::{diem_root_address, BalanceResource, CORE_CODE_ADDRESS};
 pub use diem_types::on_chain_config::{
-    config_struct_tag, DiemVersion as OnChainDiemVersion, OnChainConfig,
+    config_struct_tag, ConfigurationResource, DiemVersion as OnChainDiemVersion, OnChainConfig,
 };
+
+use crate::types::EventHandle;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Diem {
@@ -44,4 +46,12 @@ pub struct DiemConfig<T> {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DiemVersion {
     pub major: U64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Configuration {
+    #[serde(rename = "epoch")]
+    pub next_block_epoch: U64,
+    pub last_reconfiguration_time: U64,
+    pub events: EventHandle,
 }
