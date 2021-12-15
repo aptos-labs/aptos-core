@@ -4393,20 +4393,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jsonrpc-types-proto"
-version = "0.0.0"
-dependencies = [
- "diem-crypto",
- "diem-json-rpc-types",
- "diem-types",
- "diem-workspace-hack",
- "prost",
- "prost-build",
- "serde 1.0.130",
- "serde_json",
-]
-
-[[package]]
 name = "k8s-openapi"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5652,12 +5638,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "multimap"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1255076139a83bb467426e7f8d0134968a8118844faa755985e077cf31850333"
-
-[[package]]
 name = "multipart"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6622,24 +6602,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "prost-build"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "355f634b43cdd80724ee7848f95770e7e70eefa6dcf14fea676216573b8fd603"
-dependencies = [
- "bytes",
- "heck",
- "itertools 0.10.1",
- "log",
- "multimap",
- "petgraph 0.5.1",
- "prost",
- "prost-types",
- "tempfile",
- "which",
-]
-
-[[package]]
 name = "prost-derive"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6650,16 +6612,6 @@ dependencies = [
  "proc-macro2 1.0.28",
  "quote 1.0.9",
  "syn 1.0.74",
-]
-
-[[package]]
-name = "prost-types"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "603bbd6394701d13f3f25aada59c7de9d35a6a5887cfc156181234a44002771b"
-dependencies = [
- "bytes",
- "prost",
 ]
 
 [[package]]

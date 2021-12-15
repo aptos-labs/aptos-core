@@ -82,7 +82,6 @@ members = [
     "json-rpc",
     "json-rpc/integration-tests",
     "json-rpc/types",
-    "json-rpc/types/proto",
     "language/benchmarks",
     "language/move-analyzer",
     "language/move-binary-format",
