@@ -24,7 +24,7 @@ use diem_sdk::{
 use forge::{PublicUsageContext, PublicUsageTest, Result as ForgeResult, Test};
 use proptest::{collection::vec, prelude::*, sample::select};
 use std::cmp::max;
-use tokio::runtime::Builder;
+use tokio::runtime::{Builder, Runtime};
 
 //TODO expose genesis transaction and genesis waypoint from Forge
 fn verifying_client(json_rpc_endpoint: &str) -> ForgeResult<VerifyingClient<InMemoryStateStore>> {
@@ -56,8 +56,9 @@ fn verifying_client(json_rpc_endpoint: &str) -> ForgeResult<VerifyingClient<InMe
 
 fn fund_new_account(ctx: &mut PublicUsageContext<'_>, amount: u64) -> ForgeResult<LocalAccount> {
     let account = ctx.random_account();
-    ctx.create_parent_vasp_account(account.authentication_key())?;
-    ctx.fund(account.address(), amount)?;
+    let runtime = Runtime::new().unwrap();
+    runtime.block_on(ctx.create_parent_vasp_account(account.authentication_key()))?;
+    runtime.block_on(ctx.fund(account.address(), amount))?;
 
     Ok(account)
 }
@@ -411,13 +412,14 @@ impl PublicUsageTest for VerifyingSubmit {
         let transfer_amount = 100;
         let currency = Currency::XUS;
 
+        let runtime = Runtime::new().unwrap();
         let mut account_1 = ctx.random_account();
-        ctx.create_parent_vasp_account(account_1.authentication_key())?;
-        ctx.fund(account_1.address(), start_amount)?;
+        runtime.block_on(ctx.create_parent_vasp_account(account_1.authentication_key()))?;
+        runtime.block_on(ctx.fund(account_1.address(), start_amount))?;
 
         let account_2 = ctx.random_account();
-        ctx.create_parent_vasp_account(account_2.authentication_key())?;
-        ctx.fund(account_2.address(), start_amount)?;
+        runtime.block_on(ctx.create_parent_vasp_account(account_2.authentication_key()))?;
+        runtime.block_on(ctx.fund(account_2.address(), start_amount))?;
 
         rt.block_on(verifying_client.sync()).unwrap();
 

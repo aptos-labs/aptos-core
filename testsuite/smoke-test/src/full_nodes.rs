@@ -53,8 +53,9 @@ fn test_full_node_basic_flow() {
     let vfn_client = swarm.full_node(vfn_peer_id).unwrap().rest_client();
     let pfn_client = swarm.full_node(pfn_peer_id).unwrap().rest_client();
 
-    let mut account_0 = create_and_fund_account(&mut swarm, 10);
-    let account_1 = create_and_fund_account(&mut swarm, 10);
+    let runtime = Runtime::new().unwrap();
+    let mut account_0 = runtime.block_on(create_and_fund_account(&mut swarm, 10));
+    let account_1 = runtime.block_on(create_and_fund_account(&mut swarm, 10));
 
     swarm
         .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(10))
@@ -151,9 +152,11 @@ fn test_vfn_failover() {
             .unwrap();
     }
 
+    let runtime = Runtime::new().unwrap();
+
     // Setup accounts
-    let mut account_0 = create_and_fund_account(&mut swarm, 100);
-    let account_1 = create_and_fund_account(&mut swarm, 100);
+    let mut account_0 = runtime.block_on(create_and_fund_account(&mut swarm, 100));
+    let account_1 = runtime.block_on(create_and_fund_account(&mut swarm, 100));
 
     swarm
         .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(10))
@@ -165,7 +168,6 @@ fn test_vfn_failover() {
     // submit client requests directly to VFN of dead V
     swarm.validator_mut(validator).unwrap().stop();
 
-    let runtime = Runtime::new().unwrap();
     runtime.block_on(async {
         transfer_coins(
             &vfn_client,
@@ -265,14 +267,15 @@ fn test_private_full_node() {
     let validator_client = swarm.validators().next().unwrap().rest_client();
     let user_client = swarm.full_node(user).unwrap().rest_client();
 
-    let mut account_0 = create_and_fund_account(&mut swarm, 100);
-    let account_1 = create_and_fund_account(&mut swarm, 10);
+    let runtime = Runtime::new().unwrap();
+
+    let mut account_0 = runtime.block_on(create_and_fund_account(&mut swarm, 100));
+    let account_1 = runtime.block_on(create_and_fund_account(&mut swarm, 10));
 
     swarm
         .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(60))
         .unwrap();
 
-    let runtime = Runtime::new().unwrap();
     runtime.block_on(async {
         // send txn from user node and check both validator and user node have correct balance
         transfer_coins(

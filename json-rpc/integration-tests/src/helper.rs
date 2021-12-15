@@ -16,6 +16,7 @@ use diem_sdk::{
 };
 use forge::PublicUsageContext;
 use serde_json::{json, Value};
+use tokio::runtime::Runtime;
 
 pub struct JsonRpcTestHelper {
     url: String,
@@ -158,7 +159,8 @@ impl JsonRpcTestHelper {
         let mut parent = ctx.random_account();
         let child1 = ctx.random_account();
         let child2 = ctx.random_account();
-        ctx.create_parent_vasp_account(parent.authentication_key())?;
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on(ctx.create_parent_vasp_account(parent.authentication_key()))?;
         self.submit_and_wait(&parent.sign_with_transaction_builder(
             factory.create_child_vasp_account(Currency::XUS, child1.authentication_key(), false, 0),
         ));
@@ -166,9 +168,9 @@ impl JsonRpcTestHelper {
             factory.create_child_vasp_account(Currency::XUS, child2.authentication_key(), false, 0),
         ));
 
-        ctx.fund(parent.address(), amount)?;
-        ctx.fund(child1.address(), amount)?;
-        ctx.fund(child2.address(), amount)?;
+        runtime.block_on(ctx.fund(parent.address(), amount))?;
+        runtime.block_on(ctx.fund(child1.address(), amount))?;
+        runtime.block_on(ctx.fund(child2.address(), amount))?;
 
         Ok((parent, child1, child2))
     }

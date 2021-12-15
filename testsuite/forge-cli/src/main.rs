@@ -1,11 +1,8 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_sdk::{
-    client::{BlockingClient, MethodRequest},
-    move_types::account_address::AccountAddress,
-    transaction_builder::Currency,
-};
+use diem_rest_client::Client as RestClient;
+use diem_sdk::{move_types::account_address::AccountAddress, transaction_builder::Currency};
 use forge::{ForgeConfig, Options, Result, *};
 use std::{env, num::NonZeroUsize, process, time::Duration};
 use structopt::StructOpt;
@@ -15,6 +12,7 @@ use testcases::{
     performance_test::PerformanceBenchmark, reconfiguration_test::ReconfigurationTest,
     state_sync_performance::StateSyncPerformance,
 };
+use tokio::runtime::Runtime;
 use url::Url;
 
 #[derive(StructOpt, Debug)]
@@ -416,17 +414,19 @@ impl AdminTest for GetMetadata {
     }
 }
 
-pub fn check_account_balance(
-    client: &BlockingClient,
+pub async fn check_account_balance(
+    client: &RestClient,
     currency: Currency,
     account_address: AccountAddress,
     expected: u64,
 ) -> Result<()> {
-    let account_view = client.get_account(account_address)?.into_inner().unwrap();
-    let balance = account_view
-        .balances
+    let balances = client
+        .get_account_balances(account_address)
+        .await?
+        .into_inner();
+    let balance = balances
         .iter()
-        .find(|b| b.currency == currency)
+        .find(|b| b.currency_code() == currency)
         .unwrap();
     assert_eq!(balance.amount, expected);
 
@@ -444,14 +444,22 @@ impl Test for FundAccount {
 
 impl PublicUsageTest for FundAccount {
     fn run<'t>(&self, ctx: &mut PublicUsageContext<'t>) -> Result<()> {
-        let client = ctx.client();
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on(self.async_run(ctx))
+    }
+}
+
+impl FundAccount {
+    async fn async_run(&self, ctx: &mut PublicUsageContext<'_>) -> Result<()> {
+        let client = ctx.rest_client();
 
         let account = ctx.random_account();
         let amount = 1000;
         let currency = Currency::XUS;
-        ctx.create_parent_vasp_account(account.authentication_key())?;
-        ctx.fund(account.address(), amount)?;
-        check_account_balance(&client, currency, account.address(), amount)?;
+        ctx.create_parent_vasp_account(account.authentication_key())
+            .await?;
+        ctx.fund(account.address(), amount).await?;
+        check_account_balance(&client, currency, account.address(), amount).await?;
 
         Ok(())
     }
@@ -468,12 +476,20 @@ impl Test for TransferCoins {
 
 impl PublicUsageTest for TransferCoins {
     fn run<'t>(&self, ctx: &mut PublicUsageContext<'t>) -> Result<()> {
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on(self.async_run(ctx))
+    }
+}
+
+impl TransferCoins {
+    async fn async_run(&self, ctx: &mut PublicUsageContext<'_>) -> Result<()> {
         let mut account = ctx.random_account();
         let amount = 1000;
         let currency = Currency::XUS;
-        let client = ctx.client();
-        ctx.create_parent_vasp_account(account.authentication_key())?;
-        ctx.fund(account.address(), amount)?;
+        let client = ctx.rest_client();
+        ctx.create_parent_vasp_account(account.authentication_key())
+            .await?;
+        ctx.fund(account.address(), amount).await?;
 
         let mut payer = ctx.random_account();
         let payee = ctx.random_account();
@@ -493,25 +509,16 @@ impl PublicUsageTest for TransferCoins {
                 0,
             ),
         );
-        let batch = vec![
-            MethodRequest::submit(&create_payer)?,
-            MethodRequest::submit(&create_payee)?,
-        ];
-        client.batch(batch)?;
-        client.wait_for_signed_transaction(&create_payer, None, None)?;
-        client.wait_for_signed_transaction(&create_payee, None, None)?;
-        check_account_balance(&client, currency, payer.address(), 100)?;
+        client.submit(&create_payer).await?;
+        client.submit(&create_payee).await?;
+        client.wait_for_signed_transaction(&create_payer).await?;
+        client.wait_for_signed_transaction(&create_payee).await?;
+        check_account_balance(&client, currency, payer.address(), 100).await?;
 
-        ctx.transfer_coins(currency, &mut payer, payee.address(), 10)?;
-        check_account_balance(&client, currency, payer.address(), 90)?;
-        check_account_balance(&client, currency, payee.address(), 10)?;
-        let account_view = client.get_account(payee.address())?.into_inner().unwrap();
-        let balance = account_view
-            .balances
-            .iter()
-            .find(|b| b.currency == currency)
-            .unwrap();
-        assert_eq!(balance.amount, 10);
+        ctx.transfer_coins(currency, &mut payer, payee.address(), 10)
+            .await?;
+        check_account_balance(&client, currency, payer.address(), 90).await?;
+        check_account_balance(&client, currency, payee.address(), 10).await?;
 
         Ok(())
     }

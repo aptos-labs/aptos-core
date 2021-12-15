@@ -1,12 +1,12 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_sdk::{
-    client::views::VMStatusView, transaction_builder::Currency,
-    types::account_address::AccountAddress,
-};
+use anyhow::bail;
+use diem_rest_client::Transaction;
+use diem_sdk::{transaction_builder::Currency, types::account_address::AccountAddress};
 use diem_transaction_replay::DiemDebugger;
 use forge::{PublicUsageContext, PublicUsageTest, Result, Test};
+use tokio::runtime::Runtime;
 
 pub struct ReplayTooling;
 
@@ -18,36 +18,40 @@ impl Test for ReplayTooling {
 
 impl PublicUsageTest for ReplayTooling {
     fn run<'t>(&self, ctx: &mut PublicUsageContext<'t>) -> Result<()> {
-        let client = ctx.client();
+        let client = ctx.rest_client();
+        // todo: try async call to json_debugger calls
         let json_debugger = DiemDebugger::json_rpc(ctx.url())?;
 
         let treasury_account_address =
             AccountAddress::from_hex("0000000000000000000000000b1e55ed")?;
 
-        let treasury_account = client
-            .get_account(treasury_account_address)?
-            .into_inner()
-            .unwrap();
+        let runtime = Runtime::new().unwrap();
+        let treasury_account = runtime
+            .block_on(client.get_account(treasury_account_address))?
+            .into_inner();
         let mut account1 = ctx.random_account();
         let account2 = ctx.random_account();
-        ctx.create_parent_vasp_account(account1.authentication_key())?;
-        ctx.create_parent_vasp_account(account2.authentication_key())?;
-        ctx.fund(account1.address(), 100)?;
-        ctx.fund(account2.address(), 100)?;
+        runtime.block_on(ctx.create_parent_vasp_account(account1.authentication_key()))?;
+        runtime.block_on(ctx.create_parent_vasp_account(account2.authentication_key()))?;
+        runtime.block_on(ctx.fund(account1.address(), 100))?;
+        runtime.block_on(ctx.fund(account2.address(), 100))?;
         let txn = account1.sign_with_transaction_builder(ctx.transaction_factory().peer_to_peer(
             Currency::XUS,
             account2.address(),
             3,
         ));
-        client.submit(&txn)?;
-        let txn = client
-            .wait_for_signed_transaction(&txn, None, None)?
-            .into_inner();
-
+        let txn = runtime.block_on(client.submit_and_wait(&txn))?.into_inner();
+        let (txn_version, txn_gas_used) = match txn {
+            Transaction::UserTransaction(user_txn) => {
+                (user_txn.info.version.0, user_txn.info.gas_used.0)
+            }
+            _ => bail!("unexpected transaction type: {:?}", txn),
+        };
         let replay_result = json_debugger
-            .execute_past_transactions(txn.version, 1, false)?
+            .execute_past_transactions(txn_version, 1, false)?
             .pop()
             .unwrap();
+        assert_eq!(replay_result.gas_used(), txn_gas_used);
 
         let script_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../diem-move/transaction-replay/examples/account_exists.move")
@@ -58,23 +62,28 @@ impl PublicUsageTest for ReplayTooling {
                 script_path.to_str().unwrap(),
                 account1.address(),
                 0,
-                txn.version,
+                txn_version,
                 None,
             )?
             .unwrap();
 
-        let account_creation_txn = client
-            .get_account_transaction(
+        let account_creation_txn = runtime
+            .block_on(client.get_account_transactions(
                 treasury_account_address,
-                treasury_account.sequence_number,
-                false,
-            )?
+                Some(treasury_account.sequence_number),
+                Some(1),
+            ))?
             .into_inner()
+            .into_iter()
+            .next()
             .unwrap();
 
-        assert_eq!(account_creation_txn.version + 1, bisect_result);
-        assert_eq!(replay_result.gas_used(), txn.gas_used);
-        assert_eq!(VMStatusView::Executed, txn.vm_status);
+        match account_creation_txn {
+            Transaction::UserTransaction(user_txn) => {
+                assert_eq!(user_txn.info.version.0 + 1, bisect_result);
+            }
+            _ => bail!("unexpected transaction type: {:?}", account_creation_txn),
+        }
 
         Ok(())
     }

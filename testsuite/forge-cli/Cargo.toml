@@ -12,6 +12,7 @@ edition = "2018"
 [dependencies]
 anyhow = { version = "1.0", features = ["backtrace"] }
 diem-sdk = { path = "../../sdk" }
+diem-rest-client = { path = "../../crates/diem-rest-client"}
 forge = { path = "../forge" }
 itertools = "0.10.0"
 rand_core = "0.6.2"

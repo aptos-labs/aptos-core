@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{Coffer, NFTPublicInfo, PublicInfo, Result};
+use diem_rest_client::Client as RestClient;
 use diem_sdk::{
     client::BlockingClient,
     transaction_builder::{Currency, TransactionFactory},
@@ -10,6 +11,7 @@ use diem_sdk::{
         transaction::authenticator::AuthenticationKey, LocalAccount,
     },
 };
+use reqwest::Url;
 
 #[derive(Debug)]
 pub struct ChainInfo<'t> {
@@ -64,6 +66,10 @@ impl<'t> ChainInfo<'t> {
         &self.rest_api_url
     }
 
+    pub fn rest_client(&self) -> RestClient {
+        RestClient::new(Url::parse(self.rest_api()).unwrap())
+    }
+
     pub fn chain_id(&self) -> ChainId {
         self.chain_id
     }
@@ -72,13 +78,13 @@ impl<'t> ChainInfo<'t> {
         TransactionFactory::new(self.chain_id())
     }
 
-    pub fn create_parent_vasp_account(
+    pub async fn create_parent_vasp_account(
         &mut self,
         currency: Currency,
         authentication_key: AuthenticationKey,
     ) -> Result<()> {
         let factory = self.transaction_factory();
-        let client = self.json_rpc_client();
+        let client = self.rest_client();
         let treasury_compliance_account = self.treasury_compliance_account();
 
         let create_account_txn = treasury_compliance_account.sign_with_transaction_builder(
@@ -90,18 +96,17 @@ impl<'t> ChainInfo<'t> {
                 false,
             ),
         );
-        client.submit(&create_account_txn)?;
-        client.wait_for_signed_transaction(&create_account_txn, None, None)?;
+        client.submit_and_wait(&create_account_txn).await?;
         Ok(())
     }
 
-    pub fn create_designated_dealer_account(
+    pub async fn create_designated_dealer_account(
         &mut self,
         currency: Currency,
         authentication_key: AuthenticationKey,
     ) -> Result<()> {
         let factory = self.transaction_factory();
-        let client = self.json_rpc_client();
+        let client = self.rest_client();
         let treasury_compliance_account = self.treasury_compliance_account();
 
         let create_account_txn = treasury_compliance_account.sign_with_transaction_builder(
@@ -113,19 +118,22 @@ impl<'t> ChainInfo<'t> {
                 false, // add all currencies
             ),
         );
-        client.submit(&create_account_txn)?;
-        client.wait_for_signed_transaction(&create_account_txn, None, None)?;
+        client.submit_and_wait(&create_account_txn).await?;
         Ok(())
     }
 
-    pub fn fund(&mut self, currency: Currency, address: AccountAddress, amount: u64) -> Result<()> {
+    pub async fn fund(
+        &mut self,
+        currency: Currency,
+        address: AccountAddress,
+        amount: u64,
+    ) -> Result<()> {
         let factory = self.transaction_factory();
-        let client = self.json_rpc_client();
+        let client = self.rest_client();
         let designated_dealer_account = self.designated_dealer_account();
         let fund_account_txn = designated_dealer_account
             .sign_with_transaction_builder(factory.peer_to_peer(currency, address, amount));
-        client.submit(&fund_account_txn)?;
-        client.wait_for_signed_transaction(&fund_account_txn, None, None)?;
+        client.submit_and_wait(&fund_account_txn).await?;
         Ok(())
     }
 
@@ -135,7 +143,7 @@ impl<'t> ChainInfo<'t> {
             self.chain_id,
             Coffer::TreasuryCompliance {
                 transaction_factory: TransactionFactory::new(self.chain_id),
-                json_rpc_client: BlockingClient::new(self.json_rpc_url),
+                rest_client: self.rest_client(),
                 treasury_compliance_account: self.treasury_compliance_account,
                 designated_dealer_account: self.designated_dealer_account,
             },

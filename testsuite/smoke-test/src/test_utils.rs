@@ -11,17 +11,18 @@ use diem_sdk::{
 use forge::{LocalSwarm, NodeExt, Swarm};
 use rand::random;
 use std::{fs::File, io::Write, path::PathBuf};
-use tokio::runtime::Runtime;
 
-pub fn create_and_fund_account(swarm: &mut LocalSwarm, amount: u64) -> LocalAccount {
+pub async fn create_and_fund_account(swarm: &mut LocalSwarm, amount: u64) -> LocalAccount {
     let account = LocalAccount::generate(&mut rand::rngs::OsRng);
     swarm
         .chain_info()
         .create_parent_vasp_account(Currency::XUS, account.authentication_key())
+        .await
         .unwrap();
     swarm
         .chain_info()
         .fund(Currency::XUS, account.address(), amount)
+        .await
         .unwrap();
     account
 }
@@ -201,25 +202,22 @@ pub fn write_key_to_file_bcs_format(key: &Ed25519PublicKey, key_file_path: PathB
 
 /// This helper function creates 3 new accounts, mints funds, transfers funds
 /// between the accounts and verifies that these operations succeed.
-pub fn check_create_mint_transfer(swarm: &mut LocalSwarm) {
+pub async fn check_create_mint_transfer(swarm: &mut LocalSwarm) {
     let client = swarm.validators().next().unwrap().rest_client();
     let transaction_factory = swarm.chain_info().transaction_factory();
 
     // Create account 0, mint 10 coins and check balance
-    let mut account_0 = create_and_fund_account(swarm, 10);
-    let runtime = Runtime::new().unwrap();
-    runtime.block_on(assert_balance(&client, &account_0, 10));
+    let mut account_0 = create_and_fund_account(swarm, 10).await;
+    assert_balance(&client, &account_0, 10).await;
 
     // Create account 1, mint 1 coin, transfer 3 coins from account 0 to 1, check balances
-    let account_1 = create_and_fund_account(swarm, 1);
-    runtime.block_on(async {
-        transfer_coins(&client, &transaction_factory, &mut account_0, &account_1, 3).await;
+    let account_1 = create_and_fund_account(swarm, 1).await;
+    transfer_coins(&client, &transaction_factory, &mut account_0, &account_1, 3).await;
 
-        assert_balance(&client, &account_0, 7).await;
-        assert_balance(&client, &account_1, 4).await;
-    });
+    assert_balance(&client, &account_0, 7).await;
+    assert_balance(&client, &account_1, 4).await;
 
     // Create account 2, mint 15 coins and check balance
-    let account_2 = create_and_fund_account(swarm, 15);
-    runtime.block_on(assert_balance(&client, &account_2, 15));
+    let account_2 = create_and_fund_account(swarm, 15).await;
+    assert_balance(&client, &account_2, 15).await;
 }

@@ -29,23 +29,33 @@ impl NetworkTest for LaunchFullnode {
 
         let fullnode = ctx.swarm().full_node_mut(fullnode_peer_id).unwrap();
         fullnode.wait_until_healthy(Instant::now() + Duration::from_secs(10))?;
-        let client = fullnode.rest_client();
 
+        let runtime = Runtime::new().unwrap();
+        let client = fullnode.rest_client();
+        runtime.block_on(self.async_run(ctx, client))
+    }
+}
+
+impl LaunchFullnode {
+    async fn async_run(&self, ctx: &mut NetworkContext<'_>, client: RestClient) -> Result<()> {
         let factory = ctx.swarm().chain_info().transaction_factory();
         let mut account1 = LocalAccount::generate(ctx.core().rng());
         let account2 = LocalAccount::generate(ctx.core().rng());
-        ctx.swarm()
-            .chain_info()
-            .create_parent_vasp_account(Currency::XUS, account1.authentication_key())?;
-        ctx.swarm()
-            .chain_info()
-            .fund(Currency::XUS, account1.address(), 100)?;
-        ctx.swarm()
-            .chain_info()
-            .create_parent_vasp_account(Currency::XUS, account2.authentication_key())?;
 
-        let runtime = Runtime::new().unwrap();
-        runtime.block_on(wait_for_account(&client, account1.address()))?;
+        ctx.swarm()
+            .chain_info()
+            .create_parent_vasp_account(Currency::XUS, account1.authentication_key())
+            .await?;
+        ctx.swarm()
+            .chain_info()
+            .fund(Currency::XUS, account1.address(), 100)
+            .await?;
+        ctx.swarm()
+            .chain_info()
+            .create_parent_vasp_account(Currency::XUS, account2.authentication_key())
+            .await?;
+
+        wait_for_account(&client, account1.address()).await?;
 
         let txn = account1.sign_with_transaction_builder(factory.peer_to_peer(
             Currency::XUS,
@@ -53,9 +63,10 @@ impl NetworkTest for LaunchFullnode {
             10,
         ));
 
-        runtime.block_on(client.submit_and_wait(&txn))?;
-        let balances = runtime
-            .block_on(client.get_account_balances(account1.address()))?
+        client.submit_and_wait(&txn).await?;
+        let balances = client
+            .get_account_balances(account1.address())
+            .await?
             .into_inner();
 
         assert_eq!(

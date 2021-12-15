@@ -165,24 +165,25 @@ fn test_onchain_upgrade(new_onfig: OnChainConsensusConfig) {
     let num_nodes = 4;
     let (mut swarm, _, _, _) = launch_swarm_with_op_tool_and_backend(num_nodes);
 
-    // should work before upgrade.
-    check_create_mint_transfer(&mut swarm);
+    let runtime = Runtime::new().unwrap();
+    runtime.block_on(async {
+        // should work before upgrade.
+        check_create_mint_transfer(&mut swarm).await;
 
-    // send upgrade txn
-    let transaction_factory = swarm.chain_info().transaction_factory();
-    let upgrade_txn = swarm
-        .chain_info()
-        .root_account
-        .sign_with_transaction_builder(
-            transaction_factory.update_diem_consensus_config(0, bcs::to_bytes(&new_onfig).unwrap()),
-        );
+        // send upgrade txn
+        let transaction_factory = swarm.chain_info().transaction_factory();
+        let upgrade_txn = swarm
+            .chain_info()
+            .root_account
+            .sign_with_transaction_builder(
+                transaction_factory
+                    .update_diem_consensus_config(0, bcs::to_bytes(&new_onfig).unwrap()),
+            );
 
-    let client = swarm.validators().next().unwrap().json_rpc_client();
-    client.submit(&upgrade_txn).unwrap();
-    client
-        .wait_for_signed_transaction(&upgrade_txn, None, None)
-        .unwrap();
+        let client = swarm.validators().next().unwrap().rest_client();
+        client.submit_and_wait(&upgrade_txn).await.unwrap();
 
-    // should work after upgrade.
-    check_create_mint_transfer(&mut swarm);
+        // should work after upgrade.
+        check_create_mint_transfer(&mut swarm).await;
+    });
 }

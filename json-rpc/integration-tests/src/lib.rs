@@ -34,6 +34,7 @@ use std::{
     ops::Deref,
     str::FromStr,
 };
+use tokio::runtime::Runtime;
 
 mod helper;
 use helper::JsonRpcTestHelper;
@@ -94,10 +95,11 @@ impl PublicUsageTest for BlockMetadata {
     fn run<'t>(&self, ctx: &mut PublicUsageContext<'t>) -> Result<()> {
         let env = JsonRpcTestHelper::new(ctx.url().to_owned());
 
+        let runtime = Runtime::new().unwrap();
         // Fund and account to ensure there are some txns on the chain
         let account = ctx.random_account();
-        ctx.create_parent_vasp_account(account.authentication_key())?;
-        ctx.fund(account.address(), 10)?;
+        runtime.block_on(ctx.create_parent_vasp_account(account.authentication_key()))?;
+        runtime.block_on(ctx.fund(account.address(), 10))?;
 
         // batch request
         let resp = env.send_request(json!([
@@ -166,9 +168,10 @@ impl Test for OldMetadata {
 
 impl PublicUsageTest for OldMetadata {
     fn run<'t>(&self, ctx: &mut PublicUsageContext<'t>) -> Result<()> {
+        let runtime = Runtime::new().unwrap();
         // create a random accound in order to force the version hieght to be greater than 1
         let account = ctx.random_account();
-        ctx.create_parent_vasp_account(account.authentication_key())?;
+        runtime.block_on(ctx.create_parent_vasp_account(account.authentication_key()))?;
 
         let env = JsonRpcTestHelper::new(ctx.url().to_owned());
         let resp = env.send("get_metadata", json!([1]));
@@ -246,9 +249,10 @@ impl Test for DesignatedDealerPreburns {
 
 impl PublicUsageTest for DesignatedDealerPreburns {
     fn run<'t>(&self, ctx: &mut PublicUsageContext<'t>) -> Result<()> {
+        let runtime = Runtime::new().unwrap();
         let factory = ctx.transaction_factory();
         let mut dd = ctx.random_account();
-        ctx.create_designated_dealer_account(dd.authentication_key())?;
+        runtime.block_on(ctx.create_designated_dealer_account(dd.authentication_key()))?;
 
         let env = JsonRpcTestHelper::new(ctx.url().to_owned());
         let address = format!("{:x}", dd.address());
@@ -301,7 +305,7 @@ impl PublicUsageTest for DesignatedDealerPreburns {
         );
 
         // Fund the DD account and create some Pre-burns
-        ctx.fund(dd.address(), 400)?;
+        runtime.block_on(ctx.fund(dd.address(), 400))?;
 
         env.submit_and_wait(&dd.sign_with_transaction_builder(
             factory.script(stdlib::encode_preburn_script(xus_tag(), 100)),
@@ -396,8 +400,9 @@ impl Test for ParentVaspAccountRole {
 
 impl PublicUsageTest for ParentVaspAccountRole {
     fn run<'t>(&self, ctx: &mut PublicUsageContext<'t>) -> Result<()> {
+        let runtime = Runtime::new().unwrap();
         let vasp = ctx.random_account();
-        ctx.create_parent_vasp_account(vasp.authentication_key())?;
+        runtime.block_on(ctx.create_parent_vasp_account(vasp.authentication_key()))?;
 
         let env = JsonRpcTestHelper::new(ctx.url().to_owned());
         let address = format!("{:x}", vasp.address());
@@ -449,9 +454,10 @@ impl PublicUsageTest for GetAccountByVersion {
         let env = JsonRpcTestHelper::new(ctx.url().to_owned());
         let factory = ctx.transaction_factory();
 
+        let runtime = Runtime::new().unwrap();
         let mut vasp = ctx.random_account();
         let child = ctx.random_account();
-        ctx.create_parent_vasp_account(vasp.authentication_key())?;
+        runtime.block_on(ctx.create_parent_vasp_account(vasp.authentication_key()))?;
         env.submit_and_wait(&vasp.sign_with_transaction_builder(
             factory.create_child_vasp_account(Currency::XUS, child.authentication_key(), false, 0),
         ));
@@ -508,9 +514,10 @@ impl PublicUsageTest for ChildVaspAccountRole {
         let env = JsonRpcTestHelper::new(ctx.url().to_owned());
         let factory = ctx.transaction_factory();
 
+        let runtime = Runtime::new().unwrap();
         let mut parent = ctx.random_account();
         let child = ctx.random_account();
-        ctx.create_parent_vasp_account(parent.authentication_key())?;
+        runtime.block_on(ctx.create_parent_vasp_account(parent.authentication_key()))?;
         env.submit_and_wait(&parent.sign_with_transaction_builder(
             factory.create_child_vasp_account(Currency::XUS, child.authentication_key(), false, 0),
         ));
@@ -840,9 +847,12 @@ impl AdminTest for PreburnAndBurnEvents {
         let env = JsonRpcTestHelper::new(ctx.chain_info().json_rpc().to_owned());
         let factory = ctx.chain_info().transaction_factory();
         let mut dd = ctx.random_account();
-        ctx.chain_info()
-            .create_designated_dealer_account(Currency::XUS, dd.authentication_key())?;
-        ctx.chain_info().fund(Currency::XUS, dd.address(), 1000)?;
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on(
+            ctx.chain_info()
+                .create_designated_dealer_account(Currency::XUS, dd.authentication_key()),
+        )?;
+        runtime.block_on(ctx.chain_info().fund(Currency::XUS, dd.address(), 1000))?;
 
         let script = stdlib::encode_preburn_script(Currency::XUS.type_tag(), 100);
         let txn = dd.sign_with_transaction_builder(factory.script(script.clone()));
@@ -958,9 +968,12 @@ impl AdminTest for CancleBurnEvent {
         let env = JsonRpcTestHelper::new(ctx.chain_info().json_rpc().to_owned());
         let factory = ctx.chain_info().transaction_factory();
         let mut dd = ctx.random_account();
-        ctx.chain_info()
-            .create_designated_dealer_account(Currency::XUS, dd.authentication_key())?;
-        ctx.chain_info().fund(Currency::XUS, dd.address(), 1000)?;
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on(
+            ctx.chain_info()
+                .create_designated_dealer_account(Currency::XUS, dd.authentication_key()),
+        )?;
+        runtime.block_on(ctx.chain_info().fund(Currency::XUS, dd.address(), 1000))?;
 
         let txn = dd.sign_with_transaction_builder(factory.preburn(Currency::XUS, 100));
         env.submit_and_wait(&txn);
@@ -1319,8 +1332,9 @@ impl PublicUsageTest for GetAccountTransactionsWithoutEvents {
     fn run<'t>(&self, ctx: &mut PublicUsageContext<'t>) -> Result<()> {
         let env = JsonRpcTestHelper::new(ctx.url().to_owned());
         let account = ctx.random_account();
-        ctx.create_parent_vasp_account(account.authentication_key())?;
-        ctx.fund(account.address(), 10)?;
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on(ctx.create_parent_vasp_account(account.authentication_key()))?;
+        runtime.block_on(ctx.fund(account.address(), 10))?;
         let response = env.send(
             "get_account_transactions",
             json!([treasury_compliance_account_address(), 0, 1000, false]),
@@ -1370,11 +1384,11 @@ impl Test for GetTransactionsWithProofs {
 impl PublicUsageTest for GetTransactionsWithProofs {
     fn run<'t>(&self, ctx: &mut PublicUsageContext<'t>) -> Result<()> {
         let env = JsonRpcTestHelper::new(ctx.url().to_owned());
-
+        let runtime = Runtime::new().unwrap();
         // Fund and account to ensure there are some txns on the chain
         let account = ctx.random_account();
-        ctx.create_parent_vasp_account(account.authentication_key())?;
-        ctx.fund(account.address(), 10)?;
+        runtime.block_on(ctx.create_parent_vasp_account(account.authentication_key()))?;
+        runtime.block_on(ctx.fund(account.address(), 10))?;
 
         let resp = env.send("get_metadata", json!([]));
 
@@ -1497,10 +1511,12 @@ impl AdminTest for AddAndRemoveVaspDomain {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
         let env = JsonRpcTestHelper::new(ctx.chain_info().json_rpc().to_owned());
         let factory = ctx.chain_info().transaction_factory();
-
+        let runtime = Runtime::new().unwrap();
         let vasp = ctx.random_account();
-        ctx.chain_info()
-            .create_parent_vasp_account(Currency::XUS, vasp.authentication_key())?;
+        runtime.block_on(
+            ctx.chain_info()
+                .create_parent_vasp_account(Currency::XUS, vasp.authentication_key()),
+        )?;
 
         // add domain
         let domain = DiemIdVaspDomainIdentifier::new("diem")
@@ -1626,11 +1642,11 @@ impl Test for GetEventsWithProofs {
 impl PublicUsageTest for GetEventsWithProofs {
     fn run<'t>(&self, ctx: &mut PublicUsageContext<'t>) -> Result<()> {
         let env = JsonRpcTestHelper::new(ctx.url().to_owned());
-
+        let runtime = Runtime::new().unwrap();
         // Fund and account to ensure there are some txns on the chain
         let account = ctx.random_account();
-        ctx.create_parent_vasp_account(account.authentication_key())?;
-        ctx.fund(account.address(), 10)?;
+        runtime.block_on(ctx.create_parent_vasp_account(account.authentication_key()))?;
+        runtime.block_on(ctx.fund(account.address(), 10))?;
 
         let responses = env.send_request(json!([
                     {"jsonrpc": "2.0", "method": "get_state_proof", "params": json!([0]), "id": 1},
@@ -1897,12 +1913,14 @@ impl Test for MultiAgentRotateAuthenticationKeyAdminScriptFunction {
 impl AdminTest for MultiAgentRotateAuthenticationKeyAdminScriptFunction {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
         let env = JsonRpcTestHelper::new(ctx.chain_info().json_rpc().to_owned());
-
+        let runtime = Runtime::new().unwrap();
         // ScriptFunction
         let mut vasp = ctx.random_account();
 
-        ctx.chain_info()
-            .create_parent_vasp_account(Currency::XUS, vasp.authentication_key())?;
+        runtime.block_on(
+            ctx.chain_info()
+                .create_parent_vasp_account(Currency::XUS, vasp.authentication_key()),
+        )?;
 
         let new_key = AccountKey::generate(ctx.rng());
         let txn = env.create_multi_agent_txn(
@@ -1967,12 +1985,14 @@ impl Test for MultiAgentRotateAuthenticationKeyAdminScript {
 impl AdminTest for MultiAgentRotateAuthenticationKeyAdminScript {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
         let env = JsonRpcTestHelper::new(ctx.chain_info().json_rpc().to_owned());
-
+        let runtime = Runtime::new().unwrap();
         // Script
         let mut vasp = ctx.random_account();
 
-        ctx.chain_info()
-            .create_parent_vasp_account(Currency::XUS, vasp.authentication_key())?;
+        runtime.block_on(
+            ctx.chain_info()
+                .create_parent_vasp_account(Currency::XUS, vasp.authentication_key()),
+        )?;
         let new_key = AccountKey::generate(ctx.rng());
         let txn = env.create_multi_agent_txn(
             ctx.chain_info().root_account(),

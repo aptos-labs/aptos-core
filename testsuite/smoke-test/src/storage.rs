@@ -38,10 +38,10 @@ fn test_db_restore() {
         .rest_client();
     let transaction_factory = swarm.chain_info().transaction_factory();
 
-    // set up: two accounts, a lot of money
-    let mut account_0 = create_and_fund_account(&mut swarm, 1000000);
-    let account_1 = create_and_fund_account(&mut swarm, 1000000);
     let runtime = Runtime::new().unwrap();
+    // set up: two accounts, a lot of money
+    let mut account_0 = runtime.block_on(create_and_fund_account(&mut swarm, 1000000));
+    let account_1 = runtime.block_on(create_and_fund_account(&mut swarm, 1000000));
     let mut expected_balance_0 = 999999;
     let mut expected_balance_1 = 1000001;
     runtime.block_on(async {

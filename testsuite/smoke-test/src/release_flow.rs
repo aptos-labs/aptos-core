@@ -35,8 +35,9 @@ fn test_move_release_flow() {
 
     let release_modules = release_modules();
 
+    let runtime = Runtime::new().unwrap();
     // Execute some random transactions to make sure a new block is created.
-    let account = create_and_fund_account(&mut swarm, 100);
+    let account = runtime.block_on(create_and_fund_account(&mut swarm, 100));
 
     // With no artifact for TESTING, creating a release should fail.
     assert!(create_release(chain_id, url.clone(), 1, false, &release_modules, None, "").is_err());
@@ -57,7 +58,6 @@ fn test_move_release_flow() {
             transaction_factory.payload(TransactionPayload::WriteSet(payload_1.clone())),
         );
 
-    let runtime = Runtime::new().unwrap();
     runtime.block_on(client.submit_and_wait(&txn)).unwrap();
 
     let latest_version = validator_interface.get_latest_version().unwrap();
@@ -77,11 +77,14 @@ fn test_move_release_flow() {
     );
 
     // Execute some random transactions to make sure a new block is created.
-    swarm
-        .chain_info()
-        .fund(Currency::XUS, account.address(), 100)
-        .unwrap();
-    runtime.block_on(assert_balance(&client, &account, 200));
+    runtime.block_on(async {
+        swarm
+            .chain_info()
+            .fund(Currency::XUS, account.address(), 100)
+            .await
+            .unwrap();
+        assert_balance(&client, &account, 200).await;
+    });
 
     let latest_version = validator_interface.get_latest_version().unwrap();
     // Now that we have artifact file checked in, we can get rid of the first_release flag

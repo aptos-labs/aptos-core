@@ -3383,6 +3383,7 @@ name = "forge"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "base64",
  "debug-interface",
  "diem-config",
@@ -3426,6 +3427,7 @@ name = "forge-cli"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "diem-rest-client",
  "diem-sdk",
  "diem-workspace-hack",
  "forge",
@@ -4386,6 +4388,7 @@ dependencies = [
  "hex",
  "reqwest",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]

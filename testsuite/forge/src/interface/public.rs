@@ -3,12 +3,14 @@
 
 use super::Test;
 use crate::{CoreContext, Result, TestReport};
+use diem_rest_client::Client as RestClient;
 use diem_sdk::{
     client::{BlockingClient, FaucetClient},
     move_types::account_address::AccountAddress,
     transaction_builder::{Currency, TransactionFactory},
     types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey, LocalAccount},
 };
+use reqwest::Url;
 
 /// The testing interface which defines a test written from the perspective of the a public user of
 /// the network in a "testnet" like environment where there exists a funding source and a means of
@@ -36,6 +38,10 @@ impl<'t> PublicUsageContext<'t> {
 
     pub fn client(&self) -> BlockingClient {
         BlockingClient::new(&self.public_info.json_rpc_url)
+    }
+
+    pub fn rest_client(&self) -> RestClient {
+        RestClient::new(Url::parse(self.rest_api_url()).unwrap())
     }
 
     pub fn url(&self) -> &str {
@@ -66,36 +72,43 @@ impl<'t> PublicUsageContext<'t> {
         TransactionFactory::new(self.chain_id())
     }
 
-    pub fn fund(&mut self, address: AccountAddress, amount: u64) -> Result<()> {
-        self.public_info.coffer.fund(Currency::XUS, address, amount)
+    pub async fn fund(&mut self, address: AccountAddress, amount: u64) -> Result<()> {
+        self.public_info
+            .coffer
+            .fund(Currency::XUS, address, amount)
+            .await
     }
 
-    pub fn create_parent_vasp_account(&mut self, auth_key: AuthenticationKey) -> Result<()> {
+    pub async fn create_parent_vasp_account(&mut self, auth_key: AuthenticationKey) -> Result<()> {
         self.public_info
             .coffer
             .create_parent_vasp_account(Currency::XUS, auth_key)
+            .await
     }
 
-    pub fn create_designated_dealer_account(&mut self, auth_key: AuthenticationKey) -> Result<()> {
+    pub async fn create_designated_dealer_account(
+        &mut self,
+        auth_key: AuthenticationKey,
+    ) -> Result<()> {
         self.public_info
             .coffer
             .create_designated_dealer_account(Currency::XUS, auth_key)
+            .await
     }
 
-    pub fn transfer_coins(
+    pub async fn transfer_coins(
         &mut self,
         currency: Currency,
         sender: &mut LocalAccount,
         payee: AccountAddress,
         amount: u64,
     ) -> Result<()> {
-        let client = self.client();
+        let client = self.rest_client();
         let tx = sender.sign_with_transaction_builder(
             self.transaction_factory()
                 .peer_to_peer(currency, payee, amount),
         );
-        client.submit(&tx)?;
-        client.wait_for_signed_transaction(&tx, None, None)?;
+        client.submit_and_wait(&tx).await?;
 
         Ok(())
     }
@@ -104,48 +117,59 @@ impl<'t> PublicUsageContext<'t> {
 pub enum Coffer<'t> {
     TreasuryCompliance {
         transaction_factory: TransactionFactory,
-        json_rpc_client: BlockingClient,
+        rest_client: RestClient,
         treasury_compliance_account: &'t mut LocalAccount,
         designated_dealer_account: &'t mut LocalAccount,
     },
     Faucet(FaucetClient),
 }
 
+#[async_trait::async_trait]
 pub trait Fund {
-    fn fund(&mut self, currency: Currency, address: AccountAddress, amount: u64) -> Result<()>;
-    fn create_parent_vasp_account(
+    async fn fund(
+        &mut self,
+        currency: Currency,
+        address: AccountAddress,
+        amount: u64,
+    ) -> Result<()>;
+    async fn create_parent_vasp_account(
         &mut self,
         currency: Currency,
         auth_key: AuthenticationKey,
     ) -> Result<()>;
-    fn create_designated_dealer_account(
+    async fn create_designated_dealer_account(
         &mut self,
         currency: Currency,
         auth_key: AuthenticationKey,
     ) -> Result<()>;
 }
 
+#[async_trait::async_trait]
 impl Fund for Coffer<'_> {
-    fn fund(&mut self, currency: Currency, address: AccountAddress, amount: u64) -> Result<()> {
+    async fn fund(
+        &mut self,
+        currency: Currency,
+        address: AccountAddress,
+        amount: u64,
+    ) -> Result<()> {
         match self {
             Coffer::Faucet(_) => todo!(),
             Coffer::TreasuryCompliance {
                 transaction_factory,
-                json_rpc_client,
+                rest_client,
                 treasury_compliance_account: _,
                 designated_dealer_account,
             } => {
                 let fund_account_txn = designated_dealer_account.sign_with_transaction_builder(
                     transaction_factory.peer_to_peer(currency, address, amount),
                 );
-                json_rpc_client.submit(&fund_account_txn)?;
-                json_rpc_client.wait_for_signed_transaction(&fund_account_txn, None, None)?;
+                rest_client.submit_and_wait(&fund_account_txn).await?;
                 Ok(())
             }
         }
     }
 
-    fn create_parent_vasp_account(
+    async fn create_parent_vasp_account(
         &mut self,
         currency: Currency,
         auth_key: AuthenticationKey,
@@ -154,7 +178,7 @@ impl Fund for Coffer<'_> {
             Coffer::Faucet(_) => todo!(),
             Coffer::TreasuryCompliance {
                 transaction_factory,
-                json_rpc_client,
+                rest_client,
                 treasury_compliance_account,
                 ..
             } => {
@@ -167,14 +191,13 @@ impl Fund for Coffer<'_> {
                         false,
                     ),
                 );
-                json_rpc_client.submit(&create_account_txn)?;
-                json_rpc_client.wait_for_signed_transaction(&create_account_txn, None, None)?;
+                rest_client.submit_and_wait(&create_account_txn).await?;
                 Ok(())
             }
         }
     }
 
-    fn create_designated_dealer_account(
+    async fn create_designated_dealer_account(
         &mut self,
         currency: Currency,
         auth_key: AuthenticationKey,
@@ -183,7 +206,7 @@ impl Fund for Coffer<'_> {
             Coffer::Faucet(_) => todo!(),
             Coffer::TreasuryCompliance {
                 transaction_factory,
-                json_rpc_client,
+                rest_client,
                 treasury_compliance_account,
                 ..
             } => {
@@ -196,8 +219,7 @@ impl Fund for Coffer<'_> {
                         false, // add all currencies
                     ),
                 );
-                json_rpc_client.submit(&create_account_txn)?;
-                json_rpc_client.wait_for_signed_transaction(&create_account_txn, None, None)?;
+                rest_client.submit_and_wait(&create_account_txn).await?;
                 Ok(())
             }
         }

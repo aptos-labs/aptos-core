@@ -72,8 +72,10 @@ fn test_genesis_transaction_flow() {
         .wait_until_healthy(Instant::now() + Duration::from_secs(10))
         .unwrap();
 
-    let mut account_0 = create_and_fund_account(&mut swarm, 10);
-    let account_1 = create_and_fund_account(&mut swarm, 10);
+    let runtime = Runtime::new().unwrap();
+
+    let mut account_0 = runtime.block_on(create_and_fund_account(&mut swarm, 10));
+    let account_1 = runtime.block_on(create_and_fund_account(&mut swarm, 10));
 
     println!("2. Set sync_only = true for all nodes and restart");
     for validator in swarm.validators_mut() {
@@ -195,7 +197,6 @@ fn test_genesis_transaction_flow() {
         .validator(validator_peer_ids[0])
         .unwrap()
         .rest_client();
-    let runtime = Runtime::new().unwrap();
     runtime.block_on(async {
         transfer_coins(
             &client_0,

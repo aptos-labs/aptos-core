@@ -47,10 +47,11 @@ fn test_basic_state_synchronization() {
         .rest_client();
     let transaction_factory = swarm.chain_info().transaction_factory();
 
-    let mut account_0 = create_and_fund_account(&mut swarm, 100);
-    let account_1 = create_and_fund_account(&mut swarm, 10);
-
     let runtime = Runtime::new().unwrap();
+
+    let mut account_0 = runtime.block_on(create_and_fund_account(&mut swarm, 100));
+    let account_1 = runtime.block_on(create_and_fund_account(&mut swarm, 10));
+
     runtime.block_on(async {
         transfer_coins(
             &client_1,
@@ -151,10 +152,11 @@ fn test_startup_sync_state() {
         .rest_client();
     let transaction_factory = swarm.chain_info().transaction_factory();
 
-    let mut account_0 = create_and_fund_account(&mut swarm, 100);
-    let account_1 = create_and_fund_account(&mut swarm, 10);
-
     let runtime = Runtime::new().unwrap();
+
+    let mut account_0 = runtime.block_on(create_and_fund_account(&mut swarm, 100));
+    let account_1 = runtime.block_on(create_and_fund_account(&mut swarm, 10));
+
     let txn = runtime.block_on(transfer_coins(
         &client_1,
         &transaction_factory,
@@ -240,8 +242,8 @@ fn test_state_sync_multichunk_epoch() {
         ))
         .unwrap();
 
-    let mut account_0 = create_and_fund_account(&mut swarm, 100);
-    let account_1 = create_and_fund_account(&mut swarm, 10);
+    let mut account_0 = runtime.block_on(create_and_fund_account(&mut swarm, 100));
+    let account_1 = runtime.block_on(create_and_fund_account(&mut swarm, 10));
     runtime.block_on(async {
         assert_balance(&client_0, &account_0, 100).await;
         assert_balance(&client_0, &account_1, 10).await;

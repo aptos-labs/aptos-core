@@ -4,7 +4,6 @@
 use anyhow::{bail, format_err};
 use diem_rest_client::Client as RestClient;
 use diem_sdk::{
-    client::WaitForTransactionError,
     transaction_builder::{Currency, TransactionFactory},
     types::{
         account_address::AccountAddress,
@@ -34,19 +33,28 @@ impl Test for MalformedScript {
 
 impl AdminTest for MalformedScript {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on(self.async_run(ctx))
+    }
+}
+
+impl MalformedScript {
+    async fn async_run(&self, ctx: &mut AdminContext<'_>) -> Result<()> {
         let client = ctx.rest_client();
         let transaction_factory = ctx.chain_info().transaction_factory();
-        let runtime = Runtime::new().unwrap();
-        runtime.block_on(enable_open_publishing(
+        enable_open_publishing(
             &client,
             &transaction_factory,
             &mut ctx.chain_info().root_account,
-        ))?;
+        )
+        .await?;
         let mut account = ctx.random_account();
         ctx.chain_info()
-            .create_parent_vasp_account(Currency::XUS, account.authentication_key())?;
+            .create_parent_vasp_account(Currency::XUS, account.authentication_key())
+            .await?;
         ctx.chain_info()
-            .fund(Currency::XUS, account.address(), 100)?;
+            .fund(Currency::XUS, account.address(), 100)
+            .await?;
 
         let script_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
@@ -63,23 +71,25 @@ impl AdminTest for MalformedScript {
         let compiled_script = compile_program(script_path.to_str().unwrap(), dependencies)?;
 
         // the script expects two arguments. Passing only one in the test, which will cause a failure.
-        let client = ctx.client();
         let factory = ctx.chain_info().transaction_factory();
         let txn =
             account.sign_with_transaction_builder(factory.payload(TransactionPayload::Script(
                 Script::new(compiled_script, vec![], vec![TransactionArgument::U64(10)]),
             )));
-        client.submit(&txn)?;
-        assert!(matches!(
-            client
-                .wait_for_signed_transaction(&txn, None, None)
-                .unwrap_err(),
-            WaitForTransactionError::TransactionExecutionFailed(..)
-        ));
+
+        let pending_txn = client.submit(&txn).await?.into_inner();
+        // ignore error
+        let _ = client.wait_for_signed_transaction(&txn).await;
+        let executed_txn = client
+            .get_transaction(pending_txn.hash.into())
+            .await?
+            .into_inner();
+        assert!(!executed_txn.success());
 
         // Previous transaction should not choke the system.
         ctx.chain_info()
-            .fund(Currency::XUS, account.address(), 100)?;
+            .fund(Currency::XUS, account.address(), 100)
+            .await?;
 
         Ok(())
     }
@@ -95,23 +105,27 @@ impl Test for ExecuteCustomModuleAndScript {
 
 impl AdminTest for ExecuteCustomModuleAndScript {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on(self.async_run(ctx))
+    }
+}
+impl ExecuteCustomModuleAndScript {
+    async fn async_run(&self, ctx: &mut AdminContext<'_>) -> Result<()> {
         let client = ctx.rest_client();
         let factory = ctx.chain_info().transaction_factory();
-        let runtime = Runtime::new().unwrap();
-        runtime.block_on(enable_open_publishing(
-            &client,
-            &factory,
-            ctx.chain_info().root_account,
-        ))?;
+        enable_open_publishing(&client, &factory, ctx.chain_info().root_account).await?;
 
         let mut account1 = ctx.random_account();
         ctx.chain_info()
-            .create_parent_vasp_account(Currency::XUS, account1.authentication_key())?;
+            .create_parent_vasp_account(Currency::XUS, account1.authentication_key())
+            .await?;
         ctx.chain_info()
-            .fund(Currency::XUS, account1.address(), 100)?;
+            .fund(Currency::XUS, account1.address(), 100)
+            .await?;
 
-        let balances = runtime
-            .block_on(client.get_account_balances(account1.address()))?
+        let balances = client
+            .get_account_balances(account1.address())
+            .await?
             .into_inner();
         assert_eq!(balances.len(), 1);
 
@@ -120,9 +134,11 @@ impl AdminTest for ExecuteCustomModuleAndScript {
 
         let account2 = ctx.random_account();
         ctx.chain_info()
-            .create_parent_vasp_account(Currency::XUS, account2.authentication_key())?;
+            .create_parent_vasp_account(Currency::XUS, account2.authentication_key())
+            .await?;
         ctx.chain_info()
-            .fund(Currency::XUS, account2.address(), 1)?;
+            .fund(Currency::XUS, account2.address(), 1)
+            .await?;
 
         // Get the path to the Move stdlib sources
         let move_stdlib_dir = move_stdlib::move_stdlib_modules_full_path();
@@ -150,7 +166,7 @@ impl AdminTest for ExecuteCustomModuleAndScript {
         let publish_txn = account1.sign_with_transaction_builder(factory.payload(
             TransactionPayload::ModuleBundle(ModuleBundle::singleton(compiled_module)),
         ));
-        runtime.block_on(client.submit_and_wait(&publish_txn))?;
+        client.submit_and_wait(&publish_txn).await?;
 
         // Make a copy of script.move with "{{sender}}" substituted.
         let script_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -181,12 +197,13 @@ impl AdminTest for ExecuteCustomModuleAndScript {
                 ],
             )),
         ));
-        runtime.block_on(client.submit_and_wait(&execute_txn))?;
+        client.submit_and_wait(&execute_txn).await?;
 
         assert_eq!(
             vec![(90, "XUS".to_string())],
-            runtime
-                .block_on(client.get_account_balances(account1.address()))?
+            client
+                .get_account_balances(account1.address())
+                .await?
                 .into_inner()
                 .into_iter()
                 .map(|b| (b.amount, b.currency_code()))
@@ -195,8 +212,9 @@ impl AdminTest for ExecuteCustomModuleAndScript {
 
         assert_eq!(
             vec![(11, "XUS".to_string())],
-            runtime
-                .block_on(client.get_account_balances(account2.address()))?
+            client
+                .get_account_balances(account2.address())
+                .await?
                 .into_inner()
                 .into_iter()
                 .map(|b| (b.amount, b.currency_code()))
