@@ -1,0 +1,28 @@
+processed 4 tasks
+
+task 0 'print-bytecode'. lines 1-15:
+// Move bytecode v4
+module 2d6.M {
+struct T has key {
+	b: bool
+}
+
+public new(): T {
+B0:
+	0: LdTrue
+	1: Pack[0](T)
+	2: Ret
+}
+f() {
+B0:
+	0: ImmBorrowLoc[0](Arg0: signer)
+	1: Call[0](new(): T)
+	2: MoveTo[0](T)
+}
+}
+
+task 2 'print-bytecode'. lines 28-37:
+Error: Missing struct definition for T
+
+task 3 'print-bytecode'. lines 39-46:
+Error: Missing struct definition for T

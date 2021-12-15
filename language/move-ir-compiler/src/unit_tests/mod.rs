@@ -5,8 +5,5 @@
 #[macro_use]
 pub(crate) mod testutils;
 
-mod branch_tests;
 mod cfg_tests;
-mod expression_tests;
 mod function_tests;
-mod serializer_tests;

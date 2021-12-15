@@ -1,4 +1,0 @@
-processed 1 task
-
-task 0 'print-bytecode'. lines 1-16:
-Error: variable y undefined

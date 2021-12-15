@@ -1,4 +1,0 @@
-processed 1 task
-
-task 0 'print-bytecode'. lines 1-11:
-Error: Field y defined out of order for struct T

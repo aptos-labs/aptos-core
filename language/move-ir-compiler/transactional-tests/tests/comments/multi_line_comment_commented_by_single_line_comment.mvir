@@ -1,9 +1,0 @@
-//# print-bytecode --input=module
-module 0x1.M {
-    foo() {
-    label b0:
-        // /*
-        return;
-        // */
-    }
-}

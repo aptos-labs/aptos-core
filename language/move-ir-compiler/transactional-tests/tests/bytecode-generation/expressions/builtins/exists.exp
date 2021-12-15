@@ -1,0 +1,23 @@
+processed 4 tasks
+
+task 0 'print-bytecode'. lines 1-10:
+// Move bytecode v4
+module 5d5.M {
+struct T has key {
+	b: bool
+}
+
+f() {
+L0:	loc0: bool
+B0:
+	0: LdU64(4)
+	1: Exists[0](T)
+	2: StLoc[0](loc0: bool)
+}
+}
+
+task 2 'print-bytecode'. lines 17-26:
+Error: Missing struct definition for T
+
+task 3 'print-bytecode'. lines 28-36:
+Error: Missing struct definition for T

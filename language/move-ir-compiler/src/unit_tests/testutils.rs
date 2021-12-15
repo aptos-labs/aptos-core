@@ -3,7 +3,6 @@
 
 use anyhow::Result;
 use move_binary_format::{
-    access::ScriptAccess,
     errors::{Location, VMError},
     file_format::{CompiledModule, CompiledScript},
 };
@@ -12,18 +11,6 @@ use move_ir_to_bytecode::{
     compiler::{compile_module, compile_script},
     parser::{parse_module, parse_script},
 };
-
-#[allow(unused_macros)]
-macro_rules! instr_count {
-    ($compiled: expr, $instr: pat) => {
-        $compiled
-            .code
-            .code
-            .iter()
-            .filter(|ins| matches!(ins, $instr))
-            .count()
-    };
-}
 
 fn compile_script_string_impl(
     code: &str,
@@ -44,7 +31,7 @@ fn compile_script_string_impl(
     })
 }
 
-pub fn compile_script_string_and_assert_no_error(
+fn compile_script_string_and_assert_no_error(
     code: &str,
     deps: Vec<CompiledModule>,
 ) -> Result<CompiledScript> {
@@ -55,24 +42,6 @@ pub fn compile_script_string_and_assert_no_error(
 
 pub fn compile_script_string(code: &str) -> Result<CompiledScript> {
     compile_script_string_and_assert_no_error(code, vec![])
-}
-
-#[allow(dead_code)]
-pub fn compile_script_string_with_deps(
-    code: &str,
-    deps: Vec<CompiledModule>,
-) -> Result<CompiledScript> {
-    compile_script_string_and_assert_no_error(code, deps)
-}
-
-#[allow(dead_code)]
-pub fn compile_script_string_and_assert_error(
-    code: &str,
-    deps: Vec<CompiledModule>,
-) -> Result<CompiledScript> {
-    let (verified_script, verification_error) = compile_script_string_impl(code, deps)?;
-    assert!(verification_error.is_some());
-    Ok(verified_script)
 }
 
 fn compile_module_string_impl(
@@ -96,7 +65,7 @@ fn compile_module_string_impl(
     })
 }
 
-pub fn compile_module_string_and_assert_no_error(
+fn compile_module_string_and_assert_no_error(
     code: &str,
     deps: Vec<CompiledModule>,
 ) -> Result<CompiledModule> {
@@ -107,26 +76,4 @@ pub fn compile_module_string_and_assert_no_error(
 
 pub fn compile_module_string(code: &str) -> Result<CompiledModule> {
     compile_module_string_and_assert_no_error(code, vec![])
-}
-
-#[allow(dead_code)]
-pub fn compile_module_string_with_deps(
-    code: &str,
-    deps: Vec<CompiledModule>,
-) -> Result<CompiledModule> {
-    compile_module_string_and_assert_no_error(code, deps)
-}
-
-#[allow(dead_code)]
-pub fn compile_module_string_and_assert_error(
-    code: &str,
-    deps: Vec<CompiledModule>,
-) -> Result<CompiledModule> {
-    let (verified_module, verification_error) = compile_module_string_impl(code, deps)?;
-    assert!(verification_error.is_some());
-    Ok(verified_module)
-}
-
-pub fn count_locals(script: &CompiledScript) -> usize {
-    script.signature_at(script.code().locals).0.len()
 }

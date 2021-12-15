@@ -1,4 +1,0 @@
-processed 2 tasks
-
-task 1 'print-bytecode'. lines 12-25:
-Error: Missing struct definition for T

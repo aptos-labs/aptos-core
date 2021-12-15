@@ -1,7 +1,0 @@
-//# print-bytecode --input=module
-module 0x1.M {
-    public no(x: Self.M) {
-    label b0:
-        return;
-    }
-}
