@@ -1796,6 +1796,7 @@ dependencies = [
  "clap",
  "datatest-stable",
  "diem-crypto",
+ "diem-transactional-test-harness",
  "diem-types",
  "diem-vm",
  "diem-workspace-hack",

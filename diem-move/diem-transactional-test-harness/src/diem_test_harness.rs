@@ -4,7 +4,8 @@
 use anyhow::{bail, format_err, Result};
 use diem_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
-    ValidCryptoMaterialStringExt,
+    hash::HashValue,
+    PrivateKey, ValidCryptoMaterialStringExt,
 };
 use diem_keygen::KeyGen;
 use diem_state_view::StateView;
@@ -14,10 +15,12 @@ use diem_types::{
         self, diem_root_address, treasury_compliance_account_address, type_tag_for_currency_code,
         AccountResource, BalanceResource, XUS_IDENTIFIER, XUS_NAME,
     },
+    block_metadata::BlockMetadata,
     chain_id::ChainId,
+    contract_event::ContractEvent,
     transaction::{
         Module as TransactionModule, RawTransaction, Script as TransactionScript,
-        ScriptFunction as TransactionScriptFunction, SignedTransaction, Transaction,
+        ScriptFunction as TransactionScriptFunction, Transaction, TransactionOutput,
         TransactionStatus,
     },
     vm_status::KeptVMStatus,
@@ -39,7 +42,7 @@ use move_core_types::{
 };
 use move_transactional_test_runner::{
     framework::{run_test_impl, CompiledState, MoveTestAdapter},
-    tasks::{EmptyCommand, InitCommand, RawAddress, SyntaxChoice, TaskInput},
+    tasks::{InitCommand, RawAddress, SyntaxChoice, TaskInput},
     vm_test_harness::view_resource_in_move_storage,
 };
 use once_cell::sync::Lazy;
@@ -129,6 +132,23 @@ struct TypeName {
 struct ParentVaspInitArgs {
     name: Identifier,
     currency_type: TypeName,
+}
+
+/// Command to initiate a block metadata transaction.
+#[derive(StructOpt, Debug)]
+struct BlockCommand {
+    #[structopt(long = "proposer", parse(try_from_str = RawAddress::parse))]
+    proposer: RawAddress,
+
+    #[structopt(long = "time")]
+    time: u64,
+}
+
+/// Custom commands for the Diem transactional test flow.
+#[derive(StructOpt, Debug)]
+enum DiemSubCommand {
+    #[structopt(name = "block")]
+    BlockCommand(BlockCommand),
 }
 
 /*************************************************************************************************
@@ -388,12 +408,8 @@ impl<'a> DiemTestAdapter<'a> {
     ///
     /// Should error if the transaction ends up being discarded, or having a status other than
     /// EXECUTED.
-    fn run_transaction(&mut self, txn: SignedTransaction) -> Result<()> {
-        let mut outputs = DiemVM::execute_block_and_keep_vm_status(
-            vec![Transaction::UserTransaction(txn)],
-            &self.storage,
-        )
-        .unwrap();
+    fn run_transaction(&mut self, txn: Transaction) -> Result<TransactionOutput> {
+        let mut outputs = DiemVM::execute_block_and_keep_vm_status(vec![txn], &self.storage)?;
 
         assert_eq!(outputs.len(), 1);
 
@@ -402,6 +418,7 @@ impl<'a> DiemTestAdapter<'a> {
             TransactionStatus::Keep(kept_vm_status) => match kept_vm_status {
                 KeptVMStatus::Executed => {
                     self.storage.add_write_set(output.write_set());
+                    Ok(output)
                 }
                 _ => {
                     bail!("Failed to execute transaction. VMStatus: {}", status)
@@ -412,31 +429,39 @@ impl<'a> DiemTestAdapter<'a> {
             }
             TransactionStatus::Retry => panic!(),
         }
-
-        Ok(())
     }
 
     /// Create a validator account with the given credentials.
     ///
     /// Note: this does not add it to the named address or private key mappings.
     /// That needs to be done separately.
+    ///
+    /// TODO: the Genesis code seems to imply that one can use the same account as a validator owner and a
+    /// validator operator, but the `public(script) fun set_validator_operator` aborted when I tried to do
+    /// so. We should check if this is intended.
     fn create_validator_account(
         &mut self,
         validator_name: Identifier,
-        auth_key_prefix: Vec<u8>,
-        account_addr: AccountAddress,
+
+        validator_private_key: Ed25519PrivateKey,
+        validator_account_addr: AccountAddress,
+        validator_auth_key_prefix: Vec<u8>,
+
+        operator_private_key: Ed25519PrivateKey,
+        operator_account_addr: AccountAddress,
+        operator_auth_key_prefix: Vec<u8>,
     ) {
+        // Step 1. Create validator account.
         let parameters = self
             .fetch_default_transaction_parameters(&diem_root_address())
             .unwrap();
-
         let txn = RawTransaction::new(
             diem_root_address(),
             parameters.sequence_number,
-            diem_transaction_builder::stdlib::encode_create_validator_account_script_function(
+            diem_transaction_builder::experimental_stdlib::encode_create_validator_account_script_function(
                 0,
-                account_addr,
-                auth_key_prefix,
+                validator_account_addr,
+                validator_auth_key_prefix,
                 validator_name.as_bytes().into(),
             ),
             parameters.max_gas_amount,
@@ -448,9 +473,106 @@ impl<'a> DiemTestAdapter<'a> {
         .sign(&GENESIS_KEYPAIR.0, GENESIS_KEYPAIR.1.clone())
         .unwrap()
         .into_inner();
+        self.run_transaction(Transaction::UserTransaction(txn))
+            .expect("Failed to create validator account. This should not happen.");
 
-        self.run_transaction(txn)
-            .expect("Failed to create validator account. This should not happen.")
+        // Step 2. Create validator operator account.
+        let parameters = self
+            .fetch_default_transaction_parameters(&diem_root_address())
+            .unwrap();
+        let txn = RawTransaction::new(
+            diem_root_address(),
+            parameters.sequence_number,
+            diem_transaction_builder::experimental_stdlib::encode_create_validator_operator_account_script_function(
+                0,
+                operator_account_addr,
+                operator_auth_key_prefix,
+                validator_name.as_bytes().into(),
+            ),
+            parameters.max_gas_amount,
+            parameters.gas_unit_price,
+            parameters.gas_currency_code,
+            parameters.expiration_timestamp_secs,
+            ChainId::test(),
+        )
+        .sign(&GENESIS_KEYPAIR.0, GENESIS_KEYPAIR.1.clone())
+        .unwrap()
+        .into_inner();
+        self.run_transaction(Transaction::UserTransaction(txn))
+            .expect("Failed to create validator operator account. This should not happen.");
+
+        // Step 3. Set validator operator account.
+        let parameters = self
+            .fetch_default_transaction_parameters(&validator_account_addr)
+            .unwrap();
+        let txn = RawTransaction::new(
+            validator_account_addr,
+            parameters.sequence_number,
+            diem_transaction_builder::experimental_stdlib::encode_set_validator_operator_script_function(
+                validator_name.as_bytes().into(),
+                operator_account_addr,
+            ),
+            parameters.max_gas_amount,
+            parameters.gas_unit_price,
+            parameters.gas_currency_code,
+            parameters.expiration_timestamp_secs,
+            ChainId::test(),
+        )
+        .sign(
+            &validator_private_key,
+            validator_private_key.public_key(),
+        )
+        .unwrap()
+        .into_inner();
+        self.run_transaction(Transaction::UserTransaction(txn))
+            .expect("Failed to set validator operator. This should not happen.");
+
+        // Step 4. Set validator config.
+        let parameters = self
+            .fetch_default_transaction_parameters(&operator_account_addr)
+            .unwrap();
+        let txn = RawTransaction::new(
+            operator_account_addr,
+            parameters.sequence_number,
+            diem_transaction_builder::experimental_stdlib::encode_register_validator_config_script_function(validator_account_addr, validator_private_key.public_key().to_bytes().to_vec(), vec![], vec![]),
+            parameters.max_gas_amount,
+            parameters.gas_unit_price,
+            parameters.gas_currency_code,
+            parameters.expiration_timestamp_secs,
+            ChainId::test(),
+        )
+        .sign(
+            &operator_private_key,
+            operator_private_key.public_key(),
+        )
+        .unwrap()
+        .into_inner();
+        self.run_transaction(Transaction::UserTransaction(txn))
+            .expect("Failed to set validator config. This should not happen.");
+
+        // Step 5. Add validator to validator set.
+        let parameters = self
+            .fetch_default_transaction_parameters(&diem_root_address())
+            .unwrap();
+        let txn = RawTransaction::new(
+                diem_root_address(),
+                parameters.sequence_number,
+                diem_transaction_builder::experimental_stdlib::encode_add_validator_and_reconfigure_script_function(
+                    0,
+                    validator_name.as_bytes().into(),
+                    validator_account_addr,
+                ),
+                parameters.max_gas_amount,
+                parameters.gas_unit_price,
+                parameters.gas_currency_code,
+                parameters.expiration_timestamp_secs,
+                ChainId::test(),
+            )
+            .sign(&GENESIS_KEYPAIR.0, GENESIS_KEYPAIR.1.clone())
+            .unwrap()
+            .into_inner();
+        self.run_transaction(Transaction::UserTransaction(txn))
+            .expect("Failed to add validator to validator set. This should not happen.");
     }
 
     /// Create a parent vasp account with the given credentials.
@@ -501,8 +623,8 @@ impl<'a> DiemTestAdapter<'a> {
         .unwrap()
         .into_inner();
 
-        self.run_transaction(txn)
-            .expect("Failed to create parent vasp account. This should not happen.")
+        self.run_transaction(Transaction::UserTransaction(txn))
+            .expect("Failed to create parent vasp account. This should not happen.");
     }
 }
 
@@ -510,7 +632,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
     type ExtraInitArgs = DiemInitArgs;
     type ExtraPublishArgs = DiemPublishArgs;
     type ExtraRunArgs = DiemRunArgs;
-    type Subcommand = EmptyCommand;
+    type Subcommand = DiemSubCommand;
 
     fn compiled_state(&mut self) -> &mut CompiledState<'a> {
         &mut self.compiled_state
@@ -591,18 +713,34 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
                         )
                     }
 
-                    let (private_key, auth_key_prefix, account_addr) =
+                    let (validator_private_key, validator_auth_key_prefix, validator_account_addr) =
                         keygen.generate_credentials_for_account_creation();
+
+                    let (operator_private_key, operator_auth_key_prefix, operator_account_addr) =
+                        keygen.generate_credentials_for_account_creation();
+
                     named_address_mapping.insert(
                         validator_name.to_string(),
-                        NumericalAddress::new(account_addr.into_bytes(), NumberFormat::Hex),
+                        NumericalAddress::new(
+                            validator_account_addr.into_bytes(),
+                            NumberFormat::Hex,
+                        ),
                     );
-                    private_key_mapping.insert(validator_name.clone(), private_key);
+                    private_key_mapping
+                        .insert(validator_name.clone(), validator_private_key.clone());
 
                     // Note: validator accounts are created at a later time.
                     // This is because we need to fetch the sequence number of DiemRoot, which is
                     // only available after the DiemTestAdapter has been fully initialized.
-                    validators_to_create.push((validator_name, auth_key_prefix, account_addr));
+                    validators_to_create.push((
+                        validator_name,
+                        validator_private_key,
+                        validator_account_addr,
+                        validator_auth_key_prefix,
+                        operator_private_key,
+                        operator_account_addr,
+                        operator_auth_key_prefix,
+                    ));
                 }
             }
 
@@ -652,8 +790,25 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         };
 
         // Create validator accounts
-        for (validator_name, auth_key_prefix, account_addr) in validators_to_create {
-            adapter.create_validator_account(validator_name, auth_key_prefix, account_addr);
+        for (
+            validator_name,
+            validator_private_key,
+            validator_account_addr,
+            validator_auth_key_prefix,
+            operator_private_key,
+            operator_account_addr,
+            operator_auth_key_prefix,
+        ) in validators_to_create
+        {
+            adapter.create_validator_account(
+                validator_name,
+                validator_private_key,
+                validator_account_addr,
+                validator_auth_key_prefix,
+                operator_private_key,
+                operator_account_addr,
+                operator_auth_key_prefix,
+            );
         }
 
         // Create parent vasp accounts
@@ -707,7 +862,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         .sign(&private_key, Ed25519PublicKey::from(&private_key))?
         .into_inner();
 
-        self.run_transaction(txn)?;
+        self.run_transaction(Transaction::UserTransaction(txn))?;
 
         Ok(())
     }
@@ -760,7 +915,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         .unwrap()
         .into_inner();
 
-        self.run_transaction(txn)?;
+        self.run_transaction(Transaction::UserTransaction(txn))?;
 
         Ok(())
     }
@@ -815,7 +970,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         .sign(&private_key, Ed25519PublicKey::from(&private_key))?
         .into_inner();
 
-        self.run_transaction(txn)?;
+        self.run_transaction(Transaction::UserTransaction(txn))?;
 
         Ok(())
     }
@@ -830,11 +985,18 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         view_resource_in_move_storage(&self.storage, address, module, resource, type_args)
     }
 
-    fn handle_subcommand(
-        &mut self,
-        _subcommand: TaskInput<Self::Subcommand>,
-    ) -> Result<Option<String>> {
-        unreachable!()
+    fn handle_subcommand(&mut self, input: TaskInput<Self::Subcommand>) -> Result<Option<String>> {
+        match input.command {
+            DiemSubCommand::BlockCommand(block_cmd) => {
+                let proposer = self.compiled_state().resolve_address(&block_cmd.proposer);
+                let metadata =
+                    BlockMetadata::new(HashValue::zero(), 0, block_cmd.time, vec![], proposer);
+
+                let output = self.run_transaction(Transaction::BlockMetadata(metadata))?;
+
+                Ok(render_events(output.events()))
+            }
+        }
     }
 }
 
@@ -844,6 +1006,20 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
  *
  *
  ************************************************************************************************/
+fn render_events(events: &[ContractEvent]) -> Option<String> {
+    if events.is_empty() {
+        None
+    } else {
+        Some(format!(
+            "Events:\n{}",
+            events
+                .iter()
+                .map(|event| format!("{:?}", event))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        ))
+    }
+}
 
 /// Run the Diem transactional test flow, using the given file as input.
 pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
