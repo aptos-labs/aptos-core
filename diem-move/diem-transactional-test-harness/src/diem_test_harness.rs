@@ -87,6 +87,9 @@ struct TransactionParameters {
 struct DiemPublishArgs {
     #[structopt(short = "k", long = "private-key", parse(try_from_str = RawPrivateKey::parse))]
     private_key: Option<RawPrivateKey>,
+
+    #[structopt(short = "t", long = "expiration")]
+    expiration_time: Option<u64>,
 }
 
 /// Diem-specifc arguments for the run command.
@@ -97,6 +100,9 @@ struct DiemRunArgs {
 
     #[structopt(long = "--admin-script")]
     admin_script: bool,
+
+    #[structopt(short = "t", long = "expiration")]
+    expiration_time: Option<u64>,
 }
 
 /// Diem-specifc arguments for the init command.
@@ -856,7 +862,9 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
             gas_budget.unwrap_or(params.max_gas_amount),
             params.gas_unit_price,
             params.gas_currency_code,
-            params.expiration_timestamp_secs,
+            extra_args
+                .expiration_time
+                .unwrap_or(params.expiration_timestamp_secs),
             ChainId::test(),
         )
         .sign(&private_key, Ed25519PublicKey::from(&private_key))?
@@ -964,7 +972,9 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
             gas_budget.unwrap_or(params.max_gas_amount),
             params.gas_unit_price,
             params.gas_currency_code,
-            params.expiration_timestamp_secs,
+            extra_args
+                .expiration_time
+                .unwrap_or(params.expiration_timestamp_secs),
             ChainId::test(),
         )
         .sign(&private_key, Ed25519PublicKey::from(&private_key))?
