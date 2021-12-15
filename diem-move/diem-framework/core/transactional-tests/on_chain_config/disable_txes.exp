@@ -1,0 +1,18 @@
+processed 8 tasks
+
+task 1 'block'. lines 3-5:
+Events:
+ContractEvent { key: EventKey(11000000000000000000000000000000000000000a550c18), index: 0, type: Struct(StructTag { address: 00000000000000000000000000000001, module: Identifier("DiemBlock"), name: Identifier("NewBlockEvent"), type_params: [] }), event_data: "0000000000000000c5e34b925cf6875fec02d4b77adbd2d6000200000000000000" }
+
+task 3 'run'. lines 14-18:
+Error: Transaction discarded. VMStatus: status UNKNOWN_SCRIPT of type Validation
+
+task 4 'block'. lines 20-23:
+Events:
+ContractEvent { key: EventKey(11000000000000000000000000000000000000000a550c18), index: 1, type: Struct(StructTag { address: 00000000000000000000000000000001, module: Identifier("DiemBlock"), name: Identifier("NewBlockEvent"), type_params: [] }), event_data: "0000000000000000c5e34b925cf6875fec02d4b77adbd2d6000300000000000000" }
+
+task 6 'run'. lines 34-36:
+Error: Failed to execute transaction. VMStatus: status ABORTED of type Execution with sub status 2055
+
+task 7 'run'. lines 37-43:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 2

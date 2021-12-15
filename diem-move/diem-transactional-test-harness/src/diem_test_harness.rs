@@ -403,35 +403,46 @@ impl<'a> DiemTestAdapter<'a> {
     /// Derive the default transaction parameters from the account and balance resources fetched
     /// from storage. In the future, we are planning to allow the user to override these using
     /// command arguments.
-    fn fetch_default_transaction_parameters(
+    fn fetch_transaction_parameters(
         &self,
         signer_addr: &AccountAddress,
+        sequence_number: Option<u64>,
+        expiration_time: Option<u64>,
+        gas_currency_code: Option<String>,
+        gas_unit_price: Option<u64>,
+        max_gas_amount: Option<u64>,
     ) -> Result<TransactionParameters> {
         let account_resource = self.fetch_account_resource(signer_addr)?;
 
-        let sequence_number = account_resource.sequence_number();
-        let gas_currency_code = XUS_NAME.to_string();
+        let sequence_number = sequence_number.unwrap_or(account_resource.sequence_number());
+        let gas_currency_code = gas_currency_code.unwrap_or(XUS_NAME.to_string());
         let max_number_of_gas_units = GasConstants::default().maximum_number_of_gas_units;
-        let gas_unit_price = 0;
-        let max_gas_amount = if gas_unit_price == 0 {
-            max_number_of_gas_units.get()
-        } else {
-            let account_balance = self.fetch_balance_resource(
-                signer_addr,
-                account_config::from_currency_code_string(&gas_currency_code).unwrap(),
-            )?;
-            std::cmp::min(
-                max_number_of_gas_units.get(),
-                account_balance.coin() / gas_unit_price,
-            )
+        let gas_unit_price = gas_unit_price.unwrap_or(0);
+        let max_gas_amount = match max_gas_amount {
+            Some(max_gas_amount) => max_gas_amount,
+            None => {
+                if gas_unit_price == 0 {
+                    max_number_of_gas_units.get()
+                } else {
+                    let account_balance = self.fetch_balance_resource(
+                        signer_addr,
+                        account_config::from_currency_code_string(&gas_currency_code).unwrap(),
+                    )?;
+                    std::cmp::min(
+                        max_number_of_gas_units.get(),
+                        account_balance.coin() / gas_unit_price,
+                    )
+                }
+            }
         };
+        let expiration_timestamp_secs = expiration_time.unwrap_or(40000);
 
         Ok(TransactionParameters {
             sequence_number,
             gas_currency_code,
             gas_unit_price,
             max_gas_amount,
-            expiration_timestamp_secs: 40000,
+            expiration_timestamp_secs,
         })
     }
 
@@ -484,7 +495,7 @@ impl<'a> DiemTestAdapter<'a> {
     ) {
         // Step 1. Create validator account.
         let parameters = self
-            .fetch_default_transaction_parameters(&diem_root_address())
+            .fetch_transaction_parameters(&diem_root_address(), None, None, None, None, None)
             .unwrap();
         let txn = RawTransaction::new(
             diem_root_address(),
@@ -509,7 +520,7 @@ impl<'a> DiemTestAdapter<'a> {
 
         // Step 2. Create validator operator account.
         let parameters = self
-            .fetch_default_transaction_parameters(&diem_root_address())
+            .fetch_transaction_parameters(&diem_root_address(), None, None, None, None, None)
             .unwrap();
         let txn = RawTransaction::new(
             diem_root_address(),
@@ -534,7 +545,7 @@ impl<'a> DiemTestAdapter<'a> {
 
         // Step 3. Set validator operator account.
         let parameters = self
-            .fetch_default_transaction_parameters(&validator_account_addr)
+            .fetch_transaction_parameters(&validator_account_addr, None, None, None, None, None)
             .unwrap();
         let txn = RawTransaction::new(
             validator_account_addr,
@@ -560,7 +571,7 @@ impl<'a> DiemTestAdapter<'a> {
 
         // Step 4. Set validator config.
         let parameters = self
-            .fetch_default_transaction_parameters(&operator_account_addr)
+            .fetch_transaction_parameters(&operator_account_addr, None, None, None, None, None)
             .unwrap();
         let txn = RawTransaction::new(
             operator_account_addr,
@@ -583,7 +594,7 @@ impl<'a> DiemTestAdapter<'a> {
 
         // Step 5. Add validator to validator set.
         let parameters = self
-            .fetch_default_transaction_parameters(&diem_root_address())
+            .fetch_transaction_parameters(&diem_root_address(), None, None, None, None, None)
             .unwrap();
         let txn = RawTransaction::new(
                 diem_root_address(),
@@ -618,7 +629,14 @@ impl<'a> DiemTestAdapter<'a> {
         currency_type_name: TypeName,
     ) {
         let parameters = self
-            .fetch_default_transaction_parameters(&treasury_compliance_account_address())
+            .fetch_transaction_parameters(
+                &treasury_compliance_account_address(),
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
             .unwrap();
 
         let currency_type_tag = {
@@ -872,7 +890,14 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
     ) -> Result<()> {
         let module_id = module.self_id();
         let signer = module_id.address();
-        let params = self.fetch_default_transaction_parameters(signer)?;
+        let params = self.fetch_transaction_parameters(
+            signer,
+            extra_args.sequence_number,
+            extra_args.expiration_time,
+            extra_args.gas_currency_code,
+            extra_args.gas_unit_price,
+            gas_budget,
+        )?;
 
         let mut module_blob = vec![];
         module.serialize(&mut module_blob).unwrap();
@@ -888,16 +913,12 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
 
         let txn = RawTransaction::new_module(
             *signer,
-            extra_args.sequence_number.unwrap_or(params.sequence_number),
+            params.sequence_number,
             TransactionModule::new(module_blob),
-            gas_budget.unwrap_or(params.max_gas_amount),
-            extra_args.gas_unit_price.unwrap_or(params.gas_unit_price),
-            extra_args
-                .gas_currency_code
-                .unwrap_or(params.gas_currency_code),
-            extra_args
-                .expiration_time
-                .unwrap_or(params.expiration_timestamp_secs),
+            params.max_gas_amount,
+            params.gas_unit_price,
+            params.gas_currency_code,
+            params.expiration_timestamp_secs,
             ChainId::test(),
         )
         .sign(&private_key, Ed25519PublicKey::from(&private_key))?
@@ -939,6 +960,9 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         if extra_args.gas_currency_code.is_some() {
             panic!("Cannot set gas currency for admin script.")
         }
+        if extra_args.expiration_time.is_some() {
+            panic!("Cannot set expiration time for admin script.")
+        }
 
         let private_key = match (extra_args.private_key, &signers[0]) {
             (Some(private_key), _) => self.resolve_private_key(&private_key),
@@ -953,11 +977,18 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         let mut script_blob = vec![];
         script.serialize(&mut script_blob)?;
 
-        let params = self.fetch_default_transaction_parameters(&signer0)?;
+        let params = self.fetch_transaction_parameters(
+            &signer0,
+            extra_args.sequence_number,
+            None,
+            None,
+            None,
+            None,
+        )?;
 
         let txn = RawTransaction::new_writeset_script(
             signer0,
-            extra_args.sequence_number.unwrap_or(params.sequence_number),
+            params.sequence_number,
             TransactionScript::new(script_blob, type_args, txn_args),
             signer1,
             ChainId::test(),
@@ -1000,24 +1031,27 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
             (None, RawAddress::Anonymous(_)) => panic_missing_private_key("run"),
         };
 
-        let params = self.fetch_default_transaction_parameters(&signer)?;
+        let params = self.fetch_transaction_parameters(
+            &signer,
+            extra_args.sequence_number,
+            extra_args.expiration_time,
+            extra_args.gas_currency_code,
+            extra_args.gas_unit_price,
+            gas_budget,
+        )?;
         let txn = RawTransaction::new_script_function(
             signer,
-            extra_args.sequence_number.unwrap_or(params.sequence_number),
+            params.sequence_number,
             TransactionScriptFunction::new(
                 module.clone(),
                 function.to_owned(),
                 type_args,
                 convert_txn_args(&txn_args),
             ),
-            gas_budget.unwrap_or(params.max_gas_amount),
-            extra_args.gas_unit_price.unwrap_or(params.gas_unit_price),
-            extra_args
-                .gas_currency_code
-                .unwrap_or(params.gas_currency_code),
-            extra_args
-                .expiration_time
-                .unwrap_or(params.expiration_timestamp_secs),
+            params.max_gas_amount,
+            params.gas_unit_price,
+            params.gas_currency_code,
+            params.expiration_timestamp_secs,
             ChainId::test(),
         )
         .sign(&private_key, Ed25519PublicKey::from(&private_key))?
