@@ -3,7 +3,7 @@
 //# block --proposer Vivian --time 1000000
 
 //# run --admin-script
-//#     --signers DiemRoot
+//#     --signers DiemRoot DiemRoot
 script{
 use DiemFramework::DiemTimestamp;
 use DiemFramework::DiemBlock;
@@ -15,7 +15,7 @@ fun main() {
 }
 
 //# run --admin-script
-//#     --signers DiemRoot
+//#     --signers DiemRoot DiemRoot
 script{
 use DiemFramework::DiemTimestamp;
 
@@ -27,7 +27,7 @@ fun main() {
 // TODO: this transaction looks weird. We should figure out what the intention is and decide
 //       what to do with it.
 //# run --admin-script
-//#     --signers Vivian
+//#     --signers DiemRoot Vivian
 script{
 use DiemFramework::DiemTimestamp;
 

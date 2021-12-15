@@ -82,9 +82,8 @@ module A::O {
 
 
 // To send an admin script transaction, append the `--admin-script` option to the run command.
-// Admin scripts do not require a private key -- they are signed using the (test) genesis key pair.
 //
-//# run --signers A
+//# run --signers DiemRoot A
 //#     --admin-script
 script {
     fun main() {}

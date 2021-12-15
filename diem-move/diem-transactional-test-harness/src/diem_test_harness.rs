@@ -891,32 +891,36 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
             )
         }
 
-        if signers.len() != 1 {
-            panic!("Expected 1 signer, got {}.", signers.len());
+        if signers.len() != 2 {
+            panic!("Expected 2 signer, got {}.", signers.len());
         }
-        let signer = self.compiled_state().resolve_address(&signers[0]);
+        let signer0 = self.compiled_state().resolve_address(&signers[0]);
+        let signer1 = self.compiled_state().resolve_address(&signers[1]);
 
         if gas_budget.is_some() {
             panic!("Cannot set gas budget for admin script.")
         }
 
+        let private_key = match (extra_args.private_key, &signers[0]) {
+            (Some(private_key), _) => self.resolve_private_key(&private_key),
+            (None, RawAddress::Named(named_addr)) => match self.private_key_mapping.get(named_addr)
+            {
+                Some(private_key) => private_key.clone(),
+                None => panic_missing_private_key_named("run", named_addr),
+            },
+            (None, RawAddress::Anonymous(_)) => panic_missing_private_key("run"),
+        };
+
         let mut script_blob = vec![];
         script.serialize(&mut script_blob)?;
 
-        let diem_root = diem_root_address();
-
-        let params = self.fetch_default_transaction_parameters(&diem_root)?;
-
-        let private_key = match &extra_args.private_key {
-            Some(private_key) => self.resolve_private_key(private_key),
-            None => GENESIS_KEYPAIR.0.clone(),
-        };
+        let params = self.fetch_default_transaction_parameters(&signer0)?;
 
         let txn = RawTransaction::new_writeset_script(
-            diem_root,
+            signer0,
             params.sequence_number,
             TransactionScript::new(script_blob, type_args, txn_args),
-            signer,
+            signer1,
             ChainId::test(),
         )
         .sign(&private_key, Ed25519PublicKey::from(&private_key))

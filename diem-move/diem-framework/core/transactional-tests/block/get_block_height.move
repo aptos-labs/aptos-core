@@ -1,6 +1,6 @@
 //# init --validators Vivian
 
-//# run --admin-script --signers DiemRoot
+//# run --admin-script --signers DiemRoot DiemRoot
 script{
 use DiemFramework::DiemBlock;
 fun main() {
@@ -11,7 +11,7 @@ fun main() {
 
 //# block --proposer Vivian --time 100000000
 
-//# run --admin-script --signers DiemRoot
+//# run --admin-script --signers DiemRoot DiemRoot
 script{
 use DiemFramework::DiemBlock;
 use DiemFramework::DiemTimestamp;
@@ -24,7 +24,7 @@ fun main() {
 
 //# block --proposer Vivian --time 101000000
 
-//# run --admin-script --signers DiemRoot
+//# run --admin-script --signers DiemRoot DiemRoot
 script{
 use DiemFramework::DiemBlock;
 use DiemFramework::DiemTimestamp;

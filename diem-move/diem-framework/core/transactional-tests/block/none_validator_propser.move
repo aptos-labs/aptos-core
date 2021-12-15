@@ -2,7 +2,7 @@
 
 //# block --proposer Vivian --time 1000000
 
-//# run --signers DiemRoot --admin-script
+//# run --signers DiemRoot DiemRoot --admin-script
 script{
 use DiemFramework::DiemBlock;
 use DiemFramework::DiemTimestamp;

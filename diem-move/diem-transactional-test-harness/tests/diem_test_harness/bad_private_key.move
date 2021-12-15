@@ -1,7 +1,7 @@
 //# init --addresses A=0x4d6ecd8b6ac8416825234605ba5d48ea
 
 
-//# run --signers 0xA550C18
+//# run --signers DiemRoot 0xA550C18
 //#     --admin-script
 script {
     use DiemFramework::DiemAccount::create_validator_account;
