@@ -85,24 +85,42 @@ struct TransactionParameters {
 /// Diem-specific arguments for the publish command.
 #[derive(StructOpt, Debug)]
 struct DiemPublishArgs {
-    #[structopt(short = "k", long = "private-key", parse(try_from_str = RawPrivateKey::parse))]
+    #[structopt(long = "private-key", parse(try_from_str = RawPrivateKey::parse))]
     private_key: Option<RawPrivateKey>,
 
-    #[structopt(short = "t", long = "expiration")]
+    #[structopt(long = "expiration")]
     expiration_time: Option<u64>,
+
+    #[structopt(long = "sequence-number")]
+    sequence_number: Option<u64>,
+
+    #[structopt(long = "gas-price")]
+    gas_unit_price: Option<u64>,
+
+    #[structopt(long = "gas-currency")]
+    gas_currency_code: Option<String>,
 }
 
 /// Diem-specifc arguments for the run command.
 #[derive(StructOpt, Debug)]
 struct DiemRunArgs {
-    #[structopt(short = "k", long = "private-key", parse(try_from_str = RawPrivateKey::parse))]
+    #[structopt(long = "private-key", parse(try_from_str = RawPrivateKey::parse))]
     private_key: Option<RawPrivateKey>,
 
     #[structopt(long = "--admin-script")]
     admin_script: bool,
 
-    #[structopt(short = "t", long = "expiration")]
+    #[structopt(long = "expiration")]
     expiration_time: Option<u64>,
+
+    #[structopt(long = "sequence-number")]
+    sequence_number: Option<u64>,
+
+    #[structopt(long = "gas-price")]
+    gas_unit_price: Option<u64>,
+
+    #[structopt(long = "gas-currency")]
+    gas_currency_code: Option<String>,
 }
 
 /// Diem-specifc arguments for the init command.
@@ -857,11 +875,13 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
 
         let txn = RawTransaction::new_module(
             *signer,
-            params.sequence_number,
+            extra_args.sequence_number.unwrap_or(params.sequence_number),
             TransactionModule::new(module_blob),
             gas_budget.unwrap_or(params.max_gas_amount),
-            params.gas_unit_price,
-            params.gas_currency_code,
+            extra_args.gas_unit_price.unwrap_or(params.gas_unit_price),
+            extra_args
+                .gas_currency_code
+                .unwrap_or(params.gas_currency_code),
             extra_args
                 .expiration_time
                 .unwrap_or(params.expiration_timestamp_secs),
@@ -900,6 +920,12 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         if gas_budget.is_some() {
             panic!("Cannot set gas budget for admin script.")
         }
+        if extra_args.gas_unit_price.is_some() {
+            panic!("Cannot set gas price for admin script.")
+        }
+        if extra_args.gas_currency_code.is_some() {
+            panic!("Cannot set gas currency for admin script.")
+        }
 
         let private_key = match (extra_args.private_key, &signers[0]) {
             (Some(private_key), _) => self.resolve_private_key(&private_key),
@@ -918,7 +944,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
 
         let txn = RawTransaction::new_writeset_script(
             signer0,
-            params.sequence_number,
+            extra_args.sequence_number.unwrap_or(params.sequence_number),
             TransactionScript::new(script_blob, type_args, txn_args),
             signer1,
             ChainId::test(),
@@ -966,7 +992,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         let params = self.fetch_default_transaction_parameters(&signer)?;
         let txn = RawTransaction::new_script_function(
             signer,
-            params.sequence_number,
+            extra_args.sequence_number.unwrap_or(params.sequence_number),
             TransactionScriptFunction::new(
                 module.clone(),
                 function.to_owned(),
@@ -974,8 +1000,10 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
                 convert_txn_args(&txn_args),
             ),
             gas_budget.unwrap_or(params.max_gas_amount),
-            params.gas_unit_price,
-            params.gas_currency_code,
+            extra_args.gas_unit_price.unwrap_or(params.gas_unit_price),
+            extra_args
+                .gas_currency_code
+                .unwrap_or(params.gas_currency_code),
             extra_args
                 .expiration_time
                 .unwrap_or(params.expiration_timestamp_secs),
