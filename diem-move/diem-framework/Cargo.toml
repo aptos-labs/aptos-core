@@ -54,3 +54,7 @@ dir-diff = "0.3.2"
 [features]
 default = []
 fuzzing = ["diem-types/fuzzing"]
+
+[[test]]
+name = "transactional_tests"
+harness = false

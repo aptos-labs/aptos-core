@@ -1,0 +1,4 @@
+processed 1 task
+
+task 0 'block'. lines 1-1:
+Error: status UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION of type Invariant violation

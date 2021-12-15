@@ -1,6 +1,6 @@
-//! account: vivian, 1000000, 0, validator
-//! new-transaction
+//# init --validators Vivian
 
+//# run --admin-script --signers DiemRoot
 script{
 use DiemFramework::DiemBlock;
 fun main() {
@@ -9,11 +9,9 @@ fun main() {
 }
 }
 
-//! block-prologue
-//! proposer: vivian
-//! block-time: 100000000
+//# block --proposer Vivian --time 100000000
 
-//! new-transaction
+//# run --admin-script --signers DiemRoot
 script{
 use DiemFramework::DiemBlock;
 use DiemFramework::DiemTimestamp;
@@ -24,11 +22,9 @@ fun main() {
 }
 }
 
-//! block-prologue
-//! proposer: vivian
-//! block-time: 101000000
+//# block --proposer Vivian --time 101000000
 
-//! new-transaction
+//# run --admin-script --signers DiemRoot
 script{
 use DiemFramework::DiemBlock;
 use DiemFramework::DiemTimestamp;

@@ -1,10 +1,8 @@
-//! account: vivian, 1000000, 0, validator
+//# init --validators Vivian
 
-//! block-prologue
-//! proposer: vivian
-//! block-time: 100000000
+//# block --proposer Vivian --time 100000000
 
-//! new-transaction
+//# run --signers DiemRoot --admin-script
 script{
 use DiemFramework::DiemBlock;
 use DiemFramework::DiemTimestamp;
@@ -15,6 +13,4 @@ fun main() {
 }
 }
 
-//! block-prologue
-//! proposer: vivian
-//! block-time: 11000000
+//# block --proposer Vivian --time 90000000
