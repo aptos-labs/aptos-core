@@ -94,7 +94,7 @@ impl BlockLookupInner {
         let parent_block = parent_id
             .map(|id| {
                 self.get(id)?
-                    .ok_or_else(|| anyhow!("parent block {} doesn't exist."))
+                    .ok_or_else(|| anyhow!("parent block {:x} doesn't exist.", id))
             })
             .transpose()?;
 
@@ -109,7 +109,7 @@ impl BlockLookupInner {
                         .output
                         .result_view
                         .is_same_view(&output.result_view),
-                    "Different block with same id {}",
+                    "Different block with same id {:x}",
                     id,
                 );
                 Ok((existing, true, parent_block))
