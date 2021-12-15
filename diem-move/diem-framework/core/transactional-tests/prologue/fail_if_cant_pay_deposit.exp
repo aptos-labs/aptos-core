@@ -1,0 +1,4 @@
+processed 4 tasks
+
+task 3 'run'. lines 12-13:
+Error: Transaction discarded. VMStatus: status INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE of type Validation

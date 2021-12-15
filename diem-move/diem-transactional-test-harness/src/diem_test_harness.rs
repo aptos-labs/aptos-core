@@ -12,8 +12,8 @@ use diem_state_view::StateView;
 use diem_types::{
     access_path::AccessPath,
     account_config::{
-        self, diem_root_address, treasury_compliance_account_address, type_tag_for_currency_code,
-        AccountResource, BalanceResource, XUS_IDENTIFIER, XUS_NAME,
+        self, diem_root_address, testnet_dd_account_address, treasury_compliance_account_address,
+        type_tag_for_currency_code, AccountResource, BalanceResource, XUS_IDENTIFIER, XUS_NAME,
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -296,6 +296,13 @@ fn panic_missing_private_key_named(cmd_name: &str, name: &IdentStr) -> ! {
             name '{}' in the init command.",
         cmd_name, name,
     )
+}
+
+fn test_only_named_addresses() -> Vec<(String, NumericalAddress)> {
+    vec![(
+        "DesignatedDealer".to_string(),
+        NumericalAddress::new(testnet_dd_account_address().into_bytes(), NumberFormat::Hex),
+    )]
 }
 
 fn panic_missing_private_key(cmd_name: &str) -> ! {
@@ -680,6 +687,12 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         };
 
         let mut named_address_mapping = diem_framework::diem_framework_named_addresses();
+
+        for (name, addr) in test_only_named_addresses() {
+            assert!(!named_address_mapping.contains_key(&name));
+            named_address_mapping.insert(name, addr);
+        }
+
         for (name, addr) in additional_named_address_mapping {
             if named_address_mapping.contains_key(&name) {
                 panic!("Invalid init. The named address '{}' already exists.", name)
@@ -968,8 +981,6 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
     ) -> Result<()> {
-        assert!(!signers.is_empty());
-
         if extra_args.admin_script {
             panic!("Admin script functions are not supported.")
         }
