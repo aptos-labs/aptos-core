@@ -1,9 +1,9 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_json_rpc_types::views::BytesView;
+use diem_rest_client::Client as RestClient;
 use diem_sdk::{
-    client::{views::TransactionDataView, BlockingClient, SignedTransaction},
+    client::SignedTransaction,
     crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform},
     types::transaction::authenticator::AuthenticationKey,
 };
@@ -19,8 +19,9 @@ impl Test for NFTTransaction {
     }
 }
 
+#[async_trait::async_trait]
 impl NFTPublicUsageTest for NFTTransaction {
-    fn run<'t>(&self, ctx: &mut NFTPublicUsageContext<'t>) -> Result<()> {
+    async fn run<'t>(&self, ctx: &mut NFTPublicUsageContext<'t>) -> Result<()> {
         let client = ctx.client();
 
         // prepare sender and receiver accounts
@@ -28,34 +29,33 @@ impl NFTPublicUsageTest for NFTTransaction {
         let sender_public_key = sender_private_key.public_key();
         let sender_auth_key = AuthenticationKey::ed25519(&sender_public_key);
         let sender_address = sender_auth_key.derived_address();
-        ctx.create_user_account(sender_auth_key)?;
+        ctx.create_user_account(sender_auth_key).await?;
         let receiver_private_key = Ed25519PrivateKey::generate(ctx.rng());
         let receiver_public_key = receiver_private_key.public_key();
         let receiver_auth_key = AuthenticationKey::ed25519(&receiver_public_key);
         let receiver_address = receiver_auth_key.derived_address();
-        ctx.create_user_account(receiver_auth_key)?;
+        ctx.create_user_account(receiver_auth_key).await?;
 
         // register bars user for sender
-        let sender_register_txn = register_bars_user_txn(&sender_private_key, &client, ctx)?;
-        client.submit(&sender_register_txn)?;
-        client.wait_for_signed_transaction(&sender_register_txn, None, None)?;
+        let sender_register_txn = register_bars_user_txn(&sender_private_key, &client, ctx).await?;
+        client.submit_and_wait(&sender_register_txn).await?;
 
         // mint 100 nft tokens to sender
-        ctx.mint_bars(sender_address, 100)?;
+        ctx.mint_bars(sender_address, 100).await?;
 
         // register bars user for receiver
-        let receiver_register_txn = register_bars_user_txn(&receiver_private_key, &client, ctx)?;
-        client.submit(&receiver_register_txn)?;
-        client.wait_for_signed_transaction(&receiver_register_txn, None, None)?;
+        let receiver_register_txn =
+            register_bars_user_txn(&receiver_private_key, &client, ctx).await?;
+        client.submit_and_wait(&receiver_register_txn).await?;
 
         // transfer 42 tokens to receiver
         let transfer_amount = 42;
 
         // prepare transfer transaction
         let test_sequence_number = client
-            .get_account(sender_address)?
+            .get_account(sender_address)
+            .await?
             .into_inner()
-            .unwrap()
             .sequence_number;
 
         let unsigned_txn = ctx
@@ -80,52 +80,15 @@ impl NFTPublicUsageTest for NFTTransaction {
 
         // submit the transaction
         let txn = SignedTransaction::new(unsigned_txn, sender_public_key, signature);
-        client.submit(&txn)?;
-        client.wait_for_signed_transaction(&txn, None, None)?;
-
-        // query the transaction and check it contains the same values as requested
-        let txn = client
-            .get_account_transaction(sender_address, test_sequence_number, false)?
-            .into_inner()
-            .unwrap();
-
-        match txn.transaction {
-            TransactionDataView::UserTransaction {
-                sender,
-                sequence_number,
-                script,
-                ..
-            } => {
-                assert_eq!(sender, sender_address);
-                assert_eq!(sequence_number, test_sequence_number);
-
-                assert_eq!(script.r#type, "script_function");
-                assert_eq!(script.type_arguments.unwrap(), vec!["BARSToken"]);
-                assert_eq!(
-                    script.arguments_bcs.unwrap(),
-                    vec![
-                        BytesView::new(receiver_address.into_bytes()),
-                        BytesView::new(transfer_amount.to_le_bytes()),
-                        BytesView::new(sender_address.into_bytes()),
-                        BytesView::new(2_u64.to_le_bytes())
-                    ]
-                );
-                assert_eq!(script.module_name.unwrap(), "NFTGallery");
-                assert_eq!(
-                    script.function_name.unwrap(),
-                    "transfer_token_between_galleries"
-                );
-            }
-            _ => panic!("Query should get user transaction"),
-        }
+        client.submit_and_wait(&txn).await?;
         Ok(())
     }
 }
 
-fn register_bars_user_txn<'t>(
+async fn register_bars_user_txn(
     private_key: &Ed25519PrivateKey,
-    client: &BlockingClient,
-    ctx: &NFTPublicUsageContext<'t>,
+    client: &RestClient,
+    ctx: &NFTPublicUsageContext<'_>,
 ) -> Result<SignedTransaction> {
     let public_key = private_key.public_key();
 
@@ -133,9 +96,9 @@ fn register_bars_user_txn<'t>(
     let sender_address = sender_auth_key.derived_address();
 
     let sequence_number = client
-        .get_account(sender_address)?
+        .get_account(sender_address)
+        .await?
         .into_inner()
-        .unwrap()
         .sequence_number;
 
     let unsigned_txn = ctx

@@ -7989,6 +7989,7 @@ name = "smoke-test"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "backup-cli",
  "base64",
  "bcs",

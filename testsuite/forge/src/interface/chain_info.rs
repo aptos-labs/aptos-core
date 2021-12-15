@@ -152,11 +152,6 @@ impl<'t> ChainInfo<'t> {
     }
 
     pub fn into_nft_public_info(self) -> NFTPublicInfo<'t> {
-        NFTPublicInfo::new(
-            self.json_rpc_url.clone(),
-            self.chain_id,
-            self.rest_api_url.clone(),
-            self.root_account,
-        )
+        NFTPublicInfo::new(self.chain_id, self.rest_api_url.clone(), self.root_account)
     }
 }

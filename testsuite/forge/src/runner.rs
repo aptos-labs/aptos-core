@@ -10,6 +10,7 @@ use std::{
 };
 use structopt::{clap::arg_enum, StructOpt};
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+use tokio::runtime::Runtime;
 // TODO going to remove random seed once cluster deployment supports re-run genesis
 use rand::rngs::OsRng;
 
@@ -282,17 +283,20 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
 
             // Run NFTPublicUsageTests
             if !self.tests.nft_public_usage_tests.is_empty() {
-                swarm
-                    .chain_info()
-                    .into_nft_public_info()
-                    .init_nft_environment()?;
+                let runtime = Runtime::new().unwrap();
+                runtime.block_on(
+                    swarm
+                        .chain_info()
+                        .into_nft_public_info()
+                        .init_nft_environment(),
+                )?;
                 for test in self.filter_tests(self.tests.nft_public_usage_tests.iter()) {
                     let mut nft_public_ctx = NFTPublicUsageContext::new(
                         CoreContext::from_rng(&mut rng),
                         swarm.chain_info().into_nft_public_info(),
                         &mut report,
                     );
-                    let result = run_test(|| test.run(&mut nft_public_ctx));
+                    let result = run_test(|| runtime.block_on(test.run(&mut nft_public_ctx)));
                     summary.handle_result(test.name().to_owned(), result)?;
                 }
             }
