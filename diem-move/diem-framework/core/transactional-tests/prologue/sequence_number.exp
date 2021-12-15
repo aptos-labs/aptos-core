@@ -1,0 +1,7 @@
+processed 8 tasks
+
+task 5 'publish'. lines 32-34:
+Error: Transaction discarded. VMStatus: status SEQUENCE_NUMBER_TOO_OLD of type Validation
+
+task 6 'publish'. lines 37-39:
+Error: Transaction discarded. VMStatus: status SEQUENCE_NUMBER_TOO_NEW of type Validation

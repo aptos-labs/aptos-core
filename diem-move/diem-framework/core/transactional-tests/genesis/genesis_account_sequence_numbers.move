@@ -1,3 +1,4 @@
+//# run --admin-script --signers DiemRoot DiemRoot
 script {
 use DiemFramework::DiemAccount;
 
