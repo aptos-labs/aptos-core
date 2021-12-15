@@ -1,0 +1,208 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+    ┌─ tests/sources/functional/nonlinear_arithm.move:224:9
+    │
+224 │         ensures result == a*b*c + a*b*d + a*b;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/nonlinear_arithm.move:220: distribution_law_incorrect
+    =         a = <redacted>
+    =         b = <redacted>
+    =         c = <redacted>
+    =         d = <redacted>
+    =     at tests/sources/functional/nonlinear_arithm.move:221: distribution_law_incorrect
+    =         result = <redacted>
+    =     at tests/sources/functional/nonlinear_arithm.move:222: distribution_law_incorrect
+    =     at tests/sources/functional/nonlinear_arithm.move:224: distribution_law_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/nonlinear_arithm.move:210:9
+    │
+210 │         ensures result != 720;
+    │         ^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/nonlinear_arithm.move:199: mul5_incorrect
+    =         a = <redacted>
+    =         b = <redacted>
+    =         c = <redacted>
+    =         d = <redacted>
+    =         e = <redacted>
+    =     at tests/sources/functional/nonlinear_arithm.move:201: mul5_incorrect
+    =     at tests/sources/functional/nonlinear_arithm.move:202: mul5_incorrect
+    =     at tests/sources/functional/nonlinear_arithm.move:203: mul5_incorrect
+    =     at tests/sources/functional/nonlinear_arithm.move:204: mul5_incorrect
+    =     at tests/sources/functional/nonlinear_arithm.move:206: mul5_incorrect
+    =         result = <redacted>
+    =     at tests/sources/functional/nonlinear_arithm.move:207: mul5_incorrect
+    =     at tests/sources/functional/nonlinear_arithm.move:210: mul5_incorrect (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/nonlinear_arithm.move:51:5
+   │
+49 │           a * b * c
+   │             - abort happened here with execution failure
+50 │       }
+51 │ ╭     spec overflow_u128_mul_3_incorrect {
+52 │ │         aborts_if false;
+53 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/nonlinear_arithm.move:48: overflow_u128_mul_3_incorrect
+   =         a = <redacted>
+   =         b = <redacted>
+   =         c = <redacted>
+   =     at tests/sources/functional/nonlinear_arithm.move:49: overflow_u128_mul_3_incorrect
+   =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/nonlinear_arithm.move:107:5
+    │
+105 │           a * b * c * d
+    │             - abort happened here with execution failure
+106 │       }
+107 │ ╭     spec overflow_u128_mul_4_incorrect {
+108 │ │         aborts_if false;
+109 │ │     }
+    │ ╰─────^
+    │
+    =     at tests/sources/functional/nonlinear_arithm.move:104: overflow_u128_mul_4_incorrect
+    =         a = <redacted>
+    =         b = <redacted>
+    =         c = <redacted>
+    =         d = <redacted>
+    =     at tests/sources/functional/nonlinear_arithm.move:105: overflow_u128_mul_4_incorrect
+    =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/nonlinear_arithm.move:166:5
+    │
+164 │           a * b * c * d * e
+    │             - abort happened here with execution failure
+165 │       }
+166 │ ╭     spec overflow_u128_mul_5_incorrect {
+167 │ │         aborts_if false;
+168 │ │     }
+    │ ╰─────^
+    │
+    =     at tests/sources/functional/nonlinear_arithm.move:163: overflow_u128_mul_5_incorrect
+    =         a = <redacted>
+    =         b = <redacted>
+    =         c = <redacted>
+    =         d = <redacted>
+    =         e = <redacted>
+    =     at tests/sources/functional/nonlinear_arithm.move:164: overflow_u128_mul_5_incorrect
+    =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/nonlinear_arithm.move:35:5
+   │
+33 │           a * b * c
+   │             - abort happened here with execution failure
+34 │       }
+35 │ ╭     spec overflow_u64_mul_3_incorrect {
+36 │ │         aborts_if false;
+37 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/nonlinear_arithm.move:32: overflow_u64_mul_3_incorrect
+   =         a = <redacted>
+   =         b = <redacted>
+   =         c = <redacted>
+   =     at tests/sources/functional/nonlinear_arithm.move:33: overflow_u64_mul_3_incorrect
+   =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/nonlinear_arithm.move:90:5
+   │
+88 │           a * b * c * d
+   │             - abort happened here with execution failure
+89 │       }
+90 │ ╭     spec overflow_u64_mul_4_incorrect {
+91 │ │         aborts_if false;
+92 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/nonlinear_arithm.move:87: overflow_u64_mul_4_incorrect
+   =         a = <redacted>
+   =         b = <redacted>
+   =         c = <redacted>
+   =         d = <redacted>
+   =     at tests/sources/functional/nonlinear_arithm.move:88: overflow_u64_mul_4_incorrect
+   =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/nonlinear_arithm.move:148:5
+    │
+146 │           a * b * c * d * e
+    │             - abort happened here with execution failure
+147 │       }
+148 │ ╭     spec overflow_u64_mul_5_incorrect {
+149 │ │         aborts_if false;
+150 │ │     }
+    │ ╰─────^
+    │
+    =     at tests/sources/functional/nonlinear_arithm.move:145: overflow_u64_mul_5_incorrect
+    =         a = <redacted>
+    =         b = <redacted>
+    =         c = <redacted>
+    =         d = <redacted>
+    =         e = <redacted>
+    =     at tests/sources/functional/nonlinear_arithm.move:146: overflow_u64_mul_5_incorrect
+    =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/nonlinear_arithm.move:18:5
+   │
+16 │           a * b * c
+   │             - abort happened here with execution failure
+17 │       }
+18 │ ╭     spec overflow_u8_mul_3_incorrect {
+19 │ │         aborts_if false;
+20 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/nonlinear_arithm.move:15: overflow_u8_mul_3_incorrect
+   =         a = <redacted>
+   =         b = <redacted>
+   =         c = <redacted>
+   =     at tests/sources/functional/nonlinear_arithm.move:16: overflow_u8_mul_3_incorrect
+   =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/nonlinear_arithm.move:72:5
+   │
+70 │           a * b * c * d
+   │             - abort happened here with execution failure
+71 │       }
+72 │ ╭     spec overflow_u8_mul_4_incorrect {
+73 │ │         aborts_if false;
+74 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/nonlinear_arithm.move:69: overflow_u8_mul_4_incorrect
+   =         a = <redacted>
+   =         b = <redacted>
+   =         c = <redacted>
+   =         d = <redacted>
+   =     at tests/sources/functional/nonlinear_arithm.move:70: overflow_u8_mul_4_incorrect
+   =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/nonlinear_arithm.move:129:5
+    │
+127 │           a * b * c * d * e
+    │             - abort happened here with execution failure
+128 │       }
+129 │ ╭     spec overflow_u8_mul_5_incorrect {
+130 │ │         aborts_if false;
+131 │ │     }
+    │ ╰─────^
+    │
+    =     at tests/sources/functional/nonlinear_arithm.move:126: overflow_u8_mul_5_incorrect
+    =         a = <redacted>
+    =         b = <redacted>
+    =         c = <redacted>
+    =         d = <redacted>
+    =         e = <redacted>
+    =     at tests/sources/functional/nonlinear_arithm.move:127: overflow_u8_mul_5_incorrect
+    =         ABORTED

@@ -113,6 +113,16 @@ module DiemFramework::CRSN {
 
         false
     }
+    spec record {
+        pragma opaque;
+        // TODO: Complete this spec when BitVector (specially its use of loops)
+        // is completely specified. The behavior of this function is abstracted
+        // out for now in order to make a progress in verifying the epilogue
+        // functions in the DiemAccount module.
+        modifies global<CRSN>(Signer::address_of(account));
+        aborts_if [abstract] false;
+        ensures [abstract] result == true;
+    }
 
     /// A stateless version of `record`: returns `true` if the `sequence_nonce`
     /// will be accepted, and `false` otherwise.
@@ -135,6 +145,7 @@ module DiemFramework::CRSN {
         }
     }
     spec check {
+        modifies global<CRSN>(Signer::address_of(account));
         include CheckAbortsIf{addr: Signer::address_of(account)};
     }
     spec schema CheckAbortsIf {

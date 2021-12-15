@@ -261,12 +261,37 @@ Deposit <code>coin</code> into the transaction fees bucket
 
 
 
-<pre><code><b>include</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotOperating">DiemTimestamp::AbortsIfNotOperating</a>;
-<b>aborts_if</b> !<a href="TransactionFee.md#0x1_TransactionFee_is_coin_initialized">is_coin_initialized</a>&lt;CoinType&gt;() <b>with</b> Errors::NOT_PUBLISHED;
-<b>let</b> fees = <a href="TransactionFee.md#0x1_TransactionFee_spec_transaction_fee">spec_transaction_fee</a>&lt;CoinType&gt;().balance;
-<b>let</b> <b>post</b> post_fees = <a href="TransactionFee.md#0x1_TransactionFee_spec_transaction_fee">spec_transaction_fee</a>&lt;CoinType&gt;().balance;
-<b>include</b> <a href="Diem.md#0x1_Diem_DepositAbortsIf">Diem::DepositAbortsIf</a>&lt;CoinType&gt;{coin: fees, check: coin};
-<b>ensures</b> post_fees.value == fees.value + coin.value;
+<pre><code><b>include</b> <a href="TransactionFee.md#0x1_TransactionFee_PayFeeAbortsIf">PayFeeAbortsIf</a>&lt;CoinType&gt;;
+<b>include</b> <a href="TransactionFee.md#0x1_TransactionFee_PayFeeEnsures">PayFeeEnsures</a>&lt;CoinType&gt;;
+</code></pre>
+
+
+
+
+<a name="0x1_TransactionFee_PayFeeAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="TransactionFee.md#0x1_TransactionFee_PayFeeAbortsIf">PayFeeAbortsIf</a>&lt;CoinType&gt; {
+    coin: <a href="Diem.md#0x1_Diem">Diem</a>&lt;CoinType&gt;;
+    <b>let</b> fees = <a href="TransactionFee.md#0x1_TransactionFee_spec_transaction_fee">spec_transaction_fee</a>&lt;CoinType&gt;().balance;
+    <b>include</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotOperating">DiemTimestamp::AbortsIfNotOperating</a>;
+    <b>aborts_if</b> !<a href="TransactionFee.md#0x1_TransactionFee_is_coin_initialized">is_coin_initialized</a>&lt;CoinType&gt;() <b>with</b> Errors::NOT_PUBLISHED;
+    <b>include</b> <a href="Diem.md#0x1_Diem_DepositAbortsIf">Diem::DepositAbortsIf</a>&lt;CoinType&gt;{coin: fees, check: coin};
+}
+</code></pre>
+
+
+
+
+<a name="0x1_TransactionFee_PayFeeEnsures"></a>
+
+
+<pre><code><b>schema</b> <a href="TransactionFee.md#0x1_TransactionFee_PayFeeEnsures">PayFeeEnsures</a>&lt;CoinType&gt; {
+    coin: <a href="Diem.md#0x1_Diem">Diem</a>&lt;CoinType&gt;;
+    <b>let</b> fees = <a href="TransactionFee.md#0x1_TransactionFee_spec_transaction_fee">spec_transaction_fee</a>&lt;CoinType&gt;().balance;
+    <b>let</b> <b>post</b> post_fees = <a href="TransactionFee.md#0x1_TransactionFee_spec_transaction_fee">spec_transaction_fee</a>&lt;CoinType&gt;().balance;
+    <b>ensures</b> post_fees.value == fees.value + coin.value;
+}
 </code></pre>
 
 

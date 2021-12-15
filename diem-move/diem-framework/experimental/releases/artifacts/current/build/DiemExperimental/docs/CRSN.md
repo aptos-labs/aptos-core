@@ -362,6 +362,21 @@ Record <code>sequence_nonce</code> under the <code>account</code>. Returns true 
 
 </details>
 
+<details>
+<summary>Specification</summary>
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>modifies</b> <b>global</b>&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account));
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <b>true</b>;
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_CRSN_check"></a>
 
 ## Function `check`
@@ -408,7 +423,8 @@ will be accepted, and <code><b>false</b></code> otherwise.
 
 
 
-<pre><code><b>include</b> <a href="CRSN.md#0x1_CRSN_CheckAbortsIf">CheckAbortsIf</a>{addr: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)};
+<pre><code><b>modifies</b> <b>global</b>&lt;<a href="CRSN.md#0x1_CRSN">CRSN</a>&gt;(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account));
+<b>include</b> <a href="CRSN.md#0x1_CRSN_CheckAbortsIf">CheckAbortsIf</a>{addr: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)};
 </code></pre>
 
 

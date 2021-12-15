@@ -1,9 +1,5 @@
-
-
 // A module providing functionality to the script*.move tests
 address 0x1 {
-
-
 module ScriptProvider {
     use Std::Signer;
 
@@ -12,7 +8,6 @@ module ScriptProvider {
         // The errors are produced non-deterministically, therefore turned off.
         pragma verify = false;
     }
-
 
     struct Info<phantom T> has key {}
 
@@ -30,5 +25,4 @@ module ScriptProvider {
         include RegisterConditions<T>;
     }
 }
-
 }

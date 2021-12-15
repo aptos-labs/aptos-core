@@ -2089,6 +2089,10 @@ module DiemFramework::DiemAccount {
             gas_units_remaining,
         )
     }
+    spec epilogue {
+        include EpilogueCommonAbortsIf<Token>;
+        include EpilogueCommonEnsures<Token>;
+    }
 
     fun epilogue_common<Token>(
         account: &signer,
@@ -2159,6 +2163,50 @@ module DiemFramework::DiemAccount {
             TransactionFee::pay_fee(Diem::withdraw(coin, transaction_fee_amount))
         }
     }
+    spec epilogue_common {
+        include EpilogueCommonAbortsIf<Token>;
+        include EpilogueCommonEnsures<Token>;
+    }
+    spec schema EpilogueCommonAbortsIf<Token> {
+        account: signer;
+        txn_sequence_number: u64;
+        txn_gas_price: u64;
+        txn_max_gas_units: u64;
+        gas_units_remaining: u64;
+        let sender = Signer::address_of(account);
+        let sender_account = global<DiemAccount>(sender);
+        let gas_used = txn_max_gas_units - gas_units_remaining;
+        let transaction_fee_amount = txn_gas_price * gas_used;
+        let coin = global<Balance<Token>>(sender).coin;
+        /// [EA1; Invariant]
+        aborts_if txn_max_gas_units < gas_units_remaining with Errors::INVALID_ARGUMENT;
+        /// [EA2; Invariant]
+        aborts_if txn_gas_price * gas_used > MAX_U64 with Errors::LIMIT_EXCEEDED;
+        /// [EA3; Invariant]
+        aborts_if !exists_at(sender) with Errors::NOT_PUBLISHED;
+        /// [EA4; Condition]
+        aborts_if sender_account.sequence_number >= MAX_U64 with Errors::LIMIT_EXCEEDED;
+        /// [EA4; Invariant]
+        aborts_if !CRSN::has_crsn(sender) && (sender_account.sequence_number != txn_sequence_number) with Errors::INVALID_ARGUMENT;
+        /// [PCA7]
+        aborts_if (transaction_fee_amount > 0) && !exists<Balance<Token>>(sender);
+        /// [EA4; Condition]
+        aborts_if (transaction_fee_amount > 0) && transaction_fee_amount > Diem::value(coin) with Errors::LIMIT_EXCEEDED;
+        include (transaction_fee_amount > 0) ==> TransactionFee::PayFeeAbortsIf<Token>{coin: Diem<Token>{value: transaction_fee_amount}};
+    }
+    spec schema EpilogueCommonEnsures<Token> {
+        account: signer;
+        txn_sequence_number: u64;
+        txn_gas_price: u64;
+        txn_max_gas_units: u64;
+        gas_units_remaining: u64;
+        let sender = Signer::address_of(account);
+        let sender_account = global<DiemAccount>(sender);
+        let gas_used = txn_max_gas_units - gas_units_remaining;
+        let transaction_fee_amount = txn_gas_price * gas_used;
+        let coin = global<Balance<Token>>(sender).coin;
+        include (transaction_fee_amount > 0) ==> TransactionFee::PayFeeEnsures<Token>{coin: Diem<Token>{value: transaction_fee_amount}};
+    }
 
     /// Epilogue for WriteSet trasnaction
     fun writeset_epilogue(
@@ -2188,7 +2236,21 @@ module DiemFramework::DiemAccount {
         if (should_trigger_reconfiguration) DiemConfig::reconfigure(dr_account)
     }
     spec writeset_epilogue {
+        include WritesetEpilogueAbortsIf;
+        include EpilogueCommonEnsures<XUS>{account: dr_account, txn_gas_price: 0, txn_max_gas_units: 0, gas_units_remaining: 0};
         include WritesetEpilogueEmits;
+    }
+    spec schema WritesetEpilogueAbortsIf {
+        dr_account: signer;
+        txn_sequence_number: u64;
+        should_trigger_reconfiguration: bool;
+        aborts_if !exists<DiemWriteSetManager>(@DiemRoot);
+        include DiemTimestamp::AbortsIfNotOperating;
+        aborts_if Signer::address_of(dr_account) != @DiemRoot with Errors::INVALID_ARGUMENT;
+        aborts_if !Roles::has_diem_root_role(dr_account) with Errors::INVALID_ARGUMENT;
+        include EpilogueCommonAbortsIf<XUS>{account: dr_account, txn_gas_price: 0, txn_max_gas_units: 0, gas_units_remaining: 0};
+        include should_trigger_reconfiguration ==> Roles::AbortsIfNotDiemRoot{account: dr_account};
+        include should_trigger_reconfiguration ==> DiemConfig::ReconfigureAbortsIf;
     }
     spec schema WritesetEpilogueEmits {
         should_trigger_reconfiguration: bool;
@@ -2214,14 +2276,12 @@ module DiemFramework::DiemAccount {
         ValidatorConfig::publish(&new_account, dr_account, human_name);
         make_account(&new_account, auth_key_prefix)
     }
-
     spec create_validator_account {
         pragma disable_invariants_in_body;
         include CreateValidatorAccountAbortsIf;
         include CreateValidatorAccountEnsures;
         include MakeAccountEmits;
     }
-
     spec schema CreateValidatorAccountAbortsIf {
         dr_account: signer;
         new_account_address: address;
@@ -2232,7 +2292,6 @@ module DiemFramework::DiemAccount {
         include DiemTimestamp::AbortsIfNotOperating;
         aborts_if ValidatorConfig::exists_config(new_account_address) with Errors::ALREADY_PUBLISHED;
     }
-
     spec schema CreateValidatorAccountEnsures {
         new_account_address: address;
         // Note: `Roles::GrantRole` has both ensure's and aborts_if's.
@@ -2255,13 +2314,11 @@ module DiemFramework::DiemAccount {
         ValidatorOperatorConfig::publish(&new_account, dr_account, human_name);
         make_account(&new_account, auth_key_prefix)
     }
-
     spec create_validator_operator_account {
         pragma disable_invariants_in_body;
         include CreateValidatorOperatorAccountAbortsIf;
         include CreateValidatorOperatorAccountEnsures;
     }
-
     spec schema CreateValidatorOperatorAccountAbortsIf {
         dr_account: signer;
         new_account_address: address;
@@ -2272,7 +2329,6 @@ module DiemFramework::DiemAccount {
         include DiemTimestamp::AbortsIfNotOperating;
         aborts_if ValidatorOperatorConfig::has_validator_operator_config(new_account_address) with Errors::ALREADY_PUBLISHED;
     }
-
     spec schema CreateValidatorOperatorAccountEnsures {
         new_account_address: address;
         include Roles::GrantRole{addr: new_account_address, role_id: Roles::VALIDATOR_OPERATOR_ROLE_ID};

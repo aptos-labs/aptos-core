@@ -128,10 +128,10 @@ module DiemFramework::DiemTimestamp {
     spec now_seconds {
         pragma opaque;
         include AbortsIfNotOperating;
-        ensures result == spec_now_microseconds() /  MICRO_CONVERSION_FACTOR;
+        ensures result == spec_now_seconds();
     }
     spec fun spec_now_seconds(): u64 {
-        global<CurrentTimeMicroseconds>(@DiemRoot).microseconds / MICRO_CONVERSION_FACTOR
+        spec_now_microseconds() / MICRO_CONVERSION_FACTOR
     }
 
     /// Helper function to determine if Diem is in genesis state.

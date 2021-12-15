@@ -77,11 +77,20 @@ module DiemFramework::TransactionFee {
     }
 
     spec pay_fee {
+        include PayFeeAbortsIf<CoinType>;
+        include PayFeeEnsures<CoinType>;
+    }
+    spec schema PayFeeAbortsIf<CoinType> {
+        coin: Diem<CoinType>;
+        let fees = spec_transaction_fee<CoinType>().balance;
         include DiemTimestamp::AbortsIfNotOperating;
         aborts_if !is_coin_initialized<CoinType>() with Errors::NOT_PUBLISHED;
+        include Diem::DepositAbortsIf<CoinType>{coin: fees, check: coin};
+    }
+    spec schema PayFeeEnsures<CoinType> {
+        coin: Diem<CoinType>;
         let fees = spec_transaction_fee<CoinType>().balance;
         let post post_fees = spec_transaction_fee<CoinType>().balance;
-        include Diem::DepositAbortsIf<CoinType>{coin: fees, check: coin};
         ensures post_fees.value == fees.value + coin.value;
     }
 

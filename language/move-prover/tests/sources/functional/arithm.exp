@@ -1,20 +1,4 @@
 Move prover returns: exiting with verification errors
-error: post-condition does not hold
-    ┌─ tests/sources/functional/arithm.move:287:9
-    │
-287 │         ensures result == a*b*c + a*b*d + a*b;
-    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    │
-    =     at tests/sources/functional/arithm.move:283: distribution_law_incorrect
-    =         a = <redacted>
-    =         b = <redacted>
-    =         c = <redacted>
-    =         d = <redacted>
-    =     at tests/sources/functional/arithm.move:284: distribution_law_incorrect
-    =         result = <redacted>
-    =     at tests/sources/functional/arithm.move:285: distribution_law_incorrect
-    =     at tests/sources/functional/arithm.move:287: distribution_law_incorrect (spec)
-
 error: abort not covered by any of the `aborts_if` clauses
     ┌─ tests/sources/functional/arithm.move:128:5
     │
@@ -31,27 +15,6 @@ error: abort not covered by any of the `aborts_if` clauses
     =         y = <redacted>
     =     at tests/sources/functional/arithm.move:126: div_by_zero_u64_incorrect
     =         ABORTED
-
-error: post-condition does not hold
-    ┌─ tests/sources/functional/arithm.move:273:9
-    │
-273 │         ensures result != 720;
-    │         ^^^^^^^^^^^^^^^^^^^^^^
-    │
-    =     at tests/sources/functional/arithm.move:262: mul5_incorrect
-    =         a = <redacted>
-    =         b = <redacted>
-    =         c = <redacted>
-    =         d = <redacted>
-    =         e = <redacted>
-    =     at tests/sources/functional/arithm.move:264: mul5_incorrect
-    =     at tests/sources/functional/arithm.move:265: mul5_incorrect
-    =     at tests/sources/functional/arithm.move:266: mul5_incorrect
-    =     at tests/sources/functional/arithm.move:267: mul5_incorrect
-    =     at tests/sources/functional/arithm.move:269: mul5_incorrect
-    =         result = <redacted>
-    =     at tests/sources/functional/arithm.move:270: mul5_incorrect
-    =     at tests/sources/functional/arithm.move:273: mul5_incorrect (spec)
 
 error: abort not covered by any of the `aborts_if` clauses
     ┌─ tests/sources/functional/arithm.move:180:5

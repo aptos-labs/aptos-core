@@ -4565,6 +4565,19 @@ based on the conditions checked in the prologue, should never fail.
 
 </details>
 
+<details>
+<summary>Specification</summary>
+
+
+
+<pre><code><b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_EpilogueCommonAbortsIf">EpilogueCommonAbortsIf</a>&lt;Token&gt;;
+<b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_EpilogueCommonEnsures">EpilogueCommonEnsures</a>&lt;Token&gt;;
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_DiemAccount_epilogue_common"></a>
 
 ## Function `epilogue_common`
@@ -4655,6 +4668,124 @@ based on the conditions checked in the prologue, should never fail.
 
 </details>
 
+<details>
+<summary>Specification</summary>
+
+
+
+<pre><code><b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_EpilogueCommonAbortsIf">EpilogueCommonAbortsIf</a>&lt;Token&gt;;
+<b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_EpilogueCommonEnsures">EpilogueCommonEnsures</a>&lt;Token&gt;;
+</code></pre>
+
+
+
+
+<a name="0x1_DiemAccount_EpilogueCommonAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="DiemAccount.md#0x1_DiemAccount_EpilogueCommonAbortsIf">EpilogueCommonAbortsIf</a>&lt;Token&gt; {
+    account: signer;
+    txn_sequence_number: u64;
+    txn_gas_price: u64;
+    txn_max_gas_units: u64;
+    gas_units_remaining: u64;
+    <b>let</b> sender = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
+    <b>let</b> sender_account = <b>global</b>&lt;<a href="DiemAccount.md#0x1_DiemAccount">DiemAccount</a>&gt;(sender);
+    <b>let</b> gas_used = txn_max_gas_units - gas_units_remaining;
+    <b>let</b> transaction_fee_amount = txn_gas_price * gas_used;
+    <b>let</b> coin = <b>global</b>&lt;<a href="DiemAccount.md#0x1_DiemAccount_Balance">Balance</a>&lt;Token&gt;&gt;(sender).coin;
+}
+</code></pre>
+
+
+[EA1; Invariant]
+
+
+<pre><code><b>schema</b> <a href="DiemAccount.md#0x1_DiemAccount_EpilogueCommonAbortsIf">EpilogueCommonAbortsIf</a>&lt;Token&gt; {
+    <b>aborts_if</b> txn_max_gas_units &lt; gas_units_remaining <b>with</b> Errors::INVALID_ARGUMENT;
+}
+</code></pre>
+
+
+[EA2; Invariant]
+
+
+<pre><code><b>schema</b> <a href="DiemAccount.md#0x1_DiemAccount_EpilogueCommonAbortsIf">EpilogueCommonAbortsIf</a>&lt;Token&gt; {
+    <b>aborts_if</b> txn_gas_price * gas_used &gt; <a href="DiemAccount.md#0x1_DiemAccount_MAX_U64">MAX_U64</a> <b>with</b> Errors::LIMIT_EXCEEDED;
+}
+</code></pre>
+
+
+[EA3; Invariant]
+
+
+<pre><code><b>schema</b> <a href="DiemAccount.md#0x1_DiemAccount_EpilogueCommonAbortsIf">EpilogueCommonAbortsIf</a>&lt;Token&gt; {
+    <b>aborts_if</b> !<a href="DiemAccount.md#0x1_DiemAccount_exists_at">exists_at</a>(sender) <b>with</b> Errors::NOT_PUBLISHED;
+}
+</code></pre>
+
+
+[EA4; Condition]
+
+
+<pre><code><b>schema</b> <a href="DiemAccount.md#0x1_DiemAccount_EpilogueCommonAbortsIf">EpilogueCommonAbortsIf</a>&lt;Token&gt; {
+    <b>aborts_if</b> sender_account.sequence_number &gt;= <a href="DiemAccount.md#0x1_DiemAccount_MAX_U64">MAX_U64</a> <b>with</b> Errors::LIMIT_EXCEEDED;
+}
+</code></pre>
+
+
+[EA4; Invariant]
+
+
+<pre><code><b>schema</b> <a href="DiemAccount.md#0x1_DiemAccount_EpilogueCommonAbortsIf">EpilogueCommonAbortsIf</a>&lt;Token&gt; {
+    <b>aborts_if</b> !<a href="CRSN.md#0x1_CRSN_has_crsn">CRSN::has_crsn</a>(sender) && (sender_account.sequence_number != txn_sequence_number) <b>with</b> Errors::INVALID_ARGUMENT;
+}
+</code></pre>
+
+
+[PCA7]
+
+
+<pre><code><b>schema</b> <a href="DiemAccount.md#0x1_DiemAccount_EpilogueCommonAbortsIf">EpilogueCommonAbortsIf</a>&lt;Token&gt; {
+    <b>aborts_if</b> (transaction_fee_amount &gt; 0) && !<b>exists</b>&lt;<a href="DiemAccount.md#0x1_DiemAccount_Balance">Balance</a>&lt;Token&gt;&gt;(sender);
+}
+</code></pre>
+
+
+[EA4; Condition]
+
+
+<pre><code><b>schema</b> <a href="DiemAccount.md#0x1_DiemAccount_EpilogueCommonAbortsIf">EpilogueCommonAbortsIf</a>&lt;Token&gt; {
+    <b>aborts_if</b> (transaction_fee_amount &gt; 0) && transaction_fee_amount &gt; <a href="Diem.md#0x1_Diem_value">Diem::value</a>(coin) <b>with</b> Errors::LIMIT_EXCEEDED;
+    <b>include</b> (transaction_fee_amount &gt; 0) ==&gt; <a href="TransactionFee.md#0x1_TransactionFee_PayFeeAbortsIf">TransactionFee::PayFeeAbortsIf</a>&lt;Token&gt;{coin: <a href="Diem.md#0x1_Diem">Diem</a>&lt;Token&gt;{value: transaction_fee_amount}};
+}
+</code></pre>
+
+
+
+
+<a name="0x1_DiemAccount_EpilogueCommonEnsures"></a>
+
+
+<pre><code><b>schema</b> <a href="DiemAccount.md#0x1_DiemAccount_EpilogueCommonEnsures">EpilogueCommonEnsures</a>&lt;Token&gt; {
+    account: signer;
+    txn_sequence_number: u64;
+    txn_gas_price: u64;
+    txn_max_gas_units: u64;
+    gas_units_remaining: u64;
+    <b>let</b> sender = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
+    <b>let</b> sender_account = <b>global</b>&lt;<a href="DiemAccount.md#0x1_DiemAccount">DiemAccount</a>&gt;(sender);
+    <b>let</b> gas_used = txn_max_gas_units - gas_units_remaining;
+    <b>let</b> transaction_fee_amount = txn_gas_price * gas_used;
+    <b>let</b> coin = <b>global</b>&lt;<a href="DiemAccount.md#0x1_DiemAccount_Balance">Balance</a>&lt;Token&gt;&gt;(sender).coin;
+    <b>include</b> (transaction_fee_amount &gt; 0) ==&gt; <a href="TransactionFee.md#0x1_TransactionFee_PayFeeEnsures">TransactionFee::PayFeeEnsures</a>&lt;Token&gt;{coin: <a href="Diem.md#0x1_Diem">Diem</a>&lt;Token&gt;{value: transaction_fee_amount}};
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_DiemAccount_writeset_epilogue"></a>
 
 ## Function `writeset_epilogue`
@@ -4708,7 +4839,29 @@ Epilogue for WriteSet trasnaction
 
 
 
-<pre><code><b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_WritesetEpilogueEmits">WritesetEpilogueEmits</a>;
+<pre><code><b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_WritesetEpilogueAbortsIf">WritesetEpilogueAbortsIf</a>;
+<b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_EpilogueCommonEnsures">EpilogueCommonEnsures</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;{account: dr_account, txn_gas_price: 0, txn_max_gas_units: 0, gas_units_remaining: 0};
+<b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_WritesetEpilogueEmits">WritesetEpilogueEmits</a>;
+</code></pre>
+
+
+
+
+<a name="0x1_DiemAccount_WritesetEpilogueAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="DiemAccount.md#0x1_DiemAccount_WritesetEpilogueAbortsIf">WritesetEpilogueAbortsIf</a> {
+    dr_account: signer;
+    txn_sequence_number: u64;
+    should_trigger_reconfiguration: bool;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="DiemAccount.md#0x1_DiemAccount_DiemWriteSetManager">DiemWriteSetManager</a>&gt;(@DiemRoot);
+    <b>include</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotOperating">DiemTimestamp::AbortsIfNotOperating</a>;
+    <b>aborts_if</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dr_account) != @DiemRoot <b>with</b> Errors::INVALID_ARGUMENT;
+    <b>aborts_if</b> !<a href="Roles.md#0x1_Roles_has_diem_root_role">Roles::has_diem_root_role</a>(dr_account) <b>with</b> Errors::INVALID_ARGUMENT;
+    <b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_EpilogueCommonAbortsIf">EpilogueCommonAbortsIf</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;{account: dr_account, txn_gas_price: 0, txn_max_gas_units: 0, gas_units_remaining: 0};
+    <b>include</b> should_trigger_reconfiguration ==&gt; <a href="Roles.md#0x1_Roles_AbortsIfNotDiemRoot">Roles::AbortsIfNotDiemRoot</a>{account: dr_account};
+    <b>include</b> should_trigger_reconfiguration ==&gt; <a href="DiemConfig.md#0x1_DiemConfig_ReconfigureAbortsIf">DiemConfig::ReconfigureAbortsIf</a>;
+}
 </code></pre>
 
 

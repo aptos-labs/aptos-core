@@ -359,7 +359,7 @@ Gets the current time in seconds.
 
 <pre><code><b>pragma</b> opaque;
 <b>include</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotOperating">AbortsIfNotOperating</a>;
-<b>ensures</b> result == <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_microseconds">spec_now_microseconds</a>() /  <a href="DiemTimestamp.md#0x1_DiemTimestamp_MICRO_CONVERSION_FACTOR">MICRO_CONVERSION_FACTOR</a>;
+<b>ensures</b> result == <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_seconds">spec_now_seconds</a>();
 </code></pre>
 
 
@@ -369,7 +369,7 @@ Gets the current time in seconds.
 
 
 <pre><code><b>fun</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_seconds">spec_now_seconds</a>(): u64 {
-   <b>global</b>&lt;<a href="DiemTimestamp.md#0x1_DiemTimestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@DiemRoot).microseconds / <a href="DiemTimestamp.md#0x1_DiemTimestamp_MICRO_CONVERSION_FACTOR">MICRO_CONVERSION_FACTOR</a>
+   <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_microseconds">spec_now_microseconds</a>() / <a href="DiemTimestamp.md#0x1_DiemTimestamp_MICRO_CONVERSION_FACTOR">MICRO_CONVERSION_FACTOR</a>
 }
 </code></pre>
 
