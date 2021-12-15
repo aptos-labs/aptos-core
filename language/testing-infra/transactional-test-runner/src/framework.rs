@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use crate::tasks::{
-    taskify, InitCommand, PrintBytecodeCommand, PrintBytecodeInputChoice, PublishCommand,
+    taskify, Argument, InitCommand, PrintBytecodeCommand, PrintBytecodeInputChoice, PublishCommand,
     RawAddress, RunCommand, SyntaxChoice, TaskCommand, TaskInput, ViewCommand,
 };
 use anyhow::{anyhow, Result};
@@ -68,6 +68,17 @@ impl<'a> CompiledState<'a> {
             RawAddress::Named(named_addr) => self.resolve_named_address(named_addr.as_str()),
             RawAddress::Anonymous(addr) => *addr,
         }
+    }
+
+    pub fn resolve_args(&self, args: Vec<Argument>) -> Vec<TransactionArgument> {
+        args.into_iter()
+            .map(|arg| match arg {
+                Argument::NamedAddress(named_addr) => {
+                    TransactionArgument::Address(self.resolve_named_address(named_addr.as_str()))
+                }
+                Argument::TransactionArgument(arg) => arg,
+            })
+            .collect()
     }
 }
 
@@ -259,6 +270,7 @@ pub trait MoveTestAdapter<'a> {
                     }
                     SyntaxChoice::IR => (compile_ir_script(state.dep_modules(), data_path)?, None),
                 };
+                let args = self.compiled_state().resolve_args(args);
                 self.execute_script(script, type_args, signers, args, gas_budget, extra_args)?;
                 Ok(warning_opt)
             }
@@ -277,6 +289,7 @@ pub trait MoveTestAdapter<'a> {
                     syntax.is_none(),
                     "syntax flag meaningless with function execution"
                 );
+                let args = self.compiled_state().resolve_args(args);
                 self.call_function(
                     &module,
                     name.as_ident_str(),

@@ -251,12 +251,20 @@ pub struct PublishCommand {
     pub syntax: Option<SyntaxChoice>,
 }
 
+/// TODO: this is a hack to support named addresses in transaction argument positions.
+/// Should reimplement in a better way in the future.
+#[derive(Debug)]
+pub enum Argument {
+    NamedAddress(Identifier),
+    TransactionArgument(TransactionArgument),
+}
+
 #[derive(Debug, StructOpt)]
 pub struct RunCommand {
     #[structopt(long = "signers", parse(try_from_str = RawAddress::parse))]
     pub signers: Vec<RawAddress>,
-    #[structopt(long = "args", parse(try_from_str = parser::parse_transaction_argument))]
-    pub args: Vec<TransactionArgument>,
+    #[structopt(long = "args", parse(try_from_str = parse_argument))]
+    pub args: Vec<Argument>,
     #[structopt(long = "type-args", parse(try_from_str = parser::parse_type_tag))]
     pub type_args: Vec<TypeTag>,
     #[structopt(long = "gas-budget")]
@@ -408,4 +416,12 @@ impl FromStr for PrintBytecodeInputChoice {
             )),
         }
     }
+}
+
+fn parse_argument(s: &str) -> Result<Argument> {
+    Ok(if let Some(stripped) = s.strip_prefix('@') {
+        Argument::NamedAddress(Identifier::new(stripped)?)
+    } else {
+        Argument::TransactionArgument(parser::parse_transaction_argument(s)?)
+    })
 }
