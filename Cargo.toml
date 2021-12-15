@@ -28,7 +28,6 @@ members = [
     "crates/diem-faucet",
     "crates/diem-id-generator",
     "crates/diem-infallible",
-    "crates/diem-json-rpc-client",
     "crates/diem-log-derive",
     "crates/diem-logger",
     "crates/diem-metrics",

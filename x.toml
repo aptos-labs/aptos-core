@@ -166,7 +166,6 @@ members = [
     "diem-experimental-framework-releases",
     "diem-fuzz",
     "diem-fuzzer",
-    "diem-json-rpc-client",
     "diem-keygen",
     "diem-proptest-helpers",
     "diem-rest-client",

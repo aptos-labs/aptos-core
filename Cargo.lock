@@ -2042,19 +2042,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "diem-json-rpc-client"
-version = "0.1.0"
-dependencies = [
- "diem-client",
- "diem-crypto",
- "diem-json-rpc-types",
- "diem-types",
- "diem-workspace-hack",
- "futures",
- "rand 0.8.4",
-]
-
-[[package]]
 name = "diem-json-rpc-types"
 version = "0.0.3"
 dependencies = [
