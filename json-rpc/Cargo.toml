@@ -20,9 +20,6 @@ rand = "0.8.3"
 serde_json = "1.0.64"
 serde = { version = "1.0.124", features = ["derive"], default-features = false }
 tokio = { version = "1.8.1", features = ["full"] }
-tokio-retry = "0.3.0"
-tokio-stream = "0.1.4"
-tokio-tungstenite = "0.14.0"
 warp = { version = "0.3.0", features = ["default", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
 reqwest = { version = "0.11.2", features = ["blocking", "json"], default_features = false, optional = true }
 proptest = { version = "1.0.0", optional = true }
@@ -76,6 +73,7 @@ executor-types = { path = "../execution/executor-types" }
 move-vm-types = { path = "../language/move-vm/types" }
 diem-transaction-builder = { path = "../sdk/transaction-builder" }
 diem-sdk = { path = "../sdk" }
+scratchpad = { path = "../storage/scratchpad", features = ["fuzzing"] }
 
 [features]
 fuzzing = ["proptest", "diem-client", "diem-mempool/fuzzing", "diemdb/fuzzing", "diem-proptest-helpers", "diem-temppath", "executor", "executor-types", "move-vm-types", "reqwest", "scratchpad/fuzzing", "vm-genesis"]

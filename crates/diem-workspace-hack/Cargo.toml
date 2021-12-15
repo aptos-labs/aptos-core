@@ -44,10 +44,8 @@ log = { version = "0.4.14", default-features = false, features = ["serde", "std"
 memchr = { version = "2.4.0", features = ["std", "use_std"] }
 num-integer = { version = "0.1.44", default-features = false, features = ["i128", "std"] }
 num-traits = { version = "0.2.14", features = ["i128", "std"] }
-petgraph = { version = "0.5.1", features = ["graphmap", "matrix_graph", "stable_graph"] }
 plotters = { version = "0.3.0", default-features = false, features = ["area_series", "evcxr", "histogram", "line_series", "plotters-svg", "svg_backend"] }
 proptest = { version = "1.0.0", features = ["bit-set", "break-dead-code", "fork", "lazy_static", "quick-error", "regex-syntax", "rusty-fork", "std", "tempfile", "timeout"] }
-prost = { version = "0.8.0", features = ["prost-derive", "std"] }
 rand = { version = "0.8.4", features = ["alloc", "getrandom", "libc", "rand_chacha", "rand_hc", "small_rng", "std", "std_rng"] }
 rand_core = { version = "0.5.1", default-features = false, features = ["alloc", "getrandom", "std"] }
 regex = { version = "1.4.3", features = ["aho-corasick", "memchr", "perf", "perf-cache", "perf-dfa", "perf-inline", "perf-literal", "std", "thread_local", "unicode", "unicode-age", "unicode-bool", "unicode-case", "unicode-gencat", "unicode-perl", "unicode-script", "unicode-segment"] }
@@ -103,11 +101,9 @@ log = { version = "0.4.14", default-features = false, features = ["serde", "std"
 memchr = { version = "2.4.0", features = ["std", "use_std"] }
 num-integer = { version = "0.1.44", default-features = false, features = ["i128", "std"] }
 num-traits = { version = "0.2.14", features = ["i128", "std"] }
-petgraph = { version = "0.5.1", features = ["graphmap", "matrix_graph", "stable_graph"] }
 plotters = { version = "0.3.0", default-features = false, features = ["area_series", "evcxr", "histogram", "line_series", "plotters-svg", "svg_backend"] }
 proc-macro2 = { version = "0.4.30", features = ["proc-macro"] }
 proptest = { version = "1.0.0", features = ["bit-set", "break-dead-code", "fork", "lazy_static", "quick-error", "regex-syntax", "rusty-fork", "std", "tempfile", "timeout"] }
-prost = { version = "0.8.0", features = ["prost-derive", "std"] }
 quote = { version = "0.6.13", features = ["proc-macro"] }
 rand = { version = "0.8.4", features = ["alloc", "getrandom", "libc", "rand_chacha", "rand_hc", "small_rng", "std", "std_rng"] }
 rand_core = { version = "0.5.1", default-features = false, features = ["alloc", "getrandom", "std"] }

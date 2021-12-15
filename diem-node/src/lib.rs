@@ -148,7 +148,6 @@ pub fn load_test_environment<R>(
         .parse()
         .unwrap();
     template.api.address = template.json_rpc.address;
-    template.json_rpc.stream_rpc.enabled = true;
     if lazy {
         template.consensus.mempool_poll_count = u64::MAX;
     }

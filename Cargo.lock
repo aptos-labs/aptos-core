@@ -1576,7 +1576,6 @@ dependencies = [
  "diem-json-rpc-types",
  "diem-types",
  "diem-workspace-hack",
- "futures",
  "hex",
  "ipnet",
  "move-core-types",
@@ -1586,7 +1585,6 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
- "tokio-tungstenite 0.14.0",
  "tracing",
  "ureq",
  "url",
@@ -2033,9 +2031,6 @@ dependencies = [
  "storage-interface",
  "thiserror",
  "tokio",
- "tokio-retry",
- "tokio-stream",
- "tokio-tungstenite 0.14.0",
  "vm-genesis",
  "vm-validator",
  "warp",
@@ -2793,11 +2788,9 @@ dependencies = [
  "memchr",
  "num-integer",
  "num-traits 0.2.14",
- "petgraph 0.5.1",
  "plotters",
  "proc-macro2 0.4.30",
  "proptest",
- "prost",
  "quote 0.6.13",
  "rand 0.8.4",
  "rand_core 0.5.1",
@@ -6592,29 +6585,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "prost"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de5e2533f59d08fcf364fd374ebda0692a70bd6d7e66ef97f306f45c6c5d8020"
-dependencies = [
- "bytes",
- "prost-derive",
-]
-
-[[package]]
-name = "prost-derive"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "600d2f334aa05acb02a755e217ef1ab6dea4d51b58b7846588b747edec04efba"
-dependencies = [
- "anyhow",
- "itertools 0.10.1",
- "proc-macro2 1.0.28",
- "quote 1.0.9",
- "syn 1.0.74",
-]
-
-[[package]]
 name = "prover-lab"
 version = "0.1.0"
 dependencies = [
@@ -8950,20 +8920,7 @@ dependencies = [
  "log",
  "pin-project",
  "tokio",
- "tungstenite 0.12.0",
-]
-
-[[package]]
-name = "tokio-tungstenite"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e96bb520beab540ab664bd5a9cfeaa1fcd846fa68c830b42e2c8963071251d2"
-dependencies = [
- "futures-util",
- "log",
- "pin-project",
- "tokio",
- "tungstenite 0.13.0",
+ "tungstenite",
 ]
 
 [[package]]
@@ -9201,26 +9158,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tungstenite"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fe8dada8c1a3aeca77d6b51a4f1314e0f4b8e438b7b1b71e3ddaca8080e4093"
-dependencies = [
- "base64",
- "byteorder",
- "bytes",
- "http",
- "httparse",
- "input_buffer",
- "log",
- "rand 0.8.4",
- "sha-1 0.9.4",
- "thiserror",
- "url",
- "utf-8",
-]
-
-[[package]]
 name = "twoway"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9235,7 +9172,7 @@ version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "static_assertions",
 ]
 
@@ -9587,7 +9524,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-stream",
- "tokio-tungstenite 0.13.0",
+ "tokio-tungstenite",
  "tokio-util",
  "tower-service",
  "tracing",

@@ -23,8 +23,6 @@ pub mod runtime;
 
 pub use diem_json_rpc_types::{errors, response, views};
 
-pub mod stream_rpc;
-
 pub use runtime::{bootstrap, bootstrap_from_config};
 
 #[cfg(any(feature = "fuzzing", test))]

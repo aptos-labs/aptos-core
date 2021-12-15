@@ -14,8 +14,6 @@ pub struct JsonRpcConfig {
     pub content_length_limit: usize,
     pub tls_cert_path: Option<String>,
     pub tls_key_path: Option<String>,
-    #[serde(default)]
-    pub stream_rpc: StreamConfig,
 }
 
 pub const DEFAULT_JSON_RPC_ADDRESS: &str = "127.0.0.1";
@@ -35,7 +33,6 @@ impl Default for JsonRpcConfig {
             content_length_limit: DEFAULT_CONTENT_LENGTH_LIMIT,
             tls_cert_path: None,
             tls_key_path: None,
-            stream_rpc: StreamConfig::default(),
         }
     }
 }
@@ -43,34 +40,5 @@ impl Default for JsonRpcConfig {
 impl JsonRpcConfig {
     pub fn randomize_ports(&mut self) {
         self.address.set_port(utils::get_available_port());
-    }
-}
-
-/// This API is experimental and subject to change
-/// Documentation is in /json-rpc/src/stream_rpc/README.md
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(default)]
-pub struct StreamConfig {
-    pub enabled: bool,
-    pub subscription_fetch_size: u64,
-    pub send_queue_size: usize,
-    pub poll_interval_ms: u64,
-    pub max_poll_interval_ms: u64,
-}
-
-pub const DEFAULT_STREAM_RPC_SUBSCRIPTION_FETCH_SIZE: u64 = 100;
-pub const DEFAULT_STREAM_RPC_SEND_QUEUE_SIZE: usize = 100;
-pub const DEFAULT_STREAM_RPC_POLL_INTERVAL_MS: u64 = 1000;
-pub const DEFAULT_STREAM_RPC_MAX_POLL_INTERVAL_MS: u64 = 5000;
-
-impl Default for StreamConfig {
-    fn default() -> StreamConfig {
-        StreamConfig {
-            enabled: false,
-            subscription_fetch_size: DEFAULT_STREAM_RPC_SUBSCRIPTION_FETCH_SIZE,
-            send_queue_size: DEFAULT_STREAM_RPC_SEND_QUEUE_SIZE,
-            poll_interval_ms: DEFAULT_STREAM_RPC_POLL_INTERVAL_MS,
-            max_poll_interval_ms: DEFAULT_STREAM_RPC_MAX_POLL_INTERVAL_MS,
-        }
     }
 }

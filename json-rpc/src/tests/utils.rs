@@ -3,7 +3,7 @@
 
 use anyhow::{format_err, Error, Result};
 use diem_config::{
-    config::{JsonRpcConfig, RoleType, StreamConfig},
+    config::{JsonRpcConfig, RoleType},
     utils,
 };
 use diem_crypto::HashValue;
@@ -61,13 +61,8 @@ pub fn test_bootstrap(
     diem_db: Arc<dyn MoveDbReader>,
     mp_sender: MempoolClientSender,
 ) -> Runtime {
-    let stream_rpc = StreamConfig {
-        enabled: true,
-        ..Default::default()
-    };
     let cfg = JsonRpcConfig {
         address,
-        stream_rpc,
         ..Default::default()
     };
     crate::bootstrap(

@@ -6,7 +6,6 @@ use crate::{
     errors::is_internal_error,
     methods::{Handler, JsonRpcService},
     response::{JsonRpcResponse, X_DIEM_CHAIN_ID, X_DIEM_TIMESTAMP_USEC_ID, X_DIEM_VERSION_ID},
-    stream_rpc,
     util::{sdk_info_from_user_agent, SdkInfo},
 };
 use anyhow::{ensure, Result};
@@ -162,7 +161,7 @@ pub fn jsonrpc_routes(
     config: &JsonRpcConfig,
 ) -> BoxedFilter<(impl Reply,)> {
     let service = JsonRpcService::new(
-        diem_db.clone(),
+        diem_db,
         mp_sender,
         role,
         chain_id,
@@ -214,14 +213,7 @@ pub fn jsonrpc_routes(
         .and(base_route)
         .boxed();
 
-    route_root
-        .or(route_v1)
-        .or(stream_rpc::startup::get_stream_routes(
-            &config.stream_rpc,
-            config.content_length_limit as u64,
-            diem_db,
-        ))
-        .boxed()
+    route_root.or(route_v1).boxed()
 }
 
 pub fn health_check_route(health_diem_db: Arc<dyn MoveDbReader>) -> BoxedFilter<(impl Reply,)> {
