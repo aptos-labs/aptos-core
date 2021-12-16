@@ -60,10 +60,6 @@ pub trait StorageSynchronizerInterface {
 pub struct StorageSynchronizer {
     chunk_executor: Box<dyn ChunkExecutorTrait>,
     storage: Arc<RwLock<DbReaderWriter>>,
-
-    // We cache the latest storage summary to prevent unnecessary reads to the
-    // database. This should be updated after each database write.
-    cached_storage_summary: Option<StorageStateSummary>,
 }
 
 impl StorageSynchronizer {
@@ -74,15 +70,10 @@ impl StorageSynchronizer {
         Self {
             chunk_executor,
             storage,
-            cached_storage_summary: None,
         }
     }
 
-    fn invalidate_cached_storage_summary(&mut self) {
-        self.cached_storage_summary = None;
-    }
-
-    fn refresh_cached_storage_summary(&mut self) -> Result<StorageStateSummary, Error> {
+    fn fetch_storage_summary(&mut self) -> Result<StorageStateSummary, Error> {
         // Fetch the startup info from storage
         let startup_info = self
             .storage
@@ -123,15 +114,13 @@ impl StorageSynchronizer {
         let (latest_synced_version, _) = latest_transaction_info
             .ok_or_else(|| Error::StorageError("Latest transaction info is missing!".into()))?;
 
-        // Create the storage summary and save it in the cache
+        // Create the storage summary
         let storage_state_summary = StorageStateSummary {
             latest_epoch_state,
             latest_executed_trees,
             latest_ledger_info,
             latest_synced_version,
         };
-        self.cached_storage_summary = Some(storage_state_summary.clone());
-
         Ok(storage_state_summary)
     }
 }
@@ -153,7 +142,6 @@ impl StorageSynchronizerInterface for StorageSynchronizer {
             .map_err(|error| {
                 Error::UnexpectedError(format!("Apply and commit chunk failed: {}", error))
             })?;
-        self.invalidate_cached_storage_summary();
 
         Ok(committed_events)
     }
@@ -174,17 +162,12 @@ impl StorageSynchronizerInterface for StorageSynchronizer {
             .map_err(|error| {
                 Error::UnexpectedError(format!("Execute and commit chunk failed: {}", error))
             })?;
-        self.invalidate_cached_storage_summary();
 
         Ok(committed_events)
     }
 
     fn get_storage_summary(&mut self) -> Result<StorageStateSummary, Error> {
-        if let Some(cached_storage_summary) = &self.cached_storage_summary {
-            Ok(cached_storage_summary.clone())
-        } else {
-            self.refresh_cached_storage_summary()
-        }
+        self.fetch_storage_summary()
     }
 
     fn save_account_states(

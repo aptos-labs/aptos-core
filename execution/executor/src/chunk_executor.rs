@@ -138,6 +138,12 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         )?;
         let mut transactions = txn_list_with_proof.transactions;
         transactions.drain(..txns_to_skip as usize);
+        if txns_to_skip == num_txns {
+            info!(
+                "Skipping all transactions in the given chunk! Num transactions: {:?}",
+                num_txns
+            );
+        }
 
         // Execute transactions.
         let state_view = self.state_view(&latest_view, &persisted_view);
