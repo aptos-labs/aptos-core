@@ -461,15 +461,15 @@ impl<'a> DiemTestAdapter<'a> {
 
         let (status, output) = outputs.pop().unwrap();
         match output.status() {
-            TransactionStatus::Keep(kept_vm_status) => match kept_vm_status {
-                KeptVMStatus::Executed => {
-                    self.storage.add_write_set(output.write_set());
-                    Ok(output)
+            TransactionStatus::Keep(kept_vm_status) => {
+                self.storage.add_write_set(output.write_set());
+                match kept_vm_status {
+                    KeptVMStatus::Executed => Ok(output),
+                    _ => {
+                        bail!("Failed to execute transaction. VMStatus: {}", status)
+                    }
                 }
-                _ => {
-                    bail!("Failed to execute transaction. VMStatus: {}", status)
-                }
-            },
+            }
             TransactionStatus::Discard(_) => {
                 bail!("Transaction discarded. VMStatus: {}", status)
             }
