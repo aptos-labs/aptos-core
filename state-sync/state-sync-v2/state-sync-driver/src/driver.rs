@@ -52,9 +52,9 @@ impl DriverConfiguration {
 }
 
 /// The state sync driver that drives synchronization progress
-pub struct StateSyncDriver<D, M, S> {
+pub struct StateSyncDriver<DataClient, MempoolNotifier, StorageSyncer> {
     // The component that manages the initial bootstrapping of the node
-    bootstrapper: Bootstrapper<M, S>,
+    bootstrapper: Bootstrapper<MempoolNotifier, StorageSyncer>,
 
     // The listener for client notifications
     client_notification_listener: ClientNotificationListener,
@@ -63,10 +63,10 @@ pub struct StateSyncDriver<D, M, S> {
     consensus_notification_handler: ConsensusNotificationHandler,
 
     // The component that manages the continuous syncing of the node
-    continuous_syncer: ContinuousSyncer<M, S>,
+    continuous_syncer: ContinuousSyncer<MempoolNotifier, StorageSyncer>,
 
     // The client for checking the global data summary of our peers
-    diem_data_client: D,
+    diem_data_client: DataClient,
 
     // The configuration for the driver
     driver_configuration: DriverConfiguration,
@@ -75,26 +75,26 @@ pub struct StateSyncDriver<D, M, S> {
     event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
 
     // The handler for notifications to mempool
-    mempool_notification_handler: MempoolNotificationHandler<M>,
+    mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
 
     // The storage synchronizer used to update local storage
-    storage_synchronizer: Arc<Mutex<S>>,
+    storage_synchronizer: Arc<Mutex<StorageSyncer>>,
 }
 
 impl<
-        D: DiemDataClient + Send + Clone + 'static,
-        M: MempoolNotificationSender,
-        S: StorageSynchronizerInterface,
-    > StateSyncDriver<D, M, S>
+        DataClient: DiemDataClient + Send + Clone + 'static,
+        MempoolNotifier: MempoolNotificationSender,
+        StorageSyncer: StorageSynchronizerInterface,
+    > StateSyncDriver<DataClient, MempoolNotifier, StorageSyncer>
 {
     pub fn new(
         client_notification_listener: ClientNotificationListener,
         consensus_notification_handler: ConsensusNotificationHandler,
         driver_configuration: DriverConfiguration,
         event_subscription_service: EventSubscriptionService,
-        mempool_notification_handler: MempoolNotificationHandler<M>,
-        storage_synchronizer: S,
-        diem_data_client: D,
+        mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
+        storage_synchronizer: StorageSyncer,
+        diem_data_client: DataClient,
         streaming_service_client: StreamingServiceClient,
     ) -> Self {
         let event_subscription_service = Arc::new(Mutex::new(event_subscription_service));

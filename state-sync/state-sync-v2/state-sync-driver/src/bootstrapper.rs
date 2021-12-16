@@ -229,7 +229,7 @@ impl VerifiedEpochStates {
 }
 
 /// A simple component that manages the bootstrapping of the node
-pub struct Bootstrapper<M, S> {
+pub struct Bootstrapper<MempoolNotifier, StorageSyncer> {
     // The currently active data stream (provided by the data streaming service)
     active_data_stream: Option<DataStreamListener>,
 
@@ -246,25 +246,27 @@ pub struct Bootstrapper<M, S> {
     event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
 
     // The handler for notifications to mempool
-    mempool_notification_handler: MempoolNotificationHandler<M>,
+    mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
 
     // The client through which to stream data from the Diem network
     streaming_service_client: StreamingServiceClient,
 
     // The storage synchronizer used to update local storage
-    storage_synchronizer: Arc<Mutex<S>>,
+    storage_synchronizer: Arc<Mutex<StorageSyncer>>,
 
     // The epoch states verified by this node (held in memory)
     verified_epoch_states: VerifiedEpochStates,
 }
 
-impl<M: MempoolNotificationSender, S: StorageSynchronizerInterface> Bootstrapper<M, S> {
+impl<MempoolNotifier: MempoolNotificationSender, StorageSyncer: StorageSynchronizerInterface>
+    Bootstrapper<MempoolNotifier, StorageSyncer>
+{
     pub fn new(
         driver_configuration: DriverConfiguration,
         event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
-        mempool_notification_handler: MempoolNotificationHandler<M>,
+        mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
         streaming_service_client: StreamingServiceClient,
-        storage_synchronizer: Arc<Mutex<S>>,
+        storage_synchronizer: Arc<Mutex<StorageSyncer>>,
     ) -> Self {
         // Load the latest epoch state from storage
         let latest_storage_summary = storage_synchronizer

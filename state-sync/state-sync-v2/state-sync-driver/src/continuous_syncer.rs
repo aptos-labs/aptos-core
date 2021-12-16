@@ -26,7 +26,7 @@ use mempool_notifications::MempoolNotificationSender;
 use std::sync::Arc;
 
 /// A simple component that manages the continuous syncing of the node
-pub struct ContinuousSyncer<M, S> {
+pub struct ContinuousSyncer<MempoolNotifier, StorageSyncer> {
     // The currently active data stream (provided by the data streaming service)
     active_data_stream: Option<DataStreamListener>,
 
@@ -37,22 +37,24 @@ pub struct ContinuousSyncer<M, S> {
     event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
 
     // The handler for notifications to mempool
-    mempool_notification_handler: MempoolNotificationHandler<M>,
+    mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
 
     // The client through which to stream data from the Diem network
     streaming_service_client: StreamingServiceClient,
 
     // The storage synchronizer used to update local storage
-    storage_synchronizer: Arc<Mutex<S>>,
+    storage_synchronizer: Arc<Mutex<StorageSyncer>>,
 }
 
-impl<M: MempoolNotificationSender, S: StorageSynchronizerInterface> ContinuousSyncer<M, S> {
+impl<MempoolNotifier: MempoolNotificationSender, StorageSyncer: StorageSynchronizerInterface>
+    ContinuousSyncer<MempoolNotifier, StorageSyncer>
+{
     pub fn new(
         driver_configuration: DriverConfiguration,
         event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
-        mempool_notification_handler: MempoolNotificationHandler<M>,
+        mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
         streaming_service_client: StreamingServiceClient,
-        storage_synchronizer: Arc<Mutex<S>>,
+        storage_synchronizer: Arc<Mutex<StorageSyncer>>,
     ) -> Self {
         Self {
             active_data_stream: None,
