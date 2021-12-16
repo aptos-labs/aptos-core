@@ -21,8 +21,6 @@ serde = "1.0.124"
 structopt = "0.3.21"
 toml = "0.5.8"
 
-executor = { path = "../executor" }
-executor-types = { path = "../executor-types" }
 diemdb = { path = "../../storage/diemdb" }
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crates/diem-crypto" }
@@ -30,9 +28,12 @@ diem-genesis-tool = {path = "../../config/management/genesis", features = ["test
 diem-infallible = { path = "../../crates/diem-infallible" }
 diem-jellyfish-merkle = { path = "../../storage/jellyfish-merkle" }
 diem-logger = { path = "../../crates/diem-logger" }
+diem-secure-push-metrics = { path = "../../secure/push-metrics" }
 diem-types = { path = "../../types" }
 diem-vm= { path = "../../diem-move/diem-vm" }
 diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+executor = { path = "../executor" }
+executor-types = { path = "../executor-types" }
 schemadb = { path = "../../storage/schemadb" }
 storage-client = { path = "../../storage/storage-client" }
 storage-interface = { path = "../../storage/storage-interface" }

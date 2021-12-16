@@ -3233,6 +3233,7 @@ dependencies = [
  "diem-infallible",
  "diem-jellyfish-merkle",
  "diem-logger",
+ "diem-secure-push-metrics",
  "diem-temppath",
  "diem-transaction-builder",
  "diem-types",
