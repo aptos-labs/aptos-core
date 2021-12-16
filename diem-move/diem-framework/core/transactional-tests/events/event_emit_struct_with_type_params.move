@@ -1,4 +1,9 @@
-module {{default}}::M {
+//# init --parent-vasps Alice
+
+// TODO: this should be a Move test. Make it so after we fix the infrastructure.
+
+//# publish
+module Alice::M {
     use Std::Event;
 
     struct MyEvent<phantom T1, phantom T2> has copy, drop, store { b: bool }
@@ -10,14 +15,11 @@ module {{default}}::M {
     }
 }
 
-
-//! new-transaction
+//# run --admin-script --signers DiemRoot Alice --show-events
 script {
-use {{default}}::M;
+use Alice::M;
 
-fun main(account: signer) {
-    let account = &account;
-    M::emit_event<bool, u64>(account);
+fun main(_dr: signer, account: signer) {
+    M::emit_event<bool, u64>(&account);
 }
 }
-// check: "Keep(EXECUTED)"
