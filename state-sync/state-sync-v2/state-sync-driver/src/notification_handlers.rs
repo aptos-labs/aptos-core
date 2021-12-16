@@ -7,6 +7,7 @@ use consensus_notifications::{
     ConsensusSyncNotification,
 };
 use diem_infallible::Mutex;
+use diem_logger::prelude::*;
 use diem_types::{ledger_info::LedgerInfoWithSignatures, transaction::Transaction};
 use futures::{stream::FusedStream, Stream};
 use mempool_notifications::MempoolNotificationSender;
@@ -101,6 +102,7 @@ impl ConsensusNotificationHandler {
 
         // If we're now at the target, return successfully
         if sync_target_version == latest_committed_version {
+            info!("We're already at the requested sync target version! Returning early.");
             let result = Ok(());
             self.respond_to_sync_notification(sync_notification, result.clone())
                 .await?;
@@ -253,6 +255,7 @@ impl FusedStream for ConsensusNotificationHandler {
 }
 
 /// A simple handler for sending notifications to mempool
+#[derive(Clone)]
 pub struct MempoolNotificationHandler<M> {
     mempool_notification_sender: M,
 }

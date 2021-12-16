@@ -8,6 +8,7 @@ use crate::{
     error::Error,
     notification_handlers::{ConsensusNotificationHandler, MempoolNotificationHandler},
     storage_synchronizer::StorageSynchronizerInterface,
+    utils,
 };
 use consensus_notifications::{
     ConsensusCommitNotification, ConsensusNotification, ConsensusSyncNotification,
@@ -18,7 +19,7 @@ use diem_data_client::DiemDataClient;
 use diem_infallible::Mutex;
 use diem_logger::*;
 use diem_types::waypoint::Waypoint;
-use event_notifications::{EventNotificationSender, EventSubscriptionService};
+use event_notifications::EventSubscriptionService;
 use futures::StreamExt;
 use mempool_notifications::MempoolNotificationSender;
 use std::sync::Arc;
@@ -53,7 +54,7 @@ impl DriverConfiguration {
 /// The state sync driver that drives synchronization progress
 pub struct StateSyncDriver<D, M, S> {
     // The component that manages the initial bootstrapping of the node
-    bootstrapper: Bootstrapper<S>,
+    bootstrapper: Bootstrapper<M, S>,
 
     // The listener for client notifications
     client_notification_listener: ClientNotificationListener,
@@ -62,7 +63,7 @@ pub struct StateSyncDriver<D, M, S> {
     consensus_notification_handler: ConsensusNotificationHandler,
 
     // The component that manages the continuous syncing of the node
-    continuous_syncer: ContinuousSyncer<S>,
+    continuous_syncer: ContinuousSyncer<M, S>,
 
     // The client for checking the global data summary of our peers
     diem_data_client: D,
@@ -101,12 +102,14 @@ impl<
         let bootstrapper = Bootstrapper::new(
             driver_configuration.clone(),
             event_subscription_service.clone(),
+            mempool_notification_handler.clone(),
             streaming_service_client.clone(),
             storage_synchronizer.clone(),
         );
         let continuous_syncer = ContinuousSyncer::new(
             driver_configuration.clone(),
             event_subscription_service.clone(),
+            mempool_notification_handler.clone(),
             streaming_service_client,
             storage_synchronizer.clone(),
         );
@@ -215,35 +218,25 @@ impl<
     ) -> Result<(), Error> {
         debug!("Received a consensus commit notification!");
 
-        // Respond to consensus successfully
+        // TODO(joshlind): can we get consensus to forward the events?
+        // Notify mempool and the event subscription service
         let committed_transactions = commit_notification.transactions.clone();
         let reconfiguration_events = commit_notification.reconfiguration_events.clone();
+        let latest_storage_summary = self.storage_synchronizer.lock().get_storage_summary()?;
+        utils::notify_committed_events_and_transactions(
+            &latest_storage_summary,
+            self.mempool_notification_handler.clone(),
+            committed_transactions,
+            self.event_subscription_service.clone(),
+            reconfiguration_events,
+        )
+        .await
+        .map_err(|error| Error::EventNotificationError(format!("{:?}", error)))?;
+
+        // Respond to consensus successfully
         self.consensus_notification_handler
             .respond_to_commit_notification(commit_notification, Ok(()))
-            .await?;
-
-        // Notify mempool of the new commit
-        let latest_storage_summary = self.storage_synchronizer.lock().get_storage_summary()?;
-        let blockchain_timestamp_usecs = latest_storage_summary
-            .latest_ledger_info
-            .ledger_info()
-            .timestamp_usecs();
-        self.mempool_notification_handler
-            .notify_mempool_of_committed_transactions(
-                committed_transactions,
-                blockchain_timestamp_usecs,
-            )
-            .await?;
-
-        // TODO(joshlind): can we get consensus to forward the events?
-        // Publish the reconfiguration notifications
-        self.event_subscription_service
-            .lock()
-            .notify_events(
-                latest_storage_summary.latest_synced_version,
-                reconfiguration_events,
-            )
-            .map_err(|error| Error::EventNotificationError(format!("{:?}", error)))
+            .await
     }
 
     /// Handles a consensus notification to sync to a specified target
@@ -251,8 +244,11 @@ impl<
         &mut self,
         sync_notification: ConsensusSyncNotification,
     ) -> Result<(), Error> {
-        debug!("Received a consensus sync notification!");
-
+        let latest_storage_summary = self.storage_synchronizer.lock().get_storage_summary()?;
+        debug!(
+            "Received a consensus sync notification! Target version: {:?}. Latest storage summary: {:?}",
+            sync_notification.target, &latest_storage_summary,
+        );
         // Initialize a new sync request
         let latest_storage_summary = self.storage_synchronizer.lock().get_storage_summary()?;
         self.consensus_notification_handler
@@ -275,6 +271,10 @@ impl<
 
     /// Checks if the node has successfully reached the sync target
     async fn check_sync_request_progress(&mut self) -> Result<(), Error> {
+        if !self.consensus_notification_handler.active_sync_request() {
+            return Ok(());
+        }
+
         let latest_storage_summary = self.storage_synchronizer.lock().get_storage_summary()?;
         self.consensus_notification_handler
             .check_sync_request_progress(&latest_storage_summary)
@@ -306,17 +306,20 @@ impl<
         }
 
         // Check the progress of any sync requests
-        if self.consensus_notification_handler.active_sync_request() {
-            trace!("There's an active sync request!");
-            if let Err(error) = self.check_sync_request_progress().await {
-                error!(
-                    "Error found when checking the sync request progress: {:?}",
-                    error
-                );
-            }
+        if let Err(error) = self.check_sync_request_progress().await {
+            error!(
+                "Error found when checking the sync request progress: {:?}",
+                error
+            );
         }
 
-        // Check progress depending on if we're bootstrapping or continuously syncing
+        // If consensus is executing, there's nothing to do
+        if self.check_if_consensus_executing() {
+            trace!("Consensus is executing. There's nothing to do.");
+            return;
+        }
+
+        // Drive progress depending on if we're bootstrapping or continuously syncing
         if self.bootstrapper.is_bootstrapped() {
             let consensus_sync_request = self
                 .consensus_notification_handler
