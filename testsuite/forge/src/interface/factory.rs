@@ -7,10 +7,11 @@ use rand::rngs::StdRng;
 use std::num::NonZeroUsize;
 
 /// Trait used to represent a interface for constructing a launching new networks
+#[async_trait::async_trait]
 pub trait Factory {
     fn versions<'a>(&'a self) -> Box<dyn Iterator<Item = Version> + 'a>;
 
-    fn launch_swarm(
+    async fn launch_swarm(
         &self,
         rng: &mut StdRng,
         node_num: NonZeroUsize,

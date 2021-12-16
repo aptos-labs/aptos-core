@@ -241,7 +241,7 @@ impl LocalSwarm {
         LocalSwarmBuilder::new(versions)
     }
 
-    pub fn launch(&mut self) -> Result<()> {
+    pub async fn launch(&mut self) -> Result<()> {
         // Start all the validators
         for validator in self.validators.values_mut() {
             validator.start()?;
@@ -249,14 +249,14 @@ impl LocalSwarm {
 
         // Wait for all of them to startup
         let deadline = Instant::now() + Duration::from_secs(60);
-        self.wait_for_startup()?;
-        self.wait_for_connectivity(deadline)?;
-        self.liveness_check(deadline)?;
+        self.wait_for_startup().await?;
+        self.wait_for_connectivity(deadline).await?;
+        self.liveness_check(deadline).await?;
 
         Ok(())
     }
 
-    fn wait_for_startup(&mut self) -> Result<()> {
+    async fn wait_for_startup(&mut self) -> Result<()> {
         let num_attempts = 10;
         let mut done = vec![false; self.validators.len()];
         for i in 0..num_attempts {
@@ -265,7 +265,7 @@ impl LocalSwarm {
                 if *done {
                     continue;
                 }
-                match node.health_check() {
+                match node.health_check().await {
                     Ok(()) => *done = true,
 
                     Err(HealthCheckError::Unknown(e)) => {
@@ -286,13 +286,13 @@ impl LocalSwarm {
                 return Ok(());
             }
 
-            ::std::thread::sleep(::std::time::Duration::from_millis(1000));
+            tokio::time::sleep(::std::time::Duration::from_millis(1000)).await;
         }
 
         Err(anyhow!("Launching Swarm timed out"))
     }
 
-    pub fn add_validator_fullnode(
+    pub async fn add_validator_fullnode(
         &mut self,
         version: &Version,
         template: NodeConfig,
@@ -322,7 +322,7 @@ impl LocalSwarm {
         // Since the validator's config has changed we need to save it
         validator_config.save(validator.config_path())?;
         *validator.config_mut() = validator_config;
-        validator.restart()?;
+        validator.restart().await?;
 
         let version = self.versions.get(version).unwrap();
         let mut fullnode = LocalNode::new(
@@ -408,8 +408,9 @@ impl Drop for LocalSwarm {
     }
 }
 
+#[async_trait::async_trait]
 impl Swarm for LocalSwarm {
-    fn health_check(&mut self) -> Result<()> {
+    async fn health_check(&mut self) -> Result<()> {
         Ok(())
     }
 

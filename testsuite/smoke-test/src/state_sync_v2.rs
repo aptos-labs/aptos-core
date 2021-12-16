@@ -13,14 +13,13 @@ use std::{
     fs,
     time::{Duration, Instant},
 };
-use tokio::runtime::Runtime;
 
 const MAX_CATCH_UP_SECS: u64 = 60; // The max time we'll wait for nodes to catch up
 
-#[test]
-fn test_full_node_bootstrap_outputs() {
+#[tokio::test]
+async fn test_full_node_bootstrap_outputs() {
     // Create a validator swarm of 1 validator node
-    let swarm = new_local_swarm(1);
+    let swarm = new_local_swarm(1).await;
 
     // Create a fullnode config that uses transaction outputs to sync
     let mut vfn_config = NodeConfig::default_for_validator_full_node();
@@ -33,13 +32,13 @@ fn test_full_node_bootstrap_outputs() {
         .continuous_syncing_mode = ContinuousSyncingMode::ApplyTransactionOutputs;
 
     // Test the ability of the fullnode to sync
-    test_full_node_sync(vfn_config, swarm, true);
+    test_full_node_sync(vfn_config, swarm, true).await;
 }
 
-#[test]
-fn test_full_node_bootstrap_transactions() {
+#[tokio::test]
+async fn test_full_node_bootstrap_transactions() {
     // Create a validator swarm of 1 validator node
-    let swarm = new_local_swarm(1);
+    let swarm = new_local_swarm(1).await;
 
     // Create a fullnode config that uses transactions to sync
     let mut vfn_config = NodeConfig::default_for_validator_full_node();
@@ -52,13 +51,13 @@ fn test_full_node_bootstrap_transactions() {
         .continuous_syncing_mode = ContinuousSyncingMode::ExecuteTransactions;
 
     // Test the ability of the fullnode to sync
-    test_full_node_sync(vfn_config, swarm, true);
+    test_full_node_sync(vfn_config, swarm, true).await;
 }
 
-#[test]
-fn test_full_node_continuous_sync_outputs() {
+#[tokio::test]
+async fn test_full_node_continuous_sync_outputs() {
     // Create a validator swarm of 1 validator node
-    let swarm = new_local_swarm(1);
+    let swarm = new_local_swarm(1).await;
 
     // Create a fullnode config that uses transaction outputs to sync
     let mut vfn_config = NodeConfig::default_for_validator_full_node();
@@ -69,13 +68,13 @@ fn test_full_node_continuous_sync_outputs() {
         .continuous_syncing_mode = ContinuousSyncingMode::ApplyTransactionOutputs;
 
     // Test the ability of the fullnode to sync
-    test_full_node_sync(vfn_config, swarm, false);
+    test_full_node_sync(vfn_config, swarm, false).await;
 }
 
-#[test]
-fn test_full_node_continuous_sync_transactions() {
+#[tokio::test]
+async fn test_full_node_continuous_sync_transactions() {
     // Create a validator swarm of 1 validator node
-    let swarm = new_local_swarm(1);
+    let swarm = new_local_swarm(1).await;
 
     // Create a fullnode config that uses transactions to sync
     let mut vfn_config = NodeConfig::default_for_validator_full_node();
@@ -86,12 +85,17 @@ fn test_full_node_continuous_sync_transactions() {
         .continuous_syncing_mode = ContinuousSyncingMode::ExecuteTransactions;
 
     // Test the ability of the fullnode to sync
-    test_full_node_sync(vfn_config, swarm, false);
+    test_full_node_sync(vfn_config, swarm, false).await;
 }
 
 /// A helper method that tests that a full node can sync from a validator after
 /// a failure and continue to stay up-to-date.
-fn test_full_node_sync(full_node_config: NodeConfig, mut swarm: LocalSwarm, epoch_changes: bool) {
+async fn test_full_node_sync(
+    full_node_config: NodeConfig,
+    mut swarm: LocalSwarm,
+    epoch_changes: bool,
+) {
+    // Start the validator and fullnode (make sure they boot up)
     // Create the fullnode
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
     let vfn_peer_id = swarm
@@ -100,17 +104,19 @@ fn test_full_node_sync(full_node_config: NodeConfig, mut swarm: LocalSwarm, epoc
             full_node_config,
             validator_peer_id,
         )
+        .await
         .unwrap();
 
-    // Start the validator and fullnode (make sure they boot up)
     swarm
         .validator_mut(validator_peer_id)
         .unwrap()
         .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_CATCH_UP_SECS))
+        .await
         .unwrap();
     for fullnode in swarm.full_nodes_mut() {
         fullnode
             .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_CATCH_UP_SECS))
+            .await
             .unwrap();
     }
 
@@ -120,9 +126,9 @@ fn test_full_node_sync(full_node_config: NodeConfig, mut swarm: LocalSwarm, epoc
     // Execute a number of transactions on the validator
     let validator_client = swarm.validator(validator_peer_id).unwrap().rest_client();
     let transaction_factory = swarm.chain_info().transaction_factory();
-    let runtime = Runtime::new().unwrap();
-    let mut account_0 = runtime.block_on(create_and_fund_account(&mut swarm, 1000));
-    let mut account_1 = runtime.block_on(create_and_fund_account(&mut swarm, 1000));
+
+    let mut account_0 = create_and_fund_account(&mut swarm, 1000).await;
+    let mut account_1 = create_and_fund_account(&mut swarm, 1000).await;
     execute_transactions(
         &mut swarm,
         &validator_client,
@@ -130,12 +136,19 @@ fn test_full_node_sync(full_node_config: NodeConfig, mut swarm: LocalSwarm, epoc
         &mut account_0,
         &account_1,
         epoch_changes,
-    );
+    )
+    .await;
 
     // Restart the fullnode and verify it can sync
-    swarm.fullnode_mut(vfn_peer_id).unwrap().restart().unwrap();
+    swarm
+        .fullnode_mut(vfn_peer_id)
+        .unwrap()
+        .restart()
+        .await
+        .unwrap();
     swarm
         .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(MAX_CATCH_UP_SECS))
+        .await
         .unwrap();
 
     // Execute more transactions on the validator and verify the fullnode catches up
@@ -146,16 +159,18 @@ fn test_full_node_sync(full_node_config: NodeConfig, mut swarm: LocalSwarm, epoc
         &mut account_1,
         &account_0,
         epoch_changes,
-    );
+    )
+    .await;
     swarm
         .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(MAX_CATCH_UP_SECS))
+        .await
         .unwrap();
 }
 
-#[test]
-fn test_validator_bootstrap_outputs() {
+#[tokio::test]
+async fn test_validator_bootstrap_outputs() {
     // Create a swarm of 4 validators with state sync v2 enabled (output syncing)
-    let mut swarm = new_local_swarm(4);
+    let mut swarm = new_local_swarm(4).await;
     for validator in swarm.validators_mut() {
         let mut config = validator.config().clone();
         config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
@@ -164,17 +179,17 @@ fn test_validator_bootstrap_outputs() {
         config.state_sync.state_sync_driver.continuous_syncing_mode =
             ContinuousSyncingMode::ApplyTransactionOutputs;
         config.save(validator.config_path()).unwrap();
-        validator.restart().unwrap();
+        validator.restart().await.unwrap();
     }
 
     // Test the ability of the validators to sync
-    test_validator_sync(swarm);
+    test_validator_sync(swarm).await;
 }
 
-#[test]
-fn test_validator_bootstrap_transactions() {
+#[tokio::test]
+async fn test_validator_bootstrap_transactions() {
     // Create a swarm of 4 validators with state sync v2 enabled (transaction syncing)
-    let mut swarm = new_local_swarm(4);
+    let mut swarm = new_local_swarm(4).await;
     for validator in swarm.validators_mut() {
         let mut config = validator.config().clone();
         config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
@@ -183,18 +198,18 @@ fn test_validator_bootstrap_transactions() {
         config.state_sync.state_sync_driver.continuous_syncing_mode =
             ContinuousSyncingMode::ExecuteTransactions;
         config.save(validator.config_path()).unwrap();
-        validator.restart().unwrap();
+        validator.restart().await.unwrap();
     }
 
     // Test the ability of the validators to sync
-    test_validator_sync(swarm);
+    test_validator_sync(swarm).await;
 }
 
 /// A helper method that tests that a validator can sync after a failure and
 /// continue to stay up-to-date.
-fn test_validator_sync(mut swarm: LocalSwarm) {
+async fn test_validator_sync(mut swarm: LocalSwarm) {
     // Launch the swarm and wait for it to be ready
-    swarm.launch().unwrap();
+    swarm.launch().await.unwrap();
 
     // Execute multiple transactions through validator 0
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
@@ -203,9 +218,8 @@ fn test_validator_sync(mut swarm: LocalSwarm) {
         .unwrap()
         .rest_client();
     let transaction_factory = swarm.chain_info().transaction_factory();
-    let runtime = Runtime::new().unwrap();
-    let mut account_0 = runtime.block_on(create_and_fund_account(&mut swarm, 1000));
-    let mut account_1 = runtime.block_on(create_and_fund_account(&mut swarm, 1000));
+    let mut account_0 = create_and_fund_account(&mut swarm, 1000).await;
+    let mut account_1 = create_and_fund_account(&mut swarm, 1000).await;
     execute_transactions(
         &mut swarm,
         &validator_client_0,
@@ -213,9 +227,11 @@ fn test_validator_sync(mut swarm: LocalSwarm) {
         &mut account_0,
         &account_1,
         true,
-    );
+    )
+    .await;
     swarm
         .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(MAX_CATCH_UP_SECS))
+        .await
         .unwrap();
 
     // Stop validator 1 and delete the storage
@@ -234,12 +250,14 @@ fn test_validator_sync(mut swarm: LocalSwarm) {
         &mut account_1,
         &account_0,
         true,
-    );
+    )
+    .await;
 
     // Restart validator 1 and wait for all nodes to catchup
     swarm.validator_mut(validator_1).unwrap().start().unwrap();
     swarm
         .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(MAX_CATCH_UP_SECS))
+        .await
         .unwrap();
 
     // Execute multiple transactions and verify validator 1 can sync
@@ -250,16 +268,18 @@ fn test_validator_sync(mut swarm: LocalSwarm) {
         &mut account_0,
         &account_1,
         true,
-    );
+    )
+    .await;
     swarm
         .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(MAX_CATCH_UP_SECS))
+        .await
         .unwrap();
 }
 
 /// Executes transactions using the given transaction factory, client and
 /// accounts. If `force_epoch_changes` is true, also execute transactions to
 /// force reconfigurations.
-fn execute_transactions(
+async fn execute_transactions(
     swarm: &mut LocalSwarm,
     client: &RestClient,
     transaction_factory: &TransactionFactory,
@@ -267,26 +287,21 @@ fn execute_transactions(
     receiver: &LocalAccount,
     execute_epoch_changes: bool,
 ) {
-    let runtime = Runtime::new().unwrap();
     let num_transfers = 10;
     if execute_epoch_changes {
-        runtime.block_on(async {
-            transfer_and_reconfig(
-                client,
-                transaction_factory,
-                swarm.chain_info().root_account,
-                sender,
-                receiver,
-                num_transfers,
-            )
-            .await;
-        });
+        transfer_and_reconfig(
+            client,
+            transaction_factory,
+            swarm.chain_info().root_account,
+            sender,
+            receiver,
+            num_transfers,
+        )
+        .await;
     } else {
-        runtime.block_on(async {
-            for _ in 0..num_transfers {
-                // Execute simple transfer transactions
-                transfer_coins(client, transaction_factory, sender, receiver, 1).await;
-            }
-        });
+        for _ in 0..num_transfers {
+            // Execute simple transfer transactions
+            transfer_coins(client, transaction_factory, sender, receiver, 1).await;
+        }
     }
 }

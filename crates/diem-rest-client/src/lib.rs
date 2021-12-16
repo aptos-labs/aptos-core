@@ -395,7 +395,7 @@ impl Client {
             .await?;
 
         if !response.status().is_success() {
-            return Err(anyhow::anyhow!("health check failed",));
+            return Err(anyhow::anyhow!("health check failed"));
         }
 
         Ok(())

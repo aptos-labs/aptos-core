@@ -6,12 +6,13 @@ use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
 use std::num::NonZeroUsize;
 
-pub fn new_local_swarm(num_validators: usize) -> LocalSwarm {
+pub async fn new_local_swarm(num_validators: usize) -> LocalSwarm {
     static FACTORY: Lazy<LocalFactory> = Lazy::new(|| LocalFactory::from_workspace().unwrap());
 
     ::diem_logger::Logger::new().init();
 
     FACTORY
         .new_swarm(OsRng, NonZeroUsize::new(num_validators).unwrap())
+        .await
         .unwrap()
 }

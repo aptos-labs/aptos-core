@@ -4,7 +4,7 @@
 use crate::generate_traffic;
 use forge::{NetworkContext, NetworkTest, Result, Test};
 use std::thread;
-use tokio::time::Duration;
+use tokio::{runtime::Runtime, time::Duration};
 
 pub struct PartialNodesDown;
 
@@ -35,10 +35,11 @@ impl NetworkTest for PartialNodesDown {
         let txn_stat = generate_traffic(ctx, &up_nodes, duration, 0, None)?;
         ctx.report
             .report_txn_stats(self.name().to_string(), txn_stat, duration);
+        let runtime = Runtime::new()?;
         for n in &down_nodes {
             let node = ctx.swarm().validator_mut(*n).unwrap();
             println!("Node {} is going to restart", node.name());
-            node.start()?;
+            runtime.block_on(node.start())?;
         }
 
         Ok(())

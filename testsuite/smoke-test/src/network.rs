@@ -18,13 +18,13 @@ use std::{
     collections::HashMap,
     path::Path,
     str::FromStr,
-    thread::sleep,
     time::{Duration, Instant},
 };
+use tokio::runtime::Runtime;
 
-#[test]
-fn test_connection_limiting() {
-    let mut swarm = new_local_swarm(1);
+#[tokio::test]
+async fn test_connection_limiting() {
+    let mut swarm = new_local_swarm(1).await;
     let version = swarm.versions().max().unwrap();
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
     let vfn_peer_id = swarm
@@ -33,6 +33,7 @@ fn test_connection_limiting() {
             NodeConfig::default_for_validator_full_node(),
             validator_peer_id,
         )
+        .await
         .unwrap();
 
     let op_tool = OperationalTool::test();
@@ -54,18 +55,21 @@ fn test_connection_limiting() {
             ];
             network.max_inbound_connections = 0;
         },
-    );
+    )
+    .await;
 
     // Wait till nodes are healthy
     swarm
         .validator_mut(validator_peer_id)
         .unwrap()
         .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .await
         .unwrap();
     swarm
         .fullnode_mut(vfn_peer_id)
         .unwrap()
         .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .await
         .unwrap();
 
     // This node should be able to connect
@@ -77,17 +81,20 @@ fn test_connection_limiting() {
         &NetworkId::Public,
         private_key,
         peer_set,
-    );
+    )
+    .await;
     swarm
         .fullnode_mut(pfn_peer_id)
         .unwrap()
         .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .await
         .unwrap();
     // This node should connect
     FullNode::wait_for_connectivity(
         swarm.fullnode(pfn_peer_id).unwrap(),
         Instant::now() + Duration::from_secs(10),
     )
+    .await
     .unwrap();
     assert_eq!(
         1,
@@ -95,6 +102,7 @@ fn test_connection_limiting() {
             .fullnode(vfn_peer_id)
             .unwrap()
             .get_connected_peers(NetworkId::Public, Some("inbound"))
+            .await
             .unwrap()
             .unwrap_or(0)
     );
@@ -110,21 +118,24 @@ fn test_connection_limiting() {
         &NetworkId::Public,
         private_key,
         peer_set,
-    );
+    )
+    .await;
 
     // This node should fail to connect
     swarm
         .fullnode_mut(pfn_peer_id_fail)
         .unwrap()
         .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .await
         .unwrap();
-    sleep(Duration::from_secs(5));
+    tokio::time::sleep(Duration::from_secs(5)).await;
     assert_eq!(
         1,
         swarm
             .fullnode(vfn_peer_id)
             .unwrap()
             .get_connected_peers(NetworkId::Public, Some("inbound"))
+            .await
             .unwrap()
             .unwrap_or(0)
     );
@@ -132,14 +143,15 @@ fn test_connection_limiting() {
 
 #[test]
 fn test_file_discovery() {
-    let mut swarm = new_local_swarm(1);
+    let runtime = Runtime::new().unwrap();
+    let mut swarm = runtime.block_on(new_local_swarm(1));
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
     let op_tool = OperationalTool::test();
     let (private_key, peer_set) = generate_private_key_and_peer(&op_tool);
     let discovery_file = create_discovery_file(peer_set);
 
     // Add key to file based discovery
-    modify_network_of_node(
+    runtime.block_on(modify_network_of_node(
         swarm.validator_mut(validator_peer_id).unwrap(),
         &NetworkId::Validator,
         |network| {
@@ -152,10 +164,10 @@ fn test_file_discovery() {
                 ),
             ];
         },
-    );
+    ));
 
     // Startup the validator
-    swarm.launch().unwrap();
+    runtime.block_on(swarm.launch()).unwrap();
 
     // At first we should be able to connect
     assert_eq!(
@@ -170,7 +182,7 @@ fn test_file_discovery() {
 
     // Now when we clear the file, we shouldn't be able to connect
     write_peerset_to_file(discovery_file.as_ref(), HashMap::new());
-    sleep(Duration::from_millis(300));
+    std::thread::sleep(Duration::from_millis(300));
 
     assert_eq!(
         false,
@@ -205,7 +217,7 @@ fn generate_private_key_and_peer(op_tool: &OperationalTool) -> (PrivateKey, Peer
 }
 
 /// Modifies a network on the on disk configuration.  Needs to be done prior to starting node
-fn modify_network_of_node<F: FnOnce(&mut NetworkConfig)>(
+async fn modify_network_of_node<F: FnOnce(&mut NetworkConfig)>(
     node: &mut LocalNode,
     network_id: &NetworkId,
     modifier: F,
@@ -214,7 +226,7 @@ fn modify_network_of_node<F: FnOnce(&mut NetworkConfig)>(
     let mut node_config = NodeConfig::load(&node_config_path).unwrap();
     modify_network_config(&mut node_config, network_id, modifier);
     node_config.save_config(node_config_path).unwrap();
-    node.restart().unwrap();
+    node.restart().await.unwrap();
 }
 
 fn modify_network_config<F: FnOnce(&mut NetworkConfig)>(
@@ -234,7 +246,7 @@ fn modify_network_config<F: FnOnce(&mut NetworkConfig)>(
     modifier(network)
 }
 
-fn add_identity_to_node(
+async fn add_identity_to_node(
     node: &mut LocalNode,
     network_id: &NetworkId,
     private_key: PrivateKey,
@@ -243,7 +255,8 @@ fn add_identity_to_node(
     let (peer_id, _) = peer_set.iter().next().unwrap();
     modify_network_of_node(node, network_id, |network| {
         network.identity = Identity::from_config(private_key, *peer_id);
-    });
+    })
+    .await;
 }
 
 fn check_endpoint(

@@ -173,6 +173,7 @@ fn main() -> Result<()> {
             global_emit_job_request.workers_per_endpoint(workers_per_endpoint);
     }
 
+    let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
         CliCommand::Test(test_cmd) => match test_cmd {
@@ -215,23 +216,27 @@ fn main() -> Result<()> {
             ),
             OperatorCommand::CleanUp(cleanup) => {
                 uninstall_from_k8s_cluster()?;
-                set_eks_nodegroup_size(cleanup.cluster_name, 0, cleanup.auth_with_k8s_env)
+                runtime.block_on(set_eks_nodegroup_size(
+                    cleanup.cluster_name,
+                    0,
+                    cleanup.auth_with_k8s_env,
+                ))
             }
             OperatorCommand::Resize(resize) => {
-                set_eks_nodegroup_size(
+                runtime.block_on(set_eks_nodegroup_size(
                     resize.cluster_name,
                     resize.num_validators,
                     resize.auth_with_k8s_env,
-                )?;
+                ))?;
                 uninstall_from_k8s_cluster()?;
-                clean_k8s_cluster(
+                runtime.block_on(clean_k8s_cluster(
                     resize.helm_repo,
                     resize.num_validators,
                     resize.validator_image_tag,
                     resize.testnet_image_tag,
                     resize.require_validator_healthcheck,
                     resize.move_modules_dir,
-                )?;
+                ))?;
                 Ok(())
             }
         },
@@ -535,13 +540,15 @@ impl Test for RestartValidator {
 
 impl NetworkTest for RestartValidator {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
-        let node = ctx.swarm().validators_mut().next().unwrap();
-        node.health_check().expect("node health check failed");
-        node.stop()?;
-        println!("Restarting node {}", node.peer_id());
-        node.start()?;
-        node.health_check().expect("node health check failed");
-
+        let runtime = Runtime::new()?;
+        runtime.block_on(async {
+            let node = ctx.swarm().validators_mut().next().unwrap();
+            node.health_check().await.expect("node health check failed");
+            node.stop().unwrap();
+            println!("Restarting node {}", node.peer_id());
+            node.start().await.unwrap();
+            node.health_check().await.expect("node health check failed");
+        });
         Ok(())
     }
 }

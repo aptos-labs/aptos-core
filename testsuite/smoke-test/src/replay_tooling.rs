@@ -19,7 +19,7 @@ impl Test for ReplayTooling {
 impl PublicUsageTest for ReplayTooling {
     fn run<'t>(&self, ctx: &mut PublicUsageContext<'t>) -> Result<()> {
         let client = ctx.rest_client();
-        // todo: try async call to json_debugger calls
+        // we need turn this into async for making this test fully async
         let json_debugger = DiemDebugger::json_rpc(ctx.url())?;
 
         let treasury_account_address =

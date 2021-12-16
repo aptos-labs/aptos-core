@@ -14,11 +14,10 @@ use diem_writeset_generator::{
 };
 use forge::{Node, NodeExt, Swarm};
 use std::collections::BTreeMap;
-use tokio::runtime::Runtime;
 
-#[test]
-fn test_move_release_flow() {
-    let mut swarm = new_local_swarm(1);
+#[tokio::test]
+async fn test_move_release_flow() {
+    let mut swarm = new_local_swarm(1).await;
     let transaction_factory = swarm.chain_info().transaction_factory();
     let chain_id = swarm.chain_id();
     let validator = swarm.validators().next().unwrap();
@@ -35,9 +34,8 @@ fn test_move_release_flow() {
 
     let release_modules = release_modules();
 
-    let runtime = Runtime::new().unwrap();
     // Execute some random transactions to make sure a new block is created.
-    let account = runtime.block_on(create_and_fund_account(&mut swarm, 100));
+    let account = create_and_fund_account(&mut swarm, 100).await;
 
     // With no artifact for TESTING, creating a release should fail.
     assert!(create_release(chain_id, url.clone(), 1, false, &release_modules, None, "").is_err());
@@ -58,7 +56,7 @@ fn test_move_release_flow() {
             transaction_factory.payload(TransactionPayload::WriteSet(payload_1.clone())),
         );
 
-    runtime.block_on(client.submit_and_wait(&txn)).unwrap();
+    client.submit_and_wait(&txn).await.unwrap();
 
     let latest_version = validator_interface.get_latest_version().unwrap();
     let remote_modules = validator_interface
@@ -77,14 +75,12 @@ fn test_move_release_flow() {
     );
 
     // Execute some random transactions to make sure a new block is created.
-    runtime.block_on(async {
-        swarm
-            .chain_info()
-            .fund(Currency::XUS, account.address(), 100)
-            .await
-            .unwrap();
-        assert_balance(&client, &account, 200).await;
-    });
+    swarm
+        .chain_info()
+        .fund(Currency::XUS, account.address(), 100)
+        .await
+        .unwrap();
+    assert_balance(&client, &account, 200).await;
 
     let latest_version = validator_interface.get_latest_version().unwrap();
     // Now that we have artifact file checked in, we can get rid of the first_release flag
@@ -124,7 +120,7 @@ fn test_move_release_flow() {
         .sign_with_transaction_builder(
             transaction_factory.payload(TransactionPayload::WriteSet(payload_2)),
         );
-    runtime.block_on(client.submit_and_wait(&txn)).unwrap();
+    client.submit_and_wait(&txn).await.unwrap();
 
     let latest_version = validator_interface.get_latest_version().unwrap();
     let remote_modules = validator_interface
@@ -133,8 +129,9 @@ fn test_move_release_flow() {
     // Assert the remote module is the same as the release modules.
 
     assert_eq!(
-        *runtime
-            .block_on(client.get_diem_version())
+        *client
+            .get_diem_version()
+            .await
             .unwrap()
             .into_inner()
             .payload

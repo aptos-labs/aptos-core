@@ -16,11 +16,13 @@ use diem_time_service::TimeService;
 use diem_types::chain_id::ChainId;
 use forge::Node;
 use std::{convert::TryInto, thread, thread::sleep, time::Duration};
+use tokio::runtime::Runtime;
 
 #[test]
 fn test_key_manager_consensus_rotation() {
+    let runtime = Runtime::new().unwrap();
     // Create and launch a local validator swarm
-    let swarm = new_local_swarm(1);
+    let swarm = runtime.block_on(new_local_swarm(1));
     let validator = swarm.validators().next().unwrap();
 
     // Fetch the first node config in the swarm

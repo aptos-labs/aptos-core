@@ -83,7 +83,7 @@ impl NodeDebugClient {
 /// Implement default utility client for AsyncNodeDebugInterface
 pub struct AsyncNodeDebugClient {
     client: reqwest::Client,
-    addr: String,
+    url: Url,
 }
 
 impl AsyncNodeDebugClient {
@@ -91,20 +91,53 @@ impl AsyncNodeDebugClient {
     pub fn new<A: AsRef<str>>(client: reqwest::Client, address: A, port: u16) -> Self {
         let addr = format!("http://{}:{}", address.as_ref(), port);
 
-        Self { client, addr }
+        Self {
+            client,
+            url: Url::parse(&addr).unwrap(),
+        }
     }
 
-    pub async fn get_node_metric<S: AsRef<str>>(&mut self, metric: S) -> Result<Option<i64>> {
+    pub fn from_url(url: Url) -> Self {
+        let client = reqwest::Client::new();
+
+        Self { client, url }
+    }
+
+    pub async fn get_node_metric<S: AsRef<str>>(&self, metric: S) -> Result<Option<i64>> {
         let metrics = self.get_node_metrics().await?;
         Ok(metrics.get(metric.as_ref()).cloned())
     }
 
-    pub async fn get_node_metrics(&mut self) -> Result<HashMap<String, i64>> {
-        let response = self
-            .client
-            .get(&format!("{}/metrics", self.addr))
-            .send()
-            .await?;
+    /// Retrieves all node metrics for a given metric name.  Allows for filtering metrics by fields afterwards.
+    pub async fn get_node_metric_with_name(
+        &self,
+        metric: &str,
+    ) -> Result<Option<HashMap<String, i64>>> {
+        let metrics = self.get_node_metrics().await?;
+        let search_string = format!("{}{{", metric);
+
+        let result: HashMap<_, _> = metrics
+            .iter()
+            .filter_map(|(key, value)| {
+                if key.starts_with(&search_string) {
+                    Some((key.clone(), *value))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if result.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(result))
+        }
+    }
+
+    pub async fn get_node_metrics(&self) -> Result<HashMap<String, i64>> {
+        let mut url = self.url.clone();
+        url.set_path("metrics");
+        let response = self.client.get(url).send().await?;
 
         response
             .json::<HashMap<String, String>>()

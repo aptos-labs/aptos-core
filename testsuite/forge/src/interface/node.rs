@@ -3,7 +3,7 @@
 
 use crate::{Result, Version};
 use anyhow::anyhow;
-use debug_interface::NodeDebugClient;
+use debug_interface::AsyncNodeDebugClient;
 use diem_config::{config::NodeConfig, network_id::NetworkId};
 use diem_rest_client::Client as RestClient;
 use diem_sdk::{
@@ -12,7 +12,6 @@ use diem_sdk::{
 };
 use std::{
     collections::HashMap,
-    thread,
     time::{Duration, Instant},
 };
 use url::Url;
@@ -33,7 +32,8 @@ impl std::fmt::Display for HealthCheckError {
 impl std::error::Error for HealthCheckError {}
 
 /// Trait used to represent a running Validator or FullNode
-pub trait Node {
+#[async_trait::async_trait]
+pub trait Node: Send + Sync {
     /// Return the PeerId of this Node
     fn peer_id(&self) -> PeerId;
 
@@ -57,7 +57,7 @@ pub trait Node {
 
     /// Start this Node.
     /// This should be a noop if the Node is already running.
-    fn start(&mut self) -> Result<()>;
+    async fn start(&mut self) -> Result<()>;
 
     /// Stop this Node.
     /// This should be a noop if the Node isn't running.
@@ -67,7 +67,7 @@ pub trait Node {
     fn clear_storage(&mut self) -> Result<()>;
 
     /// Performs a Health Check on the Node
-    fn health_check(&mut self) -> Result<(), HealthCheckError>;
+    async fn health_check(&mut self) -> Result<(), HealthCheckError>;
 
     fn counter(&self, counter: &str, port: u64) -> Result<f64>;
 
@@ -75,23 +75,25 @@ pub trait Node {
 }
 
 /// Trait used to represent a running Validator
-pub trait Validator: Node {
-    fn check_connectivity(&self, expected_peers: usize) -> Result<bool> {
+#[async_trait::async_trait]
+pub trait Validator: Node + Sync {
+    async fn check_connectivity(&self, expected_peers: usize) -> Result<bool> {
         if expected_peers == 0 {
             return Ok(true);
         }
 
         self.get_connected_peers(NetworkId::Validator, None)
+            .await
             .map(|maybe_n| maybe_n.map(|n| n >= expected_peers as i64).unwrap_or(false))
     }
 
-    fn wait_for_connectivity(&self, expected_peers: usize, deadline: Instant) -> Result<()> {
-        while !self.check_connectivity(expected_peers)? {
+    async fn wait_for_connectivity(&self, expected_peers: usize, deadline: Instant) -> Result<()> {
+        while !self.check_connectivity(expected_peers).await? {
             if Instant::now() > deadline {
                 return Err(anyhow!("waiting for connectivity timed out"));
             }
 
-            thread::sleep(Duration::from_millis(500));
+            tokio::time::sleep(Duration::from_millis(500)).await;
         }
 
         Ok(())
@@ -99,23 +101,25 @@ pub trait Validator: Node {
 }
 
 /// Trait used to represent a running FullNode
-pub trait FullNode: Node {
+#[async_trait::async_trait]
+pub trait FullNode: Node + Sync {
     //TODO handle VFNs querying if they are connected to a validator
-    fn check_connectivity(&self) -> Result<bool> {
+    async fn check_connectivity(&self) -> Result<bool> {
         const DIRECTION: Option<&str> = Some("outbound");
         const EXPECTED_PEERS: usize = 1;
 
         self.get_connected_peers(NetworkId::Public, DIRECTION)
+            .await
             .map(|maybe_n| maybe_n.map(|n| n >= EXPECTED_PEERS as i64).unwrap_or(false))
     }
 
-    fn wait_for_connectivity(&self, deadline: Instant) -> Result<()> {
-        while !self.check_connectivity()? {
+    async fn wait_for_connectivity(&self, deadline: Instant) -> Result<()> {
+        while !self.check_connectivity().await? {
             if Instant::now() > deadline {
                 return Err(anyhow!("waiting for connectivity timed out"));
             }
 
-            thread::sleep(Duration::from_millis(500));
+            tokio::time::sleep(Duration::from_millis(500)).await;
         }
 
         Ok(())
@@ -124,6 +128,7 @@ pub trait FullNode: Node {
 
 impl<T: ?Sized> NodeExt for T where T: Node {}
 
+#[async_trait::async_trait]
 pub trait NodeExt: Node {
     /// Return JSON-RPC client of this Node
     fn async_json_rpc_client(&self) -> JsonRpcClient {
@@ -141,29 +146,30 @@ pub trait NodeExt: Node {
     }
 
     /// Return a NodeDebugClient for this Node
-    fn debug_client(&self) -> NodeDebugClient {
-        NodeDebugClient::from_url(self.debug_endpoint())
+    fn debug_client(&self) -> AsyncNodeDebugClient {
+        AsyncNodeDebugClient::from_url(self.debug_endpoint())
     }
 
     /// Restarts this Node by calling Node::Stop followed by Node::Start
-    fn restart(&mut self) -> Result<()> {
+    async fn restart(&mut self) -> Result<()> {
         self.stop()?;
-        self.start()
+        self.start().await
     }
 
     /// Query a Metric for from this Node
-    fn get_metric(&self, metric_name: &str) -> Result<Option<i64>> {
-        self.debug_client().get_node_metric(metric_name)
+    async fn get_metric(&self, metric_name: &str) -> Result<Option<i64>> {
+        self.debug_client().get_node_metric(metric_name).await
     }
 
-    fn get_metric_with_fields(
+    async fn get_metric_with_fields(
         &self,
         metric_name: &str,
         fields: HashMap<String, String>,
     ) -> Result<Option<i64>> {
         let filtered: Vec<_> = self
             .debug_client()
-            .get_node_metric_with_name(metric_name)?
+            .get_node_metric_with_name(metric_name)
+            .await?
             .into_iter()
             .flat_map(|map| map.into_iter())
             .filter_map(|(metric, metric_value)| {
@@ -185,7 +191,7 @@ pub trait NodeExt: Node {
         })
     }
 
-    fn get_connected_peers(
+    async fn get_connected_peers(
         &self,
         network_id: NetworkId,
         direction: Option<&str>,
@@ -195,29 +201,16 @@ pub trait NodeExt: Node {
         if let Some(direction) = direction {
             map.insert("direction".to_string(), direction.to_string());
         }
-        self.get_metric_with_fields("diem_connections", map)
+        self.get_metric_with_fields("diem_connections", map).await
     }
 
-    fn liveness_check(&self, seconds: u64) -> Result<()> {
-        let mut url = self.rest_api_endpoint();
-        url.set_path("-/healthy");
-        url.set_query(Some(&format!("duration_secs={}", seconds)));
-
-        let resp = reqwest::blocking::Client::new().get(url).send()?;
-
-        if !resp.status().is_success() {
-            return Err(anyhow::anyhow!(
-                "Node {} failed a liveness check",
-                self.name()
-            ));
-        }
-
-        Ok(())
+    async fn liveness_check(&self, seconds: u64) -> Result<()> {
+        self.rest_client().health_check(seconds).await
     }
 
-    fn wait_until_healthy(&mut self, deadline: Instant) -> Result<()> {
+    async fn wait_until_healthy(&mut self, deadline: Instant) -> Result<()> {
         while Instant::now() < deadline {
-            match self.health_check() {
+            match self.health_check().await {
                 Ok(()) => return Ok(()),
                 Err(HealthCheckError::NotRunning) => {
                     return Err(anyhow::anyhow!(
@@ -229,7 +222,7 @@ pub trait NodeExt: Node {
                 Err(_) => {} // For other errors we'll retry
             }
 
-            thread::sleep(Duration::from_millis(500));
+            tokio::time::sleep(Duration::from_millis(500)).await;
         }
 
         Err(anyhow::anyhow!(

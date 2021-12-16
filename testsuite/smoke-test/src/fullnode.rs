@@ -22,22 +22,25 @@ impl Test for LaunchFullnode {
 
 impl NetworkTest for LaunchFullnode {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on(self.async_run(ctx))
+    }
+}
+
+impl LaunchFullnode {
+    async fn async_run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         let version = ctx.swarm().versions().max().unwrap();
         let fullnode_peer_id = ctx
             .swarm()
             .add_full_node(&version, NodeConfig::default_for_public_full_node())?;
 
         let fullnode = ctx.swarm().full_node_mut(fullnode_peer_id).unwrap();
-        fullnode.wait_until_healthy(Instant::now() + Duration::from_secs(10))?;
+        fullnode
+            .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+            .await?;
 
-        let runtime = Runtime::new().unwrap();
         let client = fullnode.rest_client();
-        runtime.block_on(self.async_run(ctx, client))
-    }
-}
 
-impl LaunchFullnode {
-    async fn async_run(&self, ctx: &mut NetworkContext<'_>, client: RestClient) -> Result<()> {
         let factory = ctx.swarm().chain_info().transaction_factory();
         let mut account1 = LocalAccount::generate(ctx.core().rng());
         let account2 = LocalAccount::generate(ctx.core().rng());
@@ -88,7 +91,7 @@ async fn wait_for_account(client: &RestClient, address: AccountAddress) -> Resul
         if client.get_account(address).await.is_ok() {
             return Ok(());
         }
-        std::thread::sleep(std::time::Duration::from_millis(10));
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
     bail!("wait for account(address={}) timeout", address,)
 }

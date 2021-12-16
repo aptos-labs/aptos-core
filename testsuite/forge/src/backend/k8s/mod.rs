@@ -84,10 +84,14 @@ impl Drop for K8sFactory {
     // When the K8sSwarm struct goes out of scope we need to wipe the chain state and scale down
     fn drop(&mut self) {
         uninstall_from_k8s_cluster().unwrap();
-        set_eks_nodegroup_size(self.cluster_name.clone(), 0, true).unwrap();
+        let runtime = Runtime::new().unwrap();
+        runtime
+            .block_on(set_eks_nodegroup_size(self.cluster_name.clone(), 0, true))
+            .unwrap();
     }
 }
 
+#[async_trait::async_trait]
 impl Factory for K8sFactory {
     fn versions<'a>(&'a self) -> Box<dyn Iterator<Item = Version> + 'a> {
         let version = vec![
@@ -97,7 +101,7 @@ impl Factory for K8sFactory {
         Box::new(version.into_iter())
     }
 
-    fn launch_swarm(
+    async fn launch_swarm(
         &self,
         _rng: &mut StdRng,
         node_num: NonZeroUsize,
@@ -115,7 +119,7 @@ impl Factory for K8sFactory {
             None => None,
         };
 
-        set_eks_nodegroup_size(self.cluster_name.clone(), node_num.get(), true)?;
+        set_eks_nodegroup_size(self.cluster_name.clone(), node_num.get(), true).await?;
         uninstall_from_k8s_cluster()?;
         let era = clean_k8s_cluster(
             self.helm_repo.clone(),
@@ -124,20 +128,21 @@ impl Factory for K8sFactory {
             format!("{}", genesis_version),
             false,
             genesis_modules_path,
-        )?;
-        let rt = Runtime::new().unwrap();
-        let swarm = rt
-            .block_on(K8sSwarm::new(
-                &self.root_key,
-                &self.treasury_compliance_key,
-                &self.cluster_name,
-                &self.helm_repo,
-                &self.image_tag,
-                &self.base_image_tag,
-                format!("{}", init_version).as_str(),
-                &era,
-            ))
-            .unwrap();
+        )
+        .await?;
+
+        let swarm = K8sSwarm::new(
+            &self.root_key,
+            &self.treasury_compliance_key,
+            &self.cluster_name,
+            &self.helm_repo,
+            &self.image_tag,
+            &self.base_image_tag,
+            format!("{}", init_version).as_str(),
+            &era,
+        )
+        .await
+        .unwrap();
         Ok(Box::new(swarm))
     }
 }

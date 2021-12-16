@@ -261,14 +261,15 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             );
             let initial_version = self.initial_version();
             let genesis_version = self.genesis_version();
+            let runtime = Runtime::new().unwrap();
             let mut rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
-            let mut swarm = self.factory.launch_swarm(
+            let mut swarm = runtime.block_on(self.factory.launch_swarm(
                 &mut rng,
                 self.tests.initial_validator_count,
                 &initial_version,
                 &genesis_version,
                 self.tests.genesis_config.as_ref(),
-            )?;
+            ))?;
 
             // Run PublicUsageTests
             for test in self.filter_tests(self.tests.public_usage_tests.iter()) {
@@ -283,7 +284,6 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
 
             // Run NFTPublicUsageTests
             if !self.tests.nft_public_usage_tests.is_empty() {
-                let runtime = Runtime::new().unwrap();
                 runtime.block_on(
                     swarm
                         .chain_info()

@@ -4,7 +4,7 @@
 use crate::{batch_update, generate_traffic};
 use anyhow::bail;
 use forge::{NetworkContext, NetworkTest, Result, SwarmExt, Test};
-use tokio::time::Duration;
+use tokio::{runtime::Runtime, time::Duration};
 
 pub struct SimpleValidatorUpgrade;
 
@@ -16,6 +16,8 @@ impl Test for SimpleValidatorUpgrade {
 
 impl NetworkTest for SimpleValidatorUpgrade {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+        let runtime = Runtime::new()?;
+
         // Get the different versions we're testing with
         let (old_version, new_version) = {
             let mut versions = ctx.swarm().versions().collect::<Vec<_>>();
@@ -61,7 +63,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
             .filter(|v| v.version() != old_version)
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
-        batch_update(ctx, &validators_to_downgrade, &old_version)?;
+        runtime.block_on(batch_update(ctx, &validators_to_downgrade, &old_version))?;
 
         // Generate some traffic
         generate_traffic(ctx, &all_validators, duration, 0, None)?;
@@ -73,7 +75,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
         );
         println!("{}", msg);
         ctx.report.report_text(msg);
-        batch_update(ctx, &[first_node], &new_version)?;
+        runtime.block_on(batch_update(ctx, &[first_node], &new_version))?;
         generate_traffic(ctx, &[first_node], duration, 0, None)?;
 
         // Update the rest of the first batch
@@ -83,7 +85,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
         );
         println!("{}", msg);
         ctx.report.report_text(msg);
-        batch_update(ctx, &first_batch, &new_version)?;
+        runtime.block_on(batch_update(ctx, &first_batch, &new_version))?;
         generate_traffic(ctx, &first_batch, duration, 0, None)?;
 
         ctx.swarm().fork_check()?;
@@ -92,7 +94,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
         let msg = format!("4. upgrading second batch to new version: {}", new_version);
         println!("{}", msg);
         ctx.report.report_text(msg);
-        batch_update(ctx, &second_batch, &new_version)?;
+        runtime.block_on(batch_update(ctx, &second_batch, &new_version))?;
         generate_traffic(ctx, &second_batch, duration, 0, None)?;
 
         let msg = "5. check swarm health".to_string();

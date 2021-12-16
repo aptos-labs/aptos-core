@@ -64,6 +64,7 @@ impl K8sNode {
     }
 }
 
+#[async_trait::async_trait]
 impl Node for K8sNode {
     fn peer_id(&self) -> PeerId {
         self.peer_id
@@ -94,9 +95,10 @@ impl Node for K8sNode {
         todo!()
     }
 
-    fn start(&mut self) -> Result<()> {
+    async fn start(&mut self) -> Result<()> {
         scale_sts_replica(self.sts_name(), 1)?;
-        self.wait_until_healthy(Instant::now() + Duration::from_secs(60))?;
+        self.wait_until_healthy(Instant::now() + Duration::from_secs(60))
+            .await?;
 
         Ok(())
     }
@@ -129,11 +131,14 @@ impl Node for K8sNode {
         Ok(())
     }
 
-    fn health_check(&mut self) -> Result<(), HealthCheckError> {
-        reqwest::blocking::get(self.rest_api_endpoint()).map_err(|e| {
-            HealthCheckError::Failure(format_err!("K8s node health_check failed: {}", e))
-        })?;
-        Ok(())
+    async fn health_check(&mut self) -> Result<(), HealthCheckError> {
+        self.rest_client()
+            .get_ledger_information()
+            .await
+            .map(|_| ())
+            .map_err(|e| {
+                HealthCheckError::Failure(format_err!("K8s node health_check failed: {}", e))
+            })
     }
 
     fn counter(&self, counter: &str, port: u64) -> Result<f64> {

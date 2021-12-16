@@ -20,12 +20,11 @@ use diem_types::{
 };
 use forge::{LocalSwarm, Node, NodeExt, Swarm};
 use std::{convert::TryInto, str::FromStr};
-use tokio::runtime::Runtime;
 
-#[test]
-fn test_consensus_observer_mode_storage_error() {
+#[tokio::test]
+async fn test_consensus_observer_mode_storage_error() {
     let num_nodes = 4;
-    let (swarm, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(num_nodes);
+    let (swarm, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(num_nodes).await;
 
     // Kill safety rules storage for validator 1 to ensure it fails on the next epoch change
     let node_config = swarm.validators().nth(1).unwrap().config().clone();
@@ -54,80 +53,83 @@ fn test_consensus_observer_mode_storage_error() {
         assert_eq!(VMStatusView::Executed, txn_ctx.execution_result.unwrap());
     }
 
-    let runtime = Runtime::new().unwrap();
     // Verify validator 1 is still able to stay up to date with validator 0 (despite safety rules failing)
     let client_0 = swarm.validators().next().unwrap().rest_client();
-    let sequence_number_0 = runtime
-        .block_on(client_0.get_account(txn_ctx.address))
+    let sequence_number_0 = client_0
+        .get_account(txn_ctx.address)
+        .await
         .unwrap()
         .into_inner()
         .sequence_number;
     let client_1 = swarm.validators().nth(1).unwrap().rest_client();
-    let sequence_number_1 = runtime
-        .block_on(client_1.get_account(txn_ctx.address))
+    let sequence_number_1 = client_1
+        .get_account(txn_ctx.address)
+        .await
         .unwrap()
         .into_inner()
         .sequence_number;
     assert_eq!(sequence_number_0, sequence_number_1);
 }
 
-#[test]
-fn test_safety_rules_export_consensus() {
+#[tokio::test]
+async fn test_safety_rules_export_consensus() {
     // Create the smoke test environment
     let num_nodes = 4;
-    let mut swarm = new_local_swarm(num_nodes);
+    let mut swarm = new_local_swarm(num_nodes).await;
 
     // Update all nodes to export the consensus key
     for validator in swarm.validators_mut() {
         let mut node_config = validator.config().clone();
         node_config.consensus.safety_rules.export_consensus_key = true;
         node_config.save(validator.config_path()).unwrap();
-        validator.restart().unwrap();
+        validator.restart().await.unwrap();
     }
 
     // Launch and test the swarm
-    swarm.launch().unwrap();
-    rotate_operator_and_consensus_key(swarm);
+    swarm.launch().await.unwrap();
+    rotate_operator_and_consensus_key(swarm).await;
 }
 
-#[test]
-fn test_safety_rules_export_consensus_compatibility() {
+#[tokio::test]
+async fn test_safety_rules_export_consensus_compatibility() {
     // Create the smoke test environment
     let num_nodes = 4;
-    let mut swarm = new_local_swarm(num_nodes);
+    let mut swarm = new_local_swarm(num_nodes).await;
 
     // Allow the first and second nodes to export the consensus key
     for validator in swarm.validators_mut().take(2) {
         let mut node_config = validator.config().clone();
         node_config.consensus.safety_rules.export_consensus_key = true;
         node_config.save(validator.config_path()).unwrap();
-        validator.restart().unwrap();
+        validator.restart().await.unwrap();
     }
 
     // Launch and test the swarm
-    swarm.launch().unwrap();
-    rotate_operator_and_consensus_key(swarm);
+    swarm.launch().await.unwrap();
+    rotate_operator_and_consensus_key(swarm).await;
 }
 
-#[test]
-fn test_2chain_upgrade() {
+#[tokio::test]
+async fn test_2chain_upgrade() {
     // genesis starts with 2-chain already
     test_onchain_upgrade(OnChainConsensusConfig::V1(ConsensusConfigV1 {
         two_chain: false,
-    }));
+    }))
+    .await;
 }
 
-#[test]
-fn test_decoupled_execution_upgrade() {
+#[tokio::test]
+async fn test_decoupled_execution_upgrade() {
     test_onchain_upgrade(OnChainConsensusConfig::V2(ConsensusConfigV2 {
         two_chain: true,
         decoupled_execution: true,
         back_pressure_limit: 10,
         exclude_round: 20,
     }))
+    .await
 }
 
-fn rotate_operator_and_consensus_key(swarm: LocalSwarm) {
+async fn rotate_operator_and_consensus_key(swarm: LocalSwarm) {
     let validator = swarm.validators().next().unwrap();
     let json_rpc_endpoint = validator.json_rpc_endpoint().to_string();
 
@@ -143,14 +145,14 @@ fn rotate_operator_and_consensus_key(swarm: LocalSwarm) {
     assert!(txn_ctx.execution_result.is_none());
 
     // Ensure all nodes have received the transaction
-    wait_for_transaction_on_all_nodes(&swarm, txn_ctx.address, txn_ctx.sequence_number);
+    wait_for_transaction_on_all_nodes(&swarm, txn_ctx.address, txn_ctx.sequence_number).await;
 
     // Rotate the consensus key to verify the operator key has been updated
     let (txn_ctx, new_consensus_key) = op_tool.rotate_consensus_key(&backend, false).unwrap();
     assert_eq!(VMStatusView::Executed, txn_ctx.execution_result.unwrap());
 
     // Ensure all nodes have received the transaction
-    wait_for_transaction_on_all_nodes(&swarm, txn_ctx.address, txn_ctx.sequence_number);
+    wait_for_transaction_on_all_nodes(&swarm, txn_ctx.address, txn_ctx.sequence_number).await;
 
     // Verify that the config has been updated correctly with the new consensus key
     let validator_account = storage.get::<AccountAddress>(OWNER_ACCOUNT).unwrap().value;
@@ -161,29 +163,25 @@ fn rotate_operator_and_consensus_key(swarm: LocalSwarm) {
     assert_eq!(new_consensus_key, config_consensus_key);
 }
 
-fn test_onchain_upgrade(new_onfig: OnChainConsensusConfig) {
+async fn test_onchain_upgrade(new_onfig: OnChainConsensusConfig) {
     let num_nodes = 4;
-    let (mut swarm, _, _, _) = launch_swarm_with_op_tool_and_backend(num_nodes);
+    let (mut swarm, _, _, _) = launch_swarm_with_op_tool_and_backend(num_nodes).await;
 
-    let runtime = Runtime::new().unwrap();
-    runtime.block_on(async {
-        // should work before upgrade.
-        check_create_mint_transfer(&mut swarm).await;
+    // should work before upgrade.
+    check_create_mint_transfer(&mut swarm).await;
 
-        // send upgrade txn
-        let transaction_factory = swarm.chain_info().transaction_factory();
-        let upgrade_txn = swarm
-            .chain_info()
-            .root_account
-            .sign_with_transaction_builder(
-                transaction_factory
-                    .update_diem_consensus_config(0, bcs::to_bytes(&new_onfig).unwrap()),
-            );
+    // send upgrade txn
+    let transaction_factory = swarm.chain_info().transaction_factory();
+    let upgrade_txn = swarm
+        .chain_info()
+        .root_account
+        .sign_with_transaction_builder(
+            transaction_factory.update_diem_consensus_config(0, bcs::to_bytes(&new_onfig).unwrap()),
+        );
 
-        let client = swarm.validators().next().unwrap().rest_client();
-        client.submit_and_wait(&upgrade_txn).await.unwrap();
+    let client = swarm.validators().next().unwrap().rest_client();
+    client.submit_and_wait(&upgrade_txn).await.unwrap();
 
-        // should work after upgrade.
-        check_create_mint_transfer(&mut swarm).await;
-    });
+    // should work after upgrade.
+    check_create_mint_transfer(&mut swarm).await;
 }

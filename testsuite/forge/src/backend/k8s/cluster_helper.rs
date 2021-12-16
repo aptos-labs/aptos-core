@@ -1,9 +1,10 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{get_validators, k8s_retry_strategy, nodes_healthcheck, Result, Validator};
+use crate::{get_validators, k8s_retry_strategy, nodes_healthcheck, Result};
 use anyhow::{bail, format_err};
 use diem_logger::*;
+use futures::future::try_join_all;
 use hyper::{Client, Uri};
 use hyper_proxy::{Intercept, Proxy, ProxyConnector};
 use hyper_tls::HttpsConnector;
@@ -29,7 +30,6 @@ use std::{
     str,
 };
 use tempfile::TempDir;
-use tokio::runtime::Runtime;
 
 const HELM_BIN: &str = "helm";
 const KUBECTL_BIN: &str = "kubectl";
@@ -222,7 +222,7 @@ pub fn uninstall_from_k8s_cluster() -> Result<()> {
     Ok(())
 }
 
-pub fn clean_k8s_cluster(
+pub async fn clean_k8s_cluster(
     helm_repo: String,
     base_num_validators: usize,
     base_validator_image_tag: String,
@@ -331,23 +331,20 @@ pub fn clean_k8s_cluster(
     upgrade_testnet(&helm_repo, &testnet_upgrade_options)?;
 
     // wait for genesis to run again, and get the updated validators
-    let rt = Runtime::new().unwrap();
-    let mut validators = rt.block_on(async {
-        let kube_client = create_k8s_client().await;
-        wait_genesis_job(&kube_client, &new_era).await.unwrap();
-        let vals = get_validators(kube_client.clone(), &base_validator_image_tag)
-            .await
-            .unwrap();
-        vals
-    });
-    let all_nodes = Box::new(validators.values_mut().map(|v| v as &mut dyn Validator));
-
+    let kube_client = create_k8s_client().await;
+    wait_genesis_job(&kube_client, &new_era).await.unwrap();
+    let vals = get_validators(kube_client.clone(), &base_validator_image_tag)
+        .await
+        .unwrap();
+    let all_nodes = vals.values().collect();
     // healthcheck on each of the validators wait until they all healthy
-    if require_validator_healthcheck {
-        let unhealthy_nodes = nodes_healthcheck(all_nodes).unwrap();
-        if !unhealthy_nodes.is_empty() {
-            bail!("Unhealthy validators after cleanup: {:?}", unhealthy_nodes);
-        }
+    let unhealthy_nodes = if require_validator_healthcheck {
+        nodes_healthcheck(all_nodes).await.unwrap()
+    } else {
+        vec![]
+    };
+    if !unhealthy_nodes.is_empty() {
+        bail!("Unhealthy validators after cleanup: {:?}", unhealthy_nodes);
     }
 
     Ok(new_era)
@@ -454,7 +451,7 @@ async fn submit_update_nodegroup_config_request(
     Ok(update_id)
 }
 
-pub fn set_eks_nodegroup_size(
+pub async fn set_eks_nodegroup_size(
     cluster_name: String,
     num_validators: usize,
     auth_with_k8s_env: bool,
@@ -511,25 +508,27 @@ pub fn set_eks_nodegroup_size(
         * (VALIDATOR_SCALING_FACTOR + UTILITIES_SCALING_FACTOR + TRUSTED_SCALING_FACTOR);
 
     // submit the scaling requests
-    let rt = Runtime::new()?;
-    let validators_update_id = rt.block_on(submit_update_nodegroup_config_request(
+    let validators_update_id = submit_update_nodegroup_config_request(
         &eks_client,
         &cluster_name,
         "validators",
         validator_scaling,
-    ))?;
-    let utilities_update_id = rt.block_on(submit_update_nodegroup_config_request(
+    )
+    .await?;
+    let utilities_update_id = submit_update_nodegroup_config_request(
         &eks_client,
         &cluster_name,
         "utilities",
         utilities_scaling,
-    ))?;
-    let trusted_update_id = rt.block_on(submit_update_nodegroup_config_request(
+    )
+    .await?;
+    let trusted_update_id = submit_update_nodegroup_config_request(
         &eks_client,
         &cluster_name,
         "trusted",
         trusted_scaling,
-    ))?;
+    )
+    .await?;
 
     // wait for nodegroup updates
     let updates: Vec<(&str, &str)> = vec![
@@ -537,57 +536,67 @@ pub fn set_eks_nodegroup_size(
         ("utilities", &utilities_update_id),
         ("trusted", &trusted_update_id),
     ];
-    updates
-        .into_par_iter()
-        .for_each(|(nodegroup_name, update_id)| {
-            let rt = Runtime::new().unwrap();
-            rt.block_on(async {
-                diem_retrier::retry_async(k8s_retry_strategy(), || {
-                    let client = eks_client.clone();
-                    let describe_update_request = DescribeUpdateRequest {
-                        addon_name: None,
-                        name: cluster_name.clone(),
-                        nodegroup_name: Some(nodegroup_name.to_string()),
-                        update_id: update_id.to_string(),
-                    };
-                    Box::pin(async move {
-                        let describe_update =
-                            match client.describe_update(describe_update_request).await {
-                                Ok(resp) => resp.update.unwrap(),
-                                Err(err) => bail!(err),
-                            };
-                        if let Some(s) = describe_update.status {
-                            match s.as_str() {
-                                "Failed" => bail!("Nodegroup update failed"),
-                                "Successful" => {
-                                    println!(
-                                        "{} nodegroup update {} successful!!!",
-                                        &nodegroup_name, update_id
-                                    );
-                                    Ok(())
-                                }
-                                &_ => {
-                                    println!(
-                                        "Waiting for {} update {}: {} ...",
-                                        &nodegroup_name, update_id, s
-                                    );
-                                    bail!("Waiting for valid update status")
-                                }
-                            }
-                        } else {
-                            bail!("Failed to describe nodegroup update")
-                        }
-                    })
-                })
-                .await
-            })
-            .unwrap();
-        });
+    try_join_all(updates.into_iter().map(|(nodegroup_name, update_id)| {
+        describe_update(
+            eks_client.clone(),
+            cluster_name.clone(),
+            nodegroup_name.to_string(),
+            update_id.to_string(),
+        )
+    }))
+    .await
+    .unwrap();
 
-    rt.block_on(async { nodegroup_state_check(desire_nodegroup_size).await })
-        .unwrap();
+    nodegroup_state_check(desire_nodegroup_size).await.unwrap();
 
     Ok(())
+}
+
+async fn describe_update(
+    eks_client: EksClient,
+    cluster_name: String,
+    nodegroup_name: String,
+    update_id: String,
+) -> Result<()> {
+    diem_retrier::retry_async(k8s_retry_strategy(), || {
+        let client = eks_client.clone();
+        let nodegroup_name = nodegroup_name.clone();
+        let update_id = update_id.clone();
+        let request = DescribeUpdateRequest {
+            addon_name: None,
+            name: cluster_name.clone(),
+            nodegroup_name: Some(nodegroup_name.clone()),
+            update_id: update_id.clone(),
+        };
+        Box::pin(async move {
+            let describe_update = match client.describe_update(request).await {
+                Ok(resp) => resp.update.unwrap(),
+                Err(err) => bail!(err),
+            };
+            if let Some(s) = describe_update.status {
+                match s.as_str() {
+                    "Failed" => bail!("Nodegroup update failed"),
+                    "Successful" => {
+                        println!(
+                            "{} nodegroup update {} successful!!!",
+                            &nodegroup_name, update_id
+                        );
+                        Ok(())
+                    }
+                    &_ => {
+                        println!(
+                            "Waiting for {} update {}: {} ...",
+                            &nodegroup_name, update_id, s
+                        );
+                        bail!("Waiting for valid update status")
+                    }
+                }
+            } else {
+                bail!("Failed to describe nodegroup update")
+            }
+        })
+    })
+    .await
 }
 
 pub fn scale_sts_replica(sts_name: &str, replica_num: u64) -> Result<()> {

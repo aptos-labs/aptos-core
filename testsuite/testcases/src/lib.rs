@@ -18,8 +18,8 @@ use std::{
 };
 use tokio::runtime::Runtime;
 
-fn batch_update<'t>(
-    ctx: &mut NetworkContext<'t>,
+async fn batch_update(
+    ctx: &mut NetworkContext<'_>,
     validators_to_update: &[PeerId],
     version: &Version,
 ) -> Result<()> {
@@ -27,13 +27,14 @@ fn batch_update<'t>(
         ctx.swarm().upgrade_validator(*validator, version)?;
     }
 
-    ctx.swarm().health_check()?;
+    ctx.swarm().health_check().await?;
     let deadline = Instant::now() + Duration::from_secs(60);
     for validator in validators_to_update {
         ctx.swarm()
             .validator_mut(*validator)
             .unwrap()
-            .wait_until_healthy(deadline)?;
+            .wait_until_healthy(deadline)
+            .await?;
     }
 
     Ok(())

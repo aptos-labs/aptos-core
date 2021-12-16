@@ -142,7 +142,7 @@ impl LocalNode {
         fs::read_to_string(self.log_path()).map_err(Into::into)
     }
 
-    pub fn health_check(&mut self) -> Result<(), HealthCheckError> {
+    pub async fn health_check(&mut self) -> Result<(), HealthCheckError> {
         debug!("Health check on node '{}'", self.name);
 
         if let Some(p) = &mut self.process {
@@ -168,15 +168,19 @@ impl LocalNode {
 
         self.debug_client()
             .get_node_metrics()
+            .await
             .map(|_| ())
             .map_err(HealthCheckError::Failure)?;
 
-        reqwest::blocking::get(self.rest_api_endpoint())
-            .map_err(|e| HealthCheckError::Failure(e.into()))?;
-        Ok(())
+        self.rest_client()
+            .get_ledger_information()
+            .await
+            .map(|_| ())
+            .map_err(HealthCheckError::Failure)
     }
 }
 
+#[async_trait::async_trait]
 impl Node for LocalNode {
     fn peer_id(&self) -> PeerId {
         self.peer_id()
@@ -210,7 +214,7 @@ impl Node for LocalNode {
         self.config()
     }
 
-    fn start(&mut self) -> Result<()> {
+    async fn start(&mut self) -> Result<()> {
         self.start()
     }
 
@@ -223,8 +227,8 @@ impl Node for LocalNode {
         todo!()
     }
 
-    fn health_check(&mut self) -> Result<(), HealthCheckError> {
-        self.health_check()
+    async fn health_check(&mut self) -> Result<(), HealthCheckError> {
+        self.health_check().await
     }
 
     fn counter(&self, _counter: &str, _port: u64) -> Result<f64> {

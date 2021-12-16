@@ -9,7 +9,7 @@ use rand::{
     Rng, SeedableRng,
 };
 use std::{thread, time::Instant};
-use tokio::time::Duration;
+use tokio::{runtime::Runtime, time::Duration};
 
 const STATE_SYNC_COMMITTED_COUNTER_NAME: &str = "diem_state_sync_version.synced";
 
@@ -65,7 +65,8 @@ impl NetworkTest for StateSyncPerformance {
         // do data cleanup
         fullnode.clear_storage()?;
         println!("The fullnode is going to restart");
-        fullnode.start()?;
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on(fullnode.start())?;
         println!(
             "The fullnode is now up. Waiting for it to state sync to the expected version: {}",
             validator_synced_version

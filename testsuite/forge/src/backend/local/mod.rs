@@ -124,15 +124,20 @@ impl LocalFactory {
         Self::with_revision_and_workspace(&merge_base)
     }
 
-    pub fn new_swarm<R>(&self, rng: R, number_of_validators: NonZeroUsize) -> Result<LocalSwarm>
+    pub async fn new_swarm<R>(
+        &self,
+        rng: R,
+        number_of_validators: NonZeroUsize,
+    ) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
         let version = self.versions.keys().max().unwrap();
         self.new_swarm_with_version(rng, number_of_validators, version, None)
+            .await
     }
 
-    pub fn new_swarm_with_version<R>(
+    pub async fn new_swarm_with_version<R>(
         &self,
         rng: R,
         number_of_validators: NonZeroUsize,
@@ -152,18 +157,20 @@ impl LocalFactory {
         let mut swarm = builder.build(rng)?;
         swarm
             .launch()
+            .await
             .with_context(|| format!("Swarm logs can be found here: {}", swarm.logs_location()))?;
 
         Ok(swarm)
     }
 }
 
+#[async_trait::async_trait]
 impl Factory for LocalFactory {
     fn versions<'a>(&'a self) -> Box<dyn Iterator<Item = Version> + 'a> {
         Box::new(self.versions.keys().cloned())
     }
 
-    fn launch_swarm(
+    async fn launch_swarm(
         &self,
         rng: &mut StdRng,
         node_num: NonZeroUsize,
@@ -180,7 +187,9 @@ impl Factory for LocalFactory {
             },
             None => None,
         };
-        let swarm = self.new_swarm_with_version(rng, node_num, version, genesis_modules)?;
+        let swarm = self
+            .new_swarm_with_version(rng, node_num, version, genesis_modules)
+            .await?;
 
         Ok(Box::new(swarm))
     }
