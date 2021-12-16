@@ -419,9 +419,8 @@ impl FromStr for PrintBytecodeInputChoice {
 }
 
 fn parse_argument(s: &str) -> Result<Argument> {
-    Ok(if let Some(stripped) = s.strip_prefix('@') {
-        Argument::NamedAddress(Identifier::new(stripped)?)
-    } else {
-        Argument::TransactionArgument(parser::parse_transaction_argument(s)?)
+    Ok(match s.strip_prefix('@') {
+        Some(stripped) => Argument::NamedAddress(Identifier::new(stripped)?),
+        None => Argument::TransactionArgument(parser::parse_transaction_argument(s)?),
     })
 }

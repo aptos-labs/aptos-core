@@ -418,8 +418,8 @@ impl<'a> DiemTestAdapter<'a> {
     ) -> Result<TransactionParameters> {
         let account_resource = self.fetch_account_resource(signer_addr)?;
 
-        let sequence_number = sequence_number.unwrap_or(account_resource.sequence_number());
-        let gas_currency_code = gas_currency_code.unwrap_or(XUS_NAME.to_string());
+        let sequence_number = sequence_number.unwrap_or_else(|| account_resource.sequence_number());
+        let gas_currency_code = gas_currency_code.unwrap_or_else(|| XUS_NAME.to_string());
         let max_number_of_gas_units = GasConstants::default().maximum_number_of_gas_units;
         let gas_unit_price = gas_unit_price.unwrap_or(0);
         let max_gas_amount = match max_gas_amount {
