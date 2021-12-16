@@ -7,6 +7,7 @@ use crate::{
     ScriptPayload, ScriptWriteSet, Transaction, TransactionInfo, TransactionOnChainData,
     TransactionPayload, UserTransactionRequest, WriteSet, WriteSetChange, WriteSetPayload,
 };
+use diem_crypto::HashValue;
 use diem_transaction_builder::error_explain;
 use diem_types::{
     access_path::{AccessPath, Path},
@@ -74,7 +75,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         data: TransactionOnChainData,
     ) -> Result<Transaction> {
         use diem_types::transaction::Transaction::*;
-        let info = self.into_transaction_info(data.version, &data.info);
+        let info = self.into_transaction_info(data.version, &data.info, data.accumulator_root_hash);
         let events = self.try_into_events(&data.events)?;
         Ok(match data.transaction {
             UserTransaction(txn) => {
@@ -93,6 +94,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         &self,
         version: u64,
         info: &diem_types::transaction::TransactionInfo,
+        accumulator_root_hash: HashValue,
     ) -> TransactionInfo {
         TransactionInfo {
             version: version.into(),
@@ -102,6 +104,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             gas_used: info.gas_used().into(),
             success: info.status().is_success(),
             vm_status: self.explain_vm_status(info.status()),
+            accumulator_root_hash: accumulator_root_hash.into(),
         }
     }
 

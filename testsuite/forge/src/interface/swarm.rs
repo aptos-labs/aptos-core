@@ -4,11 +4,14 @@
 use crate::{ChainInfo, FullNode, NodeExt, Result, Validator, Version};
 use anyhow::anyhow;
 use diem_config::config::NodeConfig;
-use diem_sdk::{client::BlockingClient, types::PeerId};
+use diem_rest_client::Client as RestClient;
+use diem_sdk::types::PeerId;
+use futures::future::try_join_all;
 use std::{
     thread,
     time::{Duration, Instant},
 };
+use tokio::runtime::Runtime;
 
 /// Trait used to represent a running network comprised of Validators and FullNodes
 pub trait Swarm {
@@ -116,31 +119,47 @@ pub trait SwarmExt: Swarm {
     /// Perform a safety check, ensuring that no forks have occurred in the network.
     fn fork_check(&self) -> Result<()> {
         // Checks if root_hashes are equal across all nodes at a given version
-        fn are_root_hashes_equal_at_version(
-            clients: &[BlockingClient],
+        async fn are_root_hashes_equal_at_version(
+            clients: &[RestClient],
             version: u64,
         ) -> Result<bool> {
-            let root_hashes = clients
-                .iter()
-                .map(|node| {
-                    node.get_metadata_by_version(version)
-                        .map(|r| r.into_inner().accumulator_root_hash)
-                })
-                .collect::<Result<Vec<_>, _>>()?;
+            let root_hashes = try_join_all(
+                clients
+                    .iter()
+                    .map(|node| node.get_transaction_by_version(version))
+                    .collect::<Vec<_>>(),
+            )
+            .await?
+            .into_iter()
+            .map(|r| {
+                r.into_inner()
+                    .transaction_info()
+                    .unwrap()
+                    .accumulator_root_hash
+            })
+            .collect::<Vec<_>>();
 
             Ok(root_hashes.windows(2).all(|w| w[0] == w[1]))
         }
 
+        let runtime = Runtime::new().unwrap();
+
         let clients = self
             .validators()
-            .map(|node| node.json_rpc_client())
-            .chain(self.full_nodes().map(|node| node.json_rpc_client()))
+            .map(|node| node.rest_client())
+            .chain(self.full_nodes().map(|node| node.rest_client()))
             .collect::<Vec<_>>();
 
-        let versions = clients
-            .iter()
-            .map(|node| node.get_metadata().map(|r| r.into_inner().version))
-            .collect::<Result<Vec<_>, _>>()?;
+        let versions = runtime
+            .block_on(try_join_all(
+                clients
+                    .iter()
+                    .map(|node| node.get_ledger_information())
+                    .collect::<Vec<_>>(),
+            ))?
+            .into_iter()
+            .map(|resp| resp.into_inner().version)
+            .collect::<Vec<u64>>();
         let min_version = versions
             .iter()
             .min()
@@ -152,7 +171,7 @@ pub trait SwarmExt: Swarm {
             .copied()
             .ok_or_else(|| anyhow!("Unable to query nodes for their latest version"))?;
 
-        if !are_root_hashes_equal_at_version(&clients, min_version)? {
+        if !runtime.block_on(are_root_hashes_equal_at_version(&clients, min_version))? {
             return Err(anyhow!("Fork check failed"));
         }
 
@@ -161,7 +180,7 @@ pub trait SwarmExt: Swarm {
             Instant::now() + Duration::from_secs(10),
         )?;
 
-        if !are_root_hashes_equal_at_version(&clients, max_version)? {
+        if !runtime.block_on(are_root_hashes_equal_at_version(&clients, max_version))? {
             return Err(anyhow!("Fork check failed"));
         }
 

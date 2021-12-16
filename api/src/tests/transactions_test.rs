@@ -3,7 +3,7 @@
 
 use crate::tests::{assert_json, find_value, new_test_context, pretty, TestContext};
 
-use diem_api_types::HexEncodedBytes;
+use diem_api_types::{HashValue, HexEncodedBytes};
 use diem_crypto::{
     hash::CryptoHash,
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
@@ -291,6 +291,7 @@ async fn test_get_transactions_output_user_transaction_with_script_function_payl
             "previous_block_votes": [],
             "proposer": context.validator_owner.to_hex_literal(),
             "timestamp": metadata_txn.timestamp_usec().to_string(),
+            "accumulator_root_hash": HashValue::from(context.context.get_accumulator_root_hash(1).unwrap()).to_string(),
         }),
     );
 
@@ -353,6 +354,7 @@ async fn test_get_transactions_output_user_transaction_with_script_function_payl
                 "signature": format!("0x{}", hex::encode(sig.to_bytes())),
             },
             "timestamp": metadata_txn.timestamp_usec().to_string(),
+            "accumulator_root_hash": HashValue::from(context.context.get_accumulator_root_hash(2).unwrap()).to_string(),
         }),
     )
 }

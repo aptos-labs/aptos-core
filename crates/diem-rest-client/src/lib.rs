@@ -176,7 +176,9 @@ impl Client {
 
         let start = std::time::Instant::now();
         while start.elapsed() < DEFAULT_TIMEOUT {
-            let resp = self.get_transaction_inner(hash).await?;
+            let resp = self
+                .get_transaction_by_version_or_hash(hash.to_hex_literal())
+                .await?;
             if resp.status() != StatusCode::NOT_FOUND {
                 let txn_resp: Response<Transaction> = self.json(resp).await?;
                 let (transaction, state) = txn_resp.into_parts();
@@ -222,13 +224,28 @@ impl Client {
     }
 
     pub async fn get_transaction(&self, hash: HashValue) -> Result<Response<Transaction>> {
-        self.json(self.get_transaction_inner(hash).await?).await
+        self.json(
+            self.get_transaction_by_version_or_hash(hash.to_hex_literal())
+                .await?,
+        )
+        .await
     }
 
-    async fn get_transaction_inner(&self, hash: HashValue) -> Result<reqwest::Response> {
+    pub async fn get_transaction_by_version(&self, version: u64) -> Result<Response<Transaction>> {
+        self.json(
+            self.get_transaction_by_version_or_hash(version.to_string())
+                .await?,
+        )
+        .await
+    }
+
+    async fn get_transaction_by_version_or_hash(
+        &self,
+        version_or_hash: String,
+    ) -> Result<reqwest::Response> {
         let url = self
             .base_url
-            .join(&format!("transactions/{}", hash.to_hex_literal()))?;
+            .join(&format!("transactions/{}", version_or_hash))?;
 
         Ok(self.inner.get(url).send().await?)
     }

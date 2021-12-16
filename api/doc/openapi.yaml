@@ -1061,6 +1061,7 @@ components:
         - gas_used
         - success
         - vm_status
+        - accumulator_root_hash
       properties:
         version:
           $ref: '#/components/schemas/Uint64'
@@ -1081,6 +1082,8 @@ components:
           type: string
           description: |
             Human readable transaction execution result message from Diem VM.
+        accumulator_root_hash:
+          $ref: '#/components/schemas/HexEncodedBytes'
     UserTransaction:
       title: User Transaction
       type: object
