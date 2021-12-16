@@ -1,7 +1,8 @@
 processed 2 tasks
 
 task 1 'run'. lines 5-14:
-Events:{
+Events:
+{
     key:     0400000000000000c5e34b925cf6875fec02d4b77adbd2d6
     seq_num: 0
     type:    u64

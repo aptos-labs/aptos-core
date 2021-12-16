@@ -50,5 +50,5 @@ key 0x1::DiemAccount::DiemAccount {
             }
         }
     }
-    sequence_number: 3
+    sequence_number: 6
 }

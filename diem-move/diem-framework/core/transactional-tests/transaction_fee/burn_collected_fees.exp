@@ -11,7 +11,8 @@ key 0x1::DiemAccount::Balance<0x1::XUS::XUS> {
 }
 
 task 5 'run'. lines 17-20:
-Events:{
+Events:
+{
     key:     07000000000000000000000000000000000000000a550c18
     seq_num: 0
     type:    0x1::Diem::PreburnEvent
@@ -23,7 +24,6 @@ Events:{
     type:    0x1::Diem::BurnEvent
     data:    "bc02000000000000035855530000000000000000000000000b1e55ed"
 }
-
 
 task 6 'run'. lines 21-22:
 Error: Failed to execute transaction. VMStatus: status ABORTED of type Execution with sub status 1799

@@ -4,13 +4,13 @@ task 3 'run'. lines 21-31:
 Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 2
 
 task 4 'block'. lines 34-36:
-Events:{
+Events:
+{
     key:     11000000000000000000000000000000000000000a550c18
     seq_num: 0
     type:    0x1::DiemBlock::NewBlockEvent
     data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d6000200000000000000"
 }
-
 
 task 6 'publish'. lines 46-49:
 Error: Transaction discarded. VMStatus: status INVALID_MODULE_PUBLISHER of type Validation

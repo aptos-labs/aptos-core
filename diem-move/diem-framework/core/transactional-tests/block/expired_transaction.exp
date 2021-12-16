@@ -1,13 +1,13 @@
 processed 10 tasks
 
 task 1 'block'. lines 3-3:
-Events:{
+Events:
+{
     key:     11000000000000000000000000000000000000000a550c18
     seq_num: 0
     type:    0x1::DiemBlock::NewBlockEvent
     data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d60000e1f50500000000"
 }
-
 
 task 2 'publish'. lines 5-6:
 Error: Transaction discarded. VMStatus: status TRANSACTION_EXPIRED of type Validation
@@ -16,13 +16,13 @@ task 3 'publish'. lines 8-9:
 Error: Transaction discarded. VMStatus: status TRANSACTION_EXPIRED of type Validation
 
 task 6 'block'. lines 17-17:
-Events:{
+Events:
+{
     key:     11000000000000000000000000000000000000000a550c18
     seq_num: 1
     type:    0x1::DiemBlock::NewBlockEvent
     data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d6004023050600000000"
 }
-
 
 task 8 'publish'. lines 22-23:
 Error: Transaction discarded. VMStatus: status TRANSACTION_EXPIRED of type Validation

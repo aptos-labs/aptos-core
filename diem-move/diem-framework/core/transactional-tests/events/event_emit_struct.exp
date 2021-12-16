@@ -1,7 +1,8 @@
 processed 3 tasks
 
 task 2 'run'. lines 18-25:
-Events:{
+Events:
+{
     key:     0400000000000000c5e34b925cf6875fec02d4b77adbd2d6
     seq_num: 0
     type:    0xc5e34b925cf6875fec02d4b77adbd2d6::M::MyEvent

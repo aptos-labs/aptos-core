@@ -1,0 +1,4 @@
+processed 5 tasks
+
+task 3 'run'. lines 32-32:
+Error: Failed to execute transaction. VMStatus: status OUT_OF_GAS of type Execution

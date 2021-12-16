@@ -1128,7 +1128,8 @@ impl<'a> fmt::Display for PrettyEvents<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Events:")?;
         for event in self.0.iter() {
-            writeln!(f, "{}", PrettyEvent(event))?;
+            writeln!(f)?;
+            write!(f, "{}", PrettyEvent(event))?;
         }
         Ok(())
     }
