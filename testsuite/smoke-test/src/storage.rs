@@ -4,19 +4,17 @@
 use crate::{
     smoke_test_environment::new_local_swarm,
     test_utils::{
-        assert_balance, create_and_fund_account, diem_swarm_utils::insert_waypoint, transfer_coins,
+        assert_balance, create_and_fund_account, diem_swarm_utils::insert_waypoint,
+        transfer_and_reconfig, transfer_coins,
     },
     workspace_builder,
     workspace_builder::workspace_root,
 };
 use anyhow::{bail, Result};
 use backup_cli::metadata::view::BackupStorageState;
-use diem_rest_client::Client as RestClient;
-use diem_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use diem_temppath::TempPath;
 use diem_types::{transaction::Version, waypoint::Waypoint};
 use forge::{NodeExt, Swarm, SwarmExt};
-use rand::random;
 use std::{
     fs,
     path::Path,
@@ -71,8 +69,7 @@ fn test_db_restore() {
             &account_1,
             20,
         )
-        .await
-        .unwrap();
+        .await;
         assert_balance(&client_1, &account_0, expected_balance_0).await;
         assert_balance(&client_1, &account_1, expected_balance_1).await;
     });
@@ -116,8 +113,7 @@ fn test_db_restore() {
             &account_1,
             20,
         )
-        .await
-        .unwrap();
+        .await;
         assert_balance(&client_1, &account_0, expected_balance_0).await;
         assert_balance(&client_1, &account_1, expected_balance_1).await;
     });
@@ -310,30 +306,4 @@ pub(crate) fn db_restore(backup_path: &Path, db_path: &Path, trusted_waypoints: 
         panic!("db-restore failed, output: {:?}", output);
     }
     println!("Backup restored in {} seconds.", now.elapsed().as_secs());
-}
-
-async fn transfer_and_reconfig(
-    client: &RestClient,
-    transaction_factory: &TransactionFactory,
-    root_account: &mut LocalAccount,
-    account0: &mut LocalAccount,
-    account1: &LocalAccount,
-    transfers: usize,
-) -> Result<()> {
-    for _ in 0..transfers {
-        if random::<u16>() % 10 == 0 {
-            let diem_version = client.get_diem_version().await?;
-            let current_version = *diem_version.into_inner().payload.major.inner();
-            let txn = root_account.sign_with_transaction_builder(
-                transaction_factory.update_diem_version(0, current_version + 1),
-            );
-            client.submit_and_wait(&txn).await?;
-
-            println!("Changing diem version to {}", current_version + 1,);
-        }
-
-        transfer_coins(client, transaction_factory, account0, account1, 1).await;
-    }
-
-    Ok(())
 }

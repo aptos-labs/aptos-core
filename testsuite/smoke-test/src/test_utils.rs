@@ -9,6 +9,7 @@ use diem_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use forge::{LocalSwarm, NodeExt, Swarm};
+use rand::random;
 use std::{fs::File, io::Write, path::PathBuf};
 use tokio::runtime::Runtime;
 
@@ -55,6 +56,31 @@ pub async fn transfer_coins(
     client.wait_for_signed_transaction(&txn).await.unwrap();
 
     txn
+}
+
+pub async fn transfer_and_reconfig(
+    client: &RestClient,
+    transaction_factory: &TransactionFactory,
+    root_account: &mut LocalAccount,
+    sender: &mut LocalAccount,
+    receiver: &LocalAccount,
+    num_transfers: usize,
+) {
+    for _ in 0..num_transfers {
+        // Reconfigurations have a 20% chance of being executed
+        if random::<u16>() % 5 == 0 {
+            let diem_version = client.get_diem_version().await.unwrap();
+            let current_version = *diem_version.into_inner().payload.major.inner();
+            let txn = root_account.sign_with_transaction_builder(
+                transaction_factory.update_diem_version(0, current_version + 1),
+            );
+            client.submit_and_wait(&txn).await.unwrap();
+
+            println!("Changing diem version to {}", current_version + 1,);
+        }
+
+        transfer_coins(client, transaction_factory, sender, receiver, 1).await;
+    }
 }
 
 pub async fn assert_balance(client: &RestClient, account: &LocalAccount, balance: u64) {

@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    scripts_and_modules::enable_open_publishing,
     smoke_test_environment::new_local_swarm,
-    test_utils::{create_and_fund_account, transfer_coins},
+    test_utils::{create_and_fund_account, transfer_and_reconfig, transfer_coins},
 };
 use diem_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
 use diem_rest_client::Client as RestClient;
@@ -156,23 +155,30 @@ fn execute_transactions(
     swarm: &mut LocalSwarm,
     client: &RestClient,
     transaction_factory: &TransactionFactory,
-    account_0: &mut LocalAccount,
-    account_1: &LocalAccount,
-    force_epoch_changes: bool,
+    sender: &mut LocalAccount,
+    receiver: &LocalAccount,
+    execute_epoch_changes: bool,
 ) {
-    let root_account = swarm.chain_info().root_account;
     let runtime = Runtime::new().unwrap();
-    runtime.block_on(async {
-        for _ in 0..10 {
-            // Execute simple transfer transactions
-            transfer_coins(client, transaction_factory, account_0, account_1, 1).await;
-
-            // Cause an epoch change if required
-            if force_epoch_changes {
-                enable_open_publishing(client, transaction_factory, root_account)
-                    .await
-                    .unwrap();
+    let num_transfers = 10;
+    if execute_epoch_changes {
+        runtime.block_on(async {
+            transfer_and_reconfig(
+                client,
+                transaction_factory,
+                swarm.chain_info().root_account,
+                sender,
+                receiver,
+                num_transfers,
+            )
+            .await;
+        });
+    } else {
+        runtime.block_on(async {
+            for _ in 0..num_transfers {
+                // Execute simple transfer transactions
+                transfer_coins(client, transaction_factory, sender, receiver, 1).await;
             }
-        }
-    });
+        });
+    }
 }
