@@ -10,18 +10,18 @@ use std::collections::BTreeMap;
 
 /// Trait for finite-height abstract domains. Infinite height domains would require a more complex
 /// trait with widening and a partial order.
-pub(crate) trait AbstractDomain: Clone + Sized {
+pub trait AbstractDomain: Clone + Sized {
     fn join(&mut self, other: &Self) -> JoinResult;
 }
 
 #[derive(Debug)]
-pub(crate) enum JoinResult {
+pub enum JoinResult {
     Changed,
     Unchanged,
 }
 
 #[derive(Clone)]
-pub(crate) enum BlockPostcondition<AnalysisError> {
+pub enum BlockPostcondition<AnalysisError> {
     /// Block not yet analyzed
     Unprocessed,
     /// Analyzing block was successful
@@ -33,21 +33,21 @@ pub(crate) enum BlockPostcondition<AnalysisError> {
 
 #[allow(dead_code)]
 #[derive(Clone)]
-pub(crate) struct BlockInvariant<State, AnalysisError> {
+pub struct BlockInvariant<State, AnalysisError> {
     /// Precondition of the block
-    pub(crate) pre: State,
+    pub pre: State,
     /// Postcondition of the block
-    pub(crate) post: BlockPostcondition<AnalysisError>,
+    pub post: BlockPostcondition<AnalysisError>,
 }
 
 /// A map from block id's to the pre/post of each block after a fixed point is reached.
 #[allow(dead_code)]
-pub(crate) type InvariantMap<State, AnalysisError> =
+pub type InvariantMap<State, AnalysisError> =
     BTreeMap<BlockId, BlockInvariant<State, AnalysisError>>;
 
 /// Take a pre-state + instruction and mutate it to produce a post-state
 /// Auxiliary data can be stored in self.
-pub(crate) trait TransferFunctions {
+pub trait TransferFunctions {
     type State: AbstractDomain;
     type AnalysisError: Clone;
 
@@ -70,7 +70,7 @@ pub(crate) trait TransferFunctions {
     ) -> Result<(), Self::AnalysisError>;
 }
 
-pub(crate) trait AbstractInterpreter: TransferFunctions {
+pub trait AbstractInterpreter: TransferFunctions {
     /// Analyze procedure local@function_view starting from pre-state local@initial_state.
     fn analyze_function(
         &mut self,
