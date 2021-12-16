@@ -1,4 +1,5 @@
-module {{default}}::ApprovalGroup {
+#[test_only]
+module DiemFramework::ApprovalGroup {
     use DiemFramework::Signature;
 
     struct ApprovalGroup has store {
@@ -57,15 +58,15 @@ module {{default}}::ApprovalGroup {
     }
 }
 
-//! new-transaction
-module {{default}}::ColdWallet {
+#[test_only]
+module DiemFramework::ColdWallet {
     use DiemFramework::XUS::XUS;
     use Std::Hash;
     use Std::BCS;
     use DiemFramework::Diem;
     use Std::Vector;
     use Std::Signer;
-    use {{default}}::ApprovalGroup;
+    use DiemFramework::ApprovalGroup;
 
     struct ColdWallet has key {
         balance: Diem::Diem<XUS>,
@@ -188,13 +189,23 @@ module {{default}}::ColdWallet {
     }
 }
 
-//! new-transaction
-script {
-use {{default}}::ApprovalGroup;
-use {{default}}::ColdWallet;
-fun main(account: signer) {
-    let account = &account;
-    let genesis_group = ApprovalGroup::create(x"1234", x"5678", x"abc123");
-    ColdWallet::create(account, genesis_group);
-}
+#[test_only]
+module DiemFramework::WalletModuleTests {
+    use DiemFramework::Genesis;
+    use DiemFramework::DiemAccount;
+    use DiemFramework::XUS::XUS;
+    use Std::Signer;
+
+    use DiemFramework::ApprovalGroup;
+    use DiemFramework::ColdWallet;
+
+    // private-key: 2f2bbeb071948c4ca586b0fa0f3663520fc3053056e79955059520d626117cdb
+    #[test(dr = @DiemRoot, tc = @TreasuryCompliance, account = @0xc2422587142d78bdf5a8068b8f9a2859)]
+    fun wallet_module_test(dr: signer, tc: signer, account: signer) {
+        Genesis::setup(&dr, &tc);
+        DiemAccount::create_parent_vasp_account<XUS>(&tc, Signer::address_of(&account), x"355b32f571f894cfd431ab40dc950037", b"", false);
+
+        let genesis_group = ApprovalGroup::create(x"1234", x"5678", x"abc123");
+        ColdWallet::create(&account, genesis_group);
+    }
 }
