@@ -2622,6 +2622,7 @@ dependencies = [
  "diem-vm",
  "diem-workspace-hack",
  "either",
+ "hex",
  "language-e2e-tests",
  "move-binary-format",
  "move-command-line-common",

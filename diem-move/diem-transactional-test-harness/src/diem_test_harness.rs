@@ -48,6 +48,7 @@ use move_transactional_test_runner::{
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, HashMap},
+    fmt,
     path::Path,
 };
 use structopt::StructOpt;
@@ -107,7 +108,7 @@ struct DiemRunArgs {
     #[structopt(long = "private-key", parse(try_from_str = RawPrivateKey::parse))]
     private_key: Option<RawPrivateKey>,
 
-    #[structopt(long = "--admin-script")]
+    #[structopt(long = "admin-script")]
     admin_script: bool,
 
     #[structopt(long = "expiration")]
@@ -121,6 +122,9 @@ struct DiemRunArgs {
 
     #[structopt(long = "gas-currency")]
     gas_currency_code: Option<String>,
+
+    #[structopt(long = "show-events")]
+    show_events: bool,
 }
 
 /// Diem-specifc arguments for the init command.
@@ -937,7 +941,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         txn_args: Vec<TransactionArgument>,
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
-    ) -> Result<()> {
+    ) -> Result<Option<String>> {
         if !extra_args.admin_script {
             panic!(
                 "Transactions scripts are not currently allowed on Diem. \
@@ -997,9 +1001,15 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         .unwrap()
         .into_inner();
 
-        self.run_transaction(Transaction::UserTransaction(txn))?;
+        let output = self.run_transaction(Transaction::UserTransaction(txn))?;
 
-        Ok(())
+        let output = if extra_args.show_events {
+            render_events(output.events())
+        } else {
+            None
+        };
+
+        Ok(output)
     }
 
     fn call_function(
@@ -1011,7 +1021,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         txn_args: Vec<TransactionArgument>,
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
-    ) -> Result<()> {
+    ) -> Result<Option<String>> {
         if extra_args.admin_script {
             panic!("Admin script functions are not supported.")
         }
@@ -1057,9 +1067,15 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         .sign(&private_key, Ed25519PublicKey::from(&private_key))?
         .into_inner();
 
-        self.run_transaction(Transaction::UserTransaction(txn))?;
+        let output = self.run_transaction(Transaction::UserTransaction(txn))?;
 
-        Ok(())
+        let output = if extra_args.show_events {
+            render_events(output.events())
+        } else {
+            None
+        };
+
+        Ok(output)
     }
 
     fn view_data(
@@ -1093,18 +1109,36 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
  *
  *
  ************************************************************************************************/
+struct PrettyEvent<'a>(&'a ContractEvent);
+
+impl<'a> fmt::Display for PrettyEvent<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{{")?;
+        writeln!(f, "    key:     {}", self.0.key())?;
+        writeln!(f, "    seq_num: {}", self.0.sequence_number())?;
+        writeln!(f, "    type:    {}", self.0.type_tag())?;
+        writeln!(f, "    data:    {:?}", hex::encode(self.0.event_data()))?;
+        write!(f, "}}")
+    }
+}
+
+struct PrettyEvents<'a>(&'a [ContractEvent]);
+
+impl<'a> fmt::Display for PrettyEvents<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Events:")?;
+        for event in self.0.iter() {
+            writeln!(f, "{}", PrettyEvent(event))?;
+        }
+        Ok(())
+    }
+}
+
 fn render_events(events: &[ContractEvent]) -> Option<String> {
     if events.is_empty() {
         None
     } else {
-        Some(format!(
-            "Events:\n{}",
-            events
-                .iter()
-                .map(|event| format!("{:?}", event))
-                .collect::<Vec<_>>()
-                .join("\n"),
-        ))
+        Some(format!("{}", PrettyEvents(events)))
     }
 }
 

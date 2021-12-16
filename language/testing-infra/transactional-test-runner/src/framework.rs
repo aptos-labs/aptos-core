@@ -82,6 +82,17 @@ impl<'a> CompiledState<'a> {
     }
 }
 
+fn merge_output(left: Option<String>, right: Option<String>) -> Option<String> {
+    match (left, right) {
+        (None, right) => right,
+        (left, None) => left,
+        (Some(mut left), Some(right)) => {
+            left.push_str(&right);
+            Some(left)
+        }
+    }
+}
+
 pub trait MoveTestAdapter<'a> {
     type ExtraPublishArgs;
     type ExtraRunArgs;
@@ -110,7 +121,7 @@ pub trait MoveTestAdapter<'a> {
         args: Vec<TransactionArgument>,
         gas_budget: Option<u64>,
         extra: Self::ExtraRunArgs,
-    ) -> Result<()>;
+    ) -> Result<Option<String>>;
     fn call_function(
         &mut self,
         module: &ModuleId,
@@ -120,7 +131,7 @@ pub trait MoveTestAdapter<'a> {
         args: Vec<TransactionArgument>,
         gas_budget: Option<u64>,
         extra: Self::ExtraRunArgs,
-    ) -> Result<()>;
+    ) -> Result<Option<String>>;
     fn view_data(
         &mut self,
         address: AccountAddress,
@@ -271,8 +282,9 @@ pub trait MoveTestAdapter<'a> {
                     SyntaxChoice::IR => (compile_ir_script(state.dep_modules(), data_path)?, None),
                 };
                 let args = self.compiled_state().resolve_args(args);
-                self.execute_script(script, type_args, signers, args, gas_budget, extra_args)?;
-                Ok(warning_opt)
+                let output =
+                    self.execute_script(script, type_args, signers, args, gas_budget, extra_args)?;
+                Ok(merge_output(warning_opt, output))
             }
             TaskCommand::Run(
                 RunCommand {
@@ -290,7 +302,7 @@ pub trait MoveTestAdapter<'a> {
                     "syntax flag meaningless with function execution"
                 );
                 let args = self.compiled_state().resolve_args(args);
-                self.call_function(
+                let output = self.call_function(
                     &module,
                     name.as_ident_str(),
                     type_args,
@@ -299,7 +311,7 @@ pub trait MoveTestAdapter<'a> {
                     gas_budget,
                     extra_args,
                 )?;
-                Ok(None)
+                Ok(output)
             }
             TaskCommand::View(ViewCommand {
                 address,

@@ -170,7 +170,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         txn_args: Vec<TransactionArgument>,
         gas_budget: Option<u64>,
         _extra_args: Self::ExtraRunArgs,
-    ) -> Result<()> {
+    ) -> Result<Option<String>> {
         let signers: Vec<_> = signers
             .into_iter()
             .map(|addr| self.compiled_state().resolve_address(&addr))
@@ -187,7 +187,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 "Script execution failed with VMError: {}",
                 format_vm_error(&e)
             )
-        })
+        })?;
+        Ok(None)
     }
 
     fn call_function(
@@ -199,7 +200,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         txn_args: Vec<TransactionArgument>,
         gas_budget: Option<u64>,
         _extra_args: Self::ExtraRunArgs,
-    ) -> Result<()> {
+    ) -> Result<Option<String>> {
         let signers: Vec<_> = signers
             .into_iter()
             .map(|addr| self.compiled_state().resolve_address(&addr))
@@ -214,7 +215,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 "Function execution failed with VMError: {}",
                 format_vm_error(&e)
             )
-        })
+        })?;
+        Ok(None)
     }
 
     fn view_data(
