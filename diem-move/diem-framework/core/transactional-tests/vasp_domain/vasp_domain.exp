@@ -1,0 +1,31 @@
+processed 13 tasks
+
+task 4 'run'. lines 28-31:
+Events:{
+    key:     00000000000000000000000000000000000000000b1e55ed
+    seq_num: 0
+    type:    0x1::VASPDomain::VASPDomainEvent
+    data:    "00046469656d7898b9021c0ed4af78fc7bd8e75b8e5d"
+}
+
+
+task 6 'run'. lines 42-45:
+Error: Failed to execute transaction. VMStatus: status ABORTED of type Execution with sub status 775
+
+task 8 'run'. lines 56-59:
+Events:{
+    key:     00000000000000000000000000000000000000000b1e55ed
+    seq_num: 1
+    type:    0x1::VASPDomain::VASPDomainEvent
+    data:    "01046469656d7898b9021c0ed4af78fc7bd8e75b8e5d"
+}
+
+
+task 10 'run'. lines 70-73:
+Error: Failed to execute transaction. VMStatus: status ABORTED of type Execution with sub status 1287
+
+task 11 'run'. lines 74-83:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 1287
+
+task 12 'run'. lines 84-85:
+Error: Failed to execute transaction. VMStatus: status ABORTED of type Execution with sub status 258
