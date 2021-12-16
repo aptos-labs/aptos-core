@@ -69,6 +69,7 @@
 // See https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=795cd4f459f1d4a0005a99650726834b
 #![allow(clippy::while_let_loop)]
 
+mod metrics;
 mod node;
 mod updater;
 mod utils;
@@ -80,6 +81,7 @@ mod sparse_merkle_test;
 pub mod test_utils;
 
 use crate::sparse_merkle::{
+    metrics::{LATEST_GENERATION, OLDEST_GENERATION},
     node::{NodeInner, SubTree},
     updater::SubTreeUpdater,
     utils::partition,
@@ -210,6 +212,7 @@ impl<V> Inner<V> {
         child_root: SubTree<V>,
         branch_tracker: Arc<Mutex<BranchTracker<V>>>,
     ) -> Arc<Self> {
+        LATEST_GENERATION.set(self.generation as i64 + 1);
         Arc::new(Self {
             root: child_root,
             links: InnerLinks::new(branch_tracker),
@@ -261,6 +264,7 @@ impl<V> Inner<V> {
             break;
         }
 
+        OLDEST_GENERATION.set(ret.generation as i64);
         ret
     }
 
