@@ -1,0 +1,4 @@
+processed 6 tasks
+
+task 4 'run'. lines 24-24:
+Error: Failed to execute transaction. VMStatus: status ABORTED of type Execution with sub status 1337

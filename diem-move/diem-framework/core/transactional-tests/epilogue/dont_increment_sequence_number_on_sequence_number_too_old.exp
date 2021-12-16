@@ -1,0 +1,4 @@
+processed 5 tasks
+
+task 3 'run'. lines 12-14:
+Error: Transaction discarded. VMStatus: status SEQUENCE_NUMBER_TOO_OLD of type Validation
