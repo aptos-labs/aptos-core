@@ -614,31 +614,8 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
             request => invalid_stream_request!(request),
         };
 
-        // If the stream has a target end, verify we can get there.
+        // Verify we can satisfy the next version
         let (next_request_version, _) = self.next_request_version_and_epoch;
-        match &self.request {
-            StreamRequest::ContinuouslyStreamTransactions(request) => {
-                if let Some(target) = &request.target {
-                    return AdvertisedData::contains_range(
-                        next_request_version,
-                        target.ledger_info().version(),
-                        advertised_ranges,
-                    );
-                }
-            }
-            StreamRequest::ContinuouslyStreamTransactionOutputs(request) => {
-                if let Some(target) = &request.target {
-                    return AdvertisedData::contains_range(
-                        next_request_version,
-                        target.ledger_info().version(),
-                        advertised_ranges,
-                    );
-                }
-            }
-            request => invalid_stream_request!(request),
-        };
-
-        // The stream has no target end. Verify we can satisfy the next version.
         AdvertisedData::contains_range(
             next_request_version,
             next_request_version,

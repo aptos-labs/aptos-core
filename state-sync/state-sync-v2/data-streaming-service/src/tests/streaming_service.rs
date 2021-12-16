@@ -674,7 +674,9 @@ async fn test_stream_continuous_outputs_target() {
         .await;
     assert_ok!(result);
 
-    // Request a stream where data is missing (the target version is higher than advertised)
+    // Request a stream where data is missing (the target version is higher than
+    // advertised) and verify the stream is still created. This covers the case
+    // where the advertised data is lagging behind the target requested by consensus.
     let result = streaming_client
         .continuously_stream_transaction_outputs(
             MIN_ADVERTISED_TRANSACTION_OUTPUT,
@@ -686,7 +688,7 @@ async fn test_stream_continuous_outputs_target() {
             )),
         )
         .await;
-    assert_matches!(result, Err(Error::DataIsUnavailable(_)));
+    assert_ok!(result);
 }
 
 #[tokio::test]
@@ -748,7 +750,9 @@ async fn test_stream_continuous_transactions_target() {
         .await;
     assert_ok!(result);
 
-    // Request a stream where data is missing (the target version is higher than advertised)
+    // Request a stream where data is missing (the target version is higher than
+    // advertised) and verify the stream is still created. This covers the case
+    // where the advertised data is lagging behind the target requested by consensus.
     let result = streaming_client
         .continuously_stream_transactions(
             MIN_ADVERTISED_TRANSACTION,
@@ -761,7 +765,7 @@ async fn test_stream_continuous_transactions_target() {
             )),
         )
         .await;
-    assert_matches!(result, Err(Error::DataIsUnavailable(_)));
+    assert_ok!(result);
 }
 
 #[tokio::test]
