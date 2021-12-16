@@ -1,0 +1,12 @@
+processed 6 tasks
+
+task 1 'block'. lines 3-5:
+Events:
+ContractEvent { key: EventKey(11000000000000000000000000000000000000000a550c18), index: 0, type: Struct(StructTag { address: 00000000000000000000000000000001, module: Identifier("DiemBlock"), name: Identifier("NewBlockEvent"), type_params: [] }), event_data: "0000000000000000c5e34b925cf6875fec02d4b77adbd2d6000200000000000000" }
+
+task 2 'run'. lines 6-16:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 2
+
+task 4 'block'. lines 27-29:
+Events:
+ContractEvent { key: EventKey(11000000000000000000000000000000000000000a550c18), index: 1, type: Struct(StructTag { address: 00000000000000000000000000000001, module: Identifier("DiemBlock"), name: Identifier("NewBlockEvent"), type_params: [] }), event_data: "0000000000000000c5e34b925cf6875fec02d4b77adbd2d6000300000000000000" }
