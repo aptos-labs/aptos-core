@@ -22,6 +22,7 @@ diem-crypto = { path = "../../crates/diem-crypto" }
 diem-id-generator = { path = "../../crates/diem-id-generator" }
 diem-infallible = { path = "../../crates/diem-infallible" }
 diem-logger = { path = "../../crates/diem-logger" }
+diem-metrics = { path = "../../crates/diem-metrics" }
 diem-time-service = { path = "../../crates/diem-time-service", features = ["async"] }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }

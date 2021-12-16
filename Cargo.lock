@@ -1677,6 +1677,7 @@ dependencies = [
  "diem-id-generator",
  "diem-infallible",
  "diem-logger",
+ "diem-metrics",
  "diem-time-service",
  "diem-types",
  "diem-workspace-hack",

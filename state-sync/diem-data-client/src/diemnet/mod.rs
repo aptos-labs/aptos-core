@@ -4,6 +4,7 @@
 use crate::{
     diemnet::{
         logging::{LogEntry, LogEvent, LogSchema},
+        metrics::{increment_counter, start_timer},
         state::{ErrorType, PeerStates},
     },
     DiemDataClient, Error, GlobalDataSummary, Response, ResponseCallback, ResponseContext,
@@ -39,6 +40,7 @@ use storage_service_types::{
 };
 
 mod logging;
+mod metrics;
 mod state;
 #[cfg(test)]
 mod tests;
@@ -173,6 +175,7 @@ impl DiemNetDataClient {
             );
             error
         })?;
+        let _timer = start_timer(&metrics::REQUEST_LATENCIES, request.get_label().into());
         self.send_request_to_peer_and_decode(peer, request).await
     }
 
@@ -218,6 +221,8 @@ impl DiemNetDataClient {
                 .request_data(&request))
         );
 
+        increment_counter(&metrics::SENT_REQUESTS, request.get_label().into());
+
         let result = self
             .network_client
             .send_request(
@@ -238,6 +243,9 @@ impl DiemNetDataClient {
                         .request_id(id)
                         .peer(&peer))
                 );
+
+                increment_counter(&metrics::SUCCESS_RESPONSES, request.get_label().into());
+
                 // For now, record all responses that at least pass the data
                 // client layer successfully. An alternative might also have the
                 // consumer notify both success and failure via the callback.
@@ -283,6 +291,8 @@ impl DiemNetDataClient {
                         .peer(&peer)
                         .error(&client_err))
                 );
+
+                increment_counter(&metrics::ERROR_RESPONSES, request.get_label().into());
 
                 self.notify_bad_response(id, peer, &request, ErrorType::NotUseful);
                 Err(client_err)
@@ -464,6 +474,12 @@ impl DataSummaryPoller {
                 }
             };
 
+            let timer = start_timer(
+                &metrics::REQUEST_LATENCIES,
+                StorageServiceRequest::GetStorageServerSummary
+                    .get_label()
+                    .into(),
+            );
             let result: Result<StorageServerSummary> = self
                 .data_client
                 .send_request_to_peer_and_decode(
@@ -472,6 +488,7 @@ impl DataSummaryPoller {
                 )
                 .await
                 .map(Response::into_payload);
+            drop(timer);
 
             let storage_summary = match result {
                 Ok(storage_summary) => storage_summary,
