@@ -27,7 +27,7 @@ fn executor_benchmark<M: Measurement + 'static>(c: &mut Criterion<M>) {
     let executor = Arc::new(executor);
 
     let mut generator = TransactionGenerator::new(genesis_key, NUM_ACCOUNTS);
-    let (commit_tx, _commit_rx) = std::sync::mpsc::channel();
+    let (commit_tx, _commit_rx) = std::sync::mpsc::sync_channel(50 /* bound */);
 
     let mut executor = TransactionExecutor::new(executor, parent_block_id, 0, Some(commit_tx));
     let txns = generator.gen_account_creations(SMALL_BLOCK_SIZE);
