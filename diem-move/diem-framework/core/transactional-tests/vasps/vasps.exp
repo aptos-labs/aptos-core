@@ -1,0 +1,46 @@
+processed 12 tasks
+
+task 1 'run'. lines 9-17:
+Events:
+{
+    key:     00000000000000000000000000000000000000000a550c18
+    seq_num: 25
+    type:    0x1::DiemAccount::CreateAccountEvent
+    data:    "6dacafcd926e5bface48cade21c9de2d0500000000000000"
+}
+
+task 3 'run'. lines 46-53:
+Events:
+{
+    key:     00000000000000000000000000000000000000000a550c18
+    seq_num: 26
+    type:    0x1::DiemAccount::CreateAccountEvent
+    data:    "000000000000000000000000000000aa0600000000000000"
+}
+
+task 5 'run'. lines 69-76:
+Events:
+{
+    key:     00000000000000000000000000000000000000000a550c18
+    seq_num: 27
+    type:    0x1::DiemAccount::CreateAccountEvent
+    data:    "000000000000000000000000000000bb0600000000000000"
+}
+
+task 8 'run'. lines 106-109:
+Events:
+{
+    key:     01000000000000006dacafcd926e5bface48cade21c9de2d
+    seq_num: 0
+    type:    0x1::DualAttestation::BaseUrlRotationEvent
+    data:    "000000000000000000"
+}
+{
+    key:     00000000000000006dacafcd926e5bface48cade21c9de2d
+    seq_num: 0
+    type:    0x1::DualAttestation::ComplianceKeyRotationEvent
+    data:    "203d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c0000000000000000"
+}
+
+task 10 'run'. lines 127-193:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 519
