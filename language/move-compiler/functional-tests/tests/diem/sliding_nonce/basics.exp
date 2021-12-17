@@ -1,6 +1,0 @@
-[0] Transaction(0)
-[1] Move VM Status: ABORTED { code: 5, location: 00000000000000000000000000000001::SlidingNonce }
-[2] Transaction Status: Keep(ABORTED { code: 5, location: 00000000000000000000000000000001::SlidingNonce })
-[3] Transaction(1)
-[4] Move VM Status: ABORTED { code: 5, location: 00000000000000000000000000000001::SlidingNonce }
-[5] Transaction Status: Keep(ABORTED { code: 5, location: 00000000000000000000000000000001::SlidingNonce })

@@ -1,5 +1,4 @@
-//! account: bob, 100000000
-//! account: alice, 100000000
+//# init --parent-vasps Alice Bob
 
 // ****
 // Account setup - bob is account with nonce resource and alice is a regular account
@@ -40,15 +39,12 @@
 // }
 // // check: "Keep(EXECUTED)"
 
-//! new-transaction
-//! sender: alice
+//# run --admin-script --signers DiemRoot Alice
 script {
     use DiemFramework::SlidingNonce;
 
-    fun main(account: signer) {
-    let account = &account;
-        SlidingNonce::record_nonce_or_abort(account, 0);
-        SlidingNonce::record_nonce_or_abort(account, 0);
+    fun main(_dr: signer, account: signer) {
+        SlidingNonce::record_nonce_or_abort(&account, 0);
+        SlidingNonce::record_nonce_or_abort(&account, 0);
     }
 }
-// check: "Keep(EXECUTED)"
