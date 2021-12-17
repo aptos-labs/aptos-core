@@ -1,0 +1,55 @@
+processed 5 tasks
+
+task 1 'run'. lines 6-15:
+Events:
+{
+    key:     00000000000000000000000000000000000000000a550c18
+    seq_num: 24
+    type:    0x1::DiemAccount::CreateAccountEvent
+    data:    "000000000000000000000000deadbeef0200000000000000"
+}
+
+task 2 'run'. lines 16-24:
+Events:
+{
+    key:     0000000000000000000000000000000000000000deadbeef
+    seq_num: 0
+    type:    0x1::DesignatedDealer::ReceivedMintEvent
+    data:    "03585553000000000000000000000000deadbeefc09ee60500000000"
+}
+{
+    key:     05000000000000000000000000000000000000000a550c18
+    seq_num: 1
+    type:    0x1::Diem::MintEvent
+    data:    "c09ee6050000000003585553"
+}
+{
+    key:     0300000000000000000000000000000000000000deadbeef
+    seq_num: 0
+    type:    0x1::DiemAccount::ReceivedPaymentEvent
+    data:    "c09ee60500000000035855530000000000000000000000000000000000"
+}
+
+task 3 'run'. lines 25-33:
+Events:
+{
+    key:     0000000000000000000000000000000000000000deadbeef
+    seq_num: 1
+    type:    0x1::DesignatedDealer::ReceivedMintEvent
+    data:    "03585553000000000000000000000000deadbeef409248278c040000"
+}
+{
+    key:     05000000000000000000000000000000000000000a550c18
+    seq_num: 2
+    type:    0x1::Diem::MintEvent
+    data:    "409248278c04000003585553"
+}
+{
+    key:     0300000000000000000000000000000000000000deadbeef
+    seq_num: 1
+    type:    0x1::DiemAccount::ReceivedPaymentEvent
+    data:    "409248278c040000035855530000000000000000000000000000000000"
+}
+
+task 4 'run'. lines 34-38:
+Error: Failed to execute transaction. VMStatus: status ABORTED of type Execution with sub status 258

@@ -1,0 +1,67 @@
+processed 7 tasks
+
+task 1 'run'. lines 37-44:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 258
+
+task 2 'run'. lines 46-53:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 5
+
+task 3 'run'. lines 55-59:
+Events:
+{
+    key:     00000000000000000000000000000000000000000a550c18
+    seq_num: 26
+    type:    0x1::DiemAccount::CreateAccountEvent
+    data:    "f42400810cda384c1966c472bfab11f70200000000000000"
+}
+
+task 4 'run'. lines 61-65:
+Events:
+{
+    key:     0000000000000000f42400810cda384c1966c472bfab11f7
+    seq_num: 0
+    type:    0x1::DesignatedDealer::ReceivedMintEvent
+    data:    "03585553f42400810cda384c1966c472bfab11f740420f0000000000"
+}
+{
+    key:     05000000000000000000000000000000000000000a550c18
+    seq_num: 1
+    type:    0x1::Diem::MintEvent
+    data:    "40420f000000000003585553"
+}
+{
+    key:     0300000000000000f42400810cda384c1966c472bfab11f7
+    seq_num: 0
+    type:    0x1::DiemAccount::ReceivedPaymentEvent
+    data:    "40420f0000000000035855530000000000000000000000000000000000"
+}
+
+task 5 'block'. lines 67-67:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 0
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d60000f6701e16000000"
+}
+
+task 6 'run'. lines 69-74:
+Events:
+{
+    key:     0000000000000000f42400810cda384c1966c472bfab11f7
+    seq_num: 1
+    type:    0x1::DesignatedDealer::ReceivedMintEvent
+    data:    "03585553f42400810cda384c1966c472bfab11f740420f0000000000"
+}
+{
+    key:     05000000000000000000000000000000000000000a550c18
+    seq_num: 2
+    type:    0x1::Diem::MintEvent
+    data:    "40420f000000000003585553"
+}
+{
+    key:     0300000000000000f42400810cda384c1966c472bfab11f7
+    seq_num: 1
+    type:    0x1::DiemAccount::ReceivedPaymentEvent
+    data:    "40420f0000000000035855530000000000000000000000000000000000"
+}
