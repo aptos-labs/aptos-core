@@ -1,0 +1,70 @@
+processed 17 tasks
+
+task 1 'publish'. lines 5-6:
+Error: Transaction discarded. VMStatus: status CURRENCY_INFO_DOES_NOT_EXIST of type Validation
+
+task 2 'block'. lines 8-11:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 0
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d6000200000000000000"
+}
+
+task 4 'block'. lines 21-23:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 1
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d6000300000000000000"
+}
+
+task 6 'block'. lines 45-45:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 2
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d6000400000000000000"
+}
+
+task 9 'run'. lines 72-77:
+Events:
+{
+    key:     16000000000000000000000000000000000000000a550c18
+    seq_num: 0
+    type:    0x1::Diem::ToXDXExchangeRateUpdateEvent
+    data:    "04434f494e5555555500000000"
+}
+
+task 11 'run'. lines 89-93:
+Events:
+{
+    key:     00000000000000000000000000000000000000000a550c18
+    seq_num: 26
+    type:    0x1::DiemAccount::CreateAccountEvent
+    data:    "f42400810cda384c1966c472bfab11f70200000000000000"
+}
+
+task 12 'run'. lines 95-99:
+Events:
+{
+    key:     0000000000000000f42400810cda384c1966c472bfab11f7
+    seq_num: 0
+    type:    0x1::DesignatedDealer::ReceivedMintEvent
+    data:    "04434f494ef42400810cda384c1966c472bfab11f71027000000000000"
+}
+{
+    key:     12000000000000000000000000000000000000000a550c18
+    seq_num: 0
+    type:    0x1::Diem::MintEvent
+    data:    "102700000000000004434f494e"
+}
+{
+    key:     0300000000000000f42400810cda384c1966c472bfab11f7
+    seq_num: 0
+    type:    0x1::DiemAccount::ReceivedPaymentEvent
+    data:    "102700000000000004434f494e0000000000000000000000000000000000"
+}

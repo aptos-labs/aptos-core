@@ -37,4 +37,12 @@ module DiemFramework::DiemTests {
 
         become_rich(&account);
     }
+
+    #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
+    #[expected_failure(abort_code = 1)]
+    fun cannot_initialize_after_genesis(tc: signer, dr: signer) {
+        Genesis::setup(&dr, &tc);
+
+        Diem::initialize(&dr);
+    }
 }

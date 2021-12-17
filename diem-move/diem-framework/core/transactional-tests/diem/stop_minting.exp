@@ -1,0 +1,22 @@
+processed 12 tasks
+
+task 2 'block'. lines 20-22:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 0
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d6000300000000000000"
+}
+
+task 4 'block'. lines 44-44:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 1
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d6000400000000000000"
+}
+
+task 11 'run'. lines 138-147:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 1281

@@ -100,6 +100,9 @@ struct DiemPublishArgs {
 
     #[structopt(long = "gas-currency")]
     gas_currency_code: Option<String>,
+
+    #[structopt(long = "override-signer", parse(try_from_str = RawAddress::parse))]
+    override_signer: Option<RawAddress>,
 }
 
 #[derive(Debug)]
@@ -959,14 +962,26 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
     fn publish_module(
         &mut self,
         module: CompiledModule,
-        named_addr_opt: Option<Identifier>,
+        mut named_addr_opt: Option<Identifier>,
         gas_budget: Option<u64>,
         extra_args: Self::ExtraPublishArgs,
     ) -> Result<()> {
         let module_id = module.self_id();
-        let signer = module_id.address();
+
+        // TODO: hack to allow the signer to be overridden.
+        // See if we can implement it in a cleaner way.
+        let signer = match extra_args.override_signer {
+            Some(addr) => {
+                if let RawAddress::Named(named_addr) = &addr {
+                    named_addr_opt = Some(named_addr.clone())
+                }
+                self.compiled_state().resolve_address(&addr)
+            }
+            None => module_id.address().clone(),
+        };
+
         let params = self.fetch_transaction_parameters(
-            signer,
+            &signer,
             extra_args.sequence_number,
             extra_args.expiration_time,
             extra_args.gas_currency_code,
@@ -987,7 +1002,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         };
 
         let txn = RawTransaction::new_module(
-            *signer,
+            signer,
             params.sequence_number,
             TransactionModule::new(module_blob),
             params.max_gas_amount,

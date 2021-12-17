@@ -1,0 +1,19 @@
+processed 4 tasks
+
+task 2 'run'. lines 15-34:
+Events:
+{
+    key:     05000000000000000000000000000000000000000a550c18
+    seq_num: 1
+    type:    0x1::Diem::MintEvent
+    data:    "640000000000000003585553"
+}
+{
+    key:     01000000000000000000000000000000000000000a550c18
+    seq_num: 0
+    type:    0x1::DiemAccount::AdminTransactionEvent
+    data:    "0000000000000000"
+}
+
+task 3 'run'. lines 35-45:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 2308
