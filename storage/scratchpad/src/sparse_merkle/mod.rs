@@ -81,7 +81,7 @@ mod sparse_merkle_test;
 pub mod test_utils;
 
 use crate::sparse_merkle::{
-    metrics::{LATEST_GENERATION, OLDEST_GENERATION},
+    metrics::{LATEST_GENERATION, OLDEST_GENERATION, TIMER},
     node::{NodeInner, SubTree},
     updater::SubTreeUpdater,
     utils::partition,
@@ -477,6 +477,9 @@ where
         // must be sorted
         touched_accounts: Vec<HashValue>,
     ) -> HashMap<NibblePath, HashValue> {
+        let _timer = TIMER
+            .with_label_values(&["generate_node_hashes"])
+            .start_timer();
         let mut node_hashes = HashMap::new();
         let mut nibble_path = NibblePath::new(vec![]);
         self.collect_new_hashes(

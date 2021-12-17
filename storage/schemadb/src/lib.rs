@@ -20,8 +20,9 @@ pub mod schema;
 use crate::{
     metrics::{
         DIEM_SCHEMADB_BATCH_COMMIT_BYTES, DIEM_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS,
-        DIEM_SCHEMADB_DELETES, DIEM_SCHEMADB_GET_BYTES, DIEM_SCHEMADB_GET_LATENCY_SECONDS,
-        DIEM_SCHEMADB_ITER_BYTES, DIEM_SCHEMADB_ITER_LATENCY_SECONDS, DIEM_SCHEMADB_PUT_BYTES,
+        DIEM_SCHEMADB_BATCH_PUT_LATENCY_SECONDS, DIEM_SCHEMADB_DELETES, DIEM_SCHEMADB_GET_BYTES,
+        DIEM_SCHEMADB_GET_LATENCY_SECONDS, DIEM_SCHEMADB_ITER_BYTES,
+        DIEM_SCHEMADB_ITER_LATENCY_SECONDS, DIEM_SCHEMADB_PUT_BYTES,
     },
     schema::{KeyCodec, Schema, SeekKeyCodec, ValueCodec},
 };
@@ -68,6 +69,9 @@ impl SchemaBatch {
 
     /// Adds an insert/update operation to the batch.
     pub fn put<S: Schema>(&mut self, key: &S::Key, value: &S::Value) -> Result<()> {
+        let _timer = DIEM_SCHEMADB_BATCH_PUT_LATENCY_SECONDS
+            .with_label_values(&["unknown"])
+            .start_timer();
         let key = <S::Key as KeyCodec<S>>::encode_key(key)?;
         let value = <S::Value as ValueCodec<S>>::encode_value(value)?;
         self.rows

@@ -96,3 +96,15 @@ pub static DIEM_SCHEMADB_DELETES: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static DIEM_SCHEMADB_BATCH_PUT_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        // metric name
+        "diem_schemadb_batch_put_latency_seconds",
+        // metric description
+        "Diem schemadb schema batch put latency in seconds",
+        // metric labels (dimensions)
+        &["db_name"]
+    )
+    .unwrap()
+});
