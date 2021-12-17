@@ -1,0 +1,70 @@
+processed 10 tasks
+
+task 3 'run'. lines 15-22:
+Events:
+{
+    key:     01000000000000000000000000000000000000000a550c18
+    seq_num: 0
+    type:    0x1::DiemAccount::AdminTransactionEvent
+    data:    "0000000000000000"
+}
+
+task 4 'run'. lines 24-31:
+Events:
+{
+    key:     01000000000000000000000000000000000000000a550c18
+    seq_num: 1
+    type:    0x1::DiemAccount::AdminTransactionEvent
+    data:    "0000000000000000"
+}
+
+task 5 'run'. lines 33-41:
+Events:
+{
+    key:     01000000000000000000000000000000000000000a550c18
+    seq_num: 2
+    type:    0x1::DiemAccount::AdminTransactionEvent
+    data:    "0000000000000000"
+}
+
+task 6 'block'. lines 43-43:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 0
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000579a43fcffed03d31e1bd13e729669e70001a3e11100000000"
+}
+
+task 7 'run'. lines 45-59:
+Events:
+{
+    key:     04000000000000000000000000000000000000000a550c18
+    seq_num: 1
+    type:    0x1::DiemConfig::NewEpochEvent
+    data:    "0200000000000000"
+}
+{
+    key:     01000000000000000000000000000000000000000a550c18
+    seq_num: 3
+    type:    0x1::DiemAccount::AdminTransactionEvent
+    data:    "2c01000000000000"
+}
+
+task 8 'block'. lines 61-61:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 1
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000579a43fcffed03d31e1bd13e729669e7000246c32300000000"
+}
+
+task 9 'run'. lines 63-72:
+Events:
+{
+    key:     01000000000000000000000000000000000000000a550c18
+    seq_num: 4
+    type:    0x1::DiemAccount::AdminTransactionEvent
+    data:    "5802000000000000"
+}

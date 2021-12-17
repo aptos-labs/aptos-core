@@ -1,0 +1,175 @@
+processed 22 tasks
+
+task 2 'block'. lines 8-8:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 0
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "000000000000000000000000000000000000000000000000000000000000000000"
+}
+
+task 5 'run'. lines 33-40:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 1544
+
+task 6 'block'. lines 42-42:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 1
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d60000a3e11100000000"
+}
+
+task 7 'run'. lines 44-53:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 1544
+
+task 8 'block'. lines 55-55:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 2
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d60001a3e11100000000"
+}
+
+task 9 'run'. lines 57-67:
+Events:
+{
+    key:     04000000000000000000000000000000000000000a550c18
+    seq_num: 1
+    type:    0x1::DiemConfig::NewEpochEvent
+    data:    "0200000000000000"
+}
+{
+    key:     01000000000000000000000000000000000000000a550c18
+    seq_num: 2
+    type:    0x1::DiemAccount::AdminTransactionEvent
+    data:    "2c01000000000000"
+}
+
+task 10 'block'. lines 69-69:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 3
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d6000046c32300000000"
+}
+
+task 11 'run'. lines 71-81:
+Events:
+{
+    key:     01000000000000000000000000000000000000000a550c18
+    seq_num: 3
+    type:    0x1::DiemAccount::AdminTransactionEvent
+    data:    "5802000000000000"
+}
+
+task 12 'block'. lines 84-84:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 4
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d6000246c32300000000"
+}
+
+task 13 'run'. lines 86-100:
+Events:
+{
+    key:     04000000000000000000000000000000000000000a550c18
+    seq_num: 2
+    type:    0x1::DiemConfig::NewEpochEvent
+    data:    "0300000000000000"
+}
+{
+    key:     01000000000000000000000000000000000000000a550c18
+    seq_num: 4
+    type:    0x1::DiemAccount::AdminTransactionEvent
+    data:    "5802000000000000"
+}
+
+task 14 'block'. lines 102-102:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 5
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d6000346c32300000000"
+}
+
+task 15 'run'. lines 104-113:
+Events:
+{
+    key:     04000000000000000000000000000000000000000a550c18
+    seq_num: 3
+    type:    0x1::DiemConfig::NewEpochEvent
+    data:    "0400000000000000"
+}
+{
+    key:     01000000000000000000000000000000000000000a550c18
+    seq_num: 5
+    type:    0x1::DiemAccount::AdminTransactionEvent
+    data:    "5802000000000000"
+}
+
+task 16 'block'. lines 115-115:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 6
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000579a43fcffed03d31e1bd13e729669e7000446c32300000000"
+}
+
+task 17 'run'. lines 117-129:
+Events:
+{
+    key:     04000000000000000000000000000000000000000a550c18
+    seq_num: 4
+    type:    0x1::DiemConfig::NewEpochEvent
+    data:    "0500000000000000"
+}
+{
+    key:     01000000000000000000000000000000000000000a550c18
+    seq_num: 6
+    type:    0x1::DiemAccount::AdminTransactionEvent
+    data:    "5802000000000000"
+}
+
+task 18 'block'. lines 131-131:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 7
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d60004e9a43500000000"
+}
+
+task 19 'run'. lines 133-147:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 1544
+
+task 20 'block'. lines 149-149:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 8
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d60005e9a43500000000"
+}
+
+task 21 'run'. lines 151-165:
+Events:
+{
+    key:     04000000000000000000000000000000000000000a550c18
+    seq_num: 5
+    type:    0x1::DiemConfig::NewEpochEvent
+    data:    "0600000000000000"
+}
+{
+    key:     01000000000000000000000000000000000000000a550c18
+    seq_num: 7
+    type:    0x1::DiemAccount::AdminTransactionEvent
+    data:    "8403000000000000"
+}

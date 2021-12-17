@@ -1,0 +1,25 @@
+processed 6 tasks
+
+task 4 'block'. lines 29-29:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 0
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000579a43fcffed03d31e1bd13e729669e70001a3e11100000000"
+}
+
+task 5 'run'. lines 31-50:
+Events:
+{
+    key:     04000000000000000000000000000000000000000a550c18
+    seq_num: 1
+    type:    0x1::DiemConfig::NewEpochEvent
+    data:    "0200000000000000"
+}
+{
+    key:     01000000000000000000000000000000000000000a550c18
+    seq_num: 1
+    type:    0x1::DiemAccount::AdminTransactionEvent
+    data:    "2c01000000000000"
+}

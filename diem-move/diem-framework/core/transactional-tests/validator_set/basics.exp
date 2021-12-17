@@ -1,0 +1,10 @@
+processed 6 tasks
+
+task 1 'run'. lines 10-17:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 1
+
+task 2 'run'. lines 19-27:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 1287
+
+task 3 'run'. lines 29-37:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 2051

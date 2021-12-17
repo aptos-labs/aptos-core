@@ -1,0 +1,37 @@
+processed 5 tasks
+
+task 1 'block'. lines 6-6:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 0
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000579a43fcffed03d31e1bd13e729669e7000200000000000000"
+}
+
+task 2 'run'. lines 8-15:
+Events:
+{
+    key:     04000000000000000000000000000000000000000a550c18
+    seq_num: 1
+    type:    0x1::DiemConfig::NewEpochEvent
+    data:    "0200000000000000"
+}
+{
+    key:     01000000000000000000000000000000000000000a550c18
+    seq_num: 0
+    type:    0x1::DiemAccount::AdminTransactionEvent
+    data:    "0000000000000000"
+}
+
+task 3 'block'. lines 17-17:
+Events:
+{
+    key:     11000000000000000000000000000000000000000a550c18
+    seq_num: 1
+    type:    0x1::DiemBlock::NewBlockEvent
+    data:    "0000000000000000cb226111a965d233cb1b075e9ab3e67b000300000000000000"
+}
+
+task 4 'run'. lines 19-25:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 775
