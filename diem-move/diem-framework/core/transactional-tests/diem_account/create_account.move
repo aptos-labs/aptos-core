@@ -1,9 +1,13 @@
-//! sender: blessed
+//# init
+
+// TODO: switch to unit tests?
+
+//# run --admin-script --signers DiemRoot TreasuryCompliance
 script {
 use DiemFramework::XUS::XUS;
 use DiemFramework::DiemAccount;
 use Std::BCS;
-fun main(account: signer) {
+fun main(_dr: signer, account: signer) {
     let account = &account;
     let addr: address = @0x111101;
     assert!(!DiemAccount::exists_at(addr), 83);
@@ -11,11 +15,11 @@ fun main(account: signer) {
 }
 }
 
-//! new-transaction
+//# run --admin-script --signers DiemRoot DesignatedDealer
 script {
 use DiemFramework::XUS::XUS;
 use DiemFramework::DiemAccount;
-fun main(account: signer) {
+fun main(_dr: signer, account: signer) {
     let account = &account;
     let addr: address = @0x111101;
     let with_cap = DiemAccount::extract_withdraw_capability(account);

@@ -1,0 +1,85 @@
+processed 20 tasks
+
+task 2 'run'. lines 19-26:
+Events:
+{
+    key:     0f000000000000000000000000000000000000000a550c18
+    seq_num: 0
+    type:    0x1::AccountFreezing::FreezeAccountEvent
+    data:    "0000000000000000000000000b1e55ed1817e9aaeac3afebc32842759cbf7fa9"
+}
+{
+    key:     01000000000000000000000000000000000000000a550c18
+    seq_num: 0
+    type:    0x1::DiemAccount::AdminTransactionEvent
+    data:    "0000000000000000"
+}
+
+task 3 'run'. lines 28-28:
+Error: Transaction discarded. VMStatus: status SENDING_ACCOUNT_FROZEN of type Validation
+
+task 4 'run'. lines 30-36:
+Events:
+{
+    key:     10000000000000000000000000000000000000000a550c18
+    seq_num: 0
+    type:    0x1::AccountFreezing::UnfreezeAccountEvent
+    data:    "0000000000000000000000000b1e55ed1817e9aaeac3afebc32842759cbf7fa9"
+}
+{
+    key:     01000000000000000000000000000000000000000a550c18
+    seq_num: 1
+    type:    0x1::DiemAccount::AdminTransactionEvent
+    data:    "0000000000000000"
+}
+
+task 6 'run'. lines 40-46:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 775
+
+task 9 'run'. lines 58-75:
+Events:
+{
+    key:     0f000000000000000000000000000000000000000a550c18
+    seq_num: 1
+    type:    0x1::AccountFreezing::FreezeAccountEvent
+    data:    "0000000000000000000000000b1e55edf1e113a94a4088ea7d8f41b6cb21039e"
+}
+{
+    key:     10000000000000000000000000000000000000000a550c18
+    seq_num: 1
+    type:    0x1::AccountFreezing::UnfreezeAccountEvent
+    data:    "0000000000000000000000000b1e55edf1e113a94a4088ea7d8f41b6cb21039e"
+}
+{
+    key:     0f000000000000000000000000000000000000000a550c18
+    seq_num: 2
+    type:    0x1::AccountFreezing::FreezeAccountEvent
+    data:    "0000000000000000000000000b1e55edeacc26ce1e89961ca6393ab68fbf299a"
+}
+{
+    key:     10000000000000000000000000000000000000000a550c18
+    seq_num: 2
+    type:    0x1::AccountFreezing::UnfreezeAccountEvent
+    data:    "0000000000000000000000000b1e55edeacc26ce1e89961ca6393ab68fbf299a"
+}
+{
+    key:     01000000000000000000000000000000000000000a550c18
+    seq_num: 2
+    type:    0x1::DiemAccount::AdminTransactionEvent
+    data:    "0000000000000000"
+}
+
+task 15 'run'. lines 128-138:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 1281
+
+task 16 'run'. lines 140-149:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 1281
+
+task 17 'run'. lines 151-172:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 1281
+
+task 18 'run'. lines 174-180:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 517
+
+task 19 'run'. lines 182-188:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 517

@@ -1,0 +1,16 @@
+processed 2 tasks
+
+task 1 'run'. lines 5-7:
+Events:
+{
+    key:     0400000000000000000000000000000000000000000000dd
+    seq_num: 0
+    type:    0x1::DiemAccount::SentPaymentEvent
+    data:    "40420f000000000003585553c5e34b925cf6875fec02d4b77adbd2d604deadbeef"
+}
+{
+    key:     0200000000000000c5e34b925cf6875fec02d4b77adbd2d6
+    seq_num: 0
+    type:    0x1::DiemAccount::ReceivedPaymentEvent
+    data:    "40420f000000000003585553000000000000000000000000000000dd04deadbeef"
+}

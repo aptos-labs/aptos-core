@@ -1,0 +1,37 @@
+processed 19 tasks
+
+task 3 'run'. lines 28-34:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 1
+
+task 5 'run'. lines 39-40:
+Error: Failed to execute transaction. VMStatus: status ABORTED of type Execution with sub status 4357
+
+task 6 'run'. lines 42-43:
+Error: Failed to execute transaction. VMStatus: status ABORTED of type Execution with sub status 4869
+
+task 7 'run'. lines 45-46:
+Error: Failed to execute transaction. VMStatus: status ABORTED of type Execution with sub status 4615
+
+task 8 'run'. lines 48-49:
+Error: Failed to execute transaction. VMStatus: status ABORTED of type Execution with sub status 2055
+
+task 9 'run'. lines 51-65:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 2305
+
+task 13 'run'. lines 100-107:
+Error: Failed to execute transaction. VMStatus: status ABORTED of type Execution with sub status 2567
+
+task 14 'run'. lines 109-116:
+Error: Failed to execute transaction. VMStatus: status ABORTED of type Execution with sub status 2055
+
+task 15 'run'. lines 118-124:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 5
+
+task 16 'run'. lines 126-132:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 5
+
+task 17 'run'. lines 134-140:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 5
+
+task 18 'run'. lines 142-148:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 5
