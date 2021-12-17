@@ -177,7 +177,6 @@ members = [
     "executor-test-helpers",
     "forge",
     "forge-cli",
-    "functional-tests",
     "generate-format",
     "invalid-mutations",
     "jsonrpc-integration-tests",
@@ -187,7 +186,6 @@ members = [
     "memsocket",
     "mirai-dataflow-analysis",
     "module-generation",
-    "move-compiler-functional-tests",
     "move-compiler-transactional-tests",
     "move-ir-compiler-transactional-tests",
     "move-oncall-trainer",
@@ -223,8 +221,6 @@ members = [
 # yelling at you, you should redesign your crate and properly remove that
 # dependency, instead of adding the crate to this list and silencing the lint.
 diem_crates_in_language = [
-    "functional-tests",
-    "move-compiler-functional-tests",
 ]
 # A special set of diem crates Move crates are allowed to depend on.
 #

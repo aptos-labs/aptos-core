@@ -977,7 +977,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
                 }
                 self.compiled_state().resolve_address(&addr)
             }
-            None => module_id.address().clone(),
+            None => *module_id.address(),
         };
 
         let params = self.fetch_transaction_parameters(

@@ -3423,39 +3423,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d79238883cf0307100b90aba4a755d8051a3182305dfe7f649a1e9dc0517006f"
 
 [[package]]
-name = "functional-tests"
-version = "0.1.0"
-dependencies = [
- "aho-corasick",
- "anyhow",
- "datatest-stable",
- "diem-config",
- "diem-crypto",
- "diem-framework",
- "diem-framework-releases",
- "diem-keygen",
- "diem-state-view",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "difference",
- "hex",
- "itertools 0.10.1",
- "language-e2e-tests",
- "mirai-annotations",
- "move-binary-format",
- "move-bytecode-verifier",
- "move-command-line-common",
- "move-core-types",
- "once_cell",
- "regex",
- "term_size",
- "termcolor",
- "thiserror",
- "vm-genesis",
-]
-
-[[package]]
 name = "funty"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4935,22 +4902,6 @@ dependencies = [
  "structopt 0.3.21",
  "tempfile",
  "walkdir",
-]
-
-[[package]]
-name = "move-compiler-functional-tests"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "datatest-stable",
- "diem-framework",
- "diem-types",
- "diem-workspace-hack",
- "functional-tests",
- "move-command-line-common",
- "move-compiler",
- "once_cell",
- "tempfile",
 ]
 
 [[package]]
@@ -8491,16 +8442,6 @@ checksum = "edd106a334b7657c10b7c540a0106114feadeb4dc314513e97df481d5d966f42"
 dependencies = [
  "byteorder",
  "dirs",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "term_size"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e4129646ca0ed8f45d09b929036bafad5377103edd06e50bf574b353d2b08d9"
-dependencies = [
- "libc",
  "winapi 0.3.9",
 ]
 
