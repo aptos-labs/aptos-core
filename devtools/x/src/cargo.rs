@@ -10,13 +10,11 @@ use crate::{
     },
     Result,
 };
-use anyhow::{anyhow, Context};
-use cargo_metadata::Message;
+use anyhow::anyhow;
 use indexmap::map::IndexMap;
 use log::{info, warn};
 use std::{
     ffi::{OsStr, OsString},
-    io::Cursor,
     path::Path,
     process::{Command, Output, Stdio},
     time::Instant,
@@ -320,22 +318,16 @@ impl<'a> CargoCommand<'a> {
     }
 
     /// Runs this command on the selected packages, returning the standard output as a bytestring.
-    pub fn run_capture_messages(
-        &self,
-        packages: &SelectedPackages<'_>,
-    ) -> Result<impl Iterator<Item = Result<Message>>> {
+    pub fn run_capture_stdout(&self, packages: &SelectedPackages<'_>) -> Result<Vec<u8>> {
         // Early return if we have no packages to run.
-        let output = if !packages.should_invoke() {
+        if !packages.should_invoke() {
             info!("no packages to {}: exiting early", self.as_str());
-            vec![]
+            Ok(vec![])
         } else {
             let mut cargo = self.prepare_cargo(packages);
             cargo.args(&["--message-format", "json-render-diagnostics"]);
-            cargo.run_with_output()?
-        };
-
-        Ok(Message::parse_stream(Cursor::new(output))
-            .map(|message| message.context("error while parsing message from Cargo")))
+            Ok(cargo.run_with_output()?)
+        }
     }
 
     fn prepare_cargo(&self, packages: &SelectedPackages<'_>) -> Cargo {

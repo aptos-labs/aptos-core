@@ -3,13 +3,25 @@
 
 use std::ffi::OsString;
 use structopt::{clap::arg_enum, StructOpt};
+use supports_color::Stream;
 
 arg_enum! {
-    #[derive(Debug)]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     pub enum Coloring {
         Auto,
         Always,
         Never,
+    }
+}
+
+impl Coloring {
+    /// Returns true if the given stream should be colorized.
+    pub fn should_colorize(self, stream: Stream) -> bool {
+        match self {
+            Coloring::Auto => supports_color::on_cached(stream).is_some(),
+            Coloring::Always => true,
+            Coloring::Never => false,
+        }
     }
 }
 

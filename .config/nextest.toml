@@ -1,0 +1,9 @@
+[profile.ci]
+# Detect flaky tests.
+retries = 2
+# Show skipped tests in the CI output.
+status-level = "skip"
+failure-output = "immediate-final"
+
+[profile.ci.junit]
+path = "junit.xml"

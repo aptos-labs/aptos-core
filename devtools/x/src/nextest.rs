@@ -2,28 +2,32 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    cargo::{
-        build_args::{BuildArgs, Coloring},
-        selected_package::SelectedPackageArgs,
-        CargoCommand,
-    },
+    cargo::{build_args::BuildArgs, selected_package::SelectedPackageArgs, CargoCommand},
     context::XContext,
     Result,
 };
-use anyhow::bail;
-use cargo_metadata::Message;
-use guppy::PackageId;
+use anyhow::{bail, Context};
+use camino::Utf8PathBuf;
+use nextest_config::{NextestConfig, StatusLevel, TestOutputDisplay};
 use nextest_runner::{
-    reporter::{Color, ReporterOpts, TestReporter},
-    runner::TestRunnerOpts,
-    test_filter::{RunIgnored, TestFilter},
+    partition::PartitionerBuilder,
+    reporter::TestReporterBuilder,
+    runner::TestRunnerBuilder,
+    test_filter::{RunIgnored, TestFilterBuilder},
     test_list::{TestBinary, TestList},
+    SignalHandler,
 };
-use std::ffi::OsString;
+use std::{ffi::OsString, io::Cursor};
 use structopt::StructOpt;
+use supports_color::Stream;
 
 #[derive(Debug, StructOpt)]
 pub struct Args {
+    /// Nextest profile to use
+    #[structopt(long, short = "P")]
+    nextest_profile: Option<String>,
+    /// Config file [default: workspace-root/.config/nextest.toml]
+    config_file: Option<Utf8PathBuf>,
     #[structopt(flatten)]
     pub(crate) package_args: SelectedPackageArgs,
     #[structopt(long, short)]
@@ -33,16 +37,88 @@ pub struct Args {
     pub(crate) build_args: BuildArgs,
     #[structopt(flatten)]
     pub(crate) runner_opts: TestRunnerOpts,
+    #[structopt(flatten)]
+    reporter_opts: TestReporterOpts,
     #[structopt(long)]
     /// Do not run tests, only compile the test executables
     no_run: bool,
     /// Run ignored tests
     #[structopt(long, possible_values = &RunIgnored::variants(), default_value, case_insensitive = true)]
     run_ignored: RunIgnored,
+    /// Test partition, e.g. hash:1/2 or count:2/3
+    #[structopt(long)]
+    partition: Option<PartitionerBuilder>,
     #[structopt(name = "FILTERS", last = true)]
     filters: Vec<String>,
-    #[structopt(flatten)]
-    reporter_opts: ReporterOpts,
+}
+
+/// Test runner options.
+#[derive(Debug, Default, StructOpt)]
+pub struct TestRunnerOpts {
+    /// Number of retries for failing tests [default: from profile]
+    #[structopt(long)]
+    retries: Option<usize>,
+
+    /// Cancel test run on the first failure
+    #[structopt(long)]
+    fail_fast: bool,
+
+    /// Run all tests regardless of failure
+    #[structopt(long, overrides_with = "fail-fast")]
+    no_fail_fast: bool,
+
+    /// Number of tests to run simultaneously [default: logical CPU count]
+    #[structopt(long)]
+    test_threads: Option<usize>,
+}
+
+impl TestRunnerOpts {
+    fn to_builder(&self) -> TestRunnerBuilder {
+        let mut builder = TestRunnerBuilder::default();
+        if let Some(retries) = self.retries {
+            builder.set_retries(retries);
+        }
+        if self.no_fail_fast {
+            builder.set_fail_fast(false);
+        } else if self.fail_fast {
+            builder.set_fail_fast(true);
+        }
+        if let Some(test_threads) = self.test_threads {
+            builder.set_test_threads(test_threads);
+        }
+
+        builder
+    }
+}
+
+#[derive(Debug, Default, StructOpt)]
+#[structopt(rename_all = "kebab-case")]
+pub struct TestReporterOpts {
+    /// Output stdout and stderr on failure
+    #[structopt(long, possible_values = TestOutputDisplay::variants(), case_insensitive = true)]
+    failure_output: Option<TestOutputDisplay>,
+    /// Output stdout and stderr on success
+    #[structopt(long, possible_values = TestOutputDisplay::variants(), case_insensitive = true)]
+    success_output: Option<TestOutputDisplay>,
+    /// Test statuses to output
+    #[structopt(long, possible_values = StatusLevel::variants(), case_insensitive = true)]
+    status_level: Option<StatusLevel>,
+}
+
+impl TestReporterOpts {
+    fn to_builder(&self) -> TestReporterBuilder {
+        let mut builder = TestReporterBuilder::default();
+        if let Some(failure_output) = self.failure_output {
+            builder.set_failure_output(failure_output);
+        }
+        if let Some(success_output) = self.success_output {
+            builder.set_success_output(success_output);
+        }
+        if let Some(status_level) = self.status_level {
+            builder.set_status_level(status_level);
+        }
+        builder
+    }
 }
 
 pub fn run(args: Args, xctx: XContext) -> Result<()> {
@@ -71,7 +147,7 @@ pub fn run(args: Args, xctx: XContext) -> Result<()> {
         skip_sccache: false,
     };
 
-    let messages = cmd.run_capture_messages(&packages)?;
+    let stdout = cmd.run_capture_stdout(&packages)?;
 
     if args.no_run {
         // Don't proceed further.
@@ -81,58 +157,31 @@ pub fn run(args: Args, xctx: XContext) -> Result<()> {
     let package_graph = xctx.core().package_graph()?;
     let workspace = package_graph.workspace();
 
-    let mut executables = vec![];
-    for message in messages {
-        let message = message?;
-        match message {
-            Message::CompilerArtifact(artifact) if artifact.profile.test => {
-                if let Some(binary) = artifact.executable {
-                    // Look up the executable by package ID.
-                    let package_id = PackageId::new(artifact.package_id.repr);
+    let config = NextestConfig::from_sources(workspace.root(), args.config_file.as_deref())?;
+    let profile = config.profile(
+        args.nextest_profile
+            .as_deref()
+            .unwrap_or(NextestConfig::DEFAULT_PROFILE),
+    )?;
 
-                    let package = package_graph.metadata(&package_id)?;
-                    let cwd = Some(
-                        workspace.root().join(
-                            package
-                                .source()
-                                .workspace_path()
-                                .expect("tests should never be built for non-workspace artifacts"),
-                        ),
-                    );
+    let test_binaries = TestBinary::from_messages(package_graph, Cursor::new(stdout))?;
 
-                    // Construct the binary ID from the package and build target.
-                    let mut binary_id = package.name().to_owned();
-                    if artifact.target.name != package.name() {
-                        binary_id.push_str("::");
-                        binary_id.push_str(&artifact.target.name);
-                    }
+    let test_filter = TestFilterBuilder::new(args.run_ignored, args.partition, &args.filters);
+    let test_list = TestList::new(test_binaries, &test_filter)?;
 
-                    executables.push(TestBinary {
-                        binary,
-                        binary_id,
-                        cwd,
-                    });
-                }
-            }
-            _ => {
-                // Ignore all other messages.
-            }
-        }
+    let handler = SignalHandler::new().context("failed to install nextest signal handler")?;
+    let runner = args
+        .runner_opts
+        .to_builder()
+        .build(&test_list, &profile, handler);
+
+    let mut reporter = args.reporter_opts.to_builder().build(&test_list, &profile);
+    if args.build_args.color.should_colorize(Stream::Stderr) {
+        reporter.colorize();
     }
 
-    let test_filter = TestFilter::new(args.run_ignored, &args.filters);
-    let test_list = TestList::new(executables, &test_filter)?;
-
-    let runner = args.runner_opts.build(&test_list);
-
-    let color = match args.build_args.color {
-        Coloring::Auto => Color::Auto,
-        Coloring::Always => Color::Always,
-        Coloring::Never => Color::Never,
-    };
-    let mut reporter = TestReporter::new(&test_list, color, args.reporter_opts);
-
-    let run_stats = runner.try_execute(|event| reporter.report_event(event))?;
+    let stderr = std::io::stderr();
+    let run_stats = runner.try_execute(|event| reporter.report_event(event, stderr.lock()))?;
     if !run_stats.is_success() {
         bail!("test run failed");
     }

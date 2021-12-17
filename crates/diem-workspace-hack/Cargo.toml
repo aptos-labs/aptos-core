@@ -38,8 +38,7 @@ getrandom = { version = "0.2.2", default-features = false, features = ["std"] }
 hyper = { version = "0.14.11", features = ["client", "full", "h2", "http1", "http2", "runtime", "server", "socket2", "stream", "tcp"] }
 indexmap = { version = "1.7.0", default-features = false, features = ["std"] }
 itertools = { version = "0.10.1", features = ["use_alloc", "use_std"] }
-itoa = { version = "0.4.7", features = ["std"] }
-libc = { version = "0.2.99", features = ["std"] }
+libc = { version = "0.2.112", features = ["std"] }
 log = { version = "0.4.14", default-features = false, features = ["serde", "std"] }
 memchr = { version = "2.4.0", features = ["std", "use_std"] }
 num-integer = { version = "0.1.44", default-features = false, features = ["i128", "std"] }
@@ -54,7 +53,7 @@ regex-syntax = { version = "0.6.23", features = ["unicode", "unicode-age", "unic
 reqwest = { version = "0.11.2", features = ["__tls", "blocking", "default-tls", "hyper-tls", "json", "native-tls-crate", "serde_json", "stream", "tokio-native-tls"] }
 rusty-fork = { version = "0.3.0", features = ["timeout", "wait-timeout"] }
 serde = { version = "1.0.130", features = ["alloc", "derive", "rc", "serde_derive", "std"] }
-serde_json = { version = "1.0.68", features = ["indexmap", "preserve_order", "std"] }
+serde_json = { version = "1.0.73", features = ["indexmap", "preserve_order", "std"] }
 standback = { version = "0.2.15", default-features = false, features = ["std"] }
 tiny-keccak = { version = "2.0.2", features = ["sha3"] }
 tokio = { version = "1.9.0", features = ["bytes", "fs", "full", "io-std", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "sync", "test-util", "time", "tokio-macros", "winapi"] }
@@ -95,8 +94,7 @@ getrandom = { version = "0.2.2", default-features = false, features = ["std"] }
 hyper = { version = "0.14.11", features = ["client", "full", "h2", "http1", "http2", "runtime", "server", "socket2", "stream", "tcp"] }
 indexmap = { version = "1.7.0", default-features = false, features = ["std"] }
 itertools = { version = "0.10.1", features = ["use_alloc", "use_std"] }
-itoa = { version = "0.4.7", features = ["std"] }
-libc = { version = "0.2.99", features = ["std"] }
+libc = { version = "0.2.112", features = ["std"] }
 log = { version = "0.4.14", default-features = false, features = ["serde", "std"] }
 memchr = { version = "2.4.0", features = ["std", "use_std"] }
 num-integer = { version = "0.1.44", default-features = false, features = ["i128", "std"] }
@@ -113,7 +111,7 @@ regex-syntax = { version = "0.6.23", features = ["unicode", "unicode-age", "unic
 reqwest = { version = "0.11.2", features = ["__tls", "blocking", "default-tls", "hyper-tls", "json", "native-tls-crate", "serde_json", "stream", "tokio-native-tls"] }
 rusty-fork = { version = "0.3.0", features = ["timeout", "wait-timeout"] }
 serde = { version = "1.0.130", features = ["alloc", "derive", "rc", "serde_derive", "std"] }
-serde_json = { version = "1.0.68", features = ["indexmap", "preserve_order", "std"] }
+serde_json = { version = "1.0.73", features = ["indexmap", "preserve_order", "std"] }
 standback = { version = "0.2.15", default-features = false, features = ["std"] }
 syn-3575ec1268b04181 = { package = "syn", version = "0.15.44", features = ["clone-impls", "derive", "extra-traits", "full", "parsing", "printing", "proc-macro", "quote", "visit"] }
 syn-dff4ba8e3ae991db = { package = "syn", version = "1.0.74", features = ["clone-impls", "derive", "extra-traits", "full", "parsing", "printing", "proc-macro", "quote", "visit", "visit-mut"] }

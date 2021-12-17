@@ -111,9 +111,9 @@ checksum = "739f4a8db6605981345c5654f3a85b056ce52f37a39d34da03f25bf2151ea16e"
 
 [[package]]
 name = "aho-corasick"
-version = "0.7.15"
+version = "0.7.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7404febffaa47dac81aa44dba71523c9d069b1bdc50a77db41195149e17f68e5"
+checksum = "1e37cfd5e7657ada45f742d6e99ca5788580b5c529dc78faf11ece6dc702656f"
 dependencies = [
  "memchr",
 ]
@@ -225,7 +225,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4830ac690261d0b47f06e86d18c47eaa65d0184e576cf9b62c3a49b28cb876b"
 dependencies = [
- "nix",
+ "nix 0.20.0",
  "tempfile",
  "winapi 0.3.9",
 ]
@@ -300,7 +300,7 @@ dependencies = [
  "serde 1.0.130",
  "serde_json",
  "storage-interface",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "tokio",
  "tokio-stream",
  "tokio-util",
@@ -1171,7 +1171,7 @@ checksum = "22813a6dc45b335f9bade10bf7271dc477e81113e89eb251a0bc2a8a81c536e1"
 dependencies = [
  "bstr",
  "csv-core",
- "itoa",
+ "itoa 0.4.7",
  "ryu",
  "serde 1.0.130",
 ]
@@ -1192,6 +1192,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb4a30d54f7443bf3d6191dcd486aca19e67cb3c49fa7a06a319966346707e7f"
 dependencies = [
  "cipher",
+]
+
+[[package]]
+name = "ctrlc"
+version = "3.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a19c6cedffdc8c03a3346d723eb20bd85a13362bb96dc2ac000842c6381ec7bf"
+dependencies = [
+ "nix 0.23.1",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -1255,7 +1265,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a0ff02642cff6f40d39f61c8d51cb394fd313e1aa2057833b91ad788c4e9331f"
 dependencies = [
  "regex",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "termcolor",
  "walkdir",
 ]
@@ -1275,7 +1285,7 @@ dependencies = [
  "diemdb",
  "executor",
  "storage-interface",
- "structopt 0.3.21",
+ "structopt 0.3.25",
 ]
 
 [[package]]
@@ -1317,7 +1327,7 @@ dependencies = [
  "log",
  "move-core-types",
  "rand 0.8.4",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "tokio",
  "walkdir",
 ]
@@ -1357,7 +1367,7 @@ dependencies = [
  "diem-workspace-hack",
  "move-cli",
  "move-core-types",
- "structopt 0.3.21",
+ "structopt 0.3.25",
 ]
 
 [[package]]
@@ -1437,7 +1447,7 @@ dependencies = [
  "move-core-types",
  "serde 1.0.130",
  "serde_json",
- "structopt 0.3.21",
+ "structopt 0.3.25",
 ]
 
 [[package]]
@@ -1592,7 +1602,7 @@ dependencies = [
  "serde-generate",
  "serde-reflection",
  "serde_yaml",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "tempfile",
 ]
 
@@ -1613,7 +1623,7 @@ dependencies = [
  "move-stackless-bytecode-interpreter",
  "move-vm-runtime",
  "move-vm-types",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "walkdir",
 ]
 
@@ -1629,7 +1639,7 @@ dependencies = [
  "futures",
  "hex",
  "reqwest",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "tokio",
 ]
 
@@ -1666,7 +1676,7 @@ dependencies = [
  "reqwest",
  "serde 1.0.130",
  "serde_json",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "tempfile",
  "tokio",
  "warp",
@@ -1709,7 +1719,7 @@ dependencies = [
  "rayon",
  "sha2",
  "smallvec",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "tempfile",
  "transaction-builder-generator",
 ]
@@ -1781,7 +1791,7 @@ dependencies = [
  "state-sync-v1",
  "stats_alloc",
  "storage-interface",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "ureq",
 ]
 
@@ -1809,7 +1819,7 @@ dependencies = [
  "rand 0.8.4",
  "serde 1.0.130",
  "storage-interface",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "thiserror",
  "toml",
  "vm-genesis",
@@ -2038,7 +2048,7 @@ dependencies = [
  "hex",
  "serde 1.0.130",
  "serde_yaml",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "thiserror",
  "toml",
 ]
@@ -2175,7 +2185,7 @@ dependencies = [
  "storage-service",
  "storage-service-client",
  "storage-service-server",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "tokio",
  "tokio-stream",
 ]
@@ -2209,7 +2219,7 @@ dependencies = [
  "serde 1.0.130",
  "serde_json",
  "serde_yaml",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "thiserror",
  "tokio",
  "tokio-util",
@@ -2383,7 +2393,7 @@ dependencies = [
  "diem-workspace-hack",
  "diemdb",
  "storage-interface",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "tempfile",
 ]
 
@@ -2466,7 +2476,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "vm-genesis",
 ]
 
@@ -2494,7 +2504,7 @@ dependencies = [
  "move-core-types",
  "move-transactional-test-runner",
  "once_cell",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "vm-genesis",
 ]
 
@@ -2648,7 +2658,6 @@ dependencies = [
  "hyper",
  "indexmap",
  "itertools 0.10.1",
- "itoa",
  "libc",
  "log",
  "memchr",
@@ -2711,7 +2720,7 @@ dependencies = [
  "read-write-set",
  "serde 1.0.130",
  "serde_json",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "tempfile",
 ]
 
@@ -2761,7 +2770,7 @@ dependencies = [
  "serde 1.0.130",
  "serde_json",
  "storage-interface",
- "structopt 0.3.21",
+ "structopt 0.3.25",
 ]
 
 [[package]]
@@ -3110,7 +3119,7 @@ dependencies = [
  "serde 1.0.130",
  "storage-client",
  "storage-interface",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "toml",
 ]
 
@@ -3260,7 +3269,7 @@ dependencies = [
  "rusoto_sts",
  "serde 1.0.130",
  "serde_json",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "tempfile",
  "termcolor",
  "tokio",
@@ -3279,7 +3288,7 @@ dependencies = [
  "forge",
  "itertools 0.10.1",
  "rand_core 0.6.2",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "testcases",
  "tokio",
  "url",
@@ -3319,7 +3328,7 @@ dependencies = [
  "rayon",
  "sha2",
  "smallvec",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "walkdir",
 ]
 
@@ -3459,7 +3468,7 @@ dependencies = [
  "serde 1.0.130",
  "serde-reflection",
  "serde_yaml",
- "structopt 0.3.21",
+ "structopt 0.3.25",
 ]
 
 [[package]]
@@ -3504,7 +3513,7 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "move-vm-test-utils",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "vm-genesis",
 ]
 
@@ -3610,9 +3619,9 @@ dependencies = [
 
 [[package]]
 name = "guppy"
-version = "0.12.3"
+version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c628f43b0e8519d319f745bca5d65d459b2e29e8ce6731c8eb2b9e384ab9c0d4"
+checksum = "2d2086fdcefd1a3dc6f4ba4568147648231e2211be1fcc4d1063601c6baadd2e"
 dependencies = [
  "camino",
  "cargo_metadata",
@@ -3620,6 +3629,7 @@ dependencies = [
  "debug-ignore",
  "fixedbitset 0.4.0",
  "guppy-summaries",
+ "guppy-workspace-hack",
  "indexmap",
  "itertools 0.10.1",
  "nested",
@@ -3633,7 +3643,6 @@ dependencies = [
  "smallvec",
  "target-spec",
  "toml",
- "workspace-hack",
 ]
 
 [[package]]
@@ -3649,6 +3658,12 @@ dependencies = [
  "serde 1.0.130",
  "toml",
 ]
+
+[[package]]
+name = "guppy-workspace-hack"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92620684d99f750bae383ecb3be3748142d6095760afd5cbcf2261e9a279d780"
 
 [[package]]
 name = "h2"
@@ -3820,7 +3835,7 @@ checksum = "527e8c9ac747e28542699a951517aa9a6945af506cd1f2e1b53a576c17b6cc11"
 dependencies = [
  "bytes",
  "fnv",
- "itoa",
+ "itoa 0.4.7",
 ]
 
 [[package]]
@@ -3868,6 +3883,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
+name = "humantime-serde"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac34a56cfd4acddb469cc7fff187ed5ac36f498ba085caf8bbc725e3ff474058"
+dependencies = [
+ "humantime 2.1.0",
+ "serde 1.0.130",
+]
+
+[[package]]
 name = "hyper"
 version = "0.14.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3882,7 +3907,7 @@ dependencies = [
  "http-body",
  "httparse",
  "httpdate",
- "itoa",
+ "itoa 0.4.7",
  "pin-project-lite",
  "socket2",
  "tokio",
@@ -4002,6 +4027,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "indent_write"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0cfe9645a18782869361d9c8732246be7b410ad4e919d3609ebabdac00ba12c3"
+
+[[package]]
 name = "indenter"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4084,6 +4115,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47be2f14c678be2fdcab04ab1171db51b2762ce6f0a8ee87c8dd4a04ed216135"
 
 [[package]]
+name = "is_ci"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "616cde7c720bb2bb5824a224687d8f77bfd38922027f01d825cd7453be5099fb"
+
+[[package]]
 name = "itertools"
 version = "0.7.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4115,6 +4152,12 @@ name = "itoa"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd25036021b0de88a0aff6b850051563c6516d0bf53f8638938edbb9de732736"
+
+[[package]]
+name = "itoa"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1aab8fc367588b89dcee83ab0fd66b72b50b72fa1904d7095045ace2b0c81c35"
 
 [[package]]
 name = "jemalloc-sys"
@@ -4364,9 +4407,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.99"
+version = "0.2.112"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7f823d141fe0a24df1e23b4af4e3c7ba9e5966ec514ea068c93024aa7deb765"
+checksum = "1b03d17f364a3a042d5e5d46b053bbbf82c92c9430c592dd4c064dc6ee997125"
 
 [[package]]
 name = "libfuzzer-sys"
@@ -4491,9 +4534,9 @@ checksum = "b16bd47d9e329435e309c58469fe0791c2d0d1ba96ec0954152a5ae2b04387dc"
 
 [[package]]
 name = "memoffset"
-version = "0.6.1"
+version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "157b4208e3059a8f9e78d559edc658e13df41410cb3ae03979c83130067fdd87"
+checksum = "5aa361d4faea93603064a027415f07bd8e1d5c88c9fbf68bf56a285428fd79ce"
 dependencies = [
  "autocfg",
 ]
@@ -4588,7 +4631,7 @@ dependencies = [
  "regex",
  "serde 1.0.130",
  "serde_json",
- "structopt 0.3.21",
+ "structopt 0.3.25",
 ]
 
 [[package]]
@@ -4636,7 +4679,7 @@ dependencies = [
  "move-command-line-common",
  "move-compiler",
  "serde_json",
- "structopt 0.3.21",
+ "structopt 0.3.25",
 ]
 
 [[package]]
@@ -4717,7 +4760,7 @@ dependencies = [
  "move-disassembler",
  "move-ir-types",
  "regex",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "termion",
  "tui",
 ]
@@ -4760,7 +4803,7 @@ dependencies = [
  "read-write-set-dynamic",
  "serde 1.0.130",
  "serde_yaml",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "tempfile",
  "walkdir",
 ]
@@ -4802,7 +4845,7 @@ dependencies = [
  "once_cell",
  "petgraph 0.5.1",
  "regex",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "tempfile",
  "walkdir",
 ]
@@ -4854,7 +4897,7 @@ dependencies = [
  "once_cell",
  "petgraph 0.5.1",
  "serde 1.0.130",
- "structopt 0.3.21",
+ "structopt 0.3.25",
 ]
 
 [[package]]
@@ -4872,7 +4915,7 @@ dependencies = [
  "move-core-types",
  "move-coverage",
  "move-ir-types",
- "structopt 0.3.21",
+ "structopt 0.3.25",
 ]
 
 [[package]]
@@ -4923,7 +4966,7 @@ dependencies = [
  "diem-workspace-hack",
  "move-command-line-common",
  "move-core-types",
- "structopt 0.3.21",
+ "structopt 0.3.25",
 ]
 
 [[package]]
@@ -4942,7 +4985,7 @@ dependencies = [
  "move-ir-types",
  "move-symbol-pool",
  "serde_json",
- "structopt 0.3.21",
+ "structopt 0.3.25",
 ]
 
 [[package]]
@@ -5054,7 +5097,7 @@ dependencies = [
  "serde 1.0.130",
  "serde_yaml",
  "sha2",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "tempfile",
  "toml",
  "walkdir",
@@ -5216,7 +5259,7 @@ dependencies = [
  "move-vm-runtime",
  "num 0.4.0",
  "serde 1.0.130",
- "structopt 0.3.21",
+ "structopt 0.3.25",
 ]
 
 [[package]]
@@ -5285,7 +5328,7 @@ dependencies = [
  "once_cell",
  "rayon",
  "regex",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "tempfile",
 ]
 
@@ -5312,7 +5355,7 @@ dependencies = [
  "move-vm-types",
  "rayon",
  "regex",
- "structopt 0.3.21",
+ "structopt 0.3.25",
 ]
 
 [[package]]
@@ -5568,26 +5611,52 @@ dependencies = [
 ]
 
 [[package]]
+name = "nextest-config"
+version = "0.1.0"
+source = "git+https://github.com/diem/diem-devtools?rev=f99a204e3d3f8e503d51d7df42e55c8282b59154#f99a204e3d3f8e503d51d7df42e55c8282b59154"
+dependencies = [
+ "camino",
+ "config",
+ "humantime-serde",
+ "serde 1.0.130",
+ "toml",
+]
+
+[[package]]
 name = "nextest-runner"
 version = "0.1.0"
-source = "git+https://github.com/diem/diem-devtools?rev=878ad31ea3268e7496e6e2406329fbd005685a9e#878ad31ea3268e7496e6e2406329fbd005685a9e"
+source = "git+https://github.com/diem/diem-devtools?rev=f99a204e3d3f8e503d51d7df42e55c8282b59154#f99a204e3d3f8e503d51d7df42e55c8282b59154"
 dependencies = [
  "aho-corasick",
- "anyhow",
- "atty",
  "camino",
+ "cargo_metadata",
  "chrono",
  "crossbeam-channel",
+ "ctrlc",
+ "debug-ignore",
  "duct",
+ "guppy",
+ "indent_write",
+ "nextest-config",
+ "nextest-summaries",
  "num_cpus",
  "once_cell",
+ "owo-colors",
  "quick-junit",
  "rayon",
  "serde 1.0.130",
  "serde_json",
- "signal-hook",
- "structopt 0.3.21",
- "termcolor",
+ "strip-ansi-escapes",
+ "twox-hash",
+]
+
+[[package]]
+name = "nextest-summaries"
+version = "0.1.0"
+source = "git+https://github.com/diem/diem-devtools?rev=f99a204e3d3f8e503d51d7df42e55c8282b59154#f99a204e3d3f8e503d51d7df42e55c8282b59154"
+dependencies = [
+ "camino",
+ "serde 1.0.130",
 ]
 
 [[package]]
@@ -5600,6 +5669,19 @@ dependencies = [
  "cc",
  "cfg-if 1.0.0",
  "libc",
+]
+
+[[package]]
+name = "nix"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f866317acbd3a240710c63f065ffb1e4fd466259045ccb504130b7f668f35c6"
+dependencies = [
+ "bitflags",
+ "cc",
+ "cfg-if 1.0.0",
+ "libc",
+ "memoffset",
 ]
 
 [[package]]
@@ -6433,7 +6515,7 @@ checksum = "3ac73b1112776fc109b2e61909bc46c7e1bf0d7f690ffb1676553acce16d5cda"
 [[package]]
 name = "quick-junit"
 version = "0.1.0"
-source = "git+https://github.com/diem/diem-devtools?rev=878ad31ea3268e7496e6e2406329fbd005685a9e#878ad31ea3268e7496e6e2406329fbd005685a9e"
+source = "git+https://github.com/diem/diem-devtools?rev=f99a204e3d3f8e503d51d7df42e55c8282b59154#f99a204e3d3f8e503d51d7df42e55c8282b59154"
 dependencies = [
  "chrono",
  "indexmap",
@@ -7111,7 +7193,7 @@ dependencies = [
  "rayon",
  "scratchpad",
  "storage-interface",
- "structopt 0.3.21",
+ "structopt 0.3.25",
 ]
 
 [[package]]
@@ -7175,7 +7257,7 @@ dependencies = [
  "hex",
  "rand 0.8.4",
  "serde_yaml",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "thiserror",
 ]
 
@@ -7251,7 +7333,7 @@ dependencies = [
  "serde-reflection",
  "serde_bytes",
  "serde_yaml",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "textwrap 0.13.4",
 ]
 
@@ -7330,12 +7412,12 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.68"
+version = "1.0.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f690853975602e1bfe1ccbf50504d67174e3bcf340f23b5ea9992e0587a52d8"
+checksum = "bcbd0344bc6533bc7ec56df11d42fb70f1b912351c0825ccb7211b59d8af7cf5"
 dependencies = [
  "indexmap",
- "itoa",
+ "itoa 1.0.1",
  "ryu",
  "serde 1.0.130",
 ]
@@ -7358,7 +7440,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ec5d77e2d4c73717816afac02670d5c4f534ea95ed430442cad02e7a6e32c97"
 dependencies = [
  "dtoa",
- "itoa",
+ "itoa 0.4.7",
  "serde 1.0.130",
  "url",
 ]
@@ -7370,7 +7452,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edfa57a7f8d9c1d260a549e7224100f6c43d43f9103e06dd8b4095a9b2b43ce9"
 dependencies = [
  "form_urlencoded",
- "itoa",
+ "itoa 0.4.7",
  "ryu",
  "serde 1.0.130",
 ]
@@ -7565,7 +7647,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "smoke-test",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "tempfile",
  "tokio",
  "toml",
@@ -7582,16 +7664,6 @@ dependencies = [
  "diem-workspace-hack",
  "move-stdlib",
  "move-unit-test",
-]
-
-[[package]]
-name = "signal-hook"
-version = "0.3.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef33d6d0cd06e0840fba9985aab098c147e67e05cee14d412d3345ed14ff30ac"
-dependencies = [
- "libc",
- "signal-hook-registry",
 ]
 
 [[package]]
@@ -7720,7 +7792,7 @@ dependencies = [
  "fst",
  "num 0.3.1",
  "pomelo",
- "structopt 0.3.21",
+ "structopt 0.3.25",
 ]
 
 [[package]]
@@ -7764,7 +7836,7 @@ dependencies = [
  "move-prover",
  "move-stackless-bytecode",
  "pretty",
- "structopt 0.3.21",
+ "structopt 0.3.25",
 ]
 
 [[package]]
@@ -8109,13 +8181,13 @@ dependencies = [
 
 [[package]]
 name = "structopt"
-version = "0.3.21"
+version = "0.3.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5277acd7ee46e63e5168a80734c9f6ee81b1367a7d8772a2d765df2a3705d28c"
+checksum = "40b9788f4202aa75c240ecc9c15c65185e6a39ccdeb0fd5d008b98825464c87c"
 dependencies = [
  "clap",
  "lazy_static 1.4.0",
- "structopt-derive 0.4.14",
+ "structopt-derive 0.4.18",
 ]
 
 [[package]]
@@ -8132,9 +8204,9 @@ dependencies = [
 
 [[package]]
 name = "structopt-derive"
-version = "0.4.14"
+version = "0.4.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ba9cdfda491b814720b6b06e0cac513d922fc407582032e8706e9f137976f90"
+checksum = "dcb5ae327f9cc13b68763b5749770cb9e048a99bd9dfdfa58d0cf05d5f64afe0"
 dependencies = [
  "heck",
  "proc-macro-error",
@@ -8150,6 +8222,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e81da0851ada1f3e9d4312c704aa4f8806f0f9d69faaf8df2f3464b4a9437c2"
 
 [[package]]
+name = "supports-color"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4872ced36b91d47bae8a214a683fe54e7078875b399dfa251df346c9b547d1f9"
+dependencies = [
+ "atty",
+ "is_ci",
+]
+
+[[package]]
 name = "swiss-knife"
 version = "0.1.0"
 dependencies = [
@@ -8163,7 +8245,7 @@ dependencies = [
  "rand 0.8.4",
  "serde 1.0.130",
  "serde_json",
- "structopt 0.3.21",
+ "structopt 0.3.25",
 ]
 
 [[package]]
@@ -8323,7 +8405,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "rand 0.8.4",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "tracing",
  "tracing-subscriber",
 ]
@@ -8745,7 +8827,7 @@ dependencies = [
  "serde-generate",
  "serde-reflection",
  "serde_yaml",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "tempfile",
  "textwrap 0.13.4",
  "which",
@@ -8771,7 +8853,7 @@ dependencies = [
  "reqwest",
  "serde 1.0.130",
  "serde_json",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "termion",
  "tokio",
 ]
@@ -9387,12 +9469,14 @@ dependencies = [
  "indexmap",
  "indoc",
  "log",
+ "nextest-config",
  "nextest-runner",
  "rayon",
  "regex",
  "serde 1.0.130",
  "serde_json",
- "structopt 0.3.21",
+ "structopt 0.3.25",
+ "supports-color",
  "toml",
  "x-core",
  "x-lint",
@@ -9462,7 +9546,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57b52f3d4b300ffa9400cd78caebaaa6ef5a0189d08ec134624e2b8f3890b6e0"
 dependencies = [
  "smt2parser",
- "structopt 0.3.21",
+ "structopt 0.3.25",
  "thiserror",
 ]
 
