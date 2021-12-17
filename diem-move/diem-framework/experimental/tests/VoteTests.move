@@ -31,7 +31,6 @@ module DiemFramework::VoteTests {
     fun vote_test_helper(
         tc: &signer,
         dr: &signer,
-        config_storage: &signer,
         expiration_timestamp_secs: u64,
     ) : (signer, signer, signer, Vote::BallotID, TestProposal) {
         let (voter1, voter1_address, voter2, voter2_address, voter3, voter3_address) = get_three_voters();
@@ -40,7 +39,7 @@ module DiemFramework::VoteTests {
         Vector::push_back(&mut approvers, Vote::new_weighted_voter(1, BCS::to_bytes(&voter2_address)));
         Vector::push_back(&mut approvers, Vote::new_weighted_voter(1, BCS::to_bytes(&voter3_address)));
 
-        let (proposer, _addr, _addr_bcs) = ballot_setup(tc, dr, config_storage);
+        let (proposer, _addr, _addr_bcs) = ballot_setup(tc, dr);
         let proposal = TestProposal {
             test_data: 1,
         };
@@ -55,17 +54,17 @@ module DiemFramework::VoteTests {
         (voter1, voter2, voter3, ballot_id, proposal)
     }
 
-    fun ballot_setup(tc: &signer, dr: &signer, config_storage: &signer): (signer, address, vector<u8>) {
-        Genesis::setup(dr, tc, config_storage);
+    fun ballot_setup(tc: &signer, dr: &signer): (signer, address, vector<u8>) {
+        Genesis::setup(dr, tc);
         let proposer = get_proposer();
         let addr = Signer::address_of(&proposer);
         let addr_bcs = BCS::to_bytes(&addr);
         (proposer, addr, addr_bcs)
     }
 
-    #[test(tc = @TreasuryCompliance, dr = @DiemRoot, config_storage = @ConfigStorage)]
-    fun create_ballot_success(tc: signer, dr: signer, config_storage: signer) {
-        let (proposer, addr, addr_bcs) = ballot_setup(&tc, &dr, &config_storage);
+    #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
+    fun create_ballot_success(tc: signer, dr: signer) {
+        let (proposer, addr, addr_bcs) = ballot_setup(&tc, &dr);
         let ballot_id = Vote::create_ballot(
             &proposer,
             TestProposal {
@@ -103,10 +102,10 @@ module DiemFramework::VoteTests {
         assert!(&ballot_id == &Vote::new_ballot_id(2, addr), 0);
     }
 
-    #[test(tc = @TreasuryCompliance, dr = @DiemRoot, config_storage = @ConfigStorage)]
+    #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
     #[expected_failure(abort_code = 263)]
-    fun create_ballot_expired_timestamp(tc: signer, dr: signer, config_storage: signer) {
-        let (proposer, _, addr_bcs) = ballot_setup(&tc, &dr, &config_storage);
+    fun create_ballot_expired_timestamp(tc: signer, dr: signer) {
+        let (proposer, _, addr_bcs) = ballot_setup(&tc, &dr);
         Vote::create_ballot(
             &proposer, // ballot_account
             TestProposal { // proposal
@@ -119,9 +118,9 @@ module DiemFramework::VoteTests {
         );
     }
 
-    #[test(vm = @VMReserved, tc = @TreasuryCompliance, dr = @DiemRoot, config_storage = @ConfigStorage)]
-    fun gc_internal(vm: signer, tc: signer, dr: signer, config_storage: signer) {
-        let (proposer, addr, addr_bcs) = ballot_setup(&tc, &dr, &config_storage);
+    #[test(vm = @VMReserved, tc = @TreasuryCompliance, dr = @DiemRoot)]
+    fun gc_internal(vm: signer, tc: signer, dr: signer) {
+        let (proposer, addr, addr_bcs) = ballot_setup(&tc, &dr);
         let _ballot_id1 = Vote::create_ballot(
             &proposer,
             TestProposal {
@@ -173,10 +172,10 @@ module DiemFramework::VoteTests {
         assert!(&Vector::pop_back(&mut remove_ballots) == &Vote::new_ballot_id(0, addr), 0);
     }
 
-    #[test(tc = @TreasuryCompliance, dr = @DiemRoot, config_storage = @ConfigStorage)]
+    #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
     #[expected_failure(abort_code = 520)]
-    fun create_ballots_too_many(tc: signer, dr: signer, config_storage: signer) {
-        let (proposer, _, addr_bcs) = ballot_setup(&tc, &dr, &config_storage);
+    fun create_ballots_too_many(tc: signer, dr: signer) {
+        let (proposer, _, addr_bcs) = ballot_setup(&tc, &dr);
         let i = 0;
         // limit is 256
         while (i <= 257) {
@@ -194,19 +193,19 @@ module DiemFramework::VoteTests {
         }
     }
 
-    #[test(tc = @TreasuryCompliance, dr = @DiemRoot, config_storage = @ConfigStorage)]
+    #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
     #[expected_failure(abort_code = 769)]
-    fun remove_ballot(tc: signer, dr: signer, config_storage: signer) {
-        let (voter1, _voter2, _voter3, ballot_id, proposal) = vote_test_helper(&tc, &dr, &config_storage, 10);
+    fun remove_ballot(tc: signer, dr: signer) {
+        let (voter1, _voter2, _voter3, ballot_id, proposal) = vote_test_helper(&tc, &dr, 10);
         Vote::remove_ballot_internal<TestProposal>(get_proposer(), *(&ballot_id));
         // Vote fails because there is no ballot
         Vote::vote(&voter1, *(&ballot_id), b"test_proposal", *(&proposal));
     }
 
-    #[test(tc = @TreasuryCompliance, dr = @DiemRoot, config_storage = @ConfigStorage)]
+    #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
     #[expected_failure(abort_code = 769)]
-    fun vote_simple(tc: signer, dr: signer, config_storage: signer) {
-        let (voter1, voter2, voter3, ballot_id, proposal) = vote_test_helper(&tc, &dr, &config_storage, 10);
+    fun vote_simple(tc: signer, dr: signer) {
+        let (voter1, voter2, voter3, ballot_id, proposal) = vote_test_helper(&tc, &dr, 10);
         // First vote does not approve the ballot
         assert!(!Vote::vote(&voter1, *(&ballot_id), b"test_proposal", *(&proposal)), 0);
         // Second vote approves the ballot
@@ -215,15 +214,15 @@ module DiemFramework::VoteTests {
         Vote::vote(&voter3, *(&ballot_id), b"test_proposal", *(&proposal));
     }
 
-    #[test(tc = @TreasuryCompliance, dr = @DiemRoot, config_storage = @ConfigStorage)]
-    fun vote_weighted(tc: signer, dr: signer, config_storage: signer) {
+    #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
+    fun vote_weighted(tc: signer, dr: signer) {
         let (voter1, voter1_address, voter2, voter2_address, _voter3, voter3_address) = get_three_voters();
         let approvers = Vector::empty();
         Vector::push_back(&mut approvers, Vote::new_weighted_voter(3, BCS::to_bytes(&voter1_address)));
         Vector::push_back(&mut approvers, Vote::new_weighted_voter(4, BCS::to_bytes(&voter2_address)));
         Vector::push_back(&mut approvers, Vote::new_weighted_voter(2, BCS::to_bytes(&voter3_address)));
 
-        let (proposer, _addr, _addr_bcs) = ballot_setup(&tc, &dr, &config_storage);
+        let (proposer, _addr, _addr_bcs) = ballot_setup(&tc, &dr);
         let proposal = TestProposal {
             test_data: 1,
         };
@@ -243,36 +242,36 @@ module DiemFramework::VoteTests {
         assert!(Vote::vote(&voter2, *(&ballot_id), b"test_proposal", *(&proposal)), 0);
     }
 
-    #[test(tc = @TreasuryCompliance, dr = @DiemRoot, config_storage = @ConfigStorage)]
+    #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
     #[expected_failure(abort_code = 263)]
-    fun vote_expired_ts(tc: signer, dr: signer, config_storage: signer) {
-        let (voter1, _voter2, _voter3, ballot_id, proposal) = vote_test_helper(&tc, &dr, &config_storage, 0);
+    fun vote_expired_ts(tc: signer, dr: signer) {
+        let (voter1, _voter2, _voter3, ballot_id, proposal) = vote_test_helper(&tc, &dr, 0);
         // Ballot has expired
         Vote::vote(&voter1, *(&ballot_id), b"test_proposal", *(&proposal));
     }
 
-    #[test(tc = @TreasuryCompliance, dr = @DiemRoot, config_storage = @ConfigStorage)]
+    #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
     #[expected_failure(abort_code = 2049)]
-    fun vote_repeat(tc: signer, dr: signer, config_storage: signer) {
-        let (voter1, _voter2, _voter3, ballot_id, proposal) = vote_test_helper(&tc, &dr, &config_storage, 10);
+    fun vote_repeat(tc: signer, dr: signer) {
+        let (voter1, _voter2, _voter3, ballot_id, proposal) = vote_test_helper(&tc, &dr, 10);
         // First vote does not approve the ballot
         assert!(!Vote::vote(&voter1, *(&ballot_id), b"test_proposal", *(&proposal)), 0);
         // Cannot vote again
         Vote::vote(&voter1, *(&ballot_id), b"test_proposal", *(&proposal));
     }
 
-    #[test(tc = @TreasuryCompliance, dr = @DiemRoot, config_storage = @ConfigStorage)]
+    #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
     #[expected_failure(abort_code = 1031)]
-    fun vote_invalid_proposal_type(tc: signer, dr: signer, config_storage: signer) {
-        let (voter1, _voter2, _voter3, ballot_id, proposal) = vote_test_helper(&tc, &dr, &config_storage, 10);
+    fun vote_invalid_proposal_type(tc: signer, dr: signer) {
+        let (voter1, _voter2, _voter3, ballot_id, proposal) = vote_test_helper(&tc, &dr, 10);
         // Invalid proposal type
         Vote::vote(&voter1, *(&ballot_id), b"invalid", *(&proposal));
     }
 
-    #[test(tc = @TreasuryCompliance, dr = @DiemRoot, config_storage = @ConfigStorage)]
+    #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
     #[expected_failure(abort_code = 1031)]
-    fun vote_invalid_proposal(tc: signer, dr: signer, config_storage: signer) {
-        let (voter1, _voter2, _voter3, ballot_id, _proposal) = vote_test_helper(&tc, &dr, &config_storage, 10);
+    fun vote_invalid_proposal(tc: signer, dr: signer) {
+        let (voter1, _voter2, _voter3, ballot_id, _proposal) = vote_test_helper(&tc, &dr, 10);
         let invalid_proposal = TestProposal {
             test_data: 100,
         };
@@ -280,20 +279,20 @@ module DiemFramework::VoteTests {
         Vote::vote(&voter1, *(&ballot_id), b"test_proposal", invalid_proposal);
     }
 
-    #[test(tc = @TreasuryCompliance, dr = @DiemRoot, config_storage = @ConfigStorage)]
+    #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
     #[expected_failure(abort_code = 769)]
-    fun vote_invalid_ballotid(tc: signer, dr: signer, config_storage: signer) {
+    fun vote_invalid_ballotid(tc: signer, dr: signer) {
         let proposer = get_proposer();
-        let (voter1, _voter2, _voter3, _ballot_id, proposal) = vote_test_helper(&tc, &dr, &config_storage, 10);
+        let (voter1, _voter2, _voter3, _ballot_id, proposal) = vote_test_helper(&tc, &dr, 10);
         let invalid_ballotid = Vote::new_ballot_id(100, Signer::address_of(&proposer));
         // Invalid ballotid
         Vote::vote(&voter1, invalid_ballotid, b"test_proposal", proposal);
     }
 
-    #[test(tc = @TreasuryCompliance, dr = @DiemRoot, config_storage = @ConfigStorage)]
+    #[test(tc = @TreasuryCompliance, dr = @DiemRoot)]
     #[expected_failure(abort_code = 1281)]
-    fun vote_invalid_voter(tc: signer, dr: signer, config_storage: signer) {
-        let (_voter1, _voter2, _voter3, ballot_id, proposal) = vote_test_helper(&tc, &dr, &config_storage, 10);
+    fun vote_invalid_voter(tc: signer, dr: signer) {
+        let (_voter1, _voter2, _voter3, ballot_id, proposal) = vote_test_helper(&tc, &dr, 10);
         let invalid_voter = Vector::pop_back(&mut UnitTest::create_signers_for_testing(4));
         Vote::vote(&invalid_voter, ballot_id, b"test_proposal", proposal);
     }

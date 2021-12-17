@@ -39,7 +39,6 @@ module DiemFramework::Genesis {
         chain_id: u8,
         initial_diem_version: u64,
         consensus_config: vector<u8>,
-        _config_storage_signer: signer,
     ) {
         initialize_internal(
             &dr_account,

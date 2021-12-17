@@ -46,7 +46,7 @@ when executing from a fresh state.
 Initializes the Diem framework.
 
 
-<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize">initialize</a>(dr_account: signer, tc_account: signer, dr_auth_key: vector&lt;u8&gt;, tc_auth_key: vector&lt;u8&gt;, initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_diem_version: u64, consensus_config: vector&lt;u8&gt;, config_storage_signer: signer)
+<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize">initialize</a>(dr_account: signer, tc_account: signer, dr_auth_key: vector&lt;u8&gt;, tc_auth_key: vector&lt;u8&gt;, initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_diem_version: u64, consensus_config: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -67,7 +67,6 @@ Initializes the Diem framework.
     chain_id: u8,
     initial_diem_version: u64,
     consensus_config: vector&lt;u8&gt;,
-    config_storage_signer: signer,
 ) {
     <a href="Genesis.md#0x1_Genesis_initialize_internal">initialize_internal</a>(
         &dr_account,
@@ -81,7 +80,6 @@ Initializes the Diem framework.
         chain_id,
         initial_diem_version,
         consensus_config,
-        &config_storage_signer,
     )
 }
 </code></pre>
@@ -120,7 +118,7 @@ Assume that this is called in genesis state (no timestamp).
 Initializes the Diem Framework. Internal so it can be used by both genesis code, and for testing purposes
 
 
-<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize_internal">initialize_internal</a>(dr_account: &signer, tc_account: &signer, dr_auth_key: vector&lt;u8&gt;, tc_auth_key: vector&lt;u8&gt;, initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_diem_version: u64, consensus_config: vector&lt;u8&gt;, config_storage_signer: &signer)
+<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize_internal">initialize_internal</a>(dr_account: &signer, tc_account: &signer, dr_auth_key: vector&lt;u8&gt;, tc_auth_key: vector&lt;u8&gt;, initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_diem_version: u64, consensus_config: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -141,7 +139,6 @@ Initializes the Diem Framework. Internal so it can be used by both genesis code,
     chain_id: u8,
     initial_diem_version: u64,
     consensus_config: vector&lt;u8&gt;,
-    config_storage_signer: &signer,
 ) {
     <a href="DiemAccount.md#0x1_DiemAccount_initialize">DiemAccount::initialize</a>(dr_account, x"00000000000000000000000000000000");
 
@@ -166,7 +163,7 @@ Initializes the Diem Framework. Internal so it can be used by both genesis code,
 
     <a href="DiemSystem.md#0x1_DiemSystem_initialize_validator_set">DiemSystem::initialize_validator_set</a>(dr_account);
 
-    <a href="ExperimentalVersion.md#0x1_ExperimentalVersion_initialize">ExperimentalVersion::initialize</a>(config_storage_signer, dr_account, initial_diem_version);
+    <a href="ExperimentalVersion.md#0x1_ExperimentalVersion_initialize">ExperimentalVersion::initialize</a>(dr_account, initial_diem_version);
     <a href="DualAttestation.md#0x1_DualAttestation_initialize">DualAttestation::initialize</a>(dr_account);
     <a href="DiemBlock.md#0x1_DiemBlock_initialize_block_metadata">DiemBlock::initialize_block_metadata</a>(dr_account);
 

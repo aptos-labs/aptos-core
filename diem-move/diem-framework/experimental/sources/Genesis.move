@@ -38,7 +38,6 @@ module DiemFramework::Genesis {
         chain_id: u8,
         initial_diem_version: u64,
         consensus_config: vector<u8>,
-        config_storage_signer: signer,
     ) {
         initialize_internal(
             &dr_account,
@@ -52,7 +51,6 @@ module DiemFramework::Genesis {
             chain_id,
             initial_diem_version,
             consensus_config,
-            &config_storage_signer,
         )
     }
 
@@ -69,7 +67,6 @@ module DiemFramework::Genesis {
         chain_id: u8,
         initial_diem_version: u64,
         consensus_config: vector<u8>,
-        config_storage_signer: &signer,
     ) {
         DiemAccount::initialize(dr_account, x"00000000000000000000000000000000");
 
@@ -94,7 +91,7 @@ module DiemFramework::Genesis {
 
         DiemSystem::initialize_validator_set(dr_account);
 
-        ExperimentalVersion::initialize(config_storage_signer, dr_account, initial_diem_version);
+        ExperimentalVersion::initialize(dr_account, initial_diem_version);
         DualAttestation::initialize(dr_account);
         DiemBlock::initialize_block_metadata(dr_account);
 
@@ -233,7 +230,7 @@ module DiemFramework::Genesis {
     }
 
     #[test_only]
-    public fun setup(dr_account: &signer, tc_account: &signer, config_storage_signer: &signer) {
+    public fun setup(dr_account: &signer, tc_account: &signer) {
         initialize_internal(
             dr_account,
             tc_account,
@@ -246,7 +243,6 @@ module DiemFramework::Genesis {
             4u8, // TESTING chain ID
             0,
             Vector::empty(),
-            config_storage_signer,
         )
     }
 }

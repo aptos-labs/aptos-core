@@ -16,7 +16,7 @@ use diem_framework_releases::{
 use diem_transaction_builder::stdlib as transaction_builder;
 use diem_types::{
     account_config::{
-        self, config_storage_address,
+        self,
         events::{CreateAccountEvent, NewEpochEvent},
     },
     chain_id::{ChainId, NamedChain},
@@ -256,7 +256,6 @@ fn create_and_initialize_main_accounts(
             MoveValue::U8(chain_id.id()),
             MoveValue::U64(DIEM_MAX_KNOWN_VERSION.major),
             MoveValue::vector_u8(consensus_config_bytes),
-            MoveValue::Signer(config_storage_address()),
         ]),
     );
 }

@@ -3,7 +3,7 @@ compiled_package_info:
   package_name: DiemExperimental
   address_alias_instantiation:
     BARS: 06505ccd81e562b524d8f656abd92a15
-    ConfigStorage: "00000000000000000000000000000001"
+    ConfigStorage: 0000000000000000000000000a550c18
     CoreFramework: "00000000000000000000000000000001"
     CurrencyInfo: 0000000000000000000000000a550c18
     DiemFramework: "00000000000000000000000000000001"
@@ -181,7 +181,7 @@ compiled_package_info:
     ? address: "00000000000000000000000000000001"
       name: XUS
     : DiemFramework
-  source_digest: AFCAE53ED557D9315BB6E33C8F10CBBCCADD795F28403FA1FFAA8A5711A968EB
+  source_digest: CDE0B0654B8C7CEA27002E22C7D19EF70ACA79C19B1015B4821D083215D8ECE9
   build_flags:
     dev_mode: false
     test_mode: false

@@ -4,7 +4,7 @@
 use crate::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{config_storage_address, CORE_CODE_ADDRESS},
+    account_config::CORE_CODE_ADDRESS,
     event::{EventHandle, EventKey},
 };
 use anyhow::{format_err, Result};
@@ -167,9 +167,12 @@ pub fn new_epoch_event_key() -> EventKey {
 }
 
 pub fn default_access_path_for_config(config_id: ConfigID) -> AccessPath {
-    AccessPath::new(config_address(),AccessPath::resource_access_vec(config_struct_tag(
-        Identifier::new(config_id.1).expect("fail to make identifier"),
-    )))
+    AccessPath::new(
+        config_address(),
+        AccessPath::resource_access_vec(config_struct_tag(
+            Identifier::new(config_id.1).expect("fail to make identifier"),
+        )),
+    )
 }
 
 pub fn config_struct_tag(config_name: Identifier) -> StructTag {

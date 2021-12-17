@@ -47,7 +47,7 @@ when executing from a fresh state.
 Initializes the Diem framework.
 
 
-<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize">initialize</a>(dr_account: signer, tc_account: signer, dr_auth_key: vector&lt;u8&gt;, tc_auth_key: vector&lt;u8&gt;, initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_diem_version: u64, consensus_config: vector&lt;u8&gt;, _config_storage_signer: signer)
+<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize">initialize</a>(dr_account: signer, tc_account: signer, dr_auth_key: vector&lt;u8&gt;, tc_auth_key: vector&lt;u8&gt;, initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_diem_version: u64, consensus_config: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -68,7 +68,6 @@ Initializes the Diem framework.
     chain_id: u8,
     initial_diem_version: u64,
     consensus_config: vector&lt;u8&gt;,
-    _config_storage_signer: signer,
 ) {
     <a href="Genesis.md#0x1_Genesis_initialize_internal">initialize_internal</a>(
         &dr_account,

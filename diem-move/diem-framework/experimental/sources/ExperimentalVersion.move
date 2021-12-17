@@ -8,8 +8,8 @@ module ExperimentalFramework::ExperimentalVersion {
     struct ExperimentalVersion has drop {}
 
     /// Publishes the Version config.
-    public fun initialize(config_storage_signer: &signer, account: &signer, initial_version: u64) {
-        DiemVersion::initialize<ExperimentalVersion>(config_storage_signer, initial_version);
+    public fun initialize(account: &signer, initial_version: u64) {
+        DiemVersion::initialize<ExperimentalVersion>(account, initial_version);
         Capability::create<ExperimentalVersion>(account, &ExperimentalVersion {});
     }
 
