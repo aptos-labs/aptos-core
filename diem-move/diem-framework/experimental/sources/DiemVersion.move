@@ -3,6 +3,7 @@ module CoreFramework::DiemVersion {
     use Std::Capability::Cap;
     use Std::Errors;
     use Std::Signer;
+    use DiemFramework::DiemTimestamp;
 
     /// Marker to be stored under 0x1 during genesis
     struct VersionChainMarker<phantom T> has key {}
@@ -20,15 +21,17 @@ module CoreFramework::DiemVersion {
 
     /// Publishes the Version config.
     public fun initialize<T>(account: &signer, initial_version: u64) {
-        assert!(Signer::address_of(account) == @ConfigStorage, Errors::requires_address(ECONFIG));
+        DiemTimestamp::assert_genesis();
+
+        assert!(Signer::address_of(account) == @CoreResources, Errors::requires_address(ECONFIG));
 
         assert!(
-            !exists<VersionChainMarker<T>>(@ConfigStorage),
+            !exists<VersionChainMarker<T>>(@CoreResources),
             Errors::already_published(ECHAIN_MARKER)
         );
 
         assert!(
-            !exists<DiemVersion>(@ConfigStorage),
+            !exists<DiemVersion>(@CoreResources),
             Errors::already_published(ECONFIG)
         );
 
@@ -43,33 +46,34 @@ module CoreFramework::DiemVersion {
     }
 
     spec initialize {
-        aborts_if Signer::address_of(account) != @ConfigStorage with Errors::REQUIRES_ADDRESS;
-        aborts_if exists<VersionChainMarker<T>>(@ConfigStorage) with Errors::ALREADY_PUBLISHED;
-        aborts_if exists<DiemVersion>(@ConfigStorage) with Errors::ALREADY_PUBLISHED;
-        ensures exists<VersionChainMarker<T>>(@ConfigStorage);
-        ensures exists<DiemVersion>(@ConfigStorage);
-        ensures global<DiemVersion>(@ConfigStorage).major == initial_version;
+        include DiemTimestamp::AbortsIfNotGenesis;
+        aborts_if Signer::address_of(account) != @CoreResources with Errors::REQUIRES_ADDRESS;
+        aborts_if exists<VersionChainMarker<T>>(@CoreResources) with Errors::ALREADY_PUBLISHED;
+        aborts_if exists<DiemVersion>(@CoreResources) with Errors::ALREADY_PUBLISHED;
+        ensures exists<VersionChainMarker<T>>(@CoreResources);
+        ensures exists<DiemVersion>(@CoreResources);
+        ensures global<DiemVersion>(@CoreResources).major == initial_version;
     }
 
     /// Updates the major version to a larger version.
     public fun set<T>(major: u64, _cap: &Cap<T>) acquires DiemVersion {
-        assert!(exists<VersionChainMarker<T>>(@ConfigStorage), Errors::not_published(ECHAIN_MARKER));
-        assert!(exists<DiemVersion>(@ConfigStorage), Errors::not_published(ECONFIG));
-        let old_major = *&borrow_global<DiemVersion>(@ConfigStorage).major;
+        assert!(exists<VersionChainMarker<T>>(@CoreResources), Errors::not_published(ECHAIN_MARKER));
+        assert!(exists<DiemVersion>(@CoreResources), Errors::not_published(ECONFIG));
+        let old_major = *&borrow_global<DiemVersion>(@CoreResources).major;
 
         assert!(
             old_major < major,
             Errors::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER)
         );
 
-        let config = borrow_global_mut<DiemVersion>(@ConfigStorage);
+        let config = borrow_global_mut<DiemVersion>(@CoreResources);
         config.major = major;
     }
 
     spec set {
-        aborts_if !exists<VersionChainMarker<T>>(@ConfigStorage) with Errors::NOT_PUBLISHED;
-        aborts_if !exists<DiemVersion>(@ConfigStorage) with Errors::NOT_PUBLISHED;
-        aborts_if global<DiemVersion>(@ConfigStorage).major >= major with Errors::INVALID_ARGUMENT;
-        ensures global<DiemVersion>(@ConfigStorage).major == major;
+        aborts_if !exists<VersionChainMarker<T>>(@CoreResources) with Errors::NOT_PUBLISHED;
+        aborts_if !exists<DiemVersion>(@CoreResources) with Errors::NOT_PUBLISHED;
+        aborts_if global<DiemVersion>(@CoreResources).major >= major with Errors::INVALID_ARGUMENT;
+        ensures global<DiemVersion>(@CoreResources).major == major;
     }
 }

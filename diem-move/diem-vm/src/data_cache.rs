@@ -4,12 +4,11 @@
 
 use crate::{counters::CRITICAL_ERRORS, create_access_path, logging::AdapterLogSchema};
 #[allow(unused_imports)]
-use anyhow::{format_err, Result};
+use anyhow::format_err;
 use diem_logger::prelude::*;
 use diem_state_view::{StateView, StateViewId};
 use diem_types::{
     access_path::AccessPath,
-    account_state::AccountState,
     on_chain_config::ConfigStorage,
     vm_status::StatusCode,
     write_set::{WriteOp, WriteSet},
@@ -105,10 +104,6 @@ impl<'block, S: StateView> StateView for StateViewCache<'block, S> {
 
     fn id(&self) -> StateViewId {
         self.data_view.id()
-    }
-
-    fn get_account_state(&self, account: AccountAddress) -> Result<Option<AccountState>> {
-        self.data_view.get_account_state(account)
     }
 }
 

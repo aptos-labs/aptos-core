@@ -8,7 +8,6 @@ use anyhow::Result;
 use diem_state_view::StateView;
 use diem_types::{
     access_path::AccessPath,
-    account_state::AccountState,
     on_chain_config::ConfigStorage,
     transaction::ChangeSet,
     write_set::{WriteOp, WriteSet},
@@ -107,25 +106,6 @@ impl StateView for FakeDataStore {
     fn get(&self, access_path: &AccessPath) -> Result<Option<Vec<u8>>> {
         // Since the data is in-memory, it can't fail.
         Ok(self.data.get(access_path).cloned())
-    }
-
-    fn get_account_state(&self, account: AccountAddress) -> Result<Option<AccountState>> {
-        let mut account_data = self
-            .data
-            .iter()
-            .filter(|(k, _)| k.address == account)
-            .peekable();
-        if account_data.peek().is_none() {
-            return Ok(None);
-        }
-
-        let mut account_state = AccountState::default();
-        for (ap, bytes) in account_data {
-            if ap.address == account {
-                account_state.insert(ap.path.to_vec(), bytes.to_vec());
-            }
-        }
-        Ok(Some(account_state))
     }
 
     fn is_genesis(&self) -> bool {

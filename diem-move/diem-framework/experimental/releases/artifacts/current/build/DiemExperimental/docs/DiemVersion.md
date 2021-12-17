@@ -14,6 +14,7 @@ Maintains the version number for the blockchain.
 
 
 <pre><code><b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability">0x1::Capability</a>;
+<b>use</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer">0x1::Signer</a>;
 </code></pre>
@@ -127,15 +128,17 @@ Publishes the Version config.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="DiemVersion.md#0x1_DiemVersion_initialize">initialize</a>&lt;T&gt;(account: &signer, initial_version: u64) {
-    <b>assert</b>!(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account) == @ConfigStorage, <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_requires_address">Errors::requires_address</a>(<a href="DiemVersion.md#0x1_DiemVersion_ECONFIG">ECONFIG</a>));
+    <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
+
+    <b>assert</b>!(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account) == @CoreResources, <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_requires_address">Errors::requires_address</a>(<a href="DiemVersion.md#0x1_DiemVersion_ECONFIG">ECONFIG</a>));
 
     <b>assert</b>!(
-        !<b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion_VersionChainMarker">VersionChainMarker</a>&lt;T&gt;&gt;(@ConfigStorage),
+        !<b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion_VersionChainMarker">VersionChainMarker</a>&lt;T&gt;&gt;(@CoreResources),
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DiemVersion.md#0x1_DiemVersion_ECHAIN_MARKER">ECHAIN_MARKER</a>)
     );
 
     <b>assert</b>!(
-        !<b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@ConfigStorage),
+        !<b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@CoreResources),
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DiemVersion.md#0x1_DiemVersion_ECONFIG">ECONFIG</a>)
     );
 
@@ -159,12 +162,13 @@ Publishes the Version config.
 
 
 
-<pre><code><b>aborts_if</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account) != @ConfigStorage <b>with</b> Errors::REQUIRES_ADDRESS;
-<b>aborts_if</b> <b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion_VersionChainMarker">VersionChainMarker</a>&lt;T&gt;&gt;(@ConfigStorage) <b>with</b> Errors::ALREADY_PUBLISHED;
-<b>aborts_if</b> <b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@ConfigStorage) <b>with</b> Errors::ALREADY_PUBLISHED;
-<b>ensures</b> <b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion_VersionChainMarker">VersionChainMarker</a>&lt;T&gt;&gt;(@ConfigStorage);
-<b>ensures</b> <b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@ConfigStorage);
-<b>ensures</b> <b>global</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@ConfigStorage).major == initial_version;
+<pre><code><b>include</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotGenesis">DiemTimestamp::AbortsIfNotGenesis</a>;
+<b>aborts_if</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account) != @CoreResources <b>with</b> Errors::REQUIRES_ADDRESS;
+<b>aborts_if</b> <b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion_VersionChainMarker">VersionChainMarker</a>&lt;T&gt;&gt;(@CoreResources) <b>with</b> Errors::ALREADY_PUBLISHED;
+<b>aborts_if</b> <b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@CoreResources) <b>with</b> Errors::ALREADY_PUBLISHED;
+<b>ensures</b> <b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion_VersionChainMarker">VersionChainMarker</a>&lt;T&gt;&gt;(@CoreResources);
+<b>ensures</b> <b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@CoreResources);
+<b>ensures</b> <b>global</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@CoreResources).major == initial_version;
 </code></pre>
 
 
@@ -188,16 +192,16 @@ Updates the major version to a larger version.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="DiemVersion.md#0x1_DiemVersion_set">set</a>&lt;T&gt;(major: u64, _cap: &Cap&lt;T&gt;) <b>acquires</b> <a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a> {
-    <b>assert</b>!(<b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion_VersionChainMarker">VersionChainMarker</a>&lt;T&gt;&gt;(@ConfigStorage), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemVersion.md#0x1_DiemVersion_ECHAIN_MARKER">ECHAIN_MARKER</a>));
-    <b>assert</b>!(<b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@ConfigStorage), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemVersion.md#0x1_DiemVersion_ECONFIG">ECONFIG</a>));
-    <b>let</b> old_major = *&<b>borrow_global</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@ConfigStorage).major;
+    <b>assert</b>!(<b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion_VersionChainMarker">VersionChainMarker</a>&lt;T&gt;&gt;(@CoreResources), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemVersion.md#0x1_DiemVersion_ECHAIN_MARKER">ECHAIN_MARKER</a>));
+    <b>assert</b>!(<b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@CoreResources), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemVersion.md#0x1_DiemVersion_ECONFIG">ECONFIG</a>));
+    <b>let</b> old_major = *&<b>borrow_global</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@CoreResources).major;
 
     <b>assert</b>!(
         old_major &lt; major,
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="DiemVersion.md#0x1_DiemVersion_EINVALID_MAJOR_VERSION_NUMBER">EINVALID_MAJOR_VERSION_NUMBER</a>)
     );
 
-    <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@ConfigStorage);
+    <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@CoreResources);
     config.major = major;
 }
 </code></pre>
@@ -211,10 +215,10 @@ Updates the major version to a larger version.
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion_VersionChainMarker">VersionChainMarker</a>&lt;T&gt;&gt;(@ConfigStorage) <b>with</b> Errors::NOT_PUBLISHED;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@ConfigStorage) <b>with</b> Errors::NOT_PUBLISHED;
-<b>aborts_if</b> <b>global</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@ConfigStorage).major &gt;= major <b>with</b> Errors::INVALID_ARGUMENT;
-<b>ensures</b> <b>global</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@ConfigStorage).major == major;
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion_VersionChainMarker">VersionChainMarker</a>&lt;T&gt;&gt;(@CoreResources) <b>with</b> Errors::NOT_PUBLISHED;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@CoreResources) <b>with</b> Errors::NOT_PUBLISHED;
+<b>aborts_if</b> <b>global</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@CoreResources).major &gt;= major <b>with</b> Errors::INVALID_ARGUMENT;
+<b>ensures</b> <b>global</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@CoreResources).major == major;
 </code></pre>
 
 
