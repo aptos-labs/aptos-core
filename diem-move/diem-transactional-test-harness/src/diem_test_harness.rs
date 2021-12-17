@@ -102,6 +102,12 @@ struct DiemPublishArgs {
     gas_currency_code: Option<String>,
 }
 
+#[derive(Debug)]
+struct SignerAndKeyPair {
+    address: RawAddress,
+    private_key: Option<RawPrivateKey>,
+}
+
 /// Diem-specifc arguments for the run command.
 #[derive(StructOpt, Debug)]
 struct DiemRunArgs {
@@ -125,6 +131,9 @@ struct DiemRunArgs {
 
     #[structopt(long = "show-events")]
     show_events: bool,
+
+    #[structopt(long = "secondary-signers", parse(try_from_str = SignerAndKeyPair::parse))]
+    secondary_signers: Option<Vec<SignerAndKeyPair>>,
 }
 
 /// Diem-specifc arguments for the init command.
@@ -277,6 +286,31 @@ fn parse_named_private_key(s: &str) -> Result<(Identifier, Ed25519PrivateKey)> {
     Ok((name, private_key))
 }
 
+impl SignerAndKeyPair {
+    fn parse(s: &str) -> Result<Self> {
+        if let Ok(address) = RawAddress::parse(s) {
+            return Ok(Self {
+                address,
+                private_key: None,
+            });
+        };
+
+        let before_after = s.split('=').collect::<Vec<_>>();
+
+        if before_after.len() != 2 {
+            bail!("Invalid signer and key pair. Must be of the form <signer addr>=<private_key> or <named signer addr>, but found '{}'", s);
+        }
+
+        let address = RawAddress::parse(before_after[0])?;
+        let private_key = RawPrivateKey::parse(before_after[1])?;
+
+        Ok(Self {
+            address,
+            private_key: Some(private_key),
+        })
+    }
+}
+
 /*************************************************************************************************
  *
  * Helpers
@@ -356,6 +390,43 @@ impl<'a> DiemTestAdapter<'a> {
             RawPrivateKey::Anonymous(private_key) => private_key.clone(),
             RawPrivateKey::Named(name) => self.resolve_named_private_key(name),
         }
+    }
+
+    /// Resolve addresses and private keys for secondary signers.
+    fn resolve_secondary_signers(
+        &mut self,
+        secondary_signers: &[SignerAndKeyPair],
+    ) -> (Vec<AccountAddress>, Vec<Ed25519PrivateKey>) {
+        let mut addresses = vec![];
+        let mut private_keys = vec![];
+
+        for SignerAndKeyPair {
+            address,
+            private_key,
+        } in secondary_signers
+        {
+            addresses.push(self.compiled_state().resolve_address(address));
+
+            let resolved_private_key = match (private_key, address) {
+                (Some(private_key), _) => self.resolve_private_key(private_key),
+                (None, RawAddress::Named(named_addr)) => {
+                    match self.private_key_mapping.get(named_addr) {
+                        Some(private_key) => private_key.clone(),
+                        None => panic!(
+                            "Failed to resolve private key for secondary signer {}.",
+                            named_addr
+                        ),
+                    }
+                }
+                (None, RawAddress::Anonymous(addr)) => {
+                    panic!("No private key provided for secondary signer {}.", addr)
+                }
+            };
+
+            private_keys.push(resolved_private_key);
+        }
+
+        (addresses, private_keys)
     }
 
     /// Obtain a Rust representation of the account resource from storage, which is used to derive
@@ -967,6 +1038,9 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
         if extra_args.expiration_time.is_some() {
             panic!("Cannot set expiration time for admin script.")
         }
+        if extra_args.secondary_signers.is_some() {
+            panic!("Cannot set secondary signers for admin script.")
+        }
 
         let private_key = match (extra_args.private_key, &signers[0]) {
             (Some(private_key), _) => self.resolve_private_key(&private_key),
@@ -1063,9 +1137,24 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
             params.gas_currency_code,
             params.expiration_timestamp_secs,
             ChainId::test(),
-        )
-        .sign(&private_key, Ed25519PublicKey::from(&private_key))?
-        .into_inner();
+        );
+
+        let txn = match &extra_args.secondary_signers {
+            Some(secondary_signers) => {
+                let (secondary_signers, secondary_private_keys) =
+                    self.resolve_secondary_signers(secondary_signers);
+
+                txn.sign_multi_agent(
+                    &private_key,
+                    secondary_signers,
+                    secondary_private_keys.iter().collect(),
+                )?
+                .into_inner()
+            }
+            None => txn
+                .sign(&private_key, Ed25519PublicKey::from(&private_key))?
+                .into_inner(),
+        };
 
         let output = self.run_transaction(Transaction::UserTransaction(txn))?;
 
