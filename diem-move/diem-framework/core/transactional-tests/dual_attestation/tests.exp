@@ -1,0 +1,46 @@
+processed 14 tasks
+
+task 2 'run'. lines 12-19:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 258
+
+task 4 'run'. lines 67-74:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 5
+
+task 5 'run'. lines 76-83:
+Events:
+{
+    key:     01000000000000000dceedf16faf883d6d0770241510ed43
+    seq_num: 0
+    type:    0x1::DualAttestation::BaseUrlRotationEvent
+    data:    "000000000000000000"
+}
+{
+    key:     01000000000000000000000000000000000000000a550c18
+    seq_num: 2
+    type:    0x1::DiemAccount::AdminTransactionEvent
+    data:    "0000000000000000"
+}
+
+task 6 'run'. lines 85-92:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 5
+
+task 7 'run'. lines 94-104:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 519
+
+task 8 'run'. lines 105-112:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 1
+
+task 9 'run'. lines 114-136:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 1
+
+task 10 'run'. lines 138-145:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 5
+
+task 11 'run'. lines 147-154:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 5
+
+task 12 'run'. lines 156-163:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 5
+
+task 13 'run'. lines 165-172:
+Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 5
