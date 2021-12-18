@@ -234,8 +234,6 @@ impl DiemNetDataClient {
 
         match result {
             Ok(response) => {
-                // TODO(khiemngo): consider logging response payload
-                // after we override Debug for some response types with large payload.
                 debug!(
                     (LogSchema::new(LogEntry::StorageServiceResponse)
                         .event(LogEvent::ResponseSuccess)
@@ -507,7 +505,6 @@ impl DataSummaryPoller {
             self.data_client.update_summary(peer, storage_summary);
             self.data_client.update_global_summary_cache();
 
-            // TODO(khiemngo): implement overriding Debug for GlobalDataSummary struct
             debug!(
                 (LogSchema::new(LogEntry::PeerStates)
                     .event(LogEvent::AggregateSummary)

@@ -280,7 +280,7 @@ impl OptimalChunkSizes {
 }
 
 /// A summary of all data that is currently advertised in the network.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct AdvertisedData {
     /// The ranges of account states advertised, e.g., if a range is
     /// (X,Y), it means all account states are held for every version X->Y
@@ -305,6 +305,20 @@ pub struct AdvertisedData {
     /// is (X,Y), it means all transaction outputs for versions X->Y
     /// (inclusive) are available.
     pub transaction_outputs: Vec<CompleteDataRange<Version>>,
+}
+
+impl fmt::Debug for AdvertisedData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let sync_lis = (&self.synced_ledger_infos)
+            .iter()
+            .map(|LedgerInfoWithSignatures::V0(ledger)| format!("{}", ledger))
+            .join(", ");
+        write!(
+            f,
+            "account_states: {:?}, epoch_ending_ledger_infos: {:?}, synced_ledger_infos: [{}], transactions: {:?}, transaction_outputs: {:?}",
+            &self.account_states, &self.epoch_ending_ledger_infos, sync_lis, &self.transactions, &self.transaction_outputs
+        )
+    }
 }
 
 impl AdvertisedData {
