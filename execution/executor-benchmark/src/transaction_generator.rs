@@ -1,6 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use chrono::Local;
 use diem_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey, SigningKey, Uniform,
@@ -21,6 +22,7 @@ use diem_types::{
         Version,
     },
 };
+use indicatif::{ProgressBar, ProgressStyle};
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -35,6 +37,21 @@ use storage_interface::DbReader;
 
 const META_FILENAME: &str = "metadata.toml";
 const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
+
+fn get_progress_bar(num_accounts: usize) -> ProgressBar {
+    let bar = ProgressBar::new(num_accounts as u64);
+    bar.set_style(
+        ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] {bar:100.cyan/blue} {percent}% ETA {eta_precise}"),
+    );
+    bar
+}
+
+macro_rules! now_fmt {
+    () => {
+        Local::now().format("%m-%d %H:%M:%S")
+    };
+}
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type", content = "args")]
@@ -121,6 +138,8 @@ impl TransactionGenerator {
         let mut rng = StdRng::from_seed(seed);
 
         let mut accounts = Vec::with_capacity(num_accounts);
+        println!("[{}] Generating {} accounts.", now_fmt!(), num_accounts);
+        let bar = get_progress_bar(num_accounts);
         for _i in 0..num_accounts {
             let private_key = Ed25519PrivateKey::generate(&mut rng);
             let public_key = private_key.public_key();
@@ -132,7 +151,10 @@ impl TransactionGenerator {
                 sequence_number: 0,
             };
             accounts.push(account);
+            bar.inc(1);
         }
+        bar.finish();
+        println!("[{}] done.", now_fmt!());
 
         info!(
             num_accounts_generated = num_accounts,
@@ -201,6 +223,12 @@ impl TransactionGenerator {
         let tc_account = treasury_compliance_account_address();
         let mut txn_block = vec![];
 
+        println!(
+            "[{}] Generating {} account creation txns.",
+            now_fmt!(),
+            self.accounts_cache.len(),
+        );
+        let bar = get_progress_bar(self.accounts_cache.len());
         for (i, block) in self.accounts_cache.chunks(block_size).enumerate() {
             let mut transactions = Vec::with_capacity(block_size);
             for (j, account) in block.iter().enumerate() {
@@ -226,7 +254,10 @@ impl TransactionGenerator {
             } else {
                 txn_block.push(transactions);
             }
+            bar.inc(block_size as u64);
         }
+        bar.finish();
+        println!("[{}] done.", now_fmt!());
         txn_block
     }
 
@@ -239,6 +270,12 @@ impl TransactionGenerator {
         let testnet_dd_account = testnet_dd_account_address();
         let mut txn_block = vec![];
 
+        println!(
+            "[{}] Generating {} mint txns.",
+            now_fmt!(),
+            self.accounts_cache.len(),
+        );
+        let bar = get_progress_bar(self.accounts_cache.len());
         for (i, block) in self.accounts_cache.chunks(block_size).enumerate() {
             let mut transactions = Vec::with_capacity(block_size);
             for (j, account) in block.iter().enumerate() {
@@ -264,7 +301,10 @@ impl TransactionGenerator {
             } else {
                 txn_block.push(transactions);
             }
+            bar.inc(block.len() as u64)
         }
+        bar.finish();
+        println!("[{}] done.", now_fmt!());
         txn_block
     }
 
@@ -314,6 +354,12 @@ impl TransactionGenerator {
 
     /// Verifies the sequence numbers in storage match what we have locally.
     pub fn verify_sequence_number(&self, db: &dyn DbReader) {
+        println!(
+            "[{}] verify {} account sequence numbers.",
+            now_fmt!(),
+            self.accounts_cache.len(),
+        );
+        let bar = get_progress_bar(self.accounts_cache.len());
         for account in &self.accounts_cache {
             let address = account.address;
             let blob = db
@@ -322,7 +368,10 @@ impl TransactionGenerator {
                 .expect("Account must exist.");
             let account_resource = AccountResource::try_from(&blob).unwrap();
             assert_eq!(account_resource.sequence_number(), account.sequence_number);
+            bar.inc(1);
         }
+        bar.finish();
+        println!("[{}] done.", now_fmt!());
     }
 
     /// Drops the sender to notify the receiving end of the channel.

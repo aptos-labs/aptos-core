@@ -12,6 +12,7 @@ edition = "2018"
 [dependencies]
 bcs = "0.1.2"
 criterion = "0.3.4"
+chrono = "0.4.19"
 indicatif = "0.15.0"
 itertools = { version = "0.10.0", default-features = false }
 jemallocator = { version = "0.3.2", features = ["profiling", "unprefixed_malloc_on_supported_platforms"] }

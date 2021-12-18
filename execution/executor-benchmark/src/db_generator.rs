@@ -19,7 +19,6 @@ use executor::{
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
 };
 use executor_types::BlockExecutorTrait;
-use indicatif::{ProgressBar, ProgressStyle};
 use std::{
     fs,
     path::Path,
@@ -66,12 +65,6 @@ pub fn run(
     let (commit_sender, commit_receiver) = mpsc::sync_channel(3 /* bound */);
 
     // Set a progressing bar
-    let bar = Arc::new(ProgressBar::new(num_accounts as u64 * 2));
-    bar.set_style(
-        ProgressStyle::default_bar().template("[{elapsed}] {bar:100.cyan/blue} {percent}%"),
-    );
-    let exe_thread_bar = Arc::clone(&bar);
-
     // Spawn threads to run transaction generator, executor and committer separately.
     let gen_thread = std::thread::Builder::new()
         .name("txn_generator".to_string())
@@ -92,9 +85,7 @@ pub fn run(
                 Some(commit_sender),
             );
             while let Ok(transactions) = block_receiver.recv() {
-                let version_bump = transactions.len() as u64;
                 exe.execute_block(transactions);
-                exe_thread_bar.inc(version_bump);
             }
         })
         .expect("Failed to spawn transaction executor thread.");
@@ -114,8 +105,6 @@ pub fn run(
     commit_thread.join().unwrap();
     // Do a sanity check on the sequence number to make sure all transactions are committed.
     generator.verify_sequence_number(db.as_ref());
-
-    bar.finish();
 
     let final_version = generator.version();
     // Write metadata

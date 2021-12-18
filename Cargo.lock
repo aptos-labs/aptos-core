@@ -3094,6 +3094,7 @@ name = "executor-benchmark"
 version = "0.1.0"
 dependencies = [
  "bcs",
+ "chrono",
  "criterion",
  "diem-config",
  "diem-crypto",
