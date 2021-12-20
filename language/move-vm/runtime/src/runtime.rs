@@ -24,7 +24,10 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    data_store::DataStore, gas_schedule::GasStatus, loaded_data::runtime_types::Type, values::Value,
+    data_store::DataStore,
+    gas_schedule::GasStatus,
+    loaded_data::runtime_types::Type,
+    values::{Locals, Value},
 };
 use std::collections::BTreeSet;
 use tracing::warn;
@@ -187,6 +190,45 @@ impl VMRuntime {
         Ok(())
     }
 
+    fn deserialize_value(&self, ty: &Type, arg: Vec<u8>) -> PartialVMResult<Value> {
+        let layout = match self.loader.type_to_type_layout(ty) {
+            Ok(layout) => layout,
+            Err(_err) => {
+                warn!("[VM] failed to get layout from type");
+                return Err(PartialVMError::new(
+                    StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION,
+                ));
+            }
+        };
+
+        match Value::simple_deserialize(&arg, &layout) {
+            Some(val) => Ok(val),
+            None => {
+                warn!("[VM] failed to deserialize argument");
+                Err(PartialVMError::new(
+                    StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+                ))
+            }
+        }
+    }
+
+    fn deserialize_arg(&self, ty: &Type, arg: Vec<u8>) -> PartialVMResult<Value> {
+        if is_signer_reference(ty) {
+            // TODO signer_reference should be version gated
+            match MoveValue::simple_deserialize(&arg, &MoveTypeLayout::Signer) {
+                Ok(MoveValue::Signer(addr)) => Ok(Value::signer_reference(addr)),
+                Ok(_) | Err(_) => {
+                    warn!("[VM] failed to deserialize argument");
+                    Err(PartialVMError::new(
+                        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+                    ))
+                }
+            }
+        } else {
+            self.deserialize_value(ty, arg)
+        }
+    }
+
     fn deserialize_args(
         &self,
         _file_format_version: u32,
@@ -210,39 +252,7 @@ impl VMRuntime {
         // Special rule: `&signer` can be created from data with the layout of `signer`.
         let mut vals = vec![];
         for (ty, arg) in tys.iter().zip(args.into_iter()) {
-            let val = if is_signer_reference(ty) {
-                // TODO signer_reference should be version gated
-                match MoveValue::simple_deserialize(&arg, &MoveTypeLayout::Signer) {
-                    Ok(MoveValue::Signer(addr)) => Value::signer_reference(addr),
-                    Ok(_) | Err(_) => {
-                        warn!("[VM] failed to deserialize argument");
-                        return Err(PartialVMError::new(
-                            StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-                        ));
-                    }
-                }
-            } else {
-                let layout = match self.loader.type_to_type_layout(ty) {
-                    Ok(layout) => layout,
-                    Err(_err) => {
-                        warn!("[VM] failed to get layout from type");
-                        return Err(PartialVMError::new(
-                            StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION,
-                        ));
-                    }
-                };
-
-                match Value::simple_deserialize(&arg, &layout) {
-                    Some(val) => val,
-                    None => {
-                        warn!("[VM] failed to deserialize argument");
-                        return Err(PartialVMError::new(
-                            StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-                        ));
-                    }
-                }
-            };
-            vals.push(val)
+            vals.push(self.deserialize_arg(ty, arg)?)
         }
 
         Ok(vals)
@@ -337,6 +347,102 @@ impl VMRuntime {
         }
 
         Ok(())
+    }
+
+    pub(crate) fn execute_function_for_effects(
+        &self,
+        module: &ModuleId,
+        function_name: &IdentStr,
+        ty_args: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+        data_store: &mut impl DataStore,
+        gas_status: &mut GasStatus,
+    ) -> VMResult<(Vec<Vec<u8>>, Vec<Vec<u8>>)> {
+        // TODO: convert numerous unwraps below into the appropriate error
+        let is_script_execution = false;
+        let (func, ty_args, params, return_tys) = self.loader.load_function(
+            function_name,
+            module,
+            &ty_args,
+            is_script_execution,
+            data_store,
+        )?;
+
+        // actuals to be passed into the function. this can contain pure values, or references to dummy locals
+        let mut actuals = Vec::new();
+        // create a list of dummy locals. each element of this list is a value passed by reference to `actuals`
+        let mut dummy_locals = Locals::new(params.len());
+        // index and (inner) type of mutable ref inputs. we will use them to return the effects of `func` on these inputs
+        let mut mut_ref_inputs = Vec::new();
+        for (idx, (arg, arg_type)) in args.into_iter().zip(params).enumerate() {
+            match arg_type {
+                Type::MutableReference(inner_t) => {
+                    dummy_locals
+                        .store_loc(idx, self.deserialize_value(&inner_t, arg).unwrap())
+                        .unwrap();
+                    actuals.push(dummy_locals.borrow_loc(idx).unwrap());
+                    mut_ref_inputs.push((idx, *inner_t));
+                }
+                Type::Reference(inner_t) => {
+                    dummy_locals
+                        .store_loc(idx, self.deserialize_value(&inner_t, arg).unwrap())
+                        .unwrap();
+                    actuals.push(dummy_locals.borrow_loc(idx).unwrap())
+                }
+                arg_type => actuals.push(self.deserialize_value(&arg_type, arg).unwrap()),
+            }
+        }
+
+        let return_vals =
+            Interpreter::entrypoint(func, ty_args, actuals, data_store, gas_status, &self.loader)?;
+
+        let return_layouts = return_tys
+            .iter()
+            .map(|ty| {
+                self.loader.type_to_type_layout(ty).map_err(|_err| {
+                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                        .with_message(
+                            "cannot be called with non-serializable return type".to_string(),
+                        )
+                        .finish(Location::Undefined)
+                })
+            })
+            .collect::<VMResult<Vec<_>>>()?;
+
+        if return_layouts.len() != return_vals.len() {
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(format!(
+                        "declared {} return types, but got {} return values",
+                        return_layouts.len(),
+                        return_vals.len()
+                    ))
+                    .finish(Location::Undefined),
+            );
+        }
+
+        let mut serialized_return_vals = vec![];
+        for (val, layout) in return_vals.into_iter().zip(return_layouts.iter()) {
+            serialized_return_vals.push(val.simple_serialize(layout).ok_or_else(|| {
+                PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                    .with_message("failed to serialize return values".to_string())
+                    .finish(Location::Undefined)
+            })?)
+        }
+
+        let mut serialized_mut_ref_outputs = Vec::new();
+        for (idx, ty) in mut_ref_inputs {
+            let val = dummy_locals.move_loc(idx).unwrap();
+            let layout = self.loader.type_to_type_layout(&ty).map_err(|_err| {
+                PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                    .with_message("cannot be called with non-serializable return type".to_string())
+                    .finish(Location::Undefined)
+            })?;
+            let val_bytes = val.simple_serialize(&layout).unwrap();
+            serialized_mut_ref_outputs.push(val_bytes)
+        }
+
+        Ok((serialized_return_vals, serialized_mut_ref_outputs))
     }
 
     fn execute_function_impl<F>(
