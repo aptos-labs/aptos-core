@@ -62,6 +62,15 @@ impl TwoChainTimeout {
             hqc_round: self.hqc_round(),
         }
     }
+
+    pub fn verify(&self, validators: &ValidatorVerifier) -> anyhow::Result<()> {
+        ensure!(
+            self.hqc_round() < self.round(),
+            "Timeout round should be larger than the QC round"
+        );
+        self.quorum_cert.verify(validators)?;
+        Ok(())
+    }
 }
 
 impl Display for TwoChainTimeout {
@@ -121,13 +130,9 @@ impl TwoChainTimeoutCertificate {
     /// 2. all signatures are properly formed (timeout.epoch, timeout.round, round)
     /// 3. timeout.hqc_round == max(signed round)
     pub fn verify(&self, validators: &ValidatorVerifier) -> anyhow::Result<()> {
-        // Verify the highest quorum cert validity.
+        // Verify the highest timeout validity.
+        self.timeout.verify(validators)?;
         let hqc_round = self.timeout.hqc_round();
-        ensure!(
-            hqc_round < self.timeout.round(),
-            "Timeout round should be larger than the QC round"
-        );
-        self.timeout.quorum_cert().verify(validators)?;
         let mut signed_round = 0;
         validators.check_voting_power(self.signatures.keys())?;
         for (author, (qc_round, signature)) in &self.signatures {

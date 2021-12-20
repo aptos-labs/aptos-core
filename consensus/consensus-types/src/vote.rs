@@ -193,10 +193,7 @@ impl Vote {
                     == (self.epoch(), self.vote_data.proposed().round()),
                 "2-chain timeout has different (epoch, round) than Vote"
             );
-            timeout
-                .quorum_cert()
-                .verify(validator)
-                .context("Failed to verify QC from 2-chain timeout")?;
+            timeout.verify(validator)?;
             validator
                 .verify(self.author(), &timeout.signing_format(), signature)
                 .context("Failed to verify 2-chain timeout signature")?;

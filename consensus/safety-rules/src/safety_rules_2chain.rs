@@ -22,7 +22,9 @@ impl SafetyRules {
         self.signer()?;
         let mut safety_data = self.persistent_storage.safety_data()?;
         self.verify_epoch(timeout.epoch(), &safety_data)?;
-        self.verify_qc(timeout.quorum_cert())?;
+        timeout
+            .verify(&self.epoch_state()?.verifier)
+            .map_err(|e| Error::InvalidTimeout(e.to_string()))?;
         if let Some(tc) = timeout_cert {
             self.verify_tc(tc)?;
         }

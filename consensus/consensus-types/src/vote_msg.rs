@@ -54,6 +54,10 @@ impl VoteMsg {
             self.vote().epoch() == self.sync_info.epoch(),
             "VoteMsg has different epoch"
         );
+        ensure!(
+            self.vote().vote_data().proposed().round() > self.sync_info.highest_round(),
+            "Vote Round should be higher than SyncInfo"
+        );
         if let Some((timeout, _)) = self.vote().two_chain_timeout() {
             ensure!(
                 timeout.hqc_round() <= self.sync_info.highest_certified_round(),

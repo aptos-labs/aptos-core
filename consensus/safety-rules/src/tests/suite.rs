@@ -961,6 +961,15 @@ fn test_2chain_timeout(constructor: &Callback) {
             .unwrap_err(),
         Error::NotSafeToTimeout(4, 1, 3, 2)
     );
+    assert!(matches!(
+        safety_rules
+            .sign_timeout_with_qc(
+                &TwoChainTimeout::new(1, 1, a3.vote_proposal.block().quorum_cert().clone(),),
+                Some(make_timeout_cert(2, &genesis_qc, &signer)).as_ref()
+            )
+            .unwrap_err(),
+        Error::InvalidTimeout(_)
+    ));
 }
 
 /// Test that we can succesfully sign a valid commit vote

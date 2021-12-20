@@ -53,6 +53,8 @@ pub enum Error {
     InvalidOrderedLedgerInfo(String),
     #[error("Waypoint out of date: Previous waypoint version {0}, updated version {1}, current epoch {2}, provided epoch {3}")]
     WaypointOutOfDate(u64, u64, u64, u64),
+    #[error("Invalid Timeout: {0}")]
+    InvalidTimeout(String),
 }
 
 impl From<serde_json::Error> for Error {
