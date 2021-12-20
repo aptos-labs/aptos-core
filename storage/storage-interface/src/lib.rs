@@ -28,14 +28,9 @@ use diem_types::{
         TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
     },
 };
-use itertools::Itertools;
 use move_core_types::resolver::{ModuleResolver, ResourceResolver};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{HashMap, HashSet},
-    convert::TryFrom,
-    sync::Arc,
-};
+use std::{convert::TryFrom, sync::Arc};
 use thiserror::Error;
 
 #[cfg(any(feature = "testing", feature = "fuzzing"))]
@@ -519,50 +514,26 @@ pub trait DbReader: Send + Sync {
 }
 
 impl MoveStorage for &dyn DbReader {
-    fn batch_fetch_resources(&self, access_paths: Vec<AccessPath>) -> Result<Vec<Vec<u8>>> {
-        self.batch_fetch_resources_by_version(access_paths, self.fetch_synced_version()?)
+    fn fetch_resource(&self, access_path: AccessPath) -> Result<Vec<u8>> {
+        self.fetch_resource_by_version(access_path, self.fetch_synced_version()?)
     }
 
-    fn batch_fetch_resources_by_version(
+    fn fetch_resource_by_version(
         &self,
-        access_paths: Vec<AccessPath>,
+        access_path: AccessPath,
         version: Version,
-    ) -> Result<Vec<Vec<u8>>> {
-        let addresses: Vec<AccountAddress> = access_paths
-            .iter()
-            .collect::<HashSet<_>>()
-            .iter()
-            .map(|path| path.address)
-            .collect();
+    ) -> Result<Vec<u8>> {
+        let (account_state_blob, _) =
+            self.get_account_state_with_proof_by_version(access_path.address, version)?;
+        let account_state =
+            AccountState::try_from(&account_state_blob.ok_or_else(|| {
+                format_err!("missing blob in account state/account does not exist")
+            })?)?;
 
-        let results = addresses
-            .iter()
-            .map(|addr| self.get_account_state_with_proof_by_version(*addr, version))
-            .collect::<Result<Vec<_>>>()?;
-
-        // Account address --> AccountState
-        let account_states = addresses
-            .iter()
-            .zip_eq(results)
-            .map(|(addr, (blob, _proof))| {
-                let account_state = AccountState::try_from(&blob.ok_or_else(|| {
-                    format_err!("missing blob in account state/account does not exist")
-                })?)?;
-                Ok((addr, account_state))
-            })
-            .collect::<Result<HashMap<_, AccountState>>>()?;
-
-        access_paths
-            .iter()
-            .map(|path| {
-                Ok(account_states
-                    .get(&path.address)
-                    .ok_or_else(|| format_err!("missing account state for queried access path"))?
-                    .get(&path.path)
-                    .ok_or_else(|| format_err!("no value found in account state"))?
-                    .clone())
-            })
-            .collect()
+        Ok(account_state
+            .get(&access_path.path)
+            .ok_or_else(|| format_err!("no value found in account state"))?
+            .clone())
     }
 
     fn fetch_config_by_version(&self, config_id: ConfigID, version: Version) -> Result<Vec<u8>> {
