@@ -20,15 +20,6 @@
 //! ```bash
 //! cargo run -p diem-faucet -- -h
 //! ```
-//!
-//! ## Development
-//!
-//! Test with diem-swarm by add -m option:
-//!
-//! ```bash
-//! cargo run -p diem-swarm -- -s -l -n 1 -m
-//! ```
-//!
 
 use anyhow::{anyhow, Result};
 use diem_logger::info;

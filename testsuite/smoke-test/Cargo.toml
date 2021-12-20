@@ -59,7 +59,6 @@ diem-logger = { path = "../../crates/diem-logger" }
 diem-management = { path = "../../config/management", features = ["testing"] }
 diem-operational-tool = {path = "../../config/management/operational", features = ["testing"] }
 diem-secure-storage = { path = "../../secure/storage", features = ["testing"] }
-diem-swarm = { path = "../diem-swarm"}
 diem-time-service = { path = "../../crates/diem-time-service", features = ["testing"] }
 diem-vault-client = { path = "../../secure/storage/vault", features = ["fuzzing"] }
 diem-validator-interface = { path = "../../diem-move/diem-validator-interface" }

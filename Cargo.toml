@@ -186,7 +186,6 @@ members = [
     "testsuite/cli",
     "testsuite/diem-fuzzer",
     "testsuite/diem-fuzzer/fuzz",
-    "testsuite/diem-swarm",
     "testsuite/forge",
     "testsuite/forge-cli",
     "testsuite/generate-format",

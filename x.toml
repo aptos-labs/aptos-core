@@ -169,7 +169,6 @@ members = [
     "diem-proptest-helpers",
     "diem-rest-client",
     "diem-retrier",
-    "diem-swarm",
     "diem-transactional-test-harness",
     "diem-transaction-benchmarks",
     "diem-wallet",
