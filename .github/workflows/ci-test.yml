@@ -179,7 +179,7 @@ jobs:
     strategy:
       matrix:
         target_images:
-          [client faucet forge, init tools validator validator-tcb]
+          [faucet forge, init tools validator validator-tcb]
     steps:
       - uses: actions/checkout@v2.4.0
         with:
@@ -572,8 +572,6 @@ jobs:
         run: docker/diem-build.sh docker/validator/Dockerfile diem/validator:test
       - name: build faucet image
         run: docker/diem-build.sh docker/faucet/Dockerfile diem/faucet:test
-      - name: build client image
-        run: docker/diem-build.sh docker/client/Dockerfile diem/client:test
       - name: run validator-client test
         run: docker/compose/test_docker_compose.sh
         env:

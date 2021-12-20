@@ -32,4 +32,4 @@ diem-proptest-helpers = { path = "../../../crates/diem-proptest-helpers" }
 diem-types = { path = "../../../types", features = ["fuzzing"] }
 
 [features]
-fuzzing = ["proptest", "diem-proptest-helpers", "diem-types"]
+fuzzing = ["proptest", "diem-proptest-helpers", "diem-types", "diem-types/fuzzing"]

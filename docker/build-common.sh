@@ -47,7 +47,6 @@ fi
 if [ "$IMAGE_TARGETS" = "test" ] || [ "$IMAGE_TARGETS" = "all"  ]; then
   # These non-release binaries are built separately to avoid feature unification issues
   cargo build --release \
-          -p cli \
           -p diem-faucet \
           -p forge-cli \
           "$@"
