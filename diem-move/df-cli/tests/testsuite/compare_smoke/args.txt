@@ -1,2 +1,2 @@
 sandbox publish
-sandbox run scripts/set.move --dry-run
+sandbox run scripts/set_script.move --dry-run

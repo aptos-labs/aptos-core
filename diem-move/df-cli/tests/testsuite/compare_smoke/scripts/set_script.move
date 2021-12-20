@@ -1,6 +1,6 @@
 script {
 use 0x2::Set;
-fun set() {
+fun set_script() {
     // add 10 elements in arbitrary order, check sortedness at the end
     let s = Set::empty<u64>();
     Set::insert(&mut s, 4);
