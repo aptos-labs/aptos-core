@@ -19,10 +19,10 @@ pbkdf2 = "0.7.3"
 serde = "1.0.124"
 sha2 = "0.9.3"
 thiserror = "1.0.24"
-diem-crypto = { path = "../../../crates/diem-crypto", features = ["fuzzing"] }
-diem-temppath = { path = "../../../crates/diem-temppath/" }
-diem-types = { path = "../../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
+diem-crypto = { path = "../diem-crypto", features = ["fuzzing"] }
+diem-temppath = { path = "../diem-temppath" }
+diem-types = { path = "../../types" }
+diem-workspace-hack = { version = "0.1", path = "../diem-workspace-hack" }
 mirai-annotations = "1.10.1"
 
 [features]

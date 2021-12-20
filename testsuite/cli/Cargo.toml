@@ -29,7 +29,7 @@ generate-key = { path = "../../config/generate-key" }
 crash-handler = { path = "../../crates/crash-handler" }
 diem-crypto = { path = "../../crates/diem-crypto" }
 bcs = "0.1.2"
-diem-wallet = { path = "diem-wallet" }
+diem-wallet = { path = "../../crates/diem-wallet" }
 diem-client = { path = "../../crates/diem-client" }
 diem-infallible = { path = "../../crates/diem-infallible" }
 diem-logger =  { path = "../../crates/diem-logger" }
