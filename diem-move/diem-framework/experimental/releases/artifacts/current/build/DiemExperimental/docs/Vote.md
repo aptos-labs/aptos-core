@@ -35,6 +35,7 @@ A typical workflow would look like the following
 -  [Function `remove_ballot_internal`](#0x1_Vote_remove_ballot_internal)
 -  [Function `remove_ballot`](#0x1_Vote_remove_ballot)
 -  [Function `incr_counter`](#0x1_Vote_incr_counter)
+-  [Module Specification](#@Module_Specification_1)
 
 
 <pre><code><b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/BCS.md#0x1_BCS">0x1::BCS</a>;
@@ -252,6 +253,32 @@ with the ballots created by a proposer
 
 </details>
 
+<details>
+<summary>Specification</summary>
+
+All <code><a href="Vote.md#0x1_Vote_BallotID">BallotID</a></code>s of <code><a href="Vote.md#0x1_Vote_Ballot">Ballot</a></code>s in a <code><a href="Vote.md#0x1_Vote_Ballots">Ballots</a>.ballots</code> vector are unique.
+
+
+<pre><code><b>invariant</b> <a href="Vote.md#0x1_Vote_unique_ballots">unique_ballots</a>(ballots);
+</code></pre>
+
+
+Asserts that ballot ID is not in ballots vector.  Used in loop invariant
+and post-condition of remove_ballot_internal
+
+
+<a name="0x1_Vote_ballot_id_does_not_exist"></a>
+
+
+<pre><code><b>fun</b> <a href="Vote.md#0x1_Vote_ballot_id_does_not_exist">ballot_id_does_not_exist</a>&lt;Proposal&gt;(ballot_id: <a href="Vote.md#0x1_Vote_BallotID">BallotID</a>, ballots: vector&lt;<a href="Vote.md#0x1_Vote_Ballot">Ballot</a>&lt;Proposal&gt;&gt;, i: u64): bool {
+   <b>forall</b> j in 0..i: ballots[j].ballot_id != ballot_id
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_Vote_BallotCounter"></a>
 
 ## Resource `BallotCounter`
@@ -465,6 +492,16 @@ in the ballot
 
 
 
+<a name="0x1_Vote_EINVALID_NUM_VOTES"></a>
+
+Num_votes must be greater than 0, so that election is not won when started
+
+
+<pre><code><b>const</b> <a href="Vote.md#0x1_Vote_EINVALID_NUM_VOTES">EINVALID_NUM_VOTES</a>: u64 = 9;
+</code></pre>
+
+
+
 <a name="0x1_Vote_EINVALID_TIMESTAMP"></a>
 
 The provided timestamp(s) were invalid
@@ -596,6 +633,7 @@ Create a ballot under the signer's address and return the <code><a href="Vote.md
     <b>let</b> ballot_address = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(ballot_account);
 
     <b>assert</b>!(<a href="DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>() &lt; expiration_timestamp_secs, <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="Vote.md#0x1_Vote_EINVALID_TIMESTAMP">EINVALID_TIMESTAMP</a>));
+    <b>assert</b>!(num_votes_required &gt; 0, <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="Vote.md#0x1_Vote_EINVALID_NUM_VOTES">EINVALID_NUM_VOTES</a>));
 
     <b>if</b> (!<b>exists</b>&lt;<a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a>&gt;(ballot_address)) {
         <b>move_to</b>(ballot_account, <a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a> {
@@ -639,6 +677,85 @@ Create a ballot under the signer's address and return the <code><a href="Vote.md
         },
     );
     ballot_id
+}
+</code></pre>
+
+
+
+</details>
+
+<details>
+<summary>Specification</summary>
+
+
+create_ballot sets up a <code><a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;</code> resource at the <code>ballot_account</code>
+address if one does not already exist.
+
+
+<pre><code><b>ensures</b> <b>exists</b>&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(ballot_account));
+</code></pre>
+
+
+returns a new active <code><a href="Vote.md#0x1_Vote_BallotID">BallotID</a></code>.
+
+
+<pre><code><b>ensures</b> <a href="Vote.md#0x1_Vote_is_active">is_active</a>&lt;Proposal&gt;(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(ballot_account), result);
+</code></pre>
+
+
+Returns "true" iff there are no ballots in v at indices less than i whose
+expiration time is less than or equal to the current time.
+
+
+<a name="0x1_Vote_no_expired_ballots"></a>
+
+
+<pre><code><b>fun</b> <a href="Vote.md#0x1_Vote_no_expired_ballots">no_expired_ballots</a>&lt;Proposal&gt;(ballots: vector&lt;<a href="Vote.md#0x1_Vote_Ballot">Ballot</a>&lt;Proposal&gt;&gt;, now_seconds: u64, i: u64): bool {
+   <b>forall</b> j in 0..i: ballots[j].expiration_timestamp_secs &gt;= now_seconds
+}
+</code></pre>
+
+
+
+
+<a name="0x1_Vote_extract_ballot_ids"></a>
+
+
+<pre><code><b>fun</b> <a href="Vote.md#0x1_Vote_extract_ballot_ids">extract_ballot_ids</a>&lt;Proposal&gt;(v: vector&lt;<a href="Vote.md#0x1_Vote_Ballot">Ballot</a>&lt;Proposal&gt;&gt;): vector&lt;<a href="Vote.md#0x1_Vote_BallotID">BallotID</a>&gt; {
+   <b>choose</b> result: vector&lt;<a href="Vote.md#0x1_Vote_BallotID">BallotID</a>&gt; <b>where</b> len(result) == len(v)
+   && (<b>forall</b> i in 0..len(v): result[i] == v[i].ballot_id)
+}
+</code></pre>
+
+
+Common post-conditions for <code>gc_internal</code> and <code>gc_ballots</code> (which just calls <code>gc_internal</code>)
+
+
+<a name="0x1_Vote_GcEnsures"></a>
+
+
+<pre><code><b>schema</b> <a href="Vote.md#0x1_Vote_GcEnsures">GcEnsures</a>&lt;Proposal&gt; {
+    ballot_data: <a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;;
+    <b>let</b> pre_ballots = ballot_data.ballots;
+    <b>let</b> <b>post</b> post_ballots = ballot_data.ballots;
+}
+</code></pre>
+
+
+Ballots afterwards is a subset of ballots before.
+
+
+<pre><code><b>schema</b> <a href="Vote.md#0x1_Vote_GcEnsures">GcEnsures</a>&lt;Proposal&gt; {
+    <b>ensures</b> <a href="Vote.md#0x1_Vote_vector_subset">vector_subset</a>(post_ballots, pre_ballots);
+}
+</code></pre>
+
+
+All expired ballots are removed
+
+
+<pre><code><b>schema</b> <a href="Vote.md#0x1_Vote_GcEnsures">GcEnsures</a>&lt;Proposal&gt; {
+    <b>ensures</b> <a href="Vote.md#0x1_Vote_no_expired_ballots">no_expired_ballots</a>&lt;Proposal&gt;(post_ballots, <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_seconds">DiemTimestamp::spec_now_seconds</a>(), len(post_ballots));
 }
 </code></pre>
 
@@ -805,6 +922,102 @@ and does not need to have the same address as <code>addr</code>
 
 </details>
 
+<details>
+<summary>Specification</summary>
+
+
+
+<pre><code><b>include</b> <a href="Vote.md#0x1_Vote_GcEnsures">GcEnsures</a>&lt;Proposal&gt;{ballot_data: <b>global</b>&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(addr)};
+</code></pre>
+
+
+
+
+<a name="0x1_Vote_ballot_ids_have_correct_ballot_address"></a>
+
+
+<pre><code><b>fun</b> <a href="Vote.md#0x1_Vote_ballot_ids_have_correct_ballot_address">ballot_ids_have_correct_ballot_address</a>&lt;Proposal&gt;(proposer_address: <b>address</b>): bool {
+  <b>let</b> ballots = <a href="Vote.md#0x1_Vote_get_ballots">get_ballots</a>&lt;Proposal&gt;(proposer_address);
+  <b>forall</b> i in 0..len(ballots): ballots[i].ballot_id.proposer == proposer_address
+}
+</code></pre>
+
+
+Every ballot for Proposal at proposer_address has a ballot counter field that is less
+than the current value of the BallotCounter.counter published at proposer_address.
+This property is necessary to show that the ballot IDs are not repeated in the
+Ballots.ballots vector
+
+
+<a name="0x1_Vote_existing_ballots_have_small_counters"></a>
+
+
+<pre><code><b>fun</b> <a href="Vote.md#0x1_Vote_existing_ballots_have_small_counters">existing_ballots_have_small_counters</a>&lt;Proposal&gt;(proposer_address: <b>address</b>): bool {
+   // Just <b>return</b> <b>true</b> <b>if</b> there is no <a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt; published at proposer_address
+   // get_ballots may be undefined here, but we only <b>use</b> it when we know the <a href="Vote.md#0x1_Vote_Ballots">Ballots</a>
+   // is published (in the next property.
+   <b>let</b> ballots = <a href="Vote.md#0x1_Vote_get_ballots">get_ballots</a>&lt;Proposal&gt;(proposer_address);
+   <b>exists</b>&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(proposer_address)
+   ==&gt; (<b>forall</b> i in 0..len(ballots):
+           ballots[i].ballot_id.counter &lt; <b>global</b>&lt;<a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a>&gt;(proposer_address).counter)
+}
+</code></pre>
+
+
+Every ballot in Ballots<Proposal>.ballots is active or expired.
+I.e., none have sum >= required.
+TODO: This should be part of is_active/expired, and should follow from an invariant
+that every BallotID is in one of the legal states.
+
+
+<a name="0x1_Vote_no_winning_ballots_in_vector"></a>
+
+
+<pre><code><b>fun</b> <a href="Vote.md#0x1_Vote_no_winning_ballots_in_vector">no_winning_ballots_in_vector</a>&lt;Proposal&gt;(proposer_address: <b>address</b>): bool {
+   <b>let</b> ballots = <a href="Vote.md#0x1_Vote_get_ballots">get_ballots</a>&lt;Proposal&gt;(proposer_address);
+   <b>forall</b> i in 0..len(ballots):
+       ballots[i].total_weighted_votes_received &lt; ballots[i].num_votes_required
+}
+</code></pre>
+
+
+
+ballots in vector all have the proposer address in their ballot IDs.
+
+
+<pre><code><b>invariant</b>&lt;Proposal&gt; [suspendable] <b>forall</b> proposer_address: <b>address</b>:
+    <a href="Vote.md#0x1_Vote_ballot_ids_have_correct_ballot_address">ballot_ids_have_correct_ballot_address</a>&lt;Proposal&gt;(proposer_address);
+<b>invariant</b>&lt;Proposal&gt;
+    (<b>forall</b> addr: <b>address</b>: <a href="Vote.md#0x1_Vote_existing_ballots_have_small_counters">existing_ballots_have_small_counters</a>&lt;Proposal&gt;(addr))
+    && (<b>forall</b> ballot_addr: <b>address</b>: <a href="Vote.md#0x1_Vote_ballot_counter_initialized_first">ballot_counter_initialized_first</a>&lt;Proposal&gt;(ballot_addr));
+</code></pre>
+
+
+Every ballot in the vector has total_weighted_votes_received < num_votes_required
+So the ballot will eventually be removed either by accumulating enough votes or by expiring
+and being garbage-collected
+
+
+<pre><code><b>invariant</b>&lt;Proposal&gt; <b>forall</b> addr: <b>address</b>: <a href="Vote.md#0x1_Vote_no_winning_ballots_in_vector">no_winning_ballots_in_vector</a>&lt;Proposal&gt;(addr);
+</code></pre>
+
+
+There are no duplicate Ballot IDs in the Ballots<Proposer>.ballots vector
+
+
+<a name="0x1_Vote_unique_ballots"></a>
+
+
+<pre><code><b>fun</b> <a href="Vote.md#0x1_Vote_unique_ballots">unique_ballots</a>&lt;Proposal&gt;(ballots: vector&lt;<a href="Vote.md#0x1_Vote_Ballot">Ballot</a>&lt;Proposal&gt;&gt;): bool {
+   <b>forall</b> i in 0..len(ballots), j in 0..len(ballots):
+       ballots[i].ballot_id == ballots[j].ballot_id ==&gt; i == j
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_Vote_gc_test_helper"></a>
 
 ## Function `gc_test_helper`
@@ -824,6 +1037,29 @@ and does not need to have the same address as <code>addr</code>
     addr: <b>address</b>,
 ): vector&lt;<a href="Vote.md#0x1_Vote_BallotID">BallotID</a>&gt;  <b>acquires</b> <a href="Vote.md#0x1_Vote_Ballots">Ballots</a> {
     <a href="Vote.md#0x1_Vote_gc_internal">gc_internal</a>&lt;Proposal&gt;(<b>borrow_global_mut</b>&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(addr))
+}
+</code></pre>
+
+
+
+</details>
+
+<details>
+<summary>Specification</summary>
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+
+<a name="0x1_Vote_vector_subset"></a>
+
+
+<pre><code><b>fun</b> <a href="Vote.md#0x1_Vote_vector_subset">vector_subset</a>&lt;Elt&gt;(v1: vector&lt;Elt&gt;, v2: vector&lt;Elt&gt;): bool {
+   <b>forall</b> e in v1: <b>exists</b> i in 0..len(v2): v2[i] == e
 }
 </code></pre>
 
@@ -853,7 +1089,15 @@ and does not need to have the same address as <code>addr</code>
     <b>let</b> remove_handle = &<b>mut</b> ballot_data.remove_ballot_handle;
     <b>let</b> i = 0;
     <b>let</b> removed_ballots = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_empty">Vector::empty</a>();
-    <b>while</b> (i &lt; <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(ballots)) {
+    <b>while</b> ({
+        <b>spec</b> {
+            <b>invariant</b> <a href="Vote.md#0x1_Vote_no_expired_ballots">no_expired_ballots</a>(ballots, <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_seconds">DiemTimestamp::spec_now_seconds</a>(), i);
+            <b>invariant</b> <a href="Vote.md#0x1_Vote_vector_subset">vector_subset</a>(ballots, <b>old</b>(ballot_data).ballots);
+            <b>invariant</b> i &lt;= len(ballots);
+            <b>invariant</b> 0 &lt;= i;
+        };
+        i &lt; <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(ballots)
+    }) {
         <b>let</b> ballot = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(ballots, i);
         <b>if</b> (ballot.expiration_timestamp_secs &lt; <a href="DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>()) {
             <b>let</b> ballot_id = *(&ballot.ballot_id);
@@ -871,6 +1115,19 @@ and does not need to have the same address as <code>addr</code>
     };
     removed_ballots
 }
+</code></pre>
+
+
+
+</details>
+
+<details>
+<summary>Specification</summary>
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>include</b> <a href="Vote.md#0x1_Vote_GcEnsures">GcEnsures</a>&lt;Proposal&gt;;
 </code></pre>
 
 
@@ -902,7 +1159,10 @@ and does not need to have the same address as <code>addr</code>
     <b>let</b> remove_handle = &<b>mut</b> ballot_data.remove_ballot_handle;
     <b>let</b> i = 0;
     <b>let</b> len = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(ballots);
-    <b>while</b> (i &lt; len) {
+    <b>while</b> ({
+        <b>spec</b> { <b>invariant</b> <a href="Vote.md#0x1_Vote_ballot_id_does_not_exist">ballot_id_does_not_exist</a>&lt;Proposal&gt;(ballot_id, ballots, i); };
+        i &lt; len
+    }) {
         <b>if</b> (&<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(ballots, i).ballot_id == &ballot_id) {
             <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_swap_remove">Vector::swap_remove</a>(ballots, i);
             <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>&lt;<a href="Vote.md#0x1_Vote_RemoveBallotEvent">RemoveBallotEvent</a>&gt;(
@@ -916,6 +1176,20 @@ and does not need to have the same address as <code>addr</code>
         i = i + 1;
     };
 }
+</code></pre>
+
+
+
+</details>
+
+<details>
+<summary>Specification</summary>
+
+
+
+<pre><code><b>let</b> <b>post</b> ballots = <a href="Vote.md#0x1_Vote_get_ballots">get_ballots</a>&lt;Proposal&gt;(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account));
+<b>ensures</b>
+    <a href="Vote.md#0x1_Vote_ballot_id_does_not_exist">ballot_id_does_not_exist</a>&lt;Proposal&gt;(ballot_id, ballots, len(ballots));
 </code></pre>
 
 
@@ -953,6 +1227,20 @@ does nothing
 
 </details>
 
+<details>
+<summary>Specification</summary>
+
+
+
+<pre><code><b>let</b> <b>post</b> ballots = <a href="Vote.md#0x1_Vote_get_ballots">get_ballots</a>&lt;Proposal&gt;(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account));
+<b>ensures</b>
+    <a href="Vote.md#0x1_Vote_ballot_id_does_not_exist">ballot_id_does_not_exist</a>&lt;Proposal&gt;(ballot_id, ballots, len(ballots));
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_Vote_incr_counter"></a>
 
 ## Function `incr_counter`
@@ -982,3 +1270,155 @@ account
 
 
 </details>
+
+<a name="@Module_Specification_1"></a>
+
+## Module Specification
+
+****************************************************************
+Specs
+****************************************************************
+I (DD) was experimenting with some new ideas about top-down specification.
+This is a partial specification, but it does have some interesting properties
+and is good for testing the Prover.
+A "Ballot" keeps track of an election for a "Proposal" type at a particular address.
+To conduct an election at a particular address, there must be a BallotCounter
+published at that address.  This keeps track of a counter that is used to generate
+unique BallotIDs.
+
+Once the BallotCounter is published, it remains published forever
+
+
+<pre><code><b>invariant</b> <b>update</b> <b>forall</b> ballot_addr: <b>address</b> <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a>&gt;(ballot_addr)):
+    <b>exists</b>&lt;<a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a>&gt;(ballot_addr);
+</code></pre>
+
+
+Once a proposal is initialized, it stays initialized forever.
+
+
+<pre><code><b>invariant</b>&lt;Proposal&gt; <b>update</b> <b>forall</b> ballot_addr: <b>address</b>
+    <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(ballot_addr)):
+        <b>exists</b>&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(ballot_addr);
+</code></pre>
+
+
+Predicate to test if a <code><a href="Vote.md#0x1_Vote_Ballots">Ballots</a></code> resource for <code>Proposal</code> is published at <code>ballot_addr</code>,
+there is a <code><a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a></code> published at <code>ballot_addr</code>.
+
+
+<a name="0x1_Vote_ballot_counter_initialized_first"></a>
+
+
+<pre><code><b>fun</b> <a href="Vote.md#0x1_Vote_ballot_counter_initialized_first">ballot_counter_initialized_first</a>&lt;Proposal&gt;(ballot_addr: <b>address</b>): bool {
+   <b>exists</b>&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(ballot_addr) ==&gt; <b>exists</b>&lt;<a href="Vote.md#0x1_Vote_BallotCounter">BallotCounter</a>&gt;(ballot_addr)
+}
+</code></pre>
+
+
+
+Get the ballots vector from published Ballots<Proposal>
+CAUTION: Returns an arbitrary value if no Ballots<Proposal> is publised at ballot_address.
+
+
+<a name="0x1_Vote_get_ballots"></a>
+
+
+<pre><code><b>fun</b> <a href="Vote.md#0x1_Vote_get_ballots">get_ballots</a>&lt;Proposal&gt;(ballot_address: <b>address</b>): vector&lt;<a href="Vote.md#0x1_Vote_Ballot">Ballot</a>&lt;Proposal&gt;&gt; {
+  <b>global</b>&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(ballot_address).ballots
+}
+</code></pre>
+
+
+Get the ballot matching ballot_id out of the ballots vector, if it is there.
+CAUTION: Returns a arbitrary value if it's not there.
+
+
+<a name="0x1_Vote_get_ballot"></a>
+
+
+<pre><code><b>fun</b> <a href="Vote.md#0x1_Vote_get_ballot">get_ballot</a>&lt;Proposal&gt;(ballot_address: <b>address</b>, ballot_id: <a href="Vote.md#0x1_Vote_BallotID">BallotID</a>): <a href="Vote.md#0x1_Vote_Ballot">Ballot</a>&lt;Proposal&gt; {
+    <b>let</b> ballots = <b>global</b>&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(ballot_address).ballots;
+    <a href="Vote.md#0x1_Vote_get_ballots">get_ballots</a>&lt;Proposal&gt;(ballot_address)[<b>choose</b> <b>min</b> i in 0..len(ballots) <b>where</b> ballots[i].ballot_id == ballot_id]
+}
+</code></pre>
+
+
+Tests whether ballot_id is represented in the ballots vector. Returns false if there is no
+ballots vector.
+
+
+<a name="0x1_Vote_ballot_exists"></a>
+
+
+<pre><code><b>fun</b> <a href="Vote.md#0x1_Vote_ballot_exists">ballot_exists</a>&lt;Proposal&gt;(ballot_address: <b>address</b>, ballot_id: <a href="Vote.md#0x1_Vote_BallotID">BallotID</a>): bool {
+   <b>if</b> (<b>exists</b>&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(ballot_address)) {
+       <b>let</b> ballots = <b>global</b>&lt;<a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;&gt;(ballot_address).ballots;
+       <b>exists</b> i in 0..len(ballots): ballots[i].ballot_id == ballot_id
+   }
+   <b>else</b>
+       <b>false</b>
+}
+</code></pre>
+
+
+Assuming ballot exists, check if it's expired. Returns an arbitrary result if the
+ballot does not exist.
+NOTE: Maybe this should be "<=" not "<"
+
+
+<a name="0x1_Vote_is_expired_if_exists"></a>
+
+
+<pre><code><b>fun</b> <a href="Vote.md#0x1_Vote_is_expired_if_exists">is_expired_if_exists</a>&lt;Proposal&gt;(ballot_address: <b>address</b>, ballot_id: <a href="Vote.md#0x1_Vote_BallotID">BallotID</a>): bool {
+   <a href="Vote.md#0x1_Vote_get_ballot">get_ballot</a>&lt;Proposal&gt;(ballot_address, ballot_id).expiration_timestamp_secs
+       &lt;= <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_seconds">DiemTimestamp::spec_now_seconds</a>()
+}
+</code></pre>
+
+
+There is a state machine for every <code><a href="Vote.md#0x1_Vote_BallotID">BallotID</a>&lt;Proposal&gt;</code>.  Two of the states don't
+need to appear in formal specifications, but they are here for completeness.
+State: unborn -- The <code><a href="Vote.md#0x1_Vote_BallotID">BallotID</a></code> has a count that is greater than the count in BallotCounter.
+So the <code><a href="Vote.md#0x1_Vote_BallotID">BallotID</a></code> has not yet been generated, and may be generated in the future.
+It is not in use, so we won't see values in this state.
+A <code><a href="Vote.md#0x1_Vote_BallotID">BallotID</a></code> in the unborn state may transition to the active state if <code>create_ballot</code>
+generates that <code><a href="Vote.md#0x1_Vote_BallotID">BallotID</a></code>.
+State: dead -- The <code><a href="Vote.md#0x1_Vote_BallotID">BallotID</a></code> was generated and then was either and accepted (when
+a call to <code>vote</code> causes the vote total to exceed the threshold),
+or expired and garbage collected.  So, it is no longer in use and we won't see these
+values.  Note that garbage collection occurs in several functions.
+State active -- The <code><a href="Vote.md#0x1_Vote_BallotID">BallotID</a></code> is in a <code><a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;.ballots</code> vector for some Proposal and
+address.  It is not expired and may eventually be accepted.
+Active BallotIDs are created and returned by <code>create_ballot</code>.
+An active <code><a href="Vote.md#0x1_Vote_BallotID">BallotID</a></code> may transition to the expired state if it is not accepted and the current
+time exceeds its expiration time, or it may transition to the dead state if it expires and is
+garbage-collected in the same transaction or if it is accepted.
+State expired -- The <code><a href="Vote.md#0x1_Vote_BallotID">BallotID</a></code> is in a <code><a href="Vote.md#0x1_Vote_Ballots">Ballots</a>&lt;Proposal&gt;.ballots</code> vector for some Proposal and
+address but is expired.  It will be removed from the ballots vector and change to the dead state
+if and when it is garbage-collected.
+A BallotID is in the expired state if it is in the ballots vector and the
+current time is >= the expiration time.
+
+
+<a name="0x1_Vote_is_expired"></a>
+
+
+<pre><code><b>fun</b> <a href="Vote.md#0x1_Vote_is_expired">is_expired</a>&lt;Proposal&gt;(ballot_address: <b>address</b>, ballot_id: <a href="Vote.md#0x1_Vote_BallotID">BallotID</a>): bool {
+   <a href="Vote.md#0x1_Vote_ballot_exists">ballot_exists</a>&lt;Proposal&gt;(ballot_address, ballot_id)
+   && <a href="Vote.md#0x1_Vote_is_expired_if_exists">is_expired_if_exists</a>&lt;Proposal&gt;(ballot_address, ballot_id)
+}
+</code></pre>
+
+
+A BallotID is active state if it is in the ballots vector and not expired.
+
+
+<a name="0x1_Vote_is_active"></a>
+
+
+<pre><code><b>fun</b> <a href="Vote.md#0x1_Vote_is_active">is_active</a>&lt;Proposal&gt;(ballot_address: <b>address</b>, ballot_id: <a href="Vote.md#0x1_Vote_BallotID">BallotID</a>): bool {
+  <a href="Vote.md#0x1_Vote_ballot_exists">ballot_exists</a>&lt;Proposal&gt;(ballot_address, ballot_id)
+  && !<a href="Vote.md#0x1_Vote_is_expired_if_exists">is_expired_if_exists</a>&lt;Proposal&gt;(ballot_address, ballot_id)
+}
+</code></pre>
