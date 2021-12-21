@@ -3,7 +3,10 @@
 retries = 2
 # Show skipped tests in the CI output.
 status-level = "skip"
+# Show output for all tests as soon as they fail and at the end of the test run.
 failure-output = "immediate-final"
+# Do not cancel test run on the first failure.
+fail-fast = false
 
 [profile.ci.junit]
 path = "junit.xml"
