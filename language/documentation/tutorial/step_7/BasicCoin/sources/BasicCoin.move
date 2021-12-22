@@ -54,7 +54,6 @@ module NamedAddr::BasicCoin {
         Coin<CoinType> { value: amount }
     }
 
-
     fun deposit<CoinType>(addr: address, check: Coin<CoinType>) acquires Balance{
         let balance = balance_of<CoinType>(addr);
         let balance_ref = &mut borrow_global_mut<Balance<CoinType>>(addr).coin.value;
