@@ -17,7 +17,10 @@ use proptest::{
     strategy::{BoxedStrategy, Strategy},
 };
 use serde::{de, Deserialize, Serialize};
-use std::convert::TryFrom;
+use std::{
+    convert::TryFrom,
+    fmt::{Display, Formatter},
+};
 use thiserror::Error;
 
 /// A type alias for different epochs.
@@ -103,6 +106,24 @@ impl StorageServiceResponse {
             Self::TransactionOutputsWithProof(_) => "transaction_outputs_with_proof",
             Self::TransactionsWithProof(_) => "transactions_with_proof",
         }
+    }
+}
+
+impl Display for StorageServiceResponse {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        // To prevent log spamming, we only display storage response data for summaries
+        let data = match self {
+            StorageServiceResponse::StorageServerSummary(storage_summary) => {
+                format!("{:?}", storage_summary)
+            }
+            _ => "...".into(),
+        };
+        write!(
+            f,
+            "Storage service response: {}, data: {}",
+            self.get_label(),
+            data
+        )
     }
 }
 

@@ -4,14 +4,14 @@
 use crate::Error;
 use diem_logger::Schema;
 use serde::Serialize;
-use storage_service_types::{StorageServiceError, StorageServiceRequest, StorageServiceResponse};
+use storage_service_types::StorageServiceRequest;
 
 #[derive(Schema)]
 pub struct LogSchema<'a> {
     name: LogEntry,
     error: Option<&'a Error>,
     message: Option<&'a str>,
-    response: Option<&'a Result<StorageServiceResponse, StorageServiceError>>,
+    response: Option<&'a str>,
     request: Option<&'a StorageServiceRequest>,
 }
 

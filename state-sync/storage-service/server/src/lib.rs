@@ -19,7 +19,7 @@ use diem_types::{
 };
 use futures::stream::StreamExt;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use storage_interface::DbReader;
 use storage_service_types::{
     AccountStatesChunkWithProofRequest, CompleteDataRange, DataSummary,
@@ -39,6 +39,7 @@ mod tests;
 
 /// Storage server constants.
 pub const STORAGE_SERVER_VERSION: u64 = 1;
+const SUMMARY_LOG_FREQUENCY_SECS: u64 = 5;
 
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
 pub enum Error {
@@ -108,7 +109,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             self.bounded_executor
                 .spawn_blocking(move || {
                     let response = Handler::new(config, storage).call(protocol, request);
-                    debug!(LogSchema::new(LogEntry::SentStorageResponse).response(&response));
+                    log_storage_response(&response);
                     response_sender.send(response);
                 })
                 .await;
@@ -564,4 +565,32 @@ fn inclusive_range_len(start: u64, end: u64) -> Result<u64, Error> {
         .checked_add(1)
         .ok_or_else(|| Error::InvalidRequest(format!("end ({}) must not be u64::MAX", end)))?;
     Ok(len)
+}
+
+/// Logs the response sent by storage for a peer request
+fn log_storage_response(storage_response: &Result<StorageServiceResponse, StorageServiceError>) {
+    match storage_response {
+        Ok(storage_response) => {
+            let response = format!("{}", storage_response); // Use display formatting
+            if matches!(
+                storage_response,
+                StorageServiceResponse::StorageServerSummary(_)
+            ) {
+                // We expect peers to be polling our storage server summary frequently,
+                // so only log this response periodically.
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(SUMMARY_LOG_FREQUENCY_SECS)),
+                    {
+                        debug!(LogSchema::new(LogEntry::SentStorageResponse).response(&response));
+                    }
+                );
+            } else {
+                debug!(LogSchema::new(LogEntry::SentStorageResponse).response(&response));
+            }
+        }
+        Err(storage_error) => {
+            let storage_error = format!("{:?}", storage_error); // Use debug formatting
+            debug!(LogSchema::new(LogEntry::SentStorageResponse).response(&storage_error));
+        }
+    };
 }
