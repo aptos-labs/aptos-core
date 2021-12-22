@@ -276,20 +276,28 @@ impl<StorageSyncer: StorageSynchronizerInterface> Bootstrapper<StorageSyncer> {
         self.bootstrapped
     }
 
+    /// Marks bootstrapping as complete and notifies any listeners
+    pub fn bootstrapping_complete(&mut self) -> Result<(), Error> {
+        info!("The node has successfully bootstrapped!");
+        self.bootstrapped = true;
+        self.notify_listeners_if_bootstrapped()
+    }
+
     /// Subscribes the specified channel to bootstrap completion notifications
     pub fn subscribe_to_bootstrap_notifications(
         &mut self,
         bootstrap_notifier_channel: oneshot::Sender<Result<(), Error>>,
-    ) {
+    ) -> Result<(), Error> {
         if self.bootstrap_notifier_channel.is_some() {
             panic!("Only one boostrap subscriber is supported at a time!");
         }
 
-        self.bootstrap_notifier_channel = Some(bootstrap_notifier_channel)
+        self.bootstrap_notifier_channel = Some(bootstrap_notifier_channel);
+        self.notify_listeners_if_bootstrapped()
     }
 
     /// Notifies any listeners if we've now bootstrapped
-    fn notify_if_bootstrapped(&mut self) -> Result<(), Error> {
+    fn notify_listeners_if_bootstrapped(&mut self) -> Result<(), Error> {
         if self.bootstrapped {
             if let Some(notifier_channel) = self.bootstrap_notifier_channel.take() {
                 if let Err(error) = notifier_channel.send(Ok(())) {
@@ -325,7 +333,7 @@ impl<StorageSyncer: StorageSynchronizerInterface> Bootstrapper<StorageSyncer> {
         }
 
         // Check if we've now bootstrapped
-        self.notify_if_bootstrapped()
+        self.notify_listeners_if_bootstrapped()
     }
 
     /// Initializes an active data stream so that we can begin to process notifications
@@ -351,9 +359,7 @@ impl<StorageSyncer: StorageSynchronizerInterface> Bootstrapper<StorageSyncer> {
 
         // Check if we've already fetched the required data for bootstrapping
         if highest_synced_version == highest_known_ledger_version {
-            info!("The node has successfully bootstrapped!");
-            self.bootstrapped = true;
-            return Ok(());
+            return self.bootstrapping_complete();
         }
 
         // Verify we haven't synced beyond the highest ledger info

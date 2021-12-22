@@ -25,12 +25,14 @@ use diem_types::waypoint::Waypoint;
 use event_notifications::EventSubscriptionService;
 use futures::StreamExt;
 use mempool_notifications::MempoolNotificationSender;
-use std::sync::Arc;
+use std::{sync::Arc, time::SystemTime};
 use storage_interface::DbReader;
 use tokio::time::{interval, Duration};
 use tokio_stream::wrappers::IntervalStream;
 
 // TODO(joshlind): use structured logging!
+
+const MAX_CONNECTION_DEADLINE_SECS: u64 = 10;
 
 /// The configuration of the state sync driver
 #[derive(Clone)]
@@ -84,6 +86,9 @@ pub struct StateSyncDriver<DataClient, MempoolNotifier, StorageSyncer> {
     // The handler for notifications to mempool
     mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
 
+    // The timestamp at which the driver started executing
+    start_time: Option<SystemTime>,
+
     // The interface to read from storage
     storage: Arc<dyn DbReader>,
 }
@@ -131,6 +136,7 @@ impl<
             driver_configuration,
             event_subscription_service,
             mempool_notification_handler,
+            start_time: None,
             storage,
         }
     }
@@ -142,6 +148,9 @@ impl<
         )))
         .fuse();
 
+        // Start the driver
+        info!("Started the state sync v2 driver!");
+        self.start_time = Some(SystemTime::now());
         loop {
             ::futures::select! {
                 notification = self.client_notification_listener.select_next_some() => {
@@ -256,7 +265,11 @@ impl<
         // Respond to consensus successfully
         self.consensus_notification_handler
             .respond_to_commit_notification(consensus_commit_notification, Ok(()))
-            .await
+            .await?;
+
+        // Check the progress of any sync requests. We need this here because
+        // consensus might issue a sync request and then commit (asynchronously).
+        self.check_sync_request_progress().await
     }
 
     /// Handles a consensus notification to sync to a specified target
@@ -287,8 +300,15 @@ impl<
         let DriverNotification::NotifyOnceBootstrapped(notifier_channel) = notification;
 
         // Subscribe the bootstrap notifier channel
-        self.bootstrapper
-            .subscribe_to_bootstrap_notifications(notifier_channel);
+        if let Err(error) = self
+            .bootstrapper
+            .subscribe_to_bootstrap_notifications(notifier_channel)
+        {
+            error!(
+                "Failed to subscribe to bootstrap notifications! Error: {:?}",
+                error
+            );
+        }
     }
 
     /// Handles a commit notification sent by the storage synchronizer
@@ -356,23 +376,57 @@ impl<
             .await
     }
 
+    /// Returns true iff this node is a validator
+    fn is_validator(&self) -> bool {
+        self.driver_configuration.role == RoleType::Validator
+    }
+
     /// Returns true iff consensus is currently executing
     fn check_if_consensus_executing(&self) -> bool {
-        self.driver_configuration.role == RoleType::Validator
+        self.is_validator()
             && self.bootstrapper.is_bootstrapped()
             && !self.consensus_notification_handler.active_sync_request()
     }
 
+    /// Checks if the connection deadline has passed. If so, validators with
+    /// genesis waypoints will be automatically marked as bootstrapped. This
+    /// helps in the case of single node deployments, where there are no peers
+    /// and state sync is trivial.
+    fn check_auto_bootstrapping(&mut self) {
+        if !self.bootstrapper.is_bootstrapped()
+            && self.is_validator()
+            && self.driver_configuration.waypoint.version() == 0
+        {
+            if let Some(start_time) = self.start_time {
+                if let Some(connection_deadline) =
+                    start_time.checked_add(Duration::from_secs(MAX_CONNECTION_DEADLINE_SECS))
+                {
+                    if SystemTime::now()
+                        .duration_since(connection_deadline)
+                        .is_ok()
+                    {
+                        info!("Passed the connection deadline! Auto-bootstrapping the validator!");
+                        if let Err(error) = self.bootstrapper.bootstrapping_complete() {
+                            error!(
+                                "Failed to mark bootstrapping as complete! Error: {:?}",
+                                error
+                            );
+                        }
+                    }
+                } else {
+                    error!("The connection deadline overflowed! Unable to auto-bootstrap!");
+                }
+            }
+        }
+    }
+
     /// Checks that state sync is making progress
     async fn drive_progress(&mut self) {
-        trace!("Checking progress of the state sync driver!");
-
         // Fetch the global data summary and verify we have active peers
         let global_data_summary = self.diem_data_client.get_global_data_summary();
         if global_data_summary.is_empty() {
-            // TODO(joshlind): what if we have no peers? i.e., we're only a single node deployment?
             trace!("The global data summary is empty! It's likely that we have no active peers.");
-            return;
+            return self.check_auto_bootstrapping();
         }
 
         // Check the progress of any sync requests
