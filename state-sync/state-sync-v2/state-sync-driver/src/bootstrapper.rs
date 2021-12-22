@@ -154,7 +154,7 @@ impl VerifiedEpochStates {
         epoch_ending_ledger_info: LedgerInfoWithSignatures,
     ) {
         debug!(
-            "Adding a new epoch to the epoch ending ledger infos: {:?}",
+            "Adding a new epoch to the epoch ending ledger infos: {}",
             &epoch_ending_ledger_info
         );
 
