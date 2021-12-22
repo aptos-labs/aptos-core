@@ -276,6 +276,53 @@ async fn test_validator_sync(mut swarm: LocalSwarm) {
         .unwrap();
 }
 
+#[tokio::test]
+async fn test_single_validator_failure() {
+    // Create a swarm of 1 validator
+    let mut swarm = new_local_swarm(1).await;
+    swarm.launch().await.unwrap();
+
+    // Enable state sync v2 and reboot the node
+    let validator = swarm.validators_mut().next().unwrap();
+    let mut config = validator.config().clone();
+    config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
+    config.save(validator.config_path()).unwrap();
+    validator.stop();
+    swarm.launch().await.unwrap();
+
+    // Execute multiple transactions
+    let validator = swarm.validators_mut().next().unwrap();
+    let validator_client = validator.rest_client();
+    let transaction_factory = swarm.chain_info().transaction_factory();
+    let mut account_0 = create_and_fund_account(&mut swarm, 1000).await;
+    let mut account_1 = create_and_fund_account(&mut swarm, 1000).await;
+    execute_transactions(
+        &mut swarm,
+        &validator_client,
+        &transaction_factory,
+        &mut account_0,
+        &account_1,
+        true,
+    )
+    .await;
+
+    // Restart the validator
+    let validator = swarm.validators_mut().next().unwrap();
+    validator.stop();
+    swarm.launch().await.unwrap();
+
+    // Execute more transactions
+    execute_transactions(
+        &mut swarm,
+        &validator_client,
+        &transaction_factory,
+        &mut account_1,
+        &account_0,
+        true,
+    )
+    .await;
+}
+
 /// Executes transactions using the given transaction factory, client and
 /// accounts. If `force_epoch_changes` is true, also execute transactions to
 /// force reconfigurations.
