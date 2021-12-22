@@ -20,6 +20,9 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
 
+// Useful constants for the Data Streaming Service
+const REFRESH_ERROR_LOG_FREQ_SECS: u64 = 1;
+
 /// The data streaming service that responds to data stream requests.
 pub struct DataStreamingService<T> {
     // The configuration for this streaming service.
@@ -208,9 +211,12 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
                 &metrics::GLOBAL_DATA_SUMMARY_ERROR,
                 error.get_label().into(),
             );
-            error!(LogSchema::new(LogEntry::RefreshGlobalData)
-                .event(LogEvent::Error)
-                .error(&error));
+            sample!(
+                SampleRate::Duration(Duration::from_secs(REFRESH_ERROR_LOG_FREQ_SECS)),
+                error!(LogSchema::new(LogEntry::RefreshGlobalData)
+                    .event(LogEvent::Error)
+                    .error(&error))
+            );
         }
     }
 

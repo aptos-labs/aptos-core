@@ -45,7 +45,9 @@ mod state;
 #[cfg(test)]
 mod tests;
 
+// Useful constants for the Diem Data Client
 const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 5;
+const POLLER_ERROR_LOG_FREQ_SECS: u64 = 1;
 
 /// A [`DiemDataClient`] that fulfills requests from remote peers' Storage Service
 /// over DiemNet.
@@ -461,11 +463,14 @@ impl DataSummaryPoller {
             {
                 Ok(peer) => peer,
                 Err(error) => {
-                    error!(
-                        (LogSchema::new(LogEntry::StorageSummaryRequest)
-                            .event(LogEvent::NoPeersToPoll)
-                            .message("Unable to select next peer")
-                            .error(&error))
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(POLLER_ERROR_LOG_FREQ_SECS)),
+                        error!(
+                            (LogSchema::new(LogEntry::StorageSummaryRequest)
+                                .event(LogEvent::NoPeersToPoll)
+                                .message("Unable to select next peer")
+                                .error(&error))
+                        );
                     );
                     continue;
                 }
