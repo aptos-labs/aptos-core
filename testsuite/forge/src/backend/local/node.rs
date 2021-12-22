@@ -85,6 +85,7 @@ impl LocalNode {
         let log_file = OpenOptions::new()
             .create(true)
             .write(true)
+            .append(true)
             .open(self.log_path())?;
 
         // Start node process
