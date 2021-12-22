@@ -34,7 +34,7 @@ use std::{
 use storage_interface::DbReader;
 
 const META_FILENAME: &str = "metadata.toml";
-const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 100_000;
+const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type", content = "args")]

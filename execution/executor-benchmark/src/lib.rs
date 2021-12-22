@@ -75,7 +75,7 @@ pub fn run_benchmark(
     let executor_2 = executor_1.clone();
 
     let (block_sender, block_receiver) = mpsc::sync_channel(50 /* bound */);
-    let (commit_sender, commit_receiver) = mpsc::sync_channel(50 /* bound */);
+    let (commit_sender, commit_receiver) = mpsc::sync_channel(3 /* bound */);
 
     let mut generator =
         TransactionGenerator::new_with_metafile(genesis_key, block_sender, source_dir);
