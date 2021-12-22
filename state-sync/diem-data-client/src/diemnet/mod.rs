@@ -17,7 +17,7 @@ use diem_config::{
 };
 use diem_id_generator::{IdGenerator, U64IdGenerator};
 use diem_infallible::RwLock;
-use diem_logger::{debug, error, info};
+use diem_logger::prelude::*;
 use diem_time_service::{TimeService, TimeServiceTrait};
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
@@ -45,8 +45,7 @@ mod state;
 #[cfg(test)]
 mod tests;
 
-// TODO(philiphayes): does this belong in a different crate? I feel like we're
-// accumulating a lot of tiny crates though...
+const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 5;
 
 /// A [`DiemDataClient`] that fulfills requests from remote peers' Storage Service
 /// over DiemNet.
@@ -505,13 +504,16 @@ impl DataSummaryPoller {
             self.data_client.update_summary(peer, storage_summary);
             self.data_client.update_global_summary_cache();
 
-            debug!(
-                (LogSchema::new(LogEntry::PeerStates)
-                    .event(LogEvent::AggregateSummary)
-                    .message(&format!(
-                        "Global data summary: {:?}",
-                        self.data_client.get_global_data_summary()
-                    )))
+            sample!(
+                SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_LOG_FREQ_SECS)),
+                debug!(
+                    (LogSchema::new(LogEntry::PeerStates)
+                        .event(LogEvent::AggregateSummary)
+                        .message(&format!(
+                            "Global data summary: {:?}",
+                            self.data_client.get_global_data_summary()
+                        )))
+                )
             );
         }
     }
