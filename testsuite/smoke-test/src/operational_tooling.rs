@@ -1046,6 +1046,25 @@ async fn test_validator_set() {
     );
 }
 
+#[tokio::test]
+async fn test_verify_validator_state() {
+    let (_env, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(4).await;
+
+    let result = op_tool.verify_validator_state(&backend).unwrap();
+    assert_eq!(result.in_validator_set, Some(true));
+    assert_eq!(result.consensus_key_match, Some(true));
+
+    // Rotate consensus key locally, but we do not update it on-chain
+    // Verify the local validator state again.
+    // The local consensus key is no longer mached with that registered on-chain
+    let _ = storage.rotate_key(CONSENSUS_KEY).unwrap();
+    let result = op_tool.verify_validator_state(&backend).unwrap();
+    assert_eq!(result.in_validator_set, Some(true));
+    assert_eq!(result.consensus_key_match, Some(false));
+
+    // TODO(khiemngo): consider adding test where the validator is no longer in set
+}
+
 /// Creates a new account address and key for testing.
 fn create_new_test_account() -> (Ed25519PrivateKey, AccountAddress) {
     let mut rng = OsRng;

@@ -7,6 +7,7 @@ use crate::{
     keys::{load_key, EncodingType, KeyType},
     validator_config::DecryptedValidatorConfig,
     validator_set::DecryptedValidatorInfo,
+    validator_state::VerifyValidatorStateResult,
     TransactionContext,
 };
 use diem_config::{config, config::Peer, network_id::NetworkId};
@@ -707,6 +708,26 @@ impl OperationalTool {
             CommandName::RemoveValidator,
             |cmd| cmd.remove_validator(),
         )
+    }
+
+    pub fn verify_validator_state(
+        &self,
+        backend: &config::SecureBackend,
+    ) -> Result<VerifyValidatorStateResult, Error> {
+        let args = format!(
+            "
+                {command}
+                --json-server {host}
+                --chain-id {chain_id}
+                --validator-backend {backend_args}
+            ",
+            command = command(TOOL_NAME, CommandName::VerifyValidatorState),
+            host = self.host,
+            chain_id = self.chain_id.id(),
+            backend_args = backend_args(backend)?,
+        );
+        let command = Command::from_iter(args.split_whitespace());
+        command.verify_validator_state()
     }
 }
 

@@ -14,6 +14,7 @@ mod print;
 mod validate_transaction;
 mod validator_config;
 mod validator_set;
+mod validator_state;
 
 mod network_checker;
 #[cfg(any(test, feature = "testing"))]
