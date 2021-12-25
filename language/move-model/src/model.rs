@@ -70,6 +70,7 @@ use crate::{
 };
 
 // import and re-expose symbols
+use crate::ast::Attribute;
 use move_binary_format::file_format::CodeOffset;
 pub use move_binary_format::file_format::{AbilitySet, Visibility as FunctionVisibility};
 
@@ -991,6 +992,7 @@ impl GlobalEnv {
     pub fn add(
         &mut self,
         loc: Loc,
+        attributes: Vec<Attribute>,
         module: CompiledModule,
         source_map: SourceMap,
         named_constants: BTreeMap<NamedConstantId, NamedConstantData>,
@@ -1060,6 +1062,7 @@ impl GlobalEnv {
             module_spec,
             source_map,
             loc,
+            attributes,
             spec_block_infos,
             used_modules: Default::default(),
             friend_modules: Default::default(),
@@ -1090,6 +1093,7 @@ impl GlobalEnv {
         def_idx: FunctionDefinitionIndex,
         name: Symbol,
         loc: Loc,
+        attributes: Vec<Attribute>,
         arg_names: Vec<Symbol>,
         type_arg_names: Vec<Symbol>,
         spec: Spec,
@@ -1098,6 +1102,7 @@ impl GlobalEnv {
         FunctionData {
             name,
             loc,
+            attributes,
             def_idx,
             handle_idx,
             arg_names,
@@ -1117,6 +1122,7 @@ impl GlobalEnv {
         def_idx: StructDefinitionIndex,
         name: Symbol,
         loc: Loc,
+        attributes: Vec<Attribute>,
         spec: Spec,
     ) -> StructData {
         let handle_idx = module.struct_def_at(def_idx).struct_handle;
@@ -1142,6 +1148,7 @@ impl GlobalEnv {
         StructData {
             name,
             loc,
+            attributes,
             info,
             field_data,
             spec,
@@ -1179,6 +1186,7 @@ impl GlobalEnv {
         StructData {
             name: self.ghost_memory_name(var_name),
             loc,
+            attributes: Default::default(),
             info: StructInfo::Generated { spec_var: var_id },
             field_data,
             spec: Spec::default(),
@@ -1625,6 +1633,9 @@ pub struct ModuleData {
     /// Id of this module in the global env.
     pub id: ModuleId,
 
+    /// Attributes attached to this module.
+    attributes: Vec<Attribute>,
+
     /// Module byte code.
     pub module: CompiledModule,
 
@@ -1685,6 +1696,7 @@ impl ModuleData {
             module_spec: Spec::default(),
             source_map: SourceMap::new(MoveIrLoc::new(FileHash::empty(), 0, 0), None),
             loc: Loc::default(),
+            attributes: Default::default(),
             spec_block_infos: vec![],
             used_modules: Default::default(),
             friend_modules: Default::default(),
@@ -1722,6 +1734,11 @@ impl<'env> ModuleEnv<'env> {
     /// Returns the location of this module.
     pub fn get_loc(&'env self) -> Loc {
         self.data.loc.clone()
+    }
+
+    /// Returns the attributes of this module.
+    pub fn get_attributes(&self) -> &[Attribute] {
+        &self.data.attributes
     }
 
     /// Returns full name as a string.
@@ -2285,6 +2302,10 @@ pub struct StructData {
     /// The location of this struct.
     loc: Loc,
 
+    /// Attributes attached to this structure.
+    attributes: Vec<Attribute>,
+
+    /// List of function argument names. Not in bytecode but obtained from AST.
     /// Information about this struct.
     info: StructInfo,
 
@@ -2358,6 +2379,11 @@ impl<'env> StructEnv<'env> {
     /// Returns the location of this struct.
     pub fn get_loc(&self) -> Loc {
         self.data.loc.clone()
+    }
+
+    /// Returns the attributes of this struct.
+    pub fn get_attributes(&self) -> &[Attribute] {
+        &self.data.attributes
     }
 
     /// Get documentation associated with this struct.
@@ -2794,6 +2820,9 @@ pub struct FunctionData {
     /// The handle index of this function in its module.
     handle_idx: FunctionHandleIndex,
 
+    /// Attributes attached to this function.
+    attributes: Vec<Attribute>,
+
     /// List of function argument names. Not in bytecode but obtained from AST.
     arg_names: Vec<Symbol>,
 
@@ -2822,6 +2851,7 @@ impl FunctionData {
         FunctionData {
             name,
             loc: Loc::default(),
+            attributes: Vec::default(),
             def_idx,
             handle_idx,
             arg_names: vec![],
@@ -2893,6 +2923,11 @@ impl<'env> FunctionEnv<'env> {
     /// Returns the location of this function.
     pub fn get_loc(&self) -> Loc {
         self.data.loc.clone()
+    }
+
+    /// Returns the attributes of this function.
+    pub fn get_attributes(&self) -> &[Attribute] {
+        &self.data.attributes
     }
 
     /// Returns the location of the specification block of this function. If the function has

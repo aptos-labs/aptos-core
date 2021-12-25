@@ -16,7 +16,7 @@ use move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAd
 use move_symbol_pool::Symbol as MoveStringSymbol;
 
 use crate::{
-    ast::{ModuleName, Operation, QualifiedSymbol, Spec, Value},
+    ast::{Attribute, ModuleName, Operation, QualifiedSymbol, Spec, Value},
     builder::spec_builtins,
     model::{
         FunId, FunctionVisibility, GlobalEnv, Loc, ModuleId, QualifiedId, SpecFunId, SpecVarId,
@@ -107,6 +107,7 @@ pub(crate) struct StructEntry {
     pub is_resource: bool,
     pub type_params: Vec<(Symbol, Type)>,
     pub fields: Option<BTreeMap<Symbol, (usize, Type)>>,
+    pub attributes: Vec<Attribute>,
 }
 
 /// A declaration of a function.
@@ -120,6 +121,7 @@ pub(crate) struct FunEntry {
     pub params: Vec<(Symbol, Type)>,
     pub result_type: Type,
     pub is_pure: bool,
+    pub attributes: Vec<Attribute>,
 }
 
 #[derive(Debug, Clone)]
@@ -237,6 +239,7 @@ impl<'env> ModelBuilder<'env> {
     pub fn define_struct(
         &mut self,
         loc: Loc,
+        attributes: Vec<Attribute>,
         name: QualifiedSymbol,
         module_id: ModuleId,
         struct_id: StructId,
@@ -246,6 +249,7 @@ impl<'env> ModelBuilder<'env> {
     ) {
         let entry = StructEntry {
             loc,
+            attributes,
             module_id,
             struct_id,
             is_resource,
@@ -262,6 +266,7 @@ impl<'env> ModelBuilder<'env> {
     pub fn define_fun(
         &mut self,
         loc: Loc,
+        attributes: Vec<Attribute>,
         name: QualifiedSymbol,
         module_id: ModuleId,
         fun_id: FunId,
@@ -272,6 +277,7 @@ impl<'env> ModelBuilder<'env> {
     ) {
         let entry = FunEntry {
             loc,
+            attributes,
             module_id,
             fun_id,
             visibility,

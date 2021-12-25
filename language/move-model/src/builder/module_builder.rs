@@ -26,9 +26,9 @@ use move_ir_types::{ast::ConstantName, location::Spanned};
 
 use crate::{
     ast::{
-        Condition, ConditionKind, Exp, ExpData, GlobalInvariant, ModuleName, Operation,
-        PropertyBag, PropertyValue, QualifiedSymbol, Spec, SpecBlockInfo, SpecBlockTarget,
-        SpecFunDecl, SpecVarDecl, Value,
+        Attribute, AttributeValue, Condition, ConditionKind, Exp, ExpData, GlobalInvariant,
+        ModuleName, Operation, PropertyBag, PropertyValue, QualifiedSymbol, Spec, SpecBlockInfo,
+        SpecBlockTarget, SpecFunDecl, SpecVarDecl, Value,
     },
     builder::{
         exp_translator::ExpTranslator,
@@ -157,7 +157,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         self.decl_ana(&module_def, &compiled_module, &source_map);
         self.def_ana(&module_def, function_infos);
         self.collect_spec_block_infos(&module_def);
-        self.populate_env_from_result(loc, compiled_module, source_map);
+        let attrs = self.translate_attributes(&module_def.attributes);
+        self.populate_env_from_result(loc, attrs, compiled_module, source_map);
     }
 }
 
@@ -244,6 +245,76 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     }
 }
 
+/// # Attribute Analysis
+
+impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
+    pub fn translate_attributes(&mut self, attrs: &EA::Attributes) -> Vec<Attribute> {
+        attrs
+            .iter()
+            .map(|(_, _, attr)| self.translate_attribute(attr))
+            .collect()
+    }
+
+    pub fn translate_attribute(&mut self, attr: &EA::Attribute) -> Attribute {
+        let node_id = self
+            .parent
+            .env
+            .new_node(self.parent.to_loc(&attr.loc), Type::Tuple(vec![]));
+        match &attr.value {
+            EA::Attribute_::Name(n) => {
+                let sym = self.symbol_pool().make(n.value.as_str());
+                Attribute::Apply(node_id, sym, vec![])
+            }
+            EA::Attribute_::Parameterized(n, vs) => {
+                let sym = self.symbol_pool().make(n.value.as_str());
+                Attribute::Apply(node_id, sym, self.translate_attributes(vs))
+            }
+            EA::Attribute_::Assigned(n, v) => {
+                let value_node_id = self
+                    .parent
+                    .env
+                    .new_node(self.parent.to_loc(&v.loc), Type::Tuple(vec![]));
+                let v = match &v.value {
+                    EA::AttributeValue_::Value(val) => {
+                        let val =
+                            if let Some((val, _)) = ExpTranslator::new(self).translate_value(val) {
+                                val
+                            } else {
+                                // Error reported
+                                Value::Bool(false)
+                            };
+                        AttributeValue::Value(value_node_id, val)
+                    }
+                    EA::AttributeValue_::ModuleAccess(macc) => match macc.value {
+                        EA::ModuleAccess_::Name(n) => AttributeValue::Name(
+                            value_node_id,
+                            None,
+                            self.symbol_pool().make(n.value.as_str()),
+                        ),
+                        EA::ModuleAccess_::ModuleAccess(mident, n) => {
+                            let addr_bytes = self.parent.resolve_address(
+                                &self.parent.to_loc(&macc.loc),
+                                &mident.value.address,
+                            );
+                            let module_name = ModuleName::from_address_bytes_and_name(
+                                addr_bytes,
+                                self.symbol_pool()
+                                    .make(mident.value.module.0.value.as_str()),
+                            );
+                            AttributeValue::Name(
+                                value_node_id,
+                                Some(module_name),
+                                self.symbol_pool().make(n.value.as_str()),
+                            )
+                        }
+                    },
+                };
+                Attribute::Assign(node_id, self.symbol_pool().make(n.value.as_str()), v)
+            }
+        }
+    }
+}
+
 /// # Declaration Analysis
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
@@ -296,6 +367,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     fn decl_ana_struct(&mut self, name: &PA::StructName, def: &EA::StructDefinition) {
         let qsym = self.qualified_by_module_from_name(&name.0);
         let struct_id = StructId::new(qsym.symbol);
+        let attrs = self.translate_attributes(&def.attributes);
         let is_resource =
             // TODO migrate to abilities
             def.abilities.has_ability_(PA::Ability_::Key) || (
@@ -307,6 +379,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             et.analyze_and_add_type_params(def.type_parameters.iter().map(|param| &param.name));
         et.parent.parent.define_struct(
             et.to_loc(&def.loc),
+            attrs,
             qsym,
             et.parent.module_id,
             struct_id,
@@ -319,6 +392,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     fn decl_ana_fun(&mut self, name: &PA::FunctionName, def: &EA::Function) {
         let qsym = self.qualified_by_module_from_name(&name.0);
         let fun_id = FunId::new(qsym.symbol);
+        let attrs = self.translate_attributes(&def.attributes);
         let mut et = ExpTranslator::new(self);
         et.enter_scope();
         let type_params = et.analyze_and_add_type_params(
@@ -336,6 +410,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let loc = et.to_loc(&def.loc);
         et.parent.parent.define_fun(
             loc.clone(),
+            attrs,
             qsym.clone(),
             et.parent.module_id,
             fun_id,
@@ -2989,6 +3064,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     fn populate_env_from_result(
         &mut self,
         loc: Loc,
+        attributes: Vec<Attribute>,
         module: CompiledModule,
         source_map: SourceMap,
     ) {
@@ -3015,6 +3091,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                             def_idx,
                             name,
                             entry.loc.clone(),
+                            entry.attributes.clone(),
                             struct_spec,
                         ),
                     ))
@@ -3052,6 +3129,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         def_idx,
                         name,
                         entry.loc.clone(),
+                        entry.attributes.clone(),
                         arg_names,
                         type_arg_names,
                         fun_spec,
@@ -3084,6 +3162,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             .collect();
         self.parent.env.add(
             loc,
+            attributes,
             module,
             source_map,
             named_constants,

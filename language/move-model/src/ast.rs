@@ -61,6 +61,21 @@ pub struct SpecFunDecl {
 }
 
 // =================================================================================================
+/// # Attributes
+
+#[derive(Debug, Clone)]
+pub enum AttributeValue {
+    Value(NodeId, Value),
+    Name(NodeId, Option<ModuleName>, Symbol),
+}
+
+#[derive(Debug, Clone)]
+pub enum Attribute {
+    Apply(NodeId, Symbol, Vec<Attribute>),
+    Assign(NodeId, Symbol, AttributeValue),
+}
+
+// =================================================================================================
 /// # Conditions
 
 #[derive(Debug, PartialEq, Clone)]
