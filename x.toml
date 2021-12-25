@@ -301,9 +301,9 @@ mark-changed = ["transaction-builder-generator"]
 post-rule = "skip-rules"
 
 [[determinator.path-rule]]
-# On changes of diem-framework or move-stdlib, rerun the tests in move-prover.
-globs = ["diem-move/diem-framework/**/*", "language/move-stdlib/**/*"]
-mark-changed = ["move-prover"]
+# Ignore files in the language/evm/examples tree (for now)
+globs = ["language/evm/examples/**/*"]
+mark-changed = []
 
 [[determinator.path-rule]]
 # On changes to files related to VS Code, build the move-analyzer package.
