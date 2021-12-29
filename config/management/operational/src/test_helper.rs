@@ -718,12 +718,10 @@ impl OperationalTool {
             "
                 {command}
                 --json-server {host}
-                --chain-id {chain_id}
                 --validator-backend {backend_args}
             ",
             command = command(TOOL_NAME, CommandName::VerifyValidatorState),
             host = self.host,
-            chain_id = self.chain_id.id(),
             backend_args = backend_args(backend)?,
         );
         let command = Command::from_iter(args.split_whitespace());

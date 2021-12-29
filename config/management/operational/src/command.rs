@@ -73,9 +73,7 @@ pub enum Command {
     ValidatorConfig(crate::validator_config::ValidatorConfig),
     #[structopt(about = "Displays the current validator set infos registered on the blockchain")]
     ValidatorSet(crate::validator_set::ValidatorSet),
-    #[structopt(
-        about = "Compare a local validator state against the validator state held on-chain"
-    )]
+    #[structopt(about = "Compare the local validator state to the state held on-chain")]
     VerifyValidatorState(crate::validator_state::VerifyValidatorState),
 }
 
