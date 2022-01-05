@@ -10,7 +10,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.38"
+anyhow = "1.0.52"
 bcs = "0.1.2"
 diem-sdk = { path = "../../sdk" }
 diem-operational-tool = {path = "../../config/management/operational", features = ["testing"] }

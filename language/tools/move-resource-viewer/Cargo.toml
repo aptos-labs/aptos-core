@@ -16,7 +16,7 @@ move-vm-types = { path = "../../move-vm/types" }
 move-binary-format = { path = "../../move-binary-format" }
 serde = { version = "1.0.124", features = ["derive", "rc"] }
 
-anyhow = "1.0.38"
+anyhow = "1.0.52"
 once_cell = "1.7.2"
 hex = "0.4.3"
 diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }

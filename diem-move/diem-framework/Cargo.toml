@@ -31,7 +31,7 @@ move-package = { path = "../../language/tools/move-package" }
 move-bytecode-utils = { path = "../../language/tools/move-bytecode-utils" }
 
 bcs = "0.1.2"
-anyhow = "1.0.38"
+anyhow = "1.0.52"
 clap = "2.33.3"
 log = "0.4.14"
 rayon = "1.5.0"

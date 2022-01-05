@@ -10,7 +10,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
-anyhow = { version = "1.0", features = ["backtrace"] }
+anyhow = { version = "1.0.52", features = ["backtrace"] }
 async-trait = "0.1.42"
 base64 = "0.13.0"
 futures = "0.3.12"

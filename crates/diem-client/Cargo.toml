@@ -16,7 +16,7 @@ async = ["reqwest", "tokio"]
 faucet = ["reqwest", "reqwest/blocking", "blocking"]
 
 [dependencies]
-anyhow = "1.0.38"
+anyhow = "1.0.52"
 bcs = "0.1.2"
 hex = "0.4.3"
 serde = { version = "1.0.124", features = ["derive"] }

@@ -16,4 +16,4 @@ diem-types = { path = "../../types"  }
 move-core-types = { path = "../../language/move-core/types" }
 move-binary-format = { path = "../../language/move-binary-format" }
 
-anyhow = "1.0.38"
+anyhow = "1.0.52"

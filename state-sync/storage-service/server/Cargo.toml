@@ -30,7 +30,7 @@ storage-interface = { path = "../../../storage/storage-interface" }
 storage-service-types = { path = "../types" }
 
 [dev-dependencies]
-anyhow = "1.0.38"
+anyhow = "1.0.52"
 claim = "0.5.0"
 
 diem-crypto = { path = "../../../crates/diem-crypto" }

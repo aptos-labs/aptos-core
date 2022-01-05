@@ -9,7 +9,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.38"
+anyhow = "1.0.52"
 bcs = "0.1.2"
 hex = "0.4.3"
 reqwest = { version = "0.11.2", features = ["blocking", "json"], default_features = false }

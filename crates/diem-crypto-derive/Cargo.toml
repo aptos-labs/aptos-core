@@ -19,4 +19,4 @@ proc-macro2 = "1.0.24"
 diem-workspace-hack = { version = "0.1", path = "../diem-workspace-hack" }
 
 [dev-dependencies]
-anyhow = "1.0.38"
+anyhow = "1.0.52"

@@ -9,7 +9,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
-anyhow = "1"
+anyhow = "1.0.52"
 bcs = "0.1.2"
 rand = "0.8.3"
 diem-sdk = { path = ".." }

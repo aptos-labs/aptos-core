@@ -15,7 +15,7 @@ edition = "2018"
 mvhashmap = { path = "../mvhashmap" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 
-anyhow = "1.0.38"
+anyhow = "1.0.52"
 crossbeam-queue = "0.3.1"
 rayon = "1.5.0"
 num_cpus = "1.13.0"

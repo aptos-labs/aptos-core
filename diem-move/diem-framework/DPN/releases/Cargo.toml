@@ -18,7 +18,7 @@ diem-workspace-hack = { path = "../../../../crates/diem-workspace-hack" }
 move-binary-format = { path = "../../../../language/move-binary-format" }
 framework-releases = { path = "../../releases" }
 
-anyhow = "1.0.38"
+anyhow = "1.0.52"
 include_dir = "0.6.0"
 bcs = "0.1.2"
 once_cell = "1.7.2"

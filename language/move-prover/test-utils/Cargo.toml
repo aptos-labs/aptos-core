@@ -8,7 +8,7 @@ license = "Apache-2.0"
 
 [dependencies]
 prettydiff = "0.4.0"
-anyhow = "1.0.38"
+anyhow = "1.0.52"
 regex = "1.4.3"
 move-command-line-common = { path = "../../move-command-line-common" }
 diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }

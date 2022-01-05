@@ -12,7 +12,7 @@ edition = "2018"
 ### BEGIN HAKARI SECTION
 [dependencies]
 Inflector = { version = "0.11.4", features = ["heavyweight", "lazy_static", "regex"] }
-anyhow = { version = "1.0.40", features = ["backtrace", "std"] }
+anyhow = { version = "1.0.52", features = ["backtrace", "std"] }
 arrayvec = { version = "0.5.2", features = ["array-sizes-33-128", "std"] }
 backtrace = { version = "0.3.56", features = ["addr2line", "gimli-symbolize", "miniz_oxide", "object", "serde", "std"] }
 bitvec = { version = "0.19.5", features = ["alloc", "atomic", "std"] }
@@ -67,7 +67,7 @@ warp = { version = "0.3.0", features = ["multipart", "tls", "tokio-rustls", "tok
 
 [build-dependencies]
 Inflector = { version = "0.11.4", features = ["heavyweight", "lazy_static", "regex"] }
-anyhow = { version = "1.0.40", features = ["backtrace", "std"] }
+anyhow = { version = "1.0.52", features = ["backtrace", "std"] }
 arrayvec = { version = "0.5.2", features = ["array-sizes-33-128", "std"] }
 backtrace = { version = "0.3.56", features = ["addr2line", "gimli-symbolize", "miniz_oxide", "object", "serde", "std"] }
 bitvec = { version = "0.19.5", features = ["alloc", "atomic", "std"] }

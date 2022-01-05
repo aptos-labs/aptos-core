@@ -17,7 +17,7 @@ diem-workspace-hack = { path = "../../../../crates/diem-workspace-hack" }
 generate-key = { path = "../../../../config/generate-key" }
 move-core-types = { path = "../../../../language/move-core/types" }
 tokio = { version = "1", features = ["full"] }
-anyhow = "1.0.38"
+anyhow = "1.0.52"
 bcs = "0.1.2"
 log = "0.4.14"
 rand = "0.8.3"

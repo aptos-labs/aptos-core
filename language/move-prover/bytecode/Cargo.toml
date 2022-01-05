@@ -36,7 +36,7 @@ diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-
 move-stdlib = { path = "../../move-stdlib" }
 datatest-stable = "0.1.1"
 move-prover-test-utils = { path = "../test-utils" }
-anyhow = "1.0.38"
+anyhow = "1.0.52"
 
 [[test]]
 name = "testsuite"

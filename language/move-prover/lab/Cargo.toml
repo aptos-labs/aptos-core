@@ -16,7 +16,7 @@ move-stackless-bytecode = { path = "../bytecode"}
 z3tracer = "0.8.0"
 
 # external dependencies
-anyhow = "1.0.38"
+anyhow = "1.0.52"
 clap = "2.33.3"
 codespan-reporting = "0.11.1"
 chrono = "0.4.19"

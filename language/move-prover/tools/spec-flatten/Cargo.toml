@@ -15,7 +15,7 @@ move-model = { path = "../../../move-model" }
 move-prover = { path = "../.." }
 
 # external dependencies
-anyhow = "1.0.38"
+anyhow = "1.0.52"
 itertools = "0.10.1"
 pretty = "0.10.0"
 structopt = "0.3.21"
