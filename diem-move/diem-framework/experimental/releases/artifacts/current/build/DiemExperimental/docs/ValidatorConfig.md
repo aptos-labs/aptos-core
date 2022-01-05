@@ -5,14 +5,16 @@
 
 The ValidatorConfig resource holds information about a validator. Information
 is published and updated by Diem root in a <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">Self::ValidatorConfig</a></code> in preparation for
-later inclusion (by functions in DiemConfig) in a <code><a href="DiemConfig.md#0x1_DiemConfig_DiemConfig">DiemConfig::DiemConfig</a>&lt;<a href="DiemSystem.md#0x1_DiemSystem">DiemSystem</a>&gt;</code>
+later inclusion (by functions in DiemConfig) in a <code>DiemConfig::DiemConfig&lt;<a href="DiemSystem.md#0x1_DiemSystem">DiemSystem</a>&gt;</code>
 struct (the <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">Self::ValidatorConfig</a></code> in a <code>DiemConfig::ValidatorInfo</code> which is a member
 of the <code><a href="DiemSystem.md#0x1_DiemSystem_DiemSystem">DiemSystem::DiemSystem</a>.validators</code> vector).
 
 
+-  [Resource `ValidatorConfigChainMarker`](#0x1_ValidatorConfig_ValidatorConfigChainMarker)
 -  [Struct `Config`](#0x1_ValidatorConfig_Config)
 -  [Resource `ValidatorConfig`](#0x1_ValidatorConfig_ValidatorConfig)
 -  [Constants](#@Constants_0)
+-  [Function `initialize`](#0x1_ValidatorConfig_initialize)
 -  [Function `publish`](#0x1_ValidatorConfig_publish)
 -  [Function `exists_config`](#0x1_ValidatorConfig_exists_config)
 -  [Function `set_operator`](#0x1_ValidatorConfig_set_operator)
@@ -26,16 +28,45 @@ of the <code><a href="DiemSystem.md#0x1_DiemSystem_DiemSystem">DiemSystem::DiemS
 -  [Function `get_validator_network_addresses`](#0x1_ValidatorConfig_get_validator_network_addresses)
 
 
-<pre><code><b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
+<pre><code><b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability">0x1::Capability</a>;
+<b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option">0x1::Option</a>;
-<b>use</b> <a href="Roles.md#0x1_Roles">0x1::Roles</a>;
-<b>use</b> <a href="Signature.md#0x1_Signature">0x1::Signature</a>;
+<b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/Signature.md#0x1_Signature">0x1::Signature</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer">0x1::Signer</a>;
+<b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses">0x1::SystemAddresses</a>;
 <b>use</b> <a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig">0x1::ValidatorOperatorConfig</a>;
 </code></pre>
 
 
+
+<a name="0x1_ValidatorConfig_ValidatorConfigChainMarker"></a>
+
+## Resource `ValidatorConfigChainMarker`
+
+Marker to be stored under @CoreResources during genesis
+
+
+<pre><code><b>struct</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfigChainMarker">ValidatorConfigChainMarker</a>&lt;T&gt; <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
 
 <a name="0x1_ValidatorConfig_Config"></a>
 
@@ -120,6 +151,16 @@ of the <code><a href="DiemSystem.md#0x1_DiemSystem_DiemSystem">DiemSystem::DiemS
 ## Constants
 
 
+<a name="0x1_ValidatorConfig_ECHAIN_MARKER"></a>
+
+The <code>ValidatorSetChainMarker</code> resource was not in the required state
+
+
+<pre><code><b>const</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_ECHAIN_MARKER">ECHAIN_MARKER</a>: u64 = 9;
+</code></pre>
+
+
+
 <a name="0x1_ValidatorConfig_EINVALID_CONSENSUS_KEY"></a>
 
 The provided consensus public key is malformed
@@ -160,6 +201,37 @@ The <code><a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a></
 
 
 
+<a name="0x1_ValidatorConfig_initialize"></a>
+
+## Function `initialize`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_initialize">initialize</a>&lt;T&gt;(account: &signer)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_initialize">initialize</a>&lt;T&gt;(account: &signer) {
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(account);
+
+    <b>assert</b>!(
+        !<b>exists</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfigChainMarker">ValidatorConfigChainMarker</a>&lt;T&gt;&gt;(@CoreResources),
+        <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_ECHAIN_MARKER">ECHAIN_MARKER</a>)
+    );
+    <b>move_to</b>(account, <a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfigChainMarker">ValidatorConfigChainMarker</a>&lt;T&gt;{});
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_ValidatorConfig_publish"></a>
 
 ## Function `publish`
@@ -169,7 +241,7 @@ will have critical info such as keys, network addresses for validators,
 and the address of the validator operator.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_publish">publish</a>(validator_account: &signer, dr_account: &signer, human_name: vector&lt;u8&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_publish">publish</a>&lt;T&gt;(validator_account: &signer, human_name: vector&lt;u8&gt;, _cap: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_Cap">Capability::Cap</a>&lt;T&gt;)
 </code></pre>
 
 
@@ -178,14 +250,17 @@ and the address of the validator operator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_publish">publish</a>(
+<pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_publish">publish</a>&lt;T&gt;(
     validator_account: &signer,
-    dr_account: &signer,
     human_name: vector&lt;u8&gt;,
+    _cap: Cap&lt;T&gt;
 ) {
     <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp_assert_operating">DiemTimestamp::assert_operating</a>();
-    <a href="Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a>(dr_account);
-    <a href="Roles.md#0x1_Roles_assert_validator">Roles::assert_validator</a>(validator_account);
+    <b>assert</b>!(
+        <b>exists</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfigChainMarker">ValidatorConfigChainMarker</a>&lt;T&gt;&gt;(@CoreResources),
+        <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_ECHAIN_MARKER">ECHAIN_MARKER</a>)
+    );
+
     <b>assert</b>!(
         !<b>exists</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a>&gt;(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(validator_account)),
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">EVALIDATOR_CONFIG</a>)
@@ -245,9 +320,6 @@ Note: Access control.  No one but the owner of the account may change .operator_
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_set_operator">set_operator</a>(validator_account: &signer, operator_addr: <b>address</b>) <b>acquires</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a> {
-    <a href="Roles.md#0x1_Roles_assert_validator">Roles::assert_validator</a>(validator_account);
-    // Check for validator role is not necessary since the role is checked when the config
-    // resource is published.
     <b>assert</b>!(
         <a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_has_validator_operator_config">ValidatorOperatorConfig::has_validator_operator_config</a>(operator_addr),
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_ENOT_A_VALIDATOR_OPERATOR">ENOT_A_VALIDATOR_OPERATOR</a>)
@@ -280,7 +352,6 @@ The old config is preserved.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_remove_operator">remove_operator</a>(validator_account: &signer) <b>acquires</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a> {
-    <a href="Roles.md#0x1_Roles_assert_validator">Roles::assert_validator</a>(validator_account);
     <b>let</b> sender = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(validator_account);
     // <a href="ValidatorConfig.md#0x1_ValidatorConfig_Config">Config</a> field remains set
     <b>assert</b>!(<a href="ValidatorConfig.md#0x1_ValidatorConfig_exists_config">exists_config</a>(sender), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_EVALIDATOR_CONFIG">EVALIDATOR_CONFIG</a>));
@@ -322,7 +393,7 @@ of the DiemSystem's code.
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_EINVALID_TRANSACTION_SENDER">EINVALID_TRANSACTION_SENDER</a>)
     );
     <b>assert</b>!(
-        <a href="Signature.md#0x1_Signature_ed25519_validate_pubkey">Signature::ed25519_validate_pubkey</a>(<b>copy</b> consensus_pubkey),
+        <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/Signature.md#0x1_Signature_ed25519_validate_pubkey">Signature::ed25519_validate_pubkey</a>(<b>copy</b> consensus_pubkey),
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_EINVALID_CONSENSUS_KEY">EINVALID_CONSENSUS_KEY</a>)
     );
     // TODO(valerini): verify the proof of posession for consensus_pubkey

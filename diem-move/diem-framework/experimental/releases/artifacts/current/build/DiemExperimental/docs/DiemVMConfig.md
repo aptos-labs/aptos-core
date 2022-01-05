@@ -7,7 +7,8 @@ This module defines structs and methods to initialize VM configurations,
 including different costs of running the VM.
 
 
--  [Struct `DiemVMConfig`](#0x1_DiemVMConfig_DiemVMConfig)
+-  [Resource `VMConfigChainMarker`](#0x1_DiemVMConfig_VMConfigChainMarker)
+-  [Resource `DiemVMConfig`](#0x1_DiemVMConfig_DiemVMConfig)
 -  [Struct `GasSchedule`](#0x1_DiemVMConfig_GasSchedule)
 -  [Struct `GasConstants`](#0x1_DiemVMConfig_GasConstants)
 -  [Constants](#@Constants_0)
@@ -15,7 +16,8 @@ including different costs of running the VM.
 -  [Function `set_gas_constants`](#0x1_DiemVMConfig_set_gas_constants)
 
 
-<pre><code><b>use</b> <a href="DiemConfig.md#0x1_DiemConfig">0x1::DiemConfig</a>;
+<pre><code><b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability">0x1::Capability</a>;
+<b>use</b> <a href="DiemConfig.md#0x1_DiemConfig">0x1::DiemConfig</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses">0x1::SystemAddresses</a>;
@@ -23,14 +25,42 @@ including different costs of running the VM.
 
 
 
+<a name="0x1_DiemVMConfig_VMConfigChainMarker"></a>
+
+## Resource `VMConfigChainMarker`
+
+Marker to be stored under @CoreResources during genesis
+
+
+<pre><code><b>struct</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_VMConfigChainMarker">VMConfigChainMarker</a>&lt;T&gt; <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a name="0x1_DiemVMConfig_DiemVMConfig"></a>
 
-## Struct `DiemVMConfig`
+## Resource `DiemVMConfig`
 
 The struct to hold config data needed to operate the DiemVM.
 
 
-<pre><code><b>struct</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a> <b>has</b> <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a> <b>has</b> key
 </code></pre>
 
 
@@ -200,12 +230,32 @@ load this into memory at the startup of each block.
 ## Constants
 
 
+<a name="0x1_DiemVMConfig_ECHAIN_MARKER"></a>
+
+Error with chain marker
+
+
+<pre><code><b>const</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_ECHAIN_MARKER">ECHAIN_MARKER</a>: u64 = 0;
+</code></pre>
+
+
+
+<a name="0x1_DiemVMConfig_ECONFIG"></a>
+
+Error with config
+
+
+<pre><code><b>const</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_ECONFIG">ECONFIG</a>: u64 = 1;
+</code></pre>
+
+
+
 <a name="0x1_DiemVMConfig_EGAS_CONSTANT_INCONSISTENCY"></a>
 
 The provided gas constants were inconsistent.
 
 
-<pre><code><b>const</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_EGAS_CONSTANT_INCONSISTENCY">EGAS_CONSTANT_INCONSISTENCY</a>: u64 = 0;
+<pre><code><b>const</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_EGAS_CONSTANT_INCONSISTENCY">EGAS_CONSTANT_INCONSISTENCY</a>: u64 = 2;
 </code></pre>
 
 
@@ -217,7 +267,7 @@ The provided gas constants were inconsistent.
 Initialize the table under the diem root account
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_initialize">initialize</a>(dr_account: &signer, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_initialize">initialize</a>&lt;T&gt;(account: &signer, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -226,15 +276,26 @@ Initialize the table under the diem root account
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_initialize">initialize</a>(
-    dr_account: &signer,
+<pre><code><b>public</b> <b>fun</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_initialize">initialize</a>&lt;T&gt;(
+    account: &signer,
     instruction_schedule: vector&lt;u8&gt;,
     native_schedule: vector&lt;u8&gt;,
 ) {
     <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
 
-    // The permission "UpdateVMConfig" is granted <b>to</b> DiemRoot [[H11]][PERMISSION].
-    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(dr_account);
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(account);
+
+    <b>assert</b>!(
+        !<b>exists</b>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig_VMConfigChainMarker">VMConfigChainMarker</a>&lt;T&gt;&gt;(@CoreResources),
+        <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DiemVMConfig.md#0x1_DiemVMConfig_ECHAIN_MARKER">ECHAIN_MARKER</a>)
+    );
+
+    <b>assert</b>!(
+        !<b>exists</b>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;(@CoreResources),
+        <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DiemVMConfig.md#0x1_DiemVMConfig_ECONFIG">ECONFIG</a>)
+    );
+
+    <b>move_to</b>(account, <a href="DiemVMConfig.md#0x1_DiemVMConfig_VMConfigChainMarker">VMConfigChainMarker</a>&lt;T&gt;{});
 
     <b>let</b> gas_constants = <a href="DiemVMConfig.md#0x1_DiemVMConfig_GasConstants">GasConstants</a> {
         global_memory_per_byte_cost: 4,
@@ -250,8 +311,8 @@ Initialize the table under the diem root account
         default_account_size: 800,
     };
 
-    <a href="DiemConfig.md#0x1_DiemConfig_publish_new_config">DiemConfig::publish_new_config</a>(
-        dr_account,
+    <b>move_to</b>(
+        account,
         <a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a> {
             gas_schedule: <a href="DiemVMConfig.md#0x1_DiemVMConfig_GasSchedule">GasSchedule</a> {
                 instruction_schedule,
@@ -273,7 +334,7 @@ Initialize the table under the diem root account
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_set_gas_constants">set_gas_constants</a>(dr_account: &signer, global_memory_per_byte_cost: u64, global_memory_per_byte_write_cost: u64, min_transaction_gas_units: u64, large_transaction_cutoff: u64, intrinsic_gas_per_byte: u64, maximum_number_of_gas_units: u64, min_price_per_gas_unit: u64, max_price_per_gas_unit: u64, max_transaction_size_in_bytes: u64, gas_unit_scaling_factor: u64, default_account_size: u64)
+<pre><code><b>public</b> <b>fun</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_set_gas_constants">set_gas_constants</a>&lt;T&gt;(global_memory_per_byte_cost: u64, global_memory_per_byte_write_cost: u64, min_transaction_gas_units: u64, large_transaction_cutoff: u64, intrinsic_gas_per_byte: u64, maximum_number_of_gas_units: u64, min_price_per_gas_unit: u64, max_price_per_gas_unit: u64, max_transaction_size_in_bytes: u64, gas_unit_scaling_factor: u64, default_account_size: u64, _cap: &<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_Cap">Capability::Cap</a>&lt;T&gt;)
 </code></pre>
 
 
@@ -282,8 +343,7 @@ Initialize the table under the diem root account
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_set_gas_constants">set_gas_constants</a>(
-    dr_account: &signer,
+<pre><code><b>public</b> <b>fun</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig_set_gas_constants">set_gas_constants</a>&lt;T&gt;(
     global_memory_per_byte_cost: u64,
     global_memory_per_byte_write_cost: u64,
     min_transaction_gas_units: u64,
@@ -295,9 +355,12 @@ Initialize the table under the diem root account
     max_transaction_size_in_bytes: u64,
     gas_unit_scaling_factor: u64,
     default_account_size: u64,
-) {
+    _cap: &Cap&lt;T&gt;
+) <b>acquires</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a> {
     <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp_assert_operating">DiemTimestamp::assert_operating</a>();
-    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(dr_account);
+
+    <b>assert</b>!(<b>exists</b>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig_VMConfigChainMarker">VMConfigChainMarker</a>&lt;T&gt;&gt;(@CoreResources), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemVMConfig.md#0x1_DiemVMConfig_ECHAIN_MARKER">ECHAIN_MARKER</a>));
+
     <b>assert</b>!(
         min_price_per_gas_unit &lt;= max_price_per_gas_unit,
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="DiemVMConfig.md#0x1_DiemVMConfig_EGAS_CONSTANT_INCONSISTENCY">EGAS_CONSTANT_INCONSISTENCY</a>)
@@ -307,8 +370,9 @@ Initialize the table under the diem root account
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="DiemVMConfig.md#0x1_DiemVMConfig_EGAS_CONSTANT_INCONSISTENCY">EGAS_CONSTANT_INCONSISTENCY</a>)
     );
 
-    <b>let</b> config = <a href="DiemConfig.md#0x1_DiemConfig_get">DiemConfig::get</a>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;();
-    <b>let</b> gas_constants = &<b>mut</b> config.gas_schedule.gas_constants;
+    <b>assert</b>!(<b>exists</b>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;(@CoreResources), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemVMConfig.md#0x1_DiemVMConfig_ECONFIG">ECONFIG</a>));
+
+    <b>let</b> gas_constants = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a>&gt;(@CoreResources).gas_schedule.gas_constants;
 
     gas_constants.global_memory_per_byte_cost       = global_memory_per_byte_cost;
     gas_constants.global_memory_per_byte_write_cost = global_memory_per_byte_write_cost;
@@ -322,7 +386,7 @@ Initialize the table under the diem root account
     gas_constants.gas_unit_scaling_factor           = gas_unit_scaling_factor;
     gas_constants.default_account_size              = default_account_size;
 
-    <a href="DiemConfig.md#0x1_DiemConfig_set">DiemConfig::set</a>(dr_account, config);
+    <a href="DiemConfig.md#0x1_DiemConfig_reconfigure">DiemConfig::reconfigure</a>();
 }
 </code></pre>
 

@@ -156,9 +156,13 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
     where
         T: ConfigStorage,
     {
-        storage
-            .fetch_config(default_access_path_for_config(Self::CONFIG_ID))
-            .and_then(|bytes| Self::deserialize_into_config(&bytes).ok())
+        let experimental_path = experimental_access_path_for_config(Self::CONFIG_ID);
+        match storage.fetch_config(experimental_path) {
+            Some(bytes) => Self::deserialize_into_config(&bytes).ok(),
+            None => storage
+                .fetch_config(default_access_path_for_config(Self::CONFIG_ID))
+                .and_then(|bytes| Self::deserialize_into_config(&bytes).ok()),
+        }
     }
 }
 

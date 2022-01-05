@@ -1,10 +1,10 @@
 /// This module defines a struct storing the metadata of the block and new block events.
-module ExperimentalFramework::DiemBlock {
-    use CoreFramework::SystemAddresses;
-    use CoreFramework::DiemTimestamp;
-    use ExperimentalFramework::DiemSystem;
+module CoreFramework::DiemBlock {
     use Std::Errors;
     use Std::Event;
+    use CoreFramework::DiemSystem;
+    use CoreFramework::DiemTimestamp;
+    use CoreFramework::SystemAddresses;
 
     struct BlockMetadata has key {
         /// Height of the current block

@@ -39,22 +39,22 @@ compiled_package_info:
     : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: DiemBlock
-    : ExperimentalFramework
+    : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: DiemConfig
-    : ExperimentalFramework
+    : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: DiemConsensusConfig
-    : ExperimentalFramework
+    : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: DiemSystem
-    : ExperimentalFramework
+    : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: DiemTimestamp
     : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: DiemVMConfig
-    : ExperimentalFramework
+    : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: DiemVersion
     : CoreFramework
@@ -66,6 +66,24 @@ compiled_package_info:
     : Std
     ? address: "00000000000000000000000000000001"
       name: ExperimentalAccount
+    : ExperimentalFramework
+    ? address: "00000000000000000000000000000001"
+      name: ExperimentalConsensusConfig
+    : ExperimentalFramework
+    ? address: "00000000000000000000000000000001"
+      name: ExperimentalParallelExecutionConfig
+    : ExperimentalFramework
+    ? address: "00000000000000000000000000000001"
+      name: ExperimentalVMConfig
+    : ExperimentalFramework
+    ? address: "00000000000000000000000000000001"
+      name: ExperimentalValidatorConfig
+    : ExperimentalFramework
+    ? address: "00000000000000000000000000000001"
+      name: ExperimentalValidatorOperatorConfig
+    : ExperimentalFramework
+    ? address: "00000000000000000000000000000001"
+      name: ExperimentalValidatorSet
     : ExperimentalFramework
     ? address: "00000000000000000000000000000001"
       name: ExperimentalVersion
@@ -93,13 +111,10 @@ compiled_package_info:
     : Std
     ? address: "00000000000000000000000000000001"
       name: ParallelExecutionConfig
-    : ExperimentalFramework
-    ? address: "00000000000000000000000000000001"
-      name: Roles
-    : ExperimentalFramework
+    : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: Signature
-    : DiemFramework
+    : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: Signer
     : Std
@@ -111,17 +126,17 @@ compiled_package_info:
     : ExperimentalFramework
     ? address: "00000000000000000000000000000001"
       name: ValidatorConfig
-    : ExperimentalFramework
+    : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: ValidatorOperatorConfig
-    : ExperimentalFramework
+    : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: Vector
     : Std
     ? address: "00000000000000000000000000000001"
       name: Vote
     : ExperimentalFramework
-  source_digest: 2679740E264D135AC50F5D64D65A2171133B21F38A10CB990228E8C066FA76B9
+  source_digest: F14445560392B73A0E74CA3C576CD3463FE0265B9E9C8F042CA911A8D0ACE641
   build_flags:
     dev_mode: false
     test_mode: false

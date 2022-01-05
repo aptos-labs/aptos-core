@@ -1,16 +1,24 @@
 /// This module defines structs and methods to initialize VM configurations,
 /// including different costs of running the VM.
-module ExperimentalFramework::DiemVMConfig {
-    use ExperimentalFramework::DiemConfig;
+module CoreFramework::DiemVMConfig {
+    use Std::Capability::Cap;
+    use Std::Errors;
+    use CoreFramework::DiemConfig;
     use CoreFramework::DiemTimestamp;
     use CoreFramework::SystemAddresses;
-    use Std::Errors;
 
+    /// Error with chain marker
+    const ECHAIN_MARKER: u64 = 0;
+    /// Error with config
+    const ECONFIG: u64 = 1;
     /// The provided gas constants were inconsistent.
-    const EGAS_CONSTANT_INCONSISTENCY: u64 = 0;
+    const EGAS_CONSTANT_INCONSISTENCY: u64 = 2;
+
+    /// Marker to be stored under @CoreResources during genesis
+    struct VMConfigChainMarker<phantom T> has key {}
 
     /// The struct to hold config data needed to operate the DiemVM.
-    struct DiemVMConfig has copy, drop, store {
+    struct DiemVMConfig has key {
         /// Cost of running the VM.
         gas_schedule: GasSchedule,
     }
@@ -70,15 +78,26 @@ module ExperimentalFramework::DiemVMConfig {
     }
 
     /// Initialize the table under the diem root account
-    public fun initialize(
-        dr_account: &signer,
+    public fun initialize<T>(
+        account: &signer,
         instruction_schedule: vector<u8>,
         native_schedule: vector<u8>,
     ) {
         DiemTimestamp::assert_genesis();
 
-        // The permission "UpdateVMConfig" is granted to DiemRoot [[H11]][PERMISSION].
-        SystemAddresses::assert_core_resource(dr_account);
+        SystemAddresses::assert_core_resource(account);
+
+        assert!(
+            !exists<VMConfigChainMarker<T>>(@CoreResources),
+            Errors::already_published(ECHAIN_MARKER)
+        );
+
+        assert!(
+            !exists<DiemVMConfig>(@CoreResources),
+            Errors::already_published(ECONFIG)
+        );
+
+        move_to(account, VMConfigChainMarker<T>{});
 
         let gas_constants = GasConstants {
             global_memory_per_byte_cost: 4,
@@ -94,8 +113,8 @@ module ExperimentalFramework::DiemVMConfig {
             default_account_size: 800,
         };
 
-        DiemConfig::publish_new_config(
-            dr_account,
+        move_to(
+            account,
             DiemVMConfig {
                 gas_schedule: GasSchedule {
                     instruction_schedule,
@@ -106,8 +125,7 @@ module ExperimentalFramework::DiemVMConfig {
         );
     }
 
-    public fun set_gas_constants(
-        dr_account: &signer,
+    public fun set_gas_constants<T>(
         global_memory_per_byte_cost: u64,
         global_memory_per_byte_write_cost: u64,
         min_transaction_gas_units: u64,
@@ -119,9 +137,12 @@ module ExperimentalFramework::DiemVMConfig {
         max_transaction_size_in_bytes: u64,
         gas_unit_scaling_factor: u64,
         default_account_size: u64,
-    ) {
+        _cap: &Cap<T>
+    ) acquires DiemVMConfig {
         DiemTimestamp::assert_operating();
-        SystemAddresses::assert_core_resource(dr_account);
+
+        assert!(exists<VMConfigChainMarker<T>>(@CoreResources), Errors::not_published(ECHAIN_MARKER));
+
         assert!(
             min_price_per_gas_unit <= max_price_per_gas_unit,
             Errors::invalid_argument(EGAS_CONSTANT_INCONSISTENCY)
@@ -131,8 +152,9 @@ module ExperimentalFramework::DiemVMConfig {
             Errors::invalid_argument(EGAS_CONSTANT_INCONSISTENCY)
         );
 
-        let config = DiemConfig::get<DiemVMConfig>();
-        let gas_constants = &mut config.gas_schedule.gas_constants;
+        assert!(exists<DiemVMConfig>(@CoreResources), Errors::not_published(ECONFIG));
+
+        let gas_constants = &mut borrow_global_mut<DiemVMConfig>(@CoreResources).gas_schedule.gas_constants;
 
         gas_constants.global_memory_per_byte_cost       = global_memory_per_byte_cost;
         gas_constants.global_memory_per_byte_write_cost = global_memory_per_byte_write_cost;
@@ -146,6 +168,6 @@ module ExperimentalFramework::DiemVMConfig {
         gas_constants.gas_unit_scaling_factor           = gas_unit_scaling_factor;
         gas_constants.default_account_size              = default_account_size;
 
-        DiemConfig::set(dr_account, config);
+        DiemConfig::reconfigure();
     }
 }

@@ -12,7 +12,6 @@ Maintains the version number for the blockchain.
 
 
 <pre><code><b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability">0x1::Capability</a>;
-<b>use</b> <a href="DiemConfig.md#0x1_DiemConfig">0x1::DiemConfig</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemVersion.md#0x1_DiemVersion">0x1::DiemVersion</a>;
 </code></pre>
 
@@ -92,7 +91,6 @@ Updates the major version to a larger version.
         major,
         &<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_acquire">Capability::acquire</a>(account, &<a href="ExperimentalVersion.md#0x1_ExperimentalVersion">ExperimentalVersion</a> {}),
     );
-    <a href="DiemConfig.md#0x1_DiemConfig_reconfigure">DiemConfig::reconfigure</a>(account);
 }
 </code></pre>
 

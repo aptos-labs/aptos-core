@@ -1,5 +1,5 @@
 /// Contains functions for [ed25519](https://en.wikipedia.org/wiki/EdDSA) digital signatures.
-module DiemFramework::Signature {
+module CoreFramework::Signature {
 
     /// Return `true` if the bytes in `public_key` can be parsed as a valid Ed25519 public key.
     /// Returns `false` if `public_key` is not 32 bytes OR is 32 bytes, but does not pass

@@ -3,16 +3,15 @@
 /// transaction in addition to the core prologue and epilogue.
 
 module ExperimentalFramework::ExperimentalAccount {
-    use CoreFramework::Account;
-    use CoreFramework::SystemAddresses;
-    use CoreFramework::DiemTimestamp;
-
-    use ExperimentalFramework::ValidatorConfig;
-    use ExperimentalFramework::ValidatorOperatorConfig;
-    use ExperimentalFramework::Roles;
-    use ExperimentalFramework::DiemConfig;
     use Std::Event;
     use Std::Errors;
+    use CoreFramework::Account;
+    use CoreFramework::DiemConfig;
+    use CoreFramework::DiemTimestamp;
+    use CoreFramework::SystemAddresses;
+
+    use ExperimentalFramework::ExperimentalValidatorConfig;
+    use ExperimentalFramework::ExperimentalValidatorOperatorConfig;
 
     /// A resource that holds the event handle for all the past WriteSet transactions that have been committed on chain.
     struct DiemWriteSetManager has key {
@@ -133,7 +132,6 @@ module ExperimentalFramework::ExperimentalAccount {
         DiemTimestamp::assert_genesis();
         let (dr_account, _) = create_core_account(@CoreResources, auth_key_prefix);
         SystemAddresses::assert_core_resource(&dr_account);
-        Roles::grant_diem_root_role(&dr_account);
         assert!(
             !exists<DiemWriteSetManager>(@CoreResources),
             Errors::already_published(EWRITESET_MANAGER)
@@ -153,12 +151,8 @@ module ExperimentalFramework::ExperimentalAccount {
         auth_key_prefix: vector<u8>,
         human_name: vector<u8>,
     ) {
-        // TODO: Remove this role check when the core configs refactor lands
-        Roles::assert_diem_root(dr_account);
         let (new_account, _) = create_core_account(new_account_address, auth_key_prefix);
-        // The dr_account account is verified to have the diem root role in `Roles::new_validator_role`
-        Roles::new_validator_role(dr_account, &new_account);
-        ValidatorConfig::publish(&new_account, dr_account, human_name);
+        ExperimentalValidatorConfig::publish(dr_account, &new_account, human_name);
     }
 
     /// Create a Validator Operator account
@@ -168,12 +162,8 @@ module ExperimentalFramework::ExperimentalAccount {
         auth_key_prefix: vector<u8>,
         human_name: vector<u8>,
     ) {
-        // TODO: Remove this role check when the core configs refactor lands
-        Roles::assert_diem_root(dr_account);
         let (new_account, _) = create_core_account(new_account_address, auth_key_prefix);
-        // The dr_account is verified to have the diem root role in `Roles::new_validator_operator_role`
-        Roles::new_validator_operator_role(dr_account, &new_account);
-        ValidatorOperatorConfig::publish(&new_account, dr_account, human_name);
+        ExperimentalValidatorOperatorConfig::publish(dr_account, &new_account, human_name);
     }
 
     /// Rotate the authentication key for the account under cap.account_address
@@ -253,6 +243,6 @@ module ExperimentalFramework::ExperimentalAccount {
         should_trigger_reconfiguration: bool,
     ) {
         Account::epilogue(&dr_account, &ExperimentalAccountMarker{});
-        if (should_trigger_reconfiguration) DiemConfig::reconfigure(&dr_account);
+        if (should_trigger_reconfiguration) DiemConfig::reconfigure_with_root_signer(&dr_account);
     }
 }

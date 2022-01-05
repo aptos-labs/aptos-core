@@ -33,10 +33,9 @@ transaction in addition to the core prologue and epilogue.
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event">0x1::Event</a>;
-<b>use</b> <a href="Roles.md#0x1_Roles">0x1::Roles</a>;
+<b>use</b> <a href="ExperimentalValidatorConfig.md#0x1_ExperimentalValidatorConfig">0x1::ExperimentalValidatorConfig</a>;
+<b>use</b> <a href="ExperimentalValidatorOperatorConfig.md#0x1_ExperimentalValidatorOperatorConfig">0x1::ExperimentalValidatorOperatorConfig</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses">0x1::SystemAddresses</a>;
-<b>use</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">0x1::ValidatorConfig</a>;
-<b>use</b> <a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig">0x1::ValidatorOperatorConfig</a>;
 </code></pre>
 
 
@@ -485,7 +484,6 @@ AccountOperationsCapability, WriteSetManager, and finally makes the account.
     <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
     <b>let</b> (dr_account, _) = <a href="ExperimentalAccount.md#0x1_ExperimentalAccount_create_core_account">create_core_account</a>(@CoreResources, auth_key_prefix);
     <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(&dr_account);
-    <a href="Roles.md#0x1_Roles_grant_diem_root_role">Roles::grant_diem_root_role</a>(&dr_account);
     <b>assert</b>!(
         !<b>exists</b>&lt;<a href="ExperimentalAccount.md#0x1_ExperimentalAccount_DiemWriteSetManager">DiemWriteSetManager</a>&gt;(@CoreResources),
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="ExperimentalAccount.md#0x1_ExperimentalAccount_EWRITESET_MANAGER">EWRITESET_MANAGER</a>)
@@ -525,12 +523,8 @@ Create a Validator account
     auth_key_prefix: vector&lt;u8&gt;,
     human_name: vector&lt;u8&gt;,
 ) {
-    // TODO: Remove this role check when the core configs refactor lands
-    <a href="Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a>(dr_account);
     <b>let</b> (new_account, _) = <a href="ExperimentalAccount.md#0x1_ExperimentalAccount_create_core_account">create_core_account</a>(new_account_address, auth_key_prefix);
-    // The dr_account account is verified <b>to</b> have the diem root role in `<a href="Roles.md#0x1_Roles_new_validator_role">Roles::new_validator_role</a>`
-    <a href="Roles.md#0x1_Roles_new_validator_role">Roles::new_validator_role</a>(dr_account, &new_account);
-    <a href="ValidatorConfig.md#0x1_ValidatorConfig_publish">ValidatorConfig::publish</a>(&new_account, dr_account, human_name);
+    <a href="ExperimentalValidatorConfig.md#0x1_ExperimentalValidatorConfig_publish">ExperimentalValidatorConfig::publish</a>(dr_account, &new_account, human_name);
 }
 </code></pre>
 
@@ -560,12 +554,8 @@ Create a Validator Operator account
     auth_key_prefix: vector&lt;u8&gt;,
     human_name: vector&lt;u8&gt;,
 ) {
-    // TODO: Remove this role check when the core configs refactor lands
-    <a href="Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a>(dr_account);
     <b>let</b> (new_account, _) = <a href="ExperimentalAccount.md#0x1_ExperimentalAccount_create_core_account">create_core_account</a>(new_account_address, auth_key_prefix);
-    // The dr_account is verified <b>to</b> have the diem root role in `<a href="Roles.md#0x1_Roles_new_validator_operator_role">Roles::new_validator_operator_role</a>`
-    <a href="Roles.md#0x1_Roles_new_validator_operator_role">Roles::new_validator_operator_role</a>(dr_account, &new_account);
-    <a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_publish">ValidatorOperatorConfig::publish</a>(&new_account, dr_account, human_name);
+    <a href="ExperimentalValidatorOperatorConfig.md#0x1_ExperimentalValidatorOperatorConfig_publish">ExperimentalValidatorOperatorConfig::publish</a>(dr_account, &new_account, human_name);
 }
 </code></pre>
 
@@ -781,7 +771,7 @@ Rotate the authentication key for the account under cap.account_address
     should_trigger_reconfiguration: bool,
 ) {
     <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/Account.md#0x1_Account_epilogue">Account::epilogue</a>(&dr_account, &<a href="ExperimentalAccount.md#0x1_ExperimentalAccount_ExperimentalAccountMarker">ExperimentalAccountMarker</a>{});
-    <b>if</b> (should_trigger_reconfiguration) <a href="DiemConfig.md#0x1_DiemConfig_reconfigure">DiemConfig::reconfigure</a>(&dr_account);
+    <b>if</b> (should_trigger_reconfiguration) <a href="DiemConfig.md#0x1_DiemConfig_reconfigure_with_root_signer">DiemConfig::reconfigure_with_root_signer</a>(&dr_account);
 }
 </code></pre>
 

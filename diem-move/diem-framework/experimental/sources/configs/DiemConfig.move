@@ -1,22 +1,16 @@
 /// Publishes configuration information for validators, and issues reconfiguration events
 /// to synchronize configuration changes for the validators.
-module ExperimentalFramework::DiemConfig {
-    use CoreFramework::SystemAddresses;
-    use CoreFramework::DiemTimestamp;
+module CoreFramework::DiemConfig {
     use Std::Errors;
     use Std::Event;
     use Std::Signer;
+    use CoreFramework::DiemTimestamp;
+    use CoreFramework::SystemAddresses;
 
-    friend ExperimentalFramework::DiemVMConfig;
-    friend ExperimentalFramework::DiemSystem;
-    friend ExperimentalFramework::DiemConsensusConfig;
-    friend ExperimentalFramework::ParallelExecutionConfig;
-
-    /// A generic singleton resource that holds a value of a specific type.
-    struct DiemConfig<Config: copy + drop + store> has key, store {
-        /// Holds specific info for instance of `Config` type.
-        payload: Config
-    }
+    friend CoreFramework::DiemConsensusConfig;
+    friend CoreFramework::DiemSystem;
+    friend CoreFramework::DiemVMConfig;
+    friend CoreFramework::ParallelExecutionConfig;
 
     /// Event that signals DiemBFT algorithm to start a new epoch,
     /// with new configuration information. This is also called a
@@ -34,9 +28,6 @@ module ExperimentalFramework::DiemConfig {
         /// Event handle for reconfiguration events
         events: Event::EventHandle<NewEpochEvent>,
     }
-
-    /// Accounts with this privilege can modify DiemConfig<TypeName> under Diem root address.
-    struct ModifyConfigCapability<phantom TypeName> has key, store {}
 
     /// Reconfiguration disabled if this resource occurs under LibraRoot.
     struct DisableReconfiguration has key {}
@@ -69,48 +60,6 @@ module ExperimentalFramework::DiemConfig {
         );
     }
 
-    /// Returns a copy of `Config` value stored under `addr`.
-    public fun get<Config: copy + drop + store>(): Config
-    acquires DiemConfig {
-        let addr = @DiemRoot;
-        assert!(exists<DiemConfig<Config>>(addr), Errors::not_published(EDIEM_CONFIG));
-        *&borrow_global<DiemConfig<Config>>(addr).payload
-    }
-
-    /// Set a config item to a new value with the default capability stored under config address and trigger a
-    /// reconfiguration. This function requires that the signer have a `ModifyConfigCapability<Config>`
-    /// resource published under it.
-    public(friend) fun set<Config: copy + drop + store>(account: &signer, payload: Config)
-    acquires DiemConfig, Configuration {
-        let signer_address = Signer::address_of(account);
-        // Next should always be true if properly initialized.
-        assert!(exists<ModifyConfigCapability<Config>>(signer_address), Errors::requires_capability(EMODIFY_CAPABILITY));
-
-        let addr = @DiemRoot;
-        assert!(exists<DiemConfig<Config>>(addr), Errors::not_published(EDIEM_CONFIG));
-        let config = borrow_global_mut<DiemConfig<Config>>(addr);
-        config.payload = payload;
-
-        reconfigure_();
-    }
-
-    /// Set a config item to a new value and trigger a reconfiguration. This function
-    /// requires a reference to a `ModifyConfigCapability`, which is returned when the
-    /// config is published using `publish_new_config_and_get_capability`.
-    /// It is called by `DiemSystem::update_config_and_reconfigure`, which allows
-    /// validator operators to change the validator set.  All other config changes require
-    /// a Diem root signer.
-    public(friend) fun set_with_capability_and_reconfigure<Config: copy + drop + store>(
-        _cap: &ModifyConfigCapability<Config>,
-        payload: Config
-    ) acquires DiemConfig, Configuration {
-        let addr = @DiemRoot;
-        assert!(exists<DiemConfig<Config>>(addr), Errors::not_published(EDIEM_CONFIG));
-        let config = borrow_global_mut<DiemConfig<Config>>(addr);
-        config.payload = payload;
-        reconfigure_();
-    }
-
     /// Private function to temporarily halt reconfiguration.
     /// This function should only be used for offline WriteSet generation purpose and should never be invoked on chain.
     fun disable_reconfiguration(dr_account: &signer) {
@@ -140,40 +89,13 @@ module ExperimentalFramework::DiemConfig {
         !exists<DisableReconfiguration>(@DiemRoot)
     }
 
-    /// Publishes a new config.
-    /// The caller will use the returned ModifyConfigCapability to specify the access control
-    /// policy for who can modify the config.
-    /// Does not trigger a reconfiguration.
-    public(friend) fun publish_new_config_and_get_capability<Config: copy + drop + store>(
-        dr_account: &signer,
-        payload: Config,
-    ): ModifyConfigCapability<Config> {
-        SystemAddresses::assert_core_resource(dr_account);
-        assert!(
-            !exists<DiemConfig<Config>>(Signer::address_of(dr_account)),
-            Errors::already_published(EDIEM_CONFIG)
-        );
-        move_to(dr_account, DiemConfig { payload });
-        ModifyConfigCapability<Config> {}
-    }
-
-    /// Publish a new config item. Only Diem root can modify such config.
-    /// Publishes the capability to modify this config under the Diem root account.
-    /// Does not trigger a reconfiguration.
-    public(friend) fun publish_new_config<Config: copy + drop + store>(
-        dr_account: &signer,
-        payload: Config
-    ) {
-        let capability = publish_new_config_and_get_capability<Config>(dr_account, payload);
-        assert!(
-            !exists<ModifyConfigCapability<Config>>(Signer::address_of(dr_account)),
-            Errors::already_published(EMODIFY_CAPABILITY)
-        );
-        move_to(dr_account, capability);
+    /// Signal validators to start using new configuration. Must be called from friend config modules.
+    public(friend) fun reconfigure() acquires Configuration {
+        reconfigure_();
     }
 
     /// Signal validators to start using new configuration. Must be called by Diem root.
-    public fun reconfigure(
+    public fun reconfigure_with_root_signer(
         dr_account: &signer,
     ) acquires Configuration {
         SystemAddresses::assert_core_resource(dr_account);

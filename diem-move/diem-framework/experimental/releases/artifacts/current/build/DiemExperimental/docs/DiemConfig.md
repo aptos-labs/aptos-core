@@ -7,22 +7,16 @@ Publishes configuration information for validators, and issues reconfiguration e
 to synchronize configuration changes for the validators.
 
 
--  [Resource `DiemConfig`](#0x1_DiemConfig_DiemConfig)
 -  [Struct `NewEpochEvent`](#0x1_DiemConfig_NewEpochEvent)
 -  [Resource `Configuration`](#0x1_DiemConfig_Configuration)
--  [Resource `ModifyConfigCapability`](#0x1_DiemConfig_ModifyConfigCapability)
 -  [Resource `DisableReconfiguration`](#0x1_DiemConfig_DisableReconfiguration)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_DiemConfig_initialize)
--  [Function `get`](#0x1_DiemConfig_get)
--  [Function `set`](#0x1_DiemConfig_set)
--  [Function `set_with_capability_and_reconfigure`](#0x1_DiemConfig_set_with_capability_and_reconfigure)
 -  [Function `disable_reconfiguration`](#0x1_DiemConfig_disable_reconfiguration)
 -  [Function `enable_reconfiguration`](#0x1_DiemConfig_enable_reconfiguration)
 -  [Function `reconfiguration_enabled`](#0x1_DiemConfig_reconfiguration_enabled)
--  [Function `publish_new_config_and_get_capability`](#0x1_DiemConfig_publish_new_config_and_get_capability)
--  [Function `publish_new_config`](#0x1_DiemConfig_publish_new_config)
 -  [Function `reconfigure`](#0x1_DiemConfig_reconfigure)
+-  [Function `reconfigure_with_root_signer`](#0x1_DiemConfig_reconfigure_with_root_signer)
 -  [Function `reconfigure_`](#0x1_DiemConfig_reconfigure_)
 -  [Function `emit_genesis_reconfiguration_event`](#0x1_DiemConfig_emit_genesis_reconfiguration_event)
 
@@ -35,34 +29,6 @@ to synchronize configuration changes for the validators.
 </code></pre>
 
 
-
-<a name="0x1_DiemConfig_DiemConfig"></a>
-
-## Resource `DiemConfig`
-
-A generic singleton resource that holds a value of a specific type.
-
-
-<pre><code><b>struct</b> <a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config: <b>copy</b>, drop, store&gt; <b>has</b> store, key
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>payload: Config</code>
-</dt>
-<dd>
- Holds specific info for instance of <code>Config</code> type.
-</dd>
-</dl>
-
-
-</details>
 
 <a name="0x1_DiemConfig_NewEpochEvent"></a>
 
@@ -128,34 +94,6 @@ Holds information about state of reconfiguration
 </dt>
 <dd>
  Event handle for reconfiguration events
-</dd>
-</dl>
-
-
-</details>
-
-<a name="0x1_DiemConfig_ModifyConfigCapability"></a>
-
-## Resource `ModifyConfigCapability`
-
-Accounts with this privilege can modify DiemConfig<TypeName> under Diem root address.
-
-
-<pre><code><b>struct</b> <a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;TypeName&gt; <b>has</b> store, key
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>dummy_field: bool</code>
-</dt>
-<dd>
-
 </dd>
 </dl>
 
@@ -237,7 +175,7 @@ An invalid block time was encountered.
 
 <a name="0x1_DiemConfig_EMODIFY_CAPABILITY"></a>
 
-A <code><a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a></code> is in a different state than was expected
+A <code>ModifyConfigCapability</code> is in a different state than was expected
 
 
 <pre><code><b>const</b> <a href="DiemConfig.md#0x1_DiemConfig_EMODIFY_CAPABILITY">EMODIFY_CAPABILITY</a>: u64 = 2;
@@ -275,108 +213,6 @@ Publishes <code><a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configurati
             events: <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_new_event_handle">Event::new_event_handle</a>&lt;<a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">NewEpochEvent</a>&gt;(dr_account),
         }
     );
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_DiemConfig_get"></a>
-
-## Function `get`
-
-Returns a copy of <code>Config</code> value stored under <code>addr</code>.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_get">get</a>&lt;Config: <b>copy</b>, drop, store&gt;(): Config
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_get">get</a>&lt;Config: <b>copy</b> + drop + store&gt;(): Config
-<b>acquires</b> <a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a> {
-    <b>let</b> addr = @DiemRoot;
-    <b>assert</b>!(<b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config&gt;&gt;(addr), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemConfig.md#0x1_DiemConfig_EDIEM_CONFIG">EDIEM_CONFIG</a>));
-    *&<b>borrow_global</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config&gt;&gt;(addr).payload
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_DiemConfig_set"></a>
-
-## Function `set`
-
-Set a config item to a new value with the default capability stored under config address and trigger a
-reconfiguration. This function requires that the signer have a <code><a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;Config&gt;</code>
-resource published under it.
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_set">set</a>&lt;Config: <b>copy</b>, drop, store&gt;(account: &signer, payload: Config)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_set">set</a>&lt;Config: <b>copy</b> + drop + store&gt;(account: &signer, payload: Config)
-<b>acquires</b> <a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>, <a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a> {
-    <b>let</b> signer_address = <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
-    // Next should always be <b>true</b> <b>if</b> properly initialized.
-    <b>assert</b>!(<b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;Config&gt;&gt;(signer_address), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_requires_capability">Errors::requires_capability</a>(<a href="DiemConfig.md#0x1_DiemConfig_EMODIFY_CAPABILITY">EMODIFY_CAPABILITY</a>));
-
-    <b>let</b> addr = @DiemRoot;
-    <b>assert</b>!(<b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config&gt;&gt;(addr), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemConfig.md#0x1_DiemConfig_EDIEM_CONFIG">EDIEM_CONFIG</a>));
-    <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config&gt;&gt;(addr);
-    config.payload = payload;
-
-    <a href="DiemConfig.md#0x1_DiemConfig_reconfigure_">reconfigure_</a>();
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_DiemConfig_set_with_capability_and_reconfigure"></a>
-
-## Function `set_with_capability_and_reconfigure`
-
-Set a config item to a new value and trigger a reconfiguration. This function
-requires a reference to a <code><a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a></code>, which is returned when the
-config is published using <code>publish_new_config_and_get_capability</code>.
-It is called by <code><a href="DiemSystem.md#0x1_DiemSystem_update_config_and_reconfigure">DiemSystem::update_config_and_reconfigure</a></code>, which allows
-validator operators to change the validator set.  All other config changes require
-a Diem root signer.
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_set_with_capability_and_reconfigure">set_with_capability_and_reconfigure</a>&lt;Config: <b>copy</b>, drop, store&gt;(_cap: &<a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">DiemConfig::ModifyConfigCapability</a>&lt;Config&gt;, payload: Config)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_set_with_capability_and_reconfigure">set_with_capability_and_reconfigure</a>&lt;Config: <b>copy</b> + drop + store&gt;(
-    _cap: &<a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;Config&gt;,
-    payload: Config
-) <b>acquires</b> <a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>, <a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a> {
-    <b>let</b> addr = @DiemRoot;
-    <b>assert</b>!(<b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config&gt;&gt;(addr), <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="DiemConfig.md#0x1_DiemConfig_EDIEM_CONFIG">EDIEM_CONFIG</a>));
-    <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config&gt;&gt;(addr);
-    config.payload = payload;
-    <a href="DiemConfig.md#0x1_DiemConfig_reconfigure_">reconfigure_</a>();
 }
 </code></pre>
 
@@ -473,86 +309,14 @@ This function should only be used for offline WriteSet generation purpose and sh
 
 </details>
 
-<a name="0x1_DiemConfig_publish_new_config_and_get_capability"></a>
-
-## Function `publish_new_config_and_get_capability`
-
-Publishes a new config.
-The caller will use the returned ModifyConfigCapability to specify the access control
-policy for who can modify the config.
-Does not trigger a reconfiguration.
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_publish_new_config_and_get_capability">publish_new_config_and_get_capability</a>&lt;Config: <b>copy</b>, drop, store&gt;(dr_account: &signer, payload: Config): <a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">DiemConfig::ModifyConfigCapability</a>&lt;Config&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_publish_new_config_and_get_capability">publish_new_config_and_get_capability</a>&lt;Config: <b>copy</b> + drop + store&gt;(
-    dr_account: &signer,
-    payload: Config,
-): <a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;Config&gt; {
-    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(dr_account);
-    <b>assert</b>!(
-        !<b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a>&lt;Config&gt;&gt;(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dr_account)),
-        <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DiemConfig.md#0x1_DiemConfig_EDIEM_CONFIG">EDIEM_CONFIG</a>)
-    );
-    <b>move_to</b>(dr_account, <a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a> { payload });
-    <a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;Config&gt; {}
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_DiemConfig_publish_new_config"></a>
-
-## Function `publish_new_config`
-
-Publish a new config item. Only Diem root can modify such config.
-Publishes the capability to modify this config under the Diem root account.
-Does not trigger a reconfiguration.
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_publish_new_config">publish_new_config</a>&lt;Config: <b>copy</b>, drop, store&gt;(dr_account: &signer, payload: Config)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_publish_new_config">publish_new_config</a>&lt;Config: <b>copy</b> + drop + store&gt;(
-    dr_account: &signer,
-    payload: Config
-) {
-    <b>let</b> capability = <a href="DiemConfig.md#0x1_DiemConfig_publish_new_config_and_get_capability">publish_new_config_and_get_capability</a>&lt;Config&gt;(dr_account, payload);
-    <b>assert</b>!(
-        !<b>exists</b>&lt;<a href="DiemConfig.md#0x1_DiemConfig_ModifyConfigCapability">ModifyConfigCapability</a>&lt;Config&gt;&gt;(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(dr_account)),
-        <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="DiemConfig.md#0x1_DiemConfig_EMODIFY_CAPABILITY">EMODIFY_CAPABILITY</a>)
-    );
-    <b>move_to</b>(dr_account, capability);
-}
-</code></pre>
-
-
-
-</details>
-
 <a name="0x1_DiemConfig_reconfigure"></a>
 
 ## Function `reconfigure`
 
-Signal validators to start using new configuration. Must be called by Diem root.
+Signal validators to start using new configuration. Must be called from friend config modules.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_reconfigure">reconfigure</a>(dr_account: &signer)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_reconfigure">reconfigure</a>()
 </code></pre>
 
 
@@ -561,7 +325,32 @@ Signal validators to start using new configuration. Must be called by Diem root.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_reconfigure">reconfigure</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_reconfigure">reconfigure</a>() <b>acquires</b> <a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a> {
+    <a href="DiemConfig.md#0x1_DiemConfig_reconfigure_">reconfigure_</a>();
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_DiemConfig_reconfigure_with_root_signer"></a>
+
+## Function `reconfigure_with_root_signer`
+
+Signal validators to start using new configuration. Must be called by Diem root.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_reconfigure_with_root_signer">reconfigure_with_root_signer</a>(dr_account: &signer)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_reconfigure_with_root_signer">reconfigure_with_root_signer</a>(
     dr_account: &signer,
 ) <b>acquires</b> <a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a> {
     <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(dr_account);

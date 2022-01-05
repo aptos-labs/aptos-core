@@ -53,6 +53,9 @@ compiled_package_info:
       name: Option
     : Std
     ? address: "00000000000000000000000000000001"
+      name: Signature
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
       name: Signer
     : Std
     ? address: "00000000000000000000000000000001"
@@ -61,7 +64,7 @@ compiled_package_info:
     ? address: "00000000000000000000000000000001"
       name: Vector
     : Std
-  source_digest: 48E9BCF370DF0E3868BBF66B9A93A80D846F4B1A12885991FEA68A6C95BB2CE4
+  source_digest: FE964004839AD4EC5BD3B3E19EDB306897507FD39313A041F304448A1D4712D6
   build_flags:
     dev_mode: false
     test_mode: false

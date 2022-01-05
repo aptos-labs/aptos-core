@@ -13,11 +13,14 @@
 <pre><code><b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/CoreGenesis.md#0x1_CoreGenesis">0x1::CoreGenesis</a>;
 <b>use</b> <a href="DiemBlock.md#0x1_DiemBlock">0x1::DiemBlock</a>;
 <b>use</b> <a href="DiemConfig.md#0x1_DiemConfig">0x1::DiemConfig</a>;
-<b>use</b> <a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig">0x1::DiemConsensusConfig</a>;
-<b>use</b> <a href="DiemSystem.md#0x1_DiemSystem">0x1::DiemSystem</a>;
-<b>use</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig">0x1::DiemVMConfig</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event">0x1::Event</a>;
 <b>use</b> <a href="ExperimentalAccount.md#0x1_ExperimentalAccount">0x1::ExperimentalAccount</a>;
+<b>use</b> <a href="ExperimentalConsensusConfig.md#0x1_ExperimentalConsensusConfig">0x1::ExperimentalConsensusConfig</a>;
+<b>use</b> <a href="ExperimentalParallelExecutionConfig.md#0x1_ExperimentalParallelExecutionConfig">0x1::ExperimentalParallelExecutionConfig</a>;
+<b>use</b> <a href="ExperimentalVMConfig.md#0x1_ExperimentalVMConfig">0x1::ExperimentalVMConfig</a>;
+<b>use</b> <a href="ExperimentalValidatorConfig.md#0x1_ExperimentalValidatorConfig">0x1::ExperimentalValidatorConfig</a>;
+<b>use</b> <a href="ExperimentalValidatorOperatorConfig.md#0x1_ExperimentalValidatorOperatorConfig">0x1::ExperimentalValidatorOperatorConfig</a>;
+<b>use</b> <a href="ExperimentalValidatorSet.md#0x1_ExperimentalValidatorSet">0x1::ExperimentalValidatorSet</a>;
 <b>use</b> <a href="ExperimentalVersion.md#0x1_ExperimentalVersion">0x1::ExperimentalVersion</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer">0x1::Signer</a>;
 <b>use</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">0x1::ValidatorConfig</a>;
@@ -108,21 +111,26 @@
     <a href="DiemConfig.md#0x1_DiemConfig_initialize">DiemConfig::initialize</a>(dr_account);
 
     // Consensus config setup
-    <a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig_initialize">DiemConsensusConfig::initialize</a>(dr_account);
-    <a href="DiemSystem.md#0x1_DiemSystem_initialize_validator_set">DiemSystem::initialize_validator_set</a>(dr_account);
+    <a href="ExperimentalConsensusConfig.md#0x1_ExperimentalConsensusConfig_initialize">ExperimentalConsensusConfig::initialize</a>(dr_account);
+    // Parallel execution config setup
+    <a href="ExperimentalParallelExecutionConfig.md#0x1_ExperimentalParallelExecutionConfig_initialize_parallel_execution">ExperimentalParallelExecutionConfig::initialize_parallel_execution</a>(dr_account);
+    <a href="ExperimentalValidatorSet.md#0x1_ExperimentalValidatorSet_initialize_validator_set">ExperimentalValidatorSet::initialize_validator_set</a>(dr_account);
     <a href="ExperimentalVersion.md#0x1_ExperimentalVersion_initialize">ExperimentalVersion::initialize</a>(dr_account, initial_diem_version);
     <a href="DiemBlock.md#0x1_DiemBlock_initialize_block_metadata">DiemBlock::initialize_block_metadata</a>(dr_account);
 
-    // Rotate auth keys for DiemRoot and TreasuryCompliance accounts <b>to</b> the given
+    // Rotate auth keys for DiemRoot account <b>to</b> the given
     // values
     <a href="ExperimentalAccount.md#0x1_ExperimentalAccount_rotate_authentication_key">ExperimentalAccount::rotate_authentication_key</a>(dr_account, dr_auth_key);
-    <a href="DiemVMConfig.md#0x1_DiemVMConfig_initialize">DiemVMConfig::initialize</a>(
+    <a href="ExperimentalVMConfig.md#0x1_ExperimentalVMConfig_initialize">ExperimentalVMConfig::initialize</a>(
         dr_account,
         instruction_schedule,
         native_schedule,
     );
 
-    <a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig_set">DiemConsensusConfig::set</a>(dr_account, consensus_config);
+    <a href="ExperimentalConsensusConfig.md#0x1_ExperimentalConsensusConfig_set">ExperimentalConsensusConfig::set</a>(dr_account, consensus_config);
+
+    <a href="ExperimentalValidatorConfig.md#0x1_ExperimentalValidatorConfig_initialize">ExperimentalValidatorConfig::initialize</a>(dr_account);
+    <a href="ExperimentalValidatorOperatorConfig.md#0x1_ExperimentalValidatorOperatorConfig_initialize">ExperimentalValidatorOperatorConfig::initialize</a>(dr_account);
 
     // this needs <b>to</b> be called at the very end
     <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/CoreGenesis.md#0x1_CoreGenesis_init">CoreGenesis::init</a>(dr_account, chain_id);
@@ -228,7 +236,7 @@ Finally, each validator must specify the network address
         );
 
         // finally, add this validator <b>to</b> the validator set
-        <a href="DiemSystem.md#0x1_DiemSystem_add_validator">DiemSystem::add_validator</a>(&dr_account, owner_address);
+        <a href="ExperimentalValidatorSet.md#0x1_ExperimentalValidatorSet_add_validator">ExperimentalValidatorSet::add_validator</a>(&dr_account, owner_address);
 
         i = i + 1;
     }

@@ -1,87 +1,94 @@
 module ExperimentalFramework::Genesis {
-     use Std::Vector;
-     use Std::Signer;
-     use Std::Event;
-     use CoreFramework::CoreGenesis;
+    use Std::Signer;
+    use Std::Event;
+    use Std::Vector;
+    use CoreFramework::CoreGenesis;
+    use ExperimentalFramework::ExperimentalAccount;
 
-     use ExperimentalFramework::ExperimentalAccount;
-     use ExperimentalFramework::ExperimentalVersion;
+    // Config imports
+    use CoreFramework::DiemConfig;
+    use CoreFramework::DiemBlock;
+    use CoreFramework::ValidatorConfig;
+    use CoreFramework::ValidatorOperatorConfig;
+    use ExperimentalFramework::ExperimentalConsensusConfig;
+    use ExperimentalFramework::ExperimentalParallelExecutionConfig;
+    use ExperimentalFramework::ExperimentalValidatorConfig;
+    use ExperimentalFramework::ExperimentalValidatorOperatorConfig;
+    use ExperimentalFramework::ExperimentalValidatorSet;
+    use ExperimentalFramework::ExperimentalVersion;
+    use ExperimentalFramework::ExperimentalVMConfig;
 
-     // Config imports
-     use ExperimentalFramework::DiemConfig;
-     use ExperimentalFramework::DiemConsensusConfig;
-     use ExperimentalFramework::DiemSystem;
-     use ExperimentalFramework::DiemBlock;
-     use ExperimentalFramework::DiemVMConfig;
-     use ExperimentalFramework::ValidatorOperatorConfig;
-     use ExperimentalFramework::ValidatorConfig;
+    // This function needs the same signature as the DPN genesis
+    fun initialize(
+        dr_account: signer,
+        _tc_account: signer,
+        dr_auth_key: vector<u8>,
+        _tc_auth_key: vector<u8>,
+        _initial_script_allow_list: vector<vector<u8>>,
+        _is_open_module: bool,
+        instruction_schedule: vector<u8>,
+        native_schedule: vector<u8>,
+        chain_id: u8,
+        initial_diem_version: u64,
+        consensus_config: vector<u8>,
+    ) {
+        initialize_internal(
+            &dr_account,
+            dr_auth_key,
+            instruction_schedule,
+            native_schedule,
+            chain_id,
+            initial_diem_version,
+            consensus_config,
+        )
+    }
 
-     // This function needs the same signature as the DPN genesis
-     fun initialize(
-         dr_account: signer,
-         _tc_account: signer,
-         dr_auth_key: vector<u8>,
-         _tc_auth_key: vector<u8>,
-         _initial_script_allow_list: vector<vector<u8>>,
-         _is_open_module: bool,
-         instruction_schedule: vector<u8>,
-         native_schedule: vector<u8>,
-         chain_id: u8,
-         initial_diem_version: u64,
-         consensus_config: vector<u8>,
-     ) {
-         initialize_internal(
-             &dr_account,
-             dr_auth_key,
-             instruction_schedule,
-             native_schedule,
-             chain_id,
-             initial_diem_version,
-             consensus_config,
-         )
-     }
+    fun initialize_internal(
+        dr_account: &signer,
+        dr_auth_key: vector<u8>,
+        instruction_schedule: vector<u8>,
+        native_schedule: vector<u8>,
+        chain_id: u8,
+        initial_diem_version: u64,
+        consensus_config: vector<u8>,
+    ) {
+        ExperimentalAccount::initialize(dr_account, x"00000000000000000000000000000000");
 
-     fun initialize_internal(
-         dr_account: &signer,
-         dr_auth_key: vector<u8>,
-         instruction_schedule: vector<u8>,
-         native_schedule: vector<u8>,
-         chain_id: u8,
-         initial_diem_version: u64,
-         consensus_config: vector<u8>,
-     ) {
-         ExperimentalAccount::initialize(dr_account, x"00000000000000000000000000000000");
+        // Pad the event counter for the Diem Root account to match DPN. This
+        // _MUST_ match the new epoch event counter otherwise all manner of
+        // things start to break.
+        Event::destroy_handle(Event::new_event_handle<u64>(dr_account));
+        Event::destroy_handle(Event::new_event_handle<u64>(dr_account));
+        Event::destroy_handle(Event::new_event_handle<u64>(dr_account));
 
-         // Pad the event counter for the Diem Root account to match DPN. This
-         // _MUST_ match the new epoch event counter otherwise all manner of
-         // things start to break.
-         Event::destroy_handle(Event::new_event_handle<u64>(dr_account));
-         Event::destroy_handle(Event::new_event_handle<u64>(dr_account));
-         Event::destroy_handle(Event::new_event_handle<u64>(dr_account));
+        // On-chain config setup
+        DiemConfig::initialize(dr_account);
 
-         // On-chain config setup
-         DiemConfig::initialize(dr_account);
+        // Consensus config setup
+        ExperimentalConsensusConfig::initialize(dr_account);
+        // Parallel execution config setup
+        ExperimentalParallelExecutionConfig::initialize_parallel_execution(dr_account);
+        ExperimentalValidatorSet::initialize_validator_set(dr_account);
+        ExperimentalVersion::initialize(dr_account, initial_diem_version);
+        DiemBlock::initialize_block_metadata(dr_account);
 
-         // Consensus config setup
-         DiemConsensusConfig::initialize(dr_account);
-         DiemSystem::initialize_validator_set(dr_account);
-         ExperimentalVersion::initialize(dr_account, initial_diem_version);
-         DiemBlock::initialize_block_metadata(dr_account);
+        // Rotate auth keys for DiemRoot account to the given
+        // values
+        ExperimentalAccount::rotate_authentication_key(dr_account, dr_auth_key);
+        ExperimentalVMConfig::initialize(
+            dr_account,
+            instruction_schedule,
+            native_schedule,
+        );
 
-         // Rotate auth keys for DiemRoot and TreasuryCompliance accounts to the given
-         // values
-         ExperimentalAccount::rotate_authentication_key(dr_account, dr_auth_key);
-         DiemVMConfig::initialize(
-             dr_account,
-             instruction_schedule,
-             native_schedule,
-         );
+        ExperimentalConsensusConfig::set(dr_account, consensus_config);
 
-         DiemConsensusConfig::set(dr_account, consensus_config);
+        ExperimentalValidatorConfig::initialize(dr_account);
+        ExperimentalValidatorOperatorConfig::initialize(dr_account);
 
-         // this needs to be called at the very end
-         CoreGenesis::init(dr_account, chain_id);
-     }
+        // this needs to be called at the very end
+        CoreGenesis::init(dr_account, chain_id);
+    }
 
     /// Sets up the initial validator set for the Diem network.
     /// The validator "owner" accounts, their UTF-8 names, and their authentication
@@ -163,7 +170,7 @@ module ExperimentalFramework::Genesis {
             );
 
             // finally, add this validator to the validator set
-            DiemSystem::add_validator(&dr_account, owner_address);
+            ExperimentalValidatorSet::add_validator(&dr_account, owner_address);
 
             i = i + 1;
         }

@@ -1,8 +1,7 @@
 /// Maintains the version number for the blockchain.
 module ExperimentalFramework::ExperimentalVersion {
-    use CoreFramework::DiemVersion;
-    use ExperimentalFramework::DiemConfig;
     use Std::Capability;
+    use CoreFramework::DiemVersion;
 
     struct ExperimentalVersion has drop {}
 
@@ -18,6 +17,5 @@ module ExperimentalFramework::ExperimentalVersion {
             major,
             &Capability::acquire(account, &ExperimentalVersion {}),
         );
-        DiemConfig::reconfigure(account);
     }
 }

@@ -58,7 +58,7 @@ Authentication key prefixes, and how to construct them from an ed25519 public ke
 
 Successful execution will emit:
 * A <code>ExperimentalAccount::CreateAccountEvent</code> with the <code>created</code> field being <code>new_account_address</code>,
-and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_VALIDATOR_OPERATOR_ROLE_ID">Roles::VALIDATOR_OPERATOR_ROLE_ID</a></code>. This is emitted on the
+and the <code>rold_id</code> field being <code>Roles::VALIDATOR_OPERATOR_ROLE_ID</code>. This is emitted on the
 <code>ExperimentalAccount::AccountOperationsCapability</code> <code>creation_events</code> handle.
 
 
@@ -86,8 +86,8 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_VALID
 | <code>Errors::INVALID_ARGUMENT</code>  | <code>SlidingNonce::ENONCE_TOO_NEW</code>          | The <code>sliding_nonce</code> is too far in the future.                                              |
 | <code>Errors::INVALID_ARGUMENT</code>  | <code>SlidingNonce::ENONCE_ALREADY_RECORDED</code> | The <code>sliding_nonce</code> has been previously recorded.                                          |
 | <code>Errors::REQUIRES_ADDRESS</code>  | <code>CoreAddresses::EDIEM_ROOT</code>            | The sending account is not the Diem Root account.                                         |
-| <code>Errors::REQUIRES_ROLE</code>     | <code><a href="Roles.md#0x1_Roles_EDIEM_ROOT">Roles::EDIEM_ROOT</a></code>                    | The sending account is not the Diem Root account.                                         |
-| <code>Errors::ALREADY_PUBLISHED</code> | <code><a href="Roles.md#0x1_Roles_EROLE_ID">Roles::EROLE_ID</a></code>                       | The <code>new_account_address</code> address is already taken.                                        |
+| <code>Errors::REQUIRES_ROLE</code>     | <code>Roles::EDIEM_ROOT</code>                    | The sending account is not the Diem Root account.                                         |
+| <code>Errors::ALREADY_PUBLISHED</code> | <code>Roles::EROLE_ID</code>                       | The <code>new_account_address</code> address is already taken.                                        |
 
 
 <a name="@Related_Scripts_5"></a>
@@ -165,7 +165,7 @@ Authentication keys, prefixes, and how to construct them from an ed25519 public 
 
 Successful execution will emit:
 * A <code>ExperimentalAccount::CreateAccountEvent</code> with the <code>created</code> field being <code>new_account_address</code>,
-and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_VALIDATOR_ROLE_ID">Roles::VALIDATOR_ROLE_ID</a></code>. This is emitted on the
+and the <code>rold_id</code> field being <code>Roles::VALIDATOR_ROLE_ID</code>. This is emitted on the
 <code>ExperimentalAccount::AccountOperationsCapability</code> <code>creation_events</code> handle.
 
 
@@ -193,8 +193,8 @@ and the <code>rold_id</code> field being <code><a href="Roles.md#0x1_Roles_VALID
 | <code>Errors::INVALID_ARGUMENT</code>  | <code>SlidingNonce::ENONCE_TOO_NEW</code>          | The <code>sliding_nonce</code> is too far in the future.                                              |
 | <code>Errors::INVALID_ARGUMENT</code>  | <code>SlidingNonce::ENONCE_ALREADY_RECORDED</code> | The <code>sliding_nonce</code> has been previously recorded.                                          |
 | <code>Errors::REQUIRES_ADDRESS</code>  | <code>CoreAddresses::EDIEM_ROOT</code>            | The sending account is not the Diem Root account.                                         |
-| <code>Errors::REQUIRES_ROLE</code>     | <code><a href="Roles.md#0x1_Roles_EDIEM_ROOT">Roles::EDIEM_ROOT</a></code>                    | The sending account is not the Diem Root account.                                         |
-| <code>Errors::ALREADY_PUBLISHED</code> | <code><a href="Roles.md#0x1_Roles_EROLE_ID">Roles::EROLE_ID</a></code>                       | The <code>new_account_address</code> address is already taken.                                        |
+| <code>Errors::REQUIRES_ROLE</code>     | <code>Roles::EDIEM_ROOT</code>                    | The sending account is not the Diem Root account.                                         |
+| <code>Errors::ALREADY_PUBLISHED</code> | <code>Roles::EROLE_ID</code>                       | The <code>new_account_address</code> address is already taken.                                        |
 
 
 <a name="@Related_Scripts_11"></a>

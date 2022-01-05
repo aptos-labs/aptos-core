@@ -4,15 +4,19 @@
 ///
 /// > Note: When trying to understand this code, it's important to know that "config"
 /// and "configuration" are used for several distinct concepts.
-module ExperimentalFramework::DiemSystem {
-    use ExperimentalFramework::DiemConfig::{Self, ModifyConfigCapability};
-    use ExperimentalFramework::ValidatorConfig;
-    use CoreFramework::SystemAddresses;
-    use CoreFramework::DiemTimestamp;
+module CoreFramework::DiemSystem {
+    use Std::Capability::Cap;
     use Std::Errors;
     use Std::Option::{Self, Option};
     use Std::Signer;
     use Std::Vector;
+    use CoreFramework::DiemConfig;
+    use CoreFramework::DiemTimestamp;
+    use CoreFramework::SystemAddresses;
+    use CoreFramework::ValidatorConfig;
+
+    /// Marker to be stored under @CoreResources during genesis
+    struct ValidatorSetChainMarker<phantom T> has key {}
 
     /// Information about a Validator Owner.
     struct ValidatorInfo has copy, drop, store {
@@ -29,31 +33,18 @@ module ExperimentalFramework::DiemSystem {
         last_config_update_time: u64,
     }
 
-    /// Enables a scheme that restricts the DiemSystem config
-    /// in DiemConfig from being modified by any other module.  Only
-    /// code in this module can get a reference to the ModifyConfigCapability<DiemSystem>,
-    /// which is required by `DiemConfig::set_with_capability_and_reconfigure` to
-    /// modify the DiemSystem config. This is only needed by `update_config_and_reconfigure`.
-    /// Only Diem root can add or remove a validator from the validator set, so the
-    /// capability is not needed for access control in those functions.
-    struct CapabilityHolder has key {
-        /// Holds a capability returned by `DiemConfig::publish_new_config_and_get_capability`
-        /// which is called in `initialize_validator_set`.
-        cap: ModifyConfigCapability<DiemSystem>,
-    }
-
     /// The DiemSystem struct stores the validator set and crypto scheme in
     /// DiemConfig. The DiemSystem struct is stored by DiemConfig, which publishes a
     /// DiemConfig<DiemSystem> resource.
-    struct DiemSystem has copy, drop, store {
+    struct DiemSystem has key, copy, drop {
         /// The current consensus crypto scheme.
         scheme: u8,
         /// The current validator set.
         validators: vector<ValidatorInfo>,
     }
 
-    /// The `CapabilityHolder` resource was not in the required state
-    const ECAPABILITY_HOLDER: u64 = 0;
+    /// The `DiemSystem` resource was not in the required state
+    const ECONFIG: u64 = 0;
     /// Tried to add a validator with an invalid state to the validator set
     const EINVALID_PROSPECTIVE_VALIDATOR: u64 = 1;
     /// Tried to add a validator to the validator set that was already in it
@@ -70,6 +61,8 @@ module ExperimentalFramework::DiemSystem {
     const EMAX_VALIDATORS: u64 = 7;
     /// Validator config update time overflows
     const ECONFIG_UPDATE_TIME_OVERFLOWS: u64 = 8;
+    /// The `ValidatorSetChainMarker` resource was not in the required state
+    const ECHAIN_MARKER: u64 = 9;
 
     /// Number of microseconds in 5 minutes
     const FIVE_MINUTES: u64 = 300000000;
@@ -85,44 +78,38 @@ module ExperimentalFramework::DiemSystem {
     ///////////////////////////////////////////////////////////////////////////
 
 
-    /// Publishes the DiemConfig for the DiemSystem struct, which contains the current
-    /// validator set. Also publishes the `CapabilityHolder` with the
-    /// ModifyConfigCapability<DiemSystem> returned by the publish function, which allows
-    /// code in this module to change DiemSystem config (including the validator set).
-    /// Must be invoked by the Diem root a single time in Genesis.
-    public fun initialize_validator_set(
-        dr_account: &signer,
+    /// Publishes the DiemSystem struct, which contains the current validator set.
+    /// Must be invoked by @CoreResources a single time in Genesis.
+    public fun initialize_validator_set<T>(
+        account: &signer,
     ) {
         DiemTimestamp::assert_genesis();
-        SystemAddresses::assert_core_resource(dr_account);
+        SystemAddresses::assert_core_resource(account);
 
-        let cap = DiemConfig::publish_new_config_and_get_capability<DiemSystem>(
-            dr_account,
+        assert!(!exists<ValidatorSetChainMarker<T>>(@CoreResources), Errors::already_published(ECHAIN_MARKER));
+        assert!(!exists<DiemSystem>(@CoreResources), Errors::already_published(ECONFIG));
+        move_to(account, ValidatorSetChainMarker<T>{});
+        move_to(
+            account,
             DiemSystem {
                 scheme: 0,
                 validators: Vector::empty(),
             },
         );
-        assert!(
-            !exists<CapabilityHolder>(@DiemRoot),
-            Errors::already_published(ECAPABILITY_HOLDER)
-        );
-        move_to(dr_account, CapabilityHolder { cap })
     }
 
-    /// Copies a DiemSystem struct into the DiemConfig<DiemSystem> resource
+    /// Copies a DiemSystem struct into the DiemSystem resource
     /// Called by the add, remove, and update functions.
-    fun set_diem_system_config(value: DiemSystem) acquires CapabilityHolder {
+    fun set_diem_system_config(value: DiemSystem) acquires DiemSystem {
         DiemTimestamp::assert_operating();
         assert!(
-            exists<CapabilityHolder>(@DiemRoot),
-            Errors::not_published(ECAPABILITY_HOLDER)
+            exists<DiemSystem>(@CoreResources),
+            Errors::not_published(ECONFIG)
         );
-        // Updates the DiemConfig<DiemSystem> and emits a reconfigure event.
-        DiemConfig::set_with_capability_and_reconfigure<DiemSystem>(
-            &borrow_global<CapabilityHolder>(@DiemRoot).cap,
-            value
-        )
+        // Updates the DiemSystem and emits a reconfigure event.
+        let config_ref = borrow_global_mut<DiemSystem>(@CoreResources);
+        *config_ref = value;
+        DiemConfig::reconfigure();
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -130,12 +117,12 @@ module ExperimentalFramework::DiemSystem {
     ///////////////////////////////////////////////////////////////////////////
 
     /// Adds a new validator to the validator set.
-    public fun add_validator(
-        dr_account: &signer,
-        validator_addr: address
-    ) acquires CapabilityHolder {
+    public fun add_validator<T>(
+        validator_addr: address,
+        _cap: Cap<T>
+    ) acquires DiemSystem {
         DiemTimestamp::assert_operating();
-        SystemAddresses::assert_core_resource(dr_account);
+        assert_chain_marker_is_published<T>();
 
         // A prospective validator must have a validator config resource
         assert!(
@@ -170,12 +157,13 @@ module ExperimentalFramework::DiemSystem {
     }
 
     /// Removes a validator, aborts unless called by diem root account
-    public fun remove_validator(
-        dr_account: &signer,
-        validator_addr: address
-    ) acquires CapabilityHolder {
+    public fun remove_validator<T>(
+        validator_addr: address,
+        _cap: Cap<T>
+    ) acquires DiemSystem {
         DiemTimestamp::assert_operating();
-        SystemAddresses::assert_core_resource(dr_account);
+        assert_chain_marker_is_published<T>();
+
         let diem_system_config = get_diem_system_config();
         // Ensure that this address is an active validator
         let to_remove_index_vec = get_validator_index_(&diem_system_config.validators, validator_addr);
@@ -194,7 +182,7 @@ module ExperimentalFramework::DiemSystem {
     public fun update_config_and_reconfigure(
         validator_operator_account: &signer,
         validator_addr: address,
-    ) acquires CapabilityHolder {
+    ) acquires DiemSystem {
         DiemTimestamp::assert_operating();
         assert!(
             ValidatorConfig::get_operator(validator_addr) == Signer::address_of(validator_operator_account),
@@ -225,17 +213,17 @@ module ExperimentalFramework::DiemSystem {
     ///////////////////////////////////////////////////////////////////////////
 
     /// Get the DiemSystem configuration from DiemConfig
-    public fun get_diem_system_config(): DiemSystem {
-        DiemConfig::get<DiemSystem>()
+    public fun get_diem_system_config(): DiemSystem acquires DiemSystem {
+        *borrow_global<DiemSystem>(@CoreResources)
     }
 
     /// Return true if `addr` is in the current validator set
-    public fun is_validator(addr: address): bool {
+    public fun is_validator(addr: address): bool acquires DiemSystem {
         is_validator_(addr, &get_diem_system_config().validators)
     }
 
     /// Returns validator config. Aborts if `addr` is not in the validator set.
-    public fun get_validator_config(addr: address): ValidatorConfig::Config {
+    public fun get_validator_config(addr: address): ValidatorConfig::Config acquires DiemSystem {
         let diem_system_config = get_diem_system_config();
         let validator_index_vec = get_validator_index_(&diem_system_config.validators, addr);
         assert!(Option::is_some(&validator_index_vec), Errors::invalid_argument(ENOT_AN_ACTIVE_VALIDATOR));
@@ -243,12 +231,12 @@ module ExperimentalFramework::DiemSystem {
     }
 
     /// Return the size of the current validator set
-    public fun validator_set_size(): u64 {
+    public fun validator_set_size(): u64 acquires DiemSystem {
         Vector::length(&get_diem_system_config().validators)
     }
 
     /// Get the `i`'th validator address in the validator set.
-    public fun get_ith_validator_address(i: u64): address {
+    public fun get_ith_validator_address(i: u64): address acquires DiemSystem{
         assert!(i < validator_set_size(), Errors::invalid_argument(EVALIDATOR_INDEX));
         Vector::borrow(&get_diem_system_config().validators, i).addr
     }
@@ -256,6 +244,11 @@ module ExperimentalFramework::DiemSystem {
     ///////////////////////////////////////////////////////////////////////////
     // Private functions
     ///////////////////////////////////////////////////////////////////////////
+
+    fun assert_chain_marker_is_published<T>() {
+        assert!(exists<ValidatorSetChainMarker<T>>(@CoreResources), Errors::not_published(ECHAIN_MARKER));
+    }
+
 
     /// Get the index of the validator by address in the `validators` vector
     /// It has a loop, so there are spec blocks in the code to assert loop invariants.

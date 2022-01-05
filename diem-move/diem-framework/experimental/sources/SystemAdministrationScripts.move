@@ -1,9 +1,9 @@
 /// This module contains Diem Framework script functions to administer the
 /// network outside of validators and validator operators.
 module ExperimentalFramework::SystemAdministrationScripts {
-    use ExperimentalFramework::DiemConsensusConfig;
+    use ExperimentalFramework::ExperimentalConsensusConfig;
     use ExperimentalFramework::ExperimentalVersion;
-    use ExperimentalFramework::DiemVMConfig;
+    use ExperimentalFramework::ExperimentalVMConfig;
 
     ///  # Summary
     /// Updates the Diem major version that is stored on-chain and is used by the VM.  This
@@ -77,19 +77,19 @@ module ExperimentalFramework::SystemAdministrationScripts {
         gas_unit_scaling_factor: u64,
         default_account_size: u64,
     ) {
-        DiemVMConfig::set_gas_constants(
-                &dr_account,
-                global_memory_per_byte_cost,
-                global_memory_per_byte_write_cost,
-                min_transaction_gas_units,
-                large_transaction_cutoff,
-                intrinsic_gas_per_byte,
-                maximum_number_of_gas_units,
-                min_price_per_gas_unit,
-                max_price_per_gas_unit,
-                max_transaction_size_in_bytes,
-                gas_unit_scaling_factor,
-                default_account_size,
+        ExperimentalVMConfig::set_gas_constants(
+            &dr_account,
+            global_memory_per_byte_cost,
+            global_memory_per_byte_write_cost,
+            min_transaction_gas_units,
+            large_transaction_cutoff,
+            intrinsic_gas_per_byte,
+            maximum_number_of_gas_units,
+            min_price_per_gas_unit,
+            max_price_per_gas_unit,
+            max_transaction_size_in_bytes,
+            gas_unit_scaling_factor,
+            default_account_size,
         )
     }
 
@@ -113,7 +113,7 @@ module ExperimentalFramework::SystemAdministrationScripts {
     /// | `Errors::REQUIRES_ADDRESS` | `CoreAddresses::EDIEM_ROOT`                   | `account` is not the Diem Root account.                                                    |
 
     public(script) fun initialize_diem_consensus_config(account: signer, _sliding_nonce: u64) {
-        DiemConsensusConfig::initialize(&account);
+        ExperimentalConsensusConfig::initialize(&account);
     }
 
     ///  # Summary
@@ -137,6 +137,6 @@ module ExperimentalFramework::SystemAdministrationScripts {
     /// | `Errors::REQUIRES_ADDRESS` | `CoreAddresses::EDIEM_ROOT`                   | `account` is not the Diem Root account.                                                    |
 
     public(script) fun update_diem_consensus_config(account: signer, _sliding_nonce: u64, config: vector<u8>) {
-        DiemConsensusConfig::set(&account, config)
+        ExperimentalConsensusConfig::set(&account, config)
     }
 }

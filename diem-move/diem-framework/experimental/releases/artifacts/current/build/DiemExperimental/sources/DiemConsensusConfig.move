@@ -1,27 +1,47 @@
 /// Maintains the consensus config for the Diem blockchain. The config is stored in a
 /// DiemConfig, and may be updated by Diem root.
-module ExperimentalFramework::DiemConsensusConfig {
-    use CoreFramework::SystemAddresses;
-    use ExperimentalFramework::DiemConfig;
+module CoreFramework::DiemConsensusConfig {
+    use Std::Capability::Cap;
+    use Std::Errors;
     use Std::Vector;
+    use CoreFramework::DiemConfig;
+    use CoreFramework::DiemTimestamp;
+    use CoreFramework::SystemAddresses;
 
-    struct DiemConsensusConfig has copy, drop, store {
+    /// Error with chain marker
+    const ECHAIN_MARKER: u64 = 0;
+    /// Error with config
+    const ECONFIG: u64 = 1;
+
+    /// Marker to be stored under @CoreResources during genesis
+    struct ConsensusConfigChainMarker<phantom T> has key {}
+
+    struct DiemConsensusConfig has key {
         config: vector<u8>,
     }
 
     /// Publishes the DiemConsensusConfig config.
-    public fun initialize(dr_account: &signer) {
-        SystemAddresses::assert_core_resource(dr_account);
-        DiemConfig::publish_new_config(dr_account, DiemConsensusConfig { config: Vector::empty() });
+    public fun initialize<T>(account: &signer) {
+        DiemTimestamp::assert_genesis();
+        SystemAddresses::assert_core_resource(account);
+        assert!(
+            !exists<ConsensusConfigChainMarker<T>>(@CoreResources),
+            Errors::already_published(ECHAIN_MARKER)
+        );
+
+        assert!(
+            !exists<DiemConsensusConfig>(@CoreResources),
+            Errors::already_published(ECONFIG)
+        );
+        move_to(account, ConsensusConfigChainMarker<T>{});
+        move_to(account, DiemConsensusConfig { config: Vector::empty() });
     }
 
-    /// Allows Diem root to update the config.
-    public fun set(dr_account: &signer, config: vector<u8>) {
-        SystemAddresses::assert_core_resource(dr_account);
-
-        DiemConfig::set(
-            dr_account,
-            DiemConsensusConfig { config }
-        );
+    /// Update the config.
+    public fun set<T>(config: vector<u8>, _cap: &Cap<T>) acquires DiemConsensusConfig {
+        assert!(exists<ConsensusConfigChainMarker<T>>(@CoreResources), Errors::not_published(ECHAIN_MARKER));
+        let config_ref = &mut borrow_global_mut<DiemConsensusConfig>(@CoreResources).config;
+        *config_ref = config;
+        DiemConfig::reconfigure();
     }
 }

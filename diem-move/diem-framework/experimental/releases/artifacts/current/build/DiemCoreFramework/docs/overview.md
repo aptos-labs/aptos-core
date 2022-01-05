@@ -38,7 +38,7 @@ The Move modules in the Diem Framework can be bucketed in to a couple categories
 * <code>Authenticator</code>
 * <code>RecoveryAddress</code>
 * <code>SharedEd25519PublicKey</code>
-* <code>Signature</code>
+* <code><a href="Signature.md#0x1_Signature">Signature</a></code>
 
 
 <a name="@Accounts_and_Access_Control_3"></a>
@@ -98,6 +98,7 @@ The Move modules in the Diem Framework can be bucketed in to a couple categories
 -  [`0x1::DiemVersion`](DiemVersion.md#0x1_DiemVersion)
 -  [`0x1::Errors`](../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors)
 -  [`0x1::Hash`](../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Hash.md#0x1_Hash)
+-  [`0x1::Signature`](Signature.md#0x1_Signature)
 -  [`0x1::Signer`](../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer)
 -  [`0x1::SystemAddresses`](SystemAddresses.md#0x1_SystemAddresses)
 -  [`0x1::Vector`](../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector)

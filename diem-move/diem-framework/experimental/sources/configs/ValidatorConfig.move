@@ -3,16 +3,18 @@
 /// later inclusion (by functions in DiemConfig) in a `DiemConfig::DiemConfig<DiemSystem>`
 /// struct (the `Self::ValidatorConfig` in a `DiemConfig::ValidatorInfo` which is a member
 /// of the `DiemSystem::DiemSystem.validators` vector).
-module ExperimentalFramework::ValidatorConfig {
-    use CoreFramework::DiemTimestamp;
-    use DiemFramework::Signature;
-    use ExperimentalFramework::Roles;
-    use ExperimentalFramework::ValidatorOperatorConfig;
+module CoreFramework::ValidatorConfig {
+    use Std::Capability::Cap;
+    use Std::Errors;
     use Std::Option::{Self, Option};
     use Std::Signer;
-    use Std::Errors;
+    use CoreFramework::DiemTimestamp;
+    use CoreFramework::ValidatorOperatorConfig;
+    use CoreFramework::Signature;
+    use CoreFramework::SystemAddresses;
 
-    friend ExperimentalFramework::ExperimentalAccount;
+    /// Marker to be stored under @CoreResources during genesis
+    struct ValidatorConfigChainMarker<phantom T> has key {}
 
     struct Config has copy, drop, store {
         consensus_pubkey: vector<u8>,
@@ -38,6 +40,19 @@ module ExperimentalFramework::ValidatorConfig {
     const EINVALID_CONSENSUS_KEY: u64 = 2;
     /// Tried to set an account without the correct operator role as a Validator Operator
     const ENOT_A_VALIDATOR_OPERATOR: u64 = 3;
+    /// The `ValidatorSetChainMarker` resource was not in the required state
+    const ECHAIN_MARKER: u64 = 9;
+
+    public fun initialize<T>(account: &signer) {
+        DiemTimestamp::assert_genesis();
+        SystemAddresses::assert_core_resource(account);
+
+        assert!(
+            !exists<ValidatorConfigChainMarker<T>>(@CoreResources),
+            Errors::already_published(ECHAIN_MARKER)
+        );
+        move_to(account, ValidatorConfigChainMarker<T>{});
+    }
 
     ///////////////////////////////////////////////////////////////////////////
     // Validator setup methods
@@ -46,14 +61,17 @@ module ExperimentalFramework::ValidatorConfig {
     /// Publishes a mostly empty ValidatorConfig struct. Eventually, it
     /// will have critical info such as keys, network addresses for validators,
     /// and the address of the validator operator.
-    public(friend) fun publish(
+    public fun publish<T>(
         validator_account: &signer,
-        dr_account: &signer,
         human_name: vector<u8>,
+        _cap: Cap<T>
     ) {
         DiemTimestamp::assert_operating();
-        Roles::assert_diem_root(dr_account);
-        Roles::assert_validator(validator_account);
+        assert!(
+            exists<ValidatorConfigChainMarker<T>>(@CoreResources),
+            Errors::not_published(ECHAIN_MARKER)
+        );
+
         assert!(
             !exists<ValidatorConfig>(Signer::address_of(validator_account)),
             Errors::already_published(EVALIDATOR_CONFIG)
@@ -77,9 +95,6 @@ module ExperimentalFramework::ValidatorConfig {
     /// Sets a new operator account, preserving the old config.
     /// Note: Access control.  No one but the owner of the account may change .operator_account
     public fun set_operator(validator_account: &signer, operator_addr: address) acquires ValidatorConfig {
-        Roles::assert_validator(validator_account);
-        // Check for validator role is not necessary since the role is checked when the config
-        // resource is published.
         assert!(
             ValidatorOperatorConfig::has_validator_operator_config(operator_addr),
             Errors::invalid_argument(ENOT_A_VALIDATOR_OPERATOR)
@@ -92,7 +107,6 @@ module ExperimentalFramework::ValidatorConfig {
     /// Removes an operator account, setting a corresponding field to Option::none.
     /// The old config is preserved.
     public fun remove_operator(validator_account: &signer) acquires ValidatorConfig {
-        Roles::assert_validator(validator_account);
         let sender = Signer::address_of(validator_account);
         // Config field remains set
         assert!(exists_config(sender), Errors::not_published(EVALIDATOR_CONFIG));

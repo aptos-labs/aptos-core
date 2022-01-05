@@ -29,8 +29,8 @@ network outside of validators and validator operators.
     -  [Common Abort Conditions](#@Common_Abort_Conditions_15)
 
 
-<pre><code><b>use</b> <a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig">0x1::DiemConsensusConfig</a>;
-<b>use</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig">0x1::DiemVMConfig</a>;
+<pre><code><b>use</b> <a href="ExperimentalConsensusConfig.md#0x1_ExperimentalConsensusConfig">0x1::ExperimentalConsensusConfig</a>;
+<b>use</b> <a href="ExperimentalVMConfig.md#0x1_ExperimentalVMConfig">0x1::ExperimentalVMConfig</a>;
 <b>use</b> <a href="ExperimentalVersion.md#0x1_ExperimentalVersion">0x1::ExperimentalVersion</a>;
 </code></pre>
 
@@ -174,19 +174,19 @@ Updates the on-chain config holding the <code><a href="DiemVMConfig.md#0x1_DiemV
     gas_unit_scaling_factor: u64,
     default_account_size: u64,
 ) {
-    <a href="DiemVMConfig.md#0x1_DiemVMConfig_set_gas_constants">DiemVMConfig::set_gas_constants</a>(
-            &dr_account,
-            global_memory_per_byte_cost,
-            global_memory_per_byte_write_cost,
-            min_transaction_gas_units,
-            large_transaction_cutoff,
-            intrinsic_gas_per_byte,
-            maximum_number_of_gas_units,
-            min_price_per_gas_unit,
-            max_price_per_gas_unit,
-            max_transaction_size_in_bytes,
-            gas_unit_scaling_factor,
-            default_account_size,
+    <a href="ExperimentalVMConfig.md#0x1_ExperimentalVMConfig_set_gas_constants">ExperimentalVMConfig::set_gas_constants</a>(
+        &dr_account,
+        global_memory_per_byte_cost,
+        global_memory_per_byte_write_cost,
+        min_transaction_gas_units,
+        large_transaction_cutoff,
+        intrinsic_gas_per_byte,
+        maximum_number_of_gas_units,
+        min_price_per_gas_unit,
+        max_price_per_gas_unit,
+        max_transaction_size_in_bytes,
+        gas_unit_scaling_factor,
+        default_account_size,
     )
 }
 </code></pre>
@@ -245,7 +245,7 @@ Initializes the <code><a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig">D
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_initialize_diem_consensus_config">initialize_diem_consensus_config</a>(account: signer, _sliding_nonce: u64) {
-    <a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig_initialize">DiemConsensusConfig::initialize</a>(&account);
+    <a href="ExperimentalConsensusConfig.md#0x1_ExperimentalConsensusConfig_initialize">ExperimentalConsensusConfig::initialize</a>(&account);
 }
 </code></pre>
 
@@ -304,7 +304,7 @@ a reconfiguration of the system.
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_update_diem_consensus_config">update_diem_consensus_config</a>(account: signer, _sliding_nonce: u64, config: vector&lt;u8&gt;) {
-    <a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig_set">DiemConsensusConfig::set</a>(&account, config)
+    <a href="ExperimentalConsensusConfig.md#0x1_ExperimentalConsensusConfig_set">ExperimentalConsensusConfig::set</a>(&account, config)
 }
 </code></pre>
 

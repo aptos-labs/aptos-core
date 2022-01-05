@@ -755,6 +755,7 @@ Script documentation: <code>SystemAdministrationScripts::update_diem_version</co
 -  [`0x1::DiemVersion`](DiemVersion.md#0x1_DiemVersion)
 -  [`0x1::Errors`](../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors)
 -  [`0x1::Hash`](../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Hash.md#0x1_Hash)
+-  [`0x1::Signature`](Signature.md#0x1_Signature)
 -  [`0x1::Signer`](../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer)
 -  [`0x1::SystemAddresses`](SystemAddresses.md#0x1_SystemAddresses)
 -  [`0x1::Vector`](../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector)
