@@ -63,7 +63,7 @@ diem-proptest-helpers = { path = "../../crates/diem-proptest-helpers" }
 diemdb = { path = "../../storage/diemdb" }
 executor-test-helpers = { path = "../../execution/executor-test-helpers" }
 memsocket = { path = "../../network/memsocket" }
-move-core-types = { path = "../../language/move-core/types" }
+move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 network = { path = "../../network", features = ["fuzzing", "testing"] }
 network-builder = { path  = "../../network/builder" }
 storage-service = { path = "../../storage/storage-service" }

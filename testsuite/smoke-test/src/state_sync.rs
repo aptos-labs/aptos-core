@@ -2,18 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    scripts_and_modules::{compile_program, enable_open_publishing},
+    scripts_and_modules::enable_open_publishing,
     smoke_test_environment::new_local_swarm,
     test_utils::{
         assert_balance, create_and_fund_account, diem_swarm_utils::insert_waypoint, transfer_coins,
     },
 };
-use diem_types::{
-    account_address::AccountAddress,
-    epoch_change::EpochChangeProof,
-    transaction::{Script, TransactionArgument, TransactionPayload},
-    waypoint::Waypoint,
-};
+use diem_types::{epoch_change::EpochChangeProof, waypoint::Waypoint};
 use forge::{NodeExt, Swarm, SwarmExt};
 use std::{
     fs,
@@ -253,30 +248,6 @@ async fn test_state_sync_multichunk_epoch() {
         .await;
     }
 
-    let script_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .join("testsuite/smoke-test/src/dev_modules/test_script.move")
-        .canonicalize()
-        .unwrap();
-    let move_stdlib_dir = move_stdlib::move_stdlib_modules_full_path();
-    let diem_payment_framework_dir = diem_framework::diem_payment_modules_full_path();
-    let dependencies = &[
-        move_stdlib_dir.as_str(),
-        diem_payment_framework_dir.as_str(),
-    ];
-    let compiled_script = compile_program(script_path.to_str().unwrap(), dependencies).unwrap();
-
-    let txn = account_0.sign_with_transaction_builder(transaction_factory.payload(
-        TransactionPayload::Script(Script::new(
-            compiled_script,
-            vec![],
-            vec![
-                TransactionArgument::U64(10),
-                TransactionArgument::Address(AccountAddress::from_hex_literal("0x0").unwrap()),
-            ],
-        )),
-    ));
-    client_0.submit_and_wait(&txn).await.unwrap();
     // Bump epoch by trigger a reconfig for multiple epochs
     for curr_epoch in 2u64..=3 {
         // bumps epoch from curr_epoch -> curr_epoch + 1

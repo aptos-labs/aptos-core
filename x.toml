@@ -67,7 +67,6 @@ workspace-members = [
     # Don't consider the crypto packages as they do weird things with mutually exclusive features.
     "diem-crypto",
     "diem-crypto-derive",
-    "bytecode-interpreter-crypto",
 
     # Also exclude the devtools packages since they get compiled with a different set of options.
     "x",
@@ -80,6 +79,11 @@ third-party = [
     # Exclude the fail crate because the failpoints feature should only be enabled
     # for certain builds.
     { name = "fail" },
+    { name = "move-binary-format", git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" },
+    { name = "move-core-types", git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" },
+    { name = "move-stdlib", git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" },
+    { name = "move-vm-runtime", git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" },
+    { name = "move-vm-types", git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" },
 ]
 
 # This follows the same syntax as CargoOptionsSummary in guppy.
@@ -155,9 +159,6 @@ features = ["failpoints", "fuzzing"]
 members = [
     # Please keep this list in alphabetical order!
 
-    "bytecode-interpreter-testsuite",
-    "bytecode-verifier-tests",
-    "bytecode-verifier-transactional-tests",
     "testcases",
     "diem-documentation-tool",
     "diem-e2e-tests-replay",
@@ -176,29 +177,17 @@ members = [
     "forge",
     "forge-cli",
     "generate-format",
-    "invalid-mutations",
     "jsonrpc-integration-tests",
-    "language-benchmarks",
     "language-e2e-tests",
     "language-e2e-testsuite",
     "memsocket",
-    "mirai-dataflow-analysis",
-    "module-generation",
-    "move-compiler-transactional-tests",
-    "move-ir-compiler-transactional-tests",
-    "move-prover-test-utils",
-    "move-transactional-test-runner",
-    "move-vm-integration-tests",
-    "move-vm-transactional-tests",
     "offchain",
     "scratchpad-benchmark",
     "sdk-compatibility",
-    "serializer-tests",
     "shuffle",
     "shuffle-custom-move-code",
     "smoke-test",
     "socket-bench-server",
-    "test-generation",
     "transaction-emitter",
     "x",
     "x-core",
@@ -281,7 +270,7 @@ mark-changed = "all"
 
 [[determinator.path-rule]]
 # Ignore website and other ancillary files, and scripts not listed above.
-globs = ["developers.diem.com/**/*", "documentation/**/*", "docker/**/*", "helm/**/*", "language/documentation/**/*", "specifications/**/*", "scripts/**/*", "terraform/**/*",]
+globs = ["developers.diem.com/**/*", "documentation/**/*", "docker/**/*", "helm/**/*", "language/documentation/**/*", "specifications/**/*", "scripts/**/*", "terraform/**/*"]
 mark-changed = []
 
 [[determinator.path-rule]]
@@ -299,16 +288,6 @@ mark-changed = []
 globs = ["diem-move/diem-framework/DPN/releases/artifacts/current/**/*"]
 mark-changed = ["transaction-builder-generator"]
 post-rule = "skip-rules"
-
-[[determinator.path-rule]]
-# Ignore files in the language/evm/examples tree (for now)
-globs = ["language/evm/examples/**/*"]
-mark-changed = []
-
-[[determinator.path-rule]]
-# On changes to files related to VS Code, build the move-analyzer package.
-globs = [".vscode/**/*", "language/move-analyzer/editors/code/**/*.json"]
-mark-changed = ["move-analyzer"]
 
 [[determinator.package-rule]]
 # x controls the build process, so if it changes, build everything.

@@ -4,8 +4,6 @@
 #![forbid(unsafe_code)]
 
 use crate::logging::{LogEntry, LogSchema};
-#[cfg(feature = "failpoints")]
-use anyhow::anyhow;
 use anyhow::Result;
 use diem_crypto::HashValue;
 use diem_logger::prelude::*;
@@ -167,7 +165,7 @@ where
             DIEM_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
 
             fail_point!("executor::commit_blocks", |_| {
-                Err(anyhow!("Injected error in commit_blocks.").into())
+                Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
             });
 
             self.db.writer.save_transactions(

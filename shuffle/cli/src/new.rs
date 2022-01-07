@@ -17,7 +17,7 @@ pub const DEFAULT_BLOCKCHAIN: &str = "goodday";
 const EXAMPLES_DIR: Dir = include_dir!("../move/examples");
 
 /// Embedded directory holding the Move stdlib for new projects
-const MOVE_STDLIB_DIR: Dir = include_dir!("../../language/move-stdlib");
+const MOVE_STDLIB_DIR: Dir = include_dir!("../../diem-move/diem-framework/move-stdlib");
 
 pub fn handle(home: &Home, blockchain: String, pathbuf: PathBuf) -> Result<()> {
     let project_path = pathbuf.as_path();
@@ -107,7 +107,7 @@ mod test {
 
         // spot check stdlib
         let expected_example_content = String::from_utf8_lossy(include_bytes!(
-            "../../../language/move-stdlib/sources/GUID.move"
+            "../../../diem-move/diem-framework/move-stdlib/sources/GUID.move"
         ));
         let actual_example_content =
             fs::read_to_string(dir.path().join("stdlib/sources/GUID.move")).unwrap();

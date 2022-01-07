@@ -1,6 +1,0 @@
-[package]
-name = "BasicCoin"
-version = "0.0.0"
-
-[dependencies]
-MoveStdlib = { local = "../../../../move-stdlib/", addr_subst = { "Std" = "0x1" } }

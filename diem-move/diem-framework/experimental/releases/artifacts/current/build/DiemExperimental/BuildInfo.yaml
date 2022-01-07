@@ -121,7 +121,7 @@ compiled_package_info:
     ? address: "00000000000000000000000000000001"
       name: Vote
     : ExperimentalFramework
-  source_digest: 82A3D42A13A21907D37FCBFC155734A63852AD6862A21EFB1F2AF10FBB1A6B3D
+  source_digest: 2679740E264D135AC50F5D64D65A2171133B21F38A10CB990228E8C066FA76B9
   build_flags:
     dev_mode: false
     test_mode: false

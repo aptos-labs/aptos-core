@@ -1,7 +1,0 @@
-Command `sandbox publish`:
-Command `sandbox run scripts/print_values.move --dry-run`:
-[debug] 42
-[debug] (&) [100, 200, 300]
-[debug] (&) { false }
-[debug] (&) { 404, { false }, true }
-[debug] (&) { { false } }

@@ -10,17 +10,17 @@ license = "Apache-2.0"
 publish = false
 
 [dependencies]
-move-bytecode-verifier = { path = "../../../language/move-bytecode-verifier" }
-move-compiler = { path = "../../../language/move-compiler" }
+move-bytecode-verifier = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-compiler = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 diem-types = { path = "../../../types" }
 diem-workspace-hack = { path = "../../../crates/diem-workspace-hack" }
-move-binary-format = { path = "../../../language/move-binary-format" }
-move-core-types = { path = "../../../language/move-core/types" }
-move-vm-types = { path = "../../../language/move-vm/types" }
-move-vm-runtime = { path = "../../../language/move-vm/runtime" }
-move-bytecode-utils = { path = "../../../language/tools/move-bytecode-utils" }
-move-command-line-common = { path = "../../../language/move-command-line-common" }
-move-package = { path = "../../../language/tools/move-package" }
+move-binary-format = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-vm-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-vm-runtime = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-bytecode-utils = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-command-line-common = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-package = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 
 bcs = "0.1.2"
 anyhow = "1.0.52"

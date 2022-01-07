@@ -7,7 +7,6 @@ use smoke_test::{
     fullnode::LaunchFullnode,
     replay_tooling::ReplayTooling,
     rest_api::{self, GetIndex},
-    scripts_and_modules::{ExecuteCustomModuleAndScript, MalformedScript},
     transaction::ExternalTransactionSigner,
     verifying_client::{VerifyingClientEquivalence, VerifyingGetLatestMetadata, VerifyingSubmit},
 };
@@ -24,7 +23,8 @@ fn main() -> Result<()> {
             &GetIndex,
             &rest_api::BasicClient,
         ])
-        .with_admin_tests(&[&MalformedScript, &ExecuteCustomModuleAndScript])
+        //TODO Re-enable these tests once we fix how the move compiler is invoked
+        // .with_admin_tests(&[&MalformedScript, &ExecuteCustomModuleAndScript])
         .with_network_tests(&[&LaunchFullnode]);
 
     let options = Options::from_args();

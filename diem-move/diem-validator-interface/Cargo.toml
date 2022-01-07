@@ -19,5 +19,5 @@ diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
 storage-interface = { path = "../../storage/storage-interface" }
 scratchpad = { path = "../../storage/scratchpad" }
 diem-state-view = { path = "../../storage/state-view" }
-move-binary-format = { path = "../../language/move-binary-format" }
+move-binary-format = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 bcs = "0.1.2"

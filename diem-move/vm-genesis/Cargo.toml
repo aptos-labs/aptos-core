@@ -14,23 +14,23 @@ anyhow = "1.0.52"
 once_cell = "1.7.2"
 rand = "0.8.3"
 
-move-bytecode-verifier = { path = "../../language/move-bytecode-verifier" }
+move-bytecode-verifier = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 bcs = "0.1.2"
 diem-config = { path = "../../config" }
 diem-crypto = { path = "../../crates/diem-crypto" }
 diem-state-view = { path = "../../storage/state-view" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
-move-bytecode-utils = { path = "../../language/tools/move-bytecode-utils" }
-move-core-types = { path = "../../language/move-core/types" }
-move-vm-runtime = { path = "../../language/move-vm/runtime"}
-move-vm-types = { path = "../../language/move-vm/types" }
+move-bytecode-utils = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-vm-runtime = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860"}
+move-vm-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 diem-framework = { path = "../../diem-move/diem-framework" }
 diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder"}
-move-binary-format = { path = "../../language/move-binary-format" }
+move-binary-format = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 diem-vm = { path = "../diem-vm" }
-read-write-set = { path = "../../language/tools/read-write-set" }
+read-write-set = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 
 [dev-dependencies]
 proptest = "1.0.0"

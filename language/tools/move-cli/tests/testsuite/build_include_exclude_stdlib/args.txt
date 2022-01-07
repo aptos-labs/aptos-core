@@ -1,2 +1,0 @@
-package build -v
--d -v package build

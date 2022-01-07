@@ -1,8 +1,0 @@
-//# publish
-// Publishing a compatible module should be allowed
-module 0x42.Currency {
-}
-
-//# publish
-module 0x42.Currency {
-}

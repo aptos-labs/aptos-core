@@ -15,8 +15,8 @@ bcs = "0.1.2"
 structopt = "0.3.21"
 
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
-move-core-types = { path = "../../language/move-core/types" }
-move-cli = { path = "../../language/tools/move-cli" }
+move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-cli = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 diem-vm = { path = "../diem-vm" }
 diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
 

@@ -19,15 +19,15 @@ diem-state-view = { path = "../../storage/state-view" }
 diem-validator-interface = { path = "../diem-validator-interface" }
 diemdb = { path = "../../storage/diemdb" }
 diem-vm = { path = "../diem-vm" }
-move-binary-format = { path = "../../language/move-binary-format"}
-move-cli = { path = "../../language/tools/move-cli" }
-move-vm-types = { path = "../../language/move-vm/types" }
-move-core-types = { path = "../../language/move-core/types" }
-move-vm-runtime = { path = "../../language/move-vm/runtime" }
-move-vm-test-utils = { path = "../../language/move-vm/test-utils" }
+move-binary-format = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860"}
+move-cli = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-vm-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-vm-runtime = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-vm-test-utils = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 diem-resource-viewer = { path = "../diem-resource-viewer" }
 diem-framework = { path = "../../diem-move/diem-framework" }
-move-compiler = { path = "../../language/move-compiler" }
+move-compiler = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 bcs = "0.1.2"
 difference = "2.0.0"
 

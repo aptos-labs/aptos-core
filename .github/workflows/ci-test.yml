@@ -447,7 +447,7 @@ jobs:
 
   e2e-test:
     runs-on: ubuntu-20.04-xl
-    timeout-minutes: 60
+    timeout-minutes: 70
     needs: prepare
     if: ${{ needs.prepare.outputs.test-rust == 'true' }}
     container:
@@ -800,94 +800,11 @@ jobs:
           $pre_command && rustup target add powerpc-unknown-linux-gnu
           # disable the workspace-hack because it contains some code that doesn't build on powerpc
           $pre_command && cargo x generate-workspace-hack --mode disable
-          $pre_command && cargo xcheck -j ${max_threads} -p diem-transaction-builder -p move-vm-types --target powerpc-unknown-linux-gnu
+          $pre_command && cargo xcheck -j ${max_threads} -p diem-transaction-builder --target powerpc-unknown-linux-gnu
           # we can't just re-enable the workspace-hack at the end, because it can result in a different
           # Cargo.lock resolution result in some cases. So use git reset instead.
           $pre_command && git reset --hard HEAD
       - uses: ./.github/actions/build-teardown
-      - name: Early terminate workflow
-        if: ${{ failure() }}
-        uses: ./.github/actions/early-terminator
-        with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-
-  perf-benchmarks:
-    name: run-perf-benchmarks
-    runs-on: ubuntu-20.04-xl
-    timeout-minutes: 30
-    needs:
-      - prepare
-      - build-benchmarks
-    env:
-      CRITERION_HOME: /tmp/benches
-    steps:
-      - uses: actions/checkout@v2.4.0
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/cache@v2.1.6
-        with:
-          path: "/opt/cargo/git\n/opt/cargo/registry\n/opt/cargo/.package-cache"
-          key: crates-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: "crates-${{ runner.os }}"
-      - name: Download the previous baseline
-        continue-on-error: true
-        uses: actions/download-artifact@v2
-        with:
-          name: bench-baseline
-      - name: Run performance benchamrks
-        run: |
-          # Replace this with a cargo x bench
-          cargo bench --package language-benchmarks
-      - name: Archive criterion results
-        uses: actions/upload-artifact@v2
-        with:
-          name: bench-baseline
-          retention-days: 5
-          path: |
-            /tmp/benches
-      - name: Early terminate workflow
-        if: ${{ failure() }}
-        uses: ./.github/actions/early-terminator
-        with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-
-  build-move-analyzer-vscode-extension:
-    name: Build VS Code extension for move-analyzer
-    runs-on: ubuntu-20.04
-    needs:
-      - prepare
-    steps:
-      - uses: actions/checkout@v2.4.0
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-      - name: Use Node.js 14
-        uses: actions/setup-node@v2.4.0
-        with:
-          node-version: '14'
-      - name: Install NPM dependencies
-        working-directory: language/move-analyzer/editors/code
-        run: npm install
-      - name: Build the extension
-        working-directory: language/move-analyzer/editors/code
-        run: npm run pretest
-      - name: Test the extension
-        # VS Code tests require display output. This action simulates such a
-        # display, using Xvfb. (It's roughly equivalent to prefixing the 'run'
-        # commands below with `xvfb-run <command>`.) Without a simulated display
-        # such as this one, the tests would fail with the error message:
-        # "Unable to open X display."
-        uses: GabrielBB/xvfb-action@v1.5
-        with:
-          working-directory: language/move-analyzer/editors/code
-          run: npm run test
-      - name: Package the extension
-        working-directory: language/move-analyzer/editors/code
-        run: npm run package
-      - name: Upload VS Code extension
-        uses: actions/upload-artifact@v2
-        with:
-          name: move-analyzer-vscode-extension
-          path: language/move-analyzer/editors/code/move-analyzer.vsix
       - name: Early terminate workflow
         if: ${{ failure() }}
         uses: ./.github/actions/early-terminator

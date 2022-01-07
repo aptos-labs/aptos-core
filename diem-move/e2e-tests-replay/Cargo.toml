@@ -14,13 +14,13 @@ structopt = "0.3.21"
 walkdir = "2.3.1"
 
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
-move-stackless-bytecode-interpreter = { path = "../../language/move-prover/interpreter" }
+move-stackless-bytecode-interpreter = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 diem-types = { path = "../../types", features = ["fuzzing"] }
 diem-framework = { path = "../../diem-move/diem-framework" }
 diem-vm = { path = "../../diem-move/diem-vm" }
 language-e2e-tests = { path = "../e2e-tests" }
-move-binary-format = { path = "../../language/move-binary-format" }
-move-core-types = { path = "../../language/move-core/types" }
-move-model = { path = "../../language/move-model" }
-move-vm-runtime = { path = "../../language/move-vm/runtime" }
-move-vm-types = { path = "../../language/move-vm/types" }
+move-binary-format = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-model = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-vm-runtime = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-vm-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }

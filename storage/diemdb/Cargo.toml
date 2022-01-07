@@ -34,7 +34,7 @@ diem-proptest-helpers = { path = "../../crates/diem-proptest-helpers", optional 
 diem-temppath = { path = "../../crates/diem-temppath", optional = true }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
-move-core-types = {path = "../../language/move-core/types"}
+move-core-types = {git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860"}
 
 num-variants = { path = "../../crates/num-variants" }
 schemadb = { path = "../schemadb" }

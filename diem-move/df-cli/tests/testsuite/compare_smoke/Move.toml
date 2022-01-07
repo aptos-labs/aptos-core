@@ -4,4 +4,4 @@ version = "0.0.0"
 
 [dependencies]
 DPNFramework = { local = "../../../../diem-framework/DPN" }
-MoveNursery = { local = "../../../../../language/move-stdlib/nursery" }
+MoveNursery = { local = "../../../../diem-framework/move-stdlib/nursery" }

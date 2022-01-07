@@ -9,4 +9,4 @@ CoreFramework = "0x1"
 CoreResources = "0xA550C18"
 
 [dependencies]
-MoveStdlib = { local = "../../../language/move-stdlib" }
+MoveStdlib = { local = "../move-stdlib" }

@@ -334,7 +334,7 @@ async fn execute_transactions(
     receiver: &LocalAccount,
     execute_epoch_changes: bool,
 ) {
-    let num_transfers = 10;
+    let num_transfers = 4;
     if execute_epoch_changes {
         transfer_and_reconfig(
             client,

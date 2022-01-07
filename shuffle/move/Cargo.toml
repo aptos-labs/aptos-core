@@ -12,5 +12,5 @@ edition = "2018"
 diem-framework = { path = "../../diem-move/diem-framework" }
 diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
 diem-vm = { path = "../../diem-move/diem-vm" }
-move-stdlib = { path = "../../language/move-stdlib" }
-move-unit-test = { path = "../../language/tools/move-unit-test" }
+move-stdlib = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-unit-test = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
