@@ -17,10 +17,10 @@ including different costs of running the VM.
 
 <pre><code><b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability">0x1::Capability</a>;
 <b>use</b> <a href="DiemConfig.md#0x1_DiemConfig">0x1::DiemConfig</a>;
-<b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
+<b>use</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option">0x1::Option</a>;
-<b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses">0x1::SystemAddresses</a>;
+<b>use</b> <a href="SystemAddresses.md#0x1_SystemAddresses">0x1::SystemAddresses</a>;
 </code></pre>
 
 
@@ -126,8 +126,8 @@ Enable parallel execution functionality of DiemVM by setting the read_write_set 
 <pre><code><b>public</b> <b>fun</b> <a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig_initialize_parallel_execution">initialize_parallel_execution</a>&lt;T&gt;(
     account: &signer,
 ) {
-    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
-    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(account);
+    <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
+    <a href="SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(account);
 
     <b>assert</b>!(
         !<b>exists</b>&lt;<a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig_ParallelExecutionConfigChainMarker">ParallelExecutionConfigChainMarker</a>&lt;T&gt;&gt;(@CoreResources),
@@ -173,7 +173,7 @@ Enable parallel execution functionality of DiemVM by setting the read_write_set 
     read_write_inference_result: vector&lt;u8&gt;,
     _cap: &Cap&lt;T&gt;
 ) <b>acquires</b> <a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig">ParallelExecutionConfig</a> {
-    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp_assert_operating">DiemTimestamp::assert_operating</a>();
+    <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_operating">DiemTimestamp::assert_operating</a>();
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig_ParallelExecutionConfigChainMarker">ParallelExecutionConfigChainMarker</a>&lt;T&gt;&gt;(@CoreResources),
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig_ECHAIN_MARKER">ECHAIN_MARKER</a>)
@@ -206,7 +206,7 @@ Enable parallel execution functionality of DiemVM by setting the read_write_set 
 <pre><code><b>public</b> <b>fun</b> <a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig_disable_parallel_execution">disable_parallel_execution</a>&lt;T&gt;(
     _cap: &Cap&lt;T&gt;
 ) <b>acquires</b> <a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig">ParallelExecutionConfig</a> {
-    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp_assert_operating">DiemTimestamp::assert_operating</a>();
+    <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_operating">DiemTimestamp::assert_operating</a>();
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig_ParallelExecutionConfigChainMarker">ParallelExecutionConfigChainMarker</a>&lt;T&gt;&gt;(@CoreResources),
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig_ECHAIN_MARKER">ECHAIN_MARKER</a>)
@@ -220,3 +220,9 @@ Enable parallel execution functionality of DiemVM by setting the read_write_set 
 
 
 </details>
+
+
+[//]: # ("File containing references which can be used from documentation")
+[ACCESS_CONTROL]: https://github.com/diem/dip/blob/main/dips/dip-2.md
+[ROLE]: https://github.com/diem/dip/blob/main/dips/dip-2.md#roles
+[PERMISSION]: https://github.com/diem/dip/blob/main/dips/dip-2.md#permissions

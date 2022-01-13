@@ -29,7 +29,22 @@ compiled_package_info:
       name: CoreGenesis
     : CoreFramework
     ? address: "00000000000000000000000000000001"
+      name: DiemBlock
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: DiemConfig
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: DiemConsensusConfig
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: DiemSystem
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
       name: DiemTimestamp
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: DiemVMConfig
     : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: DiemVersion
@@ -53,6 +68,9 @@ compiled_package_info:
       name: Option
     : Std
     ? address: "00000000000000000000000000000001"
+      name: ParallelExecutionConfig
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
       name: Signature
     : CoreFramework
     ? address: "00000000000000000000000000000001"
@@ -62,9 +80,15 @@ compiled_package_info:
       name: SystemAddresses
     : CoreFramework
     ? address: "00000000000000000000000000000001"
+      name: ValidatorConfig
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: ValidatorOperatorConfig
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
       name: Vector
     : Std
-  source_digest: FE964004839AD4EC5BD3B3E19EDB306897507FD39313A041F304448A1D4712D6
+  source_digest: D2F6065EEE2C1B6E64EE9B5A6C745513E15D1964BAA68473482A32B33CB7495E
   build_flags:
     dev_mode: false
     test_mode: false

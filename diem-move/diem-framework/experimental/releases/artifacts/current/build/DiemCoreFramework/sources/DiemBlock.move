@@ -46,7 +46,7 @@ module CoreFramework::DiemBlock {
 
     /// Helper function to determine whether this module has been initialized.
     fun is_initialized(): bool {
-        exists<BlockMetadata>(@DiemRoot)
+        exists<BlockMetadata>(@CoreResources)
     }
 
     /// Set the metadata for the current block.
@@ -68,7 +68,7 @@ module CoreFramework::DiemBlock {
             Errors::requires_address(EVM_OR_VALIDATOR)
         );
 
-        let block_metadata_ref = borrow_global_mut<BlockMetadata>(@DiemRoot);
+        let block_metadata_ref = borrow_global_mut<BlockMetadata>(@CoreResources);
         DiemTimestamp::update_global_time(&vm, proposer, timestamp);
         block_metadata_ref.height = block_metadata_ref.height + 1;
         Event::emit_event<NewBlockEvent>(
@@ -85,6 +85,6 @@ module CoreFramework::DiemBlock {
     /// Get the current block height
     public fun get_current_block_height(): u64 acquires BlockMetadata {
         assert!(is_initialized(), Errors::not_published(EBLOCK_METADATA));
-        borrow_global<BlockMetadata>(@DiemRoot).height
+        borrow_global<BlockMetadata>(@CoreResources).height
     }
 }

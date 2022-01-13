@@ -55,16 +55,16 @@ The Move modules in the Diem Framework can be bucketed in to a couple categories
 ### System Management
 
 * <code><a href="ChainId.md#0x1_ChainId">ChainId</a></code>
-* <code>DiemBlock</code>
-* <code>DiemConfig</code>
+* <code><a href="DiemBlock.md#0x1_DiemBlock">DiemBlock</a></code>
+* <code><a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a></code>
 * <code><a href="DiemTimestamp.md#0x1_DiemTimestamp">DiemTimestamp</a></code>
 * <code>DiemTransactionPublishingOption</code>
 * <code><a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a></code>
-* <code>DiemVMConfig</code>
+* <code><a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a></code>
 * <code>TransactionFee</code>
-* <code>DiemSystem</code>
-* <code>ValidatorConfig</code>
-* <code>ValidatorOperatorConfig</code>
+* <code><a href="DiemSystem.md#0x1_DiemSystem">DiemSystem</a></code>
+* <code><a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a></code>
+* <code><a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig">ValidatorOperatorConfig</a></code>
 * <code>Genesis</code> (Note: not published on-chain)
 
 
@@ -74,11 +74,11 @@ The Move modules in the Diem Framework can be bucketed in to a couple categories
 
 * <code><a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">Errors</a></code>
 * <code>CoreAddresses</code>
-* <code>Event</code>
+* <code><a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event">Event</a></code>
 * <code>FixedPoint32</code>
 * <code><a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Hash.md#0x1_Hash">Hash</a></code>
 * <code><a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/BCS.md#0x1_BCS">BCS</a></code>
-* <code>Option</code>
+* <code><a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option">Option</a></code>
 * <code>SlidingNonce</code>
 * <code><a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector">Vector</a></code>
 * <code><a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer">Signer</a></code>
@@ -94,13 +94,24 @@ The Move modules in the Diem Framework can be bucketed in to a couple categories
 -  [`0x1::Capability`](../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability)
 -  [`0x1::ChainId`](ChainId.md#0x1_ChainId)
 -  [`0x1::CoreGenesis`](CoreGenesis.md#0x1_CoreGenesis)
+-  [`0x1::DiemBlock`](DiemBlock.md#0x1_DiemBlock)
+-  [`0x1::DiemConfig`](DiemConfig.md#0x1_DiemConfig)
+-  [`0x1::DiemConsensusConfig`](DiemConsensusConfig.md#0x1_DiemConsensusConfig)
+-  [`0x1::DiemSystem`](DiemSystem.md#0x1_DiemSystem)
 -  [`0x1::DiemTimestamp`](DiemTimestamp.md#0x1_DiemTimestamp)
+-  [`0x1::DiemVMConfig`](DiemVMConfig.md#0x1_DiemVMConfig)
 -  [`0x1::DiemVersion`](DiemVersion.md#0x1_DiemVersion)
 -  [`0x1::Errors`](../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors)
+-  [`0x1::Event`](../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event)
+-  [`0x1::GUID`](../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID)
 -  [`0x1::Hash`](../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Hash.md#0x1_Hash)
+-  [`0x1::Option`](../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option)
+-  [`0x1::ParallelExecutionConfig`](ParallelExecutionConfig.md#0x1_ParallelExecutionConfig)
 -  [`0x1::Signature`](Signature.md#0x1_Signature)
 -  [`0x1::Signer`](../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer)
 -  [`0x1::SystemAddresses`](SystemAddresses.md#0x1_SystemAddresses)
+-  [`0x1::ValidatorConfig`](ValidatorConfig.md#0x1_ValidatorConfig)
+-  [`0x1::ValidatorOperatorConfig`](ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig)
 -  [`0x1::Vector`](../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector)
 
 

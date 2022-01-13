@@ -11,7 +11,7 @@
 
 
 <pre><code><b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability">0x1::Capability</a>;
-<b>use</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">0x1::ValidatorConfig</a>;
+<b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/ValidatorConfig.md#0x1_ValidatorConfig">0x1::ValidatorConfig</a>;
 </code></pre>
 
 
@@ -59,7 +59,7 @@
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ExperimentalValidatorConfig.md#0x1_ExperimentalValidatorConfig_initialize">initialize</a>(account: &signer) {
-    <a href="ValidatorConfig.md#0x1_ValidatorConfig_initialize">ValidatorConfig::initialize</a>&lt;<a href="ExperimentalValidatorConfig.md#0x1_ExperimentalValidatorConfig">ExperimentalValidatorConfig</a>&gt;(account);
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/ValidatorConfig.md#0x1_ValidatorConfig_initialize">ValidatorConfig::initialize</a>&lt;<a href="ExperimentalValidatorConfig.md#0x1_ExperimentalValidatorConfig">ExperimentalValidatorConfig</a>&gt;(account);
     <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_create">Capability::create</a>(account, &<a href="ExperimentalValidatorConfig.md#0x1_ExperimentalValidatorConfig">ExperimentalValidatorConfig</a>{});
 }
 </code></pre>
@@ -88,7 +88,7 @@
     validator_account: &signer,
     human_name: vector&lt;u8&gt;,
 ) {
-    <a href="ValidatorConfig.md#0x1_ValidatorConfig_publish">ValidatorConfig::publish</a>(
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/ValidatorConfig.md#0x1_ValidatorConfig_publish">ValidatorConfig::publish</a>(
         validator_account,
         human_name,
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_acquire">Capability::acquire</a>(root_account, &<a href="ExperimentalValidatorConfig.md#0x1_ExperimentalValidatorConfig">ExperimentalValidatorConfig</a>{})

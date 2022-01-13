@@ -11,8 +11,6 @@
 
 
 <pre><code><b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/CoreGenesis.md#0x1_CoreGenesis">0x1::CoreGenesis</a>;
-<b>use</b> <a href="DiemBlock.md#0x1_DiemBlock">0x1::DiemBlock</a>;
-<b>use</b> <a href="DiemConfig.md#0x1_DiemConfig">0x1::DiemConfig</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event">0x1::Event</a>;
 <b>use</b> <a href="ExperimentalAccount.md#0x1_ExperimentalAccount">0x1::ExperimentalAccount</a>;
 <b>use</b> <a href="ExperimentalConsensusConfig.md#0x1_ExperimentalConsensusConfig">0x1::ExperimentalConsensusConfig</a>;
@@ -23,8 +21,8 @@
 <b>use</b> <a href="ExperimentalValidatorSet.md#0x1_ExperimentalValidatorSet">0x1::ExperimentalValidatorSet</a>;
 <b>use</b> <a href="ExperimentalVersion.md#0x1_ExperimentalVersion">0x1::ExperimentalVersion</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer">0x1::Signer</a>;
-<b>use</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">0x1::ValidatorConfig</a>;
-<b>use</b> <a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig">0x1::ValidatorOperatorConfig</a>;
+<b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/ValidatorConfig.md#0x1_ValidatorConfig">0x1::ValidatorConfig</a>;
+<b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig">0x1::ValidatorOperatorConfig</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector">0x1::Vector</a>;
 </code></pre>
 
@@ -107,16 +105,12 @@
     <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_destroy_handle">Event::destroy_handle</a>(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_new_event_handle">Event::new_event_handle</a>&lt;u64&gt;(dr_account));
     <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_destroy_handle">Event::destroy_handle</a>(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_new_event_handle">Event::new_event_handle</a>&lt;u64&gt;(dr_account));
 
-    // On-chain config setup
-    <a href="DiemConfig.md#0x1_DiemConfig_initialize">DiemConfig::initialize</a>(dr_account);
-
     // Consensus config setup
     <a href="ExperimentalConsensusConfig.md#0x1_ExperimentalConsensusConfig_initialize">ExperimentalConsensusConfig::initialize</a>(dr_account);
     // Parallel execution config setup
     <a href="ExperimentalParallelExecutionConfig.md#0x1_ExperimentalParallelExecutionConfig_initialize_parallel_execution">ExperimentalParallelExecutionConfig::initialize_parallel_execution</a>(dr_account);
     <a href="ExperimentalValidatorSet.md#0x1_ExperimentalValidatorSet_initialize_validator_set">ExperimentalValidatorSet::initialize_validator_set</a>(dr_account);
     <a href="ExperimentalVersion.md#0x1_ExperimentalVersion_initialize">ExperimentalVersion::initialize</a>(dr_account, initial_diem_version);
-    <a href="DiemBlock.md#0x1_DiemBlock_initialize_block_metadata">DiemBlock::initialize_block_metadata</a>(dr_account);
 
     // Rotate auth keys for DiemRoot account <b>to</b> the given
     // values
@@ -220,14 +214,14 @@ Finally, each validator must specify the network address
             <a href="ExperimentalAccount.md#0x1_ExperimentalAccount_rotate_authentication_key">ExperimentalAccount::rotate_authentication_key</a>(operator, operator_auth_key);
         };
         // assign the operator <b>to</b> its validator
-        <b>assert</b>!(<a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_get_human_name">ValidatorOperatorConfig::get_human_name</a>(operator_address) == operator_name, 0);
-        <a href="ValidatorConfig.md#0x1_ValidatorConfig_set_operator">ValidatorConfig::set_operator</a>(owner, operator_address);
+        <b>assert</b>!(<a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_get_human_name">ValidatorOperatorConfig::get_human_name</a>(operator_address) == operator_name, 0);
+        <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/ValidatorConfig.md#0x1_ValidatorConfig_set_operator">ValidatorConfig::set_operator</a>(owner, operator_address);
 
         // <b>use</b> the operator account set up the validator config
         <b>let</b> validator_network_address = *<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(&validator_network_addresses, i);
         <b>let</b> full_node_network_address = *<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(&full_node_network_addresses, i);
         <b>let</b> consensus_pubkey = *<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(&consensus_pubkeys, i);
-        <a href="ValidatorConfig.md#0x1_ValidatorConfig_set_config">ValidatorConfig::set_config</a>(
+        <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/ValidatorConfig.md#0x1_ValidatorConfig_set_config">ValidatorConfig::set_config</a>(
             operator,
             owner_address,
             consensus_pubkey,

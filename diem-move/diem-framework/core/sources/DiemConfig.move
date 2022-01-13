@@ -9,6 +9,7 @@ module CoreFramework::DiemConfig {
 
     friend CoreFramework::DiemConsensusConfig;
     friend CoreFramework::DiemSystem;
+    friend CoreFramework::DiemVersion;
     friend CoreFramework::DiemVMConfig;
     friend CoreFramework::ParallelExecutionConfig;
 
@@ -45,48 +46,40 @@ module CoreFramework::DiemConfig {
 
     /// Publishes `Configuration` resource. Can only be invoked by Diem root, and only a single time in Genesis.
     public fun initialize(
-        dr_account: &signer,
+        account: &signer,
     ) {
         DiemTimestamp::assert_genesis();
-        SystemAddresses::assert_core_resource(dr_account);
-        assert!(!exists<Configuration>(@DiemRoot), Errors::already_published(ECONFIGURATION));
+        SystemAddresses::assert_core_resource(account);
+        assert!(!exists<Configuration>(@CoreResources), Errors::already_published(ECONFIGURATION));
         move_to<Configuration>(
-            dr_account,
+            account,
             Configuration {
                 epoch: 0,
                 last_reconfiguration_time: 0,
-                events: Event::new_event_handle<NewEpochEvent>(dr_account),
+                events: Event::new_event_handle<NewEpochEvent>(account),
             }
         );
     }
 
     /// Private function to temporarily halt reconfiguration.
     /// This function should only be used for offline WriteSet generation purpose and should never be invoked on chain.
-    fun disable_reconfiguration(dr_account: &signer) {
-        assert!(
-            Signer::address_of(dr_account) == @DiemRoot,
-            Errors::requires_address(EDIEM_CONFIG)
-        );
-        SystemAddresses::assert_core_resource(dr_account);
+    fun disable_reconfiguration(account: &signer) {
+        SystemAddresses::assert_core_resource(account);
         assert!(reconfiguration_enabled(), Errors::invalid_state(ECONFIGURATION));
-        move_to(dr_account, DisableReconfiguration {} )
+        move_to(account, DisableReconfiguration {} )
     }
 
     /// Private function to resume reconfiguration.
     /// This function should only be used for offline WriteSet generation purpose and should never be invoked on chain.
-    fun enable_reconfiguration(dr_account: &signer) acquires DisableReconfiguration {
-        assert!(
-            Signer::address_of(dr_account) == @DiemRoot,
-            Errors::requires_address(EDIEM_CONFIG)
-        );
-        SystemAddresses::assert_core_resource(dr_account);
+    fun enable_reconfiguration(account: &signer) acquires DisableReconfiguration {
+        SystemAddresses::assert_core_resource(account);
 
         assert!(!reconfiguration_enabled(), Errors::invalid_state(ECONFIGURATION));
-        DisableReconfiguration {} = move_from<DisableReconfiguration>(Signer::address_of(dr_account));
+        DisableReconfiguration {} = move_from<DisableReconfiguration>(Signer::address_of(account));
     }
 
     fun reconfiguration_enabled(): bool {
-        !exists<DisableReconfiguration>(@DiemRoot)
+        !exists<DisableReconfiguration>(@CoreResources)
     }
 
     /// Signal validators to start using new configuration. Must be called from friend config modules.
@@ -95,10 +88,10 @@ module CoreFramework::DiemConfig {
     }
 
     /// Signal validators to start using new configuration. Must be called by Diem root.
-    public fun reconfigure_with_root_signer(
-        dr_account: &signer,
+    public fun reconfigure_with_core_resource_signer(
+        account: &signer,
     ) acquires Configuration {
-        SystemAddresses::assert_core_resource(dr_account);
+        SystemAddresses::assert_core_resource(account);
         reconfigure_();
     }
 
@@ -110,7 +103,7 @@ module CoreFramework::DiemConfig {
             return ()
         };
 
-        let config_ref = borrow_global_mut<Configuration>(@DiemRoot);
+        let config_ref = borrow_global_mut<Configuration>(@CoreResources);
         let current_time = DiemTimestamp::now_microseconds();
 
         // Do not do anything if a reconfiguration event is already emitted within this transaction.
@@ -144,8 +137,8 @@ module CoreFramework::DiemConfig {
     /// Emit a `NewEpochEvent` event. This function will be invoked by genesis directly to generate the very first
     /// reconfiguration event.
     fun emit_genesis_reconfiguration_event() acquires Configuration {
-        assert!(exists<Configuration>(@DiemRoot), Errors::not_published(ECONFIGURATION));
-        let config_ref = borrow_global_mut<Configuration>(@DiemRoot);
+        assert!(exists<Configuration>(@CoreResources), Errors::not_published(ECONFIGURATION));
+        let config_ref = borrow_global_mut<Configuration>(@CoreResources);
         assert!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, Errors::invalid_state(ECONFIGURATION));
         config_ref.epoch = 1;
 

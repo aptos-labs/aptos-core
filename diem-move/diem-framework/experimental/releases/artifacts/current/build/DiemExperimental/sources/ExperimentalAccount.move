@@ -243,6 +243,6 @@ module ExperimentalFramework::ExperimentalAccount {
         should_trigger_reconfiguration: bool,
     ) {
         Account::epilogue(&dr_account, &ExperimentalAccountMarker{});
-        if (should_trigger_reconfiguration) DiemConfig::reconfigure_with_root_signer(&dr_account);
+        if (should_trigger_reconfiguration) DiemConfig::reconfigure_with_core_resource_signer(&dr_account);
     }
 }

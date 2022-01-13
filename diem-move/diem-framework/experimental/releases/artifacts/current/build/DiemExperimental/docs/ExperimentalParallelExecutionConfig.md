@@ -12,7 +12,7 @@
 
 
 <pre><code><b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability">0x1::Capability</a>;
-<b>use</b> <a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig">0x1::ParallelExecutionConfig</a>;
+<b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/ParallelExecutionConfig.md#0x1_ParallelExecutionConfig">0x1::ParallelExecutionConfig</a>;
 </code></pre>
 
 
@@ -62,7 +62,7 @@
 <pre><code><b>public</b> <b>fun</b> <a href="ExperimentalParallelExecutionConfig.md#0x1_ExperimentalParallelExecutionConfig_initialize_parallel_execution">initialize_parallel_execution</a>(
     account: &signer,
 ) {
-    <a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig_initialize_parallel_execution">ParallelExecutionConfig::initialize_parallel_execution</a>&lt;<a href="ExperimentalParallelExecutionConfig.md#0x1_ExperimentalParallelExecutionConfig">ExperimentalParallelExecutionConfig</a>&gt;(account);
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/ParallelExecutionConfig.md#0x1_ParallelExecutionConfig_initialize_parallel_execution">ParallelExecutionConfig::initialize_parallel_execution</a>&lt;<a href="ExperimentalParallelExecutionConfig.md#0x1_ExperimentalParallelExecutionConfig">ExperimentalParallelExecutionConfig</a>&gt;(account);
     <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_create">Capability::create</a>&lt;<a href="ExperimentalParallelExecutionConfig.md#0x1_ExperimentalParallelExecutionConfig">ExperimentalParallelExecutionConfig</a>&gt;(
         account,
         &<a href="ExperimentalParallelExecutionConfig.md#0x1_ExperimentalParallelExecutionConfig">ExperimentalParallelExecutionConfig</a> {}
@@ -93,7 +93,7 @@
     account: &signer,
     read_write_inference_result: vector&lt;u8&gt;,
 ) {
-    <a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig_enable_parallel_execution_with_config">ParallelExecutionConfig::enable_parallel_execution_with_config</a>(
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/ParallelExecutionConfig.md#0x1_ParallelExecutionConfig_enable_parallel_execution_with_config">ParallelExecutionConfig::enable_parallel_execution_with_config</a>(
         read_write_inference_result,
         &<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_acquire">Capability::acquire</a>(account, &<a href="ExperimentalParallelExecutionConfig.md#0x1_ExperimentalParallelExecutionConfig">ExperimentalParallelExecutionConfig</a> {}),
     );
@@ -120,7 +120,7 @@
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ExperimentalParallelExecutionConfig.md#0x1_ExperimentalParallelExecutionConfig_disable_parallel_execution">disable_parallel_execution</a>(account: &signer) {
-    <a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig_disable_parallel_execution">ParallelExecutionConfig::disable_parallel_execution</a>(
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/ParallelExecutionConfig.md#0x1_ParallelExecutionConfig_disable_parallel_execution">ParallelExecutionConfig::disable_parallel_execution</a>(
         &<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_acquire">Capability::acquire</a>(account, &<a href="ExperimentalParallelExecutionConfig.md#0x1_ExperimentalParallelExecutionConfig">ExperimentalParallelExecutionConfig</a> {}),
     );
 }

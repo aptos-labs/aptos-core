@@ -11,7 +11,7 @@
 
 
 <pre><code><b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability">0x1::Capability</a>;
-<b>use</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig">0x1::DiemVMConfig</a>;
+<b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemVMConfig.md#0x1_DiemVMConfig">0x1::DiemVMConfig</a>;
 </code></pre>
 
 
@@ -64,7 +64,7 @@ Publishes the VM config.
     instruction_schedule: vector&lt;u8&gt;,
     native_schedule: vector&lt;u8&gt;,
 ) {
-    <a href="DiemVMConfig.md#0x1_DiemVMConfig_initialize">DiemVMConfig::initialize</a>&lt;<a href="ExperimentalVMConfig.md#0x1_ExperimentalVMConfig">ExperimentalVMConfig</a>&gt;(account, instruction_schedule, native_schedule);
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemVMConfig.md#0x1_DiemVMConfig_initialize">DiemVMConfig::initialize</a>&lt;<a href="ExperimentalVMConfig.md#0x1_ExperimentalVMConfig">ExperimentalVMConfig</a>&gt;(account, instruction_schedule, native_schedule);
     <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_create">Capability::create</a>&lt;<a href="ExperimentalVMConfig.md#0x1_ExperimentalVMConfig">ExperimentalVMConfig</a>&gt;(account, &<a href="ExperimentalVMConfig.md#0x1_ExperimentalVMConfig">ExperimentalVMConfig</a> {});
 }
 </code></pre>
@@ -102,7 +102,7 @@ Publishes the VM config.
     gas_unit_scaling_factor: u64,
     default_account_size: u64,
 ) {
-    <a href="DiemVMConfig.md#0x1_DiemVMConfig_set_gas_constants">DiemVMConfig::set_gas_constants</a>&lt;<a href="ExperimentalVMConfig.md#0x1_ExperimentalVMConfig">ExperimentalVMConfig</a>&gt;(
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemVMConfig.md#0x1_DiemVMConfig_set_gas_constants">DiemVMConfig::set_gas_constants</a>&lt;<a href="ExperimentalVMConfig.md#0x1_ExperimentalVMConfig">ExperimentalVMConfig</a>&gt;(
         global_memory_per_byte_cost,
         global_memory_per_byte_write_cost,
         min_transaction_gas_units,

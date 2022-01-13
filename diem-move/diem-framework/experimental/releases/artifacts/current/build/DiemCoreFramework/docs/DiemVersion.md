@@ -14,9 +14,10 @@ Maintains the version number for the blockchain.
 
 
 <pre><code><b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability">0x1::Capability</a>;
+<b>use</b> <a href="DiemConfig.md#0x1_DiemConfig">0x1::DiemConfig</a>;
 <b>use</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
-<b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer">0x1::Signer</a>;
+<b>use</b> <a href="SystemAddresses.md#0x1_SystemAddresses">0x1::SystemAddresses</a>;
 </code></pre>
 
 
@@ -130,7 +131,7 @@ Publishes the Version config.
 <pre><code><b>public</b> <b>fun</b> <a href="DiemVersion.md#0x1_DiemVersion_initialize">initialize</a>&lt;T&gt;(account: &signer, initial_version: u64) {
     <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
 
-    <b>assert</b>!(<a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account) == @CoreResources, <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_requires_address">Errors::requires_address</a>(<a href="DiemVersion.md#0x1_DiemVersion_ECONFIG">ECONFIG</a>));
+    <a href="SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(account);
 
     <b>assert</b>!(
         !<b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion_VersionChainMarker">VersionChainMarker</a>&lt;T&gt;&gt;(@CoreResources),
@@ -151,24 +152,6 @@ Publishes the Version config.
         <a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a> { major: initial_version },
     );
 }
-</code></pre>
-
-
-
-</details>
-
-<details>
-<summary>Specification</summary>
-
-
-
-<pre><code><b>include</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotGenesis">DiemTimestamp::AbortsIfNotGenesis</a>;
-<b>aborts_if</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account) != @CoreResources <b>with</b> Errors::REQUIRES_ADDRESS;
-<b>aborts_if</b> <b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion_VersionChainMarker">VersionChainMarker</a>&lt;T&gt;&gt;(@CoreResources) <b>with</b> Errors::ALREADY_PUBLISHED;
-<b>aborts_if</b> <b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@CoreResources) <b>with</b> Errors::ALREADY_PUBLISHED;
-<b>ensures</b> <b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion_VersionChainMarker">VersionChainMarker</a>&lt;T&gt;&gt;(@CoreResources);
-<b>ensures</b> <b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@CoreResources);
-<b>ensures</b> <b>global</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@CoreResources).major == initial_version;
 </code></pre>
 
 
@@ -203,22 +186,9 @@ Updates the major version to a larger version.
 
     <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@CoreResources);
     config.major = major;
+
+    <a href="DiemConfig.md#0x1_DiemConfig_reconfigure">DiemConfig::reconfigure</a>();
 }
-</code></pre>
-
-
-
-</details>
-
-<details>
-<summary>Specification</summary>
-
-
-
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion_VersionChainMarker">VersionChainMarker</a>&lt;T&gt;&gt;(@CoreResources) <b>with</b> Errors::NOT_PUBLISHED;
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@CoreResources) <b>with</b> Errors::NOT_PUBLISHED;
-<b>aborts_if</b> <b>global</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@CoreResources).major &gt;= major <b>with</b> Errors::INVALID_ARGUMENT;
-<b>ensures</b> <b>global</b>&lt;<a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a>&gt;(@CoreResources).major == major;
 </code></pre>
 
 

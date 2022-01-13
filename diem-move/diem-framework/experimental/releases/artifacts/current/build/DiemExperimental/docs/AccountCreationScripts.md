@@ -46,7 +46,7 @@ Root account.
 
 Creates an account with a Validator Operator role at <code>new_account_address</code>, with authentication key
 <code>auth_key_prefix</code> | <code>new_account_address</code>. It publishes a
-<code><a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource with the specified <code>human_name</code>.
+<code><a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource with the specified <code>human_name</code>.
 This script does not assign the validator operator to any validator accounts but only creates the account.
 Authentication key prefixes, and how to construct them from an ed25519 public key are described
 [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
@@ -150,9 +150,9 @@ Root account.
 
 Creates an account with a Validator role at <code>new_account_address</code>, with authentication key
 <code>auth_key_prefix</code> | <code>new_account_address</code>. It publishes a
-<code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource with empty <code>config</code>, and
+<code><a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource with empty <code>config</code>, and
 <code>operator_account</code> fields. The <code>human_name</code> field of the
-<code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> is set to the passed in <code>human_name</code>.
+<code><a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> is set to the passed in <code>human_name</code>.
 This script does not add the validator to the validator set or the system,
 but only creates the account.
 Authentication keys, prefixes, and how to construct them from an ed25519 public key are described

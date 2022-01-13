@@ -53,7 +53,7 @@ transaction can only be sent from the Diem Root account.
 
 ### Technical Description
 
-Updates the <code><a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemVersion.md#0x1_DiemVersion">DiemVersion</a></code> on-chain config and emits a <code><a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to trigger
+Updates the <code><a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemVersion.md#0x1_DiemVersion">DiemVersion</a></code> on-chain config and emits a <code><a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to trigger
 a reconfiguration of the system. The <code>major</code> version that is passed in must be strictly greater
 than the current major version held on-chain. The VM reads this information and can use it to
 preserve backwards compatibility with previous major versions of the VM.
@@ -115,8 +115,8 @@ metering. This transaction can only be sent from the Diem Root account.
 
 ### Technical Description
 
-Updates the on-chain config holding the <code><a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a></code> and emits a
-<code><a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to trigger a reconfiguration of the system.
+Updates the on-chain config holding the <code><a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a></code> and emits a
+<code><a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to trigger a reconfiguration of the system.
 
 
 <a name="@Parameters_6"></a>
@@ -146,7 +146,7 @@ Updates the on-chain config holding the <code><a href="DiemVMConfig.md#0x1_DiemV
 
 | Error Category             | Error Reason                                | Description                                                                                |
 | ----------------           | --------------                              | -------------                                                                              |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="DiemVMConfig.md#0x1_DiemVMConfig_EGAS_CONSTANT_INCONSISTENCY">DiemVMConfig::EGAS_CONSTANT_INCONSISTENCY</a></code> | The provided gas constants are inconsistent.                                               |
+| <code>Errors::INVALID_ARGUMENT</code> | <code>DiemVMConfig::EGAS_CONSTANT_INCONSISTENCY</code> | The provided gas constants are inconsistent.                                               |
 | <code>Errors::REQUIRES_ADDRESS</code> | <code>CoreAddresses::EDIEM_ROOT</code>                 | <code>account</code> is not the Diem Root account.                                                    |
 
 
@@ -212,8 +212,8 @@ transaction can only be sent from the Diem Root account.
 
 ### Technical Description
 
-Initializes the <code><a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig">DiemConsensusConfig</a></code> on-chain config to empty and allows future updates from DiemRoot via
-<code>update_diem_consensus_config</code>. This doesn't emit a <code><a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code>.
+Initializes the <code><a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemConsensusConfig.md#0x1_DiemConsensusConfig">DiemConsensusConfig</a></code> on-chain config to empty and allows future updates from DiemRoot via
+<code>update_diem_consensus_config</code>. This doesn't emit a <code><a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code>.
 
 
 <a name="@Parameters_10"></a>
@@ -270,7 +270,7 @@ transaction can only be sent from the Diem Root account.
 
 ### Technical Description
 
-Updates the <code><a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig">DiemConsensusConfig</a></code> on-chain config and emits a <code><a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to trigger
+Updates the <code><a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemConsensusConfig.md#0x1_DiemConsensusConfig">DiemConsensusConfig</a></code> on-chain config and emits a <code><a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to trigger
 a reconfiguration of the system.
 
 

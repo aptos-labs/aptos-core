@@ -6,8 +6,6 @@ module ExperimentalFramework::Genesis {
     use ExperimentalFramework::ExperimentalAccount;
 
     // Config imports
-    use CoreFramework::DiemConfig;
-    use CoreFramework::DiemBlock;
     use CoreFramework::ValidatorConfig;
     use CoreFramework::ValidatorOperatorConfig;
     use ExperimentalFramework::ExperimentalConsensusConfig;
@@ -61,16 +59,12 @@ module ExperimentalFramework::Genesis {
         Event::destroy_handle(Event::new_event_handle<u64>(dr_account));
         Event::destroy_handle(Event::new_event_handle<u64>(dr_account));
 
-        // On-chain config setup
-        DiemConfig::initialize(dr_account);
-
         // Consensus config setup
         ExperimentalConsensusConfig::initialize(dr_account);
         // Parallel execution config setup
         ExperimentalParallelExecutionConfig::initialize_parallel_execution(dr_account);
         ExperimentalValidatorSet::initialize_validator_set(dr_account);
         ExperimentalVersion::initialize(dr_account, initial_diem_version);
-        DiemBlock::initialize_block_metadata(dr_account);
 
         // Rotate auth keys for DiemRoot account to the given
         // values

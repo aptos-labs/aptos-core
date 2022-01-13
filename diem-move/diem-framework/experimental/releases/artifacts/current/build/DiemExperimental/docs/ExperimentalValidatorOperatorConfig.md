@@ -11,7 +11,7 @@
 
 
 <pre><code><b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability">0x1::Capability</a>;
-<b>use</b> <a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig">0x1::ValidatorOperatorConfig</a>;
+<b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig">0x1::ValidatorOperatorConfig</a>;
 </code></pre>
 
 
@@ -59,7 +59,7 @@
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ExperimentalValidatorOperatorConfig.md#0x1_ExperimentalValidatorOperatorConfig_initialize">initialize</a>(account: &signer) {
-    <a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_initialize">ValidatorOperatorConfig::initialize</a>&lt;<a href="ExperimentalValidatorOperatorConfig.md#0x1_ExperimentalValidatorOperatorConfig">ExperimentalValidatorOperatorConfig</a>&gt;(account);
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_initialize">ValidatorOperatorConfig::initialize</a>&lt;<a href="ExperimentalValidatorOperatorConfig.md#0x1_ExperimentalValidatorOperatorConfig">ExperimentalValidatorOperatorConfig</a>&gt;(account);
     <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_create">Capability::create</a>(account, &<a href="ExperimentalValidatorOperatorConfig.md#0x1_ExperimentalValidatorOperatorConfig">ExperimentalValidatorOperatorConfig</a>{});
 }
 </code></pre>
@@ -88,7 +88,7 @@
     validator_operator_account: &signer,
     human_name: vector&lt;u8&gt;,
 ) {
-    <a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_publish">ValidatorOperatorConfig::publish</a>(
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_publish">ValidatorOperatorConfig::publish</a>(
         validator_operator_account,
         human_name,
         <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_acquire">Capability::acquire</a>(root_account, &<a href="ExperimentalValidatorOperatorConfig.md#0x1_ExperimentalValidatorOperatorConfig">ExperimentalValidatorOperatorConfig</a>{})
