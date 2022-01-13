@@ -87,7 +87,7 @@ module CoreFramework::DiemConfig {
         reconfigure_();
     }
 
-    /// Signal validators to start using new configuration. Must be called by Diem root.
+    /// Signal validators to start using new configuration. Must be called by @CoreResources.
     public fun reconfigure_with_core_resource_signer(
         account: &signer,
     ) acquires Configuration {

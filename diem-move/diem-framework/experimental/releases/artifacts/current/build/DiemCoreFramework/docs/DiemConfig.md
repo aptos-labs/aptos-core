@@ -330,7 +330,7 @@ Signal validators to start using new configuration. Must be called from friend c
 
 ## Function `reconfigure_with_core_resource_signer`
 
-Signal validators to start using new configuration. Must be called by Diem root.
+Signal validators to start using new configuration. Must be called by @CoreResources.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_reconfigure_with_core_resource_signer">reconfigure_with_core_resource_signer</a>(account: &signer)
