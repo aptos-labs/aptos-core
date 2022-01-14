@@ -16,7 +16,6 @@ to synchronize configuration changes for the validators.
 -  [Function `enable_reconfiguration`](#0x1_DiemConfig_enable_reconfiguration)
 -  [Function `reconfiguration_enabled`](#0x1_DiemConfig_reconfiguration_enabled)
 -  [Function `reconfigure`](#0x1_DiemConfig_reconfigure)
--  [Function `reconfigure_with_core_resource_signer`](#0x1_DiemConfig_reconfigure_with_core_resource_signer)
 -  [Function `reconfigure_`](#0x1_DiemConfig_reconfigure_)
 -  [Function `emit_genesis_reconfiguration_event`](#0x1_DiemConfig_emit_genesis_reconfiguration_event)
 
@@ -318,34 +317,6 @@ Signal validators to start using new configuration. Must be called from friend c
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_reconfigure">reconfigure</a>() <b>acquires</b> <a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a> {
-    <a href="DiemConfig.md#0x1_DiemConfig_reconfigure_">reconfigure_</a>();
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_DiemConfig_reconfigure_with_core_resource_signer"></a>
-
-## Function `reconfigure_with_core_resource_signer`
-
-Signal validators to start using new configuration. Must be called by @CoreResources.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_reconfigure_with_core_resource_signer">reconfigure_with_core_resource_signer</a>(account: &signer)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="DiemConfig.md#0x1_DiemConfig_reconfigure_with_core_resource_signer">reconfigure_with_core_resource_signer</a>(
-    account: &signer,
-) <b>acquires</b> <a href="DiemConfig.md#0x1_DiemConfig_Configuration">Configuration</a> {
-    <a href="SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(account);
     <a href="DiemConfig.md#0x1_DiemConfig_reconfigure_">reconfigure_</a>();
 }
 </code></pre>

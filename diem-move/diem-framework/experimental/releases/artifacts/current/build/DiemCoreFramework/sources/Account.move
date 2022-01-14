@@ -5,6 +5,8 @@ module CoreFramework::Account {
     use Std::Hash;
     use Std::Vector;
     use CoreFramework::ChainId;
+    use CoreFramework::DiemConfig;
+    use CoreFramework::SystemAddresses;
 
     /// Resource representing an account.
     struct Account has key, store {
@@ -214,5 +216,16 @@ module CoreFramework::Account {
         // Increment sequence number
         let account_resource = borrow_global_mut<Account>(addr);
         account_resource.sequence_number = old_sequence_number + 1;
+    }
+
+    /// Epilogue function called after a successful writeset transaction, which can only be sent by @CoreResources.
+    public fun writeset_epilogue<T>(
+        account: &signer,
+        should_trigger_reconfiguration: bool,
+        witness: &T
+    ) acquires Account {
+        SystemAddresses::assert_core_resource(account);
+        epilogue(account, witness);
+        if (should_trigger_reconfiguration) DiemConfig::reconfigure();
     }
 }

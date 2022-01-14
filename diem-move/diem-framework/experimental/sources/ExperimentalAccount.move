@@ -6,7 +6,6 @@ module ExperimentalFramework::ExperimentalAccount {
     use Std::Event;
     use Std::Errors;
     use CoreFramework::Account;
-    use CoreFramework::DiemConfig;
     use CoreFramework::DiemTimestamp;
     use CoreFramework::SystemAddresses;
 
@@ -242,7 +241,6 @@ module ExperimentalFramework::ExperimentalAccount {
         _txn_sequence_number: u64,
         should_trigger_reconfiguration: bool,
     ) {
-        Account::epilogue(&dr_account, &ExperimentalAccountMarker{});
-        if (should_trigger_reconfiguration) DiemConfig::reconfigure_with_core_resource_signer(&dr_account);
+        Account::writeset_epilogue(&dr_account, should_trigger_reconfiguration, &ExperimentalAccountMarker{});
     }
 }

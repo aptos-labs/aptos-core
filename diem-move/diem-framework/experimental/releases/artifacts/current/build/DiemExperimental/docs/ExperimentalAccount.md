@@ -29,7 +29,6 @@ transaction in addition to the core prologue and epilogue.
 
 
 <pre><code><b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/Account.md#0x1_Account">0x1::Account</a>;
-<b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemConfig.md#0x1_DiemConfig">0x1::DiemConfig</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event">0x1::Event</a>;
@@ -770,8 +769,7 @@ Rotate the authentication key for the account under cap.account_address
     _txn_sequence_number: u64,
     should_trigger_reconfiguration: bool,
 ) {
-    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/Account.md#0x1_Account_epilogue">Account::epilogue</a>(&dr_account, &<a href="ExperimentalAccount.md#0x1_ExperimentalAccount_ExperimentalAccountMarker">ExperimentalAccountMarker</a>{});
-    <b>if</b> (should_trigger_reconfiguration) <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/DiemConfig.md#0x1_DiemConfig_reconfigure_with_core_resource_signer">DiemConfig::reconfigure_with_core_resource_signer</a>(&dr_account);
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/DiemCoreFramework/docs/Account.md#0x1_Account_writeset_epilogue">Account::writeset_epilogue</a>(&dr_account, should_trigger_reconfiguration, &<a href="ExperimentalAccount.md#0x1_ExperimentalAccount_ExperimentalAccountMarker">ExperimentalAccountMarker</a>{});
 }
 </code></pre>
 

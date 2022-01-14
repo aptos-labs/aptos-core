@@ -7,6 +7,7 @@ module CoreFramework::DiemConfig {
     use CoreFramework::DiemTimestamp;
     use CoreFramework::SystemAddresses;
 
+    friend CoreFramework::Account;
     friend CoreFramework::DiemConsensusConfig;
     friend CoreFramework::DiemSystem;
     friend CoreFramework::DiemVersion;
@@ -84,14 +85,6 @@ module CoreFramework::DiemConfig {
 
     /// Signal validators to start using new configuration. Must be called from friend config modules.
     public(friend) fun reconfigure() acquires Configuration {
-        reconfigure_();
-    }
-
-    /// Signal validators to start using new configuration. Must be called by @CoreResources.
-    public fun reconfigure_with_core_resource_signer(
-        account: &signer,
-    ) acquires Configuration {
-        SystemAddresses::assert_core_resource(account);
         reconfigure_();
     }
 
