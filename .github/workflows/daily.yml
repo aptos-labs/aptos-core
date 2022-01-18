@@ -127,8 +127,10 @@ jobs:
         run: |
           cd /opt/git/diem/
           set -o pipefail
-          MVP_TEST_INCONSISTENCY=1 cargo test -p move-prover --release 2>&1 | tee -a $MESSAGE_PAYLOAD_FILE
-          MVP_TEST_FEATURE=cvc5 cargo test -p move-prover --release 2>&1 | tee -a $MESSAGE_PAYLOAD_FILE
+        #  Disabling for now as `move-prover` has migrated to a separate repository, thus being unavailable
+        #  in the Diem repo. TODO: fix this.
+        #  MVP_TEST_INCONSISTENCY=1 cargo test -p move-prover --release 2>&1 | tee -a $MESSAGE_PAYLOAD_FILE
+        #  MVP_TEST_FEATURE=cvc5 cargo test -p move-prover --release 2>&1 | tee -a $MESSAGE_PAYLOAD_FILE
       - uses: ./.github/actions/slack-file
         with:
           webhook: ${{ secrets.WEBHOOK_MOVE_PROVER }}
