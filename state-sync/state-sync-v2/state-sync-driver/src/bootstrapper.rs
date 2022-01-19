@@ -624,6 +624,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
                         .transactions_and_outputs
                         .len();
                     self.storage_synchronizer.apply_transaction_outputs(
+                        notification_id,
                         transaction_outputs_with_proof,
                         proof_ledger_info,
                         end_of_epoch_ledger_info,
@@ -644,6 +645,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     let num_transactions = transaction_list_with_proof.transactions.len();
                     self.storage_synchronizer.execute_transactions(
+                        notification_id,
                         transaction_list_with_proof,
                         proof_ledger_info,
                         end_of_epoch_ledger_info,
@@ -788,7 +790,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
 
     /// Handles the end of stream notification or an invalid payload by
     /// terminating the stream appropriately.
-    pub async fn handle_end_of_stream_or_invalid_payload(
+    async fn handle_end_of_stream_or_invalid_payload(
         &mut self,
         data_notification: DataNotification,
     ) -> Result<(), Error> {
@@ -802,7 +804,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
     }
 
     /// Terminates the currently active stream with the provided feedback
-    async fn terminate_active_stream(
+    pub async fn terminate_active_stream(
         &mut self,
         notification_id: NotificationId,
         notification_feedback: NotificationFeedback,

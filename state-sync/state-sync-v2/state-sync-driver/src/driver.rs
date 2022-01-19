@@ -8,7 +8,7 @@ use crate::{
     error::Error,
     notification_handlers::{
         CommitNotification, CommitNotificationListener, ConsensusNotificationHandler,
-        MempoolNotificationHandler,
+        ErrorNotification, ErrorNotificationListener, MempoolNotificationHandler,
     },
     storage_synchronizer::StorageSynchronizerInterface,
     utils,
@@ -16,7 +16,7 @@ use crate::{
 use consensus_notifications::{
     ConsensusCommitNotification, ConsensusNotification, ConsensusSyncNotification,
 };
-use data_streaming_service::streaming_client::StreamingServiceClient;
+use data_streaming_service::streaming_client::{NotificationFeedback, StreamingServiceClient};
 use diem_config::config::{RoleType, StateSyncDriverConfig};
 use diem_data_client::DiemDataClient;
 use diem_infallible::Mutex;
@@ -80,6 +80,9 @@ pub struct StateSyncDriver<DataClient, MempoolNotifier, StorageSyncer> {
     // The configuration for the driver
     driver_configuration: DriverConfiguration,
 
+    // The listener for errors from the storage synchronizer
+    error_notification_listener: ErrorNotificationListener,
+
     // The event subscription service to notify listeners of on-chain events
     event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
 
@@ -104,6 +107,7 @@ impl<
         commit_notification_listener: CommitNotificationListener,
         consensus_notification_handler: ConsensusNotificationHandler,
         driver_configuration: DriverConfiguration,
+        error_notification_listener: ErrorNotificationListener,
         event_subscription_service: EventSubscriptionService,
         mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
         storage_synchronizer: StorageSyncer,
@@ -133,6 +137,7 @@ impl<
             continuous_syncer,
             diem_data_client,
             driver_configuration,
+            error_notification_listener,
             event_subscription_service,
             mempool_notification_handler,
             start_time: None,
@@ -160,6 +165,9 @@ impl<
                 }
                 notification = self.consensus_notification_handler.select_next_some() => {
                     self.handle_consensus_notification(notification).await;
+                }
+                notification = self.error_notification_listener.select_next_some() => {
+                    self.handle_error_notification(notification).await;
                 }
                 _ = progress_check_interval.select_next_some() => {
                     self.drive_progress().await;
@@ -359,6 +367,39 @@ impl<
             .get_consensus_sync_request();
         if let Some(sync_request) = consensus_sync_request.lock().as_mut() {
             sync_request.update_last_commit_timestamp()
+        };
+    }
+
+    /// Handles an error notification sent by the storage synchronizer
+    async fn handle_error_notification(&mut self, error_notification: ErrorNotification) {
+        debug!(
+            "Received an error notification from the storage synchronizer! Error: {:?}",
+            error_notification.clone(),
+        );
+
+        // Terminate the currently active streams
+        let notification_id = error_notification.notification_id;
+        let notification_feedback = NotificationFeedback::InvalidPayloadData;
+        if self.bootstrapper.is_bootstrapped() {
+            if let Err(error) = self
+                .continuous_syncer
+                .terminate_active_stream(notification_id, notification_feedback)
+                .await
+            {
+                panic!(
+                    "Failed to terminate the active stream for the continuous syncer! Error: {:?}",
+                    error
+                );
+            }
+        } else if let Err(error) = self
+            .bootstrapper
+            .terminate_active_stream(notification_id, notification_feedback)
+            .await
+        {
+            panic!(
+                "Failed to terminate the active stream for the bootstrapper! Error: {:?}",
+                error
+            );
         };
     }
 

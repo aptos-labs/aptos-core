@@ -6,6 +6,7 @@ use consensus_notifications::{
     ConsensusCommitNotification, ConsensusNotification, ConsensusNotificationListener,
     ConsensusSyncNotification,
 };
+use data_streaming_service::data_notification::NotificationId;
 use diem_infallible::Mutex;
 use diem_logger::prelude::*;
 use diem_types::{
@@ -342,6 +343,47 @@ impl Stream for ConsensusNotificationHandler {
 impl FusedStream for ConsensusNotificationHandler {
     fn is_terminated(&self) -> bool {
         self.consensus_listener.is_terminated()
+    }
+}
+
+/// A notification for error transactions and events that have been committed to
+/// storage.
+#[derive(Clone, Debug)]
+pub struct ErrorNotification {
+    pub error: Error,
+    pub notification_id: NotificationId,
+}
+
+/// A simple wrapper for an error notification listener
+pub struct ErrorNotificationListener {
+    // The listener for error notifications
+    error_notification_listener: mpsc::UnboundedReceiver<ErrorNotification>,
+}
+
+impl ErrorNotificationListener {
+    pub fn new() -> (mpsc::UnboundedSender<ErrorNotification>, Self) {
+        // Create a channel to send and receive error notifications
+        let (error_notification_sender, error_notification_listener) = mpsc::unbounded();
+
+        // Create and return the sender and listener
+        let error_notification_listener = Self {
+            error_notification_listener,
+        };
+        (error_notification_sender, error_notification_listener)
+    }
+}
+
+impl Stream for ErrorNotificationListener {
+    type Item = ErrorNotification;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Pin::new(&mut self.get_mut().error_notification_listener).poll_next(cx)
+    }
+}
+
+impl FusedStream for ErrorNotificationListener {
+    fn is_terminated(&self) -> bool {
+        self.error_notification_listener.is_terminated()
     }
 }
 

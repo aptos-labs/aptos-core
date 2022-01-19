@@ -214,6 +214,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
                             .transactions_and_outputs
                             .len();
                         self.storage_synchronizer.apply_transaction_outputs(
+                            notification_id,
                             transaction_outputs_with_proof,
                             ledger_info_with_signatures,
                             None,
@@ -234,6 +235,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
                     if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                         let num_transactions = transaction_list_with_proof.transactions.len();
                         self.storage_synchronizer.execute_transactions(
+                            notification_id,
                             transaction_list_with_proof,
                             ledger_info_with_signatures,
                             None,
@@ -338,7 +340,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
 
     /// Handles the end of stream notification or an invalid payload by
     /// terminating the stream appropriately.
-    pub async fn handle_end_of_stream_or_invalid_payload(
+    async fn handle_end_of_stream_or_invalid_payload(
         &mut self,
         data_notification: DataNotification,
     ) -> Result<(), Error> {
@@ -352,7 +354,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
     }
 
     /// Terminates the currently active stream with the provided feedback
-    async fn terminate_active_stream(
+    pub async fn terminate_active_stream(
         &mut self,
         notification_id: NotificationId,
         notification_feedback: NotificationFeedback,

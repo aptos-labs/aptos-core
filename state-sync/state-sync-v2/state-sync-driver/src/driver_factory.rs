@@ -5,7 +5,8 @@ use crate::{
     driver::{DriverConfiguration, StateSyncDriver},
     driver_client::{ClientNotificationListener, DriverClient, DriverNotification},
     notification_handlers::{
-        CommitNotificationListener, ConsensusNotificationHandler, MempoolNotificationHandler,
+        CommitNotificationListener, ConsensusNotificationHandler, ErrorNotificationListener,
+        MempoolNotificationHandler,
     },
     storage_synchronizer::StorageSynchronizer,
 };
@@ -52,6 +53,8 @@ impl DriverFactory {
         let (commit_notification_sender, commit_notification_listener) =
             CommitNotificationListener::new();
         let consensus_notification_handler = ConsensusNotificationHandler::new(consensus_listener);
+        let (error_notification_sender, error_notification_listener) =
+            ErrorNotificationListener::new();
         let mempool_notification_handler =
             MempoolNotificationHandler::new(mempool_notification_sender);
 
@@ -72,6 +75,7 @@ impl DriverFactory {
         let storage_synchronizer = StorageSynchronizer::new(
             chunk_executor,
             commit_notification_sender,
+            error_notification_sender,
             driver_runtime.as_ref(),
         );
 
@@ -88,6 +92,7 @@ impl DriverFactory {
             commit_notification_listener,
             consensus_notification_handler,
             driver_configuration,
+            error_notification_listener,
             event_subscription_service,
             mempool_notification_handler,
             storage_synchronizer,

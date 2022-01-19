@@ -1,7 +1,11 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::Error, notification_handlers::CommitNotification};
+use crate::{
+    error::Error,
+    notification_handlers::{CommitNotification, ErrorNotification},
+};
+use data_streaming_service::data_notification::NotificationId;
 use diem_logger::prelude::*;
 use diem_types::{
     account_state_blob::AccountStatesChunkWithProof,
@@ -19,6 +23,8 @@ use std::{
 };
 use tokio::runtime::Runtime;
 
+// TODO(joshlind): add structured logging support!
+
 // The maximum number of chunks that are pending execution or commit
 const MAX_PENDING_CHUNKS: usize = 50;
 
@@ -30,6 +36,7 @@ pub trait StorageSynchronizerInterface {
     /// Note: this assumes that the ledger infos have already been verified.
     fn apply_transaction_outputs(
         &mut self,
+        notification_id: NotificationId,
         output_list_with_proof: TransactionOutputListWithProof,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
@@ -40,6 +47,7 @@ pub trait StorageSynchronizerInterface {
     /// Note: this assumes that the ledger infos have already been verified.
     fn execute_transactions(
         &mut self,
+        notification_id: NotificationId,
         transaction_list_with_proof: TransactionListWithProof,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
@@ -70,6 +78,7 @@ impl StorageSynchronizer {
     pub fn new<ChunkExecutor: ChunkExecutorTrait + 'static>(
         chunk_executor: Arc<ChunkExecutor>,
         commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
+        error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
         runtime: Option<&Runtime>,
     ) -> Self {
         // Create a channel to notify the executor when transaction data chunks are ready
@@ -84,6 +93,7 @@ impl StorageSynchronizer {
         // Spawn the executor that executes/applies transaction data chunks
         spawn_executor(
             chunk_executor.clone(),
+            error_notification_sender.clone(),
             executor_listener,
             committer_notifier,
             pending_transaction_chunks.clone(),
@@ -95,12 +105,10 @@ impl StorageSynchronizer {
             chunk_executor,
             committer_listener,
             commit_notification_sender,
+            error_notification_sender,
             pending_transaction_chunks.clone(),
             runtime,
         );
-
-        // TODO(joshlind): handle the case where we want to reset the pipeline
-        // (due to a failure).
 
         Self {
             executor_notifier,
@@ -128,11 +136,13 @@ impl StorageSynchronizer {
 impl StorageSynchronizerInterface for StorageSynchronizer {
     fn apply_transaction_outputs(
         &mut self,
+        notification_id: NotificationId,
         output_list_with_proof: TransactionOutputListWithProof,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     ) -> Result<(), Error> {
         let transaction_data_chunk = TransactionDataChunk::TransactionOutputs(
+            notification_id,
             output_list_with_proof,
             target_ledger_info,
             end_of_epoch_ledger_info,
@@ -142,11 +152,13 @@ impl StorageSynchronizerInterface for StorageSynchronizer {
 
     fn execute_transactions(
         &mut self,
+        notification_id: NotificationId,
         transaction_list_with_proof: TransactionListWithProof,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     ) -> Result<(), Error> {
         let transaction_data_chunk = TransactionDataChunk::Transactions(
+            notification_id,
             transaction_list_with_proof,
             target_ledger_info,
             end_of_epoch_ledger_info,
@@ -170,11 +182,13 @@ impl StorageSynchronizerInterface for StorageSynchronizer {
 /// and committed.
 enum TransactionDataChunk {
     Transactions(
+        NotificationId,
         TransactionListWithProof,
         LedgerInfoWithSignatures,
         Option<LedgerInfoWithSignatures>,
     ),
     TransactionOutputs(
+        NotificationId,
         TransactionOutputListWithProof,
         LedgerInfoWithSignatures,
         Option<LedgerInfoWithSignatures>,
@@ -184,8 +198,9 @@ enum TransactionDataChunk {
 /// Spawns a dedicated executor that executes/applies transaction data chunks
 fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
     chunk_executor: Arc<ChunkExecutor>,
+    error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
     mut executor_listener: mpsc::Receiver<TransactionDataChunk>,
-    mut committer_notifier: mpsc::Sender<()>,
+    mut committer_notifier: mpsc::Sender<NotificationId>,
     pending_transaction_chunks: Arc<AtomicU64>,
     runtime: Option<&Runtime>,
 ) {
@@ -195,35 +210,39 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
             ::futures::select! {
                 transaction_data_chunk = executor_listener.select_next_some() => {
                     // Execute/apply the transaction data chunk
-                    let result = match transaction_data_chunk {
-                        TransactionDataChunk::Transactions(transactions_with_proof, target_ledger_info, end_of_epoch_ledger_info) => {
-                            chunk_executor
+                    let (notification_id, result) = match transaction_data_chunk {
+                        TransactionDataChunk::Transactions(notification_id, transactions_with_proof, target_ledger_info, end_of_epoch_ledger_info) => {
+                            let result = chunk_executor
                                .execute_chunk(
                                     transactions_with_proof,
                                     &target_ledger_info,
                                     end_of_epoch_ledger_info.as_ref(),
-                                )
+                                );
+                            (notification_id, result)
                         },
-                        TransactionDataChunk::TransactionOutputs(outputs_with_proof, target_ledger_info, end_of_epoch_ledger_info) => {
-                            chunk_executor
+                        TransactionDataChunk::TransactionOutputs(notification_id, outputs_with_proof, target_ledger_info, end_of_epoch_ledger_info) => {
+                            let result = chunk_executor
                                 .apply_chunk(
                                     outputs_with_proof,
                                     &target_ledger_info,
                                     end_of_epoch_ledger_info.as_ref(),
-                                )
+                                );
+                             (notification_id, result)
                         }
                     };
 
                     // Notify the committer of new executed chunks
                     match result {
                         Ok(()) => {
-                            if let Err(error) = committer_notifier.try_send(()) {
-                                error!("Failed to notify the committer! Error: {:?}", error);
-                                decrement_atomic(pending_transaction_chunks.clone())
+                            if let Err(error) = committer_notifier.try_send(notification_id) {
+                                let error = format!("Failed to notify the committer! Error: {:?}", error);
+                                send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
+                                decrement_atomic(pending_transaction_chunks.clone());
                             }
                         },
                         Err(error) => {
-                            error!("Failed to execute/apply the transaction data chunk! Error: {:?}", error);
+                            let error = format!("Failed to execute/apply the transaction data chunk! Error: {:?}", error);
+                            send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
                             decrement_atomic(pending_transaction_chunks.clone());
                         }
                     }
@@ -239,8 +258,9 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
 /// Spawns a dedicated committer that commits executed (but pending) chunks
 fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
     chunk_executor: Arc<ChunkExecutor>,
-    mut committer_listener: mpsc::Receiver<()>,
+    mut committer_listener: mpsc::Receiver<NotificationId>,
     mut commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
+    error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
     pending_transaction_chunks: Arc<AtomicU64>,
     runtime: Option<&Runtime>,
 ) {
@@ -248,20 +268,22 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
     let committer = async move {
         loop {
             ::futures::select! {
-                _ = committer_listener.select_next_some() => {
+                notification_id = committer_listener.select_next_some() => {
                     // Commit the executed chunk
                     match chunk_executor.commit_chunk() {
                         Ok((events, transactions)) => {
                             let commit_notification = CommitNotification::new(events, transactions);
                             if let Err(error) = commit_notification_sender.send(commit_notification).await {
-                                error!("Failed to send commit notification! Error: {:?}", error);
+                                let error = format!("Failed to send commit notification! Error: {:?}", error);
+                                send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
                             }
                         }
                         Err(error) => {
-                            error!("Failed to commit executed chunk! Error: {:?}", error);
+                            let error = format!("Failed to commit executed chunk! Error: {:?}", error);
+                            send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
                         }
                     };
-                    decrement_atomic(pending_transaction_chunks.clone())
+                    decrement_atomic(pending_transaction_chunks.clone());
                 }
             }
         }
@@ -289,4 +311,23 @@ fn increment_atomic(atomic_u64: Arc<AtomicU64>) {
 /// Decrements the given atomic u64
 fn decrement_atomic(atomic_u64: Arc<AtomicU64>) {
     atomic_u64.fetch_sub(1, Ordering::Relaxed);
+}
+
+/// Sends an error notification to the notification listener
+async fn send_storage_synchronizer_error(
+    mut error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
+    notification_id: NotificationId,
+    error_message: String,
+) {
+    let error_message = format!("Storage synchronizer error: {:?}", error_message);
+    error!("{:?}", error_message);
+
+    // Send an error notification
+    let error_notification = ErrorNotification {
+        error: Error::UnexpectedError(error_message),
+        notification_id,
+    };
+    if let Err(error) = error_notification_sender.send(error_notification).await {
+        panic!("Failed to send error notification! Error: {:?}", error);
+    }
 }
