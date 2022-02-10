@@ -86,7 +86,7 @@ pub(crate) fn verify_payload_change<'a>(
 
     let output = {
         let txn_replay = DiemDebugger::new(validator);
-        txn_replay.execute_writeset_at_version(block_height, payload, false)?
+        txn_replay.execute_writeset_at_version(block_height + 1, payload, false)?
     };
 
     if output.status() != &TransactionStatus::Keep(KeptVMStatus::Executed) {

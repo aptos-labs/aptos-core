@@ -100,7 +100,7 @@ pub(crate) fn create_release_from_artifact(
     let modules_payload = create_release_writeset(&remote_modules, release_modules)?;
 
     Ok(if let Some(updated_diem_version) = artifact.diem_version {
-        let state_view = DebuggerStateView::new(&remote, artifact.version);
+        let state_view = DebuggerStateView::new(&remote, Some(artifact.version));
         let (updated_version_writeset, events) = build_changeset(&state_view, |session| {
             session.set_diem_version(updated_diem_version);
         })

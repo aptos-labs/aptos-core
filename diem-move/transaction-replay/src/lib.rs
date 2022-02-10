@@ -63,7 +63,7 @@ impl DiemDebugger {
         version: Version,
         txns: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>> {
-        let state_view = DebuggerStateView::new(&*self.debugger, version);
+        let state_view = DebuggerStateView::new(&*self.debugger, version.checked_sub(1));
         DiemVM::execute_block(txns, &state_view)
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
     }
@@ -125,12 +125,15 @@ impl DiemDebugger {
         payload: &WriteSetPayload,
         save_write_set: bool,
     ) -> Result<TransactionOutput> {
-        let state_view = DebuggerStateView::new(&*self.debugger, version + 1);
+        let base_version = version
+            .checked_sub(1)
+            .ok_or_else(|| anyhow!("Can't run a write set transaction without genesis."))?;
+        let state_view = DebuggerStateView::new(&*self.debugger, Some(base_version));
         let vm = DiemVM::new(&state_view);
         let cache = diem_vm::data_cache::StateViewCache::new(&state_view);
         let sequence_number = match self
             .debugger
-            .get_account_state_by_version(diem_root_address(), version)?
+            .get_account_state_by_version(diem_root_address(), base_version)?
         {
             Some(account) => account
                 .get_account_resource()?
@@ -239,7 +242,7 @@ impl DiemDebugger {
 
     pub fn annotate_events(&self, events: &[EventWithProof]) -> Result<Vec<AnnotatedMoveStruct>> {
         let version = self.debugger.get_latest_version()?;
-        let state_view = DebuggerStateView::new(&*self.debugger, version);
+        let state_view = DebuggerStateView::new(&*self.debugger, Some(version));
         let remote_storage = RemoteStorage::new(&state_view);
         let annotator = DiemValueAnnotator::new(&remote_storage);
         let mut events_data = vec![];
@@ -262,7 +265,7 @@ impl DiemDebugger {
         version: Version,
         save_write_sets: bool,
     ) -> Result<Option<AnnotatedAccountStateBlob>> {
-        let state_view = DebuggerStateView::new(&*self.debugger, version);
+        let state_view = DebuggerStateView::new(&*self.debugger, Some(version));
         let remote_storage = RemoteStorage::new(&state_view);
         let annotator = DiemValueAnnotator::new(&remote_storage);
         Ok(
@@ -287,7 +290,7 @@ impl DiemDebugger {
         save_write_sets: bool,
     ) -> Result<Vec<(AccountAddress, AnnotatedAccountStateBlob)>> {
         let accounts = self.debugger.get_admin_accounts(version)?;
-        let state_view = DebuggerStateView::new(&*self.debugger, version);
+        let state_view = DebuggerStateView::new(&*self.debugger, Some(version));
         let remote_storage = RemoteStorage::new(&state_view);
         let annotator = DiemValueAnnotator::new(&remote_storage);
 
@@ -323,7 +326,7 @@ impl DiemDebugger {
         F: FnOnce(&mut Session<DeltaStorage<RemoteStorage<DebuggerStateView>>>) -> VMResult<()>,
     {
         let move_vm = MoveVM::new(diem_vm::natives::diem_natives()).unwrap();
-        let state_view = DebuggerStateView::new(&*self.debugger, version);
+        let state_view = DebuggerStateView::new(&*self.debugger, version.checked_sub(1));
         let state_view_storage = RemoteStorage::new(&state_view);
         let move_changes = override_changeset.unwrap_or_else(MoveChanges::new);
         let remote_storage = DeltaStorage::new(&state_view_storage, &move_changes);

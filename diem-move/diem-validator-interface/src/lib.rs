@@ -102,29 +102,27 @@ pub trait DiemValidatorInterface: Sync {
 
 pub struct DebuggerStateView<'a> {
     db: &'a dyn DiemValidatorInterface,
-    version: Version,
+    version: Option<Version>,
 }
 
 impl<'a> DebuggerStateView<'a> {
-    pub fn new(db: &'a dyn DiemValidatorInterface, version: Version) -> Self {
+    pub fn new(db: &'a dyn DiemValidatorInterface, version: Option<Version>) -> Self {
         Self { db, version }
     }
 }
 
 impl<'a> StateView for DebuggerStateView<'a> {
     fn get(&self, access_path: &AccessPath) -> Result<Option<Vec<u8>>> {
-        if self.version == 0 {
-            return Ok(None);
-        }
-        Ok(
-            match self
+        match self.version {
+            None => Ok(None),
+            Some(ver) => match self
                 .db
-                .get_account_state_by_version(access_path.address, self.version - 1)?
+                .get_account_state_by_version(access_path.address, ver)?
             {
-                Some(blob) => blob.get(&access_path.path).cloned(),
-                None => None,
+                Some(blob) => Ok(blob.get(&access_path.path).cloned()),
+                None => Ok(None),
             },
-        )
+        }
     }
 
     fn is_genesis(&self) -> bool {
