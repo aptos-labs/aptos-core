@@ -48,6 +48,15 @@ pub struct Options {
     ///   (json is unsupported, exists for compatibility with the default test harness)
     #[structopt(long, possible_values = &Format::variants(), default_value, case_insensitive = true)]
     format: Format,
+    #[structopt(short = "Z")]
+    /// NO-OP: unsupported option, exists for compatibility with the default test harness
+    /// -Z unstable-options Enable nightly-only flags:
+    ///                     unstable-options = Allow use of experimental features
+    z_unstable_options: Option<String>,
+    #[structopt(long)]
+    /// NO-OP: unsupported option, exists for compatibility with the default test harness
+    /// Show captured stdout of successful tests
+    show_output: bool,
 }
 
 impl Options {
