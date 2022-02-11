@@ -4778,6 +4778,7 @@ based on the conditions checked in the prologue, should never fail.
     <b>let</b> gas_used = txn_max_gas_units - gas_units_remaining;
     <b>let</b> transaction_fee_amount = txn_gas_price * gas_used;
     <b>let</b> coin = <b>global</b>&lt;<a href="DiemAccount.md#0x1_DiemAccount_Balance">Balance</a>&lt;Token&gt;&gt;(sender).coin;
+    <b>ensures</b> <b>global</b>&lt;<a href="DiemAccount.md#0x1_DiemAccount">DiemAccount</a>&gt;(sender).sequence_number == <b>old</b>(<b>global</b>&lt;<a href="DiemAccount.md#0x1_DiemAccount">DiemAccount</a>&gt;(sender).sequence_number) + 1;
     <b>include</b> (transaction_fee_amount &gt; 0) ==&gt; <a href="TransactionFee.md#0x1_TransactionFee_PayFeeEnsures">TransactionFee::PayFeeEnsures</a>&lt;Token&gt;{coin: <a href="Diem.md#0x1_Diem">Diem</a>&lt;Token&gt;{value: transaction_fee_amount}};
 }
 </code></pre>

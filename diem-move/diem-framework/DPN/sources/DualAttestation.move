@@ -500,6 +500,7 @@ module DiemFramework::DualAttestation {
         let initial_limit = INITIAL_DUAL_ATTESTATION_LIMIT * Diem::spec_scaling_factor<XDX>();
         aborts_if initial_limit > MAX_U64 with Errors::LIMIT_EXCEEDED;
         include Diem::AbortsIfNoCurrency<XDX>; // for scaling_factor.
+        ensures global<Limit>(@DiemRoot).micro_xdx_limit == initial_limit;
     }
 
     /// Return the current dual attestation limit in microdiem

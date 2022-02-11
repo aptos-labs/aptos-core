@@ -1280,6 +1280,7 @@ Travel rule limit set during genesis
 <b>let</b> initial_limit = <a href="DualAttestation.md#0x1_DualAttestation_INITIAL_DUAL_ATTESTATION_LIMIT">INITIAL_DUAL_ATTESTATION_LIMIT</a> * <a href="Diem.md#0x1_Diem_spec_scaling_factor">Diem::spec_scaling_factor</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;();
 <b>aborts_if</b> initial_limit &gt; <a href="DualAttestation.md#0x1_DualAttestation_MAX_U64">MAX_U64</a> <b>with</b> Errors::LIMIT_EXCEEDED;
 <b>include</b> <a href="Diem.md#0x1_Diem_AbortsIfNoCurrency">Diem::AbortsIfNoCurrency</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;;
+<b>ensures</b> <b>global</b>&lt;<a href="DualAttestation.md#0x1_DualAttestation_Limit">Limit</a>&gt;(@DiemRoot).micro_xdx_limit == initial_limit;
 </code></pre>
 
 

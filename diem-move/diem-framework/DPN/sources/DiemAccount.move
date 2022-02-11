@@ -2191,6 +2191,7 @@ module DiemFramework::DiemAccount {
         let gas_used = txn_max_gas_units - gas_units_remaining;
         let transaction_fee_amount = txn_gas_price * gas_used;
         let coin = global<Balance<Token>>(sender).coin;
+        ensures global<DiemAccount>(sender).sequence_number == old(global<DiemAccount>(sender).sequence_number) + 1;
         include (transaction_fee_amount > 0) ==> TransactionFee::PayFeeEnsures<Token>{coin: Diem<Token>{value: transaction_fee_amount}};
     }
 
