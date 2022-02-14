@@ -14,7 +14,9 @@ use diem_types::{
     account_address::{AccountAddress, HashAccountAddress},
     account_state::AccountState,
     account_state_blob::AccountStateBlob,
+    contract_event::ContractEvent,
     epoch_state::EpochState,
+    event::EventKey,
     nibble::nibble_path::NibblePath,
     on_chain_config,
     proof::accumulator::InMemoryAccumulator,
@@ -24,12 +26,14 @@ use diem_types::{
     write_set::{WriteOp, WriteSet},
 };
 use executor_types::{ExecutedChunk, ExecutedTrees, ProofReader, TransactionData};
+use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use scratchpad::SparseMerkleTree;
 use std::{
     collections::{hash_map, HashMap, HashSet},
     convert::TryFrom,
     iter::repeat,
+    ops::Deref,
     sync::Arc,
 };
 use storage_interface::state_view::StateCache;
@@ -77,25 +81,21 @@ impl ApplyChunkOutput {
 
     fn sort_transactions(
         mut transactions: Vec<Transaction>,
-        mut transaction_outputs: Vec<TransactionOutput>,
+        transaction_outputs: Vec<TransactionOutput>,
     ) -> Result<(
         bool,
         Vec<TransactionStatus>,
-        Vec<(Transaction, TransactionOutput)>,
+        Vec<(Transaction, ParsedTransactionOutput)>,
         Vec<Transaction>,
         Vec<Transaction>,
     )> {
         let num_txns = transactions.len();
-        // See if there's a new epoch started
-        let new_epoch_event_key = on_chain_config::new_epoch_event_key();
+        let mut transaction_outputs: Vec<ParsedTransactionOutput> =
+            transaction_outputs.into_iter().map(Into::into).collect();
+        // N.B. off-by-1 intentionally, for exclusive index
         let new_epoch_marker = transaction_outputs
             .iter()
-            .position(|o| {
-                o.events()
-                    .iter()
-                    .any(|event| *event.key() == new_epoch_event_key)
-            })
-            // Off by one for exclusive index.
+            .position(|o| o.is_reconfig())
             .map(|idx| idx + 1);
 
         // Transactions after the epoch ending are all to be retried.
@@ -118,7 +118,7 @@ impl ApplyChunkOutput {
         // Separate transactions with the Keep status out.
         let (to_keep, to_discard) =
             itertools::zip_eq(transactions.into_iter(), transaction_outputs.into_iter())
-                .partition::<Vec<(Transaction, TransactionOutput)>, _>(|(_, o)| {
+                .partition::<Vec<(Transaction, ParsedTransactionOutput)>, _>(|(_, o)| {
                     matches!(o.status(), TransactionStatus::Keep(_))
                 });
 
@@ -156,7 +156,7 @@ impl ApplyChunkOutput {
     fn apply_write_set(
         state_cache: StateCache,
         new_epoch: bool,
-        to_keep: &[(Transaction, TransactionOutput)],
+        to_keep: &[(Transaction, ParsedTransactionOutput)],
     ) -> Result<(
         Vec<HashMap<AccountAddress, AccountStateBlob>>,
         Vec<(HashValue, HashMap<NibblePath, HashValue>)>,
@@ -249,7 +249,7 @@ impl ApplyChunkOutput {
     }
 
     fn assemble_ledger_diff(
-        to_keep: Vec<(Transaction, TransactionOutput)>,
+        to_keep: Vec<(Transaction, ParsedTransactionOutput)>,
         account_blobs: Vec<HashMap<AccountAddress, AccountStateBlob>>,
         roots_with_node_hashes: Vec<(HashValue, HashMap<NibblePath, HashValue>)>,
     ) -> (Vec<(Transaction, TransactionData)>, Vec<HashValue>) {
@@ -259,18 +259,18 @@ impl ApplyChunkOutput {
             to_keep,
             itertools::zip_eq(roots_with_node_hashes, account_blobs),
         ) {
+            let (write_set, events, reconfig_events, gas_used, status) = txn_output.unpack();
             let event_tree = {
-                let event_hashes: Vec<_> =
-                    txn_output.events().iter().map(CryptoHash::hash).collect();
+                let event_hashes: Vec<_> = events.iter().map(CryptoHash::hash).collect();
                 InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes)
             };
 
-            let txn_info = match txn_output.status() {
+            let txn_info = match &status {
                 TransactionStatus::Keep(status) => TransactionInfo::new(
                     txn.hash(),
                     state_tree_hash,
                     event_tree.root_hash(),
-                    txn_output.gas_used(),
+                    gas_used,
                     status.clone(),
                 ),
                 _ => unreachable!("Transaction sorted by status already."),
@@ -283,12 +283,12 @@ impl ApplyChunkOutput {
                 TransactionData::new(
                     blobs,
                     new_node_hashes,
-                    txn_output.write_set().clone(),
-                    txn_output.events().to_vec(),
-                    txn_output.status().clone(),
-                    state_tree_hash,
+                    write_set,
+                    events,
+                    reconfig_events,
+                    status,
                     Arc::new(event_tree),
-                    txn_output.gas_used(),
+                    gas_used,
                     txn_info,
                     txn_info_hash,
                 ),
@@ -366,4 +366,58 @@ fn update_account_state(account_state: &mut AccountState, path: Vec<u8>, write_o
         WriteOp::Value(new_value) => account_state.insert(path, new_value),
         WriteOp::Deletion => account_state.remove(&path),
     };
+}
+
+static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_epoch_event_key);
+
+struct ParsedTransactionOutput {
+    output: TransactionOutput,
+    reconfig_events: Vec<ContractEvent>,
+}
+
+impl From<TransactionOutput> for ParsedTransactionOutput {
+    fn from(output: TransactionOutput) -> Self {
+        let reconfig_events = output
+            .events()
+            .iter()
+            .filter(|e| *e.key() == *NEW_EPOCH_EVENT_KEY)
+            .cloned()
+            .collect();
+        Self {
+            output,
+            reconfig_events,
+        }
+    }
+}
+
+impl Deref for ParsedTransactionOutput {
+    type Target = TransactionOutput;
+
+    fn deref(&self) -> &Self::Target {
+        &self.output
+    }
+}
+
+impl ParsedTransactionOutput {
+    fn is_reconfig(&self) -> bool {
+        !self.reconfig_events.is_empty()
+    }
+
+    pub fn unpack(
+        self,
+    ) -> (
+        WriteSet,
+        Vec<ContractEvent>,
+        Vec<ContractEvent>,
+        u64,
+        TransactionStatus,
+    ) {
+        let Self {
+            output,
+            reconfig_events,
+        } = self;
+        let (write_set, events, gas_used, status) = output.unpack();
+
+        (write_set, events, reconfig_events, gas_used, status)
+    }
 }

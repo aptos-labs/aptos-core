@@ -10,7 +10,6 @@ use diem_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config,
     proof::accumulator::InMemoryAccumulator,
     transaction::{Transaction, TransactionInfo, TransactionStatus, TransactionToCommit},
 };
@@ -169,7 +168,6 @@ impl ExecutedChunk {
         &self,
         parent_accumulator: &Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
     ) -> StateComputeResult {
-        let new_epoch_event_key = on_chain_config::new_epoch_event_key();
         let txn_accu = self.result_view.txn_accumulator();
 
         let mut transaction_info_hashes = Vec::new();
@@ -177,13 +175,7 @@ impl ExecutedChunk {
 
         for (_, txn_data) in &self.to_commit {
             transaction_info_hashes.push(txn_data.txn_info_hash());
-            reconfig_events.extend(
-                txn_data
-                    .events()
-                    .iter()
-                    .filter(|e| *e.key() == new_epoch_event_key)
-                    .cloned(),
-            )
+            reconfig_events.extend(txn_data.reconfig_events.iter().cloned())
         }
 
         StateComputeResult::new(

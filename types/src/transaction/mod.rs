@@ -967,6 +967,16 @@ impl TransactionOutput {
     pub fn status(&self) -> &TransactionStatus {
         &self.status
     }
+
+    pub fn unpack(self) -> (WriteSet, Vec<ContractEvent>, u64, TransactionStatus) {
+        let Self {
+            write_set,
+            events,
+            gas_used,
+            status,
+        } = self;
+        (write_set, events, gas_used, status)
+    }
 }
 
 /// `TransactionInfo` is the object we store in the transaction accumulator. It consists of the

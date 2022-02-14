@@ -423,11 +423,11 @@ pub struct TransactionData {
     /// The list of events emitted during this transaction.
     events: Vec<ContractEvent>,
 
+    /// List of reconfiguration events emitted during this transaction.
+    reconfig_events: Vec<ContractEvent>,
+
     /// The execution status set by the VM.
     status: TransactionStatus,
-
-    /// Root hash of the state tree.
-    state_root_hash: HashValue,
 
     /// The in-memory Merkle Accumulator that has all events emitted by this transaction.
     event_tree: Arc<InMemoryAccumulator<EventAccumulatorHasher>>,
@@ -448,8 +448,8 @@ impl TransactionData {
         jf_node_hashes: HashMap<NibblePath, HashValue>,
         write_set: WriteSet,
         events: Vec<ContractEvent>,
+        reconfig_events: Vec<ContractEvent>,
         status: TransactionStatus,
-        state_root_hash: HashValue,
         event_tree: Arc<InMemoryAccumulator<EventAccumulatorHasher>>,
         gas_used: u64,
         txn_info: TransactionInfo,
@@ -460,8 +460,8 @@ impl TransactionData {
             jf_node_hashes,
             write_set,
             events,
+            reconfig_events,
             status,
-            state_root_hash,
             event_tree,
             gas_used,
             txn_info,
@@ -487,10 +487,6 @@ impl TransactionData {
 
     pub fn status(&self) -> &TransactionStatus {
         &self.status
-    }
-
-    pub fn state_root_hash(&self) -> HashValue {
-        self.state_root_hash
     }
 
     pub fn event_root_hash(&self) -> HashValue {
