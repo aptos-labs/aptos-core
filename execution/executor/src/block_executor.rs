@@ -70,45 +70,48 @@ where
             .pop()
             .expect("Must exist.")
             .ok_or(Error::BlockNotFound(parent_block_id))?;
-        let parent_accumulator = parent_block.output.result_view.txn_accumulator();
+        let parent_output = &parent_block.output;
+        let parent_view = &parent_output.result_view;
+        let parent_accumulator = parent_view.txn_accumulator();
+
         if let Some(b) = block_vec.pop().expect("Must exist") {
             // this is a retry
             return Ok(b.output.as_state_compute_result(parent_accumulator));
         }
 
-        let output =
-            if parent_block_id != committed_block.id && parent_block.output.has_reconfiguration() {
-                info!(
-                    LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
-                    "reconfig_descendant_block_received"
-                );
-                parent_block.output.reconfig_suffix()
-            } else {
-                info!(
-                    LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
-                    "execute_block"
-                );
-                let _timer = DIEM_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
-                let state_view = parent_block.output.result_view.state_view(
-                    &committed_block.output.result_view,
-                    StateViewId::BlockExecution { block_id },
-                    self.db.reader.clone(),
-                );
+        let output = if parent_block_id != committed_block.id && parent_output.has_reconfiguration()
+        {
+            info!(
+                LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+                "reconfig_descendant_block_received"
+            );
+            parent_output.reconfig_suffix()
+        } else {
+            info!(
+                LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+                "execute_block"
+            );
+            let _timer = DIEM_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
+            let state_view = parent_view.state_view(
+                &committed_block.output.result_view,
+                StateViewId::BlockExecution { block_id },
+                self.db.reader.clone(),
+            );
 
-                let chunk_output = {
-                    let _timer = DIEM_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();
-                    fail_point!("executor::vm_execute_block", |_| {
-                        Err(Error::from(anyhow::anyhow!(
-                            "Injected error in vm_execute_block"
-                        )))
-                    });
-                    ChunkOutput::by_transaction_execution::<V>(transactions, state_view)?
-                };
-                chunk_output.trace_log_transaction_status();
-
-                let (output, _, _) = chunk_output.apply_to_ledger(parent_accumulator)?;
-                output
+            let chunk_output = {
+                let _timer = DIEM_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();
+                fail_point!("executor::vm_execute_block", |_| {
+                    Err(Error::from(anyhow::anyhow!(
+                        "Injected error in vm_execute_block"
+                    )))
+                });
+                ChunkOutput::by_transaction_execution::<V>(transactions, state_view)?
             };
+            chunk_output.trace_log_transaction_status();
+
+            let (output, _, _) = chunk_output.apply_to_ledger(parent_accumulator)?;
+            output
+        };
 
         let block = self
             .block_tree
