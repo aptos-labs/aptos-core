@@ -4,6 +4,7 @@
 use crate::{
     block_executor::BlockExecutor,
     chunk_executor::ChunkExecutor,
+    components::chunk_output::ChunkOutput,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
     mock_vm::{
         encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
@@ -11,6 +12,7 @@ use crate::{
     },
 };
 use diem_crypto::HashValue;
+use diem_state_view::StateViewId;
 use diem_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -18,7 +20,7 @@ use diem_types::{
     transaction::{Transaction, TransactionListWithProof, TransactionStatus, Version},
 };
 use diemdb::DiemDB;
-use executor_types::{BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer};
+use executor_types::{BlockExecutorTrait, ChunkExecutorTrait, ExecutedTrees, TransactionReplayer};
 use proptest::prelude::*;
 use std::collections::BTreeMap;
 use storage_interface::DbReaderWriter;
@@ -336,38 +338,30 @@ impl TestBlock {
     }
 }
 
-// Executes a list of transactions by executing and immediately commtting one at a time. Returns
+// Executes a list of transactions by executing and immediately committing one at a time. Returns
 // the root hash after all transactions are committed.
 fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
     let executor = TestExecutor::new();
-    let mut parent_block_id = executor.committed_block_id();
+    let db = &executor.db;
+    let mut ledger_view: ExecutedTrees = executor.db.reader.get_latest_tree_state().unwrap().into();
 
-    let mut iter = transactions.into_iter();
-    let first_txn = iter.next().map_or(vec![], |txn| vec![txn]);
-    let first_block_id = gen_block_id(1);
-    let mut root_hash = executor
-        .execute_block((first_block_id, first_txn.clone()), parent_block_id)
-        .unwrap()
-        .root_hash();
-    let ledger_info = gen_ledger_info(first_txn.len() as u64, root_hash, first_block_id, 0);
-    executor
-        .commit_blocks(vec![first_block_id], ledger_info)
+    for txn in transactions {
+        let out = ChunkOutput::by_transaction_execution::<MockVM>(
+            vec![txn],
+            ledger_view.state_view(&ledger_view, StateViewId::Miscellaneous, db.reader.clone()),
+        )
         .unwrap();
-    parent_block_id = first_block_id;
-
-    for (i, txn) in iter.enumerate() {
-        // when i = 0, id should be 2.
-        let id = gen_block_id(i as u64 + 2);
-        root_hash = executor
-            .execute_block((id, vec![txn.clone()]), parent_block_id)
-            .unwrap()
-            .root_hash();
-
-        let ledger_info = gen_ledger_info(i as u64 + 2, root_hash, id, i as u64 + 1);
-        executor.commit_blocks(vec![id], ledger_info).unwrap();
-        parent_block_id = id;
+        let (executed, _, _) = out.apply_to_ledger(ledger_view.txn_accumulator()).unwrap();
+        db.writer
+            .save_transactions(
+                &executed.transactions_to_commit().unwrap(),
+                ledger_view.txn_accumulator().num_leaves(),
+                None,
+            )
+            .unwrap();
+        ledger_view = executed.result_view;
     }
-    root_hash
+    ledger_view.txn_accumulator().root_hash()
 }
 
 proptest! {
