@@ -315,7 +315,7 @@ fn test_noop_block_after_reconfiguration() {
         .execute_block((first_block_id, vec![first_txn]), parent_block_id)
         .unwrap();
     parent_block_id = first_block_id;
-    let second_block = TestBlock::new(0..10, 10, gen_block_id(2));
+    let second_block = TestBlock::new(10, 10, gen_block_id(2));
     let output2 = executor
         .execute_block((second_block.id, second_block.txns), parent_block_id)
         .unwrap();
@@ -328,13 +328,17 @@ struct TestBlock {
 }
 
 impl TestBlock {
-    fn new(addr_index: std::ops::Range<u64>, amount: u32, id: HashValue) -> Self {
+    fn new(num_user_txns: u64, amount: u32, id: HashValue) -> Self {
         TestBlock {
-            txns: addr_index
+            txns: (0..num_user_txns)
                 .map(|index| encode_mint_transaction(gen_address(index), u64::from(amount)))
                 .collect(),
             id,
         }
+    }
+
+    fn len(&self) -> u64 {
+        self.txns.len() as u64
     }
 }
 
@@ -377,9 +381,9 @@ proptest! {
         // Genesis -> A -> B
         //            |
         //            └--> C
-        let block_a = TestBlock::new(0..a_size, amount, gen_block_id(1));
-        let block_b = TestBlock::new(0..b_size, amount, gen_block_id(2));
-        let block_c = TestBlock::new(0..c_size, amount, gen_block_id(3));
+        let block_a = TestBlock::new(a_size, amount, gen_block_id(1));
+        let block_b = TestBlock::new(b_size, amount, gen_block_id(2));
+        let block_c = TestBlock::new(c_size, amount, gen_block_id(3));
         // Execute block A, B and C. Hold all results in memory.
         let executor = TestExecutor::new();
         let parent_block_id = executor.committed_block_id();
@@ -388,11 +392,11 @@ proptest! {
             (block_a.id, block_a.txns.clone()), parent_block_id
         ).unwrap();
         let root_hash_a = output_a.root_hash();
-        prop_assert_eq!(output_a.version(), a_size);
+        prop_assert_eq!(output_a.version(), block_a.len());
         let output_b = executor.execute_block((block_b.id, block_b.txns.clone()), block_a.id).unwrap();
-        prop_assert_eq!(output_b.version(), a_size + b_size);
+        prop_assert_eq!(output_b.version(), block_a.len() + block_b.len());
         let output_c = executor.execute_block((block_c.id, block_c.txns.clone()), block_a.id).unwrap();
-        prop_assert_eq!(output_c.version(), a_size + c_size);
+        prop_assert_eq!(output_c.version(), block_a.len() + block_c.len());
 
         let root_hash_b = output_b.root_hash();
         let root_hash_c = output_c.root_hash();
@@ -427,7 +431,7 @@ proptest! {
             )
         })) {
             let block_id = gen_block_id(1);
-            let mut block = TestBlock::new(0..num_txns, 10, block_id);
+            let mut block = TestBlock::new(num_txns, 10, block_id);
             block.txns[reconfig_txn_index as usize] = encode_reconfiguration_transaction(gen_address(reconfig_txn_index));
             let executor = TestExecutor::new();
 
@@ -475,8 +479,8 @@ proptest! {
 
     #[test]
     fn test_executor_restart(a_size in 1..30u64, b_size in 1..30u64, amount in any::<u32>()) {
-        let block_a = TestBlock::new(0..a_size, amount, gen_block_id(1));
-        let block_b = TestBlock::new(0..b_size, amount, gen_block_id(2));
+        let block_a = TestBlock::new(a_size, amount, gen_block_id(1));
+        let block_b = TestBlock::new(b_size, amount, gen_block_id(2));
 
         let TestExecutor { _path, db, executor } = TestExecutor::new();
         let mut parent_block_id;
