@@ -4,8 +4,7 @@
 use super::*;
 #[allow(unused_imports)]
 use crate::{
-    schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    test_helper::{arb_blocks_to_commit, arb_mock_genesis},
+    schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema, test_helper::arb_blocks_to_commit,
 };
 use diem_crypto::hash::CryptoHash;
 #[allow(unused_imports)]

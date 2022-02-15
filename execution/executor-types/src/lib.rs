@@ -391,6 +391,10 @@ impl ProofReader {
     pub fn new(account_to_proof: HashMap<HashValue, SparseMerkleProof>) -> Self {
         ProofReader { account_to_proof }
     }
+
+    pub fn new_empty() -> Self {
+        Self::new(HashMap::new())
+    }
 }
 
 impl ProofRead<AccountStateBlob> for ProofReader {

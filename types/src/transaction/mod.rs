@@ -993,6 +993,17 @@ impl TransactionInfo {
             status,
         ))
     }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_placeholder(gas_used: u64, status: KeptVMStatus) -> Self {
+        Self::new(
+            HashValue::default(),
+            HashValue::default(),
+            HashValue::default(),
+            gas_used,
+            status,
+        )
+    }
 }
 
 impl Deref for TransactionInfo {

@@ -850,17 +850,9 @@ impl TransactionToCommitGen {
             })
             .collect();
 
-        let txn_info = TransactionInfo::new(
-            HashValue::default(),
-            HashValue::default(),
-            HashValue::default(),
-            self.gas_used,
-            self.status,
-        );
-
         TransactionToCommit::new(
             Transaction::UserTransaction(transaction),
-            txn_info,
+            TransactionInfo::new_placeholder(self.gas_used, self.status),
             account_states,
             None,
             self.write_set,
@@ -1105,6 +1097,51 @@ impl LedgerInfoGen {
             self.commit_info_gen.materialize(universe, block_size),
             self.consensus_data_hash,
         )
+    }
+}
+
+#[derive(Debug)]
+pub struct BlockGen {
+    txn_gens: Vec<TransactionToCommitGen>,
+    ledger_info_gen: LedgerInfoGen,
+}
+
+impl Arbitrary for BlockGen {
+    type Parameters = usize;
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(max_user_txns: Self::Parameters) -> Self::Strategy {
+        assert!(max_user_txns >= 1);
+        (
+            vec(any::<TransactionToCommitGen>(), 1..=max_user_txns),
+            any::<LedgerInfoGen>(),
+        )
+            .prop_map(|(txn_gens, ledger_info_gen)| Self {
+                txn_gens,
+                ledger_info_gen,
+            })
+            .boxed()
+    }
+}
+
+impl BlockGen {
+    pub fn materialize(
+        self,
+        universe: &mut AccountInfoUniverse,
+    ) -> (Vec<TransactionToCommit>, LedgerInfo) {
+        let mut txns_to_commit = Vec::new();
+
+        // materialize user transactions
+        for txn_gen in self.txn_gens {
+            txns_to_commit.push(txn_gen.materialize(universe));
+        }
+
+        // materialize ledger info
+        let ledger_info = self
+            .ledger_info_gen
+            .materialize(universe, txns_to_commit.len());
+
+        (txns_to_commit, ledger_info)
     }
 }
 

@@ -34,10 +34,12 @@ diem-proptest-helpers = { path = "../../crates/diem-proptest-helpers", optional 
 diem-temppath = { path = "../../crates/diem-temppath", optional = true }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+executor-types = { path = "../../execution/executor-types", optional = true }
 move-core-types = {git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860"}
 
 num-variants = { path = "../../crates/num-variants" }
 schemadb = { path = "../schemadb" }
+scratchpad = { path = "../scratchpad", optional = true }
 storage-interface = { path = "../storage-interface" }
 
 [dev-dependencies]
@@ -49,9 +51,11 @@ diem-jellyfish-merkle = { path = "../jellyfish-merkle", features = ["fuzzing"] }
 diem-proptest-helpers = { path = "../../crates/diem-proptest-helpers" }
 diem-temppath = { path = "../../crates/diem-temppath" }
 diem-types = { path = "../../types", features = ["fuzzing"] }
+executor-types = { path = "../../execution/executor-types", features = ["fuzzing"] }
 schemadb = { path = "../schemadb", features = ["fuzzing"] }
+scratchpad = { path = "../scratchpad", features = ["fuzzing"] }
 
 [features]
 default = []
 diemsum = []
-fuzzing = ["proptest", "proptest-derive", "diem-proptest-helpers", "diem-temppath", "diem-crypto/fuzzing", "diem-jellyfish-merkle/fuzzing", "diem-types/fuzzing", "schemadb/fuzzing"]
+fuzzing = ["proptest", "proptest-derive", "diem-proptest-helpers", "diem-temppath", "diem-crypto/fuzzing", "diem-jellyfish-merkle/fuzzing", "diem-types/fuzzing", "executor-types/fuzzing", "schemadb/fuzzing", "scratchpad/fuzzing"]

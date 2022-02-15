@@ -20,7 +20,9 @@ use super::MerkleTreeInternalNode;
 use crate::proof::definition::{LeafCount, MAX_ACCUMULATOR_LEAVES};
 use anyhow::{ensure, format_err, Result};
 use diem_crypto::{
-    hash::{CryptoHash, CryptoHasher, ACCUMULATOR_PLACEHOLDER_HASH},
+    hash::{
+        CryptoHash, CryptoHasher, ACCUMULATOR_PLACEHOLDER_HASH, SPARSE_MERKLE_PLACEHOLDER_HASH,
+    },
     HashValue,
 };
 use serde::{Deserialize, Serialize};
@@ -78,6 +80,15 @@ where
             root_hash,
             phantom: PhantomData,
         })
+    }
+
+    pub fn new_empty() -> Self {
+        Self {
+            frozen_subtree_roots: Vec::new(),
+            num_leaves: 0,
+            root_hash: *SPARSE_MERKLE_PLACEHOLDER_HASH,
+            phantom: PhantomData,
+        }
     }
 
     /// Constructs a new accumulator with given leaves.

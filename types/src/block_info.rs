@@ -191,6 +191,11 @@ impl BlockInfo {
             && self.executed_state_id == *ACCUMULATOR_PLACEHOLDER_HASH
             && self.version == 0
     }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn set_executed_state_id(&mut self, id: HashValue) {
+        self.executed_state_id = id
+    }
 }
 
 impl Display for BlockInfo {

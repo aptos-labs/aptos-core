@@ -127,6 +127,11 @@ impl LedgerInfo {
     pub fn set_consensus_data_hash(&mut self, consensus_data_hash: HashValue) {
         self.consensus_data_hash = consensus_data_hash;
     }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn set_executed_state_id(&mut self, id: HashValue) {
+        self.commit_info.set_executed_state_id(id)
+    }
 }
 
 /// Wrapper around LedgerInfoWithScheme to support future upgrades, this is the data being persisted.
