@@ -111,30 +111,12 @@ impl VerifiedStateView {
         }
     }
 
-    pub fn unpack_after_execution(
-        self,
-    ) -> (
-        HashMap<AccountAddress, AccountState>,
-        HashMap<HashValue, SparseMerkleProof<AccountStateBlob>>,
-        FrozenSparseMerkleTree<AccountStateBlob>,
-    ) {
-        (
-            self.account_to_state_cache.into_inner(),
-            self.account_to_proof_cache.into_inner(),
-            self.speculative_state,
-        )
-    }
-}
-
-impl From<VerifiedStateView>
-    for (
-        HashMap<AccountAddress, AccountState>,
-        HashMap<HashValue, SparseMerkleProof<AccountStateBlob>>,
-        FrozenSparseMerkleTree<AccountStateBlob>,
-    )
-{
-    fn from(view: VerifiedStateView) -> Self {
-        view.unpack_after_execution()
+    pub fn into_state_cache(self) -> StateCache {
+        StateCache {
+            frozen_base: self.speculative_state,
+            accounts: self.account_to_state_cache.into_inner(),
+            proofs: self.account_to_proof_cache.into_inner(),
+        }
     }
 }
 
@@ -142,18 +124,6 @@ pub struct StateCache {
     pub frozen_base: FrozenSparseMerkleTree<AccountStateBlob>,
     pub accounts: HashMap<AccountAddress, AccountState>,
     pub proofs: HashMap<HashValue, SparseMerkleProof<AccountStateBlob>>,
-}
-
-impl From<VerifiedStateView> for StateCache {
-    fn from(view: VerifiedStateView) -> Self {
-        let (accounts, proofs, frozen_base) = view.unpack_after_execution();
-
-        Self {
-            frozen_base,
-            accounts,
-            proofs,
-        }
-    }
 }
 
 impl StateView for VerifiedStateView {

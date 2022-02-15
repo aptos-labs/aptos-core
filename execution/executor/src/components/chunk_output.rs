@@ -39,7 +39,7 @@ impl ChunkOutput {
         Ok(Self {
             transactions,
             transaction_outputs,
-            state_cache: state_view.into(),
+            state_cache: state_view.into_state_cache(),
         })
     }
 
@@ -67,7 +67,7 @@ impl ChunkOutput {
         Ok(Self {
             transactions,
             transaction_outputs,
-            state_cache: state_view.into(),
+            state_cache: state_view.into_state_cache(),
         })
     }
 
