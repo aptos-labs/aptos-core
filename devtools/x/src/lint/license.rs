@@ -1,9 +1,10 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::HashSet;
 use x_lint::prelude::*;
 
-static LICENSE_HEADER: &str = "Copyright (c) The Diem Core Contributors\n\
+static LICENSE_HEADER: &str = "\
                                SPDX-License-Identifier: Apache-2.0\n\
                                ";
 
@@ -45,12 +46,16 @@ impl ContentLinter for LicenseHeader {
         // Determine if the file is missing the license header
         let missing_header = match file_type {
             FileType::Rust | FileType::Proto => {
-                let maybe_license = content
+                let maybe_license: HashSet<_> = content
                     .lines()
                     .skip_while(|line| line.is_empty())
                     .take(2)
-                    .map(|s| s.trim_start_matches("// "));
-                !LICENSE_HEADER.lines().eq(maybe_license)
+                    .map(|s| s.trim_start_matches("// "))
+                    .collect();
+                !LICENSE_HEADER
+                    .lines()
+                    .collect::<HashSet<_>>()
+                    .is_subset(&maybe_license)
             }
             FileType::Shell => {
                 let maybe_license = content
@@ -58,8 +63,12 @@ impl ContentLinter for LicenseHeader {
                     .skip_while(|line| line.starts_with("#!"))
                     .skip_while(|line| line.is_empty())
                     .take(2)
-                    .map(|s| s.trim_start_matches("# "));
-                !LICENSE_HEADER.lines().eq(maybe_license)
+                    .map(|s| s.trim_start_matches("# "))
+                    .collect();
+                !LICENSE_HEADER
+                    .lines()
+                    .collect::<HashSet<_>>()
+                    .is_subset(&maybe_license)
             }
         };
 
