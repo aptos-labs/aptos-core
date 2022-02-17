@@ -13,7 +13,9 @@ ENV RUSTUP_HOME "/opt/rustup"
 # WORKAROUND for glibc 2.33 and old Docker
 # See https://github.com/actions/virtual-environments/issues/2658
 # Thanks to https://github.com/lxqt/lxqt-panel/pull/1562
-RUN patched_glibc=glibc-linux4-2.33-4-x86_64.pkg.tar.zst && \
+RUN pacman -Sy archlinux-keyring --noconfirm && \
+    rm -rf /etc/pacman.d/gnupg/* && pacman-key --init && pacman-key --populate archlinux && \
+    patched_glibc=glibc-linux4-2.33-4-x86_64.pkg.tar.zst && \
     curl -LO "https://repo.archlinuxcn.org/x86_64/$patched_glibc" && \
     bsdtar -C / -xvf "$patched_glibc" && \
     mkdir -p /github/home && \
