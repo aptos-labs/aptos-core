@@ -6726,29 +6726,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "scratchpad-benchmark"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "byteorder",
- "diem-config",
- "diem-crypto",
- "diem-genesis-tool",
- "diem-infallible",
- "diem-logger",
- "diem-types",
- "diem-workspace-hack",
- "diemdb",
- "executor-types",
- "itertools 0.10.1",
- "rand 0.8.4",
- "rayon",
- "scratchpad",
- "storage-interface",
- "structopt",
-]
-
-[[package]]
 name = "sct"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

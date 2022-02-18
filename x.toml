@@ -182,7 +182,6 @@ members = [
     "language-e2e-testsuite",
     "memsocket",
     "offchain",
-    "scratchpad-benchmark",
     "sdk-compatibility",
     "shuffle",
     "shuffle-custom-move-code",
