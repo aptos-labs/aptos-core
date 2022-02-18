@@ -13,12 +13,12 @@ use diem_config::config::NodeConfig;
 use diem_crypto::{ed25519::Ed25519PrivateKey, Uniform};
 use diem_types::validator_signer::ValidatorSigner;
 use execution_correctness::{ExecutionCorrectness, ExecutionCorrectnessManager};
+use executor::components::apply_chunk_output::IntoLedgerView;
 use executor_test_helpers::start_storage_service;
-use executor_types::ExecutedTrees;
 use std::sync::Arc;
 use storage_interface::DbReader;
 
-fn get_initial_data_and_qc(db: &dyn DbReader) -> (RecoveryData, QuorumCert) {
+fn get_initial_data_and_qc(db: &Arc<dyn DbReader>) -> (RecoveryData, QuorumCert) {
     // find the block corresponding to storage latest ledger info
     let startup_info = db
         .get_startup_info()
@@ -37,7 +37,10 @@ fn get_initial_data_and_qc(db: &dyn DbReader) -> (RecoveryData, QuorumCert) {
         .committed_tree_state
         .ledger_frozen_subtree_hashes
         .clone();
-    let root_executed_trees = ExecutedTrees::from(startup_info.committed_tree_state);
+    let root_executed_trees = startup_info
+        .committed_tree_state
+        .into_ledger_view(db)
+        .expect("Failed to construct committed ledger view.");
     (
         RecoveryData::new(
             None,
@@ -96,7 +99,7 @@ async fn test_executor_restart() {
     let db = db_rw.reader.clone();
     let execution_correctness_manager = ExecutionCorrectnessManager::new(&config, db_rw.clone());
 
-    let (initial_data, qc) = get_initial_data_and_qc(&*db);
+    let (initial_data, qc) = get_initial_data_and_qc(&db);
 
     let mut inserter = build_inserter(
         &config,
@@ -144,7 +147,7 @@ async fn test_block_store_restart() {
     let execution_correctness_manager = ExecutionCorrectnessManager::new(&config, db_rw);
 
     {
-        let (initial_data, qc) = get_initial_data_and_qc(&*db);
+        let (initial_data, qc) = get_initial_data_and_qc(&db);
         let mut inserter = build_inserter(
             &config,
             initial_data,
@@ -169,7 +172,7 @@ async fn test_block_store_restart() {
 
     // Restart block_store
     {
-        let (initial_data, qc) = get_initial_data_and_qc(&*db);
+        let (initial_data, qc) = get_initial_data_and_qc(&db);
         let mut inserter = build_inserter(
             &config,
             initial_data,

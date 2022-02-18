@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::components::chunk_output::ChunkOutput;
+use crate::components::{apply_chunk_output::IntoLedgerView, chunk_output::ChunkOutput};
 use anyhow::{anyhow, ensure, format_err, Result};
 use diem_crypto::HashValue;
 use diem_logger::prelude::*;
@@ -19,7 +19,7 @@ use diem_types::{
     waypoint::Waypoint,
 };
 use diem_vm::VMExecutor;
-use executor_types::{ExecutedChunk, ExecutedTrees};
+use executor_types::ExecutedChunk;
 use move_core_types::move_resource::MoveResource;
 use std::{collections::btree_map::BTreeMap, sync::Arc};
 use storage_interface::{state_view::VerifiedStateView, DbReaderWriter, DbWriter, TreeState};
@@ -109,7 +109,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     // In the very extreme and sad situation of losing quorum among validators, we refer to the
     // second use case said above.
     let genesis_version = tree_state.num_transactions;
-    let base_view: ExecutedTrees = tree_state.into();
+    let base_view = tree_state.into_ledger_view(&db.reader)?;
     let base_state_view =
         base_view.state_view(&base_view, StateViewId::Miscellaneous, db.reader.clone());
 

@@ -4,7 +4,7 @@
 use crate::{
     block_executor::BlockExecutor,
     chunk_executor::ChunkExecutor,
-    components::chunk_output::ChunkOutput,
+    components::{apply_chunk_output::IntoLedgerView, chunk_output::ChunkOutput},
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
     mock_vm::{
         encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
@@ -347,7 +347,12 @@ impl TestBlock {
 fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
     let executor = TestExecutor::new();
     let db = &executor.db;
-    let mut ledger_view: ExecutedTrees = executor.db.reader.get_latest_tree_state().unwrap().into();
+    let mut ledger_view: ExecutedTrees = db
+        .reader
+        .get_latest_tree_state()
+        .unwrap()
+        .into_ledger_view(&db.reader)
+        .unwrap();
 
     for txn in transactions {
         let out = ChunkOutput::by_transaction_execution::<MockVM>(

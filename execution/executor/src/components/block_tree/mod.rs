@@ -6,7 +6,10 @@
 #[cfg(test)]
 mod test;
 
-use crate::logging::{LogEntry, LogSchema};
+use crate::{
+    components::apply_chunk_output::IntoLedgerView,
+    logging::{LogEntry, LogSchema},
+};
 use anyhow::{anyhow, ensure, Result};
 use consensus_types::block::Block as ConsensusBlock;
 use diem_crypto::HashValue;
@@ -216,7 +219,10 @@ impl BlockTree {
             ledger_info.consensus_block_id()
         };
 
-        let result_view = startup_info.committed_tree_state.clone().into();
+        let result_view = startup_info
+            .committed_tree_state
+            .clone()
+            .into_ledger_view(db)?;
         block_lookup.fetch_or_add_block(id, ExecutedChunk::new_empty(result_view), None)
     }
 

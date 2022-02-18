@@ -35,7 +35,7 @@ use diem_types::{
 use scratchpad::ProofRead;
 use serde::{Deserialize, Serialize};
 use std::{cmp::max, collections::HashMap, sync::Arc};
-use storage_interface::{DbReader, TreeState};
+use storage_interface::DbReader;
 
 pub use executed_chunk::ExecutedChunk;
 use storage_interface::state_view::VerifiedStateView;
@@ -295,16 +295,6 @@ pub struct ExecutedTrees {
     /// The in-memory Merkle Accumulator representing a blockchain state consistent with the
     /// `state_tree`.
     transaction_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
-}
-
-impl From<TreeState> for ExecutedTrees {
-    fn from(tree_state: TreeState) -> Self {
-        ExecutedTrees::new(
-            tree_state.account_state_root_hash,
-            tree_state.ledger_frozen_subtree_hashes,
-            tree_state.num_transactions,
-        )
-    }
 }
 
 impl ExecutedTrees {

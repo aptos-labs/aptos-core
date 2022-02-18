@@ -29,7 +29,7 @@ use diem_types::{
 };
 use diem_vm::DiemVM;
 use diemdb::backup::restore_handler::RestoreHandler;
-use executor::chunk_executor::ChunkExecutor;
+use executor::{chunk_executor::ChunkExecutor, components::apply_chunk_output::IntoLedgerView};
 use executor_types::TransactionReplayer;
 use futures::{
     future,
@@ -410,7 +410,9 @@ impl TransactionRestoreBatchController {
         let replay_start = Instant::now();
         let first_version = self.replay_from_version.unwrap();
         let db = DbReaderWriter::from_arc(Arc::clone(&restore_handler.diemdb));
-        let persisted_view = restore_handler.get_tree_state(first_version)?.into();
+        let persisted_view = restore_handler
+            .get_tree_state(first_version)?
+            .into_ledger_view(&db.reader)?;
         let chunk_replayer = Arc::new(ChunkExecutor::<DiemVM>::new_with_view(db, persisted_view));
 
         let db_commit_stream = txns_to_execute_stream

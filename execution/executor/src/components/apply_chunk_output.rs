@@ -36,7 +36,7 @@ use std::{
     ops::Deref,
     sync::Arc,
 };
-use storage_interface::state_view::StateCache;
+use storage_interface::{state_view::StateCache, DbReader, TreeState};
 
 pub struct ApplyChunkOutput;
 
@@ -367,6 +367,20 @@ fn update_account_state(account_state: &mut AccountState, path: Vec<u8>, write_o
         WriteOp::Value(new_value) => account_state.insert(path, new_value),
         WriteOp::Deletion => account_state.remove(&path),
     };
+}
+
+pub trait IntoLedgerView {
+    fn into_ledger_view(self, db: &Arc<dyn DbReader>) -> Result<ExecutedTrees>;
+}
+
+impl IntoLedgerView for TreeState {
+    fn into_ledger_view(self, _db: &Arc<dyn DbReader>) -> Result<ExecutedTrees> {
+        Ok(ExecutedTrees::new(
+            self.account_state_root_hash,
+            self.ledger_frozen_subtree_hashes,
+            self.num_transactions,
+        ))
+    }
 }
 
 static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_epoch_event_key);

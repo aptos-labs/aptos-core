@@ -13,7 +13,8 @@ use diem_types::{
     move_resource::MoveStorage, transaction::TransactionListWithProof,
 };
 use event_notifications::{EventNotificationSender, EventSubscriptionService};
-use executor_types::{ChunkExecutorTrait, ExecutedTrees};
+use executor::components::apply_chunk_output::IntoLedgerView;
+use executor_types::ChunkExecutorTrait;
 use std::sync::Arc;
 use storage_interface::DbReader;
 
@@ -83,15 +84,20 @@ impl<C: ChunkExecutorTrait> ExecutorProxyTrait for ExecutorProxy<C> {
         let storage_info = storage_info
             .ok_or_else(|| Error::UnexpectedError("Missing startup info from storage".into()))?;
         let current_epoch_state = storage_info.get_epoch_state().clone();
+        let latest_ledger_info = storage_info.latest_ledger_info.clone();
 
-        let synced_trees = if let Some(synced_tree_state) = storage_info.synced_tree_state {
-            ExecutedTrees::from(synced_tree_state)
-        } else {
-            ExecutedTrees::from(storage_info.committed_tree_state)
-        };
+        let synced_trees = storage_info
+            .into_latest_tree_state()
+            .into_ledger_view(&self.storage)
+            .map_err(|error| {
+                Error::UnexpectedError(format!(
+                    "Failed to construct latest ledger view from storage: {}",
+                    error
+                ))
+            })?;
 
         Ok(SyncState::new(
-            storage_info.latest_ledger_info,
+            latest_ledger_info,
             synced_trees,
             current_epoch_state,
         ))

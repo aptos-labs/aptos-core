@@ -16,7 +16,7 @@ use diem_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::Version,
 };
-use executor_types::ExecutedTrees;
+use executor::components::apply_chunk_output::IntoLedgerView;
 use serde::Deserialize;
 use std::{cmp::max, collections::HashSet, sync::Arc};
 use storage_interface::DbReader;
@@ -416,7 +416,10 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             .committed_tree_state
             .ledger_frozen_subtree_hashes
             .clone();
-        let root_executed_trees = ExecutedTrees::from(startup_info.committed_tree_state);
+        let root_executed_trees = startup_info
+            .committed_tree_state
+            .into_ledger_view(&self.diem_db)
+            .expect("Failed to construct committed ledger view.");
         match RecoveryData::new(
             last_vote,
             ledger_recovery_data.clone(),
