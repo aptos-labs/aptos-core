@@ -17,6 +17,7 @@ use diem_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    proof::definition::LeafCount,
     transaction::{Transaction, TransactionListWithProof, TransactionStatus, Version},
 };
 use diemdb::DiemDB;
@@ -429,14 +430,15 @@ proptest! {
 
     #[test]
     fn test_reconfiguration_with_retry_transaction_status(
-        (num_txns, reconfig_txn_index) in (10..100u64).prop_flat_map(|num_txns| {
+        (num_user_txns, reconfig_txn_index) in (10..100u64).prop_flat_map(|num_user_txns| {
             (
-                Just(num_txns),
-                0..num_txns
+                Just(num_user_txns),
+                0..num_user_txns
             )
         })) {
             let block_id = gen_block_id(1);
-            let mut block = TestBlock::new(num_txns, 10, block_id);
+            let mut block = TestBlock::new(num_user_txns, 10, block_id);
+            let num_txns = block.txns.len() as LeafCount;
             block.txns[reconfig_txn_index as usize] = encode_reconfiguration_transaction(gen_address(reconfig_txn_index));
             let executor = TestExecutor::new();
 
@@ -448,7 +450,10 @@ proptest! {
             // assert: txns after the reconfiguration are with status "Retry"
             let retry_iter = output.compute_status().iter()
             .skip_while(|status| matches!(*status, TransactionStatus::Keep(_)));
-            prop_assert_eq!(retry_iter.take_while(|status| matches!(*status,TransactionStatus::Retry)).count() as u64, num_txns - reconfig_txn_index - 1);
+            prop_assert_eq!(
+                retry_iter.take_while(|status| matches!(*status,TransactionStatus::Retry)).count() as u64,
+                num_txns - reconfig_txn_index - 1
+            );
 
             // commit
             let ledger_info = gen_ledger_info(reconfig_txn_index + 1 /* version */, output.root_hash(), block_id, 1 /* timestamp */);
@@ -463,13 +468,13 @@ proptest! {
             prop_assert!(retry_output.compute_status().iter().all(|s| matches!(*s, TransactionStatus::Keep(_))));
 
             // commit
-            let ledger_info = gen_ledger_info(num_txns  /* version */, retry_output.root_hash(), retry_block_id, 12345 /* timestamp */);
+            let ledger_info = gen_ledger_info(num_txns as Version, retry_output.root_hash(), retry_block_id, 12345 /* timestamp */);
             executor.commit_blocks(vec![retry_block_id], ledger_info).unwrap();
 
             // get txn_infos from db
             let db = executor.db.reader.clone();
             prop_assert_eq!(db.get_latest_version().unwrap(), num_txns as Version);
-            let txn_list = db.get_transactions(1 /* start version */, num_txns, num_txns as Version /* ledger version */, false /* fetch events */).unwrap();
+            let txn_list = db.get_transactions(1 /* start version */, num_txns as u64, num_txns as Version /* ledger version */, false /* fetch events */).unwrap();
             prop_assert_eq!(&block.txns, &txn_list.transactions);
             let txn_infos = txn_list.proof.transaction_infos;
 
@@ -479,7 +484,10 @@ proptest! {
             replayer.executor.replay(block.txns, txn_infos).unwrap();
             replayer.executor.commit().unwrap();
             let replayed_db = replayer.db.reader.clone();
-            prop_assert_eq!(replayed_db.get_latest_state_root().unwrap(), db.get_latest_state_root().unwrap())
+            prop_assert_eq!(
+                replayed_db.get_accumulator_root_hash(num_txns).unwrap(),
+                db.get_accumulator_root_hash(num_txns).unwrap()
+            );
         }
 
     #[test]

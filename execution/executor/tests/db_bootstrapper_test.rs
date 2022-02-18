@@ -38,6 +38,7 @@ use diem_vm::DiemVM;
 use diemdb::{DiemDB, GetRestoreHandler};
 use executor::{
     block_executor::BlockExecutor,
+    components::apply_chunk_output::IntoLedgerView,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
 };
 use executor_test_helpers::{
@@ -216,7 +217,7 @@ fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
 }
 
 fn get_state_backup(
-    db: &DiemDB,
+    db: &Arc<DiemDB>,
 ) -> (
     Vec<(HashValue, AccountStateBlob)>,
     SparseMerkleRangeProof,
@@ -231,7 +232,13 @@ fn get_state_backup(
     let proof = backup_handler
         .get_account_state_range_proof(accounts.last().unwrap().0, 1)
         .unwrap();
-    let root_hash = db.get_latest_state_root().unwrap().1;
+    let db_reader: Arc<dyn DbReader> = db.clone();
+    let root_hash = db
+        .get_latest_tree_state()
+        .unwrap()
+        .into_ledger_view(&db_reader)
+        .unwrap()
+        .state_root();
 
     (accounts, proof, root_hash)
 }

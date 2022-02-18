@@ -8620,7 +8620,6 @@ dependencies = [
  "rand 0.8.4",
  "scratchpad",
  "storage-interface",
- "storage-service",
  "vm-genesis",
 ]
 

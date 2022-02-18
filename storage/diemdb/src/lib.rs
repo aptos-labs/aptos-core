@@ -1024,13 +1024,6 @@ impl DbReader for DiemDB {
         })
     }
 
-    fn get_latest_state_root(&self) -> Result<(Version, HashValue)> {
-        gauged_api("get_latest_state_root", || {
-            let (version, txn_info) = self.ledger_store.get_latest_transaction_info()?;
-            Ok((version, txn_info.state_change_hash()))
-        })
-    }
-
     fn get_latest_tree_state(&self) -> Result<TreeState> {
         gauged_api("get_latest_tree_state", || {
             let tree_state = match self.ledger_store.get_latest_transaction_info_option()? {

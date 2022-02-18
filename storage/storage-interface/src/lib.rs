@@ -422,14 +422,6 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// See [`DiemDB::get_latest_state_root`].
-    ///
-    /// [`DiemDB::get_latest_state_root`]:
-    /// ../diemdb/struct.DiemDB.html#method.get_latest_state_root
-    fn get_latest_state_root(&self) -> Result<(Version, HashValue)> {
-        unimplemented!()
-    }
-
     /// Gets the latest TreeState no matter if db has been bootstrapped.
     /// Used by the Db-bootstrapper.
     fn get_latest_tree_state(&self) -> Result<TreeState> {

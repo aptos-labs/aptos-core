@@ -14,23 +14,22 @@ anyhow = "1.0.52"
 fail = "0.4.0"
 scratchpad = { path = "../storage/scratchpad" }
 diem-state-view = { path = "../storage/state-view" }
-storage-interface = { path = "../storage/storage-interface" }
 diem-types = { path = "../types" }
 diem-vm = { path = "../diem-move/diem-vm" }
 diem-workspace-hack = { version = "0.1", path = "../crates/diem-workspace-hack" }
+executor = { path = "../execution/executor" }
+storage-interface = { path = "../storage/storage-interface" }
 
 [dev-dependencies]
 rand = "0.8.3"
 
-executor = { path = "../execution/executor" }
 executor-test-helpers = { path = "../execution/executor-test-helpers" }
 diem-crypto = { path = "../crates/diem-crypto", features = ["fuzzing"] }
 diem-temppath = { path = "../crates/diem-temppath" }
+diem-transaction-builder = { path = "../sdk/transaction-builder" }
 diem-types = { path = "../types", features = ["fuzzing"] }
 diem-vm = { path = "../diem-move/diem-vm" }
 diemdb = { path = "../storage/diemdb", features = ["fuzzing"] }
-storage-service = { path = "../storage/storage-service" }
-diem-transaction-builder = { path = "../sdk/transaction-builder" }
 vm-genesis = { path = "../diem-move/vm-genesis" }
 move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 

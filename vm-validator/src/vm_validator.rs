@@ -11,8 +11,8 @@ use diem_types::{
     transaction::{SignedTransaction, VMValidatorResult},
 };
 use diem_vm::DiemVM;
+use executor::components::apply_chunk_output::IntoLedgerView;
 use fail::fail_point;
-use scratchpad::SparseMerkleTree;
 use std::{convert::TryFrom, sync::Arc};
 use storage_interface::{state_view::VerifiedStateView, DbReader};
 
@@ -34,16 +34,18 @@ pub trait TransactionValidation: Send + Sync + Clone {
 }
 
 fn latest_state_view(db_reader: &Arc<dyn DbReader>) -> VerifiedStateView {
-    let (version, state_root) = db_reader.get_latest_state_root().expect("Should not fail.");
+    let ledger_view = db_reader
+        .get_latest_tree_state()
+        .expect("Should not fail.")
+        .into_ledger_view(db_reader)
+        .expect("Should not fail.");
 
-    VerifiedStateView::new(
+    ledger_view.state_view(
+        &ledger_view,
         StateViewId::TransactionValidation {
-            base_version: version,
+            base_version: ledger_view.version().expect("Must be bootstrapped."),
         },
-        Arc::clone(db_reader),
-        Some(version),
-        state_root,
-        SparseMerkleTree::new(state_root),
+        db_reader.clone(),
     )
 }
 
