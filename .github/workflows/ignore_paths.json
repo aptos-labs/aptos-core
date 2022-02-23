@@ -1,6 +1,5 @@
 {
   "ignore_paths": [
-    "README.md",
-    "language/move-prover/"
+    "README.md"
   ]
 }

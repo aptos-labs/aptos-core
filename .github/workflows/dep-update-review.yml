@@ -42,15 +42,16 @@ jobs:
           echo "::set-output name=flag::${flag}"
       - name: make valid comment
         if: ${{ steps.set-update-report.outputs.report && steps.set-update-report.outputs.flag == 1 }}
-        uses: diem/actions/comment@a5fa31ff2b54a544cd88ac912cda469742592e6c
+        uses: aptos-labs/actions/comment@0.1
         with:
           comment: |
             ${{ steps.set-update-report.outputs.report }}
           tag: update-review-report
           delete-older: true
+          hyperjump_url: ${{ secrets.HYPERJUMP_URL }}
       - name: make comment when output too big
         if: ${{ steps.set-update-report.outputs.flag == 0 }}
-        uses: diem/actions/comment@a5fa31ff2b54a544cd88ac912cda469742592e6c
+        uses: aptos-labs/actions/comment@0.1
         with:
           # todo if comment too big, create a gist and post the gist link
           comment: |
@@ -59,3 +60,4 @@ jobs:
             Please, run depdive locally or check actions.`
           tag: update-review-report
           delete-older: true
+          hyperjump_url: ${{ secrets.HYPERJUMP_URL }}

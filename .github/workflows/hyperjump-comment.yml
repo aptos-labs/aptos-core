@@ -12,8 +12,9 @@ jobs:
       - name: checkout
         uses: actions/checkout@v2.4.0
       - name: comment
-        uses: diem/actions/hyperjump-comment@a5fa31ff2b54a544cd88ac912cda469742592e6c
+        uses: aptos/actions/hyperjump-comment@0.1
         with:
+          hyperump_url: ${{ secrets.HYPERJUMP_URL }}
           github-token: ${{ secrets.HYPERJUMP_TOKEN }}
           number: ${{ github.event.client_payload.number }}
           comment: ${{ github.event.client_payload.comment }}

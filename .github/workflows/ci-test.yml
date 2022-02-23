@@ -46,13 +46,13 @@ jobs:
         run: ./scripts/git-checks.sh
       - id: changes
         name: determine changes
-        uses: diem/actions/changes@faadd16607b77dfa2231a8f366883e01717b3225
+        uses: aptos-labs/actions/changes@0.1
         with:
           workflow-file: ci-test.yml
           github-token: ${{secrets.GITHUB_TOKEN}}
       - id: need-build-images
         name: find changes need image build.
-        uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
+        uses: aptos-labs/actions/matches@0.1
         with:
           pattern: '^documentation\|^developers.diem.com'
           invert: "true"
@@ -105,44 +105,44 @@ jobs:
           echo "::set-output name=changes-found::$(echo $res)";
       - id: rust-changes
         name: find rust/cargo changes.
-        uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
+        uses: aptos-labs/actions/matches@0.1
         with:
           pattern: '^documentation\|^docker\|^scripts\|^developers.diem.com'
           invert: "true"
       - id: non-rust-lint-changes
         name: find shell/dockerfile changes
-        uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
+        uses: aptos-labs/actions/matches@0.1
         with:
           pattern: 'Dockerfile$\|.*.sh$\|^developers.diem.com\|^shuffle'
       - id: helm-changes
         name: find helm changes
-        uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
+        uses: aptos-labs/actions/matches@0.1
         with:
           pattern: "^helm"
       - id: dev-setup-sh-changes
         name: find dev-setup.sh/base docker image changes
-        uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
+        uses: aptos-labs/actions/matches@0.1
         with:
           pattern: 'docker/ci\|scripts/dev_setup.sh'
       - id: docker-compose-changes
         name: find changes that should trigger docker compose testing.
-        uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
+        uses: aptos-labs/actions/matches@0.1
         with:
           pattern: "^documentation"
           invert: "true"
       - id: website-changes
         name: find website changes.
-        uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
+        uses: aptos-labs/actions/matches@0.1
         with:
           pattern: '^documentation\|^developers.diem.com\|^.github'
       - id: test-coverage
         name: check if we should see if code coverage still works.
-        uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
+        uses: aptos-labs/actions/matches@0.1
         with:
           pattern: '^rust.toolchain\|^x.toml\|^devtools\|^.github\|common/logger'
       - id: test-api-spec
         name: find api changes.
-        uses: diem/actions/matches@faadd16607b77dfa2231a8f366883e01717b3225
+        uses: aptos-labs/actions/matches@0.1
         with:
           pattern: '^api\|^scripts/dev_setup.sh'
 
@@ -185,18 +185,18 @@ jobs:
           fetch-depth: 0 #get all the history!!!
       - id: changes
         name: determine changes
-        uses: diem/actions/changes@faadd16607b77dfa2231a8f366883e01717b3225
+        uses: aptos-labs/actions/changes@0.1
         with:
           workflow-file: docker-publish.yml
       - name: setup_aws_ecr_login
         run: |
-          echo 'AWS_ECR_ACCOUNT_URL=${{ secrets.ENV_NOVI_ECR_AWS_ACCOUNT_NUM }}.dkr.ecr.${{ secrets.ENV_NOVI_ECR_AWS_REGION }}.amazonaws.com' >> $GITHUB_ENV
+          echo 'AWS_ECR_ACCOUNT_URL=${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}.dkr.ecr.${{ secrets.ENV_ECR_AWS_REGION }}.amazonaws.com' >> $GITHUB_ENV
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.ENV_NOVI_ECR_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.ENV_NOVI_ECR_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.ENV_NOVI_ECR_AWS_REGION }}
+          aws-access-key-id: ${{ secrets.ENV_ECR_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.ENV_ECR_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.ENV_ECR_AWS_REGION }}
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1.3.3
@@ -232,7 +232,7 @@ jobs:
           BRANCH="$CHANGES_TARGET_BRANCH"
           GIT_REV=$(git rev-parse --short=8 HEAD)
           echo "::set-output name=head-tag::land_$GIT_REV";
-          aws ecr get-login-password --region ${{ secrets.ENV_NOVI_ECR_AWS_REGION }} | \
+          aws ecr get-login-password --region ${{ secrets.ENV_ECR_AWS_REGION }} | \
           docker login --username AWS --password-stdin "${AWS_ECR_ACCOUNT_URL}"
           docker/docker_republish.sh -t pre_${BRANCH}_${GIT_REV} -o land_${GIT_REV} -r ${AWS_ECR_ACCOUNT_URL} -d -i "${{ matrix.target_images }}"
       - name: Early terminate workflow
@@ -850,125 +850,126 @@ jobs:
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
 
-  land-blocking-test-forge:
-    name: Run land blocking test in Forge
-    runs-on: self-hosted
-    needs: [prepare, build-images, need-base-images]
-    if: ${{ always() && needs.build-images.result=='success' && needs.prepare.outputs.test-land-blocking == 'true' }}
-    outputs:
-      forge-result: ${{ steps.post-test-result.outputs.forge-result }}
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v2.4.0
-        with:
-          # This ensures that the tip of the PR is checked out instead of the merge between the base ref and the tip
-          # On `push` this value will be empty and will "do-the-right-thing"
-          ref: ${{ github.event.pull_request.head.sha }}
-      - name: Launch forge test
-        run: |
-          set +e
-          date
-          export FGI_OUTPUT_LOG=$(mktemp)
-          echo "FGI_OUTPUT_LOG=$FGI_OUTPUT_LOG" >> $GITHUB_ENV
-          cmd=""
-          if ${{ needs.need-base-images.result!='success' }}; then
-            cmd="./scripts/fgi/run --tag ${{ needs.build-images.outputs.head-tag }} --suite land_blocking --report forge_report.json"
-          else
-            cmd="./scripts/fgi/run --tag ${{ needs.build-images.outputs.head-tag }} --base-image-tag ${{ needs.need-base-images.outputs.prev-tag }} --suite land_blocking_compat --report forge_report.json"
-          fi
-          eval $cmd
-          ret=$?
-          echo "fgi exit code: $ret"
-          echo "FGI_REPRO_CMD=$cmd" >> $GITHUB_ENV
-          echo "FGI_EXIT_CODE=$ret" >> $GITHUB_ENV
-      - name: Post test results on PR
-        uses: actions/github-script@v4.0.2
-        with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-          script: |
-            // Find the number of the pull request that trigggers this push
-            let pr_num = ${{ needs.prepare.outputs.changes-pull-request-number }};
-            if (!pr_num) {
-              console.warn("Did not find pull request num in previous step");
-              console.log("GH event payload\n", context.payload);
-              return;
-            }
-            // Read and check forge test results
-            let should_fail = false;
-            let env_vars = process.env;
-            let body = '';
-            const fsp = require('fs').promises;
-            try {
-              data = await fsp.readFile('forge_report.json', 'utf-8');
-              var result = JSON.parse(data);
-              // TODO - set P/F based on metrics TPS, latency
-              body = `Forge Test Result
-            \`\`\`
-            ${result.text}
-            ${result.logs}
-            ${result.dashboard}
-            \`\`\`
-            `;
-              // Check FGI exit code for errors
-              if (parseInt(env_vars.FGI_EXIT_CODE) != 0) {
-                body += "\n :exclamation: Forge Test failed - non-zero exit code for `fgi` \n"
-                should_fail = true;
-              }
-            } catch (err) {
-              if (err.code === 'ENOENT') {
-                body = "Forge Test failed - no test report found.\n";
-              } else {
-                body = "Forge Test runner failed.";
-                console.error(err);
-              }
-              body += " See https://github.com/diem/diem/actions/runs/${{github.run_id}}";
-              // Post comment on PR then fail this workflow
-              should_fail = true;
-            }
-            // Add repro cmd to message
-            try {
-              body += "\nRepro cmd:\n";
-              body += `
-              \`\`\`
-              ${env_vars.FGI_REPRO_CMD}
-              \`\`\`
-              `
-            } catch (err) {
-              if (err.code === 'ReferenceError') {
-                console.error("One of the following env vars is not set");
-              } else {
-                body += "[GHA DEBUG]\nFound error in actions/github-script\n";
-                body += err;
-              }
-            }
-            // Post test result on original pull request
-            try {
-              if (!should_fail) {
-                body += "\n :tada: Land-blocking forge test passed! :ok_hand:"
-              }
-              await github.issues.createComment(
-                  {
-                    issue_number: pr_num,
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    body: body,
-                  }
-              );
-            } catch (err) {
-              if (err.status === 401) {
-                // Fail silently for auth but log to console.
-                console.warn("GH token has expired when trying to POST\n", err);
-              } else {
-                console.error("HttpError other than 401 is not bypassed");
-                throw err;
-              }
-            }
-            // Fail the workflow if test fails
-            if (should_fail) {
-              throw "Land-blocking test failed";
-            }
-      - name: Early terminate workflow
-        if: ${{ failure() }}
-        uses: ./.github/actions/early-terminator
-        with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
+# Disabled pending migration to aptos
+#  land-blocking-test-forge:
+#    name: Run land blocking test in Forge
+#    runs-on: self-hosted
+#    needs: [prepare, build-images, need-base-images]
+#    if: ${{ always() && needs.build-images.result=='success' && needs.prepare.outputs.test-land-blocking == 'true' }}
+#    outputs:
+#      forge-result: ${{ steps.post-test-result.outputs.forge-result }}
+#    timeout-minutes: 45
+#    steps:
+#      - uses: actions/checkout@v2.4.0
+#        with:
+#          # This ensures that the tip of the PR is checked out instead of the merge between the base ref and the tip
+#          # On `push` this value will be empty and will "do-the-right-thing"
+#          ref: ${{ github.event.pull_request.head.sha }}
+#      - name: Launch forge test
+#        run: |
+#          set +e
+#          date
+#          export FGI_OUTPUT_LOG=$(mktemp)
+#          echo "FGI_OUTPUT_LOG=$FGI_OUTPUT_LOG" >> $GITHUB_ENV
+#          cmd=""
+#          if ${{ needs.need-base-images.result!='success' }}; then
+#            cmd="./scripts/fgi/run --tag ${{ needs.build-images.outputs.head-tag }} --suite land_blocking --report forge_report.json"
+#          else
+#            cmd="./scripts/fgi/run --tag ${{ needs.build-images.outputs.head-tag }} --base-image-tag ${{ needs.need-base-images.outputs.prev-tag }} --suite land_blocking_compat --report forge_report.json"
+#          fi
+#          eval $cmd
+#          ret=$?
+#          echo "fgi exit code: $ret"
+#          echo "FGI_REPRO_CMD=$cmd" >> $GITHUB_ENV
+#          echo "FGI_EXIT_CODE=$ret" >> $GITHUB_ENV
+#      - name: Post test results on PR
+#        uses: actions/github-script@v4.0.2
+#        with:
+#          github-token: ${{secrets.GITHUB_TOKEN}}
+#          script: |
+#            // Find the number of the pull request that trigggers this push
+#            let pr_num = ${{ needs.prepare.outputs.changes-pull-request-number }};
+#            if (!pr_num) {
+#              console.warn("Did not find pull request num in previous step");
+#              console.log("GH event payload\n", context.payload);
+#              return;
+#            }
+#            // Read and check forge test results
+#            let should_fail = false;
+#            let env_vars = process.env;
+#            let body = '';
+#            const fsp = require('fs').promises;
+#            try {
+#              data = await fsp.readFile('forge_report.json', 'utf-8');
+#              var result = JSON.parse(data);
+#              // TODO - set P/F based on metrics TPS, latency
+#              body = `Forge Test Result
+#            \`\`\`
+#            ${result.text}
+#            ${result.logs}
+#            ${result.dashboard}
+#            \`\`\`
+#            `;
+#              // Check FGI exit code for errors
+#              if (parseInt(env_vars.FGI_EXIT_CODE) != 0) {
+#                body += "\n :exclamation: Forge Test failed - non-zero exit code for `fgi` \n"
+#                should_fail = true;
+#              }
+#            } catch (err) {
+#              if (err.code === 'ENOENT') {
+#                body = "Forge Test failed - no test report found.\n";
+#              } else {
+#                body = "Forge Test runner failed.";
+#                console.error(err);
+#              }
+#              body += " See https://github.com/aptos-labs/diem-internal/actions/runs/${{github.run_id}}";
+#              // Post comment on PR then fail this workflow
+#              should_fail = true;
+#            }
+#            // Add repro cmd to message
+#            try {
+#              body += "\nRepro cmd:\n";
+#              body += `
+#              \`\`\`
+#              ${env_vars.FGI_REPRO_CMD}
+#              \`\`\`
+#              `
+#            } catch (err) {
+#              if (err.code === 'ReferenceError') {
+#                console.error("One of the following env vars is not set");
+#              } else {
+#                body += "[GHA DEBUG]\nFound error in actions/github-script\n";
+#                body += err;
+#              }
+#            }
+#            // Post test result on original pull request
+#            try {
+#              if (!should_fail) {
+#                body += "\n :tada: Land-blocking forge test passed! :ok_hand:"
+#              }
+#              await github.issues.createComment(
+#                  {
+#                    issue_number: pr_num,
+#                    owner: context.repo.owner,
+#                    repo: context.repo.repo,
+#                    body: body,
+#                  }
+#              );
+#            } catch (err) {
+#              if (err.status === 401) {
+#                // Fail silently for auth but log to console.
+#                console.warn("GH token has expired when trying to POST\n", err);
+#              } else {
+#                console.error("HttpError other than 401 is not bypassed");
+#                throw err;
+#              }
+#            }
+#            // Fail the workflow if test fails
+#            if (should_fail) {
+#              throw "Land-blocking test failed";
+#            }
+#      - name: Early terminate workflow
+#        if: ${{ failure() }}
+#        uses: ./.github/actions/early-terminator
+#        with:
+#          github-token: ${{secrets.GITHUB_TOKEN}}
