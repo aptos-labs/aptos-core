@@ -13,10 +13,10 @@ All commands in this document assume that:
 * You have a stable connection to the internet.
 
 #### Prerequisites
-* Complete the [My first transaction](/docs/tutorials/tutorial-my-first-transaction) tutorial to understand how to create accounts and interact with testnet.
+* Complete the [My first transaction](/tutorials/tutorial-my-first-transaction) tutorial to understand how to create accounts and interact with testnet.
 
 If you have already completed the My First Transaction tutorial, you can use the following account information for Alice and Bob to get started:
-* [Account address: Hex-coded account address](/docs/tutorials/tutorial-my-first-transaction#step-4-optional-list-accounts)
+* [Account address: Hex-coded account address](/tutorials/tutorial-my-first-transaction#step-4-optional-list-accounts)
 
 ## Get account information
 To get information about Alice’s account, use [get_account](https://github.com/diem/diem/blob/main/json-rpc/docs/method_get_account.md). To run this method, you will need the hex-coded account address (see step 4 of My First Transaction).

@@ -3,11 +3,11 @@ title: "My first transaction"
 slug: "tutorial-my-first-transaction"
 hidden: false
 ---
-This document will guide you through executing your first transaction on the Diem Blockchain's [testnet](../reference/glossary#testnet). Before you proceed, we recommend that you read the following to familiarize yourself with the key concepts:
+This document will guide you through executing your first transaction on the Diem Blockchain's [testnet](/reference/glossary#testnet). Before you proceed, we recommend that you read the following to familiarize yourself with the key concepts:
 
 
-* [Basics](/docs/basics/basics-txns-states)
-* [Life of a transaction](/docs/transactions/basics-life-of-txn)
+* [Basics](/basics/basics-txns-states)
+* [Life of a transaction](/transactions/basics-life-of-txn)
 
 We provide a command line interface (CLI) client to interact with the Diem Blockchain.
 
@@ -109,7 +109,7 @@ diem%
 If you have problems building the client and connecting to the testnet, refer to [Troubleshooting](#client-build-and-run).
 
 <BlockQuote type="info">
-If you would like to run a test validator network locally on your system, follow the instructions [here](/docs/tutorials/tutorial-run-local-validator-nw). The instructions for creating accounts, minting coins, and performing a transaction are the same as that for a node on testnet.
+If you would like to run a test validator network locally on your system, follow the instructions [here](/tutorials/tutorial-run-local-validator-nw). The instructions for creating accounts, minting coins, and performing a transaction are the same as that for a node on testnet.
 </BlockQuote>
 
 ### Create accounts for Alice and Bob
@@ -196,11 +196,11 @@ User account index: 1, address: 3099d7230aa336f5dcfe13c1231454ce, private_key: "
 
 ```
 
-The sequence number for an account indicates the number of transactions that have been sent from that account. It is incremented by one every time a transaction sent from that account is executed and stored in the Diem Blockchain. To learn more, refer to [sequence number](,,/reference/glossary#sequence-number).
+The sequence number for an account indicates the number of transactions that have been sent from that account. It is incremented by one every time a transaction sent from that account is executed and stored in the Diem Blockchain. To learn more, refer to [sequence number](/reference/glossary#sequence-number).
 
 ### Add Fake Diem Coins to Alice’s and Bob’s accounts
 
-Adding fake Diem Coins with no real-world value to accounts on testnet is done via Faucet. Faucet is a service that runs along with the testnet. This service only exists to facilitate minting coins for testnet and will not exist for mainnet. Faucet creates Diem Coins with no real-world value. Assuming you’ve [created Alice’s and Bob’s account](#create-accounts-for-alice-and-bob), with index 0 and index 1 respectively, you can follow the steps below to add fake Diem Coins to both accounts.
+Adding fake Diem Coins with no real-world value to accounts on testnet is done via Faucet. Faucet is a service that runs along with the testnet. This service only edocs/transactions/basics-life-of-txnxists to facilitate minting coins for testnet and will not exist for mainnet. Faucet creates Diem Coins with no real-world value. Assuming you’ve [created Alice’s and Bob’s account](#create-accounts-for-alice-and-bob), with index 0 and index 1 respectively, you can follow the steps below to add fake Diem Coins to both accounts.
 
 
 #### Step 1: Add 110 Diem Coins to Alice’s account
@@ -312,7 +312,7 @@ To query for transaction status, run: query txn_acc_seq 0 0 <fetch_events=true|f
 
 You can use the command `query txn_acc_seq 0 0 true` (transaction by account and sequence number) to retrieve the information about the transaction you just submitted. The first parameter is the local index of the sender account, and the second parameter is the sequence number of the account. To see a sample output of this command refer to [Sample Outputs](#query-transaction-by-account-and-sequence-number).
 
-You just submitted your transaction to a validator node on testnet, and it was included in the [Mempool](../reference/glossary#mempool) of the validator. This doesn't necessarily mean your transaction has been executed. In theory, if the system were slow or overloaded, it would take some time to see the results, and you may have to check multiple times by querying the accounts. To query an account with index 0, you can use the command  `query account_state 0.` The expected output is shown in the [Sample Outputs](#query-events) section
+You just submitted your transaction to a validator node on testnet, and it was included in the [Mempool](/reference/glossary#mempool) of the validator. This doesn't necessarily mean your transaction has been executed. In theory, if the system were slow or overloaded, it would take some time to see the results, and you may have to check multiple times by querying the accounts. To query an account with index 0, you can use the command  `query account_state 0.` The expected output is shown in the [Sample Outputs](#query-events) section
 
 To troubleshoot the transfer command, refer to [Troubleshooting](#the-transfer-command).
 
@@ -320,7 +320,7 @@ To troubleshoot the transfer command, refer to [Troubleshooting](#the-transfer-c
 
 `diem% transferb 0 1 10 XUS`
 
-Refer to [Life of a transaction](/docs/transactions/basics-life-of-txn) for an understanding of the lifecycle of a transaction from submission to execution and storage.
+Refer to [Life of a transaction](/transactions/basics-life-of-txn) for an understanding of the lifecycle of a transaction from submission to execution and storage.
 
 #### Query sequence number after transfer
 
@@ -673,7 +673,7 @@ Latest account state is:
 
 ## Life of a transaction
 
-Once you have executed your first transaction, you may refer to the document [Life of a transaction](/docs/transactions/basics-life-of-txn) for:
+Once you have executed your first transaction, you may refer to the document [Life of a transaction](/transactions/basics-life-of-txn) for:
 
 * A look "under the hood" at the lifecycle of a transaction from submission to execution.
 * An understanding of the interactions between each logical component of a Diem validator as transactions get submitted and executed in the Diem ecosystem.

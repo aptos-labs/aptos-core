@@ -3,12 +3,12 @@ title: "FullNodes"
 slug: "basics-fullnodes"
 hidden: false
 ---
-A Diem node is a peer entity of the Diem ecosystem that tracks the [state](../reference/glossary#state) of the Diem Blockchain. Clients interact with the blockchain via Diem nodes. There are two types of nodes:
+A Diem node is a peer entity of the Diem ecosystem that tracks the [state](/reference/glossary#state) of the Diem Blockchain. Clients interact with the blockchain via Diem nodes. There are two types of nodes:
 * [Validator nodes](basics-validator-nodes.md)
 * FullNodes
 
 Each Diem node comprises several logical components:
-* [JSON-RPC service](../reference/glossary#json-rpc-service) (disabled in validator nodes)
+* [JSON-RPC service](/reference/glossary#json-rpc-service) (disabled in validator nodes)
 * [Mempool](basics-validator-nodes.md#mempool)
 * [Consensus](basics-validator-nodes.md#consensus)
 * [Execution](basics-validator-nodes.md#execution)
@@ -16,7 +16,7 @@ Each Diem node comprises several logical components:
 * [Storage](basics-validator-nodes.md#storage)
 * [State synchronizer](basics-validator-nodes.md#state-synchronizer)
 
-The [Diem Core](../reference/glossary#diem-core) software can be configured to run as a validator node or as a FullNode.
+The [Diem Core](/reference/glossary#diem-core) software can be configured to run as a validator node or as a FullNode.
 
 ## Introduction
 
@@ -25,7 +25,7 @@ FullNodes can be run by anyone who wants to verify the state of the Diem Blockch
 Additionally, FullNodes are an external validation resource for finalized transaction history. They receive transactions from upstream nodes and then re-execute them locally (the same way a validator node executes transactions). FullNodes store the results of the re-execution to local storage. In doing so, they will notice and can provide evidence if there is any attempt to rewrite history. This helps to ensure that the validator nodes are not colluding on arbitrary transaction execution.
 
 ## Public FullNodes
-A public FullNode uses the same software as a validator node and connects directly to one or more validator nodes to submit transactions and synchronize to the [state](../reference/glossary#state) of the Diem Blockchain.
+A public FullNode uses the same software as a validator node and connects directly to one or more validator nodes to submit transactions and synchronize to the [state](/reference/glossary#state) of the Diem Blockchain.
 
 A public FullNode has all Diem node components, with the consensus component being disabled.
 

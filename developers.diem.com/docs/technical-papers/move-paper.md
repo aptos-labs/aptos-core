@@ -23,7 +23,7 @@ protocol in Move, including Diem coin, transaction processing, and validator man
 
 ### Downloads
 <PublicationLink
-  image="https://diem-developers-components.netlify.app/images/diem-move-language.png"
-  doc_link="https://diem-developers-components.netlify.app/papers/diem-move-a-language-with-programmable-resources/2020-05-26.pdf"
+  image="images/diem-move-language.png"
+  doc_link="papers/diem-move-a-language-with-programmable-resources/2020-05-26.pdf"
   title="Move: A Language With Programmable Resources"
 />

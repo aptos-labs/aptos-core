@@ -3,7 +3,7 @@ title: "Configure and run a public FullNode"
 slug: "configure-run-public-fullnode"
 hidden: false
 ---
-You can run [FullNodes](/docs/basics/basics-fullnodes) to verify the state and synchronize to the Diem Blockchain. FullNodes can be run by anyone. FullNodes replicate the full state of the blockchain by querying each other, or by querying the validators directly.
+You can run [FullNodes](/basics/basics-fullnodes) to verify the state and synchronize to the Diem Blockchain. FullNodes can be run by anyone. FullNodes replicate the full state of the blockchain by querying each other, or by querying the validators directly.
 
 This tutorial details how to configure a public FullNode to connect to *testnet*, the Diem Payment Network’s public test network..
 
@@ -13,10 +13,10 @@ This tutorial details how to configure a public FullNode to connect to *testnet*
 
 #### Prerequisites
 Before you get started with this tutorial, we recommend you familiarize yourself with the following:
-* [Validator node concepts](/docs/basics/basics-validator-nodes) 
-* [FullNode concepts](/docs/basics/basics-fullnodes) 
+* [Validator node concepts](/basics/basics-validator-nodes) 
+* [FullNode concepts](/basics/basics-fullnodes) 
 * [JSON-RPC specifications](https://github.com/diem/diem/blob/main/json-rpc/json-rpc-spec.md)
-* [CLI reference](/docs/tools/cli-reference)
+* [CLI reference](/tools/cli-reference)
 
 
 ## Getting started

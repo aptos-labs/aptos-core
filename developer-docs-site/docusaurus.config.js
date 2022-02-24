@@ -13,8 +13,8 @@ const config = {
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
   favicon: 'img/favicon.ico',
-  organizationName: 'facebook', // Usually your GitHub org/user name.
-  projectName: 'docusaurus', // Usually your repo name.
+  organizationName: 'aptos-labs', // Usually your GitHub org/user name.
+  projectName: 'developer-docs', // Usually your repo name.
 
   presets: [
     [
@@ -22,16 +22,12 @@ const config = {
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
         docs: {
+          routeBasePath: '/',
           sidebarPath: require.resolve('./sidebars.js'),
-          // Please change this to your repo.
+          // TODO: Please change this to your repo.
           editUrl: 'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
         },
-        blog: {
-          showReadingTime: true,
-          // Please change this to your repo.
-          editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
-        },
+        blog: false,
         theme: {
           customCss: require.resolve('./src/css/custom.css'),
         },
@@ -43,7 +39,7 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       navbar: {
-        title: 'Aptos Labs Developer Docs',
+        title: 'Developer Documentation',
         logo: {
           alt: 'Aptos Labs Logo',
           src: 'img/aptos_logo_wordmark_transparent_blk.png',
@@ -51,13 +47,7 @@ const config = {
         },
         items: [
           {
-            type: 'doc',
-            docId: 'intro',
-            position: 'left',
-            label: 'Tutorial',
-          },
-          {
-            href: 'https://github.com/facebook/docusaurus',
+            href: 'TODO: https://github.com/facebook/docusaurus',
             label: 'GitHub',
             position: 'right',
           },
@@ -66,15 +56,6 @@ const config = {
       footer: {
         style: 'dark',
         links: [
-          {
-            title: 'Docs',
-            items: [
-              {
-                label: 'Tutorial',
-                to: '/docs/intro',
-              },
-            ],
-          },
           {
             title: 'Community',
             items: [

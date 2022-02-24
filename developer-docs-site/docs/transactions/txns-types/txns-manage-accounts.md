@@ -4,9 +4,9 @@ slug: "txns-manage-accounts"
 hidden: false
 ---
 Once an account has been created, you can use different types of transactions to manage the following account administrative tasks:
-* [Create a recovery address account](/docs/transactions/txns-types/txns-manage-accounts#create-a-recovery-address-account)
-* [Rotate authentication key](/docs/transactions/txns-types/txns-manage-accounts#rotate-authentication-key)
-* [Add a currency to an account](/docs/transactions/txns-types/txns-manage-accounts#add-a-currency-to-an-account)
+* [Create a recovery address account](/transactions/txns-types/txns-manage-accounts#create-a-recovery-address-account)
+* [Rotate authentication key](/transactions/txns-types/txns-manage-accounts#rotate-authentication-key)
+* [Add a currency to an account](/transactions/txns-types/txns-manage-accounts#add-a-currency-to-an-account)
 
 ## Create a recovery address account
 

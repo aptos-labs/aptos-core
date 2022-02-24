@@ -12,11 +12,11 @@ The state of each account comprises both code and data:
 - **Code**: Move modules contain code (type and procedure declarations), but they do not contain data. The module's procedures encode the rules for updating the blockchain's global state.
 - **Data**: Move resources contain data but no code. Every resource value has a type that is declared in a module published in the blockchain's distributed database.
 
-An account may contain an arbitrary number of Move resources and Move modules. The Diem Payment Network (DPN) supports accounts created for Regulated Virtual Asset Service Providers [Regulated VASP](../reference/glossary#regulated-vasp) and Designated Dealers.
+An account may contain an arbitrary number of Move resources and Move modules. The Diem Payment Network (DPN) supports accounts created for Regulated Virtual Asset Service Providers [Regulated VASP](/reference/glossary#regulated-vasp) and Designated Dealers.
 
 ## Account address
 
-A Diem account address is a 16-byte value. The account address is derived from a cryptographic hash of its public verification key concatenated with a signature scheme identifier byte. The Diem Blockchain supports two signature schemes:[Ed25519](../reference/glossary#ed25519) and MultiEd25519 (for multi-signature transactions). You will need the account's private key to sign a transaction.
+A Diem account address is a 16-byte value. The account address is derived from a cryptographic hash of its public verification key concatenated with a signature scheme identifier byte. The Diem Blockchain supports two signature schemes:[Ed25519](/reference/glossary#ed25519) and MultiEd25519 (for multi-signature transactions). You will need the account's private key to sign a transaction.
 
 An account address is derived from its initial authentication key.
 
@@ -40,7 +40,7 @@ Creating a K-of-N multisig authentication key is similar to creating a single si
 Every account on the DPN is created with at least two resources:
 
 * [RoleId](https://github.com/diem/diem/blob/main/diem-move/diem-framework/core/doc/Roles.md#resource-roleid), which grants the account a single, immutable [role](basics-accounts.md#account-roles) for [access control](https://github.com/diem/dip/blob/main/dips/dip-2.md).
-* [DiemAccount](https://github.com/diem/diem/blob/main/diem-move/diem-framework/core/doc/DiemAccount.md#resource-diemaccount), which holds the account’s [sequence number](../reference/glossary#sequence-number), authentication key, and event handles.
+* [DiemAccount](https://github.com/diem/diem/blob/main/diem-move/diem-framework/core/doc/DiemAccount.md#resource-diemaccount), which holds the account’s [sequence number](/reference/glossary#sequence-number), authentication key, and event handles.
 
 ### Currencies
 

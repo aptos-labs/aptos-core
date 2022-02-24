@@ -4,13 +4,13 @@ slug: "txns-create-accounts-mint"
 hidden: false
 ---
 Depending on the type of network you are using, you can use transactions to:
-* [Create accounts and mint fake Diem Coins in testnet](/docs/transactions/txns-types/txns-create-accounts-mint#create-accounts-mint-in-testnet)
-* [Create a ChildVASP account in mainnet and pre-mainnet](/docs/transactions/txns-types/txns-create-accounts-mint#create-childvasp-accounts-in-mainnet-pre-mainnet)
+* [Create accounts and mint fake Diem Coins in testnet](/transactions/txns-types/txns-create-accounts-mint#create-accounts-mint-in-testnet)
+* [Create a ChildVASP account in mainnet and pre-mainnet](/transactions/txns-types/txns-create-accounts-mint#create-childvasp-accounts-in-mainnet-pre-mainnet)
 
 ## Create accounts, mint in testnet
 
-If you are using [testnet](../reference/glossary#tesnet), you can use the [Faucet](../reference/glossary#faucet) service to perform certain actions that only by performed by the Diem Association on [mainnet](../reference/glossary#mainnet). You can do the following by sending requests to the faucet service endpoint:
-* Create a [ParentVASP account](../reference/glossary#parentvasp-account).
+If you are using [testnet](/reference/glossary#tesnet), you can use the [Faucet](/reference/glossary#faucet) service to perform certain actions that only by performed by the Diem Association on [mainnet](/reference/glossary#mainnet). You can do the following by sending requests to the faucet service endpoint:
+* Create a [ParentVASP account](/reference/glossary#parentvasp-account).
 * Mint and add fake Diem Coins to accounts for testing.
 
 To create a ParentVASP account in testnet, send a request like the code example below to the faucet server:
@@ -30,7 +30,7 @@ This request first checks if there is an account available for the authorization
 
 If you are a Regulated VASP, and have been approved by Diem Networks as a participant on the Diem Payment Network (DPN), you first need to complete an application with Diem Networks to have a ParentVASP account created on your behalf.
 
-Once Diem Networks creates your ParentVASP account (let’s call it Account **A**), you can create a [ChildVASP account](../reference/glossary#childvasp-account) if you wish.
+Once Diem Networks creates your ParentVASP account (let’s call it Account **A**), you can create a [ChildVASP account](/reference/glossary#childvasp-account) if you wish.
 
 To create a ChildVASP account, send the [create_child_vasp_account](https://github.com/diem/diem/blob/main/diem-move/diem-framework/script_documentation/script_documentation.md#script-create_child_vasp_account) transaction script from your **Account A** (your ParentVASP account).
 

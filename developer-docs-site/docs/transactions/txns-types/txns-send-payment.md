@@ -14,7 +14,7 @@ When a payment is made, the sender must specify:
 * The amount to send
 * The account the payment is being made to, which in this example is account **B**.
 
-When constructing a transaction, account **A** can also specify the metadata parameter. This parameter can be of any form as long as **A** and **B** agree on it, subject to certain rules specified in the agreement between a [Regulated VASP](../reference/glossary# and Diem Networks, and a  `metadata_signature` used for dual attestation.
+When constructing a transaction, account **A** can also specify the metadata parameter. This parameter can be of any form as long as **A** and **B** agree on it, subject to certain rules specified in the agreement between a [Regulated VASP](/reference/glossary# and Diem Networks, and a  `metadata_signature` used for dual attestation.
 
 ## Dual attestation
 
