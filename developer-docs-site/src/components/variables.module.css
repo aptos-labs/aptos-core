@@ -1,0 +1,28 @@
+/* Breakpoints */
+@value small-mobile-breakpoint-size: 320;
+@value small-mobile-breakpoint-query: (min-width: calc(small-mobile-breakpoint-size * 1px));
+@value small-mobile-breakpoint-max-query: (max-width: calc( (small-mobile-breakpoint-size - 1) * 1px ));
+
+@value mobile-breakpoint-size: 420;
+@value mobile-breakpoint-query: (min-width: calc(mobile-breakpoint-size * 1px));
+@value mobile-breakpoint-max-query: (max-width: calc( (mobile-breakpoint-size - 1) * 1px ));
+
+@value small-tablet-breakpoint-size: 580;
+@value small-tablet-breakpoint-query: (min-width: calc(small-tablet-breakpoint-size * 1px));
+@value small-tablet-breakpoint-max-query: (max-width: calc( (small-tablet-breakpoint-size - 1) * 1px));
+
+@value medium-tablet-breakpoint-size: 768;
+@value medium-tablet-breakpoint-query: (min-width: calc(medium-tablet-breakpoint-size * 1px));
+@value medium-tablet-breakpoint-max-query: (max-width: calc( (medium-tablet-breakpoint-size - 1) * 1px ));
+
+@value large-tablet-breakpoint-size: 1024;
+@value large-tablet-breakpoint-query: (min-width: calc(large-tablet-breakpoint-size * 1px));
+@value large-tablet-breakpoint-max-query: (max-width: calc( (large-tablet-breakpoint-size - 1) * 1px ));
+
+@value desktop-breakpoint-size: 1280;
+@value desktop-breakpoint-query: (min-width: calc(desktop-breakpoint-size * 1px));
+@value desktop-breakpoint-max-query: (max-width: calc( (desktop-breakpoint-size - 1) * 1px ));
+
+@value large-desktop-breakpoint-size: 1400;
+@value large-desktop-breakpoint-query: (min-width: calc(large-desktop-breakpoint-size * 1px));
+@value large-desktop-breakpoint-max-query: (max-width: calc( (large-desktop-breakpoint-size - 1) * 1px ));

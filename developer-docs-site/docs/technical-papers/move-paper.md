@@ -2,7 +2,10 @@
 title: "Move"
 slug: "move-paper"
 hidden: false
+sidebar_position: 1
 ---
+import PublicationLink from "@site/src/components/PublicationLink";
+
 ***Note to readers: On December 1, 2020, the Libra Association was renamed to Diem Association. This report was
 published before the Association released White Paper v2.0 in April 2020, which included a number of key updates to the
 Libra payment system. Outdated links have been removed, but otherwise, this report has not been modified to incorporate
@@ -23,7 +26,7 @@ protocol in Move, including Diem coin, transaction processing, and validator man
 
 ### Downloads
 <PublicationLink
-  image="images/diem-move-language.png"
-  doc_link="papers/diem-move-a-language-with-programmable-resources/2020-05-26.pdf"
+  image="/img/docs/move-language-pdf.png"
+  doc_link="/papers/diem-move-a-language-with-programmable-resources/2020-05-26.pdf"
   title="Move: A Language With Programmable Resources"
 />
