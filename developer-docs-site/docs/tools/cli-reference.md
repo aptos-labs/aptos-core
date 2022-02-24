@@ -3,6 +3,8 @@ title: "CLI reference"
 slug: "cli-reference"
 hidden: false
 ---
+import BlockQuote from "@site/src/components/BlockQuote";
+
 This guide describes how to use the Diem command line interface (CLI) client to interact with the Diem Blockchain’s testnet. 
 
 The CLI is invoked as an interactive shell. It provides basic commands to simulate the creation of accounts, the minting of Diem Coins, performing transfers, and querying the blockchain. You can use the CLI client to interact with a validator node in different types of networks such as testnet, a local test validator network, or on a remote blockchain by specifying the node's hostname.

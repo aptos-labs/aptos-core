@@ -2,11 +2,11 @@ import React from 'react';
 import PropTypes from 'prop-types'
 
 import styles from './styles.module.css';
-import classnames from 'classnames';
+import clsx from 'clsx';
 
 const CardsWrapper = ({cardsPerRow, children, title, justify = false}) => {
 
-  let classes = classnames(styles.root, styles[`rowOf${cardsPerRow}`], {
+  let classes = clsx(styles.root, styles[`rowOf${cardsPerRow}`], {
     [styles.justify]: justify,
   });
   return (

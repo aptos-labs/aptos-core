@@ -3,6 +3,8 @@ title: "My first transaction"
 slug: "tutorial-my-first-transaction"
 hidden: false
 ---
+import BlockQuote from "@site/src/components/BlockQuote";
+
 This document will guide you through executing your first transaction on the Diem Blockchain's [testnet](/reference/glossary#testnet). Before you proceed, we recommend that you read the following to familiarize yourself with the key concepts:
 
 

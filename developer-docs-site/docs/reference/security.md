@@ -3,6 +3,8 @@ title: "Security"
 slug: "security"
 hidden: false
 ---
+import BlockQuote from "@site/src/components/BlockQuote";
+
 This document outlines security procedures and general policies for the Diem project.
 
 <BlockQuote type="info">

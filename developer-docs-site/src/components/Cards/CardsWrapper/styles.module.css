@@ -1,7 +1,7 @@
-@value large-tablet-breakpoint-query from '~diem-docusaurus-components/src/variables.module.css';
-@value mobile-breakpoint-max-query from '~diem-docusaurus-components/src/variables.module.css';
-@value medium-tablet-breakpoint-max-query from '~diem-docusaurus-components/src/variables.module.css';
-@value small-tablet-breakpoint-max-query from '~diem-docusaurus-components/src/variables.module.css';
+@value large-tablet-breakpoint-query from '../../variables.module.css';
+@value mobile-breakpoint-max-query from '../../variables.module.css';
+@value medium-tablet-breakpoint-max-query from '../../variables.module.css';
+@value small-tablet-breakpoint-max-query from '../../variables.module.css';
 
 .root {
   --horizontal-spacing: 15px;

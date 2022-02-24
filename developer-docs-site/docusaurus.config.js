@@ -61,7 +61,7 @@ const config = {
             items: [
               {
                 label: 'Reddit',
-                href: 'https://todo.com/this',
+                href: 'https://www.reddit.com/r/aptoslabs/',
               },
               {
                 label: 'Discord',
@@ -69,7 +69,7 @@ const config = {
               },
               {
                 label: 'Twitter',
-                href: 'https://twitter.com/aptos_labs',
+                href: 'https://twitter.com/aptoslabs',
               },
             ],
           },

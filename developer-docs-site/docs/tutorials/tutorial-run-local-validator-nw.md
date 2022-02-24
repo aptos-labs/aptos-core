@@ -3,6 +3,8 @@ title: "Run a local test validator network"
 slug: "tutorial-run-local-validator-nw"
 hidden: false
 ---
+import BlockQuote from "@site/src/components/BlockQuote";
+
 You can run a local test validator network to test and develop against a Diem Blockchain, including Move changes. This network is not part of the Diem Ecosystem and is only for testing and development purposes.
 
 You can also use the Diem CLI command dev to compile, publish, and execute Move programs on your local test validator network.

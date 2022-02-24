@@ -4,6 +4,8 @@ slug: "basics-life-of-txn"
 hidden: false
 sidebar_position: 1
 ---
+import BlockQuote from "@site/src/components/BlockQuote";
+
 To get a deeper understanding of the lifecycle of a Diem transaction (from an operational perspective), we will follow a transaction on its journey from being submitted to a Diem node to being committed to the Diem Blockchain. We will then “zoom-in” on the logical components of Diem nodes and take a look at its interactions with other components.
 
 #### Assumptions

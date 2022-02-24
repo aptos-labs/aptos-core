@@ -3,6 +3,7 @@ title: "Gas and transaction fees"
 slug: "basics-gas-txn-fee"
 hidden: false
 ---
+import BlockQuote from "@site/src/components/BlockQuote";
 
 When a transaction is executed in the Diem Payment Network (DPN), the network resources used are tracked and measured using gas.
 

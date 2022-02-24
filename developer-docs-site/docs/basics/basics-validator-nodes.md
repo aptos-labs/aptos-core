@@ -3,6 +3,8 @@ title: "Validator nodes"
 slug: "basics-validator-nodes"
 hidden: false
 ---
+import BlockQuote from "@site/src/components/BlockQuote";
+
 A Diem node is a peer entity of the Diem ecosystem that tracks the [state](/reference/glossary#state) of the Diem Blockchain. Clients interact with the blockchain via Diem nodes. There are two types of nodes:
 * Validator nodes
 * [FullNodes](basics-fullnodes.md)

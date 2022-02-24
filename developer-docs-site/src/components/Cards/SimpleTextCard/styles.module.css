@@ -1,6 +1,6 @@
 .root {
   align-items: center;
-  background-color: var(--doc-component-background);
+  background-color: var(--ifm-card-background-color);
   display: inline-flex;
   padding:
     calc( 19px + var(--border-width) )

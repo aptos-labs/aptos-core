@@ -3,8 +3,7 @@ import PropTypes from 'prop-types'
 
 import isInternalUrl from '@docusaurus/isInternalUrl';
 import Link from '@docusaurus/Link';
-
-import classnames from 'classnames';
+import clsx from 'clsx';
 import styles from './styles.module.css';
 
 const BaseContainer = ({
@@ -18,7 +17,7 @@ const BaseContainer = ({
 
   return (
     <Link
-      className={classnames(styles.root, {
+      className={clsx(styles.root, {
         [styles.disabled]: to === undefined,
         [styles.hasShadow]: hasShadow,
         [styles.hasRoundedCorners]: hasRoundedCorners,
@@ -26,7 +25,7 @@ const BaseContainer = ({
       to={to}
       target={isInternalUrl(to) ? '_self' : '_blank'}
     >
-      <div className={classnames(styles.children, className)}>{children}</div>
+      <div className={clsx(styles.children, className)}>{children}</div>
       {overlay &&
       <div className={styles.overlay}>
         <p>{overlay}</p>

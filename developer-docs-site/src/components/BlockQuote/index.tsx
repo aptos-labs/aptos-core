@@ -1,18 +1,17 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-
-import styles from './styles.module.css';
-import classnames from 'classnames';
+import clsx from 'clsx';
+import styles from './index.module.css';
 
 const BlockQuote = ({children, type = "info"}) => (
-  <blockquote className={classnames(styles.blockquote, styles[type])}>
+  <blockquote className={clsx(styles.blockquote, styles[type])}>
     {children}
   </blockquote>
 );
 
 BlockQuote.propTypes = {
   children: PropTypes.oneOfType([PropTypes.array, PropTypes.string]).isRequired,
-  type: PropTypes.oneOf(["info", "warning", "danger"]),
+  type: PropTypes.oneOf(["info", "warning", "danger", "note"]),
 };
 
 export default BlockQuote;
