@@ -120,6 +120,7 @@ whitespace-exceptions = [
     ".github/actions/*/dist/*",
     # TODO: reevaluate skipping whitespace checks in .md files for the website
     "developers.diem.com/**/*.md",
+    "developer-docs-site/**/*.md",
     "**/*.exp",
     "**/*.errmap",
     "**/*.abi",
@@ -269,7 +270,7 @@ mark-changed = "all"
 
 [[determinator.path-rule]]
 # Ignore website and other ancillary files, and scripts not listed above.
-globs = ["developers.diem.com/**/*", "documentation/**/*", "docker/**/*", "helm/**/*", "language/documentation/**/*", "specifications/**/*", "scripts/**/*", "terraform/**/*"]
+globs = ["developers.diem.com/**/*", "documentation/**/*", "docker/**/*", "helm/**/*", "language/documentation/**/*", "specifications/**/*", "scripts/**/*", "terraform/**/*", "developer-docs-site/**/*"]
 mark-changed = []
 
 [[determinator.path-rule]]
