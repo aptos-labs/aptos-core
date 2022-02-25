@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["diem_wallet"] = [{"text":"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.56.1/core/convert/trait.AsMut.html\" title=\"trait core::convert::AsMut\">AsMut</a>&lt;<a class=\"primitive\" href=\"https://doc.rust-lang.org/1.56.1/std/primitive.u64.html\">u64</a>&gt; for <a class=\"struct\" href=\"diem_wallet/struct.ChildNumber.html\" title=\"struct diem_wallet::ChildNumber\">ChildNumber</a>","synthetic":false,"types":["diem_wallet::key_factory::ChildNumber"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

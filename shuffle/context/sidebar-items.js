@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["UserContext","Encapsulates the fields needed to execute on behalf of a user, especially in hand offs to typescript for console REPL and end to end testing."]]});

@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["smoke_test"] = [{"text":"impl <a class=\"trait\" href=\"forge/interface/nft/trait.NFTPublicUsageTest.html\" title=\"trait forge::interface::nft::NFTPublicUsageTest\">NFTPublicUsageTest</a> for <a class=\"struct\" href=\"smoke_test/nft_transaction/struct.NFTTransaction.html\" title=\"struct smoke_test::nft_transaction::NFTTransaction\">NFTTransaction</a>","synthetic":false,"types":["smoke_test::nft_transaction::NFTTransaction"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

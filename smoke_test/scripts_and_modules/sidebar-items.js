@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["compile_program","Compile Move program"],["enable_open_publishing",""]],"struct":[["ExecuteCustomModuleAndScript",""],["MalformedScript",""]]});

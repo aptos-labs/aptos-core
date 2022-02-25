@@ -1,0 +1,1 @@
+initSidebarItems({"macro":[["bail",""]],"struct":[["Error","The `Error` type, a wrapper around a dynamic error type."]]});

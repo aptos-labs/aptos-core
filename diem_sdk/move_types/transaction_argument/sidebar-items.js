@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["TransactionArgument",""]],"fn":[["convert_txn_args","Convert the transaction arguments into Move values."]],"struct":[["VecBytes","Struct for encoding vector<vector> arguments for script functions"]]});

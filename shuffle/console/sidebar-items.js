@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["handle","Launches a Deno REPL for the shuffle project, generating transaction builders and loading them into the REPL namespace for easy on chain interaction."]]});

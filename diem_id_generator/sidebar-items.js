@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["U32IdGenerator","A generic in order [`IdGenerator`] using an [`AtomicU32`] to guarantee uniqueness"],["U64IdGenerator","A generic in order [`IdGenerator`] using an [`AtomicU64`] to guarantee uniqueness"]],"trait":[["IdGenerator","A generic [`IdGenerator`] trait, it’s intentionally generic to allow for different orders and types of `Id`"]]});

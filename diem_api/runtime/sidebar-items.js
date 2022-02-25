@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["bootstrap","Creates HTTP server (warp-based) serves for both REST and JSON-RPC API. When api and json-rpc are configured with same port, both API will be served for the port. When api and json-rpc are configured with different port, both API will be served for both ports. Returns corresponding Tokio runtime"]]});

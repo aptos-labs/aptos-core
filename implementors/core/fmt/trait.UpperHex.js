@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["offchain"] = [{"text":"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.56.1/core/fmt/trait.UpperHex.html\" title=\"trait core::fmt::UpperHex\">UpperHex</a> for <a class=\"struct\" href=\"offchain/subaddress/struct.Subaddress.html\" title=\"struct offchain::subaddress::Subaddress\">Subaddress</a>","synthetic":false,"types":["offchain::subaddress::Subaddress"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

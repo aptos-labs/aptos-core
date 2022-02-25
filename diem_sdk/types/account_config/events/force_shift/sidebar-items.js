@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["ForceShiftEvent","Struct that represents a ForceShiftEvent."]]});

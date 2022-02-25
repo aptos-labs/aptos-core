@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["diem_core_modules_full_path",""],["diem_framework_named_addresses",""],["diem_payment_modules_full_path",""],["diem_stdlib_files",""],["diem_stdlib_files_no_dependencies",""],["experimental_module_blobs",""],["module_blobs",""],["modules",""],["path_in_crate",""]],"mod":[["natives",""],["release",""]]});

@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["diem_types"] = [{"text":"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.56.1/core/ops/deref/trait.DerefMut.html\" title=\"trait core::ops::deref::DerefMut\">DerefMut</a> for <a class=\"enum\" href=\"diem_types/ledger_info/enum.LedgerInfoWithSignatures.html\" title=\"enum diem_types::ledger_info::LedgerInfoWithSignatures\">LedgerInfoWithSignatures</a>","synthetic":false,"types":["diem_types::ledger_info::LedgerInfoWithSignatures"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

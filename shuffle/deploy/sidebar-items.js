@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["deploy",""],["handle","Deploys shuffle’s main Move Package to the sender’s address."]]});

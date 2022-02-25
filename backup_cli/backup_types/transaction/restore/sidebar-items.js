@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["TransactionRestoreBatchController","Takes a series of transaction backup manifests, preheat in parallel, then execute in order."],["TransactionRestoreController",""],["TransactionRestoreOpt",""]]});

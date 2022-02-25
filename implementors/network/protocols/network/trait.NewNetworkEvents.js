@@ -1,0 +1,4 @@
+(function() {var implementors = {};
+implementors["network"] = [];
+implementors["storage_service_server"] = [{"text":"impl <a class=\"trait\" href=\"network/protocols/network/trait.NewNetworkEvents.html\" title=\"trait network::protocols::network::NewNetworkEvents\">NewNetworkEvents</a> for <a class=\"struct\" href=\"storage_service_server/network/struct.StorageServiceNetworkEvents.html\" title=\"struct storage_service_server::network::StorageServiceNetworkEvents\">StorageServiceNetworkEvents</a>","synthetic":false,"types":["storage_service_server::network::StorageServiceNetworkEvents"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

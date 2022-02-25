@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["SyncRequest","A sync request for a specified target ledger info."]]});

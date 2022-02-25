@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Response",""]],"fn":[["mint_routes",""]],"struct":[["MintParams",""]]});

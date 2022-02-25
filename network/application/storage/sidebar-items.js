@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["LockingHashMap","A generic locking hash map with ability to read before write consistency"],["PeerMetadataStorage","Metadata storage for peers across all of networking.  Splits storage of information across networks to prevent different networks from affecting each other"]]});

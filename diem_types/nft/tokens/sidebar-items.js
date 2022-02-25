@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["BARS_IDENTIFIER",""],["BARS_NAME",""]],"fn":[["bars_tag",""]]});

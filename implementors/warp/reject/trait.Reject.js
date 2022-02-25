@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["diem_api_types"] = [{"text":"impl <a class=\"trait\" href=\"https://docs.rs/warp/0.3.0/warp/reject/trait.Reject.html\" title=\"trait warp::reject::Reject\">Reject</a> for <a class=\"struct\" href=\"diem_api_types/struct.Error.html\" title=\"struct diem_api_types::Error\">Error</a>","synthetic":false,"types":["diem_api_types::error::Error"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

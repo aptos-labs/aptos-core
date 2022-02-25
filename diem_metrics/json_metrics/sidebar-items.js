@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["get_git_rev",""],["get_json_metrics",""]]});

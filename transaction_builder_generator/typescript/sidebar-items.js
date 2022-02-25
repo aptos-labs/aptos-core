@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["output","Output transaction builders and decoders in TypeScript for the given ABIs."],["replace_keywords","Walks through the registry replacing variables known to be named as a javascript keyword, making the resulting codegen invalid. ie: public function: Identifier => public function_name: Identifier"]],"struct":[["Installer",""]]});

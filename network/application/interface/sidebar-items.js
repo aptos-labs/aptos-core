@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["MultiNetworkSender",""]],"trait":[["NetworkInterface","A generic `NetworkInterface` for applications to connect to networking"]]});

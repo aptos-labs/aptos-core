@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Error",""]],"struct":[["MVHashMap",""]],"type":[["Version","A structure that holds placeholders for each write to the database"]]});

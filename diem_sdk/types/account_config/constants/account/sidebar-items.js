@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["CORE_ACCOUNT_MODULE_IDENTIFIER","The Identifier for the Account module."],["DIEM_ACCOUNT_MODULE_IDENTIFIER","The Identifier for the Account module."]],"static":[["CORE_ACCOUNT_MODULE","The ModuleId for the Account module."],["DIEM_ACCOUNT_MODULE","The ModuleId for the Account module."]]});

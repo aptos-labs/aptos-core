@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["deserialize_from_prefixed_hex_string",""],["deserialize_from_string",""],["deserialize_resource_type",""]],"struct":[["DiemAccount",""],["EventHandle",""],["EventHandleGUID",""],["GUID",""],["ID",""],["Resource",""],["RestError",""]]});

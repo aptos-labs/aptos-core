@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["AccountStateBlob",""],["AccountStateBlobHasher","Cryptographic hasher for an BCS-serializable #item"],["AccountStateWithProof",""],["AccountStatesChunkWithProof","TODO(joshlind): add a proof implementation (e.g., verify()) and unit tests for these once we start supporting them."]]});

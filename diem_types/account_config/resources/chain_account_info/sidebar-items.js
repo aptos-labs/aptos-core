@@ -1,0 +1,1 @@
+initSidebarItems({"static":[["DPN_CHAIN_INFO",""]],"struct":[["ChainSpecificAccountInfo","A Rust representation of chain-specific account information"]]});
