@@ -25,16 +25,3 @@ runs:
               },
               method: 'POST'
             }
-            const req = https.request(options, res => {
-              console.log(`statusCode: ${res.statusCode}`)
-              res.on('data', d => {
-                if (res.statusCode != 202) {
-                  let msg = JSON.parse(d)
-                  console.log(`Error: ${msg}`)
-                }
-              })
-            })
-            req.on('error', (error) => {
-              console.log(error)
-            })
-            req.end();
