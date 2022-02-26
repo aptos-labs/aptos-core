@@ -6,9 +6,9 @@
 use std::convert::TryFrom;
 
 use anyhow::Error;
-use diem_client::BlockingClient;
 use diem_config::config::{Peer, PeerRole, PeerSet};
 use diem_logger::prelude::*;
+use diem_rest_client::Client;
 use diem_types::{
     account_config::diem_root_address, account_state::AccountState,
     account_state_blob::AccountStateBlob, network_address::NetworkAddress,
@@ -36,16 +36,10 @@ pub(crate) fn to_fullnode_addresses(
 
 /// Retrieve the validator set from a JSON RPC endpoint
 fn get_validator_set(client_endpoint: String) -> anyhow::Result<ValidatorSet> {
-    let root_account_address = diem_root_address();
-    let json_rpc = BlockingClient::new(client_endpoint);
-    let account_state = json_rpc
-        .get_account_state_with_proof(root_account_address, None, None)?
-        .into_inner();
-
-    let blob = account_state
-        .blob
-        .ok_or_else(|| Error::msg("No validator set"))?;
-    let account_state_blob = AccountStateBlob::from(bcs::from_bytes::<Vec<u8>>(&blob)?);
+    let client = Client::new(url::Url::parse(&client_endpoint)?);
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let blob = rt.block_on(client.get_account_state_blob(diem_root_address()))?;
+    let account_state_blob: AccountStateBlob = blob.inner().clone().into();
     let account_state = AccountState::try_from(&account_state_blob)?;
     if let Some(val) = account_state.get_validator_set()? {
         Ok(val)

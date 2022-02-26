@@ -168,7 +168,6 @@ members = [
     "diem-fuzzer",
     "diem-keygen",
     "diem-proptest-helpers",
-    "diem-rest-client",
     "diem-retrier",
     "diem-transactional-test-harness",
     "diem-transaction-benchmarks",

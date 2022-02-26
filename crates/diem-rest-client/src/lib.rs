@@ -274,6 +274,18 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn get_account_state_blob(
+        &self,
+        address: AccountAddress,
+    ) -> Result<Response<Vec<u8>>> {
+        let url = self.base_url.join(&format!("accounts/{}/blob", address))?;
+
+        let response = self.inner.get(url).send().await?;
+        let (response, state) = self.check_response(response).await?;
+        let blob = response.json().await?;
+        Ok(Response::new(blob, state))
+    }
+
     pub async fn get_account_resources(
         &self,
         address: AccountAddress,

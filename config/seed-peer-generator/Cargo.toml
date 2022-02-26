@@ -16,11 +16,13 @@ rand = "0.8.3"
 serde_yaml = "0.8.17"
 structopt = "0.3.21"
 thiserror = "1.0.24"
+tokio = { version = "1.8.1", features = ["full"] }
+url = "2.2.2"
 
 bcs = "0.1.2"
 diem-config = { path = ".." }
 diem-crypto = { path = "../../crates/diem-crypto" }
-diem-client = { path = "../../crates/diem-client", features = ["blocking"], default-features = false }
+diem-rest-client = { path = "../../crates/diem-rest-client" }
 diem-logger = { path = "../../crates/diem-logger" }
 diem-temppath = { path = "../../crates/diem-temppath" }
 diem-types = { path = "../../types" }
