@@ -35,6 +35,16 @@ pub fn get_account(context: Context) -> BoxedFilter<(impl Reply,)> {
         .boxed()
 }
 
+// GET /accounts/<address>
+pub fn get_account_state_blob(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("accounts" / AddressParam / "blob")
+        .and(warp::get())
+        .and(context.filter())
+        .and_then(handle_get_account_state_blob)
+        .with(metrics("get_account_state_blob"))
+        .boxed()
+}
+
 // GET /accounts/<address>/resources
 pub fn get_account_resources(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("accounts" / AddressParam / "resources")
@@ -89,6 +99,14 @@ async fn handle_get_account(
 ) -> Result<impl Reply, Rejection> {
     fail_point("endpoint_get_account")?;
     Ok(Account::new(None, address, context)?.account()?)
+}
+
+async fn handle_get_account_state_blob(
+    address: AddressParam,
+    context: Context,
+) -> Result<impl Reply, Rejection> {
+    fail_point("endpoint_get_account")?;
+    Ok(Account::new(None, address, context)?.account_state_blob()?)
 }
 
 async fn handle_get_account_resources(
@@ -151,6 +169,15 @@ impl Account {
             .into();
 
         Response::new(self.latest_ledger_info, &account)
+    }
+
+    pub fn account_state_blob(self) -> Result<impl Reply, Error> {
+        let blob: Vec<u8> = self
+            .context
+            .get_account_state_blob(self.address.into(), self.ledger_version)?
+            .ok_or_else(|| self.account_not_found())?
+            .into();
+        Response::new(self.latest_ledger_info, &blob)
     }
 
     pub fn resources(self) -> Result<impl Reply, Error> {

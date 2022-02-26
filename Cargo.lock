@@ -6775,10 +6775,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bcs",
- "diem-client",
  "diem-config",
  "diem-crypto",
  "diem-logger",
+ "diem-rest-client",
  "diem-temppath",
  "diem-types",
  "diem-workspace-hack",
@@ -6787,6 +6787,8 @@ dependencies = [
  "serde_yaml",
  "structopt",
  "thiserror",
+ "tokio",
+ "url",
 ]
 
 [[package]]
