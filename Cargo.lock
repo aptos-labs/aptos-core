@@ -2610,7 +2610,6 @@ dependencies = [
  "tokio-util",
  "toml",
  "tracing",
- "url",
  "warp",
  "zeroize",
 ]
@@ -7121,65 +7120,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "shuffle"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "diem-api-types",
- "diem-config",
- "diem-crypto",
- "diem-framework-releases",
- "diem-genesis-tool",
- "diem-infallible",
- "diem-json-rpc-types",
- "diem-node",
- "diem-sdk",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diemdb",
- "directories",
- "forge",
- "generate-key",
- "hex",
- "include_dir",
- "move-abigen",
- "move-binary-format",
- "move-cli",
- "move-compiler",
- "move-core-types",
- "move-package",
- "move-unit-test",
- "once_cell",
- "rand 0.8.4",
- "reqwest",
- "serde 1.0.130",
- "serde-generate",
- "serde-reflection",
- "serde_json",
- "serde_yaml",
- "smoke-test",
- "structopt",
- "tempfile",
- "tokio",
- "toml",
- "transaction-builder-generator",
- "url",
-]
-
-[[package]]
-name = "shuffle-custom-move-code"
-version = "0.1.0"
-dependencies = [
- "diem-framework",
- "diem-vm",
- "diem-workspace-hack",
- "move-stdlib",
- "move-unit-test",
-]
-
-[[package]]
 name = "signal-hook-registry"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8347,7 +8287,7 @@ version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "static_assertions",
 ]
 
@@ -8519,7 +8459,6 @@ dependencies = [
  "idna",
  "matches",
  "percent-encoding",
- "serde 1.0.130",
 ]
 
 [[package]]

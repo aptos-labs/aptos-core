@@ -120,6 +120,7 @@ whitespace-exceptions = [
     ".github/actions/*/dist/*",
     # TODO: reevaluate skipping whitespace checks in .md files for the website
     "developers.diem.com/**/*.md",
+    "developer-docs-site/**/*",
     "**/*.exp",
     "**/*.errmap",
     "**/*.abi",
@@ -183,8 +184,6 @@ members = [
     "memsocket",
     "offchain",
     "sdk-compatibility",
-    "shuffle",
-    "shuffle-custom-move-code",
     "smoke-test",
     "socket-bench-server",
     "transaction-emitter",
@@ -259,7 +258,7 @@ root-members = [
 
 # CI-related files. TODO: maybe have separate rules for local and CI?
 [[determinator.path-rule]]
-globs = [".github/**/*", "codecov.yml"]
+globs = [".circleci/**/*", ".github/**/*", "codecov.yml"]
 mark-changed = "all"
 
 # Core devtools files.
@@ -269,7 +268,7 @@ mark-changed = "all"
 
 [[determinator.path-rule]]
 # Ignore website and other ancillary files, and scripts not listed above.
-globs = ["developers.diem.com/**/*", "documentation/**/*", "docker/**/*", "helm/**/*", "language/documentation/**/*", "specifications/**/*", "scripts/**/*", "terraform/**/*"]
+globs = ["developers.diem.com/**/*", "developer-docs-site/**/*", "documentation/**/*", "docker/**/*", "helm/**/*", "language/documentation/**/*", "specifications/**/*", "scripts/**/*", "terraform/**/*"]
 mark-changed = []
 
 [[determinator.path-rule]]

@@ -1,4 +1,4 @@
-name: Dependency Notifier
+me: Dependency Notifier
 
 on:
   pull_request:
@@ -16,7 +16,7 @@ on:
 
 jobs:
   calc-summaries:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Calculate dependency summary changes
     if: ${{ github.event_name == 'push' || github.actor != 'bors-libra' }}
     outputs:
@@ -32,7 +32,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: fetch base ref
         id: fetch-base-ref
-        uses: diem/actions/pr-base-ref@a5fa31ff2b54a544cd88ac912cda469742592e6c
+        uses: aptos-labs/actions/pr-base-ref@0.1
         if: ${{ startsWith(github.event_name, 'pull_request') }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -100,27 +100,27 @@ jobs:
           echo "::set-output name=list::${output}"
 
   # requires-dep-audit-review:
-  #   runs-on: ubuntu-latest
+  #   runs-on: ubuntu-20.04
   #   name: Require review for TCB dep summary changes.
   #   if: ${{ github.event_name == 'push' || github.actor != 'bors-libra' }}
   #   needs: calc-summaries
   #   steps:
   #     - name: require dep-audit review if TCB deps changed
   #       if: ${{ needs.calc-summaries.outputs.lsr-summary-diff || needs.calc-summaries.lec-summary-diff }}
-  #       uses: diem/actions/require-review@a5fa31ff2b54a544cd88ac912cda469742592e6c
+  #       uses: aptos-labs/actions/require-review@0.1
   #       with:
   #         github-token: ${{ secrets.GITHUB_TOKEN }}
   #         users: ${{ needs.calc-summaries.outputs.dep-auditors-list }}
 
   annotate-pr:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Annotate PR with when summaries change
     if: ${{ github.actor != 'bors-libra' && github.event_name == 'pull_request' }}
     needs: calc-summaries
     steps:
       - name: annotate PR with LSR diff
         if: ${{ needs.calc-summaries.outputs.lsr-summary-diff }}
-        uses: diem/actions/comment@a5fa31ff2b54a544cd88ac912cda469742592e6c
+        uses: aptos-labs/actions/comment@0.1
         with:
           comment: |
             **LSR dependency change summary**:
@@ -129,9 +129,10 @@ jobs:
             ```
           tag: lsr-summary
           delete-older: true
+          hyperjump_url: ${{ secrets.HYPERJUMP_URL }}
       - name: annotate PR with LEC diff
         if: ${{ needs.calc-summaries.outputs.lec-summary-diff }}
-        uses: diem/actions/comment@a5fa31ff2b54a544cd88ac912cda469742592e6c
+        uses: aptos-labs/actions/comment@0.1
         with:
           comment: |
             **LEC dependency change summary**:
@@ -140,9 +141,10 @@ jobs:
             ```
           tag: lec-summary
           delete-older: true
+          hyperjump_url: ${{ secrets.HYPERJUMP_URL }}
       - name: annotate PR with release diff
         if: ${{ needs.calc-summaries.outputs.release-summary-diff }}
-        uses: diem/actions/comment@a5fa31ff2b54a544cd88ac912cda469742592e6c
+        uses: aptos-labs/actions/comment@0.1
         with:
           comment: |
             **release binaries dependency change summary**:
@@ -151,28 +153,34 @@ jobs:
             ```
           tag: release-summary
           delete-older: true
+          hyperjump_url: ${{ secrets.HYPERJUMP_URL }}
       - name: label PR if TCB changed
         if: ${{ needs.calc-summaries.outputs.lsr-summary-diff || needs.calc-summaries.outputs.lec-summary-diff }}
-        uses: diem/actions/labels@a5fa31ff2b54a544cd88ac912cda469742592e6c
+        uses: aptos-labs/actions/labels@0.1
         with:
           add: tcb-deps-changed
+          hyperjump_url: ${{ secrets.HYPERJUMP_URL }}
       - name: label PR if tracked deps changed
         if: ${{ needs.calc-summaries.outputs.lsr-summary-diff || needs.calc-summaries.outputs.lec-summary-diff || needs.calc-summaries.outputs.release-summary-diff }}
-        uses: diem/actions/labels@a5fa31ff2b54a544cd88ac912cda469742592e6c
+        uses: aptos-labs/actions/labels@0.1
         with:
           add: deps-changed
+          hyperjump_url: ${{ secrets.HYPERJUMP_URL }}
       - name: unlabel PR if TCB changed
         if: ${{ !needs.calc-summaries.outputs.lsr-summary-diff && !needs.calc-summaries.outputs.lec-summary-diff }}
-        uses: diem/actions/labels@a5fa31ff2b54a544cd88ac912cda469742592e6c
+        uses: aptos-labs/actions/labels@0.1
         with:
           remove: tcb-deps-changed
+          hyperjump_url: ${{ secrets.HYPERJUMP_URL }}
       - name: unlabel PR if tracked deps changed
         if: ${{ !needs.calc-summaries.outputs.lsr-summary-diff && !needs.calc-summaries.outputs.lec-summary-diff && !needs.calc-summaries.outputs.release-summary-diff }}
-        uses: diem/actions/labels@a5fa31ff2b54a544cd88ac912cda469742592e6c
+        uses: aptos-labs/actions/labels@0.1
         with:
           remove: deps-changed
+          hyperjump_url: ${{ secrets.HYPERJUMP_URL }}
       - name: request dep-audit review if TCB deps changed
-        uses: diem/actions/request-review@a5fa31ff2b54a544cd88ac912cda469742592e6c
+        uses: aptos-labs/actions/request-review@0.1
         if: ${{ needs.calc-summaries.outputs.lsr-summary-diff || needs.calc-summaries.outputs.lec-summary-diff }}
         with:
           users: ${{ needs.calc-summaries.outputs.dep-auditors-list }}
+          hyperjump_url: ${{ secrets.HYPERJUMP_URL }}
