@@ -99,8 +99,6 @@ members = [
     "secure/storage",
     "secure/storage/github",
     "secure/storage/vault",
-    "shuffle/cli",
-    "shuffle/move",
     "state-sync/diem-data-client",
     "state-sync/inter-component/consensus-notifications",
     "state-sync/inter-component/event-notifications",
