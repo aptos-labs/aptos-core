@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{rest_client::RestClient, validator_config::DecryptedValidatorConfig};
+use crate::{rest_client::RestClient, validator_config::DecodedValidatorConfig};
 use diem_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, OWNER_ACCOUNT, VALIDATOR_NETWORK_KEY,
 };
@@ -87,9 +87,7 @@ impl VerifyValidatorState {
         let validator_config = client
             .validator_config(owner_account)
             .await
-            .and_then(|vc| {
-                DecryptedValidatorConfig::from_validator_config_resource(&vc, owner_account)
-            })?;
+            .and_then(|vc| DecodedValidatorConfig::from_validator_config_resource(&vc))?;
         let storage_key = storage.ed25519_public_from_private(CONSENSUS_KEY)?;
         result.consensus_key_match = Some(storage_key == validator_config.consensus_public_key);
 

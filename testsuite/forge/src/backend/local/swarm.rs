@@ -73,12 +73,6 @@ impl AsRef<Path> for SwarmDirectory {
     }
 }
 
-#[derive(Debug)]
-struct ValidatorNetworkAddressEncryptionKey {
-    key: diem_sdk::types::network_address::encrypted::Key,
-    version: diem_sdk::types::network_address::encrypted::KeyVersion,
-}
-
 pub struct LocalSwarmBuilder {
     versions: Arc<HashMap<Version, LocalVersion>>,
     initial_version: Option<Version>,
@@ -176,11 +170,6 @@ impl LocalSwarmBuilder {
             })
             .collect::<Result<HashMap<_, _>>>()?;
 
-        let validator_network_address_encryption_key = ValidatorNetworkAddressEncryptionKey {
-            key: root_keys.validator_network_address_encryption_key,
-            version: root_keys.validator_network_address_encryption_key_version,
-        };
-
         let root_account = LocalAccount::new(
             diem_sdk::types::account_config::diem_root_address(),
             AccountKey::from_private_key(root_keys.root_key),
@@ -211,7 +200,6 @@ impl LocalSwarmBuilder {
             validators,
             fullnodes: HashMap::new(),
             dir,
-            validator_network_address_encryption_key,
             root_account,
             treasury_compliance_account,
             designated_dealer_account,
@@ -229,7 +217,6 @@ pub struct LocalSwarm {
     validators: HashMap<PeerId, LocalNode>,
     fullnodes: HashMap<PeerId, LocalNode>,
     dir: SwarmDirectory,
-    validator_network_address_encryption_key: ValidatorNetworkAddressEncryptionKey,
     root_account: LocalAccount,
     treasury_compliance_account: LocalAccount,
     designated_dealer_account: LocalAccount,

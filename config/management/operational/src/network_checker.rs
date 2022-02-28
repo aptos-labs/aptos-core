@@ -11,17 +11,7 @@ use diem_config::{
 };
 use diem_crypto::{x25519, x25519::PRIVATE_KEY_SIZE};
 use diem_management::error::Error;
-use diem_network_address_encryption::Encryptor;
-use diem_secure_storage::{InMemoryStorage, Storage};
-use diem_types::{
-    account_address,
-    chain_id::ChainId,
-    network_address::{
-        encrypted::{Key, KeyVersion, KEY_LEN},
-        NetworkAddress,
-    },
-    PeerId,
-};
+use diem_types::{account_address, chain_id::ChainId, network_address::NetworkAddress, PeerId};
 use fallible::copy_from_slice::copy_slice_to_vec;
 use futures::{AsyncReadExt, AsyncWriteExt};
 use netcore::transport::tcp::{resolve_and_connect, TcpSocket};
@@ -107,12 +97,6 @@ pub struct CheckValidatorSetEndpoints {
     /// Specifies whether or not to evaluate validators or fullnodes
     #[structopt(long)]
     role: RoleType,
-    /// The expected on-chain key, only required for validator checks
-    #[structopt(long, required_if("role", "validator"), parse(try_from_str = parse_validator_key_hex))]
-    address_encryption_key: Option<Key>,
-    /// The expected on-chain key version, only required for validator checks
-    #[structopt(long, required_if("role", "validator"))]
-    version: Option<KeyVersion>,
     /// `ChainId` of remote server
     #[structopt(long)]
     chain_id: ChainId,
@@ -125,17 +109,6 @@ pub struct CheckValidatorSetEndpoints {
     /// Skip handshake for network checking
     #[structopt(long)]
     no_handshake: bool,
-}
-
-fn parse_validator_key_hex(src: &str) -> Result<Key, Error> {
-    let potential_err_msg = format!("Not a valid encryption key: {}", src);
-    let value_slice =
-        hex::decode(src.trim()).map_err(|_| Error::CommandArgumentError(potential_err_msg))?;
-
-    let mut value = [0; KEY_LEN];
-    copy_slice_to_vec(&value_slice, &mut value)
-        .map_err(|e| Error::CommandArgumentError(format!("{}", e)))?;
-    Ok(value)
 }
 
 impl CheckValidatorSetEndpoints {
@@ -154,21 +127,6 @@ impl CheckValidatorSetEndpoints {
         };
 
         let nodes = if is_validator {
-            let address_encryption_key = self.address_encryption_key.ok_or_else(|| {
-                Error::CommandArgumentError(
-                    "Must provide address encryption key for validators".into(),
-                )
-            })?;
-            let version = self.version.ok_or_else(|| {
-                Error::CommandArgumentError("Must provide version for validators".into())
-            })?;
-
-            // Following unwraps shouldn't fail as it is in memory
-            let mut encryptor = Encryptor::new(Storage::InMemoryStorage(InMemoryStorage::new()));
-            encryptor.initialize().unwrap();
-            encryptor.add_key(version, address_encryption_key).unwrap();
-            encryptor.set_current_version(version).unwrap();
-
             validator_set_validator_addresses(client, None).await?
         } else {
             validator_set_full_node_addresses(client, None).await?

@@ -6,7 +6,6 @@ use diem_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519,
 };
-use diem_network_address_encryption::Encryptor;
 use diem_secure_storage::{CryptoStorage, KVStorage, Storage};
 use diem_types::{
     account_address::AccountAddress,
@@ -27,10 +26,6 @@ impl StorageWrapper {
             storage_name,
             storage,
         }
-    }
-
-    pub fn encryptor(self) -> Encryptor<Storage> {
-        Encryptor::new(self.storage)
     }
 
     pub fn value<T: DeserializeOwned>(&self, name: &'static str) -> Result<T, Error> {

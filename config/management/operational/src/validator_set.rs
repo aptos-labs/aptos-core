@@ -3,7 +3,7 @@
 
 use crate::{
     rest_client::RestClient,
-    validator_config::{fullnode_addresses, validator_addresses, DecryptedValidatorConfig},
+    validator_config::{fullnode_addresses, validator_addresses, DecodedValidatorConfig},
 };
 use diem_crypto::ed25519::Ed25519PublicKey;
 use diem_management::{config::ConfigPath, error::Error, secure_backend::ValidatorBackend};
@@ -45,12 +45,11 @@ pub async fn decode_validator_set(
 
     let mut decoded_set = Vec::new();
     for info in set {
-        let config =
-            DecryptedValidatorConfig::from_validator_config(info.config(), *info.account_address())
-                .map_err(|e| Error::NetworkAddressDecodeError(e.to_string()))?;
+        let config = DecodedValidatorConfig::from_validator_config(info.config())
+            .map_err(|e| Error::NetworkAddressDecodeError(e.to_string()))?;
 
         let config_resource = client.validator_config(*info.account_address()).await?;
-        let name = DecryptedValidatorConfig::human_name(&config_resource.human_name);
+        let name = DecodedValidatorConfig::human_name(&config_resource.human_name);
 
         let info = DecryptedValidatorInfo {
             name,
@@ -80,7 +79,7 @@ pub async fn validator_set_validator_addresses(
     account_address: Option<AccountAddress>,
 ) -> Result<Vec<(String, AccountAddress, Vec<NetworkAddress>)>, Error> {
     validator_set_addresses(client, account_address, |info| {
-        validator_addresses(info.config(), *info.account_address())
+        validator_addresses(info.config())
     })
     .await
 }
@@ -94,7 +93,7 @@ async fn validator_set_addresses<F: Fn(ValidatorInfo) -> Result<Vec<NetworkAddre
     let mut decoded_set = Vec::new();
     for info in set {
         let config_resource = client.validator_config(*info.account_address()).await?;
-        let name = DecryptedValidatorConfig::human_name(&config_resource.human_name);
+        let name = DecodedValidatorConfig::human_name(&config_resource.human_name);
         let peer_id = *info.account_address();
         let addrs = address_accessor(info)?;
         decoded_set.push((name, peer_id, addrs));

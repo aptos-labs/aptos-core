@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_resource::SimplifiedAccountResource, validator_config::DecryptedValidatorConfig,
+    account_resource::SimplifiedAccountResource, validator_config::DecodedValidatorConfig,
     validator_set::DecryptedValidatorInfo, validator_state::VerifyValidatorStateResult,
     TransactionContext,
 };
@@ -444,7 +444,7 @@ impl Command {
         )
     }
 
-    pub async fn validator_config(self) -> Result<DecryptedValidatorConfig, Error> {
+    pub async fn validator_config(self) -> Result<DecodedValidatorConfig, Error> {
         execute_command_await!(self, Command::ValidatorConfig, CommandName::ValidatorConfig)
     }
 

@@ -1369,7 +1369,6 @@ dependencies = [
  "diem-crypto-derive",
  "diem-global-constants",
  "diem-logger",
- "diem-network-address-encryption",
  "diem-secure-storage",
  "diem-temppath",
  "diem-types",
@@ -1668,7 +1667,6 @@ dependencies = [
  "diem-framework-releases",
  "diem-global-constants",
  "diem-management",
- "diem-network-address-encryption",
  "diem-secure-storage",
  "diem-temppath",
  "diem-types",
@@ -1793,7 +1791,6 @@ dependencies = [
  "diem-config",
  "diem-crypto",
  "diem-global-constants",
- "diem-network-address-encryption",
  "diem-secure-storage",
  "diem-temppath",
  "diem-time-service",
@@ -1877,23 +1874,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "diem-network-address-encryption"
-version = "0.1.0"
-dependencies = [
- "base64",
- "bcs",
- "diem-global-constants",
- "diem-infallible",
- "diem-logger",
- "diem-secure-storage",
- "diem-types",
- "diem-workspace-hack",
- "rand 0.8.4",
- "serde 1.0.130",
- "thiserror",
-]
-
-[[package]]
 name = "diem-node"
 version = "0.1.0"
 dependencies = [
@@ -1956,7 +1936,6 @@ dependencies = [
  "diem-global-constants",
  "diem-infallible",
  "diem-management",
- "diem-network-address-encryption",
  "diem-rest-client",
  "diem-secure-storage",
  "diem-temppath",
@@ -5086,7 +5065,6 @@ dependencies = [
  "diem-crypto",
  "diem-infallible",
  "diem-logger",
- "diem-network-address-encryption",
  "diem-secure-storage",
  "diem-time-service",
  "diem-types",
@@ -5112,7 +5090,6 @@ dependencies = [
  "diem-crypto",
  "diem-logger",
  "diem-metrics",
- "diem-network-address-encryption",
  "diem-secure-storage",
  "diem-temppath",
  "diem-time-service",

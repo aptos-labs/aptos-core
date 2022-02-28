@@ -7,7 +7,6 @@ use diem_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, OPERATOR_ACCOUNT, OWNER_ACCOUNT, VALIDATOR_NETWORK_KEY,
 };
 use diem_management::{error::Error, secure_backend::ValidatorBackend, storage::to_x25519};
-use diem_network_address_encryption::Error as NetworkAddressError;
 use diem_types::{
     account_address::AccountAddress,
     network_address::{NetworkAddress, Protocol},
@@ -70,7 +69,7 @@ impl SetValidatorConfig {
         let validator_config = if in_set {
             // Retrieve the current validator / fullnode addresses and update accordingly
             let vc = client.validator_config(owner_account).await?;
-            DecryptedValidatorConfig::from_validator_config_resource(&vc, owner_account)
+            DecodedValidatorConfig::from_validator_config_resource(&vc)
                 .map(Some)
                 .map_err(|e| {
                     Error::UnexpectedError(format!("Error parsing validator config: {}", e))
@@ -149,9 +148,7 @@ impl RotateKey {
         let validator_config = client
             .validator_config(owner_account)
             .await
-            .and_then(|vc| {
-                DecryptedValidatorConfig::from_validator_config_resource(&vc, owner_account)
-            })?;
+            .and_then(|vc| DecodedValidatorConfig::from_validator_config_resource(&vc))?;
 
         // Check that the key held in storage matches the key registered on-chain in the validator
         // config. If so, rotate the key in storage. If not, don't rotate the key in storage and
@@ -278,54 +275,49 @@ pub struct ValidatorConfig {
 }
 
 impl ValidatorConfig {
-    pub async fn execute(self) -> Result<DecryptedValidatorConfig, Error> {
+    pub async fn execute(self) -> Result<DecodedValidatorConfig, Error> {
         let config = self.config.load()?.override_json_server(&self.json_server);
         let client = RestClient::new(config.json_server);
 
         client
             .validator_config(self.account_address)
             .await
-            .and_then(|vc| {
-                DecryptedValidatorConfig::from_validator_config_resource(&vc, self.account_address)
-            })
+            .and_then(|vc| DecodedValidatorConfig::from_validator_config_resource(&vc))
     }
 }
 
 #[derive(Serialize)]
-pub struct DecryptedValidatorConfig {
+pub struct DecodedValidatorConfig {
     pub name: String,
     pub consensus_public_key: Ed25519PublicKey,
     pub validator_network_address: NetworkAddress,
     pub fullnode_network_address: NetworkAddress,
 }
 
-impl DecryptedValidatorConfig {
+impl DecodedValidatorConfig {
     pub fn from_validator_config_resource(
         config_resource: &diem_types::validator_config::ValidatorConfigResource,
-        account_address: AccountAddress,
     ) -> Result<Self, Error> {
         let config = config_resource
             .validator_config
             .as_ref()
             .ok_or_else(|| Error::RestReadError("validator-config", "not present".to_string()))?;
 
-        let mut value = Self::from_validator_config(config, account_address)?;
+        let mut value = Self::from_validator_config(config)?;
         value.name = Self::human_name(&config_resource.human_name);
         Ok(value)
     }
 
     pub fn from_validator_config(
         config: &diem_types::validator_config::ValidatorConfig,
-        account_address: AccountAddress,
     ) -> Result<Self, Error> {
         let fullnode_network_addresses = fullnode_addresses(config)?;
-        let validator_network_addresses = validator_addresses(config, account_address)
-            .unwrap_or_else(|error| {
-                println!("{}: Using a dummy validator network address!", error);
-                vec![NetworkAddress::from_str("/dns4/could-not-decrypt").unwrap()]
-            });
+        let validator_network_addresses = validator_addresses(config).unwrap_or_else(|error| {
+            println!("{}: Using a dummy validator network address!", error);
+            vec![NetworkAddress::from_str("/dns4/could-not-decrypt").unwrap()]
+        });
 
-        Ok(DecryptedValidatorConfig {
+        Ok(DecodedValidatorConfig {
             name: "".to_string(),
             consensus_public_key: config.consensus_public_key.clone(),
             fullnode_network_address: fullnode_network_addresses[0].clone(),
@@ -350,18 +342,8 @@ pub fn fullnode_addresses(
 
 pub fn validator_addresses(
     config: &diem_types::validator_config::ValidatorConfig,
-    account_address: AccountAddress,
 ) -> Result<Vec<NetworkAddress>, Error> {
-    let network_addrs: Vec<NetworkAddress> = bcs::from_bytes(&config.validator_network_addresses)
-        .map_err(|error| {
-            NetworkAddressError::AddressDeserialization(account_address, error.to_string())
-        })
-        .map_err(anyhow::Error::from)
-        .unwrap_or_default();
-    Ok(network_addrs).map_err(|error: anyhow::Error| {
-        Error::CommandArgumentError(format!(
-            "Unable to decode network address for account {}: {}",
-            account_address, error
-        ))
-    })
+    config
+        .validator_network_addresses()
+        .map_err(|e| Error::NetworkAddressDecodeError(e.to_string()))
 }
