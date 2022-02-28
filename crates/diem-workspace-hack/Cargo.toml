@@ -46,6 +46,7 @@ reqwest = { version = "0.11.2", features = ["__tls", "blocking", "default-tls", 
 rusty-fork = { version = "0.3.0", features = ["timeout", "wait-timeout"] }
 serde = { version = "1.0.130", features = ["alloc", "derive", "rc", "serde_derive", "std"] }
 serde_json = { version = "1.0.73", features = ["indexmap", "preserve_order", "std"] }
+sha-1 = { version = "0.9.4", features = ["std"] }
 standback = { version = "0.2.15", default-features = false, features = ["std"] }
 subtle = { version = "2.4.0", default-features = false, features = ["std"] }
 tiny-keccak = { version = "2.0.2", features = ["sha3"] }
@@ -93,6 +94,7 @@ reqwest = { version = "0.11.2", features = ["__tls", "blocking", "default-tls", 
 rusty-fork = { version = "0.3.0", features = ["timeout", "wait-timeout"] }
 serde = { version = "1.0.130", features = ["alloc", "derive", "rc", "serde_derive", "std"] }
 serde_json = { version = "1.0.73", features = ["indexmap", "preserve_order", "std"] }
+sha-1 = { version = "0.9.4", features = ["std"] }
 standback = { version = "0.2.15", default-features = false, features = ["std"] }
 subtle = { version = "2.4.0", default-features = false, features = ["std"] }
 syn = { version = "1.0.74", features = ["clone-impls", "derive", "extra-traits", "full", "parsing", "printing", "proc-macro", "quote", "visit", "visit-mut"] }
