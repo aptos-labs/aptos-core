@@ -28,7 +28,6 @@ if [ "$IMAGE_TARGETS" = "release" ] || [ "$IMAGE_TARGETS" = "all" ]; then
           -p diem-genesis-tool \
           -p diem-operational-tool \
           -p diem-node \
-          -p diem-key-manager \
           -p safety-rules \
           -p db-bootstrapper \
           -p backup-cli \

@@ -30,7 +30,6 @@ RUN addgroup --system --gid 6180 diem && adduser --system --ingroup diem --no-cr
 
 RUN mkdir -p /opt/diem/bin /opt/diem/etc /opt/diem/data
 
-COPY --from=builder /diem/target/release/diem-key-manager /opt/diem/bin
 COPY --from=builder /diem/target/release/safety-rules /opt/diem/bin
 
 ENV RUST_BACKTRACE 1
