@@ -3,7 +3,6 @@
 
 use anyhow::{anyhow, Result};
 pub use diem_api_types::{MoveModuleBytecode, PendingTransaction, Transaction};
-use diem_client::{Response, State};
 use diem_crypto::HashValue;
 use diem_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use move_core_types::{
@@ -16,9 +15,15 @@ use serde::{de::DeserializeOwned, Deserialize};
 use std::time::Duration;
 use url::Url;
 
-pub mod types;
 pub use diem_api_types;
+pub mod error;
+pub mod response;
+pub use response::Response;
+mod state;
+use state::State;
+pub mod types;
 pub use types::{DiemAccount, Resource, RestError};
+pub mod views;
 
 macro_rules! cfg_dpn {
     ($($item:item)*) => {
