@@ -1,0 +1,21 @@
+groups:
+- name: "Cluster alerts"
+  rules:
+# high severity alerts for core testnet functionality
+{{- range list "testnet-faucet" "testnet-waypoint" }}
+  - alert: Pod crashing - {{ . }}
+    expr: count(time() - container_start_time_seconds{container!="", container!="POD", pod=~".*{{ . }}.*"} < 60)
+    for: 5m
+    labels:
+      severity: error
+      summary: "Kubernetes pod matching '{{ . }}' is crashing or not returning cAdvisor metrics"
+{{- end }}
+# lower severity alerts for monitoring
+{{- range list "testnet-monitoring" }}
+  - alert: Pod crashing - {{ . }}
+    expr: count(time() - container_start_time_seconds{container!="", container!="POD", pod=~".*{{ . }}.*"} < 60)
+    for: 5m
+    labels:
+      severity: warning
+      summary: "Kubernetes pod matching '{{ . }}' is crashing or not returning cAdvisor metrics"
+{{- end }}

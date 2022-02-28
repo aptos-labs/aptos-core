@@ -1,0 +1,3 @@
+bucket = "terraform.diem"
+key    = "state/k8s-testnet"
+region = "us-west-2"

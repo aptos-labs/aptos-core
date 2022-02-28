@@ -1,0 +1,18 @@
+groups:
+# from central monitoring
+- name: "Blockchain alerts"
+  rules:
+  - alert: More than 10% down nodes
+    expr: 1 - (count(irate(diem_consensus_current_round{role="validator"}[10m]) > 0) OR on() vector(0)) / max(diem_consensus_current_epoch_validators) > 0.1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      description: "More than 10% of the validators are down or not reporting metrics correctly"
+  - alert: More than 20% down nodes
+    expr: 1 - (count(irate(diem_consensus_current_round{role="validator"}[10m]) > 0) OR on() vector(0)) / max(diem_consensus_current_epoch_validators) > 0.2
+    for: 5m
+    labels:
+      severity: error
+    annotations:
+      description: "More than 20% of the validators are down or not reporting metrics correctly"

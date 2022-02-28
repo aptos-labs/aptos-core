@@ -161,20 +161,3 @@ groups:
         check the logging dashboard and \
         there may be network issues, downstream throughput issues, or something wrong with Vector \
         TODO: Runbook"
-
-  # Key manager alerts
-  - alert: Key manager is not making progress
-    expr: increase(diem_key_manager_state{state="keys_still_fresh"}[1h]) == 0 OR absent(diem_key_manager_state{state="keys_still_fresh"})
-    for: 20m
-    labels:
-      severity: error
-      summary: "The key manager has not reported the keys still being fresh in the last hour"
-    annotations:
-
-  - alert: The consensus key is stale
-    expr: increase(diem_key_manager_state{state="rotated_in_storage"}[15d]) == 0 OR absent(diem_key_manager_state{state="rotated_in_storage"})
-    for: 20m
-    labels:
-      severity: critical
-      summary: "The key manager has not rotated the consensus key in the last 15 days and it is now stale"
-    annotations:

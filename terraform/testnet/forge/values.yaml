@@ -1,0 +1,47 @@
+# Experimental "Forge" testing framework
+forge:
+  numValidators:
+  helmBucket:
+  image:
+    repo: docker.libra.org/forge
+    tag:
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 1
+      memory: 512Mi
+    requests:
+      cpu: 1
+      memory: 512Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name:
+  annotations: {}
+
+vault:
+  image:
+    repo: vault
+    tag: 1.4.0
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 0.1
+      memory: 128Mi
+    requests:
+      cpu: 0.1
+      memory: 128Mi
+  server:
+    address:
+  tls: {}
+  auth:
+    type: kubernetes
+    mount_path: auth/kubernetes-val0
+    config:
+      role: forge

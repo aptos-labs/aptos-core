@@ -1,0 +1,4 @@
+apiVersion: v2
+name: testnet
+version: 0.1
+description: Additional components for a multi-validator testnet deployment

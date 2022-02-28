@@ -1,6 +1,3 @@
-# Copyright (c) The Diem Core Contributors
-# SPDX-License-Identifier: Apache-2.0
-
 MIME-Version: 1.0
 Content-Type: multipart/mixed; boundary="==eef105b1-a7ca-4eb3-9db2-64bad3373176=="
 
