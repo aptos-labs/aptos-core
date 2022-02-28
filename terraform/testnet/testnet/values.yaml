@@ -1,0 +1,192 @@
+imageTag: latest
+
+genesis:
+  numValidators: 1
+  numPublicFullnodes: 1
+  era: 0
+  chain_id:
+  moveModuleDir:
+  vaultRoleId:
+  vaultSecretId:
+  image:
+    repo: diem/init
+    tag:
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 0.1
+      memory: 512Mi
+    requests:
+      cpu: 0.1
+      memory: 256Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+vault:
+  image:
+    repo: vault
+    tag: 1.4.0
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 0.1
+      memory: 128Mi
+    requests:
+      cpu: 0.1
+      memory: 128Mi
+  server:
+    address:
+  tls: {}
+  auth:
+    type: kubernetes
+    mount_path: auth/kubernetes-val0
+    config:
+      role: genesis
+
+imagePullSecret:
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name:
+  annotations: {}
+
+faucet:
+  enabled: true
+  image:
+    repo: diem/faucet
+    tag:
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 0.1
+      memory: 128Mi
+    requests:
+      cpu: 0.1
+      memory: 128Mi
+  logLevel: info
+
+service:
+  fullnode:
+    loadBalancerSourceRanges:
+  monitoring:
+    loadBalancerSourceRanges:
+  domain:
+  aws_tags:
+
+ingress:
+  acm_certificate:
+  loadBalancerSourceRanges:
+
+monitoring:
+  prometheus:
+    useHttps: true
+    image:
+      repo: prom/prometheus
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources:
+      limits:
+        cpu: 1
+        memory: 3Gi
+      requests:
+        cpu: 1
+        memory: 3Gi
+    storage:
+      class:
+      size: 50Gi
+    retention: 15d
+  alertmanager:
+    alertRouteTrees:
+      - match:
+          severity: critical
+        receiver: 'critical'
+      - match:
+          severity: error
+        receiver: 'error'
+    alertReceivers:
+      - name: 'critical'
+      - name: 'error'
+      - name: 'default'
+    image:
+      repo: prom/alertmanager
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources:
+      limits:
+        cpu: 0.25
+        memory: 128Mi
+      requests:
+        cpu: 0.25
+        memory: 128Mi
+    logLevel: info
+  grafana:
+    image:
+      repo: grafana/grafana
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources:
+      limits:
+        cpu: 0.25
+        memory: 128Mi
+      requests:
+        cpu: 0.25
+        memory: 128Mi
+
+cluster_test:
+  enabled: true
+  image:
+    repo: diem/cluster_test
+    tag:
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 1
+      memory: 512Mi
+    requests:
+      cpu: 1
+      memory: 512Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  intervalMins: 15
+  config:
+    duration: 300
+    accounts_per_client: 12
+    workers_per_ac: 64
+
+# if enabled, faucet_test is synchronized with cluster_test traffic
+# to prevent race on mint account
+faucet_test:
+  enabled: false
+  resources:
+    limits:
+      cpu: 1
+      memory: 128Mi
+    requests:
+      cpu: 1
+      memory: 128Mi
+  offsetMins: 5
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+aws:
+  region:
+  cluster_name:
+  vpc_id:
+  role_arn:
+  zone_name:
+
+# This is a hack to disable backup related alerts on testnet,
+# and doesn't affect whether the backup coordinator runs on individual nodes in the network.
+# (Since the testnet sym links to the same alert.yml file the validator uses.)
+backup:
+  enable: false
+
+### Used for testing purposes only!
+# Use a local vault backend rather than dedicated vault server for each validator
+localVaultBackend: false

@@ -65,16 +65,6 @@ resource "vault_kubernetes_auth_backend_role" "fullnode" {
   token_policies                   = [vault_policy.fullnode.name]
 }
 
-resource "vault_kubernetes_auth_backend_role" "key-manager" {
-  backend                          = vault_auth_backend.kubernetes.path
-  role_name                        = "${var.namespace}-key-manager"
-  bound_service_account_names      = ["${var.service_account_prefix}-key-manager"]
-  bound_service_account_namespaces = ["*"]
-  token_bound_cidrs                = var.pod_cidrs
-  token_period                     = 3600
-  token_policies                   = [vault_policy.key-manager.name]
-}
-
 variable "depends_on_" {
   description = "Dummy variable used by testnet Terraform"
   type        = list(string)

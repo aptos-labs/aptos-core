@@ -11,8 +11,6 @@ data:
     {{- tpl (.Files.Get "files/vault.json") . | replace "<role>" "validator" | nindent 4 }}
   fullnode.json: |-
     {{- tpl (.Files.Get "files/vault.json") . | replace "<role>" "fullnode" | nindent 4 }}
-  keymanager.json: |-
-    {{- tpl (.Files.Get "files/vault.json") . | replace "<role>" "key-manager" | nindent 4 }}
 {{- if .Values.vault.tls }}
 {{ .Values.vault.tls | toYaml | indent 2 }}
 {{- end }}
@@ -51,7 +49,4 @@ subjects:
   namespace: {{ .Release.Namespace }}
 - kind: ServiceAccount
   name: {{ include "diem-validator.fullname" . }}-fullnode
-  namespace: {{ .Release.Namespace }}
-- kind: ServiceAccount
-  name: {{ include "diem-validator.fullname" . }}-key-manager
   namespace: {{ .Release.Namespace }}

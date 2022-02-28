@@ -1,0 +1,80 @@
+{{- if .Values.cluster_test.enabled }}
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: {{ include "testnet.fullname" . }}-cluster-test
+  labels:
+    {{- include "testnet.labels" . | nindent 4 }}
+    app.kubernetes.io/name: cluster-test
+spec:
+  concurrencyPolicy: Replace
+  schedule: {{ printf "*/%d * * * *" (int .Values.cluster_test.intervalMins) | quote }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "testnet.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/name: cluster-test
+          annotations:
+            seccomp.security.alpha.kubernetes.io/pod: runtime/default
+        spec:
+          restartPolicy: Never
+          priorityClassName: {{ include "testnet.fullname" . }}-high
+          containers:
+          - name: cluster-test
+            image: {{ .Values.cluster_test.image.repo }}:{{ .Values.cluster_test.image.tag | default .Values.imageTag }}
+            imagePullPolicy: {{ .Values.cluster_test.image.pullPolicy }}
+            command:
+            - cluster-test
+            - --swarm
+            - --emit-tx
+            - --mint-file=/opt/diem/etc/mint.key
+            - --chain-id={{ .Values.genesis.chain_id | default .Values.genesis.era }}
+            - --peers={{- range $i, $e := until (int .Values.genesis.numValidators) -}}val{{$i}}-diem-validator-fullnode-lb:80,{{- end -}}
+          {{- with .Values.cluster_test }}
+            - --duration={{ .config.duration }}
+            - --accounts-per-client={{ .config.accounts_per_client }}
+            - --workers-per-ac={{ .config.workers_per_ac }}
+            env:
+            - name: RUST_BACKTRACE
+              value: "1"
+            - name: REUSE_ACC
+              value: "1"
+            volumeMounts:
+            - name: faucet-configs
+              mountPath: /opt/diem/etc
+            securityContext:
+              readOnlyRootFilesystem: true
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                - ALL
+          {{- with .nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 6180
+            runAsGroup: 6180
+            fsGroup: 6180
+          {{- end }}
+          volumes:
+          - name: faucet-configs
+            secret:
+              secretName: {{ include "testnet.fullname" . }}-faucet-e{{ .Values.genesis.era }}
+          serviceAccountName: {{ include "testnet.serviceAccountName" . }}
+          {{- if .Values.imagePullSecret }}
+          imagePullSecrets:
+          - name: {{.Values.imagePullSecret}}
+          {{- end }}
+{{- end }}

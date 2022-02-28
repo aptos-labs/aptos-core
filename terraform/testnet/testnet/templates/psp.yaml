@@ -1,0 +1,32 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "testnet.fullname" . }}
+roleRef:
+  kind: ClusterRole
+  name: eks:podsecuritypolicy:privileged
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: {{ include "testnet.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "testnet.fullname" . }}-pfn
+roleRef:
+  kind: ClusterRole
+  name: val0-diem-validator-psp
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+{{- range $i, $e := until (int .Values.genesis.numPublicFullnodes) }}
+- kind: ServiceAccount
+  name: pfn{{ $e }}-diem-fullnode
+  namespace: {{ $.Release.Namespace }}
+{{- end }}
+- kind: ServiceAccount
+  name: testnet-pfn-diem-logger
+  namespace: {{ $.Release.Namespace }}

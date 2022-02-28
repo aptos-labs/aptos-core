@@ -1,0 +1,85 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    {{ include "testnet.labels" . | nindent 4 }}
+  name: alb-ingress-controller
+rules:
+- apiGroups:
+  - ""
+  - extensions
+  resources:
+  - configmaps
+  - endpoints
+  - events
+  - ingresses
+  - ingresses/status
+  - services
+  - pods/status
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - watch
+  - patch
+- apiGroups:
+  - ""
+  - extensions
+  resources:
+  - nodes
+  - pods
+  - secrets
+  - services
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    {{ include "testnet.labels" . | nindent 4 }}
+  name: alb-ingress-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: alb-ingress-controller
+subjects:
+- kind: ServiceAccount
+  name: k8s-aws-integrations
+  namespace: kube-system
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    {{ include "testnet.labels" . | nindent 4 }}
+    app.kubernetes.io/name: alb-ingress-controller
+  name: alb-ingress-controller
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alb-ingress-controller
+  template:
+    metadata:
+      labels:
+        {{ include "testnet.labels" . | nindent 8 }}
+        app.kubernetes.io/name: alb-ingress-controller
+    spec:
+      containers:
+      - name: alb-ingress-controller
+        image: docker.io/amazon/aws-alb-ingress-controller:v1.1.8
+        args:
+        - --ingress-class=alb
+        - --aws-region={{ .Values.aws.region }}
+        - --cluster-name={{ .Values.aws.cluster_name }}
+        - --aws-vpc-id={{ .Values.aws.vpc_id }}
+      serviceAccountName: k8s-aws-integrations

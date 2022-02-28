@@ -1,0 +1,25 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: {{ include "forge.fullname" . }}-delete-old
+  labels:
+    {{- include "forge.labels" . | nindent 4 }}
+spec:
+  schedule: "0 0 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: {{ include "forge.serviceAccountName" . }}
+          containers:
+          - name: main
+            image: {{ .Values.forge.image.repo }}:{{ required "forge.image.tag must be set" .Values.forge.image.tag }}
+            imagePullPolicy: {{ .Values.forge.image.pullPolicy }}
+            command:
+            - /bin/sh
+            - -c
+            - |
+              # delete old forge jobs
+              kubectl delete job $(kubectl get job -l app.kubernetes.io/name=forge -o=jsonpath='{.items[?(@.status.succeeded==1)].metadata.name}')
+              exit 0
+          restartPolicy: OnFailure
