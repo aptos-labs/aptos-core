@@ -24,7 +24,7 @@ struct Args {
     #[structopt(short = "p", long, default_value = "80")]
     pub port: u16,
     /// Diem fullnode/validator server URL
-    #[structopt(short = "s", long, default_value = "https://testnet.diem.com/v1")]
+    #[structopt(short = "s", long, default_value = "https://testnet.diem.com/")]
     pub server_url: String,
     /// Path to the private key for creating test account and minting coins.
     /// To keep Testnet simple, we used one private key for both treasury compliance account and testnet
@@ -78,20 +78,22 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
+    use diem_crypto::hash::HashValue;
     use diem_faucet::{routes, Service};
     use diem_infallible::RwLock;
-    use diem_sdk::{
-        client::{
-            views::{BytesView, TransactionDataView, TransactionView, VMStatusView},
-            FaucetClient,
+    use diem_rest_client::{
+        diem_api_types::{
+            AccountData, DirectWriteSet, LedgerInfo, PendingTransaction, Response,
+            TransactionPayload as TransactionPayloadData, WriteSet, WriteSetPayload,
         },
-        crypto::hash::CryptoHash,
+        FaucetClient,
+    };
+    use diem_sdk::{
         transaction_builder::stdlib::{ScriptCall, ScriptFunctionCall},
         types::{
             account_address::AccountAddress,
             account_config::{testnet_dd_account_address, treasury_compliance_account_address},
             chain_id::ChainId,
-            diem_id_identifier::DiemIdVaspDomainIdentifier,
             transaction::{
                 authenticator::AuthenticationKey,
                 metadata::{CoinTradeMetadata, Metadata},
@@ -101,15 +103,34 @@ mod tests {
             LocalAccount,
         },
     };
+    use serde::Serialize;
     use std::{
         collections::HashMap,
         convert::TryFrom,
         str::FromStr,
         sync::{Arc, Mutex},
     };
-    use warp::Filter;
+    use warp::{Filter, Rejection, Reply};
 
-    fn setup(accounts: Arc<RwLock<HashMap<AccountAddress, serde_json::Value>>>) -> Arc<Service> {
+    type AccountStates = Arc<RwLock<HashMap<AccountAddress, AccountState>>>;
+    #[derive(Clone, Debug, Eq, PartialEq, Hash)]
+    struct AccountState {
+        pub authentication_key: AuthenticationKey,
+        pub balance: u64,
+        pub sequence_number: u64,
+    }
+
+    impl AccountState {
+        pub fn new(balance: u64) -> Self {
+            Self {
+                authentication_key: AuthenticationKey::new([1; 32]),
+                balance,
+                sequence_number: 0,
+            }
+        }
+    }
+
+    fn setup() -> (AccountStates, Arc<Service>) {
         let f = tempfile::NamedTempFile::new()
             .unwrap()
             .into_temp_path()
@@ -125,29 +146,181 @@ mod tests {
 
         let chain_id = ChainId::test();
 
+        let accounts = AccountStates::new(diem_infallible::RwLock::new(HashMap::new()));
+        accounts
+            .write()
+            .insert(testnet_dd_account_address(), AccountState::new(100000));
+        accounts.write().insert(
+            treasury_compliance_account_address(),
+            AccountState::new(100000),
+        );
+
         let last_txn = Arc::new(Mutex::new(None));
-        let stub = warp::any()
-            .and(warp::body::json())
-            .map(move |req: serde_json::Value| {
-                let resp = handle_request(req, chain_id, Arc::clone(&accounts), last_txn.clone());
-                Ok(warp::reply::json(&resp))
-            });
+        let last_txn_0 = last_txn.clone();
+
+        let accounts_cloned_0 = accounts.clone();
+        let accounts_cloned_1 = accounts.clone();
+        let stub = warp::path!("accounts" / String)
+            .and(warp::any().map(move || accounts_cloned_0.clone()))
+            .and_then(handle_get_account)
+            .or(warp::path!("transactions" / String)
+                .and(warp::get())
+                .and(warp::any().map(move || last_txn_0.clone()))
+                .and_then(handle_get_transaction))
+            .or(warp::path!("transactions")
+                .and(warp::post())
+                .and(warp::body::bytes())
+                .and(warp::any().map(move || (accounts_cloned_1.clone(), last_txn.clone())))
+                .and_then(handle_submit_transaction));
         let (address, future) = warp::serve(stub).bind_ephemeral(([127, 0, 0, 1], 0));
         tokio::task::spawn(async move { future.await });
 
         let service = Service::new(
-            format!("http://localhost:{}/v1", address.port()),
+            format!("http://localhost:{}/", address.port()),
             chain_id,
             treasury_account,
             dd_account,
         );
-        Arc::new(service)
+        (accounts, Arc::new(service))
+    }
+
+    async fn handle_get_account(
+        address: String,
+        accounts: AccountStates,
+    ) -> Result<impl Reply, Rejection> {
+        let reader = accounts.read();
+        let account = AccountAddress::try_from(address)
+            .ok()
+            .and_then(|address| reader.get(&address));
+
+        if let Some(account) = account {
+            let auth_vec: Vec<u8> = account.authentication_key.as_ref().into();
+            let account_data = AccountData {
+                authentication_key: auth_vec.into(),
+                sequence_number: account.sequence_number.into(),
+            };
+            Ok(response(&account_data))
+        } else {
+            Err(warp::reject())
+        }
+    }
+
+    async fn handle_get_transaction(
+        _hash: String,
+        last_txn: Arc<Mutex<Option<Transaction>>>,
+    ) -> Result<impl Reply, Rejection> {
+        last_txn.lock().unwrap().as_ref().map_or_else(
+            || Err(warp::reject()),
+            |txn| {
+                let info = diem_rest_client::diem_api_types::TransactionInfo {
+                    version: 0.into(),
+                    hash: HashValue::zero().into(),
+                    state_root_hash: HashValue::zero().into(),
+                    event_root_hash: HashValue::zero().into(),
+                    gas_used: 0.into(),
+                    success: true,
+                    vm_status: "Executed".to_string(),
+                    accumulator_root_hash: HashValue::zero().into(),
+                };
+                let serializable_txn: diem_rest_client::diem_api_types::Transaction = (
+                    txn.as_signed_user_txn().unwrap(),
+                    info,
+                    dummy_payload(),
+                    Vec::new(),
+                    0,
+                )
+                    .into();
+
+                Ok(response(&serializable_txn))
+            },
+        )
+    }
+
+    async fn handle_submit_transaction(
+        txn: bytes::Bytes,
+        (accounts, last_txn): (AccountStates, Arc<Mutex<Option<Transaction>>>),
+    ) -> Result<impl Reply, Rejection> {
+        let txn: SignedTransaction = bcs::from_bytes(&txn).unwrap();
+        assert_eq!(txn.chain_id(), ChainId::test());
+        if let Script(script) = txn.payload() {
+            match ScriptCall::decode(script) {
+                Some(ScriptCall::CreateParentVaspAccount {
+                    new_account_address: address,
+                    ..
+                }) => {
+                    let mut writer = accounts.write();
+                    let previous = writer.insert(address, AccountState::new(0));
+                    assert!(previous.is_none(), "should not create account twice");
+                }
+                Some(ScriptCall::CreateDesignatedDealer { addr: address, .. }) => {
+                    let mut writer = accounts.write();
+                    let previous = writer.insert(address, AccountState::new(0));
+                    assert!(previous.is_none(), "should not create account twice");
+                }
+                Some(ScriptCall::PeerToPeerWithMetadata { payee, amount, .. }) => {
+                    let mut writer = accounts.write();
+                    let account = writer.get_mut(&payee).expect("account should be created");
+                    account.balance = amount;
+                }
+                _ => panic!("unexpected type of script"),
+            }
+        }
+        if let Some(script_function) = ScriptFunctionCall::decode(txn.payload()) {
+            match script_function {
+                ScriptFunctionCall::AddVaspDomain { .. } => {}
+                ScriptFunctionCall::RemoveVaspDomain { .. } => {}
+                ScriptFunctionCall::CreateParentVaspAccount {
+                    new_account_address: address,
+                    ..
+                } => {
+                    let mut writer = accounts.write();
+                    let previous = writer.insert(address, AccountState::new(0));
+                    assert!(previous.is_none(), "should not create account twice");
+                }
+                ScriptFunctionCall::CreateDesignatedDealer { addr: address, .. } => {
+                    let mut writer = accounts.write();
+                    let previous = writer.insert(address, AccountState::new(0));
+                    assert!(previous.is_none(), "should not create account twice");
+                }
+                ScriptFunctionCall::PeerToPeerWithMetadata { payee, amount, .. } => {
+                    let mut writer = accounts.write();
+                    let account = writer.get_mut(&payee).expect("account should be created");
+                    account.balance = amount;
+                }
+                script => panic!("unexpected type of script: {:?}", script),
+            }
+        }
+
+        let pending_txn = PendingTransaction {
+            hash: HashValue::zero().into(),
+            request: (&txn, dummy_payload()).into(),
+        };
+
+        *last_txn.lock().unwrap() = Some(Transaction::UserTransaction(txn));
+        Ok(response(&pending_txn))
+    }
+
+    fn response<T: Serialize>(body: &T) -> warp::reply::Response {
+        let li = LedgerInfo {
+            chain_id: ChainId::test().id(),
+            ledger_version: 5.into(),
+            ledger_timestamp: 5.into(),
+        };
+        Response::new(li, body).unwrap().into_response()
+    }
+
+    fn dummy_payload() -> TransactionPayloadData {
+        TransactionPayloadData::WriteSetPayload(WriteSetPayload {
+            write_set: WriteSet::DirectWriteSet(DirectWriteSet {
+                changes: Vec::new(),
+                events: Vec::new(),
+            }),
+        })
     }
 
     #[tokio::test]
     async fn test_healthy() {
-        let accounts = genesis_accounts();
-        let service = setup(accounts);
+        let (_accounts, service) = setup();
         let filter = routes(service);
         let resp = warp::test::request()
             .method("GET")
@@ -160,8 +333,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mint() {
-        let accounts = genesis_accounts();
-        let service = setup(accounts.clone());
+        let (accounts, service) = setup();
         let filter = routes(service);
 
         // auth_key is outside of the loop for minting same account multiple
@@ -186,14 +358,13 @@ mod tests {
             let addr =
                 AccountAddress::try_from("a74fd7c46952c497e75afb0a7932586d".to_owned()).unwrap();
             let account = reader.get(&addr).expect("account should be created");
-            assert_eq!(account["balances"][0]["amount"], amount);
+            assert_eq!(account.balance, amount);
         }
     }
 
     #[tokio::test]
     async fn test_mint_with_txns_response() {
-        let accounts = genesis_accounts();
-        let service = setup(accounts.clone());
+        let (accounts, service) = setup();
         let filter = routes(service);
 
         let auth_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
@@ -216,7 +387,6 @@ mod tests {
                 .expect("valid bcs vec");
         assert_eq!(txns.len(), 2);
 
-        // ensure if we provide a trade_id, it will end up in the metadata
         let trade_ids = get_trade_ids_from_payload(txns[1].payload());
         assert_eq!(trade_ids.len(), 1);
         assert_eq!(trade_ids[0], trade_id);
@@ -224,14 +394,12 @@ mod tests {
         let reader = accounts.read();
         let addr = AccountAddress::try_from("a74fd7c46952c497e75afb0a7932586d".to_owned()).unwrap();
         let account = reader.get(&addr).expect("account should be created");
-        assert_eq!(account["balances"][0]["amount"], amount);
-        assert_eq!(account["role"]["type"], "parent_vasp");
+        assert_eq!(account.balance, amount);
     }
 
     #[tokio::test]
     async fn test_mint_dd_account_with_txns_response() {
-        let accounts = genesis_accounts();
-        let service = setup(accounts.clone());
+        let (accounts, service) = setup();
         let filter = routes(service);
 
         let auth_key = "44b8f03f203ec45dbd7484e433752efe54aa533116e934f8a50c28bece06d3ac";
@@ -256,14 +424,12 @@ mod tests {
         let reader = accounts.read();
         let addr = AccountAddress::try_from("54aa533116e934f8a50c28bece06d3ac".to_owned()).unwrap();
         let account = reader.get(&addr).expect("account should be created");
-        assert_eq!(account["balances"][0]["amount"], amount);
-        assert_eq!(account["role"]["type"], "designated_dealer");
+        assert_eq!(account.balance, amount);
     }
 
     #[tokio::test]
     async fn test_mint_invalid_auth_key() {
-        let accounts = genesis_accounts();
-        let service = setup(accounts);
+        let (_accounts, service) = setup();
         let filter = routes(service);
 
         let auth_key = "invalid-auth-key";
@@ -283,8 +449,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_mint_fullnode_error() {
-        let accounts = Arc::new(RwLock::new(HashMap::new()));
-        let service = setup(accounts);
+        let (accounts, service) = setup();
+        accounts
+            .write()
+            .remove(&treasury_compliance_account_address());
         let filter = routes(service);
 
         let auth_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
@@ -303,60 +471,44 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_vasp_domain() {
-        let accounts = genesis_accounts();
-        let service = setup(accounts.clone());
-        let filter = routes(service);
+    async fn create_account_with_client() {
+        let (_accounts, service) = setup();
+        let endpoint = service.endpoint().to_owned();
+        let (address, future) = warp::serve(routes(service)).bind_ephemeral(([127, 0, 0, 1], 0));
+        tokio::task::spawn(async move { future.await });
 
-        // auth_key is outside of the loop for minting same account multiple
-        // times, it should success and should not create same account multiple
-        // times.
-        let auth_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
-        let vasp_domain = DiemIdVaspDomainIdentifier::new("diem").unwrap();
+        let faucet_client = FaucetClient::new(format!("http://{}", address), endpoint);
 
-        {
-            let resp = warp::test::request()
-                .method("POST")
-                .path(
-                    format!(
-                        "/mint?auth_key={}&vasp_domain={}&is_remove_domain={}&amount=1&currency_code=XDX",
-                        auth_key, "diem", false,
-                    )
-                    .as_str(),
-                )
-                .reply(&filter)
-                .await;
-            assert_eq!(resp.body(), 1.to_string().as_str());
-            let reader = accounts.read();
-            let addr =
-                AccountAddress::try_from("a74fd7c46952c497e75afb0a7932586d".to_owned()).unwrap();
-            let account = reader.get(&addr).expect("account should be created");
-            assert_eq!(
-                account["role"]["vasp_domains"][0],
-                serde_json::json!(vasp_domain),
-            );
-        }
+        let auth_key = AuthenticationKey::from_str(
+            "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d",
+        )
+        .unwrap();
+        tokio::task::spawn_blocking(move || faucet_client.create_account(auth_key, "XUS").unwrap())
+            .await
+            .unwrap();
+    }
 
-        {
-            let vasp_domain_to_remove = "diem";
-            let resp = warp::test::request()
-                .method("POST")
-                .path(
-                    format!(
-                        "/mint?auth_key={}&vasp_domain={}&is_remove_domain={}&amount=1&currency_code=XDX",
-                        auth_key, vasp_domain_to_remove, true,
-                    )
-                        .as_str(),
-                )
-                .reply(&filter)
-                .await;
-            assert_eq!(resp.body(), 2.to_string().as_str());
-            let reader = accounts.read();
-            let addr =
-                AccountAddress::try_from("a74fd7c46952c497e75afb0a7932586d".to_owned()).unwrap();
-            let account = reader.get(&addr).expect("account should be created");
-            assert_eq!(account["role"]["vasp_domains"], serde_json::json!([]));
-        }
+    #[tokio::test]
+    async fn fund_account_with_client() {
+        let (_accounts, service) = setup();
+        let endpoint = service.endpoint().to_owned();
+        let (address, future) = warp::serve(routes(service)).bind_ephemeral(([127, 0, 0, 1], 0));
+        tokio::task::spawn(async move { future.await });
+
+        let faucet_client = FaucetClient::new(format!("http://{}", address), endpoint);
+
+        let auth_key = AuthenticationKey::from_str(
+            "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d",
+        )
+        .unwrap();
+        tokio::task::spawn_blocking(move || {
+            faucet_client.create_account(auth_key, "XUS").unwrap();
+            faucet_client
+                .fund(auth_key.derived_address(), "XUS", 10)
+                .unwrap()
+        })
+        .await
+        .unwrap();
     }
 
     fn get_trade_ids_from_payload(payload: &TransactionPayload) -> Vec<String> {
@@ -386,296 +538,5 @@ mod tests {
 
             _ => panic!("unexpected payload type"),
         }
-    }
-
-    fn handle_request(
-        req: serde_json::Value,
-        chain_id: ChainId,
-        accounts: Arc<RwLock<HashMap<AccountAddress, serde_json::Value>>>,
-        last_txn: Arc<Mutex<Option<SignedTransaction>>>,
-    ) -> serde_json::Value {
-        if let serde_json::Value::Array(reqs) = req {
-            return reqs
-                .iter()
-                .map(move |req| {
-                    handle_request(
-                        req.clone(),
-                        chain_id,
-                        Arc::clone(&accounts),
-                        last_txn.clone(),
-                    )
-                })
-                .collect();
-        }
-        match req["method"].as_str() {
-            Some("submit") => {
-                let raw: &str = req["params"][0].as_str().unwrap();
-                let txn: SignedTransaction = bcs::from_bytes(&hex::decode(raw).unwrap()).unwrap();
-                *last_txn.lock().unwrap() = Some(txn.clone());
-                assert_eq!(txn.chain_id(), chain_id);
-                if let Script(script) = txn.payload() {
-                    match ScriptCall::decode(script) {
-                        Some(ScriptCall::CreateParentVaspAccount {
-                            new_account_address: address,
-                            ..
-                        }) => {
-                            let mut writer = accounts.write();
-                            let previous = writer
-                                .insert(address, create_vasp_account(&address.to_string(), 0));
-                            assert!(previous.is_none(), "should not create account twice");
-                        }
-                        Some(ScriptCall::CreateDesignatedDealer { addr: address, .. }) => {
-                            let mut writer = accounts.write();
-                            let previous =
-                                writer.insert(address, create_dd_account(&address.to_string(), 0));
-                            assert!(previous.is_none(), "should not create account twice");
-                        }
-                        Some(ScriptCall::PeerToPeerWithMetadata { payee, amount, .. }) => {
-                            let mut writer = accounts.write();
-                            let account =
-                                writer.get_mut(&payee).expect("account should be created");
-                            account["balances"][0]["amount"] = serde_json::json!(amount);
-                        }
-                        _ => panic!("unexpected type of script"),
-                    }
-                }
-                if let Some(script_function) = ScriptFunctionCall::decode(txn.payload()) {
-                    match script_function {
-                        ScriptFunctionCall::AddVaspDomain {
-                            address, domain, ..
-                        } => {
-                            let mut writer = accounts.write();
-                            let account =
-                                writer.get_mut(&address).expect("account should be created");
-                            let domain = DiemIdVaspDomainIdentifier::new(
-                                String::from_utf8(domain).unwrap().as_str(),
-                            )
-                            .unwrap();
-                            account["role"]["vasp_domains"]
-                                .as_array_mut()
-                                .unwrap()
-                                .push(serde_json::json!(domain));
-                        }
-                        ScriptFunctionCall::RemoveVaspDomain {
-                            address, domain, ..
-                        } => {
-                            let mut writer = accounts.write();
-                            let domain = DiemIdVaspDomainIdentifier::new(
-                                String::from_utf8(domain).unwrap().as_str(),
-                            )
-                            .unwrap();
-                            let json_domain = &serde_json::json!(domain);
-                            let account =
-                                writer.get_mut(&address).expect("account should be created");
-
-                            let index = account["role"]["vasp_domains"]
-                                .as_array()
-                                .unwrap()
-                                .iter()
-                                .position(|x| x == json_domain)
-                                .unwrap();
-                            account["role"]["vasp_domains"]
-                                .as_array_mut()
-                                .unwrap()
-                                .remove(index);
-                        }
-                        ScriptFunctionCall::CreateParentVaspAccount {
-                            new_account_address: address,
-                            ..
-                        } => {
-                            let mut writer = accounts.write();
-                            let previous = writer
-                                .insert(address, create_vasp_account(&address.to_string(), 0));
-                            assert!(previous.is_none(), "should not create account twice");
-                        }
-                        ScriptFunctionCall::CreateDesignatedDealer { addr: address, .. } => {
-                            let mut writer = accounts.write();
-                            let previous =
-                                writer.insert(address, create_dd_account(&address.to_string(), 0));
-                            assert!(previous.is_none(), "should not create account twice");
-                        }
-                        ScriptFunctionCall::PeerToPeerWithMetadata { payee, amount, .. } => {
-                            let mut writer = accounts.write();
-                            let account =
-                                writer.get_mut(&payee).expect("account should be created");
-                            account["balances"][0]["amount"] = serde_json::json!(amount);
-                        }
-                        script => panic!("unexpected type of script: {:?}", script),
-                    }
-                }
-                create_response(&req["id"], chain_id.id(), None)
-            }
-            Some("get_account") => {
-                let address_string: String = req["params"][0].as_str().unwrap().to_owned();
-                let reader = accounts.read();
-                let address_lookup = AccountAddress::try_from(address_string)
-                    .ok()
-                    .and_then(|address| reader.get(&address));
-                create_response(&req["id"], chain_id.id(), address_lookup)
-            }
-            Some("get_account_transaction") => {
-                let response = last_txn.lock().unwrap().take().map(|txn| {
-                    let view = TransactionView {
-                        version: 0,
-                        transaction: TransactionDataView::WriteSet {},
-                        hash: Transaction::UserTransaction(txn).hash(),
-                        bytes: BytesView::new([]),
-                        events: Vec::new(),
-                        vm_status: VMStatusView::Executed,
-                        gas_used: 0,
-                    };
-                    serde_json::to_value(&view).unwrap()
-                });
-                create_response(&req["id"], chain_id.id(), response.as_ref())
-            }
-            _ => panic!("unexpected method"),
-        }
-    }
-
-    fn create_response(
-        id: &serde_json::Value,
-        chain_id: u8,
-        result: Option<&serde_json::Value>,
-    ) -> serde_json::Value {
-        serde_json::json!({
-            "id": id,
-            "jsonrpc": "2.0",
-            "diem_chain_id": chain_id,
-            "diem_ledger_timestampusec": 1599670083580598u64,
-            "diem_ledger_version": 2052770,
-            "result": result
-        })
-    }
-
-    fn genesis_accounts() -> Arc<RwLock<HashMap<AccountAddress, serde_json::Value>>> {
-        let mut accounts: HashMap<AccountAddress, serde_json::Value> = HashMap::new();
-        let blessed = "0000000000000000000000000b1e55ed";
-        accounts.insert(
-            AccountAddress::try_from(blessed.to_owned()).unwrap(),
-            create_account(
-                blessed,
-                serde_json::json!([]),
-                serde_json::json!({
-                    "type": "unknown"
-                }),
-            ),
-        );
-        let dd = "000000000000000000000000000000dd";
-        accounts.insert(
-            AccountAddress::try_from(dd.to_owned()).unwrap(),
-            create_dd_account(dd, 4611685774556657903u64),
-        );
-        Arc::new(RwLock::new(accounts))
-    }
-
-    fn create_vasp_account(address: &str, amount: u64) -> serde_json::Value {
-        create_account(
-            address,
-            serde_json::json!([{
-                "amount": amount,
-                "currency": "XDX"
-            }]),
-            serde_json::json!({
-                "type": "parent_vasp",
-                "human_name": "No. 0 VASP",
-                "base_url": "",
-                "expiration_time": 18446744073709551615u64,
-                "compliance_key": "",
-                "num_children": 0,
-                "compliance_key_rotation_events_key": format!("0200000000000000{}", address),
-                "base_url_rotation_events_key": format!("0300000000000000{}", address),
-                "vasp_domains": [],
-            }),
-        )
-    }
-
-    fn create_dd_account(address: &str, amount: u64) -> serde_json::Value {
-        create_account(
-            address,
-            serde_json::json!([{
-                "amount": amount,
-                "currency": "XDX",
-            }]),
-            serde_json::json!({
-                "base_url": "",
-                "compliance_key": "",
-                "expiration_time": 18446744073709551615u64,
-                "human_name": "moneybags",
-                "preburn_balances": [{
-                    "amount": 0,
-                    "currency": "XDX"
-                }],
-                "preburn_queues": [{
-                    "currency": "XDX",
-                    "preburns": [],
-                }],
-                "type": "designated_dealer",
-                "compliance_key_rotation_events_key": format!("0200000000000000{}", address),
-                "base_url_rotation_events_key": format!("0300000000000000{}", address),
-                "received_mint_events_key": format!("0400000000000000{}", address)
-            }),
-        )
-    }
-
-    fn create_account(
-        address: &str,
-        balances: serde_json::Value,
-        role: serde_json::Value,
-    ) -> serde_json::Value {
-        serde_json::json!({
-            "address": address,
-            "balances": balances,
-            "role": role,
-            "authentication_key": format!("{}{}", address, address),
-            "sent_events_key": format!("0000000000000000{}", address),
-            "received_events_key": format!("0100000000000000{}", address),
-            "delegated_key_rotation_capability": false,
-            "delegated_withdrawal_capability": false,
-            "is_frozen": false,
-            "sequence_number": 0
-        })
-    }
-
-    #[tokio::test]
-    async fn create_account_with_client() {
-        let accounts = genesis_accounts();
-        let service = setup(accounts.clone());
-        let jsonrpc_endpoint = service.jsonrpc_endpoint().to_owned();
-        let (address, future) = warp::serve(routes(service)).bind_ephemeral(([127, 0, 0, 1], 0));
-        tokio::task::spawn(async move { future.await });
-
-        let faucet_client = FaucetClient::new(format!("http://{}", address), jsonrpc_endpoint);
-
-        let auth_key = AuthenticationKey::from_str(
-            "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d",
-        )
-        .unwrap();
-        tokio::task::spawn_blocking(move || faucet_client.create_account(auth_key, "XUS").unwrap())
-            .await
-            .unwrap();
-    }
-
-    #[tokio::test]
-    async fn fund_account_with_client() {
-        let accounts = genesis_accounts();
-        let service = setup(accounts.clone());
-        let jsonrpc_endpoint = service.jsonrpc_endpoint().to_owned();
-        let (address, future) = warp::serve(routes(service)).bind_ephemeral(([127, 0, 0, 1], 0));
-        tokio::task::spawn(async move { future.await });
-
-        let faucet_client = FaucetClient::new(format!("http://{}", address), jsonrpc_endpoint);
-
-        let auth_key = AuthenticationKey::from_str(
-            "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d",
-        )
-        .unwrap();
-        tokio::task::spawn_blocking(move || {
-            faucet_client.create_account(auth_key, "XUS").unwrap();
-            faucet_client
-                .fund(auth_key.derived_address(), "XUS", 10)
-                .unwrap()
-        })
-        .await
-        .unwrap();
     }
 }

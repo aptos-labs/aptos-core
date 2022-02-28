@@ -17,6 +17,8 @@ use url::Url;
 
 pub use diem_api_types;
 pub mod error;
+pub mod faucet;
+pub use faucet::FaucetClient;
 pub mod response;
 pub use response::Response;
 mod state;

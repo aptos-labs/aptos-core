@@ -23,10 +23,15 @@
 
 use anyhow::{anyhow, Result};
 use diem_logger::info;
+use diem_rest_client::Client;
 use diem_sdk::{
-    client::{AccountAddress, Client, SignedTransaction},
     transaction_builder::{Currency, TransactionFactory},
-    types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey, LocalAccount},
+    types::{
+        account_address::AccountAddress,
+        chain_id::ChainId,
+        transaction::{authenticator::AuthenticationKey, SignedTransaction},
+        LocalAccount,
+    },
 };
 use reqwest::StatusCode;
 use serde::Deserialize;
@@ -35,6 +40,7 @@ use std::{
     fmt,
     sync::{Arc, Mutex},
 };
+use url::Url;
 use warp::{Filter, Rejection, Reply};
 
 pub mod mint;
@@ -44,29 +50,29 @@ pub struct Service {
     designated_dealer_account: Mutex<LocalAccount>,
     transaction_factory: TransactionFactory,
     client: Client,
-    jsonrpc_endpoint: String,
+    endpoint: String,
 }
 
 impl Service {
     pub fn new(
-        jsonrpc_endpoint: String,
+        endpoint: String,
         chain_id: ChainId,
         treasury_compliance_account: LocalAccount,
         designated_dealer_account: LocalAccount,
     ) -> Self {
-        let client = Client::new(&jsonrpc_endpoint);
+        let client = Client::new(Url::parse(&endpoint).expect("Invalid rest endpont"));
         Service {
             treasury_compliance_account: Mutex::new(treasury_compliance_account),
             designated_dealer_account: Mutex::new(designated_dealer_account),
             transaction_factory: TransactionFactory::new(chain_id)
                 .with_transaction_expiration_time(30),
             client,
-            jsonrpc_endpoint,
+            endpoint,
         }
     }
 
-    pub fn jsonrpc_endpoint(&self) -> &str {
-        &self.jsonrpc_endpoint
+    pub fn endpoint(&self) -> &String {
+        &self.endpoint
     }
 }
 
@@ -140,9 +146,8 @@ async fn create_account(
     if service
         .client
         .get_account(params.authentication_key.derived_address())
-        .await?
-        .into_inner()
-        .is_some()
+        .await
+        .is_ok()
     {
         return Err(anyhow!("account already exists"));
     }
@@ -156,9 +161,9 @@ async fn create_account(
     let tc_sequence_number = service
         .client
         .get_account(tc_account_address)
-        .await?
+        .await
+        .map_err(|_| anyhow::format_err!("treasury compliance account not found"))?
         .into_inner()
-        .ok_or_else(|| anyhow::format_err!("treasury compliance account not found"))?
         .sequence_number;
 
     let txn = {
@@ -219,13 +224,7 @@ async fn fund_account(
     params: FundAccountParams,
 ) -> Result<SignedTransaction> {
     // Check to ensure the account has already been created
-    if service
-        .client
-        .get_account(address)
-        .await?
-        .into_inner()
-        .is_none()
-    {
+    if service.client.get_account(address).await.is_err() {
         return Err(anyhow!("account doesn't exist"));
     }
 
@@ -234,9 +233,9 @@ async fn fund_account(
     let dd_sequence_number = service
         .client
         .get_account(dd_account_address)
-        .await?
+        .await
+        .map_err(|_| anyhow::format_err!("treasury compliance account not found"))?
         .into_inner()
-        .ok_or_else(|| anyhow::format_err!("treasury compliance account not found"))?
         .sequence_number;
 
     let txn = {
