@@ -3,7 +3,7 @@ forge:
   numValidators:
   helmBucket:
   image:
-    repo: docker.libra.org/forge
+    repo: diem/forge
     tag:
     pullPolicy: IfNotPresent
   resources:

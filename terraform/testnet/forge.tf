@@ -1,18 +1,14 @@
 # If Forge test framework is enabled on this testnet, also create and use
 # an internal helm repository hosted on S3
 
+resource "random_id" "helm-bucket" {
+  byte_length = 4
+}
+
 resource "aws_s3_bucket" "diem-testnet-helm" {
   count = var.enable_forge ? 1 : 0
 
-  bucket = "diem-testnet-${terraform.workspace}-helm"
-
-  server_side_encryption_configuration {
-    rule {
-      apply_server_side_encryption_by_default {
-        sse_algorithm = "AES256"
-      }
-    }
-  }
+  bucket = "diem-testnet-${terraform.workspace}-helm-${random_id.helm-bucket.hex}"
 }
 
 resource "aws_s3_bucket_public_access_block" "diem-testnet-helm" {
@@ -62,7 +58,7 @@ resource "null_resource" "helm-s3-package" {
     command = <<-EOT
       set -e
       TEMPDIR="$(mktemp -d)"
-      cd .. # script expects to be called from project root
+      cd ${path.module}/.. # script expects to be called from project root
       ./scripts/prepare-helm-charts.py "$TEMPDIR" "1.0.0"
       helm s3 push --force "$TEMPDIR"/testnet-*.tgz testnet-${terraform.workspace}
       helm s3 push --force "$TEMPDIR"/diem-validator-*.tgz testnet-${terraform.workspace}
