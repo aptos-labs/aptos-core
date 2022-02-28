@@ -2,7 +2,7 @@
 version: 0.2
 
 env:
-  secrets-manager:
+  # secrets-manager:
     # DOCKERHUB_USERNAME: dockerhub_ro_username
     # DOCKERHUB_PASSWORD: dockerhub_ro_password
 
