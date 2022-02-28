@@ -3,7 +3,6 @@
 
 use forge::{forge_main, ForgeConfig, LocalFactory, Options, Result};
 use smoke_test::{
-    event_fetcher::EventFetcher,
     fullnode::LaunchFullnode,
     replay_tooling::ReplayTooling,
     rest_api::{self, GetIndex},
@@ -14,7 +13,6 @@ use smoke_test::{
 fn main() -> Result<()> {
     let tests = ForgeConfig::default()
         .with_public_usage_tests(&[
-            &EventFetcher,
             &ExternalTransactionSigner,
             &ReplayTooling,
             &VerifyingSubmit,

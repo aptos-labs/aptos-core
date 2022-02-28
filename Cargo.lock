@@ -1564,22 +1564,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "diem-events-fetcher"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "diem-client",
- "diem-types",
- "diem-workspace-hack",
- "futures",
- "hex",
- "reqwest",
- "structopt",
- "tokio",
-]
-
-[[package]]
 name = "diem-experimental-framework-releases"
 version = "0.1.0"
 dependencies = [
@@ -7200,7 +7184,6 @@ dependencies = [
  "debug-interface",
  "diem-config",
  "diem-crypto",
- "diem-events-fetcher",
  "diem-experimental-framework-releases",
  "diem-framework",
  "diem-framework-releases",
