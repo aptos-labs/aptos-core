@@ -232,19 +232,12 @@ root-members = [
     "execution-correctness",
 ]
 
-[subsets.key-manager]
-# The Diem key manager TCB.
-root-members = [
-    "diem-key-manager",
-]
-
 [subsets.release]
 # The Diem release binaries
 root-members = [
     "backup-cli",
     "db-bootstrapper",
     "diem-genesis-tool",
-    "diem-key-manager",
     "diem-node",
     "diem-operational-tool",
     "execution-correctness",

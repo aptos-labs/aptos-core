@@ -81,9 +81,6 @@ subjects:
   name: {{ include "diem-validator.fullname" . }}-fullnode
 - kind: ServiceAccount
   namespace: {{ .Release.Namespace }}
-  name: {{ include "diem-validator.fullname" . }}-key-manager
-- kind: ServiceAccount
-  namespace: {{ .Release.Namespace }}
   name: {{ include "diem-validator.fullname" . }}-backup
 
 ---

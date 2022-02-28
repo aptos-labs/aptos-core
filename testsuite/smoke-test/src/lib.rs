@@ -20,8 +20,6 @@ mod full_nodes;
 #[cfg(test)]
 mod genesis;
 #[cfg(test)]
-mod key_manager;
-#[cfg(test)]
 mod network;
 #[cfg(test)]
 mod operational_tooling;

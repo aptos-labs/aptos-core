@@ -1840,42 +1840,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "diem-key-manager"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "crash-handler",
- "diem-client",
- "diem-config",
- "diem-crypto",
- "diem-genesis-tool",
- "diem-global-constants",
- "diem-json-rpc",
- "diem-logger",
- "diem-mempool",
- "diem-secure-push-metrics",
- "diem-secure-storage",
- "diem-time-service",
- "diem-transaction-builder",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diemdb",
- "executor",
- "executor-test-helpers",
- "executor-types",
- "futures",
- "once_cell",
- "rand 0.8.4",
- "serde 1.0.130",
- "storage-interface",
- "thiserror",
- "tokio",
- "vm-validator",
-]
-
-[[package]]
 name = "diem-keygen"
 version = "0.1.0"
 dependencies = [
@@ -7155,7 +7119,6 @@ dependencies = [
  "diem-infallible",
  "diem-json-rpc",
  "diem-json-rpc-types",
- "diem-key-manager",
  "diem-logger",
  "diem-management",
  "diem-operational-tool",
