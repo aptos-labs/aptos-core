@@ -1350,22 +1350,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "diem-assets-proof"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "diem-client",
- "diem-crypto",
- "diem-types",
- "diem-workspace-hack",
- "move-core-types",
- "serde 1.0.130",
- "serde_json",
- "structopt",
-]
-
-[[package]]
 name = "diem-bitvec"
 version = "0.1.0"
 dependencies = [
