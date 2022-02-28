@@ -173,7 +173,8 @@ resource "helm_release" "validator" {
             name          = "fullnode"
             replicas      = 1
             enableJsonRpc = true
-            enableApi     = var.enable_api
+            # Forge requires REST API
+            enableApi = var.enable_forge || var.enable_api
           }
         ]
       }
