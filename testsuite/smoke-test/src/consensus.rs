@@ -131,14 +131,14 @@ async fn test_decoupled_execution_upgrade() {
 
 async fn rotate_operator_and_consensus_key(swarm: LocalSwarm) {
     let validator = swarm.validators().next().unwrap();
-    let json_rpc_endpoint = validator.json_rpc_endpoint().to_string();
+    let rest_api_endpoint = validator.rest_api_endpoint().to_string();
 
     // Load the first validator's on disk storage
     let backend = load_validators_backend_storage(validator);
     let storage: Storage = (&backend).try_into().unwrap();
 
     // Connect the operator tool to the first node's JSON RPC API
-    let op_tool = OperationalTool::new(json_rpc_endpoint, swarm.chain_id());
+    let op_tool = OperationalTool::new(rest_api_endpoint, swarm.chain_id());
 
     // Rotate the first node's operator key
     let (txn_ctx, _) = op_tool.rotate_operator_key(&backend, true).unwrap();
