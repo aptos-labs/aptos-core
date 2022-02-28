@@ -28,9 +28,6 @@ use diem_management::{
 use diem_secure_storage::{CryptoStorage, KVStorage, OnDiskStorage, Storage};
 use diem_types::{
     chain_id::ChainId,
-    network_address::encrypted::{
-        Key as NetworkAddressEncryptionKey, KeyVersion as NetworkAddressEncryptionKeyVersion,
-    },
     on_chain_config::{ConsensusConfigV2, OnChainConsensusConfig, VMPublishingOption},
     transaction::{authenticator::AuthenticationKey, Transaction},
     waypoint::Waypoint,
@@ -130,8 +127,6 @@ impl ValidatorConfig {
 pub struct RootKeys {
     pub root_key: Ed25519PrivateKey,
     pub treasury_compliance_key: Ed25519PrivateKey,
-    pub validator_network_address_encryption_key: NetworkAddressEncryptionKey,
-    pub validator_network_address_encryption_key_version: NetworkAddressEncryptionKeyVersion,
 }
 
 impl RootKeys {
@@ -146,14 +141,9 @@ impl RootKeys {
         let root_key = Ed25519PrivateKey::try_from(key.as_ref()).unwrap();
         let treasury_compliance_key = Ed25519PrivateKey::try_from(key.as_ref()).unwrap();
 
-        let mut validator_network_address_encryption_key = NetworkAddressEncryptionKey::default();
-        rng.fill_bytes(&mut validator_network_address_encryption_key);
-
         Self {
             root_key,
             treasury_compliance_key,
-            validator_network_address_encryption_key,
-            validator_network_address_encryption_key_version: 0,
         }
     }
 }
@@ -216,14 +206,7 @@ impl ValidatorBuilder {
 
         // Generate and initialize Validator configs
         let mut validators = (0..self.num_validators.get())
-            .map(|i| {
-                self.initialize_validator_config(
-                    i,
-                    &mut rng,
-                    root_keys.validator_network_address_encryption_key,
-                    root_keys.validator_network_address_encryption_key_version,
-                )
-            })
+            .map(|i| self.initialize_validator_config(i, &mut rng))
             .collect::<Result<Vec<_>>>()?;
 
         // Build genesis
@@ -267,13 +250,7 @@ impl ValidatorBuilder {
     // Build helpers
     //
 
-    fn initialize_validator_config<R>(
-        &self,
-        index: usize,
-        rng: R,
-        validator_network_address_encryption_key: NetworkAddressEncryptionKey,
-        validator_network_address_encryption_key_version: NetworkAddressEncryptionKeyVersion,
-    ) -> Result<ValidatorConfig>
+    fn initialize_validator_config<R>(&self, index: usize, rng: R) -> Result<ValidatorConfig>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
@@ -285,12 +262,7 @@ impl ValidatorBuilder {
 
         let mut validator =
             ValidatorConfig::new(name, storage_config, directory, self.template.clone());
-        Self::initialize_validator_storage(
-            &validator,
-            rng,
-            validator_network_address_encryption_key,
-            validator_network_address_encryption_key_version,
-        )?;
+        Self::initialize_validator_storage(&validator, rng)?;
 
         validator.config.set_data_dir(validator.directory.clone());
         let mut config = &mut validator.config;
@@ -365,12 +337,7 @@ impl ValidatorBuilder {
         storage_config
     }
 
-    fn initialize_validator_storage<R>(
-        validator: &ValidatorConfig,
-        mut rng: R,
-        validator_network_address_encryption_key: NetworkAddressEncryptionKey,
-        validator_network_address_encryption_key_version: NetworkAddressEncryptionKeyVersion,
-    ) -> Result<()>
+    fn initialize_validator_storage<R>(validator: &ValidatorConfig, mut rng: R) -> Result<()>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
@@ -397,13 +364,6 @@ impl ValidatorBuilder {
         // Initialize all other data in storage
         storage.set(SAFETY_DATA, SafetyData::new(0, 0, 0, 0, None))?;
         storage.set(WAYPOINT, Waypoint::default())?;
-
-        let mut encryptor = diem_network_address_encryption::Encryptor::new(storage);
-        encryptor.initialize()?;
-        encryptor.add_key(
-            validator_network_address_encryption_key_version,
-            validator_network_address_encryption_key,
-        )?;
 
         Ok(())
     }

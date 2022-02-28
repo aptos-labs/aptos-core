@@ -16,9 +16,7 @@ use diem_global_constants::{
 use diem_management::{error::Error, secure_backend::DISK};
 use diem_secure_storage::{CryptoStorage, KVStorage, Namespaced, OnDiskStorage, Storage};
 use diem_types::{
-    chain_id::ChainId,
-    network_address::{self, NetworkAddress},
-    transaction::Transaction,
+    chain_id::ChainId, network_address::NetworkAddress, transaction::Transaction,
     waypoint::Waypoint,
 };
 use std::{fs::File, path::Path};
@@ -90,14 +88,6 @@ impl StorageHelper {
             .set(SAFETY_DATA, SafetyData::new(0, 0, 0, 0, None))
             .unwrap();
         storage.set(WAYPOINT, Waypoint::default()).unwrap();
-        let mut encryptor = diem_network_address_encryption::Encryptor::new(storage);
-        encryptor.initialize().unwrap();
-        encryptor
-            .add_key(
-                network_address::encrypted::TEST_SHARED_VAL_NETADDR_KEY_VERSION,
-                network_address::encrypted::TEST_SHARED_VAL_NETADDR_KEY,
-            )
-            .unwrap();
     }
 
     pub fn create_waypoint(&self, chain_id: ChainId) -> Result<Waypoint, Error> {

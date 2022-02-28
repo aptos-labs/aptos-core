@@ -11,7 +11,6 @@ use diem_config::{
 };
 use diem_crypto::x25519;
 use diem_logger::prelude::*;
-use diem_network_address_encryption::Error;
 use diem_types::on_chain_config::{OnChainConfigPayload, ValidatorSet};
 use event_notifications::ReconfigNotificationListener;
 use futures::Stream;
@@ -120,8 +119,8 @@ fn extract_validator_set_updates(
             let config = info.into_config();
 
             let addrs = if is_validator {
-                bcs::from_bytes(&config.validator_network_addresses)
-                    .map_err(|e| Error::AddressDeserialization(peer_id, e.to_string()))
+                config
+                    .validator_network_addresses()
                     .map_err(anyhow::Error::from)
             } else {
                 config

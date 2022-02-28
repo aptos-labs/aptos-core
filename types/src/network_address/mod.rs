@@ -21,8 +21,6 @@ use std::{
 };
 use thiserror::Error;
 
-pub mod encrypted;
-
 const MAX_DNS_NAME_SIZE: usize = 255;
 
 /// ## Overview

@@ -5,7 +5,7 @@ use crate::{
     account_resource::SimplifiedAccountResource,
     command::{Command, CommandName},
     keys::{load_key, EncodingType, KeyType},
-    validator_config::DecryptedValidatorConfig,
+    validator_config::DecodedValidatorConfig,
     validator_set::DecryptedValidatorInfo,
     validator_state::VerifyValidatorStateResult,
     TransactionContext,
@@ -596,7 +596,7 @@ impl OperationalTool {
         &self,
         account_address: AccountAddress,
         backend: Option<&config::SecureBackend>,
-    ) -> Result<DecryptedValidatorConfig, Error> {
+    ) -> Result<DecodedValidatorConfig, Error> {
         let validator_backend = if let Some(backend) = backend {
             Some(backend_args(backend)?)
         } else {
