@@ -5,7 +5,6 @@ use crate::Service;
 use anyhow::Result;
 use diem_logger::prelude::warn;
 use diem_sdk::{
-    client::MethodRequest,
     transaction_builder::Currency,
     types::{
         account_address::AccountAddress,
@@ -106,7 +105,8 @@ impl MintParams {
 
 async fn process(service: &Service, mut params: MintParams) -> Result<Response> {
     let (tc_seq, dd_seq, receiver_seq) = sequences(service, params.receiver()).await?;
-    let txns = {
+
+    {
         let mut treasury_account = service.treasury_compliance_account.lock().unwrap();
         let mut dd_account = service.designated_dealer_account.lock().unwrap();
 
@@ -118,9 +118,11 @@ async fn process(service: &Service, mut params: MintParams) -> Result<Response> 
         if dd_seq > dd_account.sequence_number() {
             *dd_account.sequence_number_mut() = tc_seq;
         }
+    }
 
-        let mut txns = vec![];
-        if receiver_seq.is_none() {
+    let (account_creation_txn, account_creation_resp) = if receiver_seq.is_none() {
+        let txn = {
+            let mut treasury_account = service.treasury_compliance_account.lock().unwrap();
             let builder = if params.is_designated_dealer.unwrap_or(false) {
                 service.transaction_factory.create_designated_dealer(
                     params.currency_code,
@@ -138,10 +140,20 @@ async fn process(service: &Service, mut params: MintParams) -> Result<Response> 
                     false, // add all currencies
                 )
             };
+            treasury_account.sign_with_transaction_builder(builder)
+        };
 
-            txns.push(treasury_account.sign_with_transaction_builder(builder));
-        }
+        let response = service.client.submit(&txn).await;
+        (Some(txn), Some(response))
+    } else {
+        (None, None)
+    };
 
+    let mut txns = vec![];
+
+    {
+        let mut treasury_account = service.treasury_compliance_account.lock().unwrap();
+        let mut dd_account = service.designated_dealer_account.lock().unwrap();
         if let (Some(ref vasp_domain), Some(is_remove_domain)) =
             (&params.vasp_domain, params.is_remove_domain)
         {
@@ -166,19 +178,17 @@ async fn process(service: &Service, mut params: MintParams) -> Result<Response> 
                 vec![],
             ),
         ));
-        txns
-    };
+    }
 
-    let batch = txns
-        .iter()
-        .map(|txn| MethodRequest::submit(txn))
-        .collect::<Result<_, _>>()
-        .expect("serialization should not fail");
-    let response = service.client.batch(batch).await?;
+    let requests = txns.iter().map(|txn| service.client.submit(txn));
+    let mut responses = futures::future::join_all(requests).await;
+    if let Some(response) = account_creation_resp {
+        responses.insert(0, response)
+    }
 
     // If there was an issue submitting a transaction we should just reset our sequence_numbers
     // to what was on chain
-    if response.iter().any(Result::is_err) {
+    if responses.iter().any(Result::is_err) {
         *service
             .treasury_compliance_account
             .lock()
@@ -191,7 +201,15 @@ async fn process(service: &Service, mut params: MintParams) -> Result<Response> 
             .sequence_number_mut() = dd_seq;
     }
 
+    while !responses.is_empty() {
+        let response = responses.swap_remove(0);
+        response?;
+    }
+
     if params.return_txns.unwrap_or(false) {
+        if let Some(txn) = account_creation_txn {
+            txns.insert(0, txn)
+        }
         Ok(Response::SubmittedTxns(txns))
     } else {
         Ok(Response::DDAccountNextSeqNum(
@@ -205,43 +223,28 @@ async fn process(service: &Service, mut params: MintParams) -> Result<Response> 
 }
 
 async fn sequences(service: &Service, receiver: AccountAddress) -> Result<(u64, u64, Option<u64>)> {
-    let accounts = vec![
-        treasury_compliance_account_address(),
-        testnet_dd_account_address(),
-        receiver,
-    ];
-    let responses = service
+    let tc_request = service
         .client
-        .batch(
-            accounts
-                .into_iter()
-                .map(MethodRequest::get_account)
-                .collect(),
-        )
-        .await?
-        .into_iter()
-        .map(|r| r.map_err(anyhow::Error::new))
-        .map(|r| r.map(|response| response.into_inner().unwrap_get_account()))
-        .collect::<Result<Vec<_>>>()?;
-    let treasury_compliance = responses
-        .get(0)
+        .get_account(treasury_compliance_account_address());
+    let dd_request = service.client.get_account(testnet_dd_account_address());
+    let r_request = service.client.get_account(receiver);
+    let mut responses = futures::future::join_all([tc_request, dd_request, r_request]).await;
+
+    let receiver_seq_num = responses
+        .remove(2)
         .as_ref()
-        .ok_or_else(|| anyhow::format_err!("get treasury compliance account response not found"))?
-        .as_ref()
-        .ok_or_else(|| anyhow::format_err!("treasury compliance account not found"))?
-        .sequence_number;
+        .ok()
+        .map(|account| account.inner().sequence_number);
     let designated_dealer = responses
-        .get(1)
-        .as_ref()
-        .ok_or_else(|| anyhow::format_err!("get designated dealer account response not found"))?
-        .as_ref()
-        .ok_or_else(|| anyhow::format_err!("designated dealer account not found"))?
+        .remove(1)
+        .map_err(|_| anyhow::format_err!("get designated dealer account response not found"))?
+        .inner()
         .sequence_number;
-    let receiver = responses
-        .get(2)
-        .as_ref()
-        .ok_or_else(|| anyhow::format_err!("get receiver account response not found"))?
-        .as_ref();
-    let receiver_seq_num = receiver.map(|account| account.sequence_number);
+    let treasury_compliance = responses
+        .remove(0)
+        .map_err(|_| anyhow::format_err!("treasury compliance account not found"))?
+        .inner()
+        .sequence_number;
+
     Ok((treasury_compliance, designated_dealer, receiver_seq_num))
 }
