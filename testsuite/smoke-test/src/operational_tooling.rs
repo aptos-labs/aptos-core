@@ -21,7 +21,6 @@ use diem_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, GENESIS_WAYPOINT, OPERATOR_ACCOUNT, OPERATOR_KEY,
     OWNER_ACCOUNT, OWNER_KEY, VALIDATOR_NETWORK_ADDRESS_KEYS, VALIDATOR_NETWORK_KEY, WAYPOINT,
 };
-use diem_key_manager::diem_interface::{DiemInterface, JsonRpcDiemInterface};
 use diem_management::storage::to_x25519;
 use diem_operational_tool::{
     keys::{EncodingType, KeyType},
@@ -33,6 +32,8 @@ use diem_secure_storage::{CryptoStorage, KVStorage, Storage};
 use diem_temppath::TempPath;
 use diem_types::{
     account_address::{from_identity_public_key, AccountAddress},
+    account_state::AccountState,
+    account_state_blob::AccountStateBlob,
     block_info::BlockInfo,
     ledger_info::LedgerInfo,
     network_address::NetworkAddress,
@@ -271,10 +272,12 @@ async fn test_set_operator_and_add_new_validator() {
         .unwrap();
 
     // Verify no validator operator
-    let diem_json_rpc = JsonRpcDiemInterface::new(validator.json_rpc_endpoint().to_string());
-    let account_state = diem_json_rpc
-        .retrieve_account_state(validator_account)
+    let account_state_data = client
+        .get_account_state_blob(validator_account)
+        .await
         .unwrap();
+    let account_state_blob: AccountStateBlob = account_state_data.inner().clone().into();
+    let account_state = AccountState::try_from(&account_state_blob).unwrap();
     let val_config_resource = account_state
         .get_validator_config_resource()
         .unwrap()
@@ -294,9 +297,12 @@ async fn test_set_operator_and_add_new_validator() {
         .unwrap();
 
     // Verify the operator has been set correctly
-    let account_state = diem_json_rpc
-        .retrieve_account_state(validator_account)
+    let account_state_data = client
+        .get_account_state_blob(validator_account)
+        .await
         .unwrap();
+    let account_state_blob: AccountStateBlob = account_state_data.inner().clone().into();
+    let account_state = AccountState::try_from(&account_state_blob).unwrap();
     let val_config_resource = account_state
         .get_validator_config_resource()
         .unwrap()
@@ -1086,11 +1092,14 @@ async fn create_operator_with_file_writer(file_writer: fn(&Ed25519PublicKey, Pat
     let (operator_key, operator_account) = create_new_test_account();
 
     let validator = swarm.validators().next().unwrap();
+    let client = validator.rest_client();
     // Verify the corresponding account doesn't exist on-chain
-    let diem_json_rpc = JsonRpcDiemInterface::new(validator.json_rpc_endpoint().to_string());
-    diem_json_rpc
-        .retrieve_account_state(operator_account)
-        .unwrap_err();
+    let account_state_data = client
+        .get_account_state_blob(operator_account)
+        .await
+        .unwrap();
+    let account_state_blob: AccountStateBlob = account_state_data.inner().clone().into();
+    let _ = AccountState::try_from(&account_state_blob).unwrap_err();
 
     // Write the key to a file using the provided file writer
     let key_file_path = write_key_to_file(&operator_key.public_key(), validator, file_writer);
@@ -1110,9 +1119,12 @@ async fn create_operator_with_file_writer(file_writer: fn(&Ed25519PublicKey, Pat
     assert_eq!(VMStatusView::Executed, txn_ctx.execution_result.unwrap());
 
     // Verify the operator account now exists on-chain
-    let account_state = diem_json_rpc
-        .retrieve_account_state(operator_account)
+    let account_state_data = client
+        .get_account_state_blob(operator_account)
+        .await
         .unwrap();
+    let account_state_blob: AccountStateBlob = account_state_data.inner().clone().into();
+    let account_state = AccountState::try_from(&account_state_blob).unwrap();
     let op_config_resource = account_state
         .get_validator_operator_config_resource()
         .unwrap()
@@ -1131,10 +1143,12 @@ async fn create_validator_with_file_writer(file_writer: fn(&Ed25519PublicKey, Pa
     let validator = swarm.validators().next().unwrap();
     let client = validator.rest_client();
     // Verify the corresponding account doesn't exist on-chain
-    let diem_json_rpc = JsonRpcDiemInterface::new(validator.json_rpc_endpoint().to_string());
-    diem_json_rpc
-        .retrieve_account_state(validator_account)
-        .unwrap_err();
+    let account_state_data = client
+        .get_account_state_blob(validator_account)
+        .await
+        .unwrap();
+    let account_state_blob: AccountStateBlob = account_state_data.inner().clone().into();
+    let _ = AccountState::try_from(&account_state_blob).unwrap_err();
 
     // Write the key to a file using the provided file writer
     let key_file_path = write_key_to_file(&validator_key.public_key(), validator, file_writer);
@@ -1165,9 +1179,12 @@ async fn create_validator_with_file_writer(file_writer: fn(&Ed25519PublicKey, Pa
     assert_eq!(VMStatusView::Executed, txn_ctx.execution_result.unwrap());
 
     // Verify the validator account now exists on-chain
-    let account_state = diem_json_rpc
-        .retrieve_account_state(validator_account)
+    let account_state_data = client
+        .get_account_state_blob(validator_account)
+        .await
         .unwrap();
+    let account_state_blob: AccountStateBlob = account_state_data.inner().clone().into();
+    let account_state = AccountState::try_from(&account_state_blob).unwrap();
     let val_config_resource = account_state
         .get_validator_config_resource()
         .unwrap()

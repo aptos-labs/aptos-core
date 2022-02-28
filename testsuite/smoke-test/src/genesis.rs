@@ -141,7 +141,7 @@ async fn test_genesis_transaction_flow() {
         swarm
             .validator(node_to_kill)
             .unwrap()
-            .json_rpc_endpoint()
+            .rest_api_endpoint()
             .to_string(),
         chain_id,
     );
@@ -253,7 +253,7 @@ async fn test_genesis_transaction_flow() {
         swarm
             .validator(validator_peer_ids[0])
             .unwrap()
-            .json_rpc_endpoint()
+            .rest_api_endpoint()
             .to_string(),
         chain_id,
     );

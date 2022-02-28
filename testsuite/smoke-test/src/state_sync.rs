@@ -2,17 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    scripts_and_modules::enable_open_publishing,
     smoke_test_environment::new_local_swarm,
-    test_utils::{
-        assert_balance, create_and_fund_account, diem_swarm_utils::insert_waypoint, transfer_coins,
-    },
+    test_utils::{assert_balance, create_and_fund_account, transfer_coins},
 };
-use diem_types::{epoch_change::EpochChangeProof, waypoint::Waypoint};
 use forge::{NodeExt, Swarm, SwarmExt};
 use std::{
     fs,
-    path::PathBuf,
     time::{Duration, Instant},
 };
 
@@ -200,6 +195,8 @@ async fn test_startup_sync_state() {
     assert_balance(&client_0, &account_1, 30).await;
 }
 
+/*
+ * Diabled until we can add waypoints to rest interface
 #[tokio::test]
 async fn test_state_sync_multichunk_epoch() {
     let mut swarm = new_local_swarm(4).await;
@@ -317,3 +314,4 @@ async fn test_state_sync_multichunk_epoch() {
         .await
         .unwrap();
 }
+*/
