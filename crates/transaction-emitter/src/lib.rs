@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{format_err, Context, Result};
-use diem_client::Response;
 use diem_logger::*;
-use diem_rest_client::{Client as RestClient, PendingTransaction};
+use diem_rest_client::{Client as RestClient, PendingTransaction, Response};
 use diem_sdk::{
     client::views::AmountView,
     move_types::account_address::AccountAddress,

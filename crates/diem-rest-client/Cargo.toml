@@ -24,9 +24,8 @@ tokio = { version = "1.8.1", features = ["full"] }
 url = "2.2.2"
 
 diem-api-types = { path = "../../api/types" }
-diem-client = { path = "../diem-client" }
 diem-crypto = { path = "../diem-crypto" }
-diem-json-rpc-types = { path = "../../json-rpc/types" }
+diem-transaction-builder = { path = "../../sdk/transaction-builder" }
 diem-types = { path = "../../types" }
 diem-workspace-hack = { version = "0.1", path = "../diem-workspace-hack" }
 move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }

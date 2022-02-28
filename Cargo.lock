@@ -2222,9 +2222,8 @@ dependencies = [
  "anyhow",
  "bcs",
  "diem-api-types",
- "diem-client",
  "diem-crypto",
- "diem-json-rpc-types",
+ "diem-transaction-builder",
  "diem-types",
  "diem-workspace-hack",
  "hex",
@@ -8202,7 +8201,6 @@ name = "transaction-emitter"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "diem-client",
  "diem-config",
  "diem-crypto",
  "diem-logger",
