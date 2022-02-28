@@ -3,17 +3,17 @@ version: 0.2
 
 env:
   secrets-manager:
-    DOCKERHUB_USERNAME: dockerhub_ro_username
-    DOCKERHUB_PASSWORD: dockerhub_ro_password
+    # DOCKERHUB_USERNAME: dockerhub_ro_username
+    # DOCKERHUB_PASSWORD: dockerhub_ro_password
 
 phases:
   install:
     runtime-versions:
       docker: 18
-  pre_build:
-    commands:
-      - echo logging in to dockerhub.
-      - echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+  # pre_build:
+  #   commands:
+  #     - echo logging in to dockerhub.
+  #     - echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
   build:
     commands:
       - echo Build started on `date`
