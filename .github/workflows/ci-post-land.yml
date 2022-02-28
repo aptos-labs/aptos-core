@@ -121,37 +121,37 @@ jobs:
 #            }' > /tmp/payload
 #          curl -X POST -H 'Content-type: application/json' -d @/tmp/payload ${{ secrets.WEBHOOK_FORGE }}
 
-  rustdoc:
-    runs-on: ubuntu-20.04
-    container:
-      image: ghcr.io/diem/diem_build_environment:${{ needs.prepare.outputs.changes-target-branch }}
-      volumes:
-        - "${{github.workspace}}:/opt/git/diem"
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2.4.0
-      - uses: ./.github/actions/build-setup
-      - uses: actions/cache@v2.1.6
-        with:
-          path: "/opt/cargo/git\n/opt/cargo/registry\n/opt/cargo/.package-cache"
-          key: crates-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: "crates-${{ runner.os }}"
-      - name: Build Documentation
-        # Build the rust crate docs
-        # Use `RUSTC_BOOTSTRAP` in order to use the `--enable-index-page` flag of rustdoc
-        # This is needed in order to generate a landing page `index.html` for workspaces
-        run: cargo doc --no-deps --workspace --lib
-        env:
-          RUSTC_BOOTSTRAP: 1
-          RUSTDOCFLAGS: "-Z unstable-options --enable-index-page"
-          CARGO_INCREMENTAL: 0
-          RUSTFLAGS: -D warnings
-      - name: copy API specification doc into target/doc/diem_api
-        run : cp api/doc/openapi.yaml target/doc/diem_api/openapi.yaml && cp api/doc/spec.html target/doc/diem_api/spec.html
-      - name: Deploy Docs
-        uses: peaceiris/actions-gh-pages@v3.8.0
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: gh-pages
-          publish_dir: ./target/doc
-          force_orphan: true
+#  rustdoc:
+#    runs-on: ubuntu-20.04
+#    container:
+#      image: ghcr.io/diem/diem_build_environment:${{ needs.prepare.outputs.changes-target-branch }}
+#      volumes:
+#        - "${{github.workspace}}:/opt/git/diem"
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v2.4.0
+#      - uses: ./.github/actions/build-setup
+#      - uses: actions/cache@v2.1.6
+#        with:
+#          path: "/opt/cargo/git\n/opt/cargo/registry\n/opt/cargo/.package-cache"
+#          key: crates-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+#          restore-keys: "crates-${{ runner.os }}"
+#      - name: Build Documentation
+#        # Build the rust crate docs
+#        # Use `RUSTC_BOOTSTRAP` in order to use the `--enable-index-page` flag of rustdoc
+#        # This is needed in order to generate a landing page `index.html` for workspaces
+#        run: cargo doc --no-deps --workspace --lib
+#        env:
+#          RUSTC_BOOTSTRAP: 1
+#          RUSTDOCFLAGS: "-Z unstable-options --enable-index-page"
+#          CARGO_INCREMENTAL: 0
+#          RUSTFLAGS: -D warnings
+#      - name: copy API specification doc into target/doc/diem_api
+#        run : cp api/doc/openapi.yaml target/doc/diem_api/openapi.yaml && cp api/doc/spec.html target/doc/diem_api/spec.html
+#      - name: Deploy Docs
+#        uses: peaceiris/actions-gh-pages@v3.8.0
+#        with:
+#          github_token: ${{ secrets.GITHUB_TOKEN }}
+#          publish_branch: gh-pages
+#          publish_dir: ./target/doc
+#          force_orphan: true
