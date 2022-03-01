@@ -1,5 +1,3 @@
-provider "vault" {}
-
 variable "namespace" {
   description = "Prefix to use when naming secrets and transit keys"
   default     = "diem"
