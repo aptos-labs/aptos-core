@@ -57,8 +57,9 @@ pub fn run(args: Args, xctx: XContext) -> crate::Result<()> {
 
     let whitespace_exceptions =
         whitespace::build_exceptions(&workspace_config.whitespace_exceptions)?;
+    let license_exceptions = license::build_exceptions(&workspace_config.license_exceptions)?;
     let content_linters: &[&dyn ContentLinter] = &[
-        &license::LicenseHeader,
+        &license::LicenseHeader::new(&license_exceptions),
         &toml::RootToml,
         &whitespace::EofNewline::new(&whitespace_exceptions),
         &whitespace::TrailingWhitespace::new(&whitespace_exceptions),

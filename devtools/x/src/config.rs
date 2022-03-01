@@ -123,6 +123,8 @@ pub struct WorkspaceConfig {
     pub banned_deps: BannedDepsConfig,
     /// Direct dep duplicate lint config
     pub direct_dep_dups: DirectDepDupsConfig,
+    /// Exceptions to license linters
+    pub license_exceptions: Vec<String>,
     /// Overlay config in this workspace
     pub overlay: OverlayConfig,
     /// Test-only config in this workspace

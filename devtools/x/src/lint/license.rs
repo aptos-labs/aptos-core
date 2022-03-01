@@ -1,6 +1,8 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::Context;
+use globset::{Glob, GlobSet, GlobSetBuilder};
 use std::collections::HashSet;
 use x_lint::prelude::*;
 
@@ -9,20 +11,28 @@ static LICENSE_HEADER: &str = "\
                                ";
 
 #[derive(Copy, Clone, Debug)]
-pub(super) struct LicenseHeader;
+pub(super) struct LicenseHeader<'cfg> {
+    exceptions: &'cfg GlobSet,
+}
 
-impl Linter for LicenseHeader {
+impl<'cfg> Linter for LicenseHeader<'cfg> {
     fn name(&self) -> &'static str {
         "license-header"
     }
 }
 
-impl ContentLinter for LicenseHeader {
+impl<'cfg> LicenseHeader<'cfg> {
+    pub fn new(exceptions: &'cfg GlobSet) -> Self {
+        Self { exceptions }
+    }
+}
+
+impl<'cfg> ContentLinter for LicenseHeader<'cfg> {
     fn pre_run<'l>(&self, file_ctx: &FilePathContext<'l>) -> Result<RunStatus<'l>> {
         // TODO: Add a way to pass around state between pre_run and run, so that this computation
         // only needs to be done once.
         match FileType::new(file_ctx) {
-            Some(_) => Ok(RunStatus::Executed),
+            Some(_) => Ok(skip_license_checks(self.exceptions, file_ctx)),
             None => Ok(RunStatus::Skipped(SkipReason::UnsupportedExtension(
                 file_ctx.extension(),
             ))),
@@ -95,4 +105,28 @@ impl FileType {
             _ => None,
         }
     }
+}
+
+pub(super) fn build_exceptions(patterns: &[String]) -> crate::Result<GlobSet> {
+    let mut builder = GlobSetBuilder::new();
+    for pattern in patterns {
+        let glob = Glob::new(pattern).with_context(|| {
+            format!(
+                "error while processing license exception glob '{}'",
+                pattern
+            )
+        })?;
+        builder.add(glob);
+    }
+    builder
+        .build()
+        .with_context(|| "error while building globset for license patterns")
+}
+
+fn skip_license_checks<'l>(exceptions: &GlobSet, file: &FilePathContext<'l>) -> RunStatus<'l> {
+    if exceptions.is_match(file.file_path()) {
+        return RunStatus::Skipped(SkipReason::UnsupportedFile(file.file_path()));
+    }
+
+    RunStatus::Executed
 }
