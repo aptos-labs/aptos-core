@@ -252,7 +252,7 @@ impl Context {
     }
 
     pub fn health_check_route(&self) -> BoxedFilter<(impl Reply,)> {
-        diem_json_rpc::runtime::health_check_route(self.db.clone())
+        super::health_check::health_check_route(self.db.clone())
     }
 
     pub fn jsonrpc_routes(&self) -> BoxedFilter<(impl Reply,)> {
