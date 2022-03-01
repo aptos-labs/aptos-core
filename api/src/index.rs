@@ -49,7 +49,6 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         .or(context.health_check_route().with(metrics("health_check")))
         // jsonrpc routes must before `recover` and after `index`
         // so that POST '/' can be handled by jsonrpc routes instead of `index` route
-        .or(context.jsonrpc_routes().with(metrics("json_rpc")))
         .with(
             warp::cors()
                 .allow_any_origin()

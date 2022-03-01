@@ -1298,7 +1298,6 @@ dependencies = [
  "diem-framework-releases",
  "diem-genesis-tool",
  "diem-global-constants",
- "diem-json-rpc",
  "diem-logger",
  "diem-mempool",
  "diem-metrics",

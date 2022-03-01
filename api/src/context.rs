@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use diem_api_types::{Error, LedgerInfo, MoveConverter, TransactionOnChainData};
-use diem_config::config::{ApiConfig, JsonRpcConfig, RoleType};
+use diem_config::config::{ApiConfig, RoleType};
 use diem_crypto::HashValue;
 use diem_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use diem_types::{
@@ -33,7 +33,6 @@ pub struct Context {
     db: Arc<dyn MoveDbReader>,
     mp_sender: MempoolClientSender,
     role: RoleType,
-    jsonrpc_config: JsonRpcConfig,
     api_config: ApiConfig,
 }
 
@@ -43,7 +42,6 @@ impl Context {
         db: Arc<dyn MoveDbReader>,
         mp_sender: MempoolClientSender,
         role: RoleType,
-        jsonrpc_config: JsonRpcConfig,
         api_config: ApiConfig,
     ) -> Self {
         Self {
@@ -51,7 +49,6 @@ impl Context {
             db,
             mp_sender,
             role,
-            jsonrpc_config,
             api_config,
         }
     }
@@ -253,15 +250,5 @@ impl Context {
 
     pub fn health_check_route(&self) -> BoxedFilter<(impl Reply,)> {
         super::health_check::health_check_route(self.db.clone())
-    }
-
-    pub fn jsonrpc_routes(&self) -> BoxedFilter<(impl Reply,)> {
-        diem_json_rpc::runtime::jsonrpc_routes(
-            self.db.clone(),
-            self.mp_sender.clone(),
-            self.role,
-            self.chain_id,
-            &self.jsonrpc_config,
-        )
     }
 }
