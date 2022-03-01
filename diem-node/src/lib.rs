@@ -20,7 +20,6 @@ use diem_config::{
 };
 use diem_data_client::diemnet::DiemNetDataClient;
 use diem_infallible::RwLock;
-use diem_json_rpc::bootstrap_from_config as bootstrap_rpc;
 use diem_logger::{prelude::*, Logger};
 use diem_metrics::metric_server;
 use diem_time_service::TimeService;
@@ -143,10 +142,9 @@ pub fn load_test_environment<R>(
         .unwrap_or_else(|_| NodeConfig::default_for_validator());
 
     // enable REST and JSON-RPC API
-    template.json_rpc.address = format!("0.0.0.0:{}", template.json_rpc.address.port())
+    template.api.address = format!("0.0.0.0:{}", template.api.address.port())
         .parse()
         .unwrap();
-    template.api.address = template.json_rpc.address;
     if lazy {
         template.consensus.mempool_poll_count = u64::MAX;
     }
@@ -194,7 +192,6 @@ pub fn load_test_environment<R>(
 }
 
 pub fn print_api_config(config: &NodeConfig, lazy: bool) {
-    println!("\tJSON-RPC endpoint: {}", config.json_rpc.address);
     println!("\tREST API endpoint: {}", config.api.address);
     println!("\tStream-RPC enabled!");
 
@@ -618,12 +615,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
     let (mp_client_sender, mp_client_events) = channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
-    let api_runtime = if node_config.api.enabled {
-        // bootstrap_api bootstraps a web-server serves for both REST and JSON-RPC API
-        bootstrap_api(node_config, chain_id, diem_db, mp_client_sender).unwrap()
-    } else {
-        bootstrap_rpc(node_config, chain_id, diem_db, mp_client_sender)
-    };
+    let api_runtime = bootstrap_api(node_config, chain_id, diem_db, mp_client_sender).unwrap();
 
     let mut consensus_runtime = None;
     let (consensus_to_mempool_sender, consensus_requests) = channel(INTRA_NODE_CHANNEL_BUFFER_SIZE);
