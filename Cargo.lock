@@ -2543,7 +2543,6 @@ dependencies = [
  "diem-state-view",
  "diem-transaction-replay",
  "diem-types",
- "diem-validator-interface",
  "diem-vm",
  "diem-workspace-hack",
  "diemdb",

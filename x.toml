@@ -172,6 +172,7 @@ members = [
     "diem-transactional-test-harness",
     "diem-transaction-benchmarks",
     "diem-wallet",
+    "diem-writeset-generator",
     "executor-benchmark",
     "executor-test-helpers",
     "forge",
