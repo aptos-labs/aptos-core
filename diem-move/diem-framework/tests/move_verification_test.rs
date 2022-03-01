@@ -6,8 +6,8 @@
 // TODO: split this into individual tests once the package system supports this.
 #[test]
 fn prove_all() {
-// All prover tests are temporarily disabled
-//    ProverTest::create("core").run();
-//    ProverTest::create("experimental").run();
-//    ProverTest::create("DPN").run()
+    // All prover tests are temporarily disabled
+    //    ProverTest::create("core").run();
+    //    ProverTest::create("experimental").run();
+    //    ProverTest::create("DPN").run()
 }
