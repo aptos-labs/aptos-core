@@ -142,7 +142,7 @@ resource "helm_release" "testnet" {
 resource "helm_release" "validator" {
   count       = var.num_validators
   name        = "val${count.index}"
-  chart       = "${path.module}/../../helm/validator"
+  chart       = "${path.module}/../helm/validator"
   max_history = var.enable_forge ? 2 : 10
   wait        = false
 
@@ -222,7 +222,7 @@ resource "helm_release" "validator" {
 resource "helm_release" "public-fullnode" {
   count       = var.num_public_fullnodes
   name        = "pfn${count.index}"
-  chart       = "${path.module}/../../helm/fullnode"
+  chart       = "${path.module}/../helm/fullnode"
   max_history = var.enable_forge ? 2 : 10
   wait        = false
 
