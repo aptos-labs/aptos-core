@@ -195,12 +195,6 @@ impl Node for LocalNode {
         self.version.version()
     }
 
-    fn json_rpc_endpoint(&self) -> Url {
-        let ip = self.config().json_rpc.address.ip();
-        let port = self.config().json_rpc.address.port();
-        Url::from_str(&format!("http://{}:{}/v1", ip, port)).expect("Invalid URL.")
-    }
-
     fn rest_api_endpoint(&self) -> Url {
         let ip = self.config().api.address.ip();
         let port = self.config().api.address.port();

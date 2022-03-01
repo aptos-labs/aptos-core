@@ -404,16 +404,10 @@ impl Test for GetMetadata {
 
 impl AdminTest for GetMetadata {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
-        let client = ctx.client();
-
-        let metadata = client.get_metadata()?.into_inner();
-
-        // get_metadata documentation states that the following fields will be present when no version
-        // argument is provided
-        metadata.script_hash_allow_list.unwrap();
-        metadata.diem_version.unwrap();
-        metadata.module_publishing_allowed.unwrap();
-        metadata.dual_attestation_limit.unwrap();
+        let client = ctx.rest_client();
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on(client.get_diem_version()).unwrap();
+        runtime.block_on(client.get_ledger_information()).unwrap();
 
         Ok(())
     }
