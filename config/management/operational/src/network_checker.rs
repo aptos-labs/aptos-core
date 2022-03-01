@@ -94,7 +94,8 @@ impl CheckEndpoint {
             self.address,
             timeout,
             self.no_handshake,
-        ).await
+        )
+        .await
     }
 }
 
@@ -193,7 +194,9 @@ impl CheckValidatorSetEndpoints {
         // Check all the addresses accordingly
         for (name, peer_id, addrs) in nodes {
             for addr in addrs {
-                match check_endpoint(upgrade_context.clone(), addr, timeout, self.no_handshake).await {
+                match check_endpoint(upgrade_context.clone(), addr, timeout, self.no_handshake)
+                    .await
+                {
                     Ok(_) => println!("{} -- good", name),
                     Err(err) => println!("{} : {} -- bad -- {}", name, peer_id, err),
                 };

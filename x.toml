@@ -123,6 +123,11 @@ whitespace-exceptions = [
     "**/*.exp",
     "**/*.errmap",
     "**/*.abi",
+    "terraform/**/*",
+]
+
+license-exceptions = [
+    "terraform/**/*",
 ]
 
 [workspace.enforced-attributes]
@@ -258,7 +263,7 @@ mark-changed = "all"
 
 [[determinator.path-rule]]
 # Ignore website and other ancillary files, and scripts not listed above.
-globs = ["developers.diem.com/**/*", "developer-docs-site/**/*", "documentation/**/*", "docker/**/*", "helm/**/*", "language/documentation/**/*", "specifications/**/*", "scripts/**/*", "terraform/**/*"]
+globs = ["developers.diem.com/**/*", "developer-docs-site/**/*", "documentation/**/*", "docker/**/*", "language/documentation/**/*", "specifications/**/*", "scripts/**/*", "terraform/**/*"]
 mark-changed = []
 
 [[determinator.path-rule]]
