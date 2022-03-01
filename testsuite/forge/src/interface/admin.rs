@@ -4,7 +4,7 @@
 use super::{ChainInfo, CoreContext, Test};
 use crate::{Result, TestReport};
 use diem_rest_client::Client as RestClient;
-use diem_sdk::{client::BlockingClient, types::LocalAccount};
+use diem_sdk::types::LocalAccount;
 use reqwest::Url;
 
 /// The testing interface which defines a test written from the perspective of the Admin of the
@@ -38,10 +38,6 @@ impl<'t> AdminContext<'t> {
 
     pub fn rng(&mut self) -> &mut ::rand::rngs::StdRng {
         self.core.rng()
-    }
-
-    pub fn client(&self) -> BlockingClient {
-        BlockingClient::new(&self.chain_info.json_rpc_url)
     }
 
     pub fn rest_client(&self) -> RestClient {

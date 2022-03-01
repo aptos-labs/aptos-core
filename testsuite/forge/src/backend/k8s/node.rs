@@ -78,10 +78,6 @@ impl Node for K8sNode {
         self.version.clone()
     }
 
-    fn json_rpc_endpoint(&self) -> Url {
-        Url::from_str(&format!("http://{}:{}/v1", self.ip(), self.port())).expect("Invalid URL.")
-    }
-
     fn rest_api_endpoint(&self) -> Url {
         Url::from_str(&format!("http://{}:{}", self.ip(), self.rest_api_port()))
             .expect("Invalid URL.")

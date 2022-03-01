@@ -6,10 +6,7 @@ use anyhow::anyhow;
 use debug_interface::AsyncNodeDebugClient;
 use diem_config::{config::NodeConfig, network_id::NetworkId};
 use diem_rest_client::Client as RestClient;
-use diem_sdk::{
-    client::{BlockingClient, Client as JsonRpcClient},
-    types::PeerId,
-};
+use diem_sdk::types::PeerId;
 use std::{
     collections::HashMap,
     time::{Duration, Instant},
@@ -42,9 +39,6 @@ pub trait Node: Send + Sync {
 
     /// Return the version this node is running
     fn version(&self) -> Version;
-
-    /// Return the URL for the JSON-RPC endpoint of this Node
-    fn json_rpc_endpoint(&self) -> Url;
 
     /// Return the URL for the REST API endpoint of this Node
     fn rest_api_endpoint(&self) -> Url;
@@ -130,19 +124,9 @@ impl<T: ?Sized> NodeExt for T where T: Node {}
 
 #[async_trait::async_trait]
 pub trait NodeExt: Node {
-    /// Return JSON-RPC client of this Node
-    fn async_json_rpc_client(&self) -> JsonRpcClient {
-        JsonRpcClient::new(self.json_rpc_endpoint().to_string())
-    }
-
     /// Return REST API client of this Node
     fn rest_client(&self) -> RestClient {
         RestClient::new(self.rest_api_endpoint())
-    }
-
-    /// Return JSON-RPC client of this Node
-    fn json_rpc_client(&self) -> BlockingClient {
-        BlockingClient::new(self.json_rpc_endpoint())
     }
 
     /// Return a NodeDebugClient for this Node

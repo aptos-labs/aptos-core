@@ -119,15 +119,6 @@ impl K8sSwarm {
         })
     }
 
-    fn get_url(&self) -> String {
-        self.validators
-            .values()
-            .next()
-            .unwrap()
-            .json_rpc_endpoint()
-            .to_string()
-    }
-
     fn get_rest_api_url(&self) -> String {
         self.validators
             .values()
@@ -231,13 +222,11 @@ impl Swarm for K8sSwarm {
     }
 
     fn chain_info(&mut self) -> ChainInfo<'_> {
-        let json_rpc_url = self.get_url();
         let rest_api_url = self.get_rest_api_url();
         ChainInfo::new(
             &mut self.root_account,
             &mut self.treasury_compliance_account,
             &mut self.designated_dealer_account,
-            json_rpc_url,
             rest_api_url,
             self.chain_id,
         )

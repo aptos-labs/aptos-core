@@ -77,7 +77,6 @@ members = [
     "execution/executor-test-helpers",
     "execution/executor-types",
     "json-rpc",
-    "json-rpc/integration-tests",
     "json-rpc/types",
     "mempool",
     "network",

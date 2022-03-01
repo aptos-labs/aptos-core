@@ -3,9 +3,8 @@
 
 use super::Test;
 use crate::{CoreContext, Result, TestReport};
-use diem_rest_client::Client as RestClient;
+use diem_rest_client::{Client as RestClient, FaucetClient};
 use diem_sdk::{
-    client::{BlockingClient, FaucetClient},
     move_types::account_address::AccountAddress,
     transaction_builder::{Currency, TransactionFactory},
     types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey, LocalAccount},
@@ -36,16 +35,8 @@ impl<'t> PublicUsageContext<'t> {
         }
     }
 
-    pub fn client(&self) -> BlockingClient {
-        BlockingClient::new(&self.public_info.json_rpc_url)
-    }
-
     pub fn rest_client(&self) -> RestClient {
         RestClient::new(Url::parse(self.rest_api_url()).unwrap())
-    }
-
-    pub fn url(&self) -> &str {
-        &self.public_info.json_rpc_url
     }
 
     pub fn rest_api_url(&self) -> &str {
@@ -227,21 +218,14 @@ impl Fund for Coffer<'_> {
 }
 
 pub struct PublicInfo<'t> {
-    json_rpc_url: String,
     chain_id: ChainId,
     coffer: Coffer<'t>,
     rest_api_url: String,
 }
 
 impl<'t> PublicInfo<'t> {
-    pub fn new(
-        json_rpc_url: String,
-        chain_id: ChainId,
-        coffer: Coffer<'t>,
-        rest_api_url: String,
-    ) -> Self {
+    pub fn new(chain_id: ChainId, coffer: Coffer<'t>, rest_api_url: String) -> Self {
         Self {
-            json_rpc_url,
             chain_id,
             coffer,
             rest_api_url,

@@ -2,7 +2,6 @@
 version = "0.8.2"
 
 [system-tests]
-jsonrpc-integration-tests = { path = "json-rpc/integration-tests" }
 smoke-test = { path = "smoke-test" }
 testcases = { path = "testsuite/testcases" }
 
@@ -178,7 +177,6 @@ members = [
     "forge",
     "forge-cli",
     "generate-format",
-    "jsonrpc-integration-tests",
     "language-e2e-tests",
     "language-e2e-testsuite",
     "memsocket",

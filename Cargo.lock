@@ -4020,22 +4020,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jsonrpc-integration-tests"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "bcs",
- "diem-json-rpc-types",
- "diem-sdk",
- "diem-workspace-hack",
- "forge",
- "hex",
- "reqwest",
- "serde_json",
- "tokio",
-]
-
-[[package]]
 name = "k8s-openapi"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
