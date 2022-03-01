@@ -14,9 +14,7 @@ use diem_types::{
     transaction::{ChangeSet, Transaction, TransactionOutput, Version, WriteSetPayload},
     write_set::WriteOp,
 };
-use diem_validator_interface::{
-    DBDebuggerInterface, DebuggerStateView, DiemValidatorInterface, JsonRpcDebuggerInterface,
-};
+use diem_validator_interface::{DBDebuggerInterface, DebuggerStateView, DiemValidatorInterface};
 use diem_vm::{
     convert_changeset_and_events, data_cache::RemoteStorage, logging::AdapterLogSchema, DiemVM,
     VMExecutor,
@@ -46,10 +44,6 @@ impl DiemDebugger {
             build_dir: PathBuf::from(move_cli::DEFAULT_BUILD_DIR),
             storage_dir: PathBuf::from(move_cli::DEFAULT_STORAGE_DIR),
         }
-    }
-
-    pub fn json_rpc(url: &str) -> Result<Self> {
-        Ok(Self::new(Box::new(JsonRpcDebuggerInterface::new(url)?)))
     }
 
     pub fn db<P: AsRef<Path> + Clone>(db_root_path: P) -> Result<Self> {

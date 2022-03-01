@@ -92,8 +92,6 @@ fn main() -> Result<()> {
     let opt = Opt::from_args();
     let debugger = if let Some(p) = opt.db {
         DiemDebugger::db(p)?
-    } else if let Some(url) = opt.url {
-        DiemDebugger::json_rpc(url.as_str())?
     } else {
         panic!("No debugger attached")
     };

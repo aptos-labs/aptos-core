@@ -28,7 +28,6 @@ diem-sdk = { path = "../../sdk" }
 diem-rest-client = { path = "../../crates/diem-rest-client" }
 diem-temppath = { path = "../../crates/diem-temppath" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder" }
-diem-transaction-replay = { path = "../../diem-move/transaction-replay" }
 move-command-line-common = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 move-ir-compiler = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 move-stdlib = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
@@ -59,7 +58,6 @@ diem-operational-tool = {path = "../../config/management/operational", features 
 diem-secure-storage = { path = "../../secure/storage", features = ["testing"] }
 diem-time-service = { path = "../../crates/diem-time-service", features = ["testing"] }
 diem-vault-client = { path = "../../secure/storage/vault", features = ["fuzzing"] }
-diem-validator-interface = { path = "../../diem-move/diem-validator-interface" }
 diem-writeset-generator = { path = "../../diem-move/writeset-transaction-generator" }
 diem-transaction-builder = { path = "../../sdk/transaction-builder" }
 
