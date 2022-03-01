@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    client::AccountAddress,
     crypto::{
         ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
         traits::Uniform,
     },
     transaction_builder::TransactionBuilder,
-    types::transaction::{authenticator::AuthenticationKey, RawTransaction, SignedTransaction},
+    types::{
+        account_address::AccountAddress,
+        transaction::{authenticator::AuthenticationKey, RawTransaction, SignedTransaction},
+    },
 };
 
 pub use diem_types::*;

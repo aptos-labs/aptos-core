@@ -7,10 +7,12 @@ use diem_rest_client::{
     Transaction,
 };
 use diem_sdk::{
-    client::SignedTransaction,
     crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform},
     transaction_builder::Currency,
-    types::{account_config::XUS_NAME, transaction::authenticator::AuthenticationKey},
+    types::{
+        account_config::XUS_NAME,
+        transaction::{authenticator::AuthenticationKey, SignedTransaction},
+    },
 };
 use forge::{PublicUsageContext, PublicUsageTest, Result, Test};
 use tokio::runtime::Runtime;

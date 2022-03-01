@@ -3,9 +3,8 @@
 
 use anyhow::{format_err, Context, Result};
 use diem_logger::*;
-use diem_rest_client::{Client as RestClient, PendingTransaction, Response};
+use diem_rest_client::{views::AmountView, Client as RestClient, PendingTransaction, Response};
 use diem_sdk::{
-    client::views::AmountView,
     move_types::account_address::AccountAddress,
     transaction_builder::{Currency, TransactionFactory},
     types::{

@@ -9,14 +9,14 @@ use diem_crypto::{
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
     SigningKey, Uniform,
 };
-use diem_sdk::{client::SignedTransaction, transaction_builder::Currency, types::LocalAccount};
+use diem_sdk::{transaction_builder::Currency, types::LocalAccount};
 use diem_types::{
     access_path::{AccessPath, Path},
     account_address::AccountAddress,
     account_config::{from_currency_code_string, xus_tag, XUS_NAME},
     transaction::{
         authenticator::{AuthenticationKey, TransactionAuthenticator},
-        ChangeSet, Script, ScriptFunction, Transaction,
+        ChangeSet, Script, ScriptFunction, SignedTransaction, Transaction,
     },
     write_set::{WriteOp, WriteSetMut},
 };
