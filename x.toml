@@ -160,14 +160,11 @@ members = [
     # Please keep this list in alphabetical order!
 
     "testcases",
-    "diem-client",
     "diem-documentation-tool",
     "diem-e2e-tests-replay",
     "diem-experimental-framework-releases",
     "diem-fuzz",
     "diem-fuzzer",
-    "diem-json-rpc",
-    "diem-json-rpc-types",
     "diem-keygen",
     "diem-proptest-helpers",
     "diem-retrier",
