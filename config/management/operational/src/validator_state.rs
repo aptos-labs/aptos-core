@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{json_rpc::JsonRpcClientWrapper, validator_config::DecryptedValidatorConfig};
+use crate::{rest_client::RestClient, validator_config::DecryptedValidatorConfig};
 use diem_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, OWNER_ACCOUNT, VALIDATOR_NETWORK_KEY,
 };
@@ -53,7 +53,7 @@ pub struct VerifyValidatorState {
 }
 
 impl VerifyValidatorState {
-    pub fn execute(self) -> Result<VerifyValidatorStateResult, Error> {
+    pub async fn execute(self) -> Result<VerifyValidatorStateResult, Error> {
         // Load the config, storage backend and create a json rpc client.
         let config = self
             .config
@@ -61,10 +61,10 @@ impl VerifyValidatorState {
             .override_json_server(&self.json_server)
             .override_validator_backend(&self.validator_backend.validator_backend)?;
         let storage = config.validator_backend();
-        let client = JsonRpcClientWrapper::new(config.json_server);
+        let client = RestClient::new(config.json_server);
         let owner_account = storage.account_address(OWNER_ACCOUNT)?;
 
-        let validator_infos = client.validator_set(None)?;
+        let validator_infos = client.validator_set(None).await?;
 
         let mut result = VerifyValidatorStateResult {
             consensus_key_match: None,
@@ -84,9 +84,12 @@ impl VerifyValidatorState {
         // Fetch the current on-chain config for this operator's owner.
         // Check if the consensus key held in secure storage matches
         // that registered on-chain.
-        let validator_config = client.validator_config(owner_account).and_then(|vc| {
-            DecryptedValidatorConfig::from_validator_config_resource(&vc, owner_account)
-        })?;
+        let validator_config = client
+            .validator_config(owner_account)
+            .await
+            .and_then(|vc| {
+                DecryptedValidatorConfig::from_validator_config_resource(&vc, owner_account)
+            })?;
         let storage_key = storage.ed25519_public_from_private(CONSENSUS_KEY)?;
         result.consensus_key_match = Some(storage_key == validator_config.consensus_public_key);
 

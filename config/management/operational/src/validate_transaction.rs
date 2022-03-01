@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{json_rpc::JsonRpcClientWrapper, TransactionContext};
+use crate::{rest_client::RestClient, TransactionContext};
 use diem_management::{config::ConfigPath, error::Error};
 use diem_types::account_address::AccountAddress;
 use structopt::StructOpt;
@@ -30,10 +30,11 @@ impl ValidateTransaction {
         }
     }
 
-    pub fn execute(&self) -> Result<TransactionContext, Error> {
+    pub async fn execute(&self) -> Result<TransactionContext, Error> {
         let config = self.config.load()?.override_json_server(&self.json_server);
-        let vm_status = JsonRpcClientWrapper::new(config.json_server)
-            .transaction_status(self.account_address, self.sequence_number)?;
+        let vm_status = RestClient::new(config.json_server)
+            .transaction_status(self.account_address, self.sequence_number)
+            .await?;
         Ok(TransactionContext::new_with_validation(
             self.account_address,
             self.sequence_number,

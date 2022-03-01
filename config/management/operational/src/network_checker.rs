@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    json_rpc::JsonRpcClientWrapper,
+    rest_client::RestClient,
     validator_set::{validator_set_full_node_addresses, validator_set_validator_addresses},
 };
 use diem_config::{
@@ -32,7 +32,7 @@ use network::{
 };
 use std::{collections::BTreeMap, sync::Arc};
 use structopt::StructOpt;
-use tokio::{runtime::Runtime, time::Duration};
+use tokio::time::Duration;
 
 const DEFAULT_TIMEOUT_SECONDS: u64 = 5;
 
@@ -77,7 +77,7 @@ fn parse_private_key_hex(src: &str) -> Result<x25519::PrivateKey, Error> {
 }
 
 impl CheckEndpoint {
-    pub fn execute(self) -> Result<String, Error> {
+    pub async fn execute(self) -> Result<String, Error> {
         validate_address(&self.address)?;
         let private_key = self.private_key.unwrap_or_else(|| {
             let dummy = [0; PRIVATE_KEY_SIZE];
@@ -94,7 +94,7 @@ impl CheckEndpoint {
             self.address,
             timeout,
             self.no_handshake,
-        )
+        ).await
     }
 }
 
@@ -138,9 +138,9 @@ fn parse_validator_key_hex(src: &str) -> Result<Key, Error> {
 }
 
 impl CheckValidatorSetEndpoints {
-    pub fn execute(self) -> Result<String, Error> {
+    pub async fn execute(self) -> Result<String, Error> {
         let is_validator = self.role.is_validator();
-        let client = JsonRpcClientWrapper::new(self.json_server);
+        let client = RestClient::new(self.json_server);
         let private_key = if let Some(private_key) = self.private_key {
             private_key
         } else if is_validator && !self.no_handshake {
@@ -168,9 +168,9 @@ impl CheckValidatorSetEndpoints {
             encryptor.add_key(version, address_encryption_key).unwrap();
             encryptor.set_current_version(version).unwrap();
 
-            validator_set_validator_addresses(client, None)?
+            validator_set_validator_addresses(client, None).await?
         } else {
-            validator_set_full_node_addresses(client, None)?
+            validator_set_full_node_addresses(client, None).await?
         };
 
         // Build a single upgrade context to run all the checks
@@ -193,7 +193,7 @@ impl CheckValidatorSetEndpoints {
         // Check all the addresses accordingly
         for (name, peer_id, addrs) in nodes {
             for addr in addrs {
-                match check_endpoint(upgrade_context.clone(), addr, timeout, self.no_handshake) {
+                match check_endpoint(upgrade_context.clone(), addr, timeout, self.no_handshake).await {
                     Ok(_) => println!("{} -- good", name),
                     Err(err) => println!("{} : {} -- bad -- {}", name, peer_id, err),
                 };
@@ -252,28 +252,23 @@ fn validate_address(address: &NetworkAddress) -> Result<(), Error> {
 }
 
 /// Wrapper for `check_endpoint_inner` to handle runtime
-fn check_endpoint(
+async fn check_endpoint(
     upgrade_context: Arc<UpgradeContext>,
     address: NetworkAddress,
     timeout: Duration,
     no_handshake: bool,
 ) -> Result<String, Error> {
-    let runtime = Runtime::new().unwrap();
     let remote_pubkey = address.find_noise_proto().unwrap();
 
-    let connect_future = async {
-        tokio::time::timeout(timeout, async {
-            if no_handshake {
-                check_endpoint_inner_no_handshake(address.clone()).await
-            } else {
-                check_endpoint_inner(upgrade_context.clone(), address.clone(), remote_pubkey).await
-            }
-        })
-        .await
-        .map_err(|_| Error::Timeout("CheckEndpoint", address.to_string()))
-    };
-
-    runtime.block_on(connect_future)?
+    tokio::time::timeout(timeout, async {
+        if no_handshake {
+            check_endpoint_inner_no_handshake(address.clone()).await
+        } else {
+            check_endpoint_inner(upgrade_context.clone(), address.clone(), remote_pubkey).await
+        }
+    })
+    .await
+    .map_err(|_| Error::Timeout("CheckEndpoint", address.to_string()))?
 }
 
 /// Connects via Noise, and then drops the connection

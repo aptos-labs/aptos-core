@@ -6,8 +6,9 @@ use diem_operational_tool::command::{Command, ResultWrapper};
 use std::process::exit;
 use structopt::StructOpt;
 
-fn main() {
-    let result = Command::from_args().execute();
+#[tokio::main]
+async fn main() {
+    let result = Command::from_args().execute().await;
 
     match result {
         Ok(val) => println!("{}", val),

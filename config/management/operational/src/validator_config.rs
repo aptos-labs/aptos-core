@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{auto_validate::AutoValidate, json_rpc::JsonRpcClientWrapper, TransactionContext};
+use crate::{auto_validate::AutoValidate, rest_client::RestClient, TransactionContext};
 use diem_crypto::{ed25519::Ed25519PublicKey, x25519};
 use diem_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, OPERATOR_ACCOUNT, OWNER_ACCOUNT, VALIDATOR_NETWORK_KEY,
@@ -43,7 +43,7 @@ pub struct SetValidatorConfig {
 }
 
 impl SetValidatorConfig {
-    pub fn execute(self) -> Result<TransactionContext, Error> {
+    pub async fn execute(self) -> Result<TransactionContext, Error> {
         let config = self
             .validator_config
             .config
@@ -57,18 +57,19 @@ impl SetValidatorConfig {
 
         let operator_account = storage.account_address(OPERATOR_ACCOUNT)?;
         let owner_account = storage.account_address(OWNER_ACCOUNT)?;
-        let client = JsonRpcClientWrapper::new(config.json_server.clone());
-        let sequence_number = client.sequence_number(operator_account)?;
+        let client = RestClient::new(config.json_server.clone());
+        let sequence_number = client.sequence_number(operator_account).await?;
 
         // See if the validator is in the set
         let in_set = client
-            .validator_set(None)?
+            .validator_set(None)
+            .await?
             .iter()
             .any(|vi| vi.account_address() == &owner_account);
 
         let validator_config = if in_set {
             // Retrieve the current validator / fullnode addresses and update accordingly
-            let vc = client.validator_config(owner_account)?;
+            let vc = client.validator_config(owner_account).await?;
             DecryptedValidatorConfig::from_validator_config_resource(&vc, owner_account)
                 .map(Some)
                 .map_err(|e| {
@@ -105,13 +106,15 @@ impl SetValidatorConfig {
             validator_config.is_some(),
             self.disable_address_validation,
         )?;
-        let mut transaction_context =
-            client.submit_transaction(txn.as_signed_user_txn().unwrap().clone())?;
+        let mut transaction_context = client
+            .submit_transaction(txn.as_signed_user_txn().unwrap().clone())
+            .await?;
 
         // Perform auto validation if required
         transaction_context = self
             .auto_validate
-            .execute(config.json_server, transaction_context)?;
+            .execute(config.json_server, transaction_context)
+            .await?;
 
         Ok(transaction_context)
     }
@@ -129,7 +132,7 @@ pub struct RotateKey {
 }
 
 impl RotateKey {
-    pub fn execute(
+    pub async fn execute(
         self,
         key_name: &'static str,
     ) -> Result<(TransactionContext, Ed25519PublicKey), Error> {
@@ -139,13 +142,16 @@ impl RotateKey {
             .config()?
             .override_json_server(&self.json_server);
         let mut storage = config.validator_backend();
-        let client = JsonRpcClientWrapper::new(config.json_server.clone());
+        let client = RestClient::new(config.json_server.clone());
 
         // Fetch the current on-chain validator config for the node
         let owner_account = storage.account_address(OWNER_ACCOUNT)?;
-        let validator_config = client.validator_config(owner_account).and_then(|vc| {
-            DecryptedValidatorConfig::from_validator_config_resource(&vc, owner_account)
-        })?;
+        let validator_config = client
+            .validator_config(owner_account)
+            .await
+            .and_then(|vc| {
+                DecryptedValidatorConfig::from_validator_config_resource(&vc, owner_account)
+            })?;
 
         // Check that the key held in storage matches the key registered on-chain in the validator
         // config. If so, rotate the key in storage. If not, don't rotate the key in storage and
@@ -183,12 +189,13 @@ impl RotateKey {
             auto_validate: self.auto_validate.clone(),
             disable_address_validation: true,
         };
-        let mut transaction_context = set_validator_config.execute()?;
+        let mut transaction_context = set_validator_config.execute().await?;
 
         // Perform auto validation if required
         transaction_context = self
             .auto_validate
-            .execute(config.json_server, transaction_context)?;
+            .execute(config.json_server, transaction_context)
+            .await?;
 
         Ok((transaction_context, storage_key))
     }
@@ -201,8 +208,8 @@ pub struct RotateConsensusKey {
 }
 
 impl RotateConsensusKey {
-    pub fn execute(self) -> Result<(TransactionContext, Ed25519PublicKey), Error> {
-        self.rotate_key.execute(CONSENSUS_KEY)
+    pub async fn execute(self) -> Result<(TransactionContext, Ed25519PublicKey), Error> {
+        self.rotate_key.execute(CONSENSUS_KEY).await
     }
 }
 
@@ -213,8 +220,8 @@ pub struct RotateValidatorNetworkKey {
 }
 
 impl RotateValidatorNetworkKey {
-    pub fn execute(self) -> Result<(TransactionContext, x25519::PublicKey), Error> {
-        let (txn_ctx, key) = self.rotate_key.execute(VALIDATOR_NETWORK_KEY)?;
+    pub async fn execute(self) -> Result<(TransactionContext, x25519::PublicKey), Error> {
+        let (txn_ctx, key) = self.rotate_key.execute(VALIDATOR_NETWORK_KEY).await?;
         Ok((txn_ctx, to_x25519(key)?))
     }
 }
@@ -226,8 +233,8 @@ pub struct RotateFullNodeNetworkKey {
 }
 
 impl RotateFullNodeNetworkKey {
-    pub fn execute(self) -> Result<(TransactionContext, x25519::PublicKey), Error> {
-        let (txn_ctx, key) = self.rotate_key.execute(FULLNODE_NETWORK_KEY)?;
+    pub async fn execute(self) -> Result<(TransactionContext, x25519::PublicKey), Error> {
+        let (txn_ctx, key) = self.rotate_key.execute(FULLNODE_NETWORK_KEY).await?;
         Ok((txn_ctx, to_x25519(key)?))
     }
 }
@@ -271,12 +278,13 @@ pub struct ValidatorConfig {
 }
 
 impl ValidatorConfig {
-    pub fn execute(self) -> Result<DecryptedValidatorConfig, Error> {
+    pub async fn execute(self) -> Result<DecryptedValidatorConfig, Error> {
         let config = self.config.load()?.override_json_server(&self.json_server);
-        let client = JsonRpcClientWrapper::new(config.json_server);
+        let client = RestClient::new(config.json_server);
 
         client
             .validator_config(self.account_address)
+            .await
             .and_then(|vc| {
                 DecryptedValidatorConfig::from_validator_config_resource(&vc, self.account_address)
             })
@@ -296,9 +304,10 @@ impl DecryptedValidatorConfig {
         config_resource: &diem_types::validator_config::ValidatorConfigResource,
         account_address: AccountAddress,
     ) -> Result<Self, Error> {
-        let config = config_resource.validator_config.as_ref().ok_or_else(|| {
-            Error::JsonRpcReadError("validator-config", "not present".to_string())
-        })?;
+        let config = config_resource
+            .validator_config
+            .as_ref()
+            .ok_or_else(|| Error::RestReadError("validator-config", "not present".to_string()))?;
 
         let mut value = Self::from_validator_config(config, account_address)?;
         value.name = Self::human_name(&config_resource.human_name);

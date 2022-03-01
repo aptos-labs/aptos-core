@@ -2048,13 +2048,13 @@ dependencies = [
  "anyhow",
  "base64",
  "bcs",
- "diem-client",
  "diem-config",
  "diem-crypto",
  "diem-global-constants",
  "diem-infallible",
  "diem-management",
  "diem-network-address-encryption",
+ "diem-rest-client",
  "diem-secure-storage",
  "diem-temppath",
  "diem-transaction-builder",
@@ -2075,6 +2075,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "toml",
+ "url",
 ]
 
 [[package]]

@@ -25,7 +25,7 @@ pub struct AutoValidate {
 }
 
 impl AutoValidate {
-    pub fn execute(
+    pub async fn execute(
         &self,
         json_server: String,
         transaction_context: TransactionContext,
@@ -45,7 +45,7 @@ impl AutoValidate {
         // Loop until we get a successful result, or hit the timeout
         let mut time_slept = 0;
         while time_slept < self.validate_timeout {
-            let validation_result = validate_transaction.execute()?;
+            let validation_result = validate_transaction.execute().await?;
             if validation_result.execution_result.is_some() {
                 // The transaction was executed, return the context.
                 return Ok(validation_result);

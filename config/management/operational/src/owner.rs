@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{auto_validate::AutoValidate, json_rpc::JsonRpcClientWrapper, TransactionContext};
+use crate::{auto_validate::AutoValidate, rest_client::RestClient, TransactionContext};
 use diem_management::{
     config::ConfigPath, error::Error, secure_backend::ValidatorBackend,
     transaction::build_raw_transaction,
@@ -29,7 +29,7 @@ pub struct SetValidatorOperator {
 }
 
 impl SetValidatorOperator {
-    pub fn execute(self) -> Result<TransactionContext, Error> {
+    pub async fn execute(self) -> Result<TransactionContext, Error> {
         let config = self
             .config
             .load()?
@@ -39,11 +39,11 @@ impl SetValidatorOperator {
         let mut storage = config.validator_backend();
         let owner_address = storage.account_address(diem_global_constants::OWNER_ACCOUNT)?;
 
-        let client = JsonRpcClientWrapper::new(config.json_server.clone());
+        let client = RestClient::new(config.json_server.clone());
         let txn = build_raw_transaction(
             config.chain_id,
             owner_address,
-            client.sequence_number(owner_address)?,
+            client.sequence_number(owner_address).await?,
             transaction_builder::encode_set_validator_operator_script_function(
                 self.name.as_bytes().to_vec(),
                 self.account_address,
@@ -52,12 +52,13 @@ impl SetValidatorOperator {
         );
 
         let signed_txn = storage.sign(diem_global_constants::OWNER_KEY, "set-operator", txn)?;
-        let mut transaction_context = client.submit_transaction(signed_txn)?;
+        let mut transaction_context = client.submit_transaction(signed_txn).await?;
 
         // Perform auto validation if required
         transaction_context = self
             .auto_validate
-            .execute(config.json_server, transaction_context)?;
+            .execute(config.json_server, transaction_context)
+            .await?;
 
         Ok(transaction_context)
     }

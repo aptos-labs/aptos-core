@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{auto_validate::AutoValidate, json_rpc::JsonRpcClientWrapper, TransactionContext};
+use crate::{auto_validate::AutoValidate, rest_client::RestClient, TransactionContext};
 use diem_crypto::ed25519::Ed25519PublicKey;
 use diem_global_constants::{OPERATOR_ACCOUNT, OPERATOR_KEY};
 use diem_management::{error::Error, transaction::build_raw_transaction};
@@ -26,13 +26,13 @@ pub struct AccountResource {
 }
 
 impl AccountResource {
-    pub fn execute(self) -> Result<SimplifiedAccountResource, Error> {
+    pub async fn execute(self) -> Result<SimplifiedAccountResource, Error> {
         // Load the config and create a json rpc client
         let config = self.config.load()?.override_json_server(&self.json_server);
-        let client = JsonRpcClientWrapper::new(config.json_server);
+        let client = RestClient::new(config.json_server);
 
         // Fetch the current account resource on-chain for the specified account address.
-        let account_resource = client.account_resource(self.account_address)?;
+        let account_resource = client.account_resource(self.account_address).await?;
         Ok(SimplifiedAccountResource {
             account: self.account_address,
             authentication_key: hex::encode(account_resource.authentication_key()),
@@ -63,18 +63,18 @@ pub struct RotateOperatorKey {
 }
 
 impl RotateOperatorKey {
-    pub fn execute(self) -> Result<(TransactionContext, Ed25519PublicKey), Error> {
+    pub async fn execute(self) -> Result<(TransactionContext, Ed25519PublicKey), Error> {
         // Load the config, storage backend and create a json rpc client
         let config = self
             .validator_config
             .config()?
             .override_json_server(&self.json_server);
         let mut storage = config.validator_backend();
-        let client = JsonRpcClientWrapper::new(config.json_server.clone());
+        let client = RestClient::new(config.json_server.clone());
 
         // Fetch the current on-chain auth key for the operator and the current key held in storage.
         let operator_account = storage.account_address(OPERATOR_ACCOUNT)?;
-        let account_resource = client.account_resource(operator_account)?;
+        let account_resource = client.account_resource(operator_account).await?;
         let on_chain_key = match AuthenticationKey::try_from(account_resource.authentication_key())
         {
             Ok(auth_key) => auth_key,
@@ -101,7 +101,7 @@ impl RotateOperatorKey {
         };
 
         // Fetch the current sequence number
-        let sequence_number = client.sequence_number(operator_account)?;
+        let sequence_number = client.sequence_number(operator_account).await?;
 
         // Build the operator rotation transaction
         let rotate_key_script =
@@ -125,13 +125,15 @@ impl RotateOperatorKey {
         let rotate_key_txn = Transaction::UserTransaction(rotate_key_txn);
 
         // Submit the transaction
-        let mut transaction_context =
-            client.submit_transaction(rotate_key_txn.as_signed_user_txn().unwrap().clone())?;
+        let mut transaction_context = client
+            .submit_transaction(rotate_key_txn.as_signed_user_txn().unwrap().clone())
+            .await?;
 
         // Perform auto validation if required
         transaction_context = self
             .auto_validate
-            .execute(config.json_server, transaction_context)?;
+            .execute(config.json_server, transaction_context)
+            .await?;
 
         Ok((transaction_context, new_storage_key))
     }

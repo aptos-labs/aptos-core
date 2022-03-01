@@ -1,7 +1,6 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_client::AccountAddress;
 use diem_config::config::{Peer, PeerRole};
 use diem_crypto::{
     ed25519::Ed25519PrivateKey, x25519, x25519::PUBLIC_KEY_SIZE, Uniform, ValidCryptoMaterial,
@@ -11,7 +10,10 @@ use diem_global_constants::OWNER_ACCOUNT;
 use diem_management::{
     config::ConfigPath, error::Error, secure_backend::ValidatorBackend, storage::StorageWrapper,
 };
-use diem_types::{account_address::from_identity_public_key, PeerId};
+use diem_types::{
+    account_address::{from_identity_public_key, AccountAddress},
+    PeerId,
+};
 use rand::SeedableRng;
 use serde::Serialize;
 use std::{

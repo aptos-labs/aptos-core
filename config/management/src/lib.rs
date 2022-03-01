@@ -38,6 +38,20 @@ macro_rules! execute_command {
     };
 }
 
+#[macro_export]
+macro_rules! execute_command_await {
+    ($obj:ident, $command:path, $expected_name:path) => {
+        if let $command(cmd) = $obj {
+            cmd.execute().await
+        } else {
+            Err(Error::UnexpectedCommand(
+                $expected_name.to_string(),
+                CommandName::from(&$obj).to_string(),
+            ))
+        }
+    };
+}
+
 use diem_crypto::ed25519::Ed25519PublicKey;
 use std::{convert::TryInto, fs, path::Path};
 

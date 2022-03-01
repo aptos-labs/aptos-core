@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    json_rpc::JsonRpcClientWrapper,
+    rest_client::RestClient,
     validator_config::{fullnode_addresses, validator_addresses, DecryptedValidatorConfig},
 };
 use diem_crypto::ed25519::Ed25519PublicKey;
@@ -30,18 +30,18 @@ pub struct ValidatorSet {
 }
 
 impl ValidatorSet {
-    pub fn execute(self) -> Result<Vec<DecryptedValidatorInfo>, Error> {
+    pub async fn execute(self) -> Result<Vec<DecryptedValidatorInfo>, Error> {
         let config = self.config.load()?.override_json_server(&self.json_server);
-        let client = JsonRpcClientWrapper::new(config.json_server);
-        decode_validator_set(client, self.account_address)
+        let client = RestClient::new(config.json_server);
+        decode_validator_set(client, self.account_address).await
     }
 }
 
-pub fn decode_validator_set(
-    client: JsonRpcClientWrapper,
+pub async fn decode_validator_set(
+    client: RestClient,
     account_address: Option<AccountAddress>,
 ) -> Result<Vec<DecryptedValidatorInfo>, Error> {
-    let set = client.validator_set(account_address)?;
+    let set = client.validator_set(account_address).await?;
 
     let mut decoded_set = Vec::new();
     for info in set {
@@ -49,7 +49,7 @@ pub fn decode_validator_set(
             DecryptedValidatorConfig::from_validator_config(info.config(), *info.account_address())
                 .map_err(|e| Error::NetworkAddressDecodeError(e.to_string()))?;
 
-        let config_resource = client.validator_config(*info.account_address())?;
+        let config_resource = client.validator_config(*info.account_address()).await?;
         let name = DecryptedValidatorConfig::human_name(&config_resource.human_name);
 
         let info = DecryptedValidatorInfo {
@@ -65,33 +65,35 @@ pub fn decode_validator_set(
     Ok(decoded_set)
 }
 
-pub fn validator_set_full_node_addresses(
-    client: JsonRpcClientWrapper,
+pub async fn validator_set_full_node_addresses(
+    client: RestClient,
     account_address: Option<AccountAddress>,
 ) -> Result<Vec<(String, AccountAddress, Vec<NetworkAddress>)>, Error> {
     validator_set_addresses(client, account_address, |info| {
         fullnode_addresses(info.config())
     })
+    .await
 }
 
-pub fn validator_set_validator_addresses(
-    client: JsonRpcClientWrapper,
+pub async fn validator_set_validator_addresses(
+    client: RestClient,
     account_address: Option<AccountAddress>,
 ) -> Result<Vec<(String, AccountAddress, Vec<NetworkAddress>)>, Error> {
     validator_set_addresses(client, account_address, |info| {
         validator_addresses(info.config(), *info.account_address())
     })
+    .await
 }
 
-fn validator_set_addresses<F: Fn(ValidatorInfo) -> Result<Vec<NetworkAddress>, Error>>(
-    client: JsonRpcClientWrapper,
+async fn validator_set_addresses<F: Fn(ValidatorInfo) -> Result<Vec<NetworkAddress>, Error>>(
+    client: RestClient,
     account_address: Option<AccountAddress>,
     address_accessor: F,
 ) -> Result<Vec<(String, AccountAddress, Vec<NetworkAddress>)>, Error> {
-    let set = client.validator_set(account_address)?;
+    let set = client.validator_set(account_address).await?;
     let mut decoded_set = Vec::new();
     for info in set {
-        let config_resource = client.validator_config(*info.account_address())?;
+        let config_resource = client.validator_config(*info.account_address()).await?;
         let name = DecryptedValidatorConfig::human_name(&config_resource.human_name);
         let peer_id = *info.account_address();
         let addrs = address_accessor(info)?;

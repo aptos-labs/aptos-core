@@ -8,7 +8,7 @@ use crate::{
 };
 use diem_config::config::Peer;
 use diem_crypto::{ed25519::Ed25519PublicKey, x25519};
-use diem_management::{error::Error, execute_command};
+use diem_management::{error::Error, execute_command, execute_command_await};
 use diem_types::{account_address::AccountAddress, waypoint::Waypoint, PeerId};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -181,17 +181,17 @@ impl std::fmt::Display for CommandName {
 }
 
 impl Command {
-    pub fn execute(self) -> Result<String, Error> {
+    pub async fn execute(self) -> Result<String, Error> {
         match self {
-            Command::AccountResource(cmd) => Self::pretty_print(cmd.execute()),
-            Command::AddValidator(cmd) => Self::print_transaction_context(cmd.execute()),
-            Command::CheckEndpoint(cmd) => Self::pretty_print(cmd.execute()),
-            Command::CheckValidatorSetEndpoints(cmd) => Self::pretty_print(cmd.execute()),
+            Command::AccountResource(cmd) => Self::pretty_print(cmd.execute().await),
+            Command::AddValidator(cmd) => Self::print_transaction_context(cmd.execute().await),
+            Command::CheckEndpoint(cmd) => Self::pretty_print(cmd.execute().await),
+            Command::CheckValidatorSetEndpoints(cmd) => Self::pretty_print(cmd.execute().await),
             Command::CreateValidator(cmd) => {
-                Self::print_transaction_context(cmd.execute().map(|(txn_ctx, _)| txn_ctx))
+                Self::print_transaction_context(cmd.execute().await.map(|(txn_ctx, _)| txn_ctx))
             }
             Command::CreateValidatorOperator(cmd) => {
-                Self::print_transaction_context(cmd.execute().map(|(txn_ctx, _)| txn_ctx))
+                Self::print_transaction_context(cmd.execute().await.map(|(txn_ctx, _)| txn_ctx))
             }
             Command::InsertWaypoint(cmd) => Self::print_success(cmd.execute()),
             Command::ExtractPeerFromFile(cmd) => Self::pretty_print(cmd.execute()),
@@ -204,26 +204,32 @@ impl Command {
             Command::PrintKey(cmd) => Self::pretty_print(cmd.execute()),
             Command::PrintXKey(cmd) => Self::pretty_print(cmd.execute()),
             Command::PrintWaypoint(cmd) => Self::pretty_print(cmd.execute()),
-            Command::RemoveValidator(cmd) => Self::print_transaction_context(cmd.execute()),
+            Command::RemoveValidator(cmd) => Self::print_transaction_context(cmd.execute().await),
             Command::RotateConsensusKey(cmd) => {
-                Self::print_transaction_context(cmd.execute().map(|(txn_ctx, _)| txn_ctx))
+                Self::print_transaction_context(cmd.execute().await.map(|(txn_ctx, _)| txn_ctx))
             }
             Command::RotateOperatorKey(cmd) => {
-                Self::print_transaction_context(cmd.execute().map(|(txn_ctx, _)| txn_ctx))
+                Self::print_transaction_context(cmd.execute().await.map(|(txn_ctx, _)| txn_ctx))
             }
             Command::RotateFullNodeNetworkKey(cmd) => {
-                Self::print_transaction_context(cmd.execute().map(|(txn_ctx, _)| txn_ctx))
+                Self::print_transaction_context(cmd.execute().await.map(|(txn_ctx, _)| txn_ctx))
             }
             Command::RotateValidatorNetworkKey(cmd) => {
-                Self::print_transaction_context(cmd.execute().map(|(txn_ctx, _)| txn_ctx))
+                Self::print_transaction_context(cmd.execute().await.map(|(txn_ctx, _)| txn_ctx))
             }
-            Command::SetValidatorConfig(cmd) => Self::print_transaction_context(cmd.execute()),
-            Command::SetValidatorOperator(cmd) => Self::print_transaction_context(cmd.execute()),
-            Command::ValidateTransaction(cmd) => Self::print_transaction_context(cmd.execute()),
-            Command::ValidatorConfig(cmd) => Self::pretty_print(cmd.execute()),
-            Command::ValidatorSet(cmd) => Self::pretty_print(cmd.execute()),
+            Command::SetValidatorConfig(cmd) => {
+                Self::print_transaction_context(cmd.execute().await)
+            }
+            Command::SetValidatorOperator(cmd) => {
+                Self::print_transaction_context(cmd.execute().await)
+            }
+            Command::ValidateTransaction(cmd) => {
+                Self::print_transaction_context(cmd.execute().await)
+            }
+            Command::ValidatorConfig(cmd) => Self::pretty_print(cmd.execute().await),
+            Command::ValidatorSet(cmd) => Self::pretty_print(cmd.execute().await),
             Command::VerifyValidatorState(cmd) => {
-                Self::print_verify_validator_state_result(cmd.execute())
+                Self::print_verify_validator_state_result(cmd.execute().await)
             }
         }
     }
@@ -234,7 +240,7 @@ impl Command {
     ) -> Result<String, Error> {
         match &result {
             Ok(txn_ctx) => match &txn_ctx.execution_result {
-                Some(status) => Self::pretty_print(Ok(status.to_string())),
+                Some(status) => Self::pretty_print(Ok(status.message.to_owned())),
                 None => Self::print_unvalidated_transaction_context(txn_ctx),
             },
             Err(_) => Self::pretty_print(result),
@@ -272,39 +278,41 @@ impl Command {
         result.map(|val| serde_json::to_string_pretty(&ResultWrapper::Result(val)).unwrap())
     }
 
-    pub fn account_resource(self) -> Result<SimplifiedAccountResource, Error> {
-        execute_command!(self, Command::AccountResource, CommandName::AccountResource)
+    pub async fn account_resource(self) -> Result<SimplifiedAccountResource, Error> {
+        execute_command_await!(self, Command::AccountResource, CommandName::AccountResource)
     }
 
-    pub fn add_validator(self) -> Result<TransactionContext, Error> {
-        execute_command!(self, Command::AddValidator, CommandName::AddValidator)
+    pub async fn add_validator(self) -> Result<TransactionContext, Error> {
+        execute_command_await!(self, Command::AddValidator, CommandName::AddValidator)
     }
 
-    pub fn check_endpoint(self) -> Result<String, Error> {
-        execute_command!(self, Command::CheckEndpoint, CommandName::CheckEndpoint)
+    pub async fn check_endpoint(self) -> Result<String, Error> {
+        execute_command_await!(self, Command::CheckEndpoint, CommandName::CheckEndpoint)
     }
 
-    pub fn check_validator_set_endpoints(self) -> Result<String, Error> {
-        execute_command!(
+    pub async fn check_validator_set_endpoints(self) -> Result<String, Error> {
+        execute_command_await!(
             self,
             Command::CheckValidatorSetEndpoints,
             CommandName::CheckValidatorSetEndpoints
         )
     }
 
-    pub fn create_validator(self) -> Result<(TransactionContext, AccountAddress), Error> {
-        execute_command!(self, Command::CreateValidator, CommandName::CreateValidator)
+    pub async fn create_validator(self) -> Result<(TransactionContext, AccountAddress), Error> {
+        execute_command_await!(self, Command::CreateValidator, CommandName::CreateValidator)
     }
 
-    pub fn create_validator_operator(self) -> Result<(TransactionContext, AccountAddress), Error> {
-        execute_command!(
+    pub async fn create_validator_operator(
+        self,
+    ) -> Result<(TransactionContext, AccountAddress), Error> {
+        execute_command_await!(
             self,
             Command::CreateValidatorOperator,
             CommandName::CreateValidatorOperator
         )
     }
 
-    pub fn extract_private_key(self) -> Result<(), Error> {
+    pub async fn extract_private_key(self) -> Result<(), Error> {
         execute_command!(
             self,
             Command::ExtractPrivateKey,
@@ -312,7 +320,7 @@ impl Command {
         )
     }
 
-    pub fn extract_public_key(self) -> Result<(), Error> {
+    pub async fn extract_public_key(self) -> Result<(), Error> {
         execute_command!(
             self,
             Command::ExtractPublicKey,
@@ -320,7 +328,7 @@ impl Command {
         )
     }
 
-    pub fn extract_peer_from_storage(self) -> Result<HashMap<PeerId, Peer>, Error> {
+    pub async fn extract_peer_from_storage(self) -> Result<HashMap<PeerId, Peer>, Error> {
         execute_command!(
             self,
             Command::ExtractPeerFromStorage,
@@ -328,7 +336,7 @@ impl Command {
         )
     }
 
-    pub fn extract_peer_from_file(self) -> Result<HashMap<PeerId, Peer>, Error> {
+    pub async fn extract_peer_from_file(self) -> Result<HashMap<PeerId, Peer>, Error> {
         execute_command!(
             self,
             Command::ExtractPeerFromFile,
@@ -336,7 +344,7 @@ impl Command {
         )
     }
 
-    pub fn extract_peers_from_keys(self) -> Result<HashMap<PeerId, Peer>, Error> {
+    pub async fn extract_peers_from_keys(self) -> Result<HashMap<PeerId, Peer>, Error> {
         execute_command!(
             self,
             Command::ExtractPeersFromKeys,
@@ -344,104 +352,108 @@ impl Command {
         )
     }
 
-    pub fn generate_key(self) -> Result<(), Error> {
+    pub async fn generate_key(self) -> Result<(), Error> {
         execute_command!(self, Command::GenerateKey, CommandName::GenerateKey)
     }
 
-    pub fn insert_waypoint(self) -> Result<(), Error> {
+    pub async fn insert_waypoint(self) -> Result<(), Error> {
         execute_command!(self, Command::InsertWaypoint, CommandName::InsertWaypoint)
     }
 
-    pub fn print_account(self) -> Result<AccountAddress, Error> {
+    pub async fn print_account(self) -> Result<AccountAddress, Error> {
         execute_command!(self, Command::PrintAccount, CommandName::PrintAccount)
     }
 
-    pub fn print_key(self) -> Result<Ed25519PublicKey, Error> {
+    pub async fn print_key(self) -> Result<Ed25519PublicKey, Error> {
         execute_command!(self, Command::PrintKey, CommandName::PrintKey)
     }
 
-    pub fn print_x_key(self) -> Result<x25519::PublicKey, Error> {
+    pub async fn print_x_key(self) -> Result<x25519::PublicKey, Error> {
         execute_command!(self, Command::PrintXKey, CommandName::PrintXKey)
     }
 
-    pub fn print_waypoint(self) -> Result<Waypoint, Error> {
+    pub async fn print_waypoint(self) -> Result<Waypoint, Error> {
         execute_command!(self, Command::PrintWaypoint, CommandName::PrintWaypoint)
     }
 
-    pub fn remove_validator(self) -> Result<TransactionContext, Error> {
-        execute_command!(self, Command::RemoveValidator, CommandName::RemoveValidator)
+    pub async fn remove_validator(self) -> Result<TransactionContext, Error> {
+        execute_command_await!(self, Command::RemoveValidator, CommandName::RemoveValidator)
     }
 
-    pub fn rotate_consensus_key(self) -> Result<(TransactionContext, Ed25519PublicKey), Error> {
-        execute_command!(
+    pub async fn rotate_consensus_key(
+        self,
+    ) -> Result<(TransactionContext, Ed25519PublicKey), Error> {
+        execute_command_await!(
             self,
             Command::RotateConsensusKey,
             CommandName::RotateConsensusKey
         )
     }
 
-    pub fn rotate_operator_key(self) -> Result<(TransactionContext, Ed25519PublicKey), Error> {
-        execute_command!(
+    pub async fn rotate_operator_key(
+        self,
+    ) -> Result<(TransactionContext, Ed25519PublicKey), Error> {
+        execute_command_await!(
             self,
             Command::RotateOperatorKey,
             CommandName::RotateOperatorKey
         )
     }
 
-    pub fn rotate_fullnode_network_key(
+    pub async fn rotate_fullnode_network_key(
         self,
     ) -> Result<(TransactionContext, x25519::PublicKey), Error> {
-        execute_command!(
+        execute_command_await!(
             self,
             Command::RotateFullNodeNetworkKey,
             CommandName::RotateFullNodeNetworkKey
         )
     }
 
-    pub fn rotate_validator_network_key(
+    pub async fn rotate_validator_network_key(
         self,
     ) -> Result<(TransactionContext, x25519::PublicKey), Error> {
-        execute_command!(
+        execute_command_await!(
             self,
             Command::RotateValidatorNetworkKey,
             CommandName::RotateValidatorNetworkKey
         )
     }
 
-    pub fn set_validator_config(self) -> Result<TransactionContext, Error> {
-        execute_command!(
+    pub async fn set_validator_config(self) -> Result<TransactionContext, Error> {
+        execute_command_await!(
             self,
             Command::SetValidatorConfig,
             CommandName::SetValidatorConfig
         )
     }
 
-    pub fn set_validator_operator(self) -> Result<TransactionContext, Error> {
-        execute_command!(
+    pub async fn set_validator_operator(self) -> Result<TransactionContext, Error> {
+        execute_command_await!(
             self,
             Command::SetValidatorOperator,
             CommandName::SetValidatorOperator
         )
     }
 
-    pub fn validate_transaction(self) -> Result<TransactionContext, Error> {
-        execute_command!(
+    pub async fn validate_transaction(self) -> Result<TransactionContext, Error> {
+        execute_command_await!(
             self,
             Command::ValidateTransaction,
             CommandName::ValidateTransaction
         )
     }
 
-    pub fn validator_config(self) -> Result<DecryptedValidatorConfig, Error> {
-        execute_command!(self, Command::ValidatorConfig, CommandName::ValidatorConfig)
+    pub async fn validator_config(self) -> Result<DecryptedValidatorConfig, Error> {
+        execute_command_await!(self, Command::ValidatorConfig, CommandName::ValidatorConfig)
     }
 
-    pub fn validator_set(self) -> Result<Vec<DecryptedValidatorInfo>, Error> {
-        execute_command!(self, Command::ValidatorSet, CommandName::ValidatorSet)
+    pub async fn validator_set(self) -> Result<Vec<DecryptedValidatorInfo>, Error> {
+        execute_command_await!(self, Command::ValidatorSet, CommandName::ValidatorSet)
     }
 
-    pub fn verify_validator_state(self) -> Result<VerifyValidatorStateResult, Error> {
-        execute_command!(
+    pub async fn verify_validator_state(self) -> Result<VerifyValidatorStateResult, Error> {
+        execute_command_await!(
             self,
             Command::VerifyValidatorState,
             CommandName::VerifyValidatorState

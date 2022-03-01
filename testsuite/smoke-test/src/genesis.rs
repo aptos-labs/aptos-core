@@ -148,6 +148,7 @@ async fn test_genesis_transaction_flow() {
     let diem_root = create_root_storage(&mut swarm);
     let config = op_tool
         .validator_config(validator_address, Some(&diem_root))
+        .await
         .unwrap();
     let name = config.name.as_bytes().to_vec();
 
@@ -259,6 +260,7 @@ async fn test_genesis_transaction_flow() {
     );
     let _ = op_tool
         .add_validator(validator_address, &diem_root, false)
+        .await
         .unwrap();
 
     // setup the waypoint for node 0

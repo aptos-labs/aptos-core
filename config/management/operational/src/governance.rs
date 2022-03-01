@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{auto_validate::AutoValidate, json_rpc::JsonRpcClientWrapper, TransactionContext};
+use crate::{auto_validate::AutoValidate, rest_client::RestClient, TransactionContext};
 use diem_global_constants::DIEM_ROOT_KEY;
 use diem_management::{
     config::{Config, ConfigPath},
@@ -38,7 +38,7 @@ pub struct CreateAccount {
 }
 
 impl CreateAccount {
-    fn execute(
+    async fn execute(
         self,
         script_callback: fn(
             nonce: u64,
@@ -57,9 +57,9 @@ impl CreateAccount {
 
         let key = diem_management::read_key_from_file(&self.path_to_key)
             .map_err(|e| Error::UnableToReadFile(format!("{:?}", self.path_to_key), e))?;
-        let client = JsonRpcClientWrapper::new(config.json_server.clone());
+        let client = RestClient::new(config.json_server.clone());
 
-        let seq_num = client.sequence_number(diem_root_address())?;
+        let seq_num = client.sequence_number(diem_root_address()).await?;
         let auth_key = AuthenticationKey::ed25519(&key);
         let account_address = auth_key.derived_address();
         let script = script_callback(
@@ -70,12 +70,13 @@ impl CreateAccount {
         )
         .into_script_function();
         let mut transaction_context =
-            build_and_submit_diem_root_transaction(&config, seq_num, script, action)?;
+            build_and_submit_diem_root_transaction(&config, seq_num, script, action).await?;
 
         // Perform auto validation if required
         transaction_context = self
             .auto_validate
-            .execute(config.json_server, transaction_context)?;
+            .execute(config.json_server, transaction_context)
+            .await?;
 
         Ok((transaction_context, account_address))
     }
@@ -88,11 +89,13 @@ pub struct CreateValidator {
 }
 
 impl CreateValidator {
-    pub fn execute(self) -> Result<(TransactionContext, AccountAddress), Error> {
-        self.input.execute(
-            transaction_builder::encode_create_validator_account_script_function,
-            "create-validator",
-        )
+    pub async fn execute(self) -> Result<(TransactionContext, AccountAddress), Error> {
+        self.input
+            .execute(
+                transaction_builder::encode_create_validator_account_script_function,
+                "create-validator",
+            )
+            .await
     }
 }
 
@@ -103,11 +106,13 @@ pub struct CreateValidatorOperator {
 }
 
 impl CreateValidatorOperator {
-    pub fn execute(self) -> Result<(TransactionContext, AccountAddress), Error> {
-        self.input.execute(
-            transaction_builder::encode_create_validator_operator_account_script_function,
-            "create-validator-operator",
-        )
+    pub async fn execute(self) -> Result<(TransactionContext, AccountAddress), Error> {
+        self.input
+            .execute(
+                transaction_builder::encode_create_validator_operator_account_script_function,
+                "create-validator-operator",
+            )
+            .await
     }
 }
 
@@ -140,17 +145,18 @@ pub struct AddValidator {
 }
 
 impl AddValidator {
-    pub fn execute(self) -> Result<TransactionContext, Error> {
+    pub async fn execute(self) -> Result<TransactionContext, Error> {
         let config = self.input.config()?;
-        let client = JsonRpcClientWrapper::new(config.json_server.clone());
+        let client = RestClient::new(config.json_server.clone());
 
         // Verify that this is a configured validator
-        client.validator_config(self.input.account_address)?;
+        client.validator_config(self.input.account_address).await?;
         let name = client
-            .validator_config(self.input.account_address)?
+            .validator_config(self.input.account_address)
+            .await?
             .human_name;
 
-        let seq_num = client.sequence_number(diem_root_address())?;
+        let seq_num = client.sequence_number(diem_root_address()).await?;
         let script = transaction_builder::encode_add_validator_and_reconfigure_script_function(
             seq_num,
             name,
@@ -158,13 +164,15 @@ impl AddValidator {
         )
         .into_script_function();
         let mut transaction_context =
-            build_and_submit_diem_root_transaction(&config, seq_num, script, "add-validator")?;
+            build_and_submit_diem_root_transaction(&config, seq_num, script, "add-validator")
+                .await?;
 
         // Perform auto validation if required
         transaction_context = self
             .input
             .auto_validate
-            .execute(config.json_server, transaction_context)?;
+            .execute(config.json_server, transaction_context)
+            .await?;
 
         Ok(transaction_context)
     }
@@ -177,17 +185,20 @@ pub struct RemoveValidator {
 }
 
 impl RemoveValidator {
-    pub fn execute(self) -> Result<TransactionContext, Error> {
+    pub async fn execute(self) -> Result<TransactionContext, Error> {
         let config = self.input.config()?;
-        let client = JsonRpcClientWrapper::new(config.json_server.clone());
+        let client = RestClient::new(config.json_server.clone());
 
         // Verify that this is a validator within the set
-        client.validator_set(Some(self.input.account_address))?;
+        client
+            .validator_set(Some(self.input.account_address))
+            .await?;
         let name = client
-            .validator_config(self.input.account_address)?
+            .validator_config(self.input.account_address)
+            .await?
             .human_name;
 
-        let seq_num = client.sequence_number(diem_root_address())?;
+        let seq_num = client.sequence_number(diem_root_address()).await?;
         let script = transaction_builder::encode_remove_validator_and_reconfigure_script_function(
             seq_num,
             name,
@@ -196,19 +207,21 @@ impl RemoveValidator {
         .into_script_function();
 
         let mut transaction_context =
-            build_and_submit_diem_root_transaction(&config, seq_num, script, "remove-validator")?;
+            build_and_submit_diem_root_transaction(&config, seq_num, script, "remove-validator")
+                .await?;
 
         // Perform auto validation if required
         transaction_context = self
             .input
             .auto_validate
-            .execute(config.json_server, transaction_context)?;
+            .execute(config.json_server, transaction_context)
+            .await?;
 
         Ok(transaction_context)
     }
 }
 
-fn build_and_submit_diem_root_transaction(
+async fn build_and_submit_diem_root_transaction(
     config: &Config,
     seq_num: u64,
     script_function: ScriptFunction,
@@ -224,6 +237,6 @@ fn build_and_submit_diem_root_transaction(
     let mut storage = config.validator_backend();
     let signed_txn = storage.sign(DIEM_ROOT_KEY, action, txn)?;
 
-    let client = JsonRpcClientWrapper::new(config.json_server.clone());
-    client.submit_transaction(signed_txn)
+    let client = RestClient::new(config.json_server.clone());
+    client.submit_transaction(signed_txn).await
 }
