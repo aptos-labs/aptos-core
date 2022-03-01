@@ -1,11 +1,9 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-mod json_rpc_interface;
 mod storage_interface;
 
 pub use crate::storage_interface::DBDebuggerInterface;
-pub use json_rpc_interface::JsonRpcDebuggerInterface;
 
 use anyhow::{anyhow, Result};
 use diem_state_view::StateView;
