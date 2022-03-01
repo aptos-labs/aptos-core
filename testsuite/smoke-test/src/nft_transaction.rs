@@ -3,9 +3,8 @@
 
 use diem_rest_client::Client as RestClient;
 use diem_sdk::{
-    client::SignedTransaction,
     crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform},
-    types::transaction::authenticator::AuthenticationKey,
+    types::transaction::{authenticator::AuthenticationKey, SignedTransaction},
 };
 use diem_transaction_builder::experimental_stdlib;
 use diem_types::nft::tokens;

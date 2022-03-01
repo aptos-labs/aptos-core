@@ -86,7 +86,6 @@ members = [
     "network/netcore",
     "network/socket-bench-server",
     "sdk",
-    "sdk/compatibility",
     "sdk/offchain",
     "sdk/transaction-builder",
     "secure/net",

@@ -2164,7 +2164,6 @@ name = "diem-sdk"
 version = "0.0.3"
 dependencies = [
  "bcs",
- "diem-client",
  "diem-crypto",
  "diem-transaction-builder",
  "diem-types",
@@ -6629,18 +6628,6 @@ checksum = "e3042af939fca8c3453b7af0f1c66e533a15a86169e39de2657310ade8f98d3c"
 dependencies = [
  "ring",
  "untrusted",
-]
-
-[[package]]
-name = "sdk-compatibility"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "bcs",
- "diem-sdk",
- "diem-workspace-hack",
- "once_cell",
- "rand 0.8.4",
 ]
 
 [[package]]

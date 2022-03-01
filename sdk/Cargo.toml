@@ -9,10 +9,6 @@ license = "Apache-2.0"
 publish = ["crates-io"]
 edition = "2018"
 
-[features]
-default = ["client"]
-client = ["diem-client"]
-
 [dependencies]
 bcs = "0.1"
 rand_core = "0.6.2"
@@ -23,6 +19,3 @@ diem-types = { path = "../types", version = "0.0.3"}
 move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860", version = "0.0.3" }
 diem-transaction-builder = { path = "./transaction-builder", version = "0.0.3" }
 diem-workspace-hack = { version = "0.1", path = "../crates/diem-workspace-hack" }
-
-# Optional Dependencies
-diem-client = { path = "../crates/diem-client", version = "0.0.3", optional = true }

@@ -160,6 +160,7 @@ members = [
     # Please keep this list in alphabetical order!
 
     "testcases",
+    "diem-client",
     "diem-documentation-tool",
     "diem-e2e-tests-replay",
     "diem-experimental-framework-releases",
@@ -181,7 +182,6 @@ members = [
     "language-e2e-testsuite",
     "memsocket",
     "offchain",
-    "sdk-compatibility",
     "smoke-test",
     "socket-bench-server",
     "transaction-emitter",
