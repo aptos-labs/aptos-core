@@ -52,18 +52,6 @@ async fn test_health_check() {
 }
 
 #[tokio::test]
-async fn test_enable_jsonrpc_api() {
-    let context = new_test_context();
-    let resp = context
-        .post(
-            "/",
-            json!({"jsonrpc": "2.0", "method": "get_metadata", "id": 1}),
-        )
-        .await;
-    assert_eq!(resp["result"]["version"].as_u64().unwrap(), 0)
-}
-
-#[tokio::test]
 async fn test_openapi_spec() {
     let context = new_test_context();
     let paths = ["/openapi.yaml", "/spec.html"];

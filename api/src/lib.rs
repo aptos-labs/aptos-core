@@ -4,6 +4,7 @@
 mod accounts;
 mod context;
 mod events;
+mod health_check;
 mod index;
 pub(crate) mod log;
 mod metrics;

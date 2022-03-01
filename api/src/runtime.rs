@@ -113,7 +113,6 @@ mod tests {
 
     use diem_config::config::NodeConfig;
     use diem_types::chain_id::ChainId;
-    use serde_json::json;
 
     use crate::{
         runtime::bootstrap,
