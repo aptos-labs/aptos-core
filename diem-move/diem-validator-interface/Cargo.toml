@@ -12,7 +12,6 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.52"
 diem-config = { path = "../../config" }
-diem-client = { path = "../../crates/diem-client" }
 diem-types = { path = "../../types" }
 diemdb = { path = "../../storage/diemdb" }
 diem-workspace-hack = { path = "../../crates/diem-workspace-hack" }
