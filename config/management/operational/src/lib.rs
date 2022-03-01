@@ -7,10 +7,10 @@ mod account_resource;
 mod auto_validate;
 pub mod command;
 mod governance;
-pub mod json_rpc;
 pub mod keys;
 mod owner;
 mod print;
+pub mod rest_client;
 mod validate_transaction;
 mod validator_config;
 mod validator_set;
@@ -20,7 +20,6 @@ mod network_checker;
 #[cfg(any(test, feature = "testing"))]
 pub mod test_helper;
 
-use diem_client::views::VMStatusView;
 use diem_types::account_address::AccountAddress;
 use serde::Serialize;
 
@@ -33,7 +32,19 @@ pub struct TransactionContext {
 
     // The execution result of the transaction if it has already been validated
     // successfully.
-    pub execution_result: Option<VMStatusView>,
+    pub execution_result: Option<TransactionStatus>,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+pub struct TransactionStatus {
+    pub message: String,
+    pub success: bool,
+}
+
+impl TransactionStatus {
+    pub fn new(message: String, success: bool) -> Self {
+        Self { message, success }
+    }
 }
 
 impl TransactionContext {
@@ -44,7 +55,7 @@ impl TransactionContext {
     pub fn new_with_validation(
         address: AccountAddress,
         sequence_number: u64,
-        execution_result: Option<VMStatusView>,
+        execution_result: Option<TransactionStatus>,
     ) -> TransactionContext {
         TransactionContext {
             address,

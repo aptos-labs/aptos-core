@@ -11,7 +11,7 @@ use crate::{
 use diem_config::config::SecureBackend;
 use diem_global_constants::OWNER_ACCOUNT;
 use diem_operational_tool::test_helper::OperationalTool;
-use diem_sdk::{client::views::VMStatusView, types::on_chain_config::OnChainConsensusConfig};
+use diem_sdk::types::on_chain_config::OnChainConsensusConfig;
 use diem_secure_storage::{KVStorage, Storage};
 use diem_types::{
     account_address::AccountAddress,
@@ -44,13 +44,14 @@ async fn test_consensus_observer_mode_storage_error() {
             false,
             false,
         )
+        .await
         .unwrap();
-    assert_eq!(VMStatusView::Executed, txn_ctx.execution_result.unwrap());
+    assert!(txn_ctx.execution_result.unwrap().success);
 
     // Rotate validator 0's operator key several different times, each requiring a new transaction
     for _ in 0..5 {
-        let (txn_ctx, _) = op_tool.rotate_operator_key(&backend, false).unwrap();
-        assert_eq!(VMStatusView::Executed, txn_ctx.execution_result.unwrap());
+        let (txn_ctx, _) = op_tool.rotate_operator_key(&backend, false).await.unwrap();
+        assert!(txn_ctx.execution_result.unwrap().success);
     }
 
     // Verify validator 1 is still able to stay up to date with validator 0 (despite safety rules failing)
@@ -141,15 +142,15 @@ async fn rotate_operator_and_consensus_key(swarm: LocalSwarm) {
     let op_tool = OperationalTool::new(rest_api_endpoint, swarm.chain_id());
 
     // Rotate the first node's operator key
-    let (txn_ctx, _) = op_tool.rotate_operator_key(&backend, true).unwrap();
+    let (txn_ctx, _) = op_tool.rotate_operator_key(&backend, true).await.unwrap();
     assert!(txn_ctx.execution_result.is_none());
 
     // Ensure all nodes have received the transaction
     wait_for_transaction_on_all_nodes(&swarm, txn_ctx.address, txn_ctx.sequence_number).await;
 
     // Rotate the consensus key to verify the operator key has been updated
-    let (txn_ctx, new_consensus_key) = op_tool.rotate_consensus_key(&backend, false).unwrap();
-    assert_eq!(VMStatusView::Executed, txn_ctx.execution_result.unwrap());
+    let (txn_ctx, new_consensus_key) = op_tool.rotate_consensus_key(&backend, false).await.unwrap();
+    assert!(txn_ctx.execution_result.unwrap().success);
 
     // Ensure all nodes have received the transaction
     wait_for_transaction_on_all_nodes(&swarm, txn_ctx.address, txn_ctx.sequence_number).await;
@@ -158,6 +159,7 @@ async fn rotate_operator_and_consensus_key(swarm: LocalSwarm) {
     let validator_account = storage.get::<AccountAddress>(OWNER_ACCOUNT).unwrap().value;
     let config_consensus_key = op_tool
         .validator_config(validator_account, Some(&backend))
+        .await
         .unwrap()
         .consensus_public_key;
     assert_eq!(new_consensus_key, config_consensus_key);

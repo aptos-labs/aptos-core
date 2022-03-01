@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::ensure;
-use diem_operational_tool::json_rpc::JsonRpcClientWrapper;
+use diem_operational_tool::rest_client::RestClient as OperationalTool;
 use diem_rest_client::Client as RestClient;
 use diem_sdk::{
     transaction_builder::TransactionFactory,
@@ -27,14 +27,16 @@ impl Test for ReconfigurationTest {
 
 impl NetworkTest for ReconfigurationTest {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+        let rt = Runtime::new()?;
+
         let mut rng = StdRng::from_seed(OsRng.gen());
-        let client = JsonRpcClientWrapper::new(ctx.swarm().chain_info().json_rpc_url);
-        let validator_info = client
-            .validator_set(None)
+        let client = OperationalTool::new(ctx.swarm().chain_info().rest_api().to_owned());
+        let validator_info = rt
+            .block_on(client.validator_set(None))
             .expect("Unable to fetch validator set");
         let affected_peer_id = *validator_info[0].account_address();
-        let validator_config = client
-            .validator_config(affected_peer_id)
+        let validator_config = rt
+            .block_on(client.validator_config(affected_peer_id))
             .expect("Unable to fetch validator config");
         let affected_pod_name = std::str::from_utf8(&validator_config.human_name)
             .unwrap()
@@ -47,7 +49,6 @@ impl NetworkTest for ReconfigurationTest {
         let tx_factory = TransactionFactory::new(ctx.swarm().chain_info().chain_id);
         let mut diem_root_account = ctx.swarm().chain_info().root_account;
         let allowed_nonce = 0;
-        let rt = Runtime::new()?;
         let full_node_client = validator_clients.iter().choose(&mut rng).unwrap();
         let timer = Instant::now();
         let count = 101;

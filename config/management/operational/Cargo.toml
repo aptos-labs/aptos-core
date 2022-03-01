@@ -24,9 +24,10 @@ thiserror = "1.0.24"
 tokio = { version = "1.8.1", features = ["full"] }
 tokio-util = { version = "0.6.4", features = ["compat"] }
 toml = { version = "0.5.8", default-features = false }
+url = "2.2.2"
 
 bcs = "0.1.2"
-diem-client = { path = "../../../crates/diem-client", features = ["blocking"] }
+diem-rest-client = { path = "../../../crates/diem-rest-client" }
 diem-config = { path = "../.."}
 diem-crypto = { path = "../../../crates/diem-crypto" }
 diem-global-constants = { path = "../../global-constants" }

@@ -20,7 +20,6 @@ use std::{
     str::FromStr,
     time::{Duration, Instant},
 };
-use tokio::runtime::Runtime;
 
 #[tokio::test]
 async fn test_connection_limiting() {
@@ -37,7 +36,7 @@ async fn test_connection_limiting() {
         .unwrap();
 
     let op_tool = OperationalTool::test();
-    let (private_key, peer_set) = generate_private_key_and_peer(&op_tool);
+    let (private_key, peer_set) = generate_private_key_and_peer(&op_tool).await;
     let discovery_file = create_discovery_file(peer_set.clone());
 
     // Only allow file based discovery, disallow other nodes
@@ -109,7 +108,7 @@ async fn test_connection_limiting() {
 
     // And not be able to connect with an arbitrary one, limit is 0
     // TODO: Improve network checker to keep connection alive so we can test connection limits without nodes
-    let (private_key, peer_set) = generate_private_key_and_peer(&op_tool);
+    let (private_key, peer_set) = generate_private_key_and_peer(&op_tool).await;
     let pfn_peer_id_fail = swarm
         .add_full_node(&version, NodeConfig::default_for_public_full_node())
         .unwrap();
@@ -141,17 +140,16 @@ async fn test_connection_limiting() {
     );
 }
 
-#[test]
-fn test_file_discovery() {
-    let runtime = Runtime::new().unwrap();
-    let mut swarm = runtime.block_on(new_local_swarm(1));
+#[tokio::test]
+async fn test_file_discovery() {
+    let mut swarm = new_local_swarm(1).await;
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
     let op_tool = OperationalTool::test();
-    let (private_key, peer_set) = generate_private_key_and_peer(&op_tool);
+    let (private_key, peer_set) = generate_private_key_and_peer(&op_tool).await;
     let discovery_file = create_discovery_file(peer_set);
 
     // Add key to file based discovery
-    runtime.block_on(modify_network_of_node(
+    modify_network_of_node(
         swarm.validator_mut(validator_peer_id).unwrap(),
         &NetworkId::Validator,
         |network| {
@@ -164,10 +162,11 @@ fn test_file_discovery() {
                 ),
             ];
         },
-    ));
+    )
+    .await;
 
     // Startup the validator
-    runtime.block_on(swarm.launch()).unwrap();
+    swarm.launch().await.unwrap();
 
     // At first we should be able to connect
     assert_eq!(
@@ -178,6 +177,7 @@ fn test_file_discovery() {
             swarm.validator(validator_peer_id).unwrap(),
             &private_key
         )
+        .await
     );
 
     // Now when we clear the file, we shouldn't be able to connect
@@ -192,6 +192,7 @@ fn test_file_discovery() {
             swarm.validator(validator_peer_id).unwrap(),
             &private_key
         )
+        .await
     );
 }
 
@@ -204,14 +205,16 @@ fn create_discovery_file(peer_set: PeerSet) -> TempPath {
 }
 
 /// Generates `PrivateKey` and `Peer` information for a client / node
-fn generate_private_key_and_peer(op_tool: &OperationalTool) -> (PrivateKey, PeerSet) {
+async fn generate_private_key_and_peer(op_tool: &OperationalTool) -> (PrivateKey, PeerSet) {
     let key_file = TempPath::new();
     key_file.create_as_file().unwrap();
     let private_key = op_tool
         .generate_key(KeyType::X25519, key_file.as_ref(), EncodingType::BCS)
+        .await
         .unwrap();
     let peer_set = op_tool
         .extract_peer_from_file(key_file.as_ref(), EncodingType::BCS)
+        .await
         .unwrap();
     (private_key, peer_set)
 }
@@ -259,14 +262,16 @@ async fn add_identity_to_node(
     .await;
 }
 
-fn check_endpoint(
+async fn check_endpoint(
     op_tool: &OperationalTool,
     network_id: NetworkId,
     node: &LocalNode,
     private_key: &x25519::PrivateKey,
 ) -> bool {
     let address = network_address(node.config(), &network_id);
-    let result = op_tool.check_endpoint_with_key(&network_id, address.clone(), private_key);
+    let result = op_tool
+        .check_endpoint_with_key(&network_id, address.clone(), private_key)
+        .await;
     println!(
         "Endpoint check for {}:{} is:  {:?}",
         network_id, address, result

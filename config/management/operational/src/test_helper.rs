@@ -44,7 +44,7 @@ impl OperationalTool {
         }
     }
 
-    pub fn account_resource(
+    pub async fn account_resource(
         &self,
         account_address: AccountAddress,
     ) -> Result<SimplifiedAccountResource, Error> {
@@ -60,10 +60,10 @@ impl OperationalTool {
         );
 
         let command = Command::from_iter(args.split_whitespace());
-        command.account_resource()
+        command.account_resource().await
     }
 
-    pub fn check_endpoint(
+    pub async fn check_endpoint(
         &self,
         network_id: &NetworkId,
         network_address: NetworkAddress,
@@ -81,10 +81,10 @@ impl OperationalTool {
             network_id = network_id
         );
         let command = Command::from_iter(args.split_whitespace());
-        command.check_endpoint()
+        command.check_endpoint().await
     }
 
-    pub fn check_endpoint_with_key(
+    pub async fn check_endpoint_with_key(
         &self,
         network_id: &NetworkId,
         network_address: NetworkAddress,
@@ -104,7 +104,9 @@ impl OperationalTool {
             network_id = network_id,
             private_key = private_key.to_encoded_string().unwrap(),
         );
-        Command::from_iter(args.split_whitespace()).check_endpoint()
+        Command::from_iter(args.split_whitespace())
+            .check_endpoint()
+            .await
     }
 
     pub fn create_account(
@@ -114,8 +116,7 @@ impl OperationalTool {
         backend: &config::SecureBackend,
         disable_validate: bool,
         command_name: CommandName,
-        execute: fn(Command) -> Result<(TransactionContext, AccountAddress), Error>,
-    ) -> Result<(TransactionContext, AccountAddress), Error> {
+    ) -> Result<Command, Error> {
         let args = format!(
             "
                 {command}
@@ -135,11 +136,10 @@ impl OperationalTool {
             disable_validate = optional_flag("disable-validate", disable_validate),
         );
 
-        let command = Command::from_iter(args.split_whitespace());
-        execute(command)
+        Ok(Command::from_iter(args.split_whitespace()))
     }
 
-    pub fn create_validator(
+    pub async fn create_validator(
         &self,
         name: &str,
         path_to_key: &str,
@@ -152,11 +152,12 @@ impl OperationalTool {
             backend,
             disable_validate,
             CommandName::CreateValidator,
-            |cmd| cmd.create_validator(),
-        )
+        )?
+        .create_validator()
+        .await
     }
 
-    pub fn create_validator_operator(
+    pub async fn create_validator_operator(
         &self,
         name: &str,
         path_to_key: &str,
@@ -169,8 +170,9 @@ impl OperationalTool {
             backend,
             disable_validate,
             CommandName::CreateValidatorOperator,
-            |cmd| cmd.create_validator_operator(),
-        )
+        )?
+        .create_validator_operator()
+        .await
     }
 
     fn extract_key(
@@ -181,8 +183,7 @@ impl OperationalTool {
         encoding: EncodingType,
         backend: &config::SecureBackend,
         command_name: CommandName,
-        execute: fn(Command) -> Result<(), Error>,
-    ) -> Result<(), Error> {
+    ) -> Result<Command, Error> {
         let args = format!(
             "
                 {command}
@@ -200,11 +201,10 @@ impl OperationalTool {
             backend_args = backend_args(backend)?,
         );
 
-        let command = Command::from_iter(args.split_whitespace());
-        execute(command)
+        Ok(Command::from_iter(args.split_whitespace()))
     }
 
-    pub fn extract_public_key(
+    pub async fn extract_public_key(
         &self,
         key_name: &str,
         key_file: &str,
@@ -219,11 +219,12 @@ impl OperationalTool {
             encoding,
             backend,
             CommandName::ExtractPublicKey,
-            |cmd| cmd.extract_public_key(),
-        )
+        )?
+        .extract_public_key()
+        .await
     }
 
-    pub fn extract_private_key(
+    pub async fn extract_private_key(
         &self,
         key_name: &str,
         key_file: &str,
@@ -238,11 +239,12 @@ impl OperationalTool {
             encoding,
             backend,
             CommandName::ExtractPrivateKey,
-            |cmd| cmd.extract_private_key(),
-        )
+        )?
+        .extract_private_key()
+        .await
     }
 
-    pub fn extract_peer_from_file(
+    pub async fn extract_peer_from_file(
         &self,
         key_file: &Path,
         encoding: EncodingType,
@@ -259,10 +261,10 @@ impl OperationalTool {
         );
 
         let command = Command::from_iter(args.split_whitespace());
-        command.extract_peer_from_file()
+        command.extract_peer_from_file().await
     }
 
-    pub fn extract_peer_from_storage(
+    pub async fn extract_peer_from_storage(
         &self,
         key_name: &str,
         backend: &config::SecureBackend,
@@ -279,10 +281,10 @@ impl OperationalTool {
         );
 
         let command = Command::from_iter(args.split_whitespace());
-        command.extract_peer_from_storage()
+        command.extract_peer_from_storage().await
     }
 
-    pub fn extract_peers_from_keys(
+    pub async fn extract_peers_from_keys(
         &self,
         keys: HashSet<x25519::PublicKey>,
         output_file: &Path,
@@ -299,10 +301,10 @@ impl OperationalTool {
         );
 
         let command = Command::from_iter(args.split_whitespace());
-        command.extract_peers_from_keys()
+        command.extract_peers_from_keys().await
     }
 
-    pub fn generate_key(
+    pub async fn generate_key(
         &self,
         key_type: KeyType,
         key_file: &Path,
@@ -321,11 +323,11 @@ impl OperationalTool {
             encoding = encoding,
         );
         let command = Command::from_iter(args.split_whitespace());
-        command.generate_key()?;
+        command.generate_key().await?;
         load_key(key_file.to_path_buf(), encoding)
     }
 
-    pub fn insert_waypoint(
+    pub async fn insert_waypoint(
         &self,
         waypoint: Waypoint,
         backend: &config::SecureBackend,
@@ -344,10 +346,10 @@ impl OperationalTool {
             set_genesis = optional_flag("set-genesis", set_genesis),
         );
         let command = Command::from_iter(args.split_whitespace());
-        command.insert_waypoint()
+        command.insert_waypoint().await
     }
 
-    pub fn print_account(
+    pub async fn print_account(
         &self,
         account_name: &str,
         backend: &config::SecureBackend,
@@ -363,10 +365,10 @@ impl OperationalTool {
             backend_args = backend_args(backend)?,
         );
         let command = Command::from_iter(args.split_whitespace());
-        command.print_account()
+        command.print_account().await
     }
 
-    pub fn print_key(
+    pub async fn print_key(
         &self,
         key_name: &str,
         backend: &config::SecureBackend,
@@ -382,10 +384,10 @@ impl OperationalTool {
             backend_args = backend_args(backend)?,
         );
         let command = Command::from_iter(args.split_whitespace());
-        command.print_key()
+        command.print_key().await
     }
 
-    pub fn print_waypoint(
+    pub async fn print_waypoint(
         &self,
         waypoint_name: &str,
         backend: &config::SecureBackend,
@@ -401,10 +403,10 @@ impl OperationalTool {
             backend_args = backend_args(backend)?,
         );
         let command = Command::from_iter(args.split_whitespace());
-        command.print_waypoint()
+        command.print_waypoint().await
     }
 
-    pub fn set_validator_config(
+    pub async fn set_validator_config(
         &self,
         validator_address: Option<NetworkAddress>,
         fullnode_address: Option<NetworkAddress>,
@@ -435,16 +437,15 @@ impl OperationalTool {
         );
 
         let command = Command::from_iter(args.split_whitespace());
-        command.set_validator_config()
+        command.set_validator_config().await
     }
 
-    fn rotate_key<T>(
+    fn rotate_key(
         &self,
         backend: &config::SecureBackend,
         disable_validate: bool,
         name: CommandName,
-        execute: fn(Command) -> Result<T, Error>,
-    ) -> Result<T, Error> {
+    ) -> Result<Command, Error> {
         let args = format!(
             "
                 {command}
@@ -459,37 +460,30 @@ impl OperationalTool {
             backend_args = backend_args(backend)?,
             disable_validate = optional_flag("disable-validate", disable_validate),
         );
-        let command = Command::from_iter(args.split_whitespace());
-        execute(command)
+        Ok(Command::from_iter(args.split_whitespace()))
     }
 
-    pub fn rotate_consensus_key(
+    pub async fn rotate_consensus_key(
         &self,
         backend: &config::SecureBackend,
         disable_validate: bool,
     ) -> Result<(TransactionContext, Ed25519PublicKey), Error> {
-        self.rotate_key(
-            backend,
-            disable_validate,
-            CommandName::RotateConsensusKey,
-            |cmd| cmd.rotate_consensus_key(),
-        )
+        self.rotate_key(backend, disable_validate, CommandName::RotateConsensusKey)?
+            .rotate_consensus_key()
+            .await
     }
 
-    pub fn rotate_operator_key(
+    pub async fn rotate_operator_key(
         &self,
         backend: &config::SecureBackend,
         disable_validate: bool,
     ) -> Result<(TransactionContext, Ed25519PublicKey), Error> {
-        self.rotate_key(
-            backend,
-            disable_validate,
-            CommandName::RotateOperatorKey,
-            |cmd| cmd.rotate_operator_key(),
-        )
+        self.rotate_key(backend, disable_validate, CommandName::RotateOperatorKey)?
+            .rotate_operator_key()
+            .await
     }
 
-    pub fn rotate_operator_key_with_custom_validation(
+    pub async fn rotate_operator_key_with_custom_validation(
         &self,
         backend: &config::SecureBackend,
         disable_validate: bool,
@@ -515,10 +509,10 @@ impl OperationalTool {
             validate_timeout = optional_arg("validate-timeout", validate_timeout),
         );
         let command = Command::from_iter(args.split_whitespace());
-        command.rotate_operator_key()
+        command.rotate_operator_key().await
     }
 
-    pub fn rotate_validator_network_key(
+    pub async fn rotate_validator_network_key(
         &self,
         backend: &config::SecureBackend,
         disable_validate: bool,
@@ -527,11 +521,12 @@ impl OperationalTool {
             backend,
             disable_validate,
             CommandName::RotateValidatorNetworkKey,
-            |cmd| cmd.rotate_validator_network_key(),
-        )
+        )?
+        .rotate_validator_network_key()
+        .await
     }
 
-    pub fn rotate_fullnode_network_key(
+    pub async fn rotate_fullnode_network_key(
         &self,
         backend: &config::SecureBackend,
         disable_validate: bool,
@@ -540,11 +535,12 @@ impl OperationalTool {
             backend,
             disable_validate,
             CommandName::RotateFullNodeNetworkKey,
-            |cmd| cmd.rotate_fullnode_network_key(),
-        )
+        )?
+        .rotate_fullnode_network_key()
+        .await
     }
 
-    pub fn validate_transaction(
+    pub async fn validate_transaction(
         &self,
         account_address: AccountAddress,
         sequence_number: u64,
@@ -563,10 +559,10 @@ impl OperationalTool {
         );
 
         let command = Command::from_iter(args.split_whitespace());
-        command.validate_transaction()
+        command.validate_transaction().await
     }
 
-    pub fn set_validator_operator(
+    pub async fn set_validator_operator(
         &self,
         name: &str,
         account_address: AccountAddress,
@@ -593,10 +589,10 @@ impl OperationalTool {
         );
 
         let command = Command::from_iter(args.split_whitespace());
-        command.set_validator_operator()
+        command.set_validator_operator().await
     }
 
-    pub fn validator_config(
+    pub async fn validator_config(
         &self,
         account_address: AccountAddress,
         backend: Option<&config::SecureBackend>,
@@ -621,10 +617,10 @@ impl OperationalTool {
         );
 
         let command = Command::from_iter(args.split_whitespace());
-        command.validator_config()
+        command.validator_config().await
     }
 
-    pub fn validator_set(
+    pub async fn validator_set(
         &self,
         account_address: Option<AccountAddress>,
         backend: Option<&config::SecureBackend>,
@@ -649,17 +645,16 @@ impl OperationalTool {
         );
 
         let command = Command::from_iter(args.split_whitespace());
-        command.validator_set()
+        command.validator_set().await
     }
 
-    fn validator_operation<T>(
+    fn validator_operation(
         &self,
         account_address: AccountAddress,
         backend: &config::SecureBackend,
         disable_validate: bool,
         name: CommandName,
-        execute: fn(Command) -> Result<T, Error>,
-    ) -> Result<T, Error> {
+    ) -> Result<Command, Error> {
         let args = format!(
             "
                 {command}
@@ -676,11 +671,10 @@ impl OperationalTool {
             backend_args = backend_args(backend)?,
             disable_validate = optional_flag("disable-validate", disable_validate),
         );
-        let command = Command::from_iter(args.split_whitespace());
-        execute(command)
+        Ok(Command::from_iter(args.split_whitespace()))
     }
 
-    pub fn add_validator(
+    pub async fn add_validator(
         &self,
         account_address: AccountAddress,
         backend: &config::SecureBackend,
@@ -691,11 +685,12 @@ impl OperationalTool {
             backend,
             disable_validate,
             CommandName::AddValidator,
-            |cmd| cmd.add_validator(),
-        )
+        )?
+        .add_validator()
+        .await
     }
 
-    pub fn remove_validator(
+    pub async fn remove_validator(
         &self,
         account_address: AccountAddress,
         backend: &config::SecureBackend,
@@ -706,11 +701,12 @@ impl OperationalTool {
             backend,
             disable_validate,
             CommandName::RemoveValidator,
-            |cmd| cmd.remove_validator(),
-        )
+        )?
+        .remove_validator()
+        .await
     }
 
-    pub fn verify_validator_state(
+    pub async fn verify_validator_state(
         &self,
         backend: &config::SecureBackend,
     ) -> Result<VerifyValidatorStateResult, Error> {
@@ -725,7 +721,7 @@ impl OperationalTool {
             backend_args = backend_args(backend)?,
         );
         let command = Command::from_iter(args.split_whitespace());
-        command.verify_validator_state()
+        command.verify_validator_state().await
     }
 }
 
