@@ -3,7 +3,6 @@
 
 mod admin_script_builder;
 pub mod old_releases;
-pub mod release_flow;
 
 mod writeset_builder;
 
@@ -13,5 +12,4 @@ pub use admin_script_builder::{
     encode_initialize_parallel_execution, encode_remove_validators_payload,
 };
 
-pub use release_flow::{create_release, verify_release};
 pub use writeset_builder::{build_changeset, GenesisSession};

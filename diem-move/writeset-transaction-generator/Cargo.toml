@@ -31,7 +31,6 @@ diem-framework = { path = "../../diem-move/diem-framework" }
 move-compiler = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 bcs = "0.1.2"
 diem-state-view = { path = "../../storage/state-view" }
-diem-validator-interface = { path = "../diem-validator-interface" }
 diem-transaction-replay = { path = "../transaction-replay" }
 diemdb = { path = "../../storage/diemdb" }
 diem-vm = { path = "../diem-vm" }

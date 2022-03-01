@@ -151,7 +151,6 @@ default-members = [
     "diem-move/df-cli",
     "diem-move/genesis-viewer",
     "diem-move/transaction-replay",
-    "diem-move/writeset-transaction-generator",
     "diem-node",
     "sdk",
     "storage/backup/backup-cli",
