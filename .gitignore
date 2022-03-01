@@ -41,6 +41,14 @@ diem-move/vm-genesis/genesis/vm_config.toml
 
 # Terraform
 .terraform/
+terraform/terraform.tfstate*
+terraform/.terraform.tfstate*
+terraform/validator/*/*-kubernetes.json
+terraform/validator/*/*-vault.ca
+terraform/validator/*/*-kube.config
+terraform/validator/vault-init/backend.tf
+terraform/testnet/*-kubernetes.json
+terraform/testnet/*-vault.ca
 
 # Move Build Output
 build/

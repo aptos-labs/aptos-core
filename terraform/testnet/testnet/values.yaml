@@ -135,6 +135,8 @@ monitoring:
       requests:
         cpu: 0.25
         memory: 128Mi
+    googleAuth:
+    config:
 
 cluster_test:
   enabled: true

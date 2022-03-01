@@ -75,9 +75,6 @@ spec:
     {{- include "testnet.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/name: monitoring
   ports:
-  - name: prom-http
-    port: 9090
-    targetPort: 9090
   - name: grafana-http
     port: 80
     targetPort: 3000
@@ -166,7 +163,6 @@ spec:
         args:
         - "--web.enable-lifecycle"
         - "--config.file=/etc/prometheus/prometheus.yml"
-        - "--web.external-url=http://mon.{{ $domain }}:9090"
         - "--storage.tsdb.min-block-duration=15m"
         - "--storage.tsdb.max-block-duration=30m"
         - "--storage.tsdb.retention.time={{ .prometheus.retention }}"
