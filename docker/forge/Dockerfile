@@ -27,8 +27,7 @@ RUN apt-get update && apt-get install -y libssl1.1 openssh-client wget && apt-ge
 
 RUN mkdir /diem
 COPY rust-toolchain /diem/rust-toolchain
-COPY scripts/dev_setup.sh /diem/scripts/dev_setup.sh
-RUN /diem/scripts/dev_setup.sh -b -p -i kubectl -i helm -i git -i unzip -i awscli -i vault
+RUN apt-get install -y kubectl helm git unzip awscli vault
 ENV PATH "$PATH:/root/bin"
 
 RUN helm plugin install https://github.com/hypnoglow/helm-s3.git --version 0.10.0
