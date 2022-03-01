@@ -7,7 +7,6 @@ pub mod nft_transaction;
 pub mod rest_api;
 pub mod scripts_and_modules;
 pub mod transaction;
-pub mod verifying_client;
 
 // Converted to local Forge backend
 #[cfg(test)]
