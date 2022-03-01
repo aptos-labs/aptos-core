@@ -7116,8 +7116,6 @@ dependencies = [
  "diem-genesis-tool",
  "diem-global-constants",
  "diem-infallible",
- "diem-json-rpc",
- "diem-json-rpc-types",
  "diem-logger",
  "diem-management",
  "diem-operational-tool",

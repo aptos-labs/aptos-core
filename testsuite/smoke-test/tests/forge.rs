@@ -6,16 +6,12 @@ use smoke_test::{
     fullnode::LaunchFullnode,
     rest_api::{self, GetIndex},
     transaction::ExternalTransactionSigner,
-    verifying_client::{VerifyingClientEquivalence, VerifyingGetLatestMetadata, VerifyingSubmit},
 };
 
 fn main() -> Result<()> {
     let tests = ForgeConfig::default()
         .with_public_usage_tests(&[
             &ExternalTransactionSigner,
-            &VerifyingSubmit,
-            &VerifyingClientEquivalence,
-            &VerifyingGetLatestMetadata,
             &GetIndex,
             &rest_api::BasicClient,
         ])

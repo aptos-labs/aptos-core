@@ -23,7 +23,6 @@ diem-crypto = { path = "../../crates/diem-crypto" }
 diem-experimental-framework-releases = { path = "../../diem-move/diem-framework/experimental/releases" }
 diem-framework = { path = "../../diem-move/diem-framework" }
 diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
-diem-json-rpc-types = { path = "../../json-rpc/types" }
 diem-sdk = { path = "../../sdk" }
 diem-rest-client = { path = "../../crates/diem-rest-client" }
 diem-temppath = { path = "../../crates/diem-temppath" }
@@ -50,8 +49,6 @@ generate-key = { path = "../../config/generate-key" }
 diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
 diem-global-constants = { path = "../../config/global-constants" }
 diem-infallible = { path = "../../crates/diem-infallible" }
-diem-json-rpc = { path = "../../json-rpc" }
-diem-json-rpc-types = { path = "../../json-rpc/types" }
 diem-logger = { path = "../../crates/diem-logger" }
 diem-management = { path = "../../config/management", features = ["testing"] }
 diem-operational-tool = {path = "../../config/management/operational", features = ["testing"] }
