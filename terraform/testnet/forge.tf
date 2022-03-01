@@ -58,8 +58,9 @@ resource "null_resource" "helm-s3-package" {
     command = <<-EOT
       set -e
       TEMPDIR="$(mktemp -d)"
-      cd ${path.module}/.. # script expects to be called from project root
-      ./scripts/prepare-helm-charts.py "$TEMPDIR" "1.0.0"
+      helm package ${path.module}/testnet -d "$TEMPDIR" --app-version 1.0.0 --version 1.0.0
+      helm package ${path.module}/../helm/validator -d "$TEMPDIR" --app-version 1.0.0 --version 1.0.0
+      helm package ${path.module}/../helm/fullnode -d "$TEMPDIR" --app-version 1.0.0 --version 1.0.0
       helm s3 push --force "$TEMPDIR"/testnet-*.tgz testnet-${terraform.workspace}
       helm s3 push --force "$TEMPDIR"/diem-validator-*.tgz testnet-${terraform.workspace}
       helm s3 push --force "$TEMPDIR"/diem-fullnode-*.tgz testnet-${terraform.workspace}
