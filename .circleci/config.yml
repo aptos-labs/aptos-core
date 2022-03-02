@@ -31,7 +31,7 @@ jobs:
       - run: cargo xclippy --workspace --all-targets
       - run: cargo fmt
       - run: cargo xfmt --check
-  e2e-test-0:
+  e2e-test:
     machine:
       image: ubuntu-2004:current
     resource_class: xlarge
@@ -40,25 +40,7 @@ jobs:
       - build-and-split
       - run: mv /tmp/tests.0 /tmp/tests_to_run
       - run-e2e-tests
-  e2e-test-1:
-    machine:
-      image: ubuntu-2004:current
-    resource_class: xlarge
-    steps:
-      - dev-setup
-      - build-and-split
-      - run: mv /tmp/tests.1 /tmp/tests_to_run
-      - run-e2e-tests
-  e2e-test-2:
-    machine:
-      image: ubuntu-2004:current
-    resource_class: xlarge
-    steps:
-      - dev-setup
-      - build-and-split
-      - run: mv /tmp/tests.2 /tmp/tests_to_run
-      - run-e2e-tests
-  unit-test-0:
+  unit-test:
     machine:
       image: ubuntu-2004:current
     resource_class: xlarge
@@ -66,27 +48,16 @@ jobs:
       - dev-setup
       - run: cargo xtest --package jsonrpc-integration-tests --changed-since "origin/main"
       - run: cargo xtest --doc --jobs 8 --unit --changed-since "origin/main"
-      - run: cargo nextest --nextest-profile ci --partition hash:1/2 --jobs 6 --test-threads 8 --unit --exclude backup-cli --changed-since "origin/main"
-  unit-test-1:
-    machine:
-      image: ubuntu-2004:current
-    resource_class: xlarge
-    steps:
-      - dev-setup
-      - run: cargo nextest --nextest-profile ci --partition hash:2/2 --jobs 6 --test-threads 8 --unit --exclude backup-cli --changed-since "origin/main"
+      - run: cargo nextest --nextest-profile ci --partition hash:1/1 --jobs 6 --test-threads 8 --unit --exclude backup-cli --changed-since "origin/main"
 
 workflows:
   build-test-deploy:
     jobs:
-      - build-benchmarks
+#      - build-benchmarks
       - crypto
-      - e2e-test-0
-      - e2e-test-1
-      - e2e-test-2
+      - e2e-test
       - lint
-      - unit-test-0
-      - unit-test-1
-
+      - unit-test
 commands:
   dev-setup:
     steps:
@@ -100,7 +71,7 @@ commands:
       - run: |
           cargo x test --package smoke-test --jobs 8 -- --list | grep "::" | sed 's/: .*$//' > e2e_tests
           echo -e "Found $(wc -l e2e_tests) tests."
-          split -n r/3 -d -a 1 e2e_tests /tmp/tests.
+          split -n r/1 -d -a 1 e2e_tests /tmp/tests.
   run-e2e-tests:
     steps:
       - run: |
