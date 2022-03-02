@@ -10,7 +10,7 @@ jobs:
     name: (hyperjump) labels
     steps:
       - name: checkout
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v3
       - name: labels
         uses: aptos-labs/actions/hyperjump-labels@0.1
         with:

@@ -10,7 +10,7 @@ jobs:
     name: (hyperjump) request-review
     steps:
       - name: checkout
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v3
       - name: request review
         uses: aptos/actions/hyperjump-request-review@0.1
         with:
