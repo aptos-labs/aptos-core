@@ -2,23 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    operational_tooling::{
-        launch_swarm_with_op_tool_and_backend, wait_for_transaction_on_all_nodes,
-    },
-    smoke_test_environment::new_local_swarm,
-    test_utils::{check_create_mint_transfer, diem_swarm_utils::load_validators_backend_storage},
+    operational_tooling::launch_swarm_with_op_tool_and_backend,
+    test_utils::check_create_mint_transfer,
 };
 use diem_config::config::SecureBackend;
-use diem_global_constants::OWNER_ACCOUNT;
-use diem_operational_tool::test_helper::OperationalTool;
 use diem_sdk::types::on_chain_config::OnChainConsensusConfig;
 use diem_secure_storage::{KVStorage, Storage};
-use diem_types::{
-    account_address::AccountAddress,
-    network_address::NetworkAddress,
-    on_chain_config::{ConsensusConfigV1, ConsensusConfigV2},
-};
-use forge::{LocalSwarm, Node, NodeExt, Swarm};
+use diem_types::network_address::NetworkAddress;
+use forge::{NodeExt, Swarm};
 use std::{convert::TryInto, str::FromStr};
 
 #[tokio::test]
@@ -72,99 +63,7 @@ async fn test_consensus_observer_mode_storage_error() {
     assert_eq!(sequence_number_0, sequence_number_1);
 }
 
-#[tokio::test]
-async fn test_safety_rules_export_consensus() {
-    // Create the smoke test environment
-    let num_nodes = 4;
-    let mut swarm = new_local_swarm(num_nodes).await;
-
-    // Update all nodes to export the consensus key
-    for validator in swarm.validators_mut() {
-        let mut node_config = validator.config().clone();
-        node_config.consensus.safety_rules.export_consensus_key = true;
-        node_config.save(validator.config_path()).unwrap();
-        validator.restart().await.unwrap();
-    }
-
-    // Launch and test the swarm
-    swarm.launch().await.unwrap();
-    rotate_operator_and_consensus_key(swarm).await;
-}
-
-#[tokio::test]
-async fn test_safety_rules_export_consensus_compatibility() {
-    // Create the smoke test environment
-    let num_nodes = 4;
-    let mut swarm = new_local_swarm(num_nodes).await;
-
-    // Allow the first and second nodes to export the consensus key
-    for validator in swarm.validators_mut().take(2) {
-        let mut node_config = validator.config().clone();
-        node_config.consensus.safety_rules.export_consensus_key = true;
-        node_config.save(validator.config_path()).unwrap();
-        validator.restart().await.unwrap();
-    }
-
-    // Launch and test the swarm
-    swarm.launch().await.unwrap();
-    rotate_operator_and_consensus_key(swarm).await;
-}
-
-#[tokio::test]
-async fn test_2chain_upgrade() {
-    // genesis starts with 2-chain already
-    test_onchain_upgrade(OnChainConsensusConfig::V1(ConsensusConfigV1 {
-        two_chain: false,
-    }))
-    .await;
-}
-
-#[tokio::test]
-async fn test_decoupled_execution_upgrade() {
-    test_onchain_upgrade(OnChainConsensusConfig::V2(ConsensusConfigV2 {
-        two_chain: true,
-        decoupled_execution: true,
-        back_pressure_limit: 10,
-        exclude_round: 20,
-    }))
-    .await
-}
-
-async fn rotate_operator_and_consensus_key(swarm: LocalSwarm) {
-    let validator = swarm.validators().next().unwrap();
-    let rest_api_endpoint = validator.rest_api_endpoint().to_string();
-
-    // Load the first validator's on disk storage
-    let backend = load_validators_backend_storage(validator);
-    let storage: Storage = (&backend).try_into().unwrap();
-
-    // Connect the operator tool to the first node's JSON RPC API
-    let op_tool = OperationalTool::new(rest_api_endpoint, swarm.chain_id());
-
-    // Rotate the first node's operator key
-    let (txn_ctx, _) = op_tool.rotate_operator_key(&backend, true).await.unwrap();
-    assert!(txn_ctx.execution_result.is_none());
-
-    // Ensure all nodes have received the transaction
-    wait_for_transaction_on_all_nodes(&swarm, txn_ctx.address, txn_ctx.sequence_number).await;
-
-    // Rotate the consensus key to verify the operator key has been updated
-    let (txn_ctx, new_consensus_key) = op_tool.rotate_consensus_key(&backend, false).await.unwrap();
-    assert!(txn_ctx.execution_result.unwrap().success);
-
-    // Ensure all nodes have received the transaction
-    wait_for_transaction_on_all_nodes(&swarm, txn_ctx.address, txn_ctx.sequence_number).await;
-
-    // Verify that the config has been updated correctly with the new consensus key
-    let validator_account = storage.get::<AccountAddress>(OWNER_ACCOUNT).unwrap().value;
-    let config_consensus_key = op_tool
-        .validator_config(validator_account, Some(&backend))
-        .await
-        .unwrap()
-        .consensus_public_key;
-    assert_eq!(new_consensus_key, config_consensus_key);
-}
-
+#[allow(dead_code)]
 async fn test_onchain_upgrade(new_onfig: OnChainConsensusConfig) {
     let num_nodes = 4;
     let (mut swarm, _, _, _) = launch_swarm_with_op_tool_and_backend(num_nodes).await;
