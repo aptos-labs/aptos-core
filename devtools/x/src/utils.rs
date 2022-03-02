@@ -24,27 +24,20 @@ pub fn project_root() -> &'static Utf8Path {
 /// If the project is configured for sccache, and the env variable SKIP_SCCACHE is unset then returns true.
 /// If the warn_if_not_correct_location parameter is set to true, warnings will be logged if the project is configured for sccache
 /// but the CARGO_HOME or project root are not in the right locations.
-pub fn sccache_should_run(cargo_config: &CargoConfig, warn_if_not_correct_location: bool) -> bool {
+pub fn sccache_should_run(cargo_config: &CargoConfig, _warn_if_not_correct_location: bool) -> bool {
     if var_os("SKIP_SCCACHE").is_none() {
-        if let Some(sccache_config) = &cargo_config.sccache {
-            // Are we work on items in the right location:
-            // See: https://github.com/mozilla/sccache#known-caveats
-            let correct_location = var_os("CARGO_HOME").unwrap_or_default()
-                == sccache_config.required_cargo_home.as_str()
-                && sccache_config.required_git_home == project_root();
-            if !correct_location && warn_if_not_correct_location {
-                warn!("You will not benefit from sccache in this build!!!");
-                warn!(
-                    "To get the best experience, please move your diem source code to {} and your set your CARGO_HOME to be {}, simply export it in your .profile or .bash_rc",
-                    &sccache_config.required_git_home, &sccache_config.required_cargo_home
-                );
-                warn!(
-                    "Current diem root is '{}',  and current CARGO_HOME is '{}'",
-                    project_root(),
-                    var_os("CARGO_HOME").unwrap_or_default().to_string_lossy()
-                );
-            }
-            correct_location
+        if let Some(_) = &cargo_config.sccache {
+            // warn!("You will not benefit from sccache in this build!!!");
+            // warn!(
+            //         "To get the best experience, please move your diem source code to {} and your set your CARGO_HOME to be {}, simply export it in your .profile or .bash_rc",
+            //         &sccache_config.required_git_home, &sccache_config.required_cargo_home
+            //     );
+            warn!(
+                "Current diem root is '{}',  and current CARGO_HOME is '{}'",
+                project_root(),
+                var_os("CARGO_HOME").unwrap_or_default().to_string_lossy()
+            );
+            true
         } else {
             false
         }
