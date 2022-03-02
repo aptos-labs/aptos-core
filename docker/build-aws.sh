@@ -68,7 +68,7 @@ if [ -z "${SOURCE_VERSION}" ] || [ ${#BUILD_PROJECTS[@]} -eq 0 ]; then
 fi
 
 if [[ -n "${ADDL_TAGS}" ]]; then
-  TAGS="${TAGS},${ADDL_TAGS}"
+  TAGS="latest,${TAGS},${ADDL_TAGS}"
 fi
 
 echo "Building with SOURCE_VERSION=${SOURCE_VERSION} TAGS=${TAGS}"
