@@ -1,6 +1,6 @@
 [profile.ci]
 # Detect flaky tests.
-retries = 2
+retries = 3
 # Show skipped tests in the CI output.
 status-level = "skip"
 # Show output for all tests as soon as they fail and at the end of the test run.
