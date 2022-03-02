@@ -49,7 +49,7 @@ storage-interface = { path = "../../storage-interface" }
 
 [dev-dependencies]
 proptest = "1.0.0"
-warp = "0.3.0"
+warp = "0.3.2"
 
 backup-service = { path = "../backup-service" }
 executor-test-helpers = { path = "../../../execution/executor-test-helpers" }

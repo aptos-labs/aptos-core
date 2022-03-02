@@ -17,7 +17,7 @@ use warp::{
     body::BodyDeserializeError,
     cors::CorsForbidden,
     filters::BoxedFilter,
-    http::{header, StatusCode},
+    http::{header, HeaderValue, StatusCode},
     reject::{LengthRequired, MethodNotAllowed, PayloadTooLarge, UnsupportedMediaType},
     reply, Filter, Rejection, Reply,
 };
@@ -47,8 +47,6 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         .or(events::get_events_by_event_key(context.clone()))
         .or(events::get_events_by_event_handle(context.clone()))
         .or(context.health_check_route().with(metrics("health_check")))
-        // jsonrpc routes must before `recover` and after `index`
-        // so that POST '/' can be handled by jsonrpc routes instead of `index` route
         .with(
             warp::cors()
                 .allow_any_origin()
@@ -124,7 +122,10 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
         code = StatusCode::INTERNAL_SERVER_ERROR;
         body = reply::json(&Error::new(code, format!("unexpected error: {:?}", err)));
     }
-    Ok(reply::with_status(body, code))
+    let mut rep = reply::with_status(body, code).into_response();
+    rep.headers_mut()
+        .insert("access-control-allow-origin", HeaderValue::from_static("*"));
+    Ok(rep)
 }
 
 fn open_api_html() -> String {
