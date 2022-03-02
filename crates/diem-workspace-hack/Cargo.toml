@@ -24,11 +24,10 @@ crossbeam-deque = { version = "0.8.1", features = ["crossbeam-epoch", "crossbeam
 crossbeam-queue = { version = "0.3.1", features = ["alloc", "std"] }
 crossbeam-utils = { version = "0.8.3", features = ["lazy_static", "std"] }
 either = { version = "1.6.1", features = ["use_std"] }
-futures = { version = "0.3.12", features = ["alloc", "async-await", "executor", "futures-executor", "std"] }
-futures-channel = { version = "0.3.16", features = ["alloc", "futures-sink", "sink", "std"] }
-futures-core = { version = "0.3.16", features = ["alloc", "std"] }
+futures-channel = { version = "0.3.21", features = ["alloc", "futures-sink", "sink", "std"] }
+futures-core = { version = "0.3.21", features = ["alloc", "std"] }
 futures-io = { version = "0.3.16", features = ["std"] }
-futures-sink = { version = "0.3.16", features = ["alloc", "std"] }
+futures-sink = { version = "0.3.21", features = ["alloc", "std"] }
 futures-util = { version = "0.3.16", features = ["alloc", "async-await", "async-await-macro", "channel", "futures-channel", "futures-io", "futures-macro", "futures-sink", "io", "memchr", "proc-macro-hack", "proc-macro-nested", "sink", "slab", "std"] }
 hyper = { version = "0.14.11", features = ["client", "full", "h2", "http1", "http2", "runtime", "server", "socket2", "stream", "tcp"] }
 indexmap = { version = "1.7.0", default-features = false, features = ["std"] }
@@ -54,7 +53,7 @@ tokio = { version = "1.9.0", features = ["bytes", "fs", "full", "io-std", "io-ut
 tokio-util = { version = "0.6.7", features = ["codec", "compat", "futures-io", "io"] }
 toml = { version = "0.5.8" }
 tracing = { version = "0.1.26", features = ["attributes", "log", "std", "tracing-attributes"] }
-warp = { version = "0.3.0", features = ["multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
+warp = { version = "0.3.2", features = ["multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
 zeroize = { version = "1.2.0", features = ["alloc", "zeroize_derive"] }
 
 [build-dependencies]
@@ -72,11 +71,10 @@ crossbeam-deque = { version = "0.8.1", features = ["crossbeam-epoch", "crossbeam
 crossbeam-queue = { version = "0.3.1", features = ["alloc", "std"] }
 crossbeam-utils = { version = "0.8.3", features = ["lazy_static", "std"] }
 either = { version = "1.6.1", features = ["use_std"] }
-futures = { version = "0.3.12", features = ["alloc", "async-await", "executor", "futures-executor", "std"] }
-futures-channel = { version = "0.3.16", features = ["alloc", "futures-sink", "sink", "std"] }
-futures-core = { version = "0.3.16", features = ["alloc", "std"] }
+futures-channel = { version = "0.3.21", features = ["alloc", "futures-sink", "sink", "std"] }
+futures-core = { version = "0.3.21", features = ["alloc", "std"] }
 futures-io = { version = "0.3.16", features = ["std"] }
-futures-sink = { version = "0.3.16", features = ["alloc", "std"] }
+futures-sink = { version = "0.3.21", features = ["alloc", "std"] }
 futures-util = { version = "0.3.16", features = ["alloc", "async-await", "async-await-macro", "channel", "futures-channel", "futures-io", "futures-macro", "futures-sink", "io", "memchr", "proc-macro-hack", "proc-macro-nested", "sink", "slab", "std"] }
 hyper = { version = "0.14.11", features = ["client", "full", "h2", "http1", "http2", "runtime", "server", "socket2", "stream", "tcp"] }
 indexmap = { version = "1.7.0", default-features = false, features = ["std"] }
@@ -103,7 +101,7 @@ tokio = { version = "1.9.0", features = ["bytes", "fs", "full", "io-std", "io-ut
 tokio-util = { version = "0.6.7", features = ["codec", "compat", "futures-io", "io"] }
 toml = { version = "0.5.8" }
 tracing = { version = "0.1.26", features = ["attributes", "log", "std", "tracing-attributes"] }
-warp = { version = "0.3.0", features = ["multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
+warp = { version = "0.3.2", features = ["multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
 zeroize = { version = "1.2.0", features = ["alloc", "zeroize_derive"] }
 
 ### END HAKARI SECTION

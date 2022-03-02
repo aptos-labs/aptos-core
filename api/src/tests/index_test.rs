@@ -103,3 +103,34 @@ async fn test_cors_forbidden() {
         )
     }
 }
+
+#[tokio::test]
+async fn test_cors_on_non_200_responses() {
+    let context = new_test_context();
+    // Preflight must work no matter what
+    let preflight_req = warp::test::request()
+        .header("origin", "test")
+        .header("Access-Control-Request-Headers", "Content-Type")
+        .header("Access-Control-Request-Method", "GET")
+        .method("OPTIONS")
+        .path("/accounts/nope/resources");
+    let preflight_resp = context.reply(preflight_req).await;
+    assert_eq!(preflight_resp.status(), 200);
+    let cors_header = preflight_resp
+        .headers()
+        .get("access-control-allow-origin")
+        .unwrap();
+    assert_eq!(cors_header, "test");
+
+    // Actual request should also have correct CORS headers set
+    let req = warp::test::request()
+        .header("origin", "test")
+        .header("Access-Control-Request-Headers", "Content-Type")
+        .header("Access-Control-Request-Method", "GET")
+        .method("GET")
+        .path("/accounts/nope/resources");
+    let resp = context.reply(req).await;
+    assert_eq!(resp.status(), 400);
+    let cors_header = resp.headers().get("access-control-allow-origin").unwrap();
+    assert_eq!(cors_header, "*");
+}
