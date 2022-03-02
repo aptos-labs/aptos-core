@@ -13,8 +13,8 @@ jobs:
     resource_class: medium
     steps:
       - dev-setup
-      - run: cargo test --package diem-crypto --features='u32' --no-default-features
-      - run: cargo test --package diem-crypto --features='u64' --no-default-features
+      - run: cargo nextest --nextest-profile ci --package diem-crypto --features='u32' --no-default-features
+      - run: cargo nextest --nextest-profile ci --package diem-crypto --features='u64' --no-default-features
   lint:
     docker:
       - image: cimg/base:2020.01
@@ -37,9 +37,7 @@ jobs:
     resource_class: xlarge
     steps:
       - dev-setup
-      - build-and-split
-      - run: mv /tmp/tests.0 /tmp/tests_to_run
-      - run-e2e-tests
+      - run: RUST_BACKTRACE=full cargo nextest --nextest-profile ci --partition hash:1/1 --jobs 8 --test-threads 2 --package smoke-test
   unit-test:
     machine:
       image: ubuntu-2004:current
@@ -49,7 +47,6 @@ jobs:
       - run: cargo xtest --package jsonrpc-integration-tests --changed-since "origin/main"
       - run: cargo xtest --doc --jobs 8 --unit --changed-since "origin/main"
       - run: cargo nextest --nextest-profile ci --partition hash:1/1 --jobs 6 --test-threads 8 --unit --exclude backup-cli --changed-since "origin/main"
-
 workflows:
   build-test-deploy:
     jobs:
@@ -66,36 +63,3 @@ commands:
       - run: sudo apt-get install build-essential ca-certificates clang curl git libssl-dev pkg-config --no-install-recommends --assume-yes
       - run: curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
       - run: cat $HOME/.cargo/env >> $BASH_ENV
-  build-and-split:
-    steps:
-      - run: |
-          cargo x test --package smoke-test --jobs 8 -- --list | grep "::" | sed 's/: .*$//' > e2e_tests
-          echo -e "Found $(wc -l e2e_tests) tests."
-          split -n r/1 -d -a 1 e2e_tests /tmp/tests.
-  run-e2e-tests:
-    steps:
-      - run: |
-          echo -e "This runner will run these tests\n$(cat /tmp/tests_to_run)"
-          set +e
-          num_fails=0
-          export RUST_BACKTRACE=full
-          failed_tests=
-          for target in $(cat /tmp/tests_to_run) ; do
-            retry=0
-            status=1
-            while [[ $status != 0 && $retry < 3 ]]; do
-              cargo x test --package smoke-test -- $target --test-threads 1 --exact --nocapture
-              status=$?
-              retry=$((retry + 1))
-              if [[ $status != 0 ]] ; then
-                echo Failed to execute $target, $retry times
-              fi
-            done
-
-            if [[ $status != 0 ]] ; then
-              num_fails=$((num_fails + 1))
-              echo failed to execute $target
-              break
-            fi
-          done
-          exit $status
