@@ -50,10 +50,12 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[tokio::test]
-async fn test_account_resource() {
-    let (_env, op_tool, _, storage) = launch_swarm_with_op_tool_and_backend(1).await;
-
+async fn test_account_resource(
+    _swarm: &LocalSwarm,
+    op_tool: &OperationalTool,
+    _backend: &SecureBackend,
+    storage: &mut Storage,
+) {
     // Fetch the owner account resource
     let owner_account = storage.get::<AccountAddress>(OWNER_ACCOUNT).unwrap().value;
     let account_resource = op_tool.account_resource(owner_account).await.unwrap();
@@ -80,7 +82,7 @@ async fn test_account_resource() {
 
 #[tokio::test]
 async fn test_auto_validate_options() {
-    let (swarm, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(1).await;
+    let (swarm, op_tool, backend, _storage) = launch_swarm_with_op_tool_and_backend(1).await;
 
     // Rotate the operator key with a really low timeout to prevent validation
     let (txn_ctx, _) = op_tool
@@ -112,7 +114,7 @@ async fn test_auto_validate_options() {
 
 #[tokio::test]
 async fn test_consensus_key_rotation() {
-    let (_env, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1).await;
+    let (_swarm, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1).await;
 
     // Rotate the consensus key
     let (txn_ctx, new_consensus_key) = op_tool.rotate_consensus_key(&backend, false).await.unwrap();
@@ -145,30 +147,73 @@ async fn test_consensus_key_rotation() {
     assert_eq!(rotated_consensus_key, new_consensus_key);
 }
 
-#[tokio::test]
-async fn test_create_operator_hex_file() {
-    create_operator_with_file_writer(write_key_to_file_hex_format).await;
+async fn test_create_operator_hex_file(
+    swarm: &mut LocalSwarm,
+    op_tool: &OperationalTool,
+    backend: &SecureBackend,
+    storage: &mut Storage,
+) {
+    create_operator_with_file_writer(
+        write_key_to_file_hex_format,
+        swarm,
+        op_tool,
+        backend,
+        storage,
+    )
+    .await;
 }
 
-#[tokio::test]
-async fn test_create_operator_bcs_file() {
-    create_operator_with_file_writer(write_key_to_file_bcs_format).await;
+async fn test_create_operator_bcs_file(
+    swarm: &mut LocalSwarm,
+    op_tool: &OperationalTool,
+    backend: &SecureBackend,
+    storage: &mut Storage,
+) {
+    create_operator_with_file_writer(
+        write_key_to_file_bcs_format,
+        swarm,
+        op_tool,
+        backend,
+        storage,
+    )
+    .await;
 }
 
-#[tokio::test]
-async fn test_create_validator_hex_file() {
-    create_validator_with_file_writer(write_key_to_file_hex_format).await;
+async fn test_create_validator_hex_file(
+    swarm: &mut LocalSwarm,
+    op_tool: &OperationalTool,
+    backend: &SecureBackend,
+    storage: &mut Storage,
+) {
+    create_validator_with_file_writer(
+        write_key_to_file_hex_format,
+        swarm,
+        op_tool,
+        backend,
+        storage,
+    )
+    .await;
 }
 
-#[tokio::test]
-async fn test_create_validator_bcs_file() {
-    create_validator_with_file_writer(write_key_to_file_bcs_format).await;
+async fn test_create_validator_bcs_file(
+    swarm: &mut LocalSwarm,
+    op_tool: &OperationalTool,
+    backend: &SecureBackend,
+    storage: &mut Storage,
+) {
+    create_validator_with_file_writer(
+        write_key_to_file_bcs_format,
+        swarm,
+        op_tool,
+        backend,
+        storage,
+    )
+    .await;
 }
 
 #[tokio::test]
 async fn test_disable_address_validation() {
-    let num_nodes = 1;
-    let (_env, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(num_nodes).await;
+    let (_swarm, op_tool, backend, _storage) = launch_swarm_with_op_tool_and_backend(1).await;
 
     // Try to set the validator config with a bad address and verify failure
     let bad_network_address = NetworkAddress::from_str("/dns4/127.0.0.1/tcp/1234").unwrap();
@@ -394,9 +439,31 @@ async fn test_set_operator_and_add_new_validator() {
 }
 
 #[tokio::test]
-async fn test_extract_private_key() {
-    let (swarm, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1).await;
+// Because each test takes non-neglible time to start, streamlining them into a single test
+async fn test_single_node_operations() {
+    let (mut swarm, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1).await;
 
+    test_account_resource(&swarm, &op_tool, &backend, &mut storage).await;
+    test_create_operator_bcs_file(&mut swarm, &op_tool, &backend, &mut storage).await;
+    test_create_operator_hex_file(&mut swarm, &op_tool, &backend, &mut storage).await;
+    test_create_validator_bcs_file(&mut swarm, &op_tool, &backend, &mut storage).await;
+    test_create_validator_hex_file(&mut swarm, &op_tool, &backend, &mut storage).await;
+    test_extract_private_key(&swarm, &op_tool, &backend, &mut storage).await;
+    test_extract_public_key(&swarm, &op_tool, &backend, &mut storage).await;
+    test_extract_peer_from_storage(&swarm, &op_tool, &backend, &storage).await;
+    test_insert_waypoint(&swarm, &op_tool, &backend, &mut storage).await;
+    test_print_account(&swarm, &op_tool, &backend, &mut storage).await;
+    test_print_key(&swarm, &op_tool, &backend, &mut storage).await;
+    test_print_waypoints(&swarm, &op_tool, &backend, &mut storage).await;
+    test_verify_validator_state(&swarm, &op_tool, &backend, &mut storage).await;
+}
+
+async fn test_extract_private_key(
+    swarm: &LocalSwarm,
+    op_tool: &OperationalTool,
+    backend: &SecureBackend,
+    storage: &mut Storage,
+) {
     // Extract the operator private key to file
     let node_config_path = swarm.validators().next().unwrap().config_path();
     let key_file_path = node_config_path.with_file_name(OPERATOR_KEY);
@@ -406,7 +473,7 @@ async fn test_extract_private_key() {
             key_file_path.to_str().unwrap(),
             KeyType::Ed25519,
             EncodingType::BCS,
-            &backend,
+            backend,
         )
         .await
         .unwrap();
@@ -418,10 +485,12 @@ async fn test_extract_private_key() {
     assert_eq!(key_from_storage, key_from_file);
 }
 
-#[tokio::test]
-async fn test_extract_public_key() {
-    let (swarm, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1).await;
-
+async fn test_extract_public_key(
+    swarm: &LocalSwarm,
+    op_tool: &OperationalTool,
+    backend: &SecureBackend,
+    storage: &mut Storage,
+) {
     // Extract the operator public key to file
     let node_config_path = swarm.validators().next().unwrap().config_path();
     let key_file_path = node_config_path.with_file_name(OPERATOR_KEY);
@@ -431,7 +500,7 @@ async fn test_extract_public_key() {
             key_file_path.to_str().unwrap(),
             KeyType::Ed25519,
             EncodingType::BCS,
-            &backend,
+            backend,
         )
         .await
         .unwrap();
@@ -443,14 +512,16 @@ async fn test_extract_public_key() {
     assert_eq!(key_from_storage, key_from_file);
 }
 
-#[tokio::test]
-async fn test_extract_peer_from_storage() {
-    let (swarm, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(1).await;
-
+async fn test_extract_peer_from_storage(
+    swarm: &LocalSwarm,
+    op_tool: &OperationalTool,
+    backend: &SecureBackend,
+    _storage: &Storage,
+) {
     // Check Validator Network Key
     let config = swarm.validators().next().unwrap().config().clone();
     let map = op_tool
-        .extract_peer_from_storage(VALIDATOR_NETWORK_KEY, &backend)
+        .extract_peer_from_storage(VALIDATOR_NETWORK_KEY, backend)
         .await
         .unwrap();
     let network_config = config.validator_network.unwrap();
@@ -462,7 +533,7 @@ async fn test_extract_peer_from_storage() {
 
     // Check FullNode Network Key
     let map = op_tool
-        .extract_peer_from_storage(FULLNODE_NETWORK_KEY, &backend)
+        .extract_peer_from_storage(FULLNODE_NETWORK_KEY, backend)
         .await
         .unwrap();
     let network_config = config
@@ -578,10 +649,12 @@ async fn test_generate_key() {
     );
 }
 
-#[tokio::test]
-async fn test_insert_waypoint() {
-    let (_env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1).await;
-
+async fn test_insert_waypoint(
+    _swarm: &LocalSwarm,
+    op_tool: &OperationalTool,
+    backend: &SecureBackend,
+    storage: &mut Storage,
+) {
     // Get the current waypoint from storage
     let current_waypoint: Waypoint = storage.get(WAYPOINT).unwrap().value;
 
@@ -590,7 +663,7 @@ async fn test_insert_waypoint() {
         Waypoint::new_any(&LedgerInfo::new(BlockInfo::empty(), HashValue::zero()));
     assert_ne!(current_waypoint, inserted_waypoint);
     op_tool
-        .insert_waypoint(inserted_waypoint, &backend, true)
+        .insert_waypoint(inserted_waypoint, backend, true)
         .await
         .unwrap();
 
@@ -603,7 +676,7 @@ async fn test_insert_waypoint() {
 
     // Insert the old waypoint into storage, but skip the genesis waypoint
     op_tool
-        .insert_waypoint(current_waypoint, &backend, false)
+        .insert_waypoint(current_waypoint, backend, false)
         .await
         .unwrap();
     assert_eq!(current_waypoint, storage.get(WAYPOINT).unwrap().value);
@@ -615,8 +688,7 @@ async fn test_insert_waypoint() {
 
 #[tokio::test]
 async fn test_fullnode_network_key_rotation() {
-    let num_nodes = 1;
-    let (env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(num_nodes).await;
+    let (swarm, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1).await;
 
     // Rotate the full node network key
     let (txn_ctx, new_network_key) = op_tool
@@ -626,7 +698,7 @@ async fn test_fullnode_network_key_rotation() {
     assert!(txn_ctx.execution_result.is_none());
 
     // Wait for transaction execution
-    let client = env.validators().next().unwrap().rest_client();
+    let client = swarm.validators().next().unwrap().rest_client();
     wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number)
         .await
         .unwrap();
@@ -755,13 +827,13 @@ async fn test_network_key_rotation_recovery() {
 
 #[tokio::test]
 async fn test_operator_key_rotation() {
-    let (env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1).await;
+    let (swarm, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1).await;
 
     let (txn_ctx, _) = op_tool.rotate_operator_key(&backend, true).await.unwrap();
     assert!(txn_ctx.execution_result.is_none());
 
     // Wait for transaction execution
-    let client = env.validators().next().unwrap().rest_client();
+    let client = swarm.validators().next().unwrap().rest_client();
     wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number)
         .await
         .unwrap();
@@ -789,7 +861,7 @@ async fn test_operator_key_rotation() {
 
 #[tokio::test]
 async fn test_operator_key_rotation_recovery() {
-    let (env, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1).await;
+    let (swarm, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1).await;
 
     // Rotate the operator key
     let (txn_ctx, new_operator_key) = op_tool.rotate_operator_key(&backend, false).await.unwrap();
@@ -823,7 +895,7 @@ async fn test_operator_key_rotation_recovery() {
     assert_eq!(rotated_operator_key, new_operator_key);
 
     // Wait for transaction execution
-    let client = env.validators().next().unwrap().rest_client();
+    let client = swarm.validators().next().unwrap().rest_client();
     wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number)
         .await
         .unwrap();
@@ -844,21 +916,20 @@ async fn test_operator_key_rotation_recovery() {
     );
 }
 
-#[tokio::test]
-async fn test_print_account() {
-    let (_env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1).await;
-
+async fn test_print_account(
+    _swarm: &LocalSwarm,
+    op_tool: &OperationalTool,
+    backend: &SecureBackend,
+    storage: &mut Storage,
+) {
     // Print the owner account
-    let op_tool_owner_account = op_tool
-        .print_account(OWNER_ACCOUNT, &backend)
-        .await
-        .unwrap();
+    let op_tool_owner_account = op_tool.print_account(OWNER_ACCOUNT, backend).await.unwrap();
     let storage_owner_account = storage.get::<AccountAddress>(OWNER_ACCOUNT).unwrap().value;
     assert_eq!(storage_owner_account, op_tool_owner_account);
 
     // Print the operator account
     let op_tool_operator_account = op_tool
-        .print_account(OPERATOR_ACCOUNT, &backend)
+        .print_account(OPERATOR_ACCOUNT, backend)
         .await
         .unwrap();
     let storage_operator_account = storage
@@ -868,92 +939,52 @@ async fn test_print_account() {
     assert_eq!(storage_operator_account, op_tool_operator_account);
 }
 
-#[tokio::test]
-async fn test_print_key() {
-    let (_env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(1).await;
-
+async fn test_print_key(
+    _swarm: &LocalSwarm,
+    op_tool: &OperationalTool,
+    backend: &SecureBackend,
+    storage: &mut Storage,
+) {
     // Print the operator key
-    let op_tool_operator_key = op_tool.print_key(OPERATOR_KEY, &backend).await.unwrap();
+    let op_tool_operator_key = op_tool.print_key(OPERATOR_KEY, backend).await.unwrap();
     let storage_operator_key = storage.get_public_key(OPERATOR_KEY).unwrap().public_key;
     assert_eq!(storage_operator_key, op_tool_operator_key);
 
     // Print the consensus key
-    let op_tool_consensus_key = op_tool.print_key(CONSENSUS_KEY, &backend).await.unwrap();
+    let op_tool_consensus_key = op_tool.print_key(CONSENSUS_KEY, backend).await.unwrap();
     let storage_consensus_key = storage.get_public_key(CONSENSUS_KEY).unwrap().public_key;
     assert_eq!(storage_consensus_key, op_tool_consensus_key);
 }
 
-#[tokio::test]
-async fn test_print_waypoints() {
-    let (_env, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(1).await;
-
+async fn test_print_waypoints(
+    _swarm: &LocalSwarm,
+    op_tool: &OperationalTool,
+    backend: &SecureBackend,
+    _storage: &mut Storage,
+) {
     // Insert a new waypoint and genesis waypoint into storage
     let inserted_waypoint =
         Waypoint::new_any(&LedgerInfo::new(BlockInfo::empty(), HashValue::zero()));
     op_tool
-        .insert_waypoint(inserted_waypoint, &backend, true)
+        .insert_waypoint(inserted_waypoint, backend, true)
         .await
         .unwrap();
 
     // Print the waypoint
-    let waypoint = op_tool.print_waypoint(WAYPOINT, &backend).await.unwrap();
+    let waypoint = op_tool.print_waypoint(WAYPOINT, backend).await.unwrap();
     assert_eq!(inserted_waypoint, waypoint);
 
     // Print the gensis waypoint
     let genesis_waypoint = op_tool
-        .print_waypoint(GENESIS_WAYPOINT, &backend)
+        .print_waypoint(GENESIS_WAYPOINT, backend)
         .await
         .unwrap();
     assert_eq!(inserted_waypoint, genesis_waypoint);
 }
 
 #[tokio::test]
-async fn test_validate_transaction() {
-    let (swarm, op_tool, backend, _) = launch_swarm_with_op_tool_and_backend(1).await;
-
-    // Validate an unknown transaction and verify no VM state found
-    let operator_account = op_tool
-        .print_account(OPERATOR_ACCOUNT, &backend)
-        .await
-        .unwrap();
-    assert_eq!(
-        None,
-        op_tool
-            .validate_transaction(operator_account, 1000)
-            .await
-            .unwrap()
-            .execution_result
-    );
-
-    // Submit a transaction (rotate the operator key) and validate the transaction execution
-    let (txn_ctx, _) = op_tool.rotate_operator_key(&backend, true).await.unwrap();
-    let client = swarm.validators().next().unwrap().rest_client();
-    wait_for_account_sequence_number(&client, operator_account, txn_ctx.sequence_number)
-        .await
-        .unwrap();
-
-    let result = op_tool
-        .validate_transaction(operator_account, txn_ctx.sequence_number)
-        .await
-        .unwrap()
-        .execution_result;
-    assert!(result.unwrap().success);
-
-    // Submit a transaction with auto validation (rotate the operator key) and compare results
-    let (txn_ctx, _) = op_tool.rotate_operator_key(&backend, false).await.unwrap();
-    assert!(txn_ctx.execution_result.unwrap().success);
-
-    let result = op_tool
-        .validate_transaction(operator_account, txn_ctx.sequence_number)
-        .await
-        .unwrap()
-        .execution_result;
-    assert!(result.unwrap().success);
-}
-
-#[tokio::test]
 async fn test_validator_config() {
-    let (_env, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1).await;
+    let (_swarm, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1).await;
 
     // Fetch the initial validator config for this operator's owner
     let owner_account = storage.get::<AccountAddress>(OWNER_ACCOUNT).unwrap().value;
@@ -1001,7 +1032,7 @@ async fn test_validator_config() {
 
 #[tokio::test]
 async fn test_validator_decryption() {
-    let (_env, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1).await;
+    let (_swarm, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1).await;
 
     // Fetch the validator config and validator info for this operator's owner
     let owner_account = storage.get::<AccountAddress>(OWNER_ACCOUNT).unwrap().value;
@@ -1109,18 +1140,20 @@ async fn test_validator_set() {
     );
 }
 
-#[tokio::test]
-async fn test_verify_validator_state() {
-    let (_env, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1).await;
-
-    let result = op_tool.verify_validator_state(&backend).await.unwrap();
+async fn test_verify_validator_state(
+    _swarm: &LocalSwarm,
+    op_tool: &OperationalTool,
+    backend: &SecureBackend,
+    storage: &mut Storage,
+) {
+    let result = op_tool.verify_validator_state(backend).await.unwrap();
     assert!(result.is_valid_state());
 
     // Rotate consensus key locally, but we do not update it on-chain
     // Verify the local validator state again.
     // The local consensus key is no longer mached with that registered on-chain
     let _ = storage.rotate_key(CONSENSUS_KEY).unwrap();
-    let result = op_tool.verify_validator_state(&backend).await.unwrap();
+    let result = op_tool.verify_validator_state(backend).await.unwrap();
     assert_eq!(result.in_validator_set, Some(true));
     assert_eq!(result.consensus_key_match, Some(false));
     assert_eq!(result.consensus_key_unique, Some(true));
@@ -1142,9 +1175,13 @@ fn create_new_test_account() -> (Ed25519PrivateKey, AccountAddress) {
 
 /// Creates a new validator operator using the given file writer and verifies
 /// the operator account is correctly initialized on-chain.
-async fn create_operator_with_file_writer(file_writer: fn(&Ed25519PublicKey, PathBuf)) {
-    let (mut swarm, op_tool, _, _) = launch_swarm_with_op_tool_and_backend(1).await;
-
+async fn create_operator_with_file_writer(
+    file_writer: fn(&Ed25519PublicKey, PathBuf),
+    swarm: &mut LocalSwarm,
+    op_tool: &OperationalTool,
+    _backend: &SecureBackend,
+    _storage: &mut Storage,
+) {
     // Create a new operator key and account
     let (operator_key, operator_account) = create_new_test_account();
 
@@ -1160,7 +1197,7 @@ async fn create_operator_with_file_writer(file_writer: fn(&Ed25519PublicKey, Pat
     let key_file_path = write_key_to_file(&operator_key.public_key(), validator, file_writer);
 
     // Create the operator account
-    let backend = create_root_storage(&mut swarm);
+    let backend = create_root_storage(swarm);
     let op_human_name = "new_operator";
     let (txn_ctx, account_address) = op_tool
         .create_validator_operator(
@@ -1190,9 +1227,13 @@ async fn create_operator_with_file_writer(file_writer: fn(&Ed25519PublicKey, Pat
 
 /// Creates a new validator using the given file writer and verifies
 /// the account is correctly initialized on-chain.
-async fn create_validator_with_file_writer(file_writer: fn(&Ed25519PublicKey, PathBuf)) {
-    let (mut swarm, op_tool, _, _) = launch_swarm_with_op_tool_and_backend(1).await;
-
+async fn create_validator_with_file_writer(
+    file_writer: fn(&Ed25519PublicKey, PathBuf),
+    swarm: &mut LocalSwarm,
+    op_tool: &OperationalTool,
+    _backend: &SecureBackend,
+    _storage: &mut Storage,
+) {
     // Create a new validator key and account
     let (validator_key, validator_account) = create_new_test_account();
 
@@ -1208,7 +1249,7 @@ async fn create_validator_with_file_writer(file_writer: fn(&Ed25519PublicKey, Pa
     let key_file_path = write_key_to_file(&validator_key.public_key(), validator, file_writer);
 
     // Create the validator account
-    let backend = create_root_storage(&mut swarm);
+    let backend = create_root_storage(swarm);
     let val_human_name = "new_validator";
     let (txn_ctx, account_address) = op_tool
         .create_validator(
