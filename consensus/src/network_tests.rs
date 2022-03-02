@@ -596,6 +596,7 @@ mod tests {
                 network_sender,
                 self_sender,
                 validator_verifier.clone(),
+                true,
             );
             let (task, receiver) = NetworkTask::new(network_events, self_receiver);
             receivers.push(receiver);
@@ -694,6 +695,7 @@ mod tests {
                 network_sender.clone(),
                 self_sender,
                 validator_verifier.clone(),
+                true,
             );
             let (task, receiver) = NetworkTask::new(network_events, self_receiver);
             senders.push(network_sender);

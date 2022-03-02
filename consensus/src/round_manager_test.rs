@@ -21,6 +21,7 @@ use crate::{
     },
     util::time_service::{ClockTimeService, TimeService},
 };
+
 use aptos_config::network_id::NetworkId;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, Uniform};
 use aptos_infallible::Mutex;
@@ -175,7 +176,7 @@ impl NodeSetup {
         playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
 
         let (self_sender, self_receiver) = channel::new_test(1000);
-        let network = NetworkSender::new(author, network_sender, self_sender, validators);
+        let network = NetworkSender::new(author, network_sender, self_sender, validators, true);
 
         let all_events = Box::new(select(network_events, self_receiver));
 

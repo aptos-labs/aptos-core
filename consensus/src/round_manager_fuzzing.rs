@@ -129,6 +129,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         network_sender,
         self_sender,
         epoch_state.verifier.clone(),
+        true,
     );
 
     // TODO: mock

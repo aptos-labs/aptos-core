@@ -26,6 +26,7 @@ pub struct ConsensusConfig {
     // the period = (poll_count - 1) * 30ms
     pub mempool_poll_count: u64,
     pub channel_size: usize,
+    pub enable_voting_power_aware_broadcast: bool,
 }
 
 impl Default for ConsensusConfig {
@@ -45,6 +46,7 @@ impl Default for ConsensusConfig {
             sync_only: false,
             mempool_poll_count: 20,
             channel_size: 30, // hard-coded
+            enable_voting_power_aware_broadcast: true,
         }
     }
 }

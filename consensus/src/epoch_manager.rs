@@ -80,7 +80,7 @@ impl LivenessStorageData {
 // epoch-specific input.
 pub struct EpochManager {
     author: Author,
-    config: ConsensusConfig,
+    config: Arc<ConsensusConfig>,
     time_service: Arc<dyn TimeService>,
     self_sender: channel::Sender<Event<ConsensusMsg>>,
     network_sender: ConsensusNetworkSender,
@@ -113,7 +113,7 @@ impl EpochManager {
         reconfig_events: ReconfigNotificationListener,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
-        let config = node_config.consensus.clone();
+        let config = Arc::new(node_config.consensus.clone());
         let sr_config = &node_config.consensus.safety_rules;
         let safety_rules_manager = SafetyRulesManager::new(sr_config);
         Self {
@@ -298,6 +298,16 @@ impl EpochManager {
         Ok(())
     }
 
+    fn create_network_sender(&self, verifier: ValidatorVerifier) -> NetworkSender {
+        NetworkSender::new(
+            self.author,
+            self.network_sender.clone(),
+            self.self_sender.clone(),
+            verifier,
+            self.config.enable_voting_power_aware_broadcast,
+        )
+    }
+
     /// this function spawns the phases and a buffer manager
     /// it sets `self.commit_msg_tx` to a new aptos_channel::Sender and returns an OrderingStateComputer
     fn spawn_decoupled_execution(
@@ -305,12 +315,7 @@ impl EpochManager {
         safety_rules_container: Arc<Mutex<MetricsSafetyRules>>,
         verifier: ValidatorVerifier,
     ) -> OrderingStateComputer {
-        let network_sender = NetworkSender::new(
-            self.author,
-            self.network_sender.clone(),
-            self.self_sender.clone(),
-            verifier.clone(),
-        );
+        let network_sender = self.create_network_sender(verifier.clone());
 
         let (block_tx, block_rx) = unbounded::<OrderedBlocks>();
         let (reset_tx, reset_rx) = unbounded::<ResetRequest>();
@@ -408,12 +413,7 @@ impl EpochManager {
 
         info!(epoch = epoch, "Create ProposerElection");
         let proposer_election = self.create_proposer_election(&epoch_state, &onchain_config);
-        let network_sender = NetworkSender::new(
-            self.author,
-            self.network_sender.clone(),
-            self.self_sender.clone(),
-            epoch_state.verifier.clone(),
-        );
+        let network_sender = self.create_network_sender(epoch_state.verifier.clone());
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 

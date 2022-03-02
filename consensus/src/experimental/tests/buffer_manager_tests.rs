@@ -99,7 +99,13 @@ pub fn prepare_buffer_manager() -> (
     );
 
     let (self_loop_tx, self_loop_rx) = channel::new_test(1000);
-    let network = NetworkSender::new(author, network_sender, self_loop_tx, validators.clone());
+    let network = NetworkSender::new(
+        author,
+        network_sender,
+        self_loop_tx,
+        validators.clone(),
+        true,
+    );
 
     let (msg_tx, msg_rx) =
         aptos_channel::new::<AccountAddress, VerifiedEvent>(QueueStyle::FIFO, channel_size, None);

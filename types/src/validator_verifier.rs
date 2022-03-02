@@ -7,8 +7,9 @@ use aptos_crypto::{
     hash::CryptoHash,
     Signature, VerifyingKey,
 };
+use rand::seq::index::sample_weighted;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fmt};
+use std::{collections::BTreeMap, fmt, iter::FromIterator};
 use thiserror::Error;
 
 #[cfg(any(test, feature = "fuzzing"))]
@@ -264,6 +265,41 @@ impl ValidatorVerifier {
         self.address_to_validator_info.keys().copied()
     }
 
+    pub fn get_ordered_account_addresses(
+        &self,
+        voting_power_aware_ordering: bool,
+    ) -> Box<dyn Iterator<Item = AccountAddress> + '_> {
+        if voting_power_aware_ordering {
+            Box::new(self.get_voting_power_weighted_ordered_account_addresses())
+        } else {
+            Box::new(self.get_ordered_account_addresses_iter())
+        }
+    }
+
+    /// This function returns a non-deterministic order of the validators weighted by their voting
+    /// power i.e., validator with higher voting power will have a higher probability of being
+    /// placed before a validator with lower voting power. Some randomness is included to ensure
+    /// fairness i.e, validators with low voting power are being placed at first to increase their
+    /// chances of their votes being included in the consensus.
+    fn get_voting_power_weighted_ordered_account_addresses(
+        &self,
+    ) -> impl Iterator<Item = AccountAddress> + '_ {
+        let mut rng = rand::thread_rng();
+
+        let validator_info = Vec::from_iter(self.address_to_validator_info.iter());
+        let weighted_indices = sample_weighted(
+            &mut rng,
+            validator_info.len(),
+            |i| validator_info.get(i).unwrap().1.voting_power as f64,
+            validator_info.len(),
+        )
+        .expect("Failed to get validator order weighted by voting power");
+        weighted_indices
+            .into_iter()
+            .map(move |x| validator_info.get(x).unwrap().0)
+            .copied()
+    }
+
     /// Returns the number of authors to be validated.
     pub fn len(&self) -> usize {
         self.address_to_validator_info.len()
@@ -406,6 +442,22 @@ mod tests {
             validator_verifier.check_voting_power(author_to_signature_map.keys()),
             Ok(())
         );
+    }
+
+    #[test]
+    fn test_voting_power_weighted_ordering() {
+        let num_validators = 10;
+        let (_, validator_verifier) = random_validator_verifier(num_validators, None, false);
+        let mut account_addresses = Vec::new();
+        for account_address in validator_verifier.get_ordered_account_addresses(true) {
+            account_addresses.push(account_address)
+        }
+        // Verify we have expected number of validators
+        assert_eq!(account_addresses.len(), num_validators);
+        // Verify all validators are returned
+        for account_address in validator_verifier.get_ordered_account_addresses_iter() {
+            assert!(account_addresses.contains(&account_address))
+        }
     }
 
     #[test]

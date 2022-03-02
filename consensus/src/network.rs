@@ -65,6 +65,9 @@ pub struct NetworkSender {
     // Note that we do not support self rpc requests as it might cause infinite recursive calls.
     self_sender: channel::Sender<Event<ConsensusMsg>>,
     validators: ValidatorVerifier,
+    // If enabled, broadcast messages are ordered to prioritize highest voting power validators in
+    // an weighted manner.
+    voting_power_aware_broadcast: bool,
 }
 
 impl NetworkSender {
@@ -73,12 +76,14 @@ impl NetworkSender {
         network_sender: ConsensusNetworkSender,
         self_sender: channel::Sender<Event<ConsensusMsg>>,
         validators: ValidatorVerifier,
+        voting_power_aware_broadcast: bool,
     ) -> Self {
         NetworkSender {
             author,
             network_sender,
             self_sender,
             validators,
+            voting_power_aware_broadcast,
         }
     }
 
@@ -130,9 +135,10 @@ impl NetworkSender {
         // Get the list of validators excluding our own account address. Note the
         // ordering is not important in this case.
         let self_author = self.author;
+
         let other_validators = self
             .validators
-            .get_ordered_account_addresses_iter()
+            .get_ordered_account_addresses(self.voting_power_aware_broadcast)
             .filter(|author| author != &self_author);
 
         // Broadcast message over direct-send to all other validators.
