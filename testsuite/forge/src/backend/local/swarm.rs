@@ -253,6 +253,7 @@ impl LocalSwarm {
         self.wait_for_connectivity(deadline).await?;
         self.liveness_check(deadline).await?;
 
+        println!("Swarm launched successfully.");
         Ok(())
     }
 
@@ -276,7 +277,7 @@ impl LocalSwarm {
                     }
                     Err(HealthCheckError::Failure(e)) => {
                         println!("health check failure: {}", e);
-                        continue;
+                        break;
                     }
                 }
             }

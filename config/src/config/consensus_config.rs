@@ -22,14 +22,10 @@ pub struct ConsensusConfig {
     // Only sync committed transactions but not vote for any pending blocks. This is useful when
     // validators coordinate on the latest version to apply a manual transaction.
     pub sync_only: bool,
-    // how many times to wait for txns from mempool when propose
+    // Decides how long the leader waits before proposing empty block if there's no txns in mempool
+    // the period = (poll_count - 1) * 30ms
     pub mempool_poll_count: u64,
     pub channel_size: usize,
-    // TODO: delete unused field
-    #[serde(default)]
-    pub decoupled_execution: bool,
-    #[serde(default)]
-    pub back_pressure_limit: u64,
 }
 
 impl Default for ConsensusConfig {
@@ -47,10 +43,8 @@ impl Default for ConsensusConfig {
             }),
             safety_rules: SafetyRulesConfig::default(),
             sync_only: false,
-            mempool_poll_count: 1,
+            mempool_poll_count: 20,
             channel_size: 30, // hard-coded
-            decoupled_execution: false,
-            back_pressure_limit: 10,
         }
     }
 }
