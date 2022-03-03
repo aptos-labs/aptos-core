@@ -1,4 +1,9 @@
 version: 2.1
+
+orbs:
+  aws-cli: circleci/aws-cli@2.1.0
+  aws-ecr: circleci/aws-ecr@7.3.0
+
 jobs:
   build-benchmarks:
     machine:
@@ -47,6 +52,14 @@ jobs:
       - run: cargo xtest --package jsonrpc-integration-tests --changed-since "origin/main"
       - run: cargo xtest --doc --jobs 8 --unit --changed-since "origin/main"
       - run: cargo nextest --nextest-profile ci --partition hash:1/1 --jobs 6 --test-threads 8 --unit --exclude backup-cli --changed-since "origin/main"
+  build-aws:
+    machine:
+      image: ubuntu-2004:current
+    resource_class: xlarge
+    steps:
+      - aws-setup
+      - run: aws sts get-caller-identity
+
 workflows:
   build-test-deploy:
     jobs:
@@ -55,6 +68,16 @@ workflows:
       - e2e-test
       - lint
       - unit-test
+  bors-runs:
+    jobs:
+      - build-aws:
+          context: aws-dev
+          filters:
+            branches:
+              only:
+                - auto
+                - canary
+
 commands:
   dev-setup:
     steps:
@@ -63,3 +86,13 @@ commands:
       - run: sudo apt-get install build-essential ca-certificates clang curl git libssl-dev pkg-config --no-install-recommends --assume-yes
       - run: curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
       - run: cat $HOME/.cargo/env >> $BASH_ENV
+  aws-setup:
+    steps:
+      - run:
+          name: Compose AWS Env Variables
+          command: |
+            echo 'export AWS_ECR_ACCOUNT_URL="${AWS_ECR_ACCOUNT_NUM}.dkr.ecr.${AWS_REGION}.amazonaws.com"' >> $BASH_ENV
+      - aws-cli/install
+      # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
+      - aws-cli/setup
+      - aws-ecr/ecr-login
