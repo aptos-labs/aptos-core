@@ -59,13 +59,6 @@ module AptosFramework::Genesis {
         AptosAccount::create_account(Signer::address_of(core_resource_account), dummy_auth_key_prefix);
         AptosAccount::rotate_authentication_key(core_resource_account, core_resource_account_auth_key);
 
-        // Pad the event counter for the Diem Root account to match DPN. This
-        // _MUST_ match the new epoch event counter otherwise all manner of
-        // things start to break.
-        Event::destroy_handle(Event::new_event_handle<u64>(core_resource_account));
-        Event::destroy_handle(Event::new_event_handle<u64>(core_resource_account));
-        Event::destroy_handle(Event::new_event_handle<u64>(core_resource_account));
-
         // Consensus config setup
         AptosConsensusConfig::initialize(core_resource_account);
         AptosValidatorSet::initialize_validator_set(core_resource_account);
@@ -83,6 +76,14 @@ module AptosFramework::Genesis {
         AptosValidatorOperatorConfig::initialize(core_resource_account);
 
         TestCoin::initialize(core_resource_account);
+
+        // Pad the event counter for the Diem Root account to match DPN. This
+        // _MUST_ match the new epoch event counter otherwise all manner of
+        // things start to break.
+        Event::destroy_handle(Event::new_event_handle<u64>(core_resource_account));
+        Event::destroy_handle(Event::new_event_handle<u64>(core_resource_account));
+        Event::destroy_handle(Event::new_event_handle<u64>(core_resource_account));
+        Event::destroy_handle(Event::new_event_handle<u64>(core_resource_account));
 
         // this needs to be called at the very end
         CoreGenesis::init(core_resource_account, chain_id);

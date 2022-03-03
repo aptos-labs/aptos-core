@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Defines Forge Tests
+pub mod aptos;
 pub mod fullnode;
 pub mod nft_transaction;
 pub mod rest_api;

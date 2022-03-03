@@ -165,6 +165,7 @@ members = [
     # Please keep this list in alphabetical order!
 
     "testcases",
+    "aptos-framework-releases",
     "diem-documentation-tool",
     "diem-e2e-tests-replay",
     "diem-experimental-framework-releases",

@@ -1,0 +1,1 @@
+../../../diem-move/diem-framework/aptos-framework/releases/artifacts/current/transaction_script_builder.rs

@@ -20,6 +20,7 @@ use std::{
 pub enum Release {
     DPN,
     Experimental,
+    Aptos,
 }
 
 impl Release {
@@ -27,6 +28,7 @@ impl Release {
         match self {
             Self::DPN => "DPN",
             Self::Experimental => "experimental",
+            Self::Aptos => "aptos-framework",
         }
     }
 }
@@ -43,6 +45,10 @@ static RELEASES_MAP: Lazy<BTreeMap<Release, Dir>> = Lazy::new(|| {
     map.insert(
         Release::Experimental,
         include_dir!("../experimental/releases/artifacts"),
+    );
+    map.insert(
+        Release::Aptos,
+        include_dir!("../aptos-framework/releases/artifacts"),
     );
     map
 });

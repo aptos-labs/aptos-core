@@ -49,6 +49,7 @@ members = [
     "diem-move/df-cli",
     "diem-move/diem-framework",
     "diem-move/diem-framework/DPN/releases",
+    "diem-move/diem-framework/aptos-framework/releases",
     "diem-move/diem-framework/experimental/releases",
     "diem-move/diem-framework/releases",
     "diem-move/diem-keygen",

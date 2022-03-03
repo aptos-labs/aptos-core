@@ -77,8 +77,7 @@ pub fn main() {
     // we default to `all`
     let arg_count = std::env::args().len();
     let args = Args::from_args();
-    let ws =
-        vm_genesis::generate_genesis_change_set_for_testing(vm_genesis::GenesisOptions::Compiled);
+    let ws = vm_genesis::generate_genesis_change_set_for_testing(vm_genesis::GenesisOptions::Aptos);
 
     let mut storage = InMemoryStorage::new();
     for (blob, module) in diem_framework_releases::current_modules_with_blobs() {

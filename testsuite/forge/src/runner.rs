@@ -105,6 +105,7 @@ pub enum InitialVersion {
 }
 
 pub struct ForgeConfig<'cfg> {
+    aptos_tests: &'cfg [&'cfg dyn AptosTest],
     public_usage_tests: &'cfg [&'cfg dyn PublicUsageTest],
     nft_public_usage_tests: &'cfg [&'cfg dyn NFTPublicUsageTest],
     admin_tests: &'cfg [&'cfg dyn AdminTest],
@@ -138,6 +139,11 @@ impl<'cfg> ForgeConfig<'cfg> {
         nft_public_usage_tests: &'cfg [&'cfg dyn NFTPublicUsageTest],
     ) -> Self {
         self.nft_public_usage_tests = nft_public_usage_tests;
+        self
+    }
+
+    pub fn with_aptos_tests(mut self, aptos_tests: &'cfg [&'cfg dyn AptosTest]) -> Self {
+        self.aptos_tests = aptos_tests;
         self
     }
 
@@ -176,6 +182,7 @@ impl<'cfg> ForgeConfig<'cfg> {
             + self.admin_tests.len()
             + self.network_tests.len()
             + self.nft_public_usage_tests.len()
+            + self.aptos_tests.len()
     }
 
     pub fn all_tests(&self) -> impl Iterator<Item = &'cfg dyn Test> + 'cfg {
@@ -185,12 +192,14 @@ impl<'cfg> ForgeConfig<'cfg> {
             .chain(self.admin_tests.iter().map(|t| t as &dyn Test))
             .chain(self.network_tests.iter().map(|t| t as &dyn Test))
             .chain(self.nft_public_usage_tests.iter().map(|t| t as &dyn Test))
+            .chain(self.aptos_tests.iter().map(|t| t as &dyn Test))
     }
 }
 
 impl<'cfg> Default for ForgeConfig<'cfg> {
     fn default() -> Self {
         Self {
+            aptos_tests: &[],
             public_usage_tests: &[],
             nft_public_usage_tests: &[],
             admin_tests: &[],
@@ -312,6 +321,17 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     let result = run_test(|| runtime.block_on(test.run(&mut nft_public_ctx)));
                     summary.handle_result(test.name().to_owned(), result)?;
                 }
+            }
+
+            // Run AptosTests
+            for test in self.filter_tests(self.tests.aptos_tests.iter()) {
+                let mut aptos_ctx = AptosContext::new(
+                    CoreContext::from_rng(&mut rng),
+                    swarm.chain_info().into_aptos_public_info(),
+                    &mut report,
+                );
+                let result = run_test(|| runtime.block_on(test.run(&mut aptos_ctx)));
+                summary.handle_result(test.name().to_owned(), result)?;
             }
 
             // Run AdminTests
