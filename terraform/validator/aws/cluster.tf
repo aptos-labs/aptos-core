@@ -53,19 +53,15 @@ locals {
   }
 }
 
-locals {
-  user_data = { for pool in local.pools :
-    pool => templatefile("${path.module}/templates/eks_user_data.sh", {
-      taints = each.value.taint ? "diem.org/nodepool=${pool.key}:NoExecute" : ""
-    })
-  }
-}
-
 resource "aws_launch_template" "nodes" {
   for_each      = local.pools
   name          = "diem-${local.workspace_name}/${each.key}"
   instance_type = each.value.instance_type
-  user_data     = base64encode(local.user_data[each.key])
+  user_data     = base64encode(
+    templatefile("${path.module}/templates/eks_user_data.sh", {
+      taints = each.value.taint ? "diem.org/nodepool=${each.key}:NoExecute" : ""
+    })
+  )
 
   tag_specifications {
     resource_type = "instance"
