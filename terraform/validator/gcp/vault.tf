@@ -214,10 +214,8 @@ resource "google_compute_instance" "bastion" {
   metadata_startup_script = file("${path.module}/templates/bastion_user_data.sh")
 }
 
-data "template_file" "vault_user_data" {
-  template = file("${path.module}/templates/vault_user_data.sh")
-
-  vars = {
+locals {
+  vault_user_data = templatefile("${path.module}/templates/vault_user_data.sh", {
     vault_version    = "1.8.1"
     vault_sha256     = "bb411f2bbad79c2e4f0640f1d3d5ef50e2bda7d4f40875a56917c95ff783c2db"
     vault_ca         = tls_self_signed_cert.ca.cert_pem
@@ -255,7 +253,7 @@ data "template_file" "vault_user_data" {
         disable_hostname = true
       }
     })
-  }
+  })
 }
 
 resource "google_compute_instance_template" "vault" {
@@ -282,7 +280,7 @@ resource "google_compute_instance_template" "vault" {
     ssh-keys = join("\n", [for user, sshkey in var.ssh_keys : "${user}:${sshkey}"])
   }
 
-  metadata_startup_script = data.template_file.vault_user_data.rendered
+  metadata_startup_script = local.vault_user_data
 
   lifecycle {
     create_before_destroy = true

@@ -192,10 +192,8 @@ resource "azurerm_linux_virtual_machine" "bastion" {
   }
 }
 
-data "template_file" "vault_user_data" {
-  template = file("${path.module}/templates/vault_user_data.sh")
-
-  vars = {
+locals {
+  vault_user_data = templatefile("${path.module}/templates/vault_user_data.sh", {
     vault_version    = "1.8.1"
     vault_sha256     = "bb411f2bbad79c2e4f0640f1d3d5ef50e2bda7d4f40875a56917c95ff783c2db"
     vault_ca         = tls_self_signed_cert.ca.cert_pem
@@ -233,7 +231,7 @@ data "template_file" "vault_user_data" {
         disable_hostname = true
       }
     })
-  }
+  })
 }
 
 resource "azurerm_linux_virtual_machine_scale_set" "vault" {
@@ -243,7 +241,7 @@ resource "azurerm_linux_virtual_machine_scale_set" "vault" {
   sku                 = "Standard_F2s_v2"
   instances           = var.vault_num
   admin_username      = "az-user"
-  custom_data         = base64encode(data.template_file.vault_user_data.rendered)
+  custom_data         = base64encode(local.vault_user_data)
 
   admin_ssh_key {
     username   = "az-user"
@@ -295,8 +293,8 @@ resource "azurerm_lb" "vault" {
 }
 
 resource "azurerm_lb_backend_address_pool" "vault" {
-  name                = "vault"
-  loadbalancer_id     = azurerm_lb.vault.id
+  name            = "vault"
+  loadbalancer_id = azurerm_lb.vault.id
 }
 
 resource "azurerm_lb_probe" "vault" {

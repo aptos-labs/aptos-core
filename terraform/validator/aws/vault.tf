@@ -272,10 +272,8 @@ resource "aws_instance" "bastion" {
   })
 }
 
-data "template_file" "vault_user_data" {
-  template = file("${path.module}/templates/vault_user_data.sh")
-
-  vars = {
+locals {
+  vault_user_data = templatefile("${path.module}/templates/vault_user_data.sh", {
     region           = var.region
     vault_version    = "1.8.1"
     vault_sha256     = "bb411f2bbad79c2e4f0640f1d3d5ef50e2bda7d4f40875a56917c95ff783c2db"
@@ -310,7 +308,7 @@ data "template_file" "vault_user_data" {
         disable_hostname = true
       }
     })
-  }
+  })
 }
 
 resource "aws_launch_template" "vault" {
@@ -319,7 +317,7 @@ resource "aws_launch_template" "vault" {
   instance_type          = "c5.large"
   key_name               = aws_key_pair.diem.key_name
   vpc_security_group_ids = [aws_security_group.vault.id]
-  user_data              = base64encode(data.template_file.vault_user_data.rendered)
+  user_data              = base64encode(local.vault_user_data)
 
   iam_instance_profile {
     arn = aws_iam_instance_profile.vault.arn
