@@ -29,12 +29,6 @@ full_node_networks:
 storage:
   backup_service_address: "0.0.0.0:6186"
 
-json_rpc:
-  {{- if .Values.json_rpc.content_length_limit }}
-  content_length_limit: {{ .Values.json_rpc.content_length_limit }}
-  {{- end }}
-  address: "0.0.0.0:8080"
-
 api:
   enabled: {{ .Values.enableApi | default false}}
-  address: "0.0.0.0:8081"
+  address: "0.0.0.0:8080"

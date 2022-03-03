@@ -13,12 +13,9 @@ spec:
     {{- include "diem-fullnode.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/name: fullnode
   ports:
-  - name: json-rpc
+  - name: api
     port: 80
     targetPort: 8080
-  - name: rest-api
-    port: 8081
-    targetPort: 8081
   {{- with .Values.service }}
   type: {{ .type }}
   externalTrafficPolicy: {{ .externalTrafficPolicy }}

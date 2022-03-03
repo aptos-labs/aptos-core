@@ -23,10 +23,8 @@ spec:
   ports:
   - name: diemnet
     port: 6182
-  - name: json-rpc
-    port: 8080
   - name: api
-    port: 8081
+    port: 8080
   - name: backup
     port: 6186
 
@@ -111,7 +109,6 @@ spec:
         - containerPort: 6181
         - containerPort: 6182
         - containerPort: 8080
-        - containerPort: 8081
         - containerPort: 9101
         livenessProbe:
           tcpSocket:

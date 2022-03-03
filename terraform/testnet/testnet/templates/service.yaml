@@ -31,7 +31,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "testnet.fullname" . }}-jsonrpc
+  name: {{ include "testnet.fullname" . }}-api
   labels:
     {{- include "testnet.labels" . | nindent 4 }}
   annotations:
@@ -47,22 +47,22 @@ spec:
   externalTrafficPolicy: Local
 
 ---
-
+{{- if .Values.service.pfn.exposeApi }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "testnet.fullname" . }}-api
+  name: {{ include "testnet.fullname" . }}-pfn
   labels:
     {{- include "testnet.labels" . | nindent 4 }}
   annotations:
-    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/healthcheck-path: /-/healthy
 spec:
   selector:
-    app.kubernetes.io/part-of: diem-validator
-    app.kubernetes.io/name: haproxy
+    app.kubernetes.io/part-of: diem-fullnode
+    app.kubernetes.io/name: fullnode
   ports:
-  - name: api
-    port: 80
-    targetPort: 8081
+  - port: 80
+    targetPort: 8080
   type: NodePort
   externalTrafficPolicy: Local
+{{- end }}

@@ -51,8 +51,8 @@ spec:
     port: 6180
   - name: fullnode
     port: 6181
-  {{- if .Values.exposeValidatorJsonRpc }}
-  - name: json-rpc
+  {{- if .Values.exposeValidatorRestApi }}
+  - name: api
     port: 8080
   {{- end }}
 
@@ -225,7 +225,7 @@ spec:
     - protocol: TCP
       port: 6180
   {{- if .Values.exposeValidatorJsonRpc }}
-  # JSON-RPC from HAproxy
+  # REST API from HAproxy
   - from:
     - podSelector:
         matchLabels:

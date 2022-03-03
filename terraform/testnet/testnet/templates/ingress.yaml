@@ -27,13 +27,15 @@ spec:
         backend:
           serviceName: {{ include "testnet.fullname" . }}-faucet
           servicePort: 80
-  - host: api.{{ .Values.service.domain }}
+  {{- if .Values.service.pfn.exposeApi }}
+  - host: pfn.{{ .Values.service.domain }}
     http:
       paths:
       - path: /*
         backend:
-          serviceName: {{ include "testnet.fullname" . }}-api
+          serviceName: {{ include "testnet.fullname" . }}-pfn
           servicePort: 80
+  {{- end }}
   - http:
       paths:
       {{- if .Values.faucet.enabled }}
@@ -60,5 +62,5 @@ spec:
           servicePort: 80
       - path: /*
         backend:
-          serviceName: {{ include "testnet.fullname" . }}-jsonrpc
+          serviceName: {{ include "testnet.fullname" . }}-api
           servicePort: 80
