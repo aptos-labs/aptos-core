@@ -19,10 +19,6 @@ fullnode_identity:
   # Set this to start fullnode from an existing key.
   # If not set, it will generate a random one on startup.
 
-# If set, increase the size limit of JSON-RPC
-json_rpc:
-  content_length_limit:
-
 # Enable the REST API. Default is false.
 enableApi:
 
@@ -51,7 +47,7 @@ storage:
   size: 350Gi
 
 service:
-  # Change this to LoadBalancer to expose the JSON-RPC endpoint externally
+  # Change this to LoadBalancer to expose the REST API endpoint externally
   type: ClusterIP
   externalTrafficPolicy:
   loadBalancerSourceRanges: []

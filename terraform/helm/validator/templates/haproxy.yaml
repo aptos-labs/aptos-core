@@ -36,8 +36,8 @@ spec:
   ports:
   - name: validator
     port: 6180
-  {{- if .Values.exposeValidatorJsonRpc }}
-  - name: json-rpc
+  {{- if .Values.exposeValidatorRestApi }}
+  - name: api
     port: 80
     targetPort: 8180
   {{- end }}
@@ -69,17 +69,12 @@ spec:
   - name: diemnet
     port: 6182
     targetPort: {{ add 6182 $index }}
-  {{- if $config.enableApi }}
+  {{- if $config.enableRestApi }}
   - name: api
-    port: 8081
-    targetPort: {{ add 8081 $index }}
-  {{- end }}
-  {{- if $config.enableJsonRpc }}
-  - name: json-rpc
     port: 80
     targetPort: {{ add 8080 $index }}
   {{- if $.Values.haproxy.tls_secret }}
-  - name: json-rpc-tls
+  - name: api-tls
     port: 443
     targetPort: {{ add 8443 $index }}
   {{- end }}
@@ -132,7 +127,6 @@ spec:
         - containerPort: 6180
         - containerPort: 6182
         - containerPort: 8080
-        - containerPort: 8081
         - containerPort: 8180
         - containerPort: 9101
         livenessProbe:

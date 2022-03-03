@@ -74,6 +74,9 @@ service:
     loadBalancerSourceRanges:
   monitoring:
     loadBalancerSourceRanges:
+  pfn:
+    exposeApi: false
+    loadBalancerSourceRanges:
   domain:
   aws_tags:
 

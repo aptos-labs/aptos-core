@@ -43,7 +43,7 @@ module "validator" {
   max_node_pool_surge = var.enable_forge ? 2 : 1
   node_pool_sizes = {
     utilities  = 3 * var.num_validators
-    validators = 3 * var.num_validators + 1
+    validators = 3 * var.num_validators + var.num_public_fullnodes + 1
     trusted    = 1 * var.num_validators
   }
   vault_lb_internal       = false

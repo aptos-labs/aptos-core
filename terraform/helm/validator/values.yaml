@@ -149,9 +149,7 @@ fullnode:
   groups:
   - name: fullnode
     replicas: 1
-    enableJsonRpc: true
-    # enable the REST API
-    enableApi: false
+    enableRestApi: true
   resources:
     limits:
       cpu: 4
@@ -362,5 +360,5 @@ loggingCentralHost:
 loggingToNull: true
 
 # Used for testing purposes only!
-# Exposes the validator's JSON-RPC in addition to that of its VFN
-exposeValidatorJsonRpc: false
+# Exposes the validator's REST API in addition to that of its VFN
+exposeValidatorRestApi: false

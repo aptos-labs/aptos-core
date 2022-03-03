@@ -65,11 +65,8 @@ full_node_networks:
   seeds:
     {{- .Values.fullnode.config.seeds | default dict | toYaml | nindent 6 }}
 
-json_rpc:
-  address: "0.0.0.0:8080"
-
 api:
   # REST API will be enabled locally,
   # to expose the endpoint through HAProxy, set the option in helm values.
   enabled: true
-  address: "0.0.0.0:8081"
+  address: "0.0.0.0:8080"
