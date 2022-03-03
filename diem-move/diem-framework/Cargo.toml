@@ -56,5 +56,9 @@ default = []
 fuzzing = ["diem-types/fuzzing"]
 
 [[test]]
-name = "transactional_tests"
+name = "dpn_transactional_tests"
+harness = false
+
+[[test]]
+name = "aptos_transactional_tests"
 harness = false

@@ -5,7 +5,7 @@ use anyhow::{bail, Result};
 use std::collections::{BTreeMap, BTreeSet};
 use structopt::StructOpt;
 
-use diem_framework::diem_stdlib_files;
+use diem_framework::dpn_files;
 use diem_types::on_chain_config::{DiemVersion, DIEM_MAX_KNOWN_VERSION};
 use move_model::run_model_builder;
 use move_stackless_bytecode_interpreter::{
@@ -92,7 +92,7 @@ pub fn main() -> Result<()> {
         settings.no_expr_check = true;
     }
 
-    let env = run_model_builder(&diem_stdlib_files(), &[])?;
+    let env = run_model_builder(&dpn_files(), &[])?;
     let interpreter = StacklessBytecodeInterpreter::new(&env, None, settings);
     for trace in args.trace_files {
         diem_e2e_tests_replay::replay(trace, &interpreter, &flags)?;
