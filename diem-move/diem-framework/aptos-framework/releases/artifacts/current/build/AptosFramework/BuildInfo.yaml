@@ -1,0 +1,139 @@
+---
+compiled_package_info:
+  package_name: AptosFramework
+  address_alias_instantiation:
+    AptosFramework: "00000000000000000000000000000001"
+    CoreFramework: "00000000000000000000000000000001"
+    CoreResources: 0000000000000000000000000a550c18
+    Std: "00000000000000000000000000000001"
+    VMReserved: "00000000000000000000000000000000"
+  module_resolution_metadata:
+    ? address: "00000000000000000000000000000001"
+      name: ASCII
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: Account
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: AptosAccount
+    : AptosFramework
+    ? address: "00000000000000000000000000000001"
+      name: AptosConsensusConfig
+    : AptosFramework
+    ? address: "00000000000000000000000000000001"
+      name: AptosVMConfig
+    : AptosFramework
+    ? address: "00000000000000000000000000000001"
+      name: AptosValidatorConfig
+    : AptosFramework
+    ? address: "00000000000000000000000000000001"
+      name: AptosValidatorOperatorConfig
+    : AptosFramework
+    ? address: "00000000000000000000000000000001"
+      name: AptosValidatorSet
+    : AptosFramework
+    ? address: "00000000000000000000000000000001"
+      name: AptosVersion
+    : AptosFramework
+    ? address: "00000000000000000000000000000001"
+      name: BCS
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: BasicScripts
+    : AptosFramework
+    ? address: "00000000000000000000000000000001"
+      name: BitVector
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: Capability
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: ChainId
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: CoreGenesis
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: DiemBlock
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: DiemConfig
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: DiemConsensusConfig
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: DiemSystem
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: DiemTimestamp
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: DiemVMConfig
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: DiemVersion
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: Errors
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: Event
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: FixedPoint32
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: GUID
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: Genesis
+    : AptosFramework
+    ? address: "00000000000000000000000000000001"
+      name: Hash
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: Marker
+    : AptosFramework
+    ? address: "00000000000000000000000000000001"
+      name: Option
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: ParallelExecutionConfig
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: Signature
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: Signer
+    : Std
+    ? address: "00000000000000000000000000000001"
+      name: SystemAddresses
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: TestCoin
+    : AptosFramework
+    ? address: "00000000000000000000000000000001"
+      name: TransactionFee
+    : AptosFramework
+    ? address: "00000000000000000000000000000001"
+      name: ValidatorConfig
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: ValidatorOperatorConfig
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: Vector
+    : Std
+  source_digest: 0938E7BF53F969A4183A372CD20D0FBA89B2C244A4919FA409426FB436272A52
+  build_flags:
+    dev_mode: false
+    test_mode: false
+    generate_docs: true
+    generate_abis: true
+    install_dir: aptos-framework/releases/artifacts/current
+    force_recompilation: false
+    additional_named_addresses: {}
+dependencies:
+  - MoveStdlib
+  - DiemCoreFramework
