@@ -39,7 +39,7 @@ scrape_configs:
 
   static_configs:
   {{- range $i, $e := .Values.genesis.numPublicFullnodes | int | until }}
-  - targets: {{ printf "pfn%d-diem-fullnode-monitoring:9101" $i | quote | list }}
+  - targets: {{ printf "pfn%d-diem-fullnode:9101" $i | quote | list }}
     labels:
       owner: {{ printf "pfn%d" $i | quote }}
   {{- end }}
