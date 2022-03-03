@@ -21,7 +21,7 @@ pub const SCRIPTS_DIR_PATH: &str = "templates";
 
 pub fn compile_script(source_file_str: String) -> Vec<u8> {
     let (_files, mut compiled_program) =
-        Compiler::new(&[source_file_str], &diem_framework::diem_stdlib_files())
+        Compiler::new(&[source_file_str], &diem_framework::dpn_files())
             .set_flags(Flags::empty().set_sources_shadow_deps(false))
             .set_named_address_values(diem_framework::diem_framework_named_addresses())
             .build_and_report()

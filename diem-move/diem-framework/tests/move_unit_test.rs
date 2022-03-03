@@ -29,3 +29,8 @@ fn move_unit_tests() {
     run_tests_for_pkg("experimental");
     run_tests_for_pkg("DPN");
 }
+
+#[test]
+fn aptos_move_unit_tests() {
+    run_tests_for_pkg("aptos-framework");
+}

@@ -3,4 +3,4 @@
 
 mod diem_test_harness;
 
-pub use diem_test_harness::run_test;
+pub use diem_test_harness::{run_aptos_test, run_dpn_test};

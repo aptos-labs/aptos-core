@@ -403,7 +403,7 @@ fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {
 fn compile_move_script(file_path: &str) -> Result<Vec<u8>> {
     let cur_path = file_path.to_owned();
     let targets = &vec![cur_path];
-    let (files, units_or_diags) = Compiler::new(targets, &diem_framework::diem_stdlib_files())
+    let (files, units_or_diags) = Compiler::new(targets, &diem_framework::dpn_files())
         .set_flags(Flags::empty().set_sources_shadow_deps(false))
         .set_named_address_values(diem_framework::diem_framework_named_addresses())
         .build()?;

@@ -356,7 +356,7 @@ fn panic_missing_private_key(cmd_name: &str) -> ! {
 
 static PRECOMPILED_DIEM_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
     let program_res = move_compiler::construct_pre_compiled_lib(
-        &diem_framework::diem_stdlib_files(),
+        &diem_framework::dpn_files(),
         None,
         move_compiler::Flags::empty().set_sources_shadow_deps(false),
         diem_framework::diem_framework_named_addresses(),
@@ -366,6 +366,23 @@ static PRECOMPILED_DIEM_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
         Ok(df) => df,
         Err((files, errors)) => {
             eprintln!("!!!Diem Framework failed to compile!!!");
+            move_compiler::diagnostics::report_diagnostics(&files, errors)
+        }
+    }
+});
+
+static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
+    let program_res = move_compiler::construct_pre_compiled_lib(
+        &diem_framework::aptos_files(),
+        None,
+        move_compiler::Flags::empty().set_sources_shadow_deps(false),
+        diem_framework::aptos_framework_named_addresses(),
+    )
+    .unwrap();
+    match program_res {
+        Ok(af) => af,
+        Err((files, errors)) => {
+            eprintln!("!!!Aptos Framework failed to compile!!!");
             move_compiler::diagnostics::report_diagnostics(&files, errors)
         }
     }
@@ -1247,6 +1264,10 @@ fn render_events(events: &[ContractEvent]) -> Option<String> {
 }
 
 /// Run the Diem transactional test flow, using the given file as input.
-pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run_dpn_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     run_test_impl::<DiemTestAdapter>(path, Some(&*PRECOMPILED_DIEM_FRAMEWORK))
+}
+
+pub fn run_aptos_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    run_test_impl::<DiemTestAdapter>(path, Some(&*PRECOMPILED_APTOS_FRAMEWORK))
 }

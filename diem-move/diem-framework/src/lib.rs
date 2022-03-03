@@ -19,6 +19,11 @@ pub mod release;
 
 const CORE_MODULES_DIR: &str = "core/sources";
 const DPN_MODULES_DIR: &str = "DPN/sources";
+const APTOS_MODULES_DIR: &str = "aptos-framework/sources";
+
+static DPN_FRAMEWORK_PKG: Lazy<CompiledPackage> = Lazy::new(|| package("DPN"));
+static EXPERIMENTAL_FRAMEWORK_PKG: Lazy<CompiledPackage> = Lazy::new(|| package("experimental"));
+static APTOS_FRAMEWORK_PKG: Lazy<CompiledPackage> = Lazy::new(|| package("aptos-framework"));
 
 pub fn path_in_crate<S>(relative: S) -> PathBuf
 where
@@ -37,23 +42,43 @@ pub fn diem_payment_modules_full_path() -> String {
     format!("{}/{}", env!("CARGO_MANIFEST_DIR"), DPN_MODULES_DIR)
 }
 
-pub fn diem_stdlib_files_no_dependencies() -> Vec<String> {
-    let diem_payment_modules_path = path_in_crate(DPN_MODULES_DIR);
-    find_filenames(&[diem_payment_modules_path], |p| {
-        extension_equals(p, MOVE_EXTENSION)
-    })
-    .unwrap()
+pub fn dpn_files_no_dependencies() -> Vec<String> {
+    move_files_in_path(DPN_MODULES_DIR)
 }
 
-pub fn diem_stdlib_files() -> Vec<String> {
+pub fn dpn_files() -> Vec<String> {
     let mut files = move_stdlib::move_stdlib_files();
-    files.extend(diem_stdlib_files_no_dependencies());
+    files.extend(dpn_files_no_dependencies());
+    files
+}
+
+pub fn aptos_files_no_dependencies() -> Vec<String> {
+    let mut files = move_files_in_path(APTOS_MODULES_DIR);
+    files.extend(move_files_in_path(CORE_MODULES_DIR));
+    files
+}
+
+fn move_files_in_path(path: &str) -> Vec<String> {
+    let modules_path = path_in_crate(path);
+    find_filenames(&[modules_path], |p| extension_equals(p, MOVE_EXTENSION)).unwrap()
+}
+
+pub fn aptos_files() -> Vec<String> {
+    let mut files = move_stdlib::move_stdlib_files();
+    files.extend(aptos_files_no_dependencies());
     files
 }
 
 pub fn diem_framework_named_addresses() -> BTreeMap<String, NumericalAddress> {
-    DPN_FRAMEWORK_PKG
-        .compiled_package_info
+    named_addresses(&*DPN_FRAMEWORK_PKG)
+}
+
+pub fn aptos_framework_named_addresses() -> BTreeMap<String, NumericalAddress> {
+    named_addresses(&*APTOS_FRAMEWORK_PKG)
+}
+
+fn named_addresses(pkg: &CompiledPackage) -> BTreeMap<String, NumericalAddress> {
+    pkg.compiled_package_info
         .address_alias_instantiation
         .iter()
         .map(|(name, addr)| {
@@ -65,27 +90,17 @@ pub fn diem_framework_named_addresses() -> BTreeMap<String, NumericalAddress> {
         .collect()
 }
 
-static DPN_FRAMEWORK_PKG: Lazy<CompiledPackage> = Lazy::new(|| {
+fn package(name: &str) -> CompiledPackage {
     let build_config = move_package::BuildConfig {
         install_dir: Some(tempdir().unwrap().path().to_path_buf()),
         ..Default::default()
     };
     build_config
-        .compile_package(&path_in_crate("DPN"), &mut Vec::new())
+        .compile_package(&path_in_crate(name), &mut Vec::new())
         .unwrap()
-});
+}
 
-static EXPERIMENTAL_FRAMEWORK_PKG: Lazy<CompiledPackage> = Lazy::new(|| {
-    let build_config = move_package::BuildConfig {
-        install_dir: Some(tempdir().unwrap().path().to_path_buf()),
-        ..Default::default()
-    };
-    build_config
-        .compile_package(&path_in_crate("experimental"), &mut Vec::new())
-        .unwrap()
-});
-
-pub fn modules() -> Vec<CompiledModule> {
+pub fn dpn_modules() -> Vec<CompiledModule> {
     DPN_FRAMEWORK_PKG
         .transitive_compiled_units()
         .iter()
@@ -96,9 +111,8 @@ pub fn modules() -> Vec<CompiledModule> {
         .collect()
 }
 
-pub fn module_blobs() -> Vec<Vec<u8>> {
-    DPN_FRAMEWORK_PKG
-        .transitive_compiled_units()
+fn module_blobs(pkg: &CompiledPackage) -> Vec<Vec<u8>> {
+    pkg.transitive_compiled_units()
         .iter()
         .filter_map(|unit| match unit {
             CompiledUnit::Module(NamedCompiledModule { module, .. }) => {
@@ -111,17 +125,10 @@ pub fn module_blobs() -> Vec<Vec<u8>> {
         .collect()
 }
 
+pub fn dpn_module_blobs() -> Vec<Vec<u8>> {
+    module_blobs(&*DPN_FRAMEWORK_PKG)
+}
+
 pub fn experimental_module_blobs() -> Vec<Vec<u8>> {
-    EXPERIMENTAL_FRAMEWORK_PKG
-        .transitive_compiled_units()
-        .iter()
-        .filter_map(|unit| match unit {
-            CompiledUnit::Module(NamedCompiledModule { module, .. }) => {
-                let mut bytes = vec![];
-                module.serialize(&mut bytes).unwrap();
-                Some(bytes)
-            }
-            CompiledUnit::Script(_) => None,
-        })
-        .collect()
+    module_blobs(&*EXPERIMENTAL_FRAMEWORK_PKG)
 }
