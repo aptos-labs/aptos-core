@@ -3,6 +3,8 @@
 
 mod admin;
 pub use admin::*;
+mod aptos;
+pub use aptos::*;
 mod network;
 pub use network::*;
 mod test;
@@ -19,8 +21,6 @@ mod chain_info;
 pub use chain_info::*;
 mod nft;
 pub use nft::*;
-mod aptos;
-pub use aptos::*;
 
 /// A wrapper around a usize in order to represent an opaque version of a Node.
 ///
