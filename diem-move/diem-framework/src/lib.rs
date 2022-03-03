@@ -132,3 +132,7 @@ pub fn dpn_module_blobs() -> Vec<Vec<u8>> {
 pub fn experimental_module_blobs() -> Vec<Vec<u8>> {
     module_blobs(&*EXPERIMENTAL_FRAMEWORK_PKG)
 }
+
+pub fn aptos_module_blobs() -> Vec<Vec<u8>> {
+    module_blobs(&*APTOS_FRAMEWORK_PKG)
+}

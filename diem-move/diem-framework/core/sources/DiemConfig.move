@@ -4,6 +4,7 @@ module CoreFramework::DiemConfig {
     use Std::Errors;
     use Std::Event;
     use Std::Signer;
+    use Std::GUID;
     use CoreFramework::DiemTimestamp;
     use CoreFramework::SystemAddresses;
 
@@ -42,6 +43,8 @@ module CoreFramework::DiemConfig {
     const EMODIFY_CAPABILITY: u64 = 2;
     /// An invalid block time was encountered.
     const EINVALID_BLOCK_TIME: u64 = 3;
+    /// An invalid block time was encountered.
+    const EINVALID_GUID_FOR_EVENT: u64 = 4;
     /// The largest possible u64 value
     const MAX_U64: u64 = 18446744073709551615;
 
@@ -52,6 +55,8 @@ module CoreFramework::DiemConfig {
         DiemTimestamp::assert_genesis();
         SystemAddresses::assert_core_resource(account);
         assert!(!exists<Configuration>(@CoreResources), Errors::already_published(ECONFIGURATION));
+        // assert it matches `new_epoch_event_key()`, otherwise the event can't be recognized
+        assert!(GUID::get_next_creation_num(Signer::address_of(account)) == 4, Errors::invalid_state(EINVALID_GUID_FOR_EVENT));
         move_to<Configuration>(
             account,
             Configuration {

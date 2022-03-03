@@ -146,6 +146,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-framework-releases"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bcs",
+ "diem-crypto",
+ "diem-types",
+ "diem-workspace-hack",
+ "framework-releases",
+ "include_dir",
+ "move-binary-format",
+ "move-command-line-common",
+ "once_cell",
+]
+
+[[package]]
 name = "arbitrary"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6944,6 +6960,7 @@ name = "smoke-test"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-framework-releases",
  "async-trait",
  "backup-cli",
  "base64",

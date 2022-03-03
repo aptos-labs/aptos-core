@@ -3,6 +3,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod aptos_stdlib;
 pub mod error_explain;
 pub mod experimental_stdlib;
 pub mod stdlib;

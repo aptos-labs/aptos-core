@@ -443,6 +443,7 @@ pub enum GenesisOptions {
     Compiled,
     Fresh,
     Experimental,
+    Aptos,
 }
 
 /// Generate an artificial genesis `ChangeSet` for testing
@@ -451,6 +452,7 @@ pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) 
         GenesisOptions::Compiled => diem_framework_releases::current_module_blobs().to_vec(),
         GenesisOptions::Fresh => diem_framework::dpn_module_blobs(),
         GenesisOptions::Experimental => diem_framework::experimental_module_blobs(),
+        GenesisOptions::Aptos => diem_framework::aptos_module_blobs(),
     };
 
     generate_test_genesis(&modules, VMPublishingOption::open(), None, false).0
