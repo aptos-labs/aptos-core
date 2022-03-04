@@ -3,11 +3,15 @@
 use super::Test;
 use crate::{CoreContext, Result, TestReport};
 use diem_rest_client::Client as RestClient;
-use diem_sdk::crypto::ed25519::Ed25519PublicKey;
-use diem_sdk::types::transaction::authenticator::AuthenticationKeyPreimage;
 use diem_sdk::{
+    crypto::ed25519::Ed25519PublicKey,
     transaction_builder::TransactionFactory,
-    types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey, LocalAccount},
+    types::{
+        account_address::AccountAddress,
+        chain_id::ChainId,
+        transaction::authenticator::{AuthenticationKey, AuthenticationKeyPreimage},
+        LocalAccount,
+    },
 };
 use diem_transaction_builder::aptos_stdlib;
 use reqwest::Url;
@@ -65,8 +69,8 @@ impl<'t> AptosContext<'t> {
         TransactionFactory::new(self.chain_id())
     }
 
-    pub async fn create_user_account(&mut self, auth_key: &Ed25519PublicKey) -> Result<()> {
-        let preimage = AuthenticationKeyPreimage::ed25519(auth_key);
+    pub async fn create_user_account(&mut self, pubkey: &Ed25519PublicKey) -> Result<()> {
+        let preimage = AuthenticationKeyPreimage::ed25519(pubkey);
         let auth_key = AuthenticationKey::from_preimage(&preimage);
         let create_account_txn = self.public_info.root_account.sign_with_transaction_builder(
             self.transaction_factory().payload(
@@ -79,6 +83,18 @@ impl<'t> AptosContext<'t> {
         self.public_info
             .rest_client
             .submit_and_wait(&create_account_txn)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn mint(&mut self, addr: AccountAddress, amount: u64) -> Result<()> {
+        let mint_txn = self.public_info.root_account.sign_with_transaction_builder(
+            self.transaction_factory()
+                .payload(aptos_stdlib::encode_mint_script_function(addr, amount)),
+        );
+        self.public_info
+            .rest_client
+            .submit_and_wait(&mint_txn)
             .await?;
         Ok(())
     }
