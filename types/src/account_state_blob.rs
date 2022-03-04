@@ -15,12 +15,18 @@ use diem_crypto::{
     HashValue,
 };
 use diem_crypto_derive::CryptoHasher;
+use once_cell::sync::Lazy;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{arbitrary::Arbitrary, prelude::*};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Deserializer, Serialize};
+use std::collections::HashMap;
+use std::sync::RwLock;
 use std::{convert::TryFrom, fmt};
+
+static CACHE: Lazy<RwLock<HashMap<HashValue, AccountState>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 
 #[derive(Clone, Eq, PartialEq, Serialize, CryptoHasher)]
 pub struct AccountStateBlob {
@@ -108,7 +114,16 @@ impl TryFrom<&AccountStateBlob> for AccountState {
     type Error = Error;
 
     fn try_from(account_state_blob: &AccountStateBlob) -> Result<Self> {
-        bcs::from_bytes(&account_state_blob.blob).map_err(Into::into)
+        let read_lock = &*CACHE.read().unwrap();
+        if let Some(account_state) = read_lock.get(&account_state_blob.hash) {
+            Ok(account_state.clone())
+        } else {
+            drop(read_lock);
+            let account_state = bcs::from_bytes::<AccountState>(&account_state_blob.blob)?;
+            let mut write_lock = (&*CACHE).write().unwrap();
+            write_lock.insert(account_state_blob.hash, account_state.clone());
+            Ok(account_state)
+        }
     }
 }
 
