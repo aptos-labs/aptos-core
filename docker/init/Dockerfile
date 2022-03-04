@@ -46,6 +46,13 @@ COPY --from=builder /diem/diem-move/diem-framework/experimental/releases/artifac
 RUN mv /experimental/move/build/**/bytecode_modules/*.mv /experimental/move/modules
 RUN rm -rf /experimental/move/build
 
+### Get Aptos Move modules bytecodes for genesis ceremony
+RUN mkdir -p /aptos-framework/move/build
+RUN mkdir -p /aptos-framework/move/modules
+COPY --from=builder /diem/diem-move/diem-framework/aptos-framework/releases/artifacts/current/build /aptos-framework/move/build
+RUN mv /aptos-framework/move/build/**/bytecode_modules/*.mv /aptos-framework/move/modules
+RUN rm -rf /aptos-framework/move/build
+
 FROM pre-prod as testing
 
 RUN /usr/local/bin/diem-genesis-tool -h
