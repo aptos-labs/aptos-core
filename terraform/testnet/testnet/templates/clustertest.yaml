@@ -1,5 +1,5 @@
 {{- if .Values.cluster_test.enabled }}
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: {{ include "testnet.fullname" . }}-cluster-test

@@ -13,7 +13,7 @@ data:
 
 ---
 
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: {{ include "testnet.fullname" . }}-genesis
@@ -26,7 +26,7 @@ rules:
 
 ---
 
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: {{ include "testnet.fullname" . }}-genesis
@@ -99,7 +99,11 @@ spec:
             vault write -f "/transit/keys/val${N}__validator_network/rotate"
             diem-genesis-tool owner-key --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N"
             diem-genesis-tool operator-key --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N"
+            {{- if .Values.service.fullnode.enableOnchainDiscovery }}
+            diem-genesis-tool validator-config --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N" --validator-address "/dns4/val$N-diem-validator-validator-lb/tcp/6180" --fullnode-address "/dns4/fn$N.{{.Values.service.domain}}/tcp/6182" --owner-name "val$N" --chain-id "{{ .Values.genesis.chain_id | default .Values.genesis.era }}"
+            {{- else }}
             diem-genesis-tool validator-config --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N" --validator-address "/dns4/val$N-diem-validator-validator-lb/tcp/6180" --fullnode-address "/dns4/val$N-diem-validator-fullnode-lb/tcp/6182" --owner-name "val$N" --chain-id "{{ .Values.genesis.chain_id | default .Values.genesis.era }}"
+            {{- end }}
             diem-genesis-tool set-operator --shared-backend "$FILE_BACKEND;namespace=val$N" --operator-name "val$N"
           done
 

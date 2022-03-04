@@ -1,19 +1,27 @@
+{{- $fullName := include "testnet.fullname" . -}}
+{{- $labels := include "testnet.labels" . -}}
+{{- $domain := .Values.service.domain -}}
+{{- $loadBalancerSourceRanges := .Values.service.fullnode.loadBalancerSourceRanges -}}
+
+{{- if .Values.service.fullnode.enableOnchainDiscovery }}
+# create internet facing network address for fullnode 
+# to allow onchain discovery
+{{- range $i, $e := .Values.genesis.numValidators | int | until }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "testnet.fullname" . }}-fullnode
+  name: {{ printf "%s-fullnode-%d" $fullName $i | quote }}
   labels:
-    {{- include "testnet.labels" . | nindent 4 }}
+    {{- $labels | nindent 4 }}
   annotations:
     service.beta.kubernetes.io/aws-load-balancer-type: nlb
-    service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: {{ .Values.service.aws_tags | quote }}
-    {{- if .Values.service.domain }}
-    external-dns.alpha.kubernetes.io/hostname: fn.{{ .Values.service.domain }}
+    {{- if $domain }}
+    external-dns.alpha.kubernetes.io/hostname: {{ printf "fn%d.%s" $i $domain | quote }}
     {{- end }}
     alb.ingress.kubernetes.io/healthcheck-path: /-/healthy
 spec:
   selector:
-    app.kubernetes.io/instance: val0
+    app.kubernetes.io/instance: {{ printf "val%d" $i | quote }}
     app.kubernetes.io/part-of: diem-validator
     app.kubernetes.io/name: haproxy
   ports:
@@ -21,10 +29,11 @@ spec:
     port: 6182
   type: LoadBalancer
   externalTrafficPolicy: Local
-  {{- with .Values.service.fullnode.loadBalancerSourceRanges }}
   loadBalancerSourceRanges:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- toYaml $loadBalancerSourceRanges | nindent 4 }}
+---
+{{- end }}
+{{- end }}
 
 ---
 
