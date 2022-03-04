@@ -20,7 +20,10 @@ use move_core_types::{
 };
 use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
+use diem_crypto::_once_cell::sync::Lazy;
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::HashMap;
+use std::sync::RwLock;
 use std::{
     collections::BTreeMap,
     convert::{From, Into, TryFrom, TryInto},
@@ -28,6 +31,9 @@ use std::{
     result::Result,
     str::FromStr,
 };
+
+static CACHE: Lazy<RwLock<HashMap<Vec<u8>, Option<MoveModule>>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MoveResource {
@@ -867,11 +873,19 @@ impl MoveModuleBytecode {
 
     pub fn try_parse_abi(mut self) -> anyhow::Result<Self> {
         if self.abi.is_none() {
-            // Ignore error, because it is possible a transaction module payload contains
-            // invalid bytecode.
-            // So we ignore the error and output bytecode without abi.
-            if let Ok(module) = CompiledModule::deserialize(self.bytecode.inner()) {
-                self.abi = Some(module.try_into()?);
+            let read_lock = (&*CACHE).read().unwrap();
+            if let Some(abi) = read_lock.get(self.bytecode.inner()) {
+                self.abi = abi.clone();
+            } else {
+                drop(read_lock);
+                // Ignore error, because it is possible a transaction module payload contains
+                // invalid bytecode.
+                // So we ignore the error and output bytecode without abi.
+                if let Ok(module) = CompiledModule::deserialize(self.bytecode.inner()) {
+                    self.abi = Some(module.try_into()?);
+                }
+                let mut write_lock = (&*CACHE).write().unwrap();
+                write_lock.insert(self.bytecode.inner().to_vec(), self.abi.clone());
             }
         }
         Ok(self)
