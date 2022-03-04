@@ -3,9 +3,8 @@
 
 use diem_crypto::HashValue;
 use diem_types::{
-    account_address::AccountAddress,
-    account_config::AccountSequenceInfo,
-    transaction::{GovernanceRole, SignedTransaction},
+    account_address::AccountAddress, account_config::AccountSequenceInfo,
+    transaction::SignedTransaction,
 };
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -18,7 +17,6 @@ pub struct MempoolTransaction {
     pub gas_amount: u64,
     pub ranking_score: u64,
     pub timeline_state: TimelineState,
-    pub governance_role: GovernanceRole,
     pub sequence_info: SequenceInfo,
 }
 
@@ -29,7 +27,6 @@ impl MempoolTransaction {
         gas_amount: u64,
         ranking_score: u64,
         timeline_state: TimelineState,
-        governance_role: GovernanceRole,
         seqno_type: AccountSequenceInfo,
     ) -> Self {
         Self {
@@ -42,7 +39,6 @@ impl MempoolTransaction {
             gas_amount,
             ranking_score,
             timeline_state,
-            governance_role,
         }
     }
     pub(crate) fn get_sender(&self) -> AccountAddress {

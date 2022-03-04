@@ -6,9 +6,9 @@ use crate::{
     account_config::XUS_NAME,
     chain_id::ChainId,
     transaction::{
-        metadata, AccountTransactionsWithProof, GovernanceRole, RawTransaction, Script,
-        SignedTransaction, Transaction, TransactionInfo, TransactionListWithProof,
-        TransactionPayload, TransactionWithProof,
+        metadata, AccountTransactionsWithProof, RawTransaction, Script, SignedTransaction,
+        Transaction, TransactionInfo, TransactionListWithProof, TransactionPayload,
+        TransactionWithProof,
     },
 };
 use bcs::test_helpers::assert_canonical_encode_decode;
@@ -37,22 +37,6 @@ fn test_invalid_signature() {
     );
     txn.check_signature()
         .expect_err("signature checking should fail");
-}
-
-#[test]
-fn test_role_ordering() {
-    use GovernanceRole::*;
-    assert!(DiemRoot.priority() > TreasuryCompliance.priority());
-    assert!(DiemRoot.priority() > Validator.priority());
-    assert!(DiemRoot.priority() > ValidatorOperator.priority());
-    assert!(DiemRoot.priority() > DesignatedDealer.priority());
-
-    assert!(TreasuryCompliance.priority() > Validator.priority());
-    assert!(TreasuryCompliance.priority() > ValidatorOperator.priority());
-    assert!(TreasuryCompliance.priority() > DesignatedDealer.priority());
-
-    assert!(Validator.priority() == ValidatorOperator.priority());
-    assert!(Validator.priority() == DesignatedDealer.priority());
 }
 
 #[test]

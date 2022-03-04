@@ -15,10 +15,8 @@ use diem_config::{
 };
 use diem_infallible::{Mutex, RwLock};
 use diem_types::{
-    account_config::AccountSequenceInfo,
-    mempool_status::MempoolStatusCode,
-    on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
-    transaction::{GovernanceRole, SignedTransaction},
+    account_config::AccountSequenceInfo, mempool_status::MempoolStatusCode,
+    on_chain_config::ON_CHAIN_CONFIG_REGISTRY, transaction::SignedTransaction,
 };
 use event_notifications::EventSubscriptionService;
 use futures::channel::mpsc;
@@ -153,7 +151,6 @@ impl MockSharedMempool {
                         txn.gas_unit_price(),
                         AccountSequenceInfo::Sequential(0),
                         TimelineState::NotReady,
-                        GovernanceRole::NonGovernanceRole,
                     )
                     .code
                     != MempoolStatusCode::Accepted

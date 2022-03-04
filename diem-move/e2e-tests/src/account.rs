@@ -12,7 +12,7 @@ use diem_types::{
     account_address::AccountAddress,
     account_config::{
         self, from_currency_code_string, type_tag_for_currency_code, BalanceResource,
-        DiemAccountResource, RoleId, XDX_NAME, XUS_NAME,
+        DiemAccountResource, XDX_NAME, XUS_NAME,
     },
     chain_id::ChainId,
     event::EventHandle,
@@ -415,15 +415,6 @@ impl AccountRoleSpecifier {
     pub fn to_value(&self) -> Value {
         Value::struct_(Struct::pack(vec![Value::u64(self.id())]))
     }
-
-    pub fn role_id_struct_tag() -> StructTag {
-        StructTag {
-            address: account_config::CORE_CODE_ADDRESS,
-            module: RoleId::module_identifier(),
-            name: RoleId::struct_identifier(),
-            type_params: vec![],
-        }
-    }
 }
 
 impl FromStr for AccountRoleSpecifier {
@@ -650,14 +641,13 @@ impl AccountData {
     }
 
     /// Creates and returns the top-level resources to be published under the account
-    pub fn to_value(&self) -> (Value, Vec<(Identifier, Value)>, Value) {
+    pub fn to_value(&self) -> (Value, Vec<(Identifier, Value)>) {
         // TODO: publish some concept of Account
         let balances: Vec<_> = self
             .balances
             .iter()
             .map(|(code, balance)| (code.clone(), balance.to_value()))
             .collect();
-        let role_id = self.account_role.account_specifier.to_value();
         let account = Value::struct_(Struct::pack(vec![
             // TODO: this needs to compute the auth key instead
             Value::vector_u8(AuthenticationKey::ed25519(&self.account.pubkey).to_vec()),
@@ -673,7 +663,7 @@ impl AccountData {
             ])),
             Value::u64(self.sequence_number),
         ]));
-        (account, balances, role_id)
+        (account, balances)
     }
 
     /// Returns the AccessPath that describes the Account resource instance.
@@ -693,7 +683,7 @@ impl AccountData {
     /// Creates a writeset that contains the account data and can be patched to the storage
     /// directly.
     pub fn to_writeset(&self) -> WriteSet {
-        let (account_blob, balance_blobs, role_id_blob) = self.to_value();
+        let (account_blob, balance_blobs) = self.to_value();
         let mut write_set = Vec::new();
         let account = account_blob
             .value_as::<Struct>()
@@ -719,17 +709,6 @@ impl AccountData {
             self.account
                 .make_access_path(account_config::FreezingBit::struct_tag()),
             WriteOp::Value(freezing_bit),
-        ));
-
-        let role_id = role_id_blob
-            .value_as::<Struct>()
-            .unwrap()
-            .simple_serialize(&AccountRoleSpecifier::layout())
-            .unwrap();
-        write_set.push((
-            self.account
-                .make_access_path(AccountRoleSpecifier::role_id_struct_tag()),
-            WriteOp::Value(role_id),
         ));
 
         WriteSetMut::new(write_set).freeze().unwrap()

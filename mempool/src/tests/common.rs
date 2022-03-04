@@ -10,7 +10,7 @@ use diem_types::{
     account_config::{AccountSequenceInfo, XUS_NAME},
     chain_id::ChainId,
     mempool_status::MempoolStatusCode,
-    transaction::{GovernanceRole, RawTransaction, Script, SignedTransaction},
+    transaction::{RawTransaction, Script, SignedTransaction},
 };
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, SeedableRng};
@@ -37,7 +37,6 @@ pub struct TestTransaction {
     pub(crate) address: usize,
     pub(crate) sequence_number: u64,
     pub(crate) gas_price: u64,
-    pub(crate) governance_role: GovernanceRole,
     pub(crate) account_seqno_type: AccountSequenceInfo,
 }
 
@@ -47,7 +46,6 @@ impl TestTransaction {
             address,
             sequence_number,
             gas_price,
-            governance_role: GovernanceRole::NonGovernanceRole,
             account_seqno_type: AccountSequenceInfo::Sequential(0),
         }
     }
@@ -122,7 +120,6 @@ pub(crate) fn add_txns_to_mempool(
             txn.gas_unit_price(),
             transaction.account_seqno_type,
             TimelineState::NotReady,
-            transaction.governance_role,
         );
         transactions.push(txn);
     }
@@ -141,7 +138,6 @@ pub(crate) fn add_signed_txn(pool: &mut CoreMempool, transaction: SignedTransact
             transaction.gas_unit_price(),
             AccountSequenceInfo::Sequential(0),
             TimelineState::NotReady,
-            GovernanceRole::NonGovernanceRole,
         )
         .code
     {
