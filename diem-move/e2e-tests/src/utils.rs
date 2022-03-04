@@ -5,7 +5,7 @@
 use crate::{
     account::Account,
     compile,
-    executor::{self, FakeExecutor},
+    executor::FakeExecutor,
 };
 use diem_transaction_builder::stdlib as transaction_builder;
 use move_binary_format::file_format::CompiledModule;
@@ -39,23 +39,18 @@ pub fn close_module_publishing(
 }
 
 pub fn start_with_released_df() -> (FakeExecutor, Account, Account, Account) {
-    let executor = FakeExecutor::from_saved_genesis(executor::RELEASE_1_1_GENESIS);
+    let executor = FakeExecutor::from_fresh_genesis();
     let mut dd_account = Account::new_testing_dd();
     let mut dr_account = Account::new_diem_root();
     let mut tc_account = Account::new_blessed_tc();
 
-    dd_account.rotate_key(
-        bcs::from_bytes(executor::RELEASE_1_1_GENESIS_PRIVKEY).unwrap(),
-        bcs::from_bytes(executor::RELEASE_1_1_GENESIS_PUBKEY).unwrap(),
-    );
-    dr_account.rotate_key(
-        bcs::from_bytes(executor::RELEASE_1_1_GENESIS_PRIVKEY).unwrap(),
-        bcs::from_bytes(executor::RELEASE_1_1_GENESIS_PUBKEY).unwrap(),
-    );
-    tc_account.rotate_key(
-        bcs::from_bytes(executor::RELEASE_1_1_GENESIS_PRIVKEY).unwrap(),
-        bcs::from_bytes(executor::RELEASE_1_1_GENESIS_PUBKEY).unwrap(),
-    );
+    let (private_key, public_key) = vm_genesis::GENESIS_KEYPAIR.clone();
+    dd_account.rotate_key(private_key, public_key);
+    let (private_key, public_key) = vm_genesis::GENESIS_KEYPAIR.clone();
+    dr_account.rotate_key(private_key, public_key);
+    let (private_key, public_key) = vm_genesis::GENESIS_KEYPAIR.clone();
+    tc_account.rotate_key(private_key, public_key);
+
     (executor, dr_account, tc_account, dd_account)
 }
 

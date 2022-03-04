@@ -60,13 +60,6 @@ use read_write_set::analyze;
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
 
-pub const RELEASE_1_1_GENESIS: &[u8] =
-    include_bytes!("../genesis-release-1-1/release-1-1-genesis.blob");
-pub const RELEASE_1_1_GENESIS_PRIVKEY: &[u8] =
-    include_bytes!("../genesis-release-1-1/release-1-1-privkey.blob");
-pub const RELEASE_1_1_GENESIS_PUBKEY: &[u8] =
-    include_bytes!("../genesis-release-1-1/release-1-1-pubkey.blob");
-
 const ENV_TRACE_DIR: &str = "TRACE";
 
 /// Directory structure of the trace dir
@@ -224,14 +217,14 @@ impl FakeExecutor {
     }
 
     pub fn parallel_genesis() -> Self {
-        let geneisis = vm_genesis::generate_test_genesis(
+        let genesis = vm_genesis::generate_test_genesis(
             current_module_blobs(),
             VMPublishingOption::open(),
             None,
             true,
         )
         .0;
-        FakeExecutor::from_genesis(geneisis.write_set())
+        FakeExecutor::from_genesis(genesis.write_set())
     }
 
     /// Create one instance of [`AccountData`] without saving it to data store.
