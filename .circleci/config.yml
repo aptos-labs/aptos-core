@@ -67,7 +67,7 @@ jobs:
           command: ./docker/<< parameters.image-name >>/build.sh
           no_output_timeout: 30m
       - aws-setup
-      - run: SOURCE=diem/<< parameters.target-image-name >>:latest TARGET_REPO="${AWS_ECR_ACCOUNT_URL}/diem/<< parameters.target-image-name >>" TARGET_TAGS="${TAGS}:dev_$(git rev-parse --short=8  HEAD)" docker/tag-and-push.sh
+      - run: SOURCE=diem/<< parameters.target-image-name >>:latest TARGET_REPO="${AWS_ECR_ACCOUNT_URL}/diem/<< parameters.target-image-name >>" TARGET_TAGS="${TAGS}:main_$(git rev-parse --short=8  HEAD),latest" docker/tag-and-push.sh
   # a dummy job so that we can require auto or canary branches
   require-bors:
     machine:
