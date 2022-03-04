@@ -4,6 +4,7 @@
 use crate::builder::GenesisBuilder;
 use diem_management::{config::ConfigPath, error::Error, secure_backend::SharedBackend};
 use diem_secure_storage::Storage;
+use diem_types::on_chain_config::VMPublishingOption;
 use diem_types::{
     chain_id::ChainId,
     on_chain_config::{ConsensusConfigV2, OnChainConsensusConfig},
@@ -41,7 +42,7 @@ impl Genesis {
         let genesis = GenesisBuilder::new(storage)
             .build(
                 chain_id,
-                None,
+                Some(VMPublishingOption::open()),
                 OnChainConsensusConfig::V2(ConsensusConfigV2 {
                     two_chain: true,
                     decoupled_execution: true,
