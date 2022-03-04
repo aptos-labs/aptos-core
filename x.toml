@@ -188,7 +188,6 @@ members = [
     "memsocket",
     "offchain",
     "smoke-test",
-    "socket-bench-server",
     "transaction-emitter",
     "x",
     "x-core",

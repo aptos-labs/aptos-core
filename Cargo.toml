@@ -81,7 +81,6 @@ members = [
     "network/discovery",
     "network/memsocket",
     "network/netcore",
-    "network/socket-bench-server",
     "sdk",
     "sdk/offchain",
     "sdk/transaction-builder",

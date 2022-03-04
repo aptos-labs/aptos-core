@@ -63,17 +63,8 @@ proptest = { version = "1.0.0", default-features = true }
 proptest-derive = { version = "0.3.0" }
 rand_core = "0.6.2"
 serial_test = "0.5.1"
-socket-bench-server = { path = "./socket-bench-server" }
 
 [features]
 default = []
 fuzzing = ["bitvec/fuzzing", "aptos-config/fuzzing", "aptos-crypto/fuzzing", "aptos-types/fuzzing", "aptos-proptest-helpers", "aptos-time-service/testing", "aptos-types/fuzzing", "memsocket/testing", "netcore/fuzzing", "proptest", "proptest-derive", "rand_core"]
 testing = ["aptos-config/testing", "aptos-time-service/testing", "memsocket/testing", "netcore/testing"]
-
-[[bench]]
-name = "socket_bench"
-harness = false
-
-[[bench]]
-name = "network_bench"
-harness = false
