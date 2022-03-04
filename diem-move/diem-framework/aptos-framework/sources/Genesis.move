@@ -56,7 +56,7 @@ module AptosFramework::Genesis {
         // initialize the core resource account
         AptosAccount::initialize(core_resource_account);
         let dummy_auth_key_prefix = x"00000000000000000000000000000000";
-        AptosAccount::create_account(Signer::address_of(core_resource_account), dummy_auth_key_prefix);
+        AptosAccount::create_account_internal(Signer::address_of(core_resource_account), dummy_auth_key_prefix);
         AptosAccount::rotate_authentication_key(core_resource_account, core_resource_account_auth_key);
 
         // Consensus config setup

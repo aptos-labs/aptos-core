@@ -15,8 +15,7 @@ impl AptosTest for AccountCreation {
     async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
         for _ in 0..10 {
             let local_account = ctx.random_account();
-            ctx.create_user_account(local_account.authentication_key())
-                .await?;
+            ctx.create_user_account(local_account.public_key()).await?;
         }
         Ok(())
     }

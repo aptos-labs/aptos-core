@@ -4,6 +4,9 @@
 
 module AptosFramework::AptosAccount {
     use Std::Errors;
+    use Std::Hash;
+    use Std::Vector;
+    use Std::BCS;
     use CoreFramework::Account;
     use CoreFramework::DiemTimestamp;
     use CoreFramework::SystemAddresses;
@@ -13,13 +16,16 @@ module AptosFramework::AptosAccount {
     use AptosFramework::TestCoin;
     use AptosFramework::TransactionFee;
 
+    friend AptosFramework::Genesis;
+
     const MAX_U64: u128 = 18446744073709551615;
 
     const ECANNOT_CREATE_AT_VM_RESERVED: u64 = 0;
     const EGAS: u64 = 1;
     const ECANNOT_CREATE_AT_CORE_CODE: u64 = 2;
+    const EADDR_NOT_MATCH_PREIMAGE: u64 = 3;
 
-    fun create_account_internal(account_address: address, auth_key_prefix: vector<u8>): (signer, vector<u8>) {
+    public(friend) fun create_account_internal(account_address: address, auth_key_prefix: vector<u8>): (signer, vector<u8>) {
         assert!(
             account_address != @VMReserved,
             Errors::invalid_argument(ECANNOT_CREATE_AT_VM_RESERVED)
@@ -56,9 +62,18 @@ module AptosFramework::AptosAccount {
 
     public fun create_account(
         new_account_address: address,
-        auth_key_prefix: vector<u8>,
+        auth_key_preimage: vector<u8>,
     ): signer {
-        let (signer, _) = create_account_internal(new_account_address, auth_key_prefix);
+        let auth_key = Hash::sha3_256(auth_key_preimage);
+        let bytes = BCS::to_bytes(&new_account_address);
+        let len = Vector::length(&bytes);
+        while (len > 0) {
+            let expect_byte = Vector::pop_back(&mut auth_key);
+            assert!(*Vector::borrow(&bytes, len - 1) == expect_byte, Errors::invalid_argument(EADDR_NOT_MATCH_PREIMAGE));
+            len = len - 1;
+        };
+
+        let (signer, _) = create_account_internal(new_account_address, auth_key);
         signer
     }
 

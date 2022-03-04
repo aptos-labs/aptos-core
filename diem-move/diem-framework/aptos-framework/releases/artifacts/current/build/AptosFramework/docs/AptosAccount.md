@@ -27,12 +27,15 @@ transaction in addition to the core prologue and epilogue.
 <pre><code><b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/DiemCoreFramework/docs/Account.md#0x1_Account">0x1::Account</a>;
 <b>use</b> <a href="AptosValidatorConfig.md#0x1_AptosValidatorConfig">0x1::AptosValidatorConfig</a>;
 <b>use</b> <a href="AptosValidatorOperatorConfig.md#0x1_AptosValidatorOperatorConfig">0x1::AptosValidatorOperatorConfig</a>;
+<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/BCS.md#0x1_BCS">0x1::BCS</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/DiemCoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
+<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Hash.md#0x1_Hash">0x1::Hash</a>;
 <b>use</b> <a href="Marker.md#0x1_Marker">0x1::Marker</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/DiemCoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses">0x1::SystemAddresses</a>;
 <b>use</b> <a href="TestCoin.md#0x1_TestCoin">0x1::TestCoin</a>;
 <b>use</b> <a href="TransactionFee.md#0x1_TransactionFee">0x1::TransactionFee</a>;
+<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector">0x1::Vector</a>;
 </code></pre>
 
 
@@ -47,6 +50,15 @@ transaction in addition to the core prologue and epilogue.
 
 
 <pre><code><b>const</b> <a href="AptosAccount.md#0x1_AptosAccount_MAX_U64">MAX_U64</a>: u128 = 18446744073709551615;
+</code></pre>
+
+
+
+<a name="0x1_AptosAccount_EADDR_NOT_MATCH_PREIMAGE"></a>
+
+
+
+<pre><code><b>const</b> <a href="AptosAccount.md#0x1_AptosAccount_EADDR_NOT_MATCH_PREIMAGE">EADDR_NOT_MATCH_PREIMAGE</a>: u64 = 3;
 </code></pre>
 
 
@@ -84,7 +96,7 @@ transaction in addition to the core prologue and epilogue.
 
 
 
-<pre><code><b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">create_account_internal</a>(account_address: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;): (signer, vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">create_account_internal</a>(account_address: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;): (signer, vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -93,7 +105,7 @@ transaction in addition to the core prologue and epilogue.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">create_account_internal</a>(account_address: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;): (signer, vector&lt;u8&gt;) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">create_account_internal</a>(account_address: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;): (signer, vector&lt;u8&gt;) {
     <b>assert</b>!(
         account_address != @VMReserved,
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="AptosAccount.md#0x1_AptosAccount_ECANNOT_CREATE_AT_VM_RESERVED">ECANNOT_CREATE_AT_VM_RESERVED</a>)
@@ -156,7 +168,7 @@ Initialize this module. This is only callable from genesis.
 Basic account creation method: no roles attached, no conditions checked.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account">create_account</a>(new_account_address: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;): signer
+<pre><code><b>public</b> <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account">create_account</a>(new_account_address: <b>address</b>, auth_key_preimage: vector&lt;u8&gt;): signer
 </code></pre>
 
 
@@ -167,9 +179,18 @@ Basic account creation method: no roles attached, no conditions checked.
 
 <pre><code><b>public</b> <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account">create_account</a>(
     new_account_address: <b>address</b>,
-    auth_key_prefix: vector&lt;u8&gt;,
+    auth_key_preimage: vector&lt;u8&gt;,
 ): signer {
-    <b>let</b> (signer, _) = <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">create_account_internal</a>(new_account_address, auth_key_prefix);
+    <b>let</b> auth_key = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Hash.md#0x1_Hash_sha3_256">Hash::sha3_256</a>(auth_key_preimage);
+    <b>let</b> bytes = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/BCS.md#0x1_BCS_to_bytes">BCS::to_bytes</a>(&new_account_address);
+    <b>let</b> len = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&bytes);
+    <b>while</b> (len &gt; 0) {
+        <b>let</b> expect_byte = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_pop_back">Vector::pop_back</a>(&<b>mut</b> auth_key);
+        <b>assert</b>!(*<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(&bytes, len - 1) == expect_byte, <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="AptosAccount.md#0x1_AptosAccount_EADDR_NOT_MATCH_PREIMAGE">EADDR_NOT_MATCH_PREIMAGE</a>));
+        len = len - 1;
+    };
+
+    <b>let</b> (signer, _) = <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">create_account_internal</a>(new_account_address, auth_key);
     signer
 }
 </code></pre>

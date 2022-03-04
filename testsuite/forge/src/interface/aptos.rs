@@ -3,6 +3,8 @@
 use super::Test;
 use crate::{CoreContext, Result, TestReport};
 use diem_rest_client::Client as RestClient;
+use diem_sdk::crypto::ed25519::Ed25519PublicKey;
+use diem_sdk::types::transaction::authenticator::AuthenticationKeyPreimage;
 use diem_sdk::{
     transaction_builder::TransactionFactory,
     types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey, LocalAccount},
@@ -63,12 +65,14 @@ impl<'t> AptosContext<'t> {
         TransactionFactory::new(self.chain_id())
     }
 
-    pub async fn create_user_account(&mut self, auth_key: AuthenticationKey) -> Result<()> {
+    pub async fn create_user_account(&mut self, auth_key: &Ed25519PublicKey) -> Result<()> {
+        let preimage = AuthenticationKeyPreimage::ed25519(auth_key);
+        let auth_key = AuthenticationKey::from_preimage(&preimage);
         let create_account_txn = self.public_info.root_account.sign_with_transaction_builder(
             self.transaction_factory().payload(
                 aptos_stdlib::encode_create_account_script_function(
                     auth_key.derived_address(),
-                    auth_key.prefix().to_vec(),
+                    preimage.into_vec(),
                 ),
             ),
         );
