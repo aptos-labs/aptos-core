@@ -1,18 +1,14 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{counters::*, create_access_path, data_cache::StateViewCache};
+use crate::{counters::*, data_cache::StateViewCache};
 use anyhow::Result;
 use diem_state_view::StateView;
 use diem_types::{
-    account_address::AccountAddress,
-    account_config::{self, RoleId},
-    transaction::{
-        GovernanceRole, SignatureCheckedTransaction, SignedTransaction, VMValidatorResult,
-    },
+    transaction::{SignatureCheckedTransaction, SignedTransaction, VMValidatorResult},
     vm_status::{StatusCode, VMStatus},
 };
-use move_core_types::{move_resource::MoveStructType, resolver::MoveResolver};
+use move_core_types::resolver::MoveResolver;
 use move_vm_runtime::session::Session;
 
 use crate::logging::AdapterLogSchema;
@@ -86,7 +82,6 @@ pub fn validate_signed_transaction<A: VMAdapter>(
     state_view: &impl StateView,
 ) -> VMValidatorResult {
     let _timer = TXN_VALIDATION_SECONDS.start_timer();
-    let txn_sender = transaction.sender();
     let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
     let txn = match A::check_signature(transaction) {
@@ -97,7 +92,6 @@ pub fn validate_signed_transaction<A: VMAdapter>(
     };
 
     let remote_cache = StateViewCache::new(state_view);
-    let account_role = get_account_role(txn_sender, &remote_cache);
     let mut session = adapter.new_session(&remote_cache);
 
     let (status, gas_price) = match adapter.get_gas_price(&*txn, &remote_cache) {
@@ -123,20 +117,7 @@ pub fn validate_signed_transaction<A: VMAdapter>(
         .with_label_values(&[counter_label])
         .inc();
 
-    VMValidatorResult::new(status, gas_price, account_role)
-}
-
-fn get_account_role<S: StateView>(
-    sender: AccountAddress,
-    remote_cache: &StateViewCache<S>,
-) -> GovernanceRole {
-    let role_access_path = create_access_path(sender, RoleId::struct_tag());
-    match remote_cache.get(&role_access_path) {
-        Ok(Some(blob)) => bcs::from_bytes::<account_config::RoleId>(&blob)
-            .map(|role_id| GovernanceRole::from_role_id(role_id.role_id()))
-            .unwrap_or(GovernanceRole::NonGovernanceRole),
-        _ => GovernanceRole::NonGovernanceRole,
-    }
+    VMValidatorResult::new(status, gas_price)
 }
 
 pub(crate) fn validate_signature_checked_transaction<S: MoveResolver, A: VMAdapter>(

@@ -73,11 +73,6 @@ pub struct VMValidatorResult {
     /// Score for ranking the transaction priority (e.g., based on the gas price).
     /// Only used when the status is `None`. Higher values indicate a higher priority.
     score: u64,
-
-    /// The account role for the transaction sender, so that certain
-    /// governance transactions can be prioritized above normal transactions.
-    /// Only used when the status is `None`.
-    governance_role: GovernanceRole,
 }
 ```
 

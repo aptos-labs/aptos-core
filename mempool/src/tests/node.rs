@@ -17,8 +17,7 @@ use diem_config::{
 use diem_crypto::{x25519::PrivateKey, Uniform};
 use diem_infallible::{Mutex, MutexGuard, RwLock};
 use diem_types::{
-    account_config::AccountSequenceInfo, on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
-    transaction::GovernanceRole, PeerId,
+    account_config::AccountSequenceInfo, on_chain_config::ON_CHAIN_CONFIG_REGISTRY, PeerId,
 };
 use enum_dispatch::enum_dispatch;
 use event_notifications::EventSubscriptionService;
@@ -379,7 +378,6 @@ impl Node {
                 transaction.gas_unit_price(),
                 AccountSequenceInfo::Sequential(0),
                 TimelineState::NotReady,
-                GovernanceRole::NonGovernanceRole,
             );
         }
     }

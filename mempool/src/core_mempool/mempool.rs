@@ -20,7 +20,7 @@ use diem_types::{
     account_address::AccountAddress,
     account_config::AccountSequenceInfo,
     mempool_status::{MempoolStatus, MempoolStatusCode},
-    transaction::{GovernanceRole, SignedTransaction},
+    transaction::SignedTransaction,
 };
 use std::{
     cmp::max,
@@ -132,7 +132,6 @@ impl Mempool {
         ranking_score: u64,
         crsn_or_seqno: AccountSequenceInfo,
         timeline_state: TimelineState,
-        governance_role: GovernanceRole,
     ) -> MempoolStatus {
         let db_sequence_number = crsn_or_seqno.min_seq();
         trace!(
@@ -172,7 +171,6 @@ impl Mempool {
             gas_amount,
             ranking_score,
             timeline_state,
-            governance_role,
             sequence_number,
         );
 

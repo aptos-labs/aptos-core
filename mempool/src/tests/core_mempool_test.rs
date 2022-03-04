@@ -10,10 +10,7 @@ use crate::{
 };
 use diem_config::config::NodeConfig;
 use diem_crypto::HashValue;
-use diem_types::{
-    account_config::AccountSequenceInfo,
-    transaction::{GovernanceRole, SignedTransaction},
-};
+use diem_types::{account_config::AccountSequenceInfo, transaction::SignedTransaction};
 use std::{
     collections::HashSet,
     time::{Duration, SystemTime},
@@ -178,61 +175,6 @@ fn test_transaction_eviction_crsns() {
     // These transactions should have been evicted because the account's min_nonce got bumped
     for _transaction in &to_be_removed_txns {
         assert_eq!(consensus.get_block(&mut mempool, 1), vec![]);
-    }
-}
-
-#[test]
-fn test_ordering_of_governance_transactions() {
-    let gov_roles = vec![
-        GovernanceRole::DiemRoot,
-        GovernanceRole::TreasuryCompliance,
-        GovernanceRole::Validator,
-        GovernanceRole::ValidatorOperator,
-        GovernanceRole::DesignatedDealer,
-    ];
-
-    for role1 in &gov_roles {
-        for role2 in &gov_roles {
-            let (mut pool, mut consensus) = setup_mempool();
-            let txn1 = TestTransaction::new(0, 0, 100);
-            let txn2 = TestTransaction::new(1, 0, 200);
-            let mut gov_txn1 = TestTransaction::new(2, 0, 2);
-            let mut gov_txn2 = TestTransaction::new(3, 0, 1);
-            gov_txn1.governance_role = *role1;
-            gov_txn2.governance_role = *role2;
-
-            let _ = add_txns_to_mempool(
-                &mut pool,
-                vec![
-                    txn1.clone(),
-                    txn2.clone(),
-                    gov_txn1.clone(),
-                    gov_txn2.clone(),
-                ],
-            );
-
-            // If the first role is "less than" the second then we should swap them since the
-            // second txn should have higher priority.
-            if role1.priority() < role2.priority() {
-                std::mem::swap(&mut gov_txn1, &mut gov_txn2);
-            }
-            assert_eq!(
-                consensus.get_block(&mut pool, 1),
-                vec!(gov_txn1.make_signed_transaction())
-            );
-            assert_eq!(
-                consensus.get_block(&mut pool, 1),
-                vec!(gov_txn2.make_signed_transaction())
-            );
-            assert_eq!(
-                consensus.get_block(&mut pool, 1),
-                vec!(txn2.make_signed_transaction())
-            );
-            assert_eq!(
-                consensus.get_block(&mut pool, 1),
-                vec!(txn1.make_signed_transaction())
-            );
-        }
     }
 }
 
@@ -616,7 +558,6 @@ fn test_gc_ready_transaction() {
         1,
         AccountSequenceInfo::Sequential(0),
         TimelineState::NotReady,
-        GovernanceRole::NonGovernanceRole,
     );
 
     // Insert few transactions after it.
@@ -655,7 +596,6 @@ fn test_clean_stuck_transactions() {
         1,
         AccountSequenceInfo::Sequential(db_sequence_number),
         TimelineState::NotReady,
-        GovernanceRole::NonGovernanceRole,
     );
     let block = pool.get_block(10, HashSet::new());
     assert_eq!(block.len(), 1);
@@ -697,7 +637,6 @@ fn test_get_transaction_by_hash() {
         1,
         AccountSequenceInfo::Sequential(db_sequence_number),
         TimelineState::NotReady,
-        GovernanceRole::NonGovernanceRole,
     );
     let hash = txn.clone().committed_hash();
     let ret = pool.get_by_hash(hash);
@@ -718,7 +657,6 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
         1,
         AccountSequenceInfo::Sequential(db_sequence_number),
         TimelineState::NotReady,
-        GovernanceRole::NonGovernanceRole,
     );
     let hash = txn.committed_hash();
 
@@ -730,7 +668,6 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
         1,
         AccountSequenceInfo::Sequential(db_sequence_number),
         TimelineState::NotReady,
-        GovernanceRole::NonGovernanceRole,
     );
     let new_txn_hash = new_txn.clone().committed_hash();
 

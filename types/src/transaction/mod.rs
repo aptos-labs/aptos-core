@@ -817,44 +817,6 @@ impl From<KeptVMStatus> for TransactionStatus {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum GovernanceRole {
-    DiemRoot,
-    TreasuryCompliance,
-    Validator,
-    ValidatorOperator,
-    DesignatedDealer,
-    NonGovernanceRole,
-}
-
-impl GovernanceRole {
-    pub fn from_role_id(role_id: u64) -> Self {
-        use GovernanceRole::*;
-        match role_id {
-            0 => DiemRoot,
-            1 => TreasuryCompliance,
-            2 => DesignatedDealer,
-            3 => Validator,
-            4 => ValidatorOperator,
-            _ => NonGovernanceRole,
-        }
-    }
-
-    /// The higher the number that is returned, the greater priority assigned to a transaction sent
-    /// from an account with that role in mempool. All transactions sent from an account with role
-    /// priority N are ranked higher than all transactions sent from accounts with role priorities < N.
-    /// Transactions from accounts with equal priority are ranked base on other characteristics (e.g., gas price).
-    pub fn priority(&self) -> u64 {
-        use GovernanceRole::*;
-        match self {
-            DiemRoot => 3,
-            TreasuryCompliance => 2,
-            Validator | ValidatorOperator | DesignatedDealer => 1,
-            NonGovernanceRole => 0,
-        }
-    }
-}
-
 /// The result of running the transaction through the VM validator.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VMValidatorResult {
@@ -865,19 +827,10 @@ pub struct VMValidatorResult {
     /// Score for ranking the transaction priority (e.g., based on the gas price).
     /// Only used when the status is `None`. Higher values indicate a higher priority.
     score: u64,
-
-    /// The account role for the transaction sender, so that certain
-    /// governance transactions can be prioritized above normal transactions.
-    /// Only used when the status is `None`.
-    governance_role: GovernanceRole,
 }
 
 impl VMValidatorResult {
-    pub fn new(
-        vm_status: Option<DiscardedVMStatus>,
-        score: u64,
-        governance_role: GovernanceRole,
-    ) -> Self {
+    pub fn new(vm_status: Option<DiscardedVMStatus>, score: u64) -> Self {
         debug_assert!(
             match vm_status {
                 None => true,
@@ -892,7 +845,6 @@ impl VMValidatorResult {
         Self {
             status: vm_status,
             score,
-            governance_role,
         }
     }
 
@@ -900,7 +852,6 @@ impl VMValidatorResult {
         Self {
             status: Some(vm_status),
             score: 0,
-            governance_role: GovernanceRole::NonGovernanceRole,
         }
     }
 
@@ -910,10 +861,6 @@ impl VMValidatorResult {
 
     pub fn score(&self) -> u64 {
         self.score
-    }
-
-    pub fn governance_role(&self) -> GovernanceRole {
-        self.governance_role
     }
 }
 

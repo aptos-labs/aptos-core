@@ -298,14 +298,12 @@ where
                     None => {
                         let gas_amount = transaction.max_gas_amount();
                         let ranking_score = validation_result.score();
-                        let governance_role = validation_result.governance_role();
                         let mempool_status = mempool.add_txn(
                             transaction.clone(),
                             gas_amount,
                             ranking_score,
                             crsn_or_seqno,
                             timeline_state,
-                            governance_role,
                         );
                         statuses.push((transaction, (mempool_status, None)));
                     }
