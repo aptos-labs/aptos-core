@@ -57,13 +57,13 @@ jobs:
       image: ubuntu-2004:current
     resource_class: xlarge
     parameters:
-      image-name: 
+      image-name:
         type: string
-      target-image-name: 
+      target-image-name:
         type: string
     steps:
       - checkout
-      - run: 
+      - run:
           command: ./docker/<< parameters.image-name >>/build.sh
           no_output_timeout: 30m
       - aws-setup
@@ -149,4 +149,4 @@ commands:
       - aws-cli/install
       # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
       - aws-cli/setup
-      - aws-ecr/ecr-login 
+      - aws-ecr/ecr-login
