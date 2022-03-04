@@ -66,23 +66,16 @@ metadata:
   labels:
     {{- include "testnet.labels" . | nindent 4 }}
   annotations:
-    service.beta.kubernetes.io/aws-load-balancer-type: nlb
-    {{- if .Values.service.domain }}
-    external-dns.alpha.kubernetes.io/hostname: mon.{{ .Values.service.domain }}
-    {{- end }}
+    alb.ingress.kubernetes.io/healthcheck-path: /api/health
 spec:
   selector:
     {{- include "testnet.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/name: monitoring
   ports:
-  - name: grafana-http
-    port: 80
+  - port: 80
     targetPort: 3000
-  type: LoadBalancer
-  {{- with .Values.service.monitoring.loadBalancerSourceRanges }}
-  loadBalancerSourceRanges:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+  type: NodePort
+  externalTrafficPolicy: Local
 
 ---
 

@@ -30,6 +30,16 @@ spec:
             name: {{ include "testnet.fullname" . }}-faucet
             port:
               number: 80
+  - host: mon.{{ .Values.service.domain }}
+    http:
+      paths:
+      - path: /*
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "testnet.fullname" . }}-monitoring
+            port:
+              number: 80
   {{- if .Values.service.pfn.exposeApi }}
   - host: pfn.{{ .Values.service.domain }}
     http:
