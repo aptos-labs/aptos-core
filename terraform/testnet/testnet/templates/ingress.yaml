@@ -1,4 +1,4 @@
-apiVersion: networking.k8s.io/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ include "testnet.fullname" . }}
@@ -24,43 +24,67 @@ spec:
     http:
       paths:
       - path: /*
+        pathType: Prefix
         backend:
-          serviceName: {{ include "testnet.fullname" . }}-faucet
-          servicePort: 80
+          service:
+            name: {{ include "testnet.fullname" . }}-faucet
+            port:
+              number: 80
   {{- if .Values.service.pfn.exposeApi }}
   - host: pfn.{{ .Values.service.domain }}
     http:
       paths:
       - path: /*
+        pathType: Prefix
         backend:
-          serviceName: {{ include "testnet.fullname" . }}-pfn
-          servicePort: 80
+          service:
+            name: {{ include "testnet.fullname" . }}-pfn
+            port:
+              number: 80
   {{- end }}
   - http:
       paths:
       {{- if .Values.faucet.enabled }}
       - path: /mint
+        pathType: Exact
         backend:
-          serviceName: {{ include "testnet.fullname" . }}-faucet
-          servicePort: 80
+          service:
+            name: {{ include "testnet.fullname" . }}-faucet
+            port:
+              number: 80
       {{- end }}
       - path: /waypoint.txt
+        pathType: Exact
         backend:
-          serviceName: {{ include "testnet.fullname" . }}-waypoint
-          servicePort: 80
+          service:
+            name: {{ include "testnet.fullname" . }}-waypoint
+            port:
+              number: 80
       - path: /chainid.txt
+        pathType: Exact
         backend:
-          serviceName: {{ include "testnet.fullname" . }}-waypoint
-          servicePort: 80
+          service:
+            name: {{ include "testnet.fullname" . }}-waypoint
+            port:
+              number: 80
       - path: /era.txt
+        pathType: Exact
         backend:
-          serviceName: {{ include "testnet.fullname" . }}-waypoint
-          servicePort: 80
+          service:
+            name: {{ include "testnet.fullname" . }}-waypoint
+            port:
+              number: 80
       - path: /genesis.blob
+        pathType: Exact
         backend:
-          serviceName: {{ include "testnet.fullname" . }}-waypoint
-          servicePort: 80
+          service:
+            name: {{ include "testnet.fullname" . }}-waypoint
+            port:
+              number: 80
       - path: /*
+        pathType: Prefix
         backend:
-          serviceName: {{ include "testnet.fullname" . }}-api
-          servicePort: 80
+          service:
+            name: {{ include "testnet.fullname" . }}-api
+            port:
+              number: 80
