@@ -6,32 +6,32 @@ use crate::{
     waypoint::create_genesis_waypoint,
 };
 use anyhow::Result;
-use consensus_types::safety_data::SafetyData;
-use diem_config::{
+use aptos_config::{
     config::{
         DiscoveryMethod, Identity, NetworkConfig, NodeConfig, OnDiskStorageConfig,
         SafetyRulesService, SecureBackend, WaypointConfig,
     },
     network_id::NetworkId,
 };
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     Uniform,
 };
-use diem_global_constants::{
+use aptos_global_constants::{
     CONSENSUS_KEY, EXECUTION_KEY, FULLNODE_NETWORK_KEY, GENESIS_WAYPOINT, OPERATOR_ACCOUNT,
     OPERATOR_KEY, OWNER_ACCOUNT, OWNER_KEY, SAFETY_DATA, VALIDATOR_NETWORK_KEY, WAYPOINT,
 };
-use diem_management::{
+use aptos_management::{
     storage::StorageWrapper, validator_config::build_validator_config_transaction,
 };
-use diem_secure_storage::{CryptoStorage, KVStorage, OnDiskStorage, Storage};
-use diem_types::{
+use aptos_secure_storage::{CryptoStorage, KVStorage, OnDiskStorage, Storage};
+use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{ConsensusConfigV2, OnChainConsensusConfig, VMPublishingOption},
     transaction::{authenticator::AuthenticationKey, Transaction},
     waypoint::Waypoint,
 };
+use consensus_types::safety_data::SafetyData;
 use std::{
     convert::TryFrom,
     fs::File,
@@ -40,7 +40,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const DIEM_ROOT_NS: &str = "diem_root";
+const APTOS_ROOT_NS: &str = "aptos_root";
 const OPERATOR_NS: &str = "_operator";
 const OWNER_NS: &str = "_owner";
 
@@ -134,7 +134,7 @@ impl RootKeys {
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
-        // TODO use distinct keys for diem root and treasury
+        // TODO use distinct keys for aptos root and treasury
         // let root_key = Ed25519PrivateKey::generate(rng);
         // let treasury_compliance_key = Ed25519PrivateKey::generate(rng);
         let key = Ed25519PrivateKey::generate(&mut rng).to_bytes();
@@ -286,7 +286,7 @@ impl ValidatorBuilder {
             if let Some(template_fullnode_config) = config.full_node_networks.first() {
                 template_fullnode_config.listen_address.clone()
             } else {
-                diem_config::utils::get_available_port_in_multiaddr(true)
+                aptos_config::utils::get_available_port_in_multiaddr(true)
             };
         let fullnode_network = NetworkConfig {
             listen_address: fullnode_network_listen_address,
@@ -303,7 +303,7 @@ impl ValidatorBuilder {
         };
 
         let vfn_network = NetworkConfig {
-            listen_address: diem_config::utils::get_available_port_in_multiaddr(true),
+            listen_address: aptos_config::utils::get_available_port_in_multiaddr(true),
             network_id: NetworkId::Vfn,
             max_outbound_connections: 0,
             identity: Identity::from_storage(
@@ -346,7 +346,7 @@ impl ValidatorBuilder {
         // Set owner key and account address
         storage.import_private_key(OWNER_KEY, Ed25519PrivateKey::generate(&mut rng))?;
         let owner_address =
-            diem_config::utils::validator_owner_account_from_name(validator.owner().as_bytes());
+            aptos_config::utils::validator_owner_account_from_name(validator.owner().as_bytes());
         storage.set(OWNER_ACCOUNT, owner_address)?;
 
         // Set operator key and account address
@@ -381,8 +381,8 @@ impl ValidatorBuilder {
         let layout = Layout {
             owners: validators.iter().map(|v| v.owner()).collect(),
             operators: validators.iter().map(|v| v.operator()).collect(),
-            diem_root: DIEM_ROOT_NS.into(),
-            treasury_compliance: DIEM_ROOT_NS.into(),
+            aptos_root: APTOS_ROOT_NS.into(),
+            treasury_compliance: APTOS_ROOT_NS.into(),
         };
         genesis_builder.set_layout(&layout)?;
         genesis_builder.set_move_modules(move_modules)?;

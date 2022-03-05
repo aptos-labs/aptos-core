@@ -18,14 +18,14 @@ use crate::{
     write_set::WriteSet,
 };
 use anyhow::{ensure, format_err, Error, Result};
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::*,
     hash::{CryptoHash, EventAccumulatorHasher},
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
     traits::{signing_message, SigningKey},
     HashValue,
 };
-use diem_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::transaction_argument::convert_txn_args;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;

@@ -11,11 +11,11 @@ use crate::{
         TransactionWithProof,
     },
 };
-use bcs::test_helpers::assert_canonical_encode_decode;
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::{self, Ed25519PrivateKey, Ed25519Signature},
     PrivateKey, Uniform,
 };
+use bcs::test_helpers::assert_canonical_encode_decode;
 use proptest::prelude::*;
 use std::convert::TryFrom;
 

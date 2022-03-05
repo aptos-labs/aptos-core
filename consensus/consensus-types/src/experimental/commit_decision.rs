@@ -3,7 +3,7 @@
 
 use crate::common::Round;
 use anyhow::Context;
-use diem_types::{ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier};
+use aptos_types::{ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 

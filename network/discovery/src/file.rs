@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::DiscoveryError;
-use diem_config::config::PeerSet;
-use diem_time_service::{Interval, TimeService, TimeServiceTrait};
+use aptos_config::config::PeerSet;
+use aptos_time_service::{Interval, TimeService, TimeServiceTrait};
 use futures::Stream;
 use std::{
     path::{Path, PathBuf},
@@ -54,13 +54,13 @@ fn load_file(path: &Path) -> Result<PeerSet, DiscoveryError> {
 mod tests {
     use super::*;
     use crate::DiscoveryChangeListener;
-    use channel::Receiver;
-    use diem_config::{
+    use aptos_config::{
         config::{Peer, PeerRole},
         network_id::NetworkContext,
     };
-    use diem_temppath::TempPath;
-    use diem_types::{network_address::NetworkAddress, PeerId};
+    use aptos_temppath::TempPath;
+    use aptos_types::{network_address::NetworkAddress, PeerId};
+    use channel::Receiver;
     use futures::StreamExt;
     use network::connectivity_manager::{ConnectivityRequest, DiscoverySource};
     use std::{collections::HashSet, str::FromStr, sync::Arc};

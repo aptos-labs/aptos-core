@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_types::{
+use aptos_types::{
     epoch_change::Verifier, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
 };
 use executor_types::ExecutedTrees;
@@ -82,20 +82,20 @@ pub(crate) mod test_utils {
 
     use futures::channel::mpsc;
 
-    use channel::{diem_channel, message_queues::QueueStyle};
-    use diem_config::{
+    use aptos_config::{
         config::{NodeConfig, RoleType},
         network_id::NetworkId,
     };
-    use diem_infallible::RwLock;
-    use diem_types::{
+    use aptos_infallible::RwLock;
+    use aptos_types::{
         move_resource::MoveStorage,
         on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
         transaction::{Transaction, WriteSetPayload},
         waypoint::Waypoint,
     };
-    use diem_vm::DiemVM;
-    use diemdb::DiemDB;
+    use aptos_vm::DiemVM;
+    use aptosdb::DiemDB;
+    use channel::{aptos_channel, message_queues::QueueStyle};
     use event_notifications::{EventNotificationSender, EventSubscriptionService};
     use executor::chunk_executor::ChunkExecutor;
     use executor_test_helpers::bootstrap_genesis;
@@ -155,7 +155,7 @@ pub(crate) mod test_utils {
         let (genesis, _) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
 
         // Create test diem database
-        let db_path = diem_temppath::TempPath::new();
+        let db_path = aptos_temppath::TempPath::new();
         db_path.create_as_dir().unwrap();
         let (db, db_rw) = DbReaderWriter::wrap(DiemDB::new_for_test(db_path.path()));
 
@@ -182,8 +182,8 @@ pub(crate) mod test_utils {
         let initial_state = executor_proxy.get_local_storage_state().unwrap();
 
         // Setup network senders
-        let (network_reqs_tx, _network_reqs_rx) = diem_channel::new(QueueStyle::FIFO, 8, None);
-        let (connection_reqs_tx, _) = diem_channel::new(QueueStyle::FIFO, 8, None);
+        let (network_reqs_tx, _network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+        let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let network_sender = StateSyncSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),

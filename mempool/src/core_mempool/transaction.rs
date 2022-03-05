@@ -1,8 +1,8 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_crypto::HashValue;
-use diem_types::{
+use aptos_crypto::HashValue;
+use aptos_types::{
     account_address::AccountAddress, account_config::AccountSequenceInfo,
     transaction::SignedTransaction,
 };

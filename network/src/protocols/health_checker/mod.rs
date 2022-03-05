@@ -34,13 +34,13 @@ use crate::{
     },
     ProtocolId,
 };
+use aptos_config::network_id::{NetworkContext, PeerNetworkId};
+use aptos_logger::prelude::*;
+use aptos_time_service::{TimeService, TimeServiceTrait};
+use aptos_types::PeerId;
 use async_trait::async_trait;
 use bytes::Bytes;
-use channel::{diem_channel, message_queues::QueueStyle};
-use diem_config::network_id::{NetworkContext, PeerNetworkId};
-use diem_logger::prelude::*;
-use diem_time_service::{TimeService, TimeServiceTrait};
-use diem_types::PeerId;
+use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{
     channel::oneshot,
     stream::{FuturesUnordered, StreamExt},
@@ -80,7 +80,7 @@ pub struct HealthCheckerNetworkSender {
 pub fn network_endpoint_config() -> AppConfig {
     AppConfig::p2p(
         [ProtocolId::HealthCheckerRpc],
-        diem_channel::Config::new(NETWORK_CHANNEL_SIZE)
+        aptos_channel::Config::new(NETWORK_CHANNEL_SIZE)
             .queue_style(QueueStyle::LIFO)
             .counters(&counters::PENDING_HEALTH_CHECKER_NETWORK_EVENTS),
     )

@@ -3,14 +3,14 @@
 
 use super::Test;
 use crate::{CoreContext, Result, TestReport};
-use diem_rest_client::Client as RestClient;
-use diem_sdk::{
+use aptos_rest_client::Client as RestClient;
+use aptos_sdk::{
     crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform},
     move_types::account_address::AccountAddress,
     transaction_builder::TransactionFactory,
     types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey, LocalAccount},
 };
-use diem_transaction_builder::experimental_stdlib;
+use aptos_transaction_builder::experimental_stdlib;
 use rand::{rngs::StdRng, SeedableRng};
 use reqwest::Url;
 

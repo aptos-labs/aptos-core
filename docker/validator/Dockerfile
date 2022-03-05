@@ -30,7 +30,7 @@ RUN addgroup --system --gid 6180 diem && adduser --system --ingroup diem --no-cr
 
 RUN mkdir -p /opt/diem/bin /opt/diem/etc
 COPY docker/install-tools.sh /root
-COPY --from=builder /diem/target/release/diem-node /opt/diem/bin
+COPY --from=builder /diem/target/release/aptos-node /opt/diem/bin
 COPY --from=builder /diem/target/release/db-backup /opt/diem/bin
 COPY --from=builder /diem/target/release/db-bootstrapper /opt/diem/bin
 COPY --from=builder /diem/target/release/db-restore /opt/diem/bin

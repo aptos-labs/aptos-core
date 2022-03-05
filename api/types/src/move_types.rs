@@ -4,7 +4,7 @@
 use crate::{Address, Bytecode};
 
 use anyhow::{bail, format_err};
-use diem_types::{account_config::CORE_CODE_ADDRESS, event::EventKey, transaction::Module};
+use aptos_types::{account_config::CORE_CODE_ADDRESS, event::EventKey, transaction::Module};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
@@ -968,7 +968,7 @@ mod tests {
         U64,
     };
 
-    use diem_types::account_address::AccountAddress;
+    use aptos_types::account_address::AccountAddress;
     use move_binary_format::file_format::AbilitySet;
     use move_core_types::{
         identifier::Identifier,

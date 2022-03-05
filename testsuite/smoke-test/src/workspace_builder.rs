@@ -5,22 +5,22 @@
 //!
 //! This utility is to only be used inside of smoke test.
 
-use diem_logger::prelude::*;
+use aptos_logger::prelude::*;
 use once_cell::sync::Lazy;
 use std::{env, path::PathBuf, process::Command};
 
 const WORKSPACE_BUILD_ERROR_MSG: &str = r#"
     Unable to build all workspace binaries. Cannot continue running tests.
 
-    Try running 'cargo build --all --bins --exclude diem-node' yourself.
+    Try running 'cargo build --all --bins --exclude aptos-node' yourself.
 "#;
 
 // Global flag indicating if all binaries in the workspace have been built.
 static WORKSPACE_BUILT: Lazy<bool> = Lazy::new(|| {
     info!("Building project binaries");
     let args = if cfg!(debug_assertions) {
-        // use get_diem_node_with_failpoints to get diem-node binary
-        vec!["build", "--all", "--bins", "--exclude", "diem-node"]
+        // use get_aptos_node_with_failpoints to get aptos-node binary
+        vec!["build", "--all", "--bins", "--exclude", "aptos-node"]
     } else {
         vec!["build", "--all", "--bins", "--release"]
     };

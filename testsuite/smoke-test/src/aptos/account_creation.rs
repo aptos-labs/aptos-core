@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_transaction_builder::aptos_stdlib;
-use diem_types::transaction::authenticator::AuthenticationKeyPreimage;
+use aptos_transaction_builder::aptos_stdlib;
+use aptos_types::transaction::authenticator::AuthenticationKeyPreimage;
 use forge::{AptosContext, AptosTest, Result, Test};
 
 pub struct AccountCreation;

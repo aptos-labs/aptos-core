@@ -5,15 +5,15 @@ use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, str::FromStr};
 
 #[derive(Clone, Debug, PartialEq, Copy)]
-pub struct HashValue(diem_crypto::hash::HashValue);
+pub struct HashValue(aptos_crypto::hash::HashValue);
 
-impl From<diem_crypto::hash::HashValue> for HashValue {
-    fn from(val: diem_crypto::hash::HashValue) -> Self {
+impl From<aptos_crypto::hash::HashValue> for HashValue {
+    fn from(val: aptos_crypto::hash::HashValue) -> Self {
         Self(val)
     }
 }
 
-impl From<HashValue> for diem_crypto::hash::HashValue {
+impl From<HashValue> for aptos_crypto::hash::HashValue {
     fn from(val: HashValue) -> Self {
         val.0
     }
@@ -24,9 +24,9 @@ impl FromStr for HashValue {
 
     fn from_str(s: &str) -> anyhow::Result<Self, anyhow::Error> {
         if let Some(hex) = s.strip_prefix("0x") {
-            Ok(hex.parse::<diem_crypto::hash::HashValue>()?.into())
+            Ok(hex.parse::<aptos_crypto::hash::HashValue>()?.into())
         } else {
-            Ok(s.parse::<diem_crypto::hash::HashValue>()?.into())
+            Ok(s.parse::<aptos_crypto::hash::HashValue>()?.into())
         }
     }
 }

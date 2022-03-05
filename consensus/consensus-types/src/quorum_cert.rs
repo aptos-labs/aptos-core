@@ -3,8 +3,8 @@
 
 use crate::vote_data::VoteData;
 use anyhow::{ensure, Context};
-use diem_crypto::{hash::CryptoHash, HashValue};
-use diem_types::{
+use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_verifier::ValidatorVerifier,

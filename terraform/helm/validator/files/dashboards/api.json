@@ -98,7 +98,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum by (status) (rate(diem_api_response_status_count{role=~\"$role\", owner=~\"$owner\", status=~\"$status\"}[$interval]))",
+          "expr": "sum by (status) (rate(aptos_api_response_status_count{role=~\"$role\", owner=~\"$owner\", status=~\"$status\"}[$interval]))",
           "interval": "",
           "legendFormat": "{{status}}",
           "refId": "A"
@@ -180,7 +180,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum by (operation_id) (rate(diem_api_requests_count{role=~\"$role\", owner=~\"$owner\", operation_id=~\"$endpoint\", status=~\"$status\"}[$interval]))",
+          "expr": "sum by (operation_id) (rate(aptos_api_requests_count{role=~\"$role\", owner=~\"$owner\", operation_id=~\"$endpoint\", status=~\"$status\"}[$interval]))",
           "instant": false,
           "interval": "",
           "legendFormat": "{{operation_id}}",
@@ -263,7 +263,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "histogram_quantile(0.90, sum by (le) (rate(diem_api_requests_bucket{operation_id=~\"$endpoint\"}[$interval])))",
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(aptos_api_requests_bucket{operation_id=~\"$endpoint\"}[$interval])))",
           "format": "time_series",
           "interval": "",
           "legendFormat": "p90",
@@ -271,7 +271,7 @@
         },
         {
           "exemplar": true,
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(diem_api_requests_bucket{operation_id=~\"$endpoint\"}[$interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(aptos_api_requests_bucket{operation_id=~\"$endpoint\"}[$interval])))",
           "hide": false,
           "interval": "",
           "legendFormat": "p99",
@@ -279,7 +279,7 @@
         },
         {
           "exemplar": true,
-          "expr": "histogram_quantile(1, sum by (le) (rate(diem_api_requests_bucket{operation_id=~\"$endpoint\"}[$interval])))",
+          "expr": "histogram_quantile(1, sum by (le) (rate(aptos_api_requests_bucket{operation_id=~\"$endpoint\"}[$interval])))",
           "hide": false,
           "interval": "",
           "legendFormat": "p100",
@@ -362,7 +362,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum by (operation_id) (rate(diem_api_requests_count{role=~\"$role\", owner=~\"$owner\", operation_id=~\"$endpoint\", status=\"500\"}[$interval]))",
+          "expr": "sum by (operation_id) (rate(aptos_api_requests_count{role=~\"$role\", owner=~\"$owner\", operation_id=~\"$endpoint\", status=\"500\"}[$interval]))",
           "interval": "",
           "legendFormat": "",
           "refId": "A"

@@ -5,9 +5,9 @@ use crate::{
     rest_client::RestClient,
     validator_config::{fullnode_addresses, validator_addresses, DecodedValidatorConfig},
 };
-use diem_crypto::ed25519::Ed25519PublicKey;
-use diem_management::{config::ConfigPath, error::Error, secure_backend::ValidatorBackend};
-use diem_types::{
+use aptos_crypto::ed25519::Ed25519PublicKey;
+use aptos_management::{config::ConfigPath, error::Error, secure_backend::ValidatorBackend};
+use aptos_types::{
     account_address::AccountAddress, network_address::NetworkAddress, validator_info::ValidatorInfo,
 };
 use serde::Serialize;

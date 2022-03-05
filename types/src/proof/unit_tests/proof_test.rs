@@ -25,7 +25,7 @@ use crate::{
     vm_status::KeptVMStatus,
     write_set::WriteSet,
 };
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::Ed25519PrivateKey,
     hash::{
         CryptoHash, TestOnlyHash, TestOnlyHasher, ACCUMULATOR_PLACEHOLDER_HASH, GENESIS_BLOCK_ID,

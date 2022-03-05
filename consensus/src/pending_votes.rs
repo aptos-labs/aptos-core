@@ -7,15 +7,15 @@
 //! when enough votes (or timeout votes) have been observed.
 //! Votes are automatically dropped when the structure goes out of scope.
 
+use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_logger::prelude::*;
+use aptos_types::{
+    ledger_info::LedgerInfoWithSignatures,
+    validator_verifier::{ValidatorVerifier, VerifyError},
+};
 use consensus_types::{
     common::Author, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate,
     timeout_certificate::TimeoutCertificate, vote::Vote,
-};
-use diem_crypto::{hash::CryptoHash, HashValue};
-use diem_logger::prelude::*;
-use diem_types::{
-    ledger_info::LedgerInfoWithSignatures,
-    validator_verifier::{ValidatorVerifier, VerifyError},
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -262,13 +262,13 @@ impl fmt::Display for PendingVotes {
 #[cfg(test)]
 mod tests {
     use super::{PendingVotes, VoteReceptionResult};
-    use consensus_types::{
-        block::block_test_utils::certificate_for_genesis, vote::Vote, vote_data::VoteData,
-    };
-    use diem_crypto::HashValue;
-    use diem_types::{
+    use aptos_crypto::HashValue;
+    use aptos_types::{
         block_info::BlockInfo, ledger_info::LedgerInfo,
         validator_verifier::random_validator_verifier,
+    };
+    use consensus_types::{
+        block::block_test_utils::certificate_for_genesis, vote::Vote, vote_data::VoteData,
     };
 
     /// Creates a random ledger info for epoch 1 and round 1.
@@ -288,7 +288,7 @@ mod tests {
     #[test]
     /// Verify that votes are properly aggregated to QC based on their LedgerInfo digest
     fn test_qc_aggregation() {
-        ::diem_logger::Logger::init_for_testing();
+        ::aptos_logger::Logger::init_for_testing();
 
         // set up 4 validators
         let (signers, validator) = random_validator_verifier(4, Some(2), false);
@@ -354,7 +354,7 @@ mod tests {
     #[test]
     /// Verify that votes are properly aggregated to TC based on their rounds
     fn test_tc_aggregation() {
-        ::diem_logger::Logger::init_for_testing();
+        ::aptos_logger::Logger::init_for_testing();
 
         // set up 4 validators
         let (signers, validator) = random_validator_verifier(4, Some(2), false);
@@ -405,7 +405,7 @@ mod tests {
 
     #[test]
     fn test_2chain_tc_aggregation() {
-        ::diem_logger::Logger::init_for_testing();
+        ::aptos_logger::Logger::init_for_testing();
 
         // set up 4 validators
         let (signers, validator) = random_validator_verifier(4, Some(2), false);

@@ -4,12 +4,12 @@
 use crate::serializer::{
     ExecutionCorrectnessInput, SerializerClient, SerializerService, TSerializerClient,
 };
-use diem_crypto::ed25519::Ed25519PrivateKey;
-use diem_infallible::Mutex;
-use diem_logger::warn;
-use diem_secure_net::{NetworkClient, NetworkServer};
+use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_infallible::Mutex;
+use aptos_logger::warn;
+use aptos_secure_net::{NetworkClient, NetworkServer};
 
-use diem_vm::DiemVM;
+use aptos_vm::DiemVM;
 use executor::block_executor::BlockExecutor;
 use executor_types::Error;
 use std::net::SocketAddr;

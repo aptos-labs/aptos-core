@@ -2,23 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{metrics_safety_rules::MetricsSafetyRules, test_utils::MockStorage};
-use consensus_types::{
-    block::block_test_utils::certificate_for_genesis, common::Round, executed_block::ExecutedBlock,
-    quorum_cert::QuorumCert, vote_proposal::MaybeSignedVoteProposal,
-};
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
     hash::ACCUMULATOR_PLACEHOLDER_HASH,
     HashValue, Uniform,
 };
-use diem_infallible::Mutex;
-use diem_secure_storage::Storage;
-use diem_types::{
+use aptos_infallible::Mutex;
+use aptos_secure_storage::Storage;
+use aptos_types::{
     account_address::AccountAddress,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_signer::ValidatorSigner,
     validator_verifier::random_validator_verifier,
     waypoint::Waypoint,
+};
+use consensus_types::{
+    block::block_test_utils::certificate_for_genesis, common::Round, executed_block::ExecutedBlock,
+    quorum_cert::QuorumCert, vote_proposal::MaybeSignedVoteProposal,
 };
 use executor_types::StateComputeResult;
 use safety_rules::{
@@ -39,7 +39,7 @@ pub fn prepare_safety_rules() -> (Arc<Mutex<MetricsSafetyRules>>, Vec<ValidatorS
         Waypoint::new_epoch_boundary(&LedgerInfo::mock_genesis(Some(validator_set))).unwrap();
 
     let safety_storage = PersistentSafetyStorage::initialize(
-        Storage::from(diem_secure_storage::InMemoryStorage::new()),
+        Storage::from(aptos_secure_storage::InMemoryStorage::new()),
         signer.author(),
         signer.private_key().clone(),
         Ed25519PrivateKey::generate_for_testing(),

@@ -39,7 +39,7 @@ data "aws_iam_policy_document" "backup-assume-role" {
     condition {
       test     = "StringEquals"
       variable = "${local.oidc_provider}:sub"
-      values   = ["system:serviceaccount:default:${var.helm_release_name != "" ? var.helm_release_name : local.workspace_name}-diem-validator-backup"]
+      values   = ["system:serviceaccount:default:${var.helm_release_name != "" ? var.helm_release_name : local.workspace_name}-aptos-validator-backup"]
     }
 
     condition {

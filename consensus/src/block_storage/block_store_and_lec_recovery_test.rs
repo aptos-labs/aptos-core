@@ -8,10 +8,10 @@ use crate::{
     test_utils::{EmptyStorage, MockTransactionManager, TreeInserter},
     util::mock_time_service::SimulatedTimeService,
 };
+use aptos_config::config::NodeConfig;
+use aptos_crypto::{ed25519::Ed25519PrivateKey, Uniform};
+use aptos_types::validator_signer::ValidatorSigner;
 use consensus_types::{block::Block, quorum_cert::QuorumCert};
-use diem_config::config::NodeConfig;
-use diem_crypto::{ed25519::Ed25519PrivateKey, Uniform};
-use diem_types::validator_signer::ValidatorSigner;
 use execution_correctness::{ExecutionCorrectness, ExecutionCorrectnessManager};
 use executor::components::apply_chunk_output::IntoLedgerView;
 use executor_test_helpers::start_storage_service;

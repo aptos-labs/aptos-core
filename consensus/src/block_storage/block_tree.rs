@@ -8,13 +8,13 @@ use crate::{
     persistent_liveness_storage::PersistentLivenessStorage,
 };
 use anyhow::bail;
+use aptos_crypto::HashValue;
+use aptos_logger::prelude::*;
+use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures};
 use consensus_types::{
     executed_block::ExecutedBlock, quorum_cert::QuorumCert,
     timeout_2chain::TwoChainTimeoutCertificate, timeout_certificate::TimeoutCertificate,
 };
-use diem_crypto::HashValue;
-use diem_logger::prelude::*;
-use diem_types::{block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures};
 use mirai_annotations::{checked_verify_eq, precondition};
 use std::{
     collections::{vec_deque::VecDeque, HashMap, HashSet},

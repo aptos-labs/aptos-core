@@ -12,7 +12,7 @@
 //! while ignored during serialization.
 //!
 
-use diem_crypto::PrivateKey;
+use aptos_crypto::PrivateKey;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// ConfigKey places a clonable wrapper around PrivateKeys for config purposes only. The only time
@@ -36,7 +36,7 @@ impl<T: DeserializeOwned + PrivateKey + Serialize> ConfigKey<T> {
     }
 
     pub fn public_key(&self) -> T::PublicKeyMaterial {
-        diem_crypto::PrivateKey::public_key(&self.key)
+        aptos_crypto::PrivateKey::public_key(&self.key)
     }
 }
 
@@ -47,10 +47,10 @@ impl<T: DeserializeOwned + PrivateKey + Serialize> Clone for ConfigKey<T> {
 }
 
 #[cfg(test)]
-impl<T: PrivateKey + Serialize + diem_crypto::Uniform> Default for ConfigKey<T> {
+impl<T: PrivateKey + Serialize + aptos_crypto::Uniform> Default for ConfigKey<T> {
     fn default() -> Self {
         Self {
-            key: diem_crypto::Uniform::generate_for_testing(),
+            key: aptos_crypto::Uniform::generate_for_testing(),
         }
     }
 }

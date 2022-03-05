@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_config::{
+use aptos_config::{
     config::{ExecutionCorrectnessService, PersistableConfig, RemoteExecutionService},
     utils,
 };
@@ -17,7 +17,7 @@ fn test_rest() {
     config.execution.service =
         ExecutionCorrectnessService::Process(RemoteExecutionService { server_address });
 
-    let config_path = diem_temppath::TempPath::new();
+    let config_path = aptos_temppath::TempPath::new();
     config_path.create_as_file().unwrap();
     config.save_config(config_path.path()).unwrap();
 

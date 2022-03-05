@@ -1,5 +1,5 @@
 [package]
-name = "diem-jellyfish-merkle"
+name = "aptos-jellyfish-merkle"
 version = "0.1.0"
 authors = ["Diem Association <opensource@diem.com>"]
 description = "Diem jellyfish merkle"
@@ -24,12 +24,12 @@ serde = { version = "1.0.124", features = ["derive"] }
 thiserror = "1.0.24"
 
 bcs = "0.1.2"
-diem-crypto = { path = "../../crates/diem-crypto" }
-diem-crypto-derive = { path = "../../crates/diem-crypto-derive" }
-diem-infallible = { path = "../../crates/diem-infallible" }
-diem-metrics = { path = "../../crates/diem-metrics" }
-diem-types = { path = "../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-crypto-derive = { path = "../../crates/aptos-crypto-derive" }
+aptos-infallible = { path = "../../crates/aptos-infallible" }
+aptos-metrics = { path = "../../crates/aptos-metrics" }
+aptos-types = { path = "../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 storage-interface = { path = "../storage-interface" }
 
 [dev-dependencies]
@@ -37,9 +37,9 @@ rand = "0.8.3"
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
 
-diem-crypto = { path = "../../crates/diem-crypto", features = ["fuzzing"] }
-diem-types = { path = "../../types", features = ["fuzzing"] }
+aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
+aptos-types = { path = "../../types", features = ["fuzzing"] }
 
 [features]
 default = []
-fuzzing = ["proptest", "rand", "proptest-derive", "diem-crypto/fuzzing", "diem-types/fuzzing"]
+fuzzing = ["proptest", "rand", "proptest-derive", "aptos-crypto/fuzzing", "aptos-types/fuzzing"]

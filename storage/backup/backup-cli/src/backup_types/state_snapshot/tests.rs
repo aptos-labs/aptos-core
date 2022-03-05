@@ -13,9 +13,9 @@ use crate::{
         ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, RocksdbOpt, TrustedWaypointOpt,
     },
 };
-use diem_temppath::TempPath;
-use diem_types::transaction::PRE_GENESIS_VERSION;
-use diemdb::DiemDB;
+use aptos_temppath::TempPath;
+use aptos_types::transaction::PRE_GENESIS_VERSION;
+use aptosdb::DiemDB;
 use std::{convert::TryInto, sync::Arc};
 use storage_interface::DbReader;
 use tokio::time::Duration;

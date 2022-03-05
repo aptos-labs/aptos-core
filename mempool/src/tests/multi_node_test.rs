@@ -12,11 +12,11 @@ use crate::{
         },
     },
 };
-use diem_config::{
+use aptos_config::{
     config::{NodeConfig, PeerRole},
     network_id::{NetworkId, PeerNetworkId},
 };
-use diem_types::{transaction::SignedTransaction, PeerId};
+use aptos_types::{transaction::SignedTransaction, PeerId};
 use netcore::transport::ConnectionOrigin;
 use network::{
     peer_manager::{PeerManagerNotification, PeerManagerRequest},

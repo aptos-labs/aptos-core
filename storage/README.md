@@ -86,7 +86,7 @@ Patricia tree.
 ```
     storage
           └── accumulator      # Implementation of Merkle accumulator.
-          └── diemdb          # Implementation of DiemDB.
+          └── aptosdb          # Implementation of DiemDB.
           └── schemadb         # Schematized wrapper on top of RocksDB.
           └── scratchpad       # In-memory representation of Diem core data structures used by execution.
           └── jellyfish-merkle # Implementation of sparse Merkle tree.

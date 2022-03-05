@@ -12,7 +12,7 @@ pub mod validator_config;
 pub mod waypoint;
 
 pub mod constants {
-    use diem_types::account_config::XUS_NAME;
+    use aptos_types::account_config::XUS_NAME;
     pub const COMMON_NS: &str = "common";
     pub const LAYOUT: &str = "layout";
     pub const VALIDATOR_CONFIG: &str = "validator_config";
@@ -52,7 +52,7 @@ macro_rules! execute_command_await {
     };
 }
 
-use diem_crypto::ed25519::Ed25519PublicKey;
+use aptos_crypto::ed25519::Ed25519PublicKey;
 use std::{convert::TryInto, fs, path::Path};
 
 /// Reads a given ed25519 public key from file. Attempts to read the key using
@@ -68,6 +68,6 @@ pub fn read_key_from_file(path: &Path) -> Result<Ed25519PublicKey, String> {
         key_data
             .as_slice()
             .try_into()
-            .map_err(|e: diem_crypto::CryptoMaterialError| e.to_string())
+            .map_err(|e: aptos_crypto::CryptoMaterialError| e.to_string())
     }
 }

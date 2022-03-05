@@ -3,10 +3,10 @@
 
 #![forbid(unsafe_code)]
 
-use diem_config::network_id::NetworkContext;
-use diem_crypto::{test_utils::TEST_SEED, x25519, Uniform as _};
-use diem_logger::prelude::*;
-use diem_types::network_address::NetworkAddress;
+use aptos_config::network_id::NetworkContext;
+use aptos_crypto::{test_utils::TEST_SEED, x25519, Uniform as _};
+use aptos_logger::prelude::*;
+use aptos_types::network_address::NetworkAddress;
 use futures::{
     future::Future,
     io::{AsyncRead, AsyncWrite},
@@ -83,7 +83,7 @@ pub fn build_memsocket_noise_transport() -> impl Transport<Output = NoiseStream<
         let mut rng: StdRng = SeedableRng::from_seed(TEST_SEED);
         let private = x25519::PrivateKey::generate(&mut rng);
         let public = private.public_key();
-        let peer_id = diem_types::account_address::from_identity_public_key(public);
+        let peer_id = aptos_types::account_address::from_identity_public_key(public);
         let noise_config = Arc::new(NoiseUpgrader::new(
             NetworkContext::mock_with_peer_id(peer_id),
             private,
@@ -104,7 +104,7 @@ pub fn build_tcp_noise_transport() -> impl Transport<Output = NoiseStream<TcpSoc
         let mut rng: StdRng = SeedableRng::from_seed(TEST_SEED);
         let private = x25519::PrivateKey::generate(&mut rng);
         let public = private.public_key();
-        let peer_id = diem_types::account_address::from_identity_public_key(public);
+        let peer_id = aptos_types::account_address::from_identity_public_key(public);
         let noise_config = Arc::new(NoiseUpgrader::new(
             NetworkContext::mock_with_peer_id(peer_id),
             private,

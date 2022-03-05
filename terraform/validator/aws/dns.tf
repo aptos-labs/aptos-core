@@ -16,7 +16,7 @@ locals {
 data "kubernetes_service" "validator-lb" {
   count = var.zone_id != "" ? 1 : 0
   metadata {
-    name = "${local.workspace_name}-diem-validator-validator-lb"
+    name = "${local.workspace_name}-aptos-validator-validator-lb"
   }
   depends_on = [time_sleep.lb_creation]
 }
@@ -24,7 +24,7 @@ data "kubernetes_service" "validator-lb" {
 data "kubernetes_service" "fullnode-lb" {
   count = var.zone_id != "" ? 1 : 0
   metadata {
-    name = "${local.workspace_name}-diem-validator-fullnode-lb"
+    name = "${local.workspace_name}-aptos-validator-fullnode-lb"
   }
   depends_on = [time_sleep.lb_creation]
 }

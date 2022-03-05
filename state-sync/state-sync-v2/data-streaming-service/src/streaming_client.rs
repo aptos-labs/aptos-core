@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{data_notification::NotificationId, data_stream::DataStreamListener, error::Error};
+use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use async_trait::async_trait;
-use diem_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use futures::{
     channel::{mpsc, oneshot},
     stream::FusedStream,

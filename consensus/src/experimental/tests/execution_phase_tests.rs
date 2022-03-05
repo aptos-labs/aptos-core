@@ -3,13 +3,13 @@
 
 use std::sync::Arc;
 
+use aptos_crypto::HashValue;
+use aptos_types::{ledger_info::LedgerInfo, validator_verifier::random_validator_verifier};
 use consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     executed_block::ExecutedBlock,
     quorum_cert::QuorumCert,
 };
-use diem_crypto::HashValue;
-use diem_types::{ledger_info::LedgerInfo, validator_verifier::random_validator_verifier};
 use executor_types::{Error, StateComputeResult};
 
 use crate::{

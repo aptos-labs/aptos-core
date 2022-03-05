@@ -17,9 +17,9 @@ name = "accumulator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "diem-crypto",
- "diem-types",
- "diem-workspace-hack",
+ "aptos-crypto",
+ "aptos-types",
+ "aptos-workspace-hack",
  "mirai-annotations",
  "proptest",
  "rand 0.8.4",
@@ -146,19 +146,1152 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-api"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-api-types",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-genesis-tool",
+ "aptos-global-constants",
+ "aptos-logger",
+ "aptos-mempool",
+ "aptos-metrics",
+ "aptos-sdk",
+ "aptos-secure-storage",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "aptosdb",
+ "bcs",
+ "bytes",
+ "diem-framework-releases",
+ "executor",
+ "executor-types",
+ "fail",
+ "futures",
+ "hex",
+ "hyper",
+ "mempool-notifications",
+ "move-core-types",
+ "move-resource-viewer",
+ "once_cell",
+ "percent-encoding",
+ "rand 0.8.4",
+ "reqwest",
+ "serde 1.0.130",
+ "serde_json",
+ "storage-interface",
+ "tokio",
+ "vm-validator",
+ "warp",
+]
+
+[[package]]
+name = "aptos-api-types"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-transaction-builder",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "bcs",
+ "hex",
+ "move-binary-format",
+ "move-core-types",
+ "move-resource-viewer",
+ "serde 1.0.130",
+ "serde_json",
+ "warp",
+]
+
+[[package]]
+name = "aptos-bitvec"
+version = "0.1.0"
+dependencies = [
+ "aptos-workspace-hack",
+ "bcs",
+ "proptest",
+ "proptest-derive",
+ "serde 1.0.130",
+ "serde_bytes",
+]
+
+[[package]]
+name = "aptos-config"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-global-constants",
+ "aptos-logger",
+ "aptos-secure-storage",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "bcs",
+ "get_if_addrs",
+ "log",
+ "mirai-annotations",
+ "rand 0.8.4",
+ "serde 1.0.130",
+ "serde_yaml",
+ "short-hex-str",
+ "thiserror",
+]
+
+[[package]]
+name = "aptos-crypto"
+version = "0.0.3"
+dependencies = [
+ "aes-gcm",
+ "anyhow",
+ "aptos-crypto-derive",
+ "aptos-workspace-hack",
+ "bcs",
+ "bitvec",
+ "byteorder",
+ "bytes",
+ "criterion",
+ "curve25519-dalek-fiat",
+ "digest 0.9.0",
+ "ed25519-dalek-fiat",
+ "hex",
+ "hkdf",
+ "mirai-annotations",
+ "once_cell",
+ "proptest",
+ "proptest-derive",
+ "rand 0.8.4",
+ "rand_core 0.6.2",
+ "ripemd160",
+ "serde 1.0.130",
+ "serde-name",
+ "serde_bytes",
+ "serde_json",
+ "sha2",
+ "sha3",
+ "static_assertions",
+ "thiserror",
+ "tiny-keccak",
+ "trybuild",
+ "x25519-dalek-fiat",
+]
+
+[[package]]
+name = "aptos-crypto-derive"
+version = "0.0.3"
+dependencies = [
+ "anyhow",
+ "aptos-workspace-hack",
+ "proc-macro2 1.0.28",
+ "quote 1.0.9",
+ "syn 1.0.74",
+]
+
+[[package]]
+name = "aptos-data-client"
+version = "0.1.0"
+dependencies = [
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-id-generator",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics",
+ "aptos-time-service",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "async-trait",
+ "bcs",
+ "channel",
+ "claim",
+ "futures",
+ "itertools 0.10.1",
+ "maplit",
+ "network",
+ "rand 0.8.4",
+ "serde 1.0.130",
+ "storage-service-client",
+ "storage-service-server",
+ "storage-service-types",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "aptos-documentation-tool"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-workspace-hack",
+ "once_cell",
+ "regex",
+ "serde 1.0.130",
+ "serde-generate",
+ "serde-reflection",
+ "serde_yaml",
+ "structopt",
+ "tempfile",
+]
+
+[[package]]
+name = "aptos-e2e-tests-replay"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "bcs",
+ "diem-framework",
+ "language-e2e-tests",
+ "move-binary-format",
+ "move-core-types",
+ "move-model",
+ "move-stackless-bytecode-interpreter",
+ "move-vm-runtime",
+ "move-vm-types",
+ "structopt",
+ "walkdir",
+]
+
+[[package]]
+name = "aptos-faucet"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-rest-client",
+ "aptos-sdk",
+ "aptos-workspace-hack",
+ "bcs",
+ "bytes",
+ "futures",
+ "generate-key",
+ "hex",
+ "rand 0.8.4",
+ "reqwest",
+ "serde 1.0.130",
+ "serde_json",
+ "structopt",
+ "tempfile",
+ "tokio",
+ "url",
+ "warp",
+]
+
+[[package]]
 name = "aptos-framework-releases"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-crypto",
+ "aptos-types",
+ "aptos-workspace-hack",
  "bcs",
- "diem-crypto",
- "diem-types",
- "diem-workspace-hack",
  "framework-releases",
  "include_dir",
  "move-binary-format",
  "move-command-line-common",
  "once_cell",
+]
+
+[[package]]
+name = "aptos-fuzz"
+version = "0.1.0"
+dependencies = [
+ "aptos-fuzzer",
+ "aptos-workspace-hack",
+ "libfuzzer-sys",
+ "once_cell",
+]
+
+[[package]]
+name = "aptos-fuzzer"
+version = "0.1.0"
+dependencies = [
+ "accumulator",
+ "anyhow",
+ "aptos-crypto",
+ "aptos-jellyfish-merkle",
+ "aptos-mempool",
+ "aptos-proptest-helpers",
+ "aptos-types",
+ "aptos-vault-client",
+ "aptos-workspace-hack",
+ "aptosdb",
+ "bcs",
+ "byteorder",
+ "consensus",
+ "consensus-types",
+ "datatest-stable",
+ "executor",
+ "executor-types",
+ "hex",
+ "language-e2e-tests",
+ "move-binary-format",
+ "move-core-types",
+ "move-vm-types",
+ "network",
+ "once_cell",
+ "proptest",
+ "proptest-derive",
+ "rand 0.8.4",
+ "rusty-fork",
+ "safety-rules",
+ "scratchpad",
+ "serde_json",
+ "sha-1 0.9.4",
+ "state-sync-v1",
+ "stats_alloc",
+ "storage-interface",
+ "structopt",
+ "ureq",
+]
+
+[[package]]
+name = "aptos-genesis-tool"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-global-constants",
+ "aptos-management",
+ "aptos-secure-storage",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "aptosdb",
+ "bcs",
+ "consensus-types",
+ "diem-framework-releases",
+ "executor",
+ "generate-key",
+ "rand 0.8.4",
+ "serde 1.0.130",
+ "storage-interface",
+ "structopt",
+ "thiserror",
+ "toml",
+ "vm-genesis",
+]
+
+[[package]]
+name = "aptos-github-client"
+version = "0.1.0"
+dependencies = [
+ "aptos-workspace-hack",
+ "base64",
+ "proxy",
+ "serde 1.0.130",
+ "serde_json",
+ "thiserror",
+ "ureq",
+]
+
+[[package]]
+name = "aptos-global-constants"
+version = "0.1.0"
+
+[[package]]
+name = "aptos-id-generator"
+version = "0.1.0"
+dependencies = [
+ "aptos-workspace-hack",
+]
+
+[[package]]
+name = "aptos-infallible"
+version = "0.1.0"
+dependencies = [
+ "aptos-workspace-hack",
+]
+
+[[package]]
+name = "aptos-jellyfish-merkle"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-infallible",
+ "aptos-metrics",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "bcs",
+ "byteorder",
+ "itertools 0.10.1",
+ "mirai-annotations",
+ "num-derive",
+ "num-traits 0.2.14",
+ "once_cell",
+ "proptest",
+ "proptest-derive",
+ "rand 0.8.4",
+ "serde 1.0.130",
+ "storage-interface",
+ "thiserror",
+]
+
+[[package]]
+name = "aptos-keygen"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "hex",
+ "rand 0.8.4",
+ "sha3",
+]
+
+[[package]]
+name = "aptos-log-derive"
+version = "0.1.0"
+dependencies = [
+ "aptos-workspace-hack",
+ "proc-macro2 1.0.28",
+ "quote 1.0.9",
+ "syn 1.0.74",
+]
+
+[[package]]
+name = "aptos-logger"
+version = "0.1.0"
+dependencies = [
+ "aptos-infallible",
+ "aptos-log-derive",
+ "aptos-workspace-hack",
+ "backtrace",
+ "chrono",
+ "erased-serde",
+ "hostname",
+ "once_cell",
+ "prometheus",
+ "serde 1.0.130",
+ "serde_json",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "aptos-management"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-global-constants",
+ "aptos-secure-storage",
+ "aptos-temppath",
+ "aptos-time-service",
+ "aptos-transaction-builder",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "bcs",
+ "hex",
+ "serde 1.0.130",
+ "serde_yaml",
+ "structopt",
+ "thiserror",
+ "toml",
+]
+
+[[package]]
+name = "aptos-mempool"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-id-generator",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics",
+ "aptos-proptest-helpers",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "async-trait",
+ "bcs",
+ "bounded-executor",
+ "channel",
+ "enum_dispatch",
+ "event-notifications",
+ "fail",
+ "futures",
+ "itertools 0.10.1",
+ "mempool-notifications",
+ "mirai-annotations",
+ "netcore",
+ "network",
+ "once_cell",
+ "proptest",
+ "rand 0.8.4",
+ "rayon",
+ "serde 1.0.130",
+ "serde_json",
+ "short-hex-str",
+ "storage-interface",
+ "storage-service",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "vm-validator",
+]
+
+[[package]]
+name = "aptos-metrics"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-workspace-hack",
+ "assert_approx_eq",
+ "futures",
+ "hyper",
+ "once_cell",
+ "prometheus",
+ "rusty-fork",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "aptos-metrics-core"
+version = "0.1.0"
+dependencies = [
+ "aptos-workspace-hack",
+ "prometheus",
+]
+
+[[package]]
+name = "aptos-node"
+version = "0.1.0"
+dependencies = [
+ "aptos-api",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-data-client",
+ "aptos-genesis-tool",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-mempool",
+ "aptos-metrics",
+ "aptos-secure-storage",
+ "aptos-temppath",
+ "aptos-time-service",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "aptosdb",
+ "backup-service",
+ "bcs",
+ "consensus",
+ "consensus-notifications",
+ "crash-handler",
+ "data-streaming-service",
+ "debug-interface",
+ "diem-framework-releases",
+ "event-notifications",
+ "executor",
+ "executor-types",
+ "fail",
+ "futures",
+ "hex",
+ "jemallocator",
+ "mempool-notifications",
+ "network",
+ "network-builder",
+ "rand 0.8.4",
+ "state-sync-multiplexer",
+ "state-sync-v1",
+ "storage-client",
+ "storage-interface",
+ "storage-service",
+ "storage-service-client",
+ "storage-service-server",
+ "structopt",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
+name = "aptos-operational-tool"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-global-constants",
+ "aptos-infallible",
+ "aptos-management",
+ "aptos-rest-client",
+ "aptos-secure-storage",
+ "aptos-temppath",
+ "aptos-transaction-builder",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "base64",
+ "bcs",
+ "fallible",
+ "futures",
+ "hex",
+ "itertools 0.10.1",
+ "netcore",
+ "network",
+ "rand 0.8.4",
+ "serde 1.0.130",
+ "serde_json",
+ "serde_yaml",
+ "structopt",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "toml",
+ "url",
+]
+
+[[package]]
+name = "aptos-parallel-executor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-workspace-hack",
+ "criterion",
+ "crossbeam-queue",
+ "mvhashmap",
+ "num_cpus",
+ "once_cell",
+ "proptest",
+ "proptest-derive",
+ "rand 0.8.4",
+ "rayon",
+]
+
+[[package]]
+name = "aptos-proptest-helpers"
+version = "0.1.0"
+dependencies = [
+ "aptos-workspace-hack",
+ "crossbeam",
+ "proptest",
+ "proptest-derive",
+]
+
+[[package]]
+name = "aptos-rate-limiter"
+version = "0.1.0"
+dependencies = [
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics",
+ "aptos-workspace-hack",
+ "futures",
+ "pin-project",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "aptos-resource-viewer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "move-binary-format",
+ "move-core-types",
+ "move-resource-viewer",
+]
+
+[[package]]
+name = "aptos-rest-client"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-api-types",
+ "aptos-crypto",
+ "aptos-transaction-builder",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "bcs",
+ "hex",
+ "move-core-types",
+ "reqwest",
+ "serde 1.0.130",
+ "serde_json",
+ "tokio",
+ "url",
+]
+
+[[package]]
+name = "aptos-retrier"
+version = "0.1.0"
+dependencies = [
+ "aptos-logger",
+ "aptos-workspace-hack",
+ "tokio",
+]
+
+[[package]]
+name = "aptos-sdk"
+version = "0.0.3"
+dependencies = [
+ "aptos-crypto",
+ "aptos-transaction-builder",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "bcs",
+ "move-core-types",
+ "rand_core 0.6.2",
+ "serde 1.0.130",
+]
+
+[[package]]
+name = "aptos-secure-net"
+version = "0.1.0"
+dependencies = [
+ "aptos-config",
+ "aptos-logger",
+ "aptos-secure-push-metrics",
+ "aptos-workspace-hack",
+ "once_cell",
+ "serde 1.0.130",
+ "thiserror",
+]
+
+[[package]]
+name = "aptos-secure-push-metrics"
+version = "0.1.0"
+dependencies = [
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-workspace-hack",
+ "ureq",
+]
+
+[[package]]
+name = "aptos-secure-storage"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-github-client",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-temppath",
+ "aptos-time-service",
+ "aptos-vault-client",
+ "aptos-workspace-hack",
+ "base64",
+ "bcs",
+ "chrono",
+ "enum_dispatch",
+ "rand 0.8.4",
+ "serde 1.0.130",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "aptos-state-view"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-types",
+ "aptos-workspace-hack",
+]
+
+[[package]]
+name = "aptos-storage-inspector"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "aptosdb",
+ "diem-framework-releases",
+ "storage-interface",
+ "structopt",
+ "tempfile",
+]
+
+[[package]]
+name = "aptos-temppath"
+version = "0.1.0"
+dependencies = [
+ "aptos-workspace-hack",
+ "hex",
+ "rand 0.8.4",
+]
+
+[[package]]
+name = "aptos-time-service"
+version = "0.1.0"
+dependencies = [
+ "aptos-infallible",
+ "aptos-workspace-hack",
+ "enum_dispatch",
+ "futures",
+ "pin-project",
+ "thiserror",
+ "tokio",
+ "tokio-test",
+]
+
+[[package]]
+name = "aptos-transaction-benchmarks"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "criterion",
+ "criterion-cpu-time",
+ "diem-framework-releases",
+ "language-e2e-tests",
+ "proptest",
+ "read-write-set",
+ "read-write-set-dynamic",
+]
+
+[[package]]
+name = "aptos-transaction-builder"
+version = "0.0.3"
+dependencies = [
+ "anyhow",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "bcs",
+ "move-core-types",
+ "once_cell",
+ "proptest",
+ "proptest-derive",
+ "serde 1.0.130",
+]
+
+[[package]]
+name = "aptos-transaction-replay"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-resource-viewer",
+ "aptos-state-view",
+ "aptos-types",
+ "aptos-validator-interface",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "aptosdb",
+ "bcs",
+ "diem-framework",
+ "diem-framework-releases",
+ "difference",
+ "hex",
+ "move-binary-format",
+ "move-cli",
+ "move-compiler",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-test-utils",
+ "move-vm-types",
+ "structopt",
+ "vm-genesis",
+]
+
+[[package]]
+name = "aptos-transactional-test-harness"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-keygen",
+ "aptos-state-view",
+ "aptos-transaction-builder",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "bcs",
+ "datatest-stable",
+ "diem-framework",
+ "either",
+ "hex",
+ "language-e2e-tests",
+ "move-binary-format",
+ "move-command-line-common",
+ "move-compiler",
+ "move-core-types",
+ "move-transactional-test-runner",
+ "once_cell",
+ "structopt",
+ "vm-genesis",
+]
+
+[[package]]
+name = "aptos-types"
+version = "0.0.3"
+dependencies = [
+ "aes-gcm",
+ "anyhow",
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-workspace-hack",
+ "bcs",
+ "bytes",
+ "chrono",
+ "hex",
+ "itertools 0.10.1",
+ "mirai-annotations",
+ "move-core-types",
+ "move-read-write-set-types",
+ "once_cell",
+ "proptest",
+ "proptest-derive",
+ "rand 0.8.4",
+ "regex",
+ "serde 1.0.130",
+ "serde_bytes",
+ "serde_json",
+ "thiserror",
+ "tiny-keccak",
+]
+
+[[package]]
+name = "aptos-validator-interface"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-state-view",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "aptosdb",
+ "bcs",
+ "move-binary-format",
+ "scratchpad",
+ "storage-interface",
+]
+
+[[package]]
+name = "aptos-vault-client"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-proptest-helpers",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "base64",
+ "chrono",
+ "native-tls",
+ "once_cell",
+ "proptest",
+ "serde 1.0.130",
+ "serde_json",
+ "thiserror",
+ "ureq",
+]
+
+[[package]]
+name = "aptos-vm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-metrics",
+ "aptos-parallel-executor",
+ "aptos-state-view",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "bcs",
+ "diem-framework",
+ "diem-framework-releases",
+ "fail",
+ "mirai-annotations",
+ "move-binary-format",
+ "move-bytecode-utils",
+ "move-core-types",
+ "move-stdlib",
+ "move-vm-runtime",
+ "move-vm-types",
+ "mvhashmap",
+ "once_cell",
+ "proptest",
+ "rayon",
+ "read-write-set-dynamic",
+ "serde 1.0.130",
+ "serde_json",
+ "tracing",
+]
+
+[[package]]
+name = "aptos-wallet"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "byteorder",
+ "hex",
+ "hmac",
+ "mirai-annotations",
+ "pbkdf2",
+ "rand 0.8.4",
+ "serde 1.0.130",
+ "sha2",
+ "thiserror",
+]
+
+[[package]]
+name = "aptos-workspace-hack"
+version = "0.1.0"
+dependencies = [
+ "Inflector",
+ "anyhow",
+ "backtrace",
+ "bitvec",
+ "byteorder",
+ "bytes",
+ "cc",
+ "chrono",
+ "clap",
+ "crossbeam-channel",
+ "crossbeam-deque",
+ "crossbeam-queue",
+ "crossbeam-utils",
+ "either",
+ "futures-channel",
+ "futures-core",
+ "futures-io",
+ "futures-sink",
+ "futures-util",
+ "hyper",
+ "indexmap",
+ "itertools 0.10.1",
+ "libc",
+ "log",
+ "memchr",
+ "num-integer",
+ "num-traits 0.2.14",
+ "plotters",
+ "rand 0.8.4",
+ "regex",
+ "regex-automata",
+ "reqwest",
+ "rusty-fork",
+ "serde 1.0.130",
+ "serde_json",
+ "sha-1 0.9.4",
+ "standback",
+ "subtle",
+ "syn 1.0.74",
+ "tiny-keccak",
+ "tokio",
+ "tokio-util",
+ "toml",
+ "tracing",
+ "warp",
+ "zeroize",
+]
+
+[[package]]
+name = "aptos-writeset-generator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-state-view",
+ "aptos-transaction-replay",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "aptosdb",
+ "bcs",
+ "diem-framework",
+ "diem-framework-releases",
+ "handlebars",
+ "hex",
+ "move-binary-format",
+ "move-bytecode-verifier",
+ "move-compiler",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-test-utils",
+ "move-vm-types",
+ "once_cell",
+ "read-write-set",
+ "serde 1.0.130",
+ "serde_json",
+ "structopt",
+ "tempfile",
+]
+
+[[package]]
+name = "aptosdb"
+version = "0.1.0"
+dependencies = [
+ "accumulator",
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-infallible",
+ "aptos-jellyfish-merkle",
+ "aptos-logger",
+ "aptos-metrics",
+ "aptos-proptest-helpers",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "arc-swap",
+ "bcs",
+ "byteorder",
+ "executor-types",
+ "itertools 0.10.1",
+ "move-core-types",
+ "num-derive",
+ "num-traits 0.2.14",
+ "num-variants",
+ "once_cell",
+ "proptest",
+ "proptest-derive",
+ "rand 0.8.4",
+ "schemadb",
+ "scratchpad",
+ "serde 1.0.130",
+ "storage-interface",
+ "thiserror",
+]
+
+[[package]]
+name = "aptossum"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "aptosdb",
+ "serde 1.0.130",
+ "serde_json",
+ "storage-interface",
+ "structopt",
 ]
 
 [[package]]
@@ -271,23 +1404,23 @@ name = "backup-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-infallible",
+ "aptos-jellyfish-merkle",
+ "aptos-logger",
+ "aptos-proptest-helpers",
+ "aptos-secure-push-metrics",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "aptosdb",
  "async-trait",
  "backup-service",
  "bcs",
  "byteorder",
  "bytes",
- "diem-config",
- "diem-crypto",
- "diem-infallible",
- "diem-jellyfish-merkle",
- "diem-logger",
- "diem-proptest-helpers",
- "diem-secure-push-metrics",
- "diem-temppath",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diemdb",
  "executor",
  "executor-test-helpers",
  "executor-types",
@@ -317,16 +1450,16 @@ name = "backup-service"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-metrics",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "aptosdb",
  "bcs",
  "bytes",
- "diem-config",
- "diem-crypto",
- "diem-logger",
- "diem-metrics",
- "diem-temppath",
- "diem-types",
- "diem-workspace-hack",
- "diemdb",
  "futures",
  "hyper",
  "once_cell",
@@ -488,7 +1621,7 @@ checksum = "8d696c370c750c948ada61c69a0ee2cbbb9c50b1019ddb86d9317157a99c2cae"
 name = "bounded-executor"
 version = "0.1.0"
 dependencies = [
- "diem-workspace-hack",
+ "aptos-workspace-hack",
  "futures",
  "tokio",
 ]
@@ -652,10 +1785,10 @@ name = "channel"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "diem-infallible",
- "diem-metrics",
- "diem-types",
- "diem-workspace-hack",
+ "aptos-infallible",
+ "aptos-metrics",
+ "aptos-types",
+ "aptos-workspace-hack",
  "futures",
  "tokio",
 ]
@@ -808,6 +1941,17 @@ name = "consensus"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-mempool",
+ "aptos-metrics",
+ "aptos-secure-storage",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
  "async-trait",
  "bcs",
  "byteorder",
@@ -816,17 +1960,6 @@ dependencies = [
  "claim",
  "consensus-notifications",
  "consensus-types",
- "diem-config",
- "diem-crypto",
- "diem-infallible",
- "diem-logger",
- "diem-mempool",
- "diem-metrics",
- "diem-secure-storage",
- "diem-temppath",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
  "event-notifications",
  "execution-correctness",
  "executor",
@@ -861,11 +1994,11 @@ dependencies = [
 name = "consensus-notifications"
 version = "0.1.0"
 dependencies = [
+ "aptos-crypto",
+ "aptos-types",
+ "aptos-workspace-hack",
  "async-trait",
  "claim",
- "diem-crypto",
- "diem-types",
- "diem-workspace-hack",
  "futures",
  "move-core-types",
  "serde 1.0.130",
@@ -878,12 +2011,12 @@ name = "consensus-types"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-infallible",
+ "aptos-types",
+ "aptos-workspace-hack",
  "bcs",
- "diem-crypto",
- "diem-crypto-derive",
- "diem-infallible",
- "diem-types",
- "diem-workspace-hack",
  "executor-types",
  "itertools 0.10.1",
  "mirai-annotations",
@@ -968,9 +2101,9 @@ checksum = "dcb25d077389e53838a8158c8e99174c5a9d902dee4904320db714f3c653ffba"
 name = "crash-handler"
 version = "0.1.0"
 dependencies = [
+ "aptos-logger",
+ "aptos-workspace-hack",
  "backtrace",
- "diem-logger",
- "diem-workspace-hack",
  "serde 1.0.130",
  "toml",
 ]
@@ -1185,18 +2318,18 @@ dependencies = [
 name = "data-streaming-service"
 version = "0.1.0"
 dependencies = [
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-data-client",
+ "aptos-id-generator",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics",
+ "aptos-types",
+ "aptos-workspace-hack",
  "async-trait",
  "channel",
  "claim",
- "diem-config",
- "diem-crypto",
- "diem-data-client",
- "diem-id-generator",
- "diem-infallible",
- "diem-logger",
- "diem-metrics",
- "diem-types",
- "diem-workspace-hack",
  "enum_dispatch",
  "futures",
  "network",
@@ -1227,14 +2360,14 @@ name = "db-bootstrapper"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "aptosdb",
  "bcs",
- "diem-config",
- "diem-crypto",
- "diem-temppath",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diemdb",
  "executor",
  "storage-interface",
  "structopt",
@@ -1251,11 +2384,11 @@ name = "debug-interface"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
+ "aptos-logger",
+ "aptos-metrics",
+ "aptos-workspace-hack",
  "bytes",
- "diem-config",
- "diem-logger",
- "diem-metrics",
- "diem-workspace-hack",
  "reqwest",
  "serde 1.0.130",
  "serde_json",
@@ -1291,228 +2424,14 @@ name = "df-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-vm",
+ "aptos-workspace-hack",
  "bcs",
  "datatest-stable",
  "diem-framework-releases",
- "diem-vm",
- "diem-workspace-hack",
  "move-cli",
  "move-core-types",
  "structopt",
-]
-
-[[package]]
-name = "diem-api"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "bytes",
- "diem-api-types",
- "diem-config",
- "diem-crypto",
- "diem-framework-releases",
- "diem-genesis-tool",
- "diem-global-constants",
- "diem-logger",
- "diem-mempool",
- "diem-metrics",
- "diem-sdk",
- "diem-secure-storage",
- "diem-temppath",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diemdb",
- "executor",
- "executor-types",
- "fail",
- "futures",
- "hex",
- "hyper",
- "mempool-notifications",
- "move-core-types",
- "move-resource-viewer",
- "once_cell",
- "percent-encoding",
- "rand 0.8.4",
- "reqwest",
- "serde 1.0.130",
- "serde_json",
- "storage-interface",
- "tokio",
- "vm-validator",
- "warp",
-]
-
-[[package]]
-name = "diem-api-types"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "bcs",
- "diem-crypto",
- "diem-transaction-builder",
- "diem-types",
- "diem-workspace-hack",
- "hex",
- "move-binary-format",
- "move-core-types",
- "move-resource-viewer",
- "serde 1.0.130",
- "serde_json",
- "warp",
-]
-
-[[package]]
-name = "diem-bitvec"
-version = "0.1.0"
-dependencies = [
- "bcs",
- "diem-workspace-hack",
- "proptest",
- "proptest-derive",
- "serde 1.0.130",
- "serde_bytes",
-]
-
-[[package]]
-name = "diem-config"
-version = "0.1.0"
-dependencies = [
- "bcs",
- "diem-crypto",
- "diem-crypto-derive",
- "diem-global-constants",
- "diem-logger",
- "diem-secure-storage",
- "diem-temppath",
- "diem-types",
- "diem-workspace-hack",
- "get_if_addrs",
- "log",
- "mirai-annotations",
- "rand 0.8.4",
- "serde 1.0.130",
- "serde_yaml",
- "short-hex-str",
- "thiserror",
-]
-
-[[package]]
-name = "diem-crypto"
-version = "0.0.3"
-dependencies = [
- "aes-gcm",
- "anyhow",
- "bcs",
- "bitvec",
- "byteorder",
- "bytes",
- "criterion",
- "curve25519-dalek-fiat",
- "diem-crypto-derive",
- "diem-workspace-hack",
- "digest 0.9.0",
- "ed25519-dalek-fiat",
- "hex",
- "hkdf",
- "mirai-annotations",
- "once_cell",
- "proptest",
- "proptest-derive",
- "rand 0.8.4",
- "rand_core 0.6.2",
- "ripemd160",
- "serde 1.0.130",
- "serde-name",
- "serde_bytes",
- "serde_json",
- "sha2",
- "sha3",
- "static_assertions",
- "thiserror",
- "tiny-keccak",
- "trybuild",
- "x25519-dalek-fiat",
-]
-
-[[package]]
-name = "diem-crypto-derive"
-version = "0.0.3"
-dependencies = [
- "anyhow",
- "diem-workspace-hack",
- "proc-macro2 1.0.28",
- "quote 1.0.9",
- "syn 1.0.74",
-]
-
-[[package]]
-name = "diem-data-client"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "bcs",
- "channel",
- "claim",
- "diem-config",
- "diem-crypto",
- "diem-id-generator",
- "diem-infallible",
- "diem-logger",
- "diem-metrics",
- "diem-time-service",
- "diem-types",
- "diem-workspace-hack",
- "futures",
- "itertools 0.10.1",
- "maplit",
- "network",
- "rand 0.8.4",
- "serde 1.0.130",
- "storage-service-client",
- "storage-service-server",
- "storage-service-types",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "diem-documentation-tool"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "diem-workspace-hack",
- "once_cell",
- "regex",
- "serde 1.0.130",
- "serde-generate",
- "serde-reflection",
- "serde_yaml",
- "structopt",
- "tempfile",
-]
-
-[[package]]
-name = "diem-e2e-tests-replay"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "diem-framework",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "language-e2e-tests",
- "move-binary-format",
- "move-core-types",
- "move-model",
- "move-stackless-bytecode-interpreter",
- "move-vm-runtime",
- "move-vm-types",
- "structopt",
- "walkdir",
 ]
 
 [[package]]
@@ -1520,10 +2439,10 @@ name = "diem-experimental-framework-releases"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-crypto",
+ "aptos-types",
+ "aptos-workspace-hack",
  "bcs",
- "diem-crypto",
- "diem-types",
- "diem-workspace-hack",
  "framework-releases",
  "include_dir",
  "move-binary-format",
@@ -1532,46 +2451,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "diem-faucet"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "bytes",
- "diem-config",
- "diem-crypto",
- "diem-infallible",
- "diem-logger",
- "diem-rest-client",
- "diem-sdk",
- "diem-workspace-hack",
- "futures",
- "generate-key",
- "hex",
- "rand 0.8.4",
- "reqwest",
- "serde 1.0.130",
- "serde_json",
- "structopt",
- "tempfile",
- "tokio",
- "url",
- "warp",
-]
-
-[[package]]
 name = "diem-framework"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-crypto",
+ "aptos-transactional-test-harness",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
  "bcs",
  "clap",
  "datatest-stable",
- "diem-crypto",
- "diem-transactional-test-harness",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
  "dir-diff",
  "include_dir",
  "log",
@@ -1606,907 +2497,16 @@ name = "diem-framework-releases"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-crypto",
+ "aptos-types",
+ "aptos-workspace-hack",
  "bcs",
- "diem-crypto",
- "diem-types",
- "diem-workspace-hack",
  "framework-releases",
  "include_dir",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-command-line-common",
  "once_cell",
-]
-
-[[package]]
-name = "diem-fuzz"
-version = "0.1.0"
-dependencies = [
- "diem-fuzzer",
- "diem-workspace-hack",
- "libfuzzer-sys",
- "once_cell",
-]
-
-[[package]]
-name = "diem-fuzzer"
-version = "0.1.0"
-dependencies = [
- "accumulator",
- "anyhow",
- "bcs",
- "byteorder",
- "consensus",
- "consensus-types",
- "datatest-stable",
- "diem-crypto",
- "diem-jellyfish-merkle",
- "diem-mempool",
- "diem-proptest-helpers",
- "diem-types",
- "diem-vault-client",
- "diem-workspace-hack",
- "diemdb",
- "executor",
- "executor-types",
- "hex",
- "language-e2e-tests",
- "move-binary-format",
- "move-core-types",
- "move-vm-types",
- "network",
- "once_cell",
- "proptest",
- "proptest-derive",
- "rand 0.8.4",
- "rusty-fork",
- "safety-rules",
- "scratchpad",
- "serde_json",
- "sha-1 0.9.4",
- "state-sync-v1",
- "stats_alloc",
- "storage-interface",
- "structopt",
- "ureq",
-]
-
-[[package]]
-name = "diem-genesis-tool"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "consensus-types",
- "diem-config",
- "diem-crypto",
- "diem-framework-releases",
- "diem-global-constants",
- "diem-management",
- "diem-secure-storage",
- "diem-temppath",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diemdb",
- "executor",
- "generate-key",
- "rand 0.8.4",
- "serde 1.0.130",
- "storage-interface",
- "structopt",
- "thiserror",
- "toml",
- "vm-genesis",
-]
-
-[[package]]
-name = "diem-github-client"
-version = "0.1.0"
-dependencies = [
- "base64",
- "diem-workspace-hack",
- "proxy",
- "serde 1.0.130",
- "serde_json",
- "thiserror",
- "ureq",
-]
-
-[[package]]
-name = "diem-global-constants"
-version = "0.1.0"
-
-[[package]]
-name = "diem-id-generator"
-version = "0.1.0"
-dependencies = [
- "diem-workspace-hack",
-]
-
-[[package]]
-name = "diem-infallible"
-version = "0.1.0"
-dependencies = [
- "diem-workspace-hack",
-]
-
-[[package]]
-name = "diem-jellyfish-merkle"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "byteorder",
- "diem-crypto",
- "diem-crypto-derive",
- "diem-infallible",
- "diem-metrics",
- "diem-types",
- "diem-workspace-hack",
- "itertools 0.10.1",
- "mirai-annotations",
- "num-derive",
- "num-traits 0.2.14",
- "once_cell",
- "proptest",
- "proptest-derive",
- "rand 0.8.4",
- "serde 1.0.130",
- "storage-interface",
- "thiserror",
-]
-
-[[package]]
-name = "diem-keygen"
-version = "0.1.0"
-dependencies = [
- "diem-crypto",
- "diem-types",
- "diem-workspace-hack",
- "hex",
- "rand 0.8.4",
- "sha3",
-]
-
-[[package]]
-name = "diem-log-derive"
-version = "0.1.0"
-dependencies = [
- "diem-workspace-hack",
- "proc-macro2 1.0.28",
- "quote 1.0.9",
- "syn 1.0.74",
-]
-
-[[package]]
-name = "diem-logger"
-version = "0.1.0"
-dependencies = [
- "backtrace",
- "chrono",
- "diem-infallible",
- "diem-log-derive",
- "diem-workspace-hack",
- "erased-serde",
- "hostname",
- "once_cell",
- "prometheus",
- "serde 1.0.130",
- "serde_json",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "diem-management"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "diem-config",
- "diem-crypto",
- "diem-global-constants",
- "diem-secure-storage",
- "diem-temppath",
- "diem-time-service",
- "diem-transaction-builder",
- "diem-types",
- "diem-workspace-hack",
- "hex",
- "serde 1.0.130",
- "serde_yaml",
- "structopt",
- "thiserror",
- "toml",
-]
-
-[[package]]
-name = "diem-mempool"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "bcs",
- "bounded-executor",
- "channel",
- "diem-config",
- "diem-crypto",
- "diem-id-generator",
- "diem-infallible",
- "diem-logger",
- "diem-metrics",
- "diem-proptest-helpers",
- "diem-types",
- "diem-workspace-hack",
- "enum_dispatch",
- "event-notifications",
- "fail",
- "futures",
- "itertools 0.10.1",
- "mempool-notifications",
- "mirai-annotations",
- "netcore",
- "network",
- "once_cell",
- "proptest",
- "rand 0.8.4",
- "rayon",
- "serde 1.0.130",
- "serde_json",
- "short-hex-str",
- "storage-interface",
- "storage-service",
- "thiserror",
- "tokio",
- "tokio-stream",
- "vm-validator",
-]
-
-[[package]]
-name = "diem-metrics"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "assert_approx_eq",
- "diem-logger",
- "diem-metrics-core",
- "diem-workspace-hack",
- "futures",
- "hyper",
- "once_cell",
- "prometheus",
- "rusty-fork",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "diem-metrics-core"
-version = "0.1.0"
-dependencies = [
- "diem-workspace-hack",
- "prometheus",
-]
-
-[[package]]
-name = "diem-node"
-version = "0.1.0"
-dependencies = [
- "backup-service",
- "bcs",
- "consensus",
- "consensus-notifications",
- "crash-handler",
- "data-streaming-service",
- "debug-interface",
- "diem-api",
- "diem-config",
- "diem-crypto",
- "diem-data-client",
- "diem-framework-releases",
- "diem-genesis-tool",
- "diem-infallible",
- "diem-logger",
- "diem-mempool",
- "diem-metrics",
- "diem-secure-storage",
- "diem-temppath",
- "diem-time-service",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diemdb",
- "event-notifications",
- "executor",
- "executor-types",
- "fail",
- "futures",
- "hex",
- "jemallocator",
- "mempool-notifications",
- "network",
- "network-builder",
- "rand 0.8.4",
- "state-sync-multiplexer",
- "state-sync-v1",
- "storage-client",
- "storage-interface",
- "storage-service",
- "storage-service-client",
- "storage-service-server",
- "structopt",
- "tokio",
- "tokio-stream",
-]
-
-[[package]]
-name = "diem-operational-tool"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "base64",
- "bcs",
- "diem-config",
- "diem-crypto",
- "diem-global-constants",
- "diem-infallible",
- "diem-management",
- "diem-rest-client",
- "diem-secure-storage",
- "diem-temppath",
- "diem-transaction-builder",
- "diem-types",
- "diem-workspace-hack",
- "fallible",
- "futures",
- "hex",
- "itertools 0.10.1",
- "netcore",
- "network",
- "rand 0.8.4",
- "serde 1.0.130",
- "serde_json",
- "serde_yaml",
- "structopt",
- "thiserror",
- "tokio",
- "tokio-util",
- "toml",
- "url",
-]
-
-[[package]]
-name = "diem-parallel-executor"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "criterion",
- "crossbeam-queue",
- "diem-workspace-hack",
- "mvhashmap",
- "num_cpus",
- "once_cell",
- "proptest",
- "proptest-derive",
- "rand 0.8.4",
- "rayon",
-]
-
-[[package]]
-name = "diem-proptest-helpers"
-version = "0.1.0"
-dependencies = [
- "crossbeam",
- "diem-workspace-hack",
- "proptest",
- "proptest-derive",
-]
-
-[[package]]
-name = "diem-rate-limiter"
-version = "0.1.0"
-dependencies = [
- "diem-infallible",
- "diem-logger",
- "diem-metrics",
- "diem-workspace-hack",
- "futures",
- "pin-project",
- "tokio",
- "tokio-util",
-]
-
-[[package]]
-name = "diem-resource-viewer"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "diem-types",
- "diem-workspace-hack",
- "move-binary-format",
- "move-core-types",
- "move-resource-viewer",
-]
-
-[[package]]
-name = "diem-rest-client"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "bcs",
- "diem-api-types",
- "diem-crypto",
- "diem-transaction-builder",
- "diem-types",
- "diem-workspace-hack",
- "hex",
- "move-core-types",
- "reqwest",
- "serde 1.0.130",
- "serde_json",
- "tokio",
- "url",
-]
-
-[[package]]
-name = "diem-retrier"
-version = "0.1.0"
-dependencies = [
- "diem-logger",
- "diem-workspace-hack",
- "tokio",
-]
-
-[[package]]
-name = "diem-sdk"
-version = "0.0.3"
-dependencies = [
- "bcs",
- "diem-crypto",
- "diem-transaction-builder",
- "diem-types",
- "diem-workspace-hack",
- "move-core-types",
- "rand_core 0.6.2",
- "serde 1.0.130",
-]
-
-[[package]]
-name = "diem-secure-net"
-version = "0.1.0"
-dependencies = [
- "diem-config",
- "diem-logger",
- "diem-secure-push-metrics",
- "diem-workspace-hack",
- "once_cell",
- "serde 1.0.130",
- "thiserror",
-]
-
-[[package]]
-name = "diem-secure-push-metrics"
-version = "0.1.0"
-dependencies = [
- "diem-logger",
- "diem-metrics-core",
- "diem-workspace-hack",
- "ureq",
-]
-
-[[package]]
-name = "diem-secure-storage"
-version = "0.1.0"
-dependencies = [
- "base64",
- "bcs",
- "chrono",
- "diem-crypto",
- "diem-crypto-derive",
- "diem-github-client",
- "diem-infallible",
- "diem-logger",
- "diem-temppath",
- "diem-time-service",
- "diem-vault-client",
- "diem-workspace-hack",
- "enum_dispatch",
- "rand 0.8.4",
- "serde 1.0.130",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "diem-state-view"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "diem-crypto",
- "diem-types",
- "diem-workspace-hack",
-]
-
-[[package]]
-name = "diem-storage-inspector"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "diem-config",
- "diem-crypto",
- "diem-framework-releases",
- "diem-logger",
- "diem-types",
- "diem-workspace-hack",
- "diemdb",
- "storage-interface",
- "structopt",
- "tempfile",
-]
-
-[[package]]
-name = "diem-temppath"
-version = "0.1.0"
-dependencies = [
- "diem-workspace-hack",
- "hex",
- "rand 0.8.4",
-]
-
-[[package]]
-name = "diem-time-service"
-version = "0.1.0"
-dependencies = [
- "diem-infallible",
- "diem-workspace-hack",
- "enum_dispatch",
- "futures",
- "pin-project",
- "thiserror",
- "tokio",
- "tokio-test",
-]
-
-[[package]]
-name = "diem-transaction-benchmarks"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "criterion-cpu-time",
- "diem-crypto",
- "diem-framework-releases",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "language-e2e-tests",
- "proptest",
- "read-write-set",
- "read-write-set-dynamic",
-]
-
-[[package]]
-name = "diem-transaction-builder"
-version = "0.0.3"
-dependencies = [
- "anyhow",
- "bcs",
- "diem-types",
- "diem-workspace-hack",
- "move-core-types",
- "once_cell",
- "proptest",
- "proptest-derive",
- "serde 1.0.130",
-]
-
-[[package]]
-name = "diem-transaction-replay"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "diem-framework",
- "diem-framework-releases",
- "diem-resource-viewer",
- "diem-state-view",
- "diem-types",
- "diem-validator-interface",
- "diem-vm",
- "diem-workspace-hack",
- "diemdb",
- "difference",
- "hex",
- "move-binary-format",
- "move-cli",
- "move-compiler",
- "move-core-types",
- "move-vm-runtime",
- "move-vm-test-utils",
- "move-vm-types",
- "structopt",
- "vm-genesis",
-]
-
-[[package]]
-name = "diem-transactional-test-harness"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "datatest-stable",
- "diem-crypto",
- "diem-framework",
- "diem-keygen",
- "diem-state-view",
- "diem-transaction-builder",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "either",
- "hex",
- "language-e2e-tests",
- "move-binary-format",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-transactional-test-runner",
- "once_cell",
- "structopt",
- "vm-genesis",
-]
-
-[[package]]
-name = "diem-types"
-version = "0.0.3"
-dependencies = [
- "aes-gcm",
- "anyhow",
- "bcs",
- "bytes",
- "chrono",
- "diem-crypto",
- "diem-crypto-derive",
- "diem-workspace-hack",
- "hex",
- "itertools 0.10.1",
- "mirai-annotations",
- "move-core-types",
- "move-read-write-set-types",
- "once_cell",
- "proptest",
- "proptest-derive",
- "rand 0.8.4",
- "regex",
- "serde 1.0.130",
- "serde_bytes",
- "serde_json",
- "thiserror",
- "tiny-keccak",
-]
-
-[[package]]
-name = "diem-validator-interface"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "diem-config",
- "diem-state-view",
- "diem-types",
- "diem-workspace-hack",
- "diemdb",
- "move-binary-format",
- "scratchpad",
- "storage-interface",
-]
-
-[[package]]
-name = "diem-vault-client"
-version = "0.1.0"
-dependencies = [
- "base64",
- "chrono",
- "diem-crypto",
- "diem-proptest-helpers",
- "diem-types",
- "diem-workspace-hack",
- "native-tls",
- "once_cell",
- "proptest",
- "serde 1.0.130",
- "serde_json",
- "thiserror",
- "ureq",
-]
-
-[[package]]
-name = "diem-vm"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "diem-crypto",
- "diem-framework",
- "diem-framework-releases",
- "diem-logger",
- "diem-metrics",
- "diem-parallel-executor",
- "diem-state-view",
- "diem-types",
- "diem-workspace-hack",
- "fail",
- "mirai-annotations",
- "move-binary-format",
- "move-bytecode-utils",
- "move-core-types",
- "move-stdlib",
- "move-vm-runtime",
- "move-vm-types",
- "mvhashmap",
- "once_cell",
- "proptest",
- "rayon",
- "read-write-set-dynamic",
- "serde 1.0.130",
- "serde_json",
- "tracing",
-]
-
-[[package]]
-name = "diem-wallet"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "byteorder",
- "diem-crypto",
- "diem-temppath",
- "diem-types",
- "diem-workspace-hack",
- "hex",
- "hmac",
- "mirai-annotations",
- "pbkdf2",
- "rand 0.8.4",
- "serde 1.0.130",
- "sha2",
- "thiserror",
-]
-
-[[package]]
-name = "diem-workspace-hack"
-version = "0.1.0"
-dependencies = [
- "Inflector",
- "anyhow",
- "backtrace",
- "bitvec",
- "byteorder",
- "bytes",
- "cc",
- "chrono",
- "clap",
- "crossbeam-channel",
- "crossbeam-deque",
- "crossbeam-queue",
- "crossbeam-utils",
- "either",
- "futures-channel",
- "futures-core",
- "futures-io",
- "futures-sink",
- "futures-util",
- "hyper",
- "indexmap",
- "itertools 0.10.1",
- "libc",
- "log",
- "memchr",
- "num-integer",
- "num-traits 0.2.14",
- "plotters",
- "rand 0.8.4",
- "regex",
- "regex-automata",
- "reqwest",
- "rusty-fork",
- "serde 1.0.130",
- "serde_json",
- "sha-1 0.9.4",
- "standback",
- "subtle",
- "syn 1.0.74",
- "tiny-keccak",
- "tokio",
- "tokio-util",
- "toml",
- "tracing",
- "warp",
- "zeroize",
-]
-
-[[package]]
-name = "diem-writeset-generator"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bcs",
- "diem-crypto",
- "diem-crypto-derive",
- "diem-framework",
- "diem-framework-releases",
- "diem-state-view",
- "diem-transaction-replay",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diemdb",
- "handlebars",
- "hex",
- "move-binary-format",
- "move-bytecode-verifier",
- "move-compiler",
- "move-core-types",
- "move-vm-runtime",
- "move-vm-test-utils",
- "move-vm-types",
- "once_cell",
- "read-write-set",
- "serde 1.0.130",
- "serde_json",
- "structopt",
- "tempfile",
-]
-
-[[package]]
-name = "diemdb"
-version = "0.1.0"
-dependencies = [
- "accumulator",
- "anyhow",
- "arc-swap",
- "bcs",
- "byteorder",
- "diem-config",
- "diem-crypto",
- "diem-infallible",
- "diem-jellyfish-merkle",
- "diem-logger",
- "diem-metrics",
- "diem-proptest-helpers",
- "diem-temppath",
- "diem-types",
- "diem-workspace-hack",
- "executor-types",
- "itertools 0.10.1",
- "move-core-types",
- "num-derive",
- "num-traits 0.2.14",
- "num-variants",
- "once_cell",
- "proptest",
- "proptest-derive",
- "rand 0.8.4",
- "schemadb",
- "scratchpad",
- "serde 1.0.130",
- "storage-interface",
- "thiserror",
-]
-
-[[package]]
-name = "diemsum"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "diem-crypto",
- "diem-types",
- "diem-workspace-hack",
- "diemdb",
- "serde 1.0.130",
- "serde_json",
- "storage-interface",
- "structopt",
 ]
 
 [[package]]
@@ -2722,18 +2722,18 @@ dependencies = [
 name = "event-notifications"
 version = "0.1.0"
 dependencies = [
+ "aptos-crypto",
+ "aptos-id-generator",
+ "aptos-infallible",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "aptosdb",
  "async-trait",
  "bcs",
  "channel",
  "claim",
- "diem-crypto",
- "diem-id-generator",
- "diem-infallible",
- "diem-temppath",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diemdb",
  "executor-test-helpers",
  "futures",
  "itertools 0.10.1",
@@ -2750,21 +2750,21 @@ name = "execution-correctness"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-genesis-tool",
+ "aptos-global-constants",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-secure-net",
+ "aptos-secure-storage",
+ "aptos-temppath",
+ "aptos-transaction-builder",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
  "bcs",
  "consensus-types",
- "diem-config",
- "diem-crypto",
- "diem-genesis-tool",
- "diem-global-constants",
- "diem-infallible",
- "diem-logger",
- "diem-secure-net",
- "diem-secure-storage",
- "diem-temppath",
- "diem-transaction-builder",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
  "executor",
  "executor-test-helpers",
  "executor-types",
@@ -2780,23 +2780,23 @@ name = "executor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-genesis-tool",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics",
+ "aptos-secure-net",
+ "aptos-state-view",
+ "aptos-temppath",
+ "aptos-transaction-builder",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "aptosdb",
  "bcs",
  "consensus-types",
- "diem-config",
- "diem-crypto",
  "diem-framework-releases",
- "diem-genesis-tool",
- "diem-infallible",
- "diem-logger",
- "diem-metrics",
- "diem-secure-net",
- "diem-state-view",
- "diem-temppath",
- "diem-transaction-builder",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diemdb",
  "executor-test-helpers",
  "executor-types",
  "fail",
@@ -2818,22 +2818,22 @@ dependencies = [
 name = "executor-benchmark"
 version = "0.1.0"
 dependencies = [
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-genesis-tool",
+ "aptos-infallible",
+ "aptos-jellyfish-merkle",
+ "aptos-logger",
+ "aptos-secure-push-metrics",
+ "aptos-temppath",
+ "aptos-transaction-builder",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "aptosdb",
  "bcs",
  "chrono",
  "criterion",
- "diem-config",
- "diem-crypto",
- "diem-genesis-tool",
- "diem-infallible",
- "diem-jellyfish-merkle",
- "diem-logger",
- "diem-secure-push-metrics",
- "diem-temppath",
- "diem-transaction-builder",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diemdb",
  "executor",
  "executor-types",
  "indicatif",
@@ -2854,15 +2854,15 @@ name = "executor-test-helpers"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "diem-config",
- "diem-crypto",
- "diem-genesis-tool",
- "diem-temppath",
- "diem-transaction-builder",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diemdb",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-genesis-tool",
+ "aptos-temppath",
+ "aptos-transaction-builder",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "aptosdb",
  "executor",
  "executor-types",
  "rand 0.8.4",
@@ -2877,12 +2877,12 @@ name = "executor-types"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-crypto",
+ "aptos-secure-net",
+ "aptos-state-view",
+ "aptos-types",
+ "aptos-workspace-hack",
  "bcs",
- "diem-crypto",
- "diem-secure-net",
- "diem-state-view",
- "diem-types",
- "diem-workspace-hack",
  "scratchpad",
  "serde 1.0.130",
  "storage-interface",
@@ -2910,7 +2910,7 @@ checksum = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
 name = "fallible"
 version = "0.1.0"
 dependencies = [
- "diem-workspace-hack",
+ "aptos-workspace-hack",
  "thiserror",
 ]
 
@@ -2958,19 +2958,19 @@ name = "forge"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
+ "aptos-genesis-tool",
+ "aptos-logger",
+ "aptos-rest-client",
+ "aptos-retrier",
+ "aptos-sdk",
+ "aptos-secure-storage",
+ "aptos-transaction-builder",
+ "aptos-workspace-hack",
  "async-trait",
  "base64",
  "debug-interface",
- "diem-config",
  "diem-framework-releases",
- "diem-genesis-tool",
- "diem-logger",
- "diem-rest-client",
- "diem-retrier",
- "diem-sdk",
- "diem-secure-storage",
- "diem-transaction-builder",
- "diem-workspace-hack",
  "futures",
  "hyper",
  "hyper-proxy",
@@ -3002,9 +3002,9 @@ name = "forge-cli"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "diem-rest-client",
- "diem-sdk",
- "diem-workspace-hack",
+ "aptos-rest-client",
+ "aptos-sdk",
+ "aptos-workspace-hack",
  "forge",
  "itertools 0.10.1",
  "rand_core 0.6.2",
@@ -3029,10 +3029,10 @@ name = "framework-releases"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-types",
+ "aptos-workspace-hack",
  "bcs",
  "clap",
- "diem-types",
- "diem-workspace-hack",
  "include_dir",
  "log",
  "move-binary-format",
@@ -3168,14 +3168,14 @@ checksum = "8f5f3913fa0bfe7ee1fd8248b6b9f42a5af4b9d65ec2dd2c3c26132b950ecfc2"
 name = "generate-format"
 version = "0.1.0"
 dependencies = [
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-types",
+ "aptos-workspace-hack",
  "bcs",
  "consensus",
  "consensus-types",
- "diem-config",
- "diem-crypto",
- "diem-crypto-derive",
- "diem-types",
- "diem-workspace-hack",
  "move-core-types",
  "network",
  "rand 0.8.4",
@@ -3189,10 +3189,10 @@ dependencies = [
 name = "generate-key"
 version = "0.1.0"
 dependencies = [
+ "aptos-crypto",
+ "aptos-temppath",
+ "aptos-workspace-hack",
  "bcs",
- "diem-crypto",
- "diem-temppath",
- "diem-workspace-hack",
  "rand 0.8.4",
 ]
 
@@ -3219,11 +3219,11 @@ dependencies = [
 name = "genesis-viewer"
 version = "0.1.0"
 dependencies = [
+ "aptos-resource-viewer",
+ "aptos-types",
+ "aptos-workspace-hack",
  "bcs",
  "diem-framework-releases",
- "diem-resource-viewer",
- "diem-types",
- "diem-workspace-hack",
  "move-binary-format",
  "move-core-types",
  "move-vm-test-utils",
@@ -3975,18 +3975,18 @@ name = "language-e2e-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-keygen",
+ "aptos-proptest-helpers",
+ "aptos-state-view",
+ "aptos-transaction-builder",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "aptos-writeset-generator",
  "bcs",
- "diem-config",
- "diem-crypto",
  "diem-framework-releases",
- "diem-keygen",
- "diem-proptest-helpers",
- "diem-state-view",
- "diem-transaction-builder",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diem-writeset-generator",
  "goldenfile",
  "hex",
  "move-binary-format",
@@ -4008,18 +4008,18 @@ dependencies = [
 name = "language-e2e-testsuite"
 version = "0.1.0"
 dependencies = [
+ "aptos-crypto",
+ "aptos-keygen",
+ "aptos-logger",
+ "aptos-parallel-executor",
+ "aptos-state-view",
+ "aptos-transaction-builder",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "aptos-writeset-generator",
  "bcs",
- "diem-crypto",
  "diem-framework-releases",
- "diem-keygen",
- "diem-logger",
- "diem-parallel-executor",
- "diem-state-view",
- "diem-transaction-builder",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diem-writeset-generator",
  "hex",
  "language-e2e-tests",
  "move-binary-format",
@@ -4170,11 +4170,11 @@ dependencies = [
 name = "mempool-notifications"
 version = "0.1.0"
 dependencies = [
+ "aptos-crypto",
+ "aptos-types",
+ "aptos-workspace-hack",
  "async-trait",
  "claim",
- "diem-crypto",
- "diem-types",
- "diem-workspace-hack",
  "futures",
  "serde 1.0.130",
  "thiserror",
@@ -4185,9 +4185,9 @@ dependencies = [
 name = "memsocket"
 version = "0.1.0"
 dependencies = [
+ "aptos-infallible",
+ "aptos-workspace-hack",
  "bytes",
- "diem-infallible",
- "diem-workspace-hack",
  "futures",
  "once_cell",
 ]
@@ -4959,7 +4959,7 @@ dependencies = [
 name = "mvhashmap"
 version = "0.1.0"
 dependencies = [
- "diem-workspace-hack",
+ "aptos-workspace-hack",
  "num_cpus",
  "once_cell",
  "proptest",
@@ -4995,10 +4995,10 @@ checksum = "ca2b420f638f07fe83056b55ea190bb815f609ec5a35e7017884a10f78839c9e"
 name = "netcore"
 version = "0.1.0"
 dependencies = [
+ "aptos-logger",
+ "aptos-types",
+ "aptos-workspace-hack",
  "bytes",
- "diem-logger",
- "diem-types",
- "diem-workspace-hack",
  "futures",
  "memsocket",
  "pin-project",
@@ -5014,24 +5014,24 @@ name = "network"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-bitvec",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-id-generator",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics",
+ "aptos-proptest-helpers",
+ "aptos-rate-limiter",
+ "aptos-time-service",
+ "aptos-types",
+ "aptos-workspace-hack",
  "async-trait",
  "bcs",
  "bytes",
  "channel",
  "criterion",
- "diem-bitvec",
- "diem-config",
- "diem-crypto",
- "diem-crypto-derive",
- "diem-id-generator",
- "diem-infallible",
- "diem-logger",
- "diem-metrics",
- "diem-proptest-helpers",
- "diem-rate-limiter",
- "diem-time-service",
- "diem-types",
- "diem-workspace-hack",
  "futures",
  "futures-util",
  "hex",
@@ -5064,17 +5064,17 @@ dependencies = [
 name = "network-builder"
 version = "0.1.0"
 dependencies = [
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-secure-storage",
+ "aptos-time-service",
+ "aptos-types",
+ "aptos-workspace-hack",
  "async-trait",
  "bcs",
  "channel",
- "diem-config",
- "diem-crypto",
- "diem-infallible",
- "diem-logger",
- "diem-secure-storage",
- "diem-time-service",
- "diem-types",
- "diem-workspace-hack",
  "event-notifications",
  "futures",
  "netcore",
@@ -5090,17 +5090,17 @@ name = "network-discovery"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-metrics",
+ "aptos-secure-storage",
+ "aptos-temppath",
+ "aptos-time-service",
+ "aptos-types",
+ "aptos-workspace-hack",
  "bcs",
  "channel",
- "diem-config",
- "diem-crypto",
- "diem-logger",
- "diem-metrics",
- "diem-secure-storage",
- "diem-temppath",
- "diem-time-service",
- "diem-types",
- "diem-workspace-hack",
  "event-notifications",
  "futures",
  "move-core-types",
@@ -5319,7 +5319,7 @@ dependencies = [
 name = "num-variants"
 version = "0.1.0"
 dependencies = [
- "diem-workspace-hack",
+ "aptos-workspace-hack",
  "proc-macro2 1.0.28",
  "quote 1.0.9",
  "syn 1.0.74",
@@ -5357,10 +5357,10 @@ checksum = "a9a7ab5d64814df0fe4a4b5ead45ed6c5f181ee3ff04ba344313a6c80446c5d4"
 name = "offchain"
 version = "0.1.0"
 dependencies = [
+ "aptos-sdk",
+ "aptos-workspace-hack",
  "base64",
  "bech32",
- "diem-sdk",
- "diem-workspace-hack",
  "hex",
  "rand 0.8.4",
  "rand_core 0.6.2",
@@ -5832,7 +5832,7 @@ dependencies = [
 name = "proxy"
 version = "0.1.0"
 dependencies = [
- "diem-workspace-hack",
+ "aptos-workspace-hack",
  "ipnet",
 ]
 
@@ -6414,22 +6414,22 @@ checksum = "ef703b7cb59335eae2eb93ceb664c0eb7ea6bf567079d843e09420219668e072"
 name = "safety-rules"
 version = "0.1.0"
 dependencies = [
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-global-constants",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-proptest-helpers",
+ "aptos-secure-net",
+ "aptos-secure-push-metrics",
+ "aptos-secure-storage",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vault-client",
+ "aptos-workspace-hack",
  "consensus-types",
  "crash-handler",
  "criterion",
- "diem-config",
- "diem-crypto",
- "diem-global-constants",
- "diem-infallible",
- "diem-logger",
- "diem-proptest-helpers",
- "diem-secure-net",
- "diem-secure-push-metrics",
- "diem-secure-storage",
- "diem-temppath",
- "diem-types",
- "diem-vault-client",
- "diem-workspace-hack",
  "once_cell",
  "proptest",
  "rand 0.8.4",
@@ -6464,12 +6464,12 @@ name = "schemadb"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
+ "aptos-logger",
+ "aptos-metrics",
+ "aptos-temppath",
+ "aptos-workspace-hack",
  "byteorder",
- "diem-config",
- "diem-logger",
- "diem-metrics",
- "diem-temppath",
- "diem-workspace-hack",
  "once_cell",
  "proptest",
  "rocksdb",
@@ -6491,14 +6491,14 @@ checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
 name = "scratchpad"
 version = "0.1.0"
 dependencies = [
+ "aptos-crypto",
+ "aptos-infallible",
+ "aptos-metrics",
+ "aptos-types",
+ "aptos-workspace-hack",
  "arc-swap",
  "bitvec",
  "criterion",
- "diem-crypto",
- "diem-infallible",
- "diem-metrics",
- "diem-types",
- "diem-workspace-hack",
  "itertools 0.10.1",
  "once_cell",
  "proptest",
@@ -6545,14 +6545,14 @@ name = "seed-peer-generator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-rest-client",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-workspace-hack",
  "bcs",
- "diem-config",
- "diem-crypto",
- "diem-logger",
- "diem-rest-client",
- "diem-temppath",
- "diem-types",
- "diem-workspace-hack",
  "hex",
  "rand 0.8.4",
  "serde_yaml",
@@ -6883,7 +6883,7 @@ checksum = "43b2853a4d09f215c24cc5489c992ce46052d359b5109343cbafbf26bc62f8a3"
 name = "short-hex-str"
 version = "0.1.0"
 dependencies = [
- "diem-workspace-hack",
+ "aptos-workspace-hack",
  "hex",
  "mirai-annotations",
  "proptest",
@@ -6960,33 +6960,33 @@ name = "smoke-test"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
+ "aptos-crypto",
  "aptos-framework-releases",
+ "aptos-genesis-tool",
+ "aptos-global-constants",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-management",
+ "aptos-operational-tool",
+ "aptos-rest-client",
+ "aptos-sdk",
+ "aptos-secure-storage",
+ "aptos-temppath",
+ "aptos-time-service",
+ "aptos-transaction-builder",
+ "aptos-types",
+ "aptos-vault-client",
+ "aptos-workspace-hack",
+ "aptos-writeset-generator",
  "async-trait",
  "backup-cli",
  "base64",
  "bcs",
  "debug-interface",
- "diem-config",
- "diem-crypto",
  "diem-experimental-framework-releases",
  "diem-framework",
  "diem-framework-releases",
- "diem-genesis-tool",
- "diem-global-constants",
- "diem-infallible",
- "diem-logger",
- "diem-management",
- "diem-operational-tool",
- "diem-rest-client",
- "diem-sdk",
- "diem-secure-storage",
- "diem-temppath",
- "diem-time-service",
- "diem-transaction-builder",
- "diem-types",
- "diem-vault-client",
- "diem-workspace-hack",
- "diem-writeset-generator",
  "forge",
  "futures",
  "generate-key",
@@ -7008,11 +7008,11 @@ dependencies = [
 name = "socket-bench-server"
 version = "0.1.0"
 dependencies = [
- "diem-config",
- "diem-crypto",
- "diem-logger",
- "diem-types",
- "diem-workspace-hack",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-types",
+ "aptos-workspace-hack",
  "futures",
  "memsocket",
  "netcore",
@@ -7058,21 +7058,21 @@ dependencies = [
 name = "state-sync-driver"
 version = "0.1.0"
 dependencies = [
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-data-client",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-temppath",
+ "aptos-time-service",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "aptosdb",
  "channel",
  "claim",
  "consensus-notifications",
  "data-streaming-service",
- "diem-config",
- "diem-crypto",
- "diem-data-client",
- "diem-infallible",
- "diem-logger",
- "diem-temppath",
- "diem-time-service",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diemdb",
  "event-notifications",
  "executor",
  "executor-test-helpers",
@@ -7093,19 +7093,19 @@ dependencies = [
 name = "state-sync-multiplexer"
 version = "0.1.0"
 dependencies = [
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-data-client",
+ "aptos-genesis-tool",
+ "aptos-infallible",
+ "aptos-temppath",
+ "aptos-time-service",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "aptosdb",
  "consensus-notifications",
  "data-streaming-service",
- "diem-config",
- "diem-crypto",
- "diem-data-client",
- "diem-genesis-tool",
- "diem-infallible",
- "diem-temppath",
- "diem-time-service",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diemdb",
  "event-notifications",
  "executor",
  "executor-test-helpers",
@@ -7124,28 +7124,28 @@ dependencies = [
 name = "state-sync-v1"
 version = "0.1.0"
 dependencies = [
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-genesis-tool",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-mempool",
+ "aptos-metrics",
+ "aptos-proptest-helpers",
+ "aptos-temppath",
+ "aptos-time-service",
+ "aptos-transaction-builder",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "aptosdb",
  "async-trait",
  "bcs",
  "bytes",
  "channel",
  "claim",
  "consensus-notifications",
- "diem-config",
- "diem-crypto",
  "diem-framework-releases",
- "diem-genesis-tool",
- "diem-infallible",
- "diem-logger",
- "diem-mempool",
- "diem-metrics",
- "diem-proptest-helpers",
- "diem-temppath",
- "diem-time-service",
- "diem-transaction-builder",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diemdb",
  "event-notifications",
  "executor",
  "executor-test-helpers",
@@ -7238,13 +7238,13 @@ name = "storage-client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-crypto",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-secure-net",
+ "aptos-types",
+ "aptos-workspace-hack",
  "bcs",
- "diem-crypto",
- "diem-infallible",
- "diem-logger",
- "diem-secure-net",
- "diem-types",
- "diem-workspace-hack",
  "serde 1.0.130",
  "storage-interface",
 ]
@@ -7254,12 +7254,12 @@ name = "storage-interface"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-crypto",
+ "aptos-secure-net",
+ "aptos-state-view",
+ "aptos-types",
+ "aptos-workspace-hack",
  "bcs",
- "diem-crypto",
- "diem-secure-net",
- "diem-state-view",
- "diem-types",
- "diem-workspace-hack",
  "itertools 0.10.1",
  "move-core-types",
  "parking_lot",
@@ -7273,16 +7273,16 @@ name = "storage-service"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-metrics",
+ "aptos-secure-net",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "aptosdb",
  "bcs",
- "diem-config",
- "diem-crypto",
- "diem-logger",
- "diem-metrics",
- "diem-secure-net",
- "diem-temppath",
- "diem-types",
- "diem-workspace-hack",
- "diemdb",
  "futures",
  "itertools 0.10.1",
  "proptest",
@@ -7296,11 +7296,11 @@ dependencies = [
 name = "storage-service-client"
 version = "0.1.0"
 dependencies = [
+ "aptos-config",
+ "aptos-types",
+ "aptos-workspace-hack",
  "async-trait",
  "channel",
- "diem-config",
- "diem-types",
- "diem-workspace-hack",
  "network",
  "storage-service-types",
  "thiserror",
@@ -7311,17 +7311,17 @@ name = "storage-service-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-metrics",
+ "aptos-types",
+ "aptos-workspace-hack",
  "bcs",
  "bounded-executor",
  "bytes",
  "channel",
  "claim",
- "diem-config",
- "diem-crypto",
- "diem-logger",
- "diem-metrics",
- "diem-types",
- "diem-workspace-hack",
  "futures",
  "move-core-types",
  "network",
@@ -7337,11 +7337,11 @@ dependencies = [
 name = "storage-service-types"
 version = "0.1.0"
 dependencies = [
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-types",
+ "aptos-workspace-hack",
  "claim",
- "diem-config",
- "diem-crypto",
- "diem-types",
- "diem-workspace-hack",
  "num-traits 0.2.14",
  "proptest",
  "serde 1.0.130",
@@ -7407,11 +7407,11 @@ dependencies = [
 name = "swiss-knife"
 version = "0.1.0"
 dependencies = [
+ "aptos-crypto",
+ "aptos-transaction-builder",
+ "aptos-types",
+ "aptos-workspace-hack",
  "bcs",
- "diem-crypto",
- "diem-transaction-builder",
- "diem-types",
- "diem-workspace-hack",
  "hex",
  "move-core-types",
  "rand 0.8.4",
@@ -7549,12 +7549,12 @@ name = "testcases"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "aptos-logger",
+ "aptos-operational-tool",
+ "aptos-rest-client",
+ "aptos-sdk",
+ "aptos-workspace-hack",
  "bcs",
- "diem-logger",
- "diem-operational-tool",
- "diem-rest-client",
- "diem-sdk",
- "diem-workspace-hack",
  "forge",
  "rand 0.8.4",
  "tokio",
@@ -7938,9 +7938,9 @@ name = "transaction-builder-generator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-types",
+ "aptos-workspace-hack",
  "bcs",
- "diem-types",
- "diem-workspace-hack",
  "heck",
  "move-core-types",
  "regex",
@@ -7958,12 +7958,12 @@ name = "transaction-emitter"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "diem-config",
- "diem-crypto",
- "diem-logger",
- "diem-rest-client",
- "diem-sdk",
- "diem-workspace-hack",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-rest-client",
+ "aptos-sdk",
+ "aptos-workspace-hack",
  "futures",
  "generate-key",
  "itertools 0.10.1",
@@ -8272,17 +8272,17 @@ name = "vm-genesis"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-proptest-helpers",
+ "aptos-state-view",
+ "aptos-transaction-builder",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
  "bcs",
- "diem-config",
- "diem-crypto",
  "diem-framework",
  "diem-framework-releases",
- "diem-proptest-helpers",
- "diem-state-view",
- "diem-transaction-builder",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
  "move-binary-format",
  "move-bytecode-utils",
  "move-bytecode-verifier",
@@ -8301,14 +8301,14 @@ name = "vm-validator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "diem-crypto",
- "diem-state-view",
- "diem-temppath",
- "diem-transaction-builder",
- "diem-types",
- "diem-vm",
- "diem-workspace-hack",
- "diemdb",
+ "aptos-crypto",
+ "aptos-state-view",
+ "aptos-temppath",
+ "aptos-transaction-builder",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "aptosdb",
  "executor",
  "executor-test-helpers",
  "fail",

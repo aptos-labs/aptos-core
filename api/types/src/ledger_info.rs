@@ -3,7 +3,7 @@
 
 use crate::U64;
 
-use diem_types::{chain_id::ChainId, ledger_info::LedgerInfoWithSignatures};
+use aptos_types::{chain_id::ChainId, ledger_info::LedgerInfoWithSignatures};
 
 use serde::{Deserialize, Serialize};
 

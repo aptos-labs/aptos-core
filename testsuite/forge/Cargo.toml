@@ -38,14 +38,14 @@ tokio = { version = "1.8.1", features = ["full"] }
 url = "2.2.2"
 
 debug-interface = { path = "../../crates/debug-interface" }
-diem-config = { path = "../../config" }
-diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
-diem-genesis-tool = { path = "../../config/management/genesis" }
-diem-logger = { path = "../../crates/diem-logger" }
-diem-retrier = { path = "../../crates/diem-retrier" }
-diem-sdk = { path = "../../sdk" }
-diem-rest-client = { path = "../../crates/diem-rest-client"}
-diem-secure-storage = { path = "../../secure/storage" }
-diem-transaction-builder = { path = "../../sdk/transaction-builder" }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptos-config = { path = "../../config" }
+diem-framework-releases = { path = "../../aptos-move/diem-framework/DPN/releases" }
+aptos-genesis-tool = { path = "../../config/management/genesis" }
+aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-retrier = { path = "../../crates/aptos-retrier" }
+aptos-sdk = { path = "../../sdk" }
+aptos-rest-client = { path = "../../crates/aptos-rest-client"}
+aptos-secure-storage = { path = "../../secure/storage" }
+aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 transaction-emitter = { path = "../../crates/transaction-emitter" }

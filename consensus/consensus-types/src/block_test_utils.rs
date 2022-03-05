@@ -9,11 +9,11 @@ use crate::{
     quorum_cert::QuorumCert,
     vote_data::VoteData,
 };
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::Ed25519PrivateKey,
     hash::{CryptoHash, HashValue},
 };
-use diem_types::{
+use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -43,7 +43,7 @@ prop_compose! {
         Block::new_proposal(
             vec![],
             round,
-            diem_infallible::duration_since_epoch().as_micros() as u64,
+            aptos_infallible::duration_since_epoch().as_micros() as u64,
             parent_qc,
             &signer,
         )
@@ -88,7 +88,7 @@ prop_compose! {
                     block.payload().unwrap().clone(),
                     block.author().unwrap(),
                     block.round(),
-                    diem_infallible::duration_since_epoch().as_micros() as u64,
+                    aptos_infallible::duration_since_epoch().as_micros() as u64,
                     block.quorum_cert().clone(),
                 ),
                 signature: Some(block.signature().unwrap().clone()),

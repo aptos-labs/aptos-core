@@ -167,9 +167,9 @@ Terraform with Vault
      Check your `VAULT_CACERT` env (`echo $VAULT_CERT`), make sure it's the full path to the vault CA certificate file.
      `<vault root token>` is the token you generated in step 13.
 
-20. Rename `diem-root.tf.example` to `diem-root.tf`, this will add `diem-root` key and `treasury_compliance` key in your vault for this test.
+20. Rename `aptos-root.tf.example` to `aptos-root.tf`, this will add `aptos-root` key and `treasury_compliance` key in your vault for this test.
 
-        $ cp diem-root.tf.example diem-root.tf
+        $ cp aptos-root.tf.example aptos-root.tf
 
 21. Apply the configuration, providing your Kubernetes cluster information:
 
@@ -200,34 +200,34 @@ Terraform with Vault
 
     * Otherwise on AWS:
 
-          $ export VALIDATOR_ADDRESS="$(kubectl get svc ${WORKSPACE}-diem-validator-validator-lb -o go-template='/dns4/{{(index .status.loadBalancer.ingress 0).hostname}}/tcp/{{(index .spec.ports 0).port}}')"
-          $ export FULLNODE_ADDRESS="$(kubectl get svc ${WORKSPACE}-diem-validator-fullnode-lb -o go-template='/dns4/{{(index .status.loadBalancer.ingress 0).hostname}}/tcp/{{(index .spec.ports 0).port}}')"
+          $ export VALIDATOR_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-validator-validator-lb -o go-template='/dns4/{{(index .status.loadBalancer.ingress 0).hostname}}/tcp/{{(index .spec.ports 0).port}}')"
+          $ export FULLNODE_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-validator-fullnode-lb -o go-template='/dns4/{{(index .status.loadBalancer.ingress 0).hostname}}/tcp/{{(index .spec.ports 0).port}}')"
 
     * Otherwise on GCP and Azure:
 
-          $ export VALIDATOR_ADDRESS="$(kubectl get svc ${WORKSPACE}-diem-validator-validator-lb -o go-template='/ip4/{{(index .status.loadBalancer.ingress 0).ip}}/tcp/{{(index .spec.ports 0).port}}')"
-          $ export FULLNODE_ADDRESS="$(kubectl get svc ${WORKSPACE}-diem-validator-fullnode-lb -o go-template='/ip4/{{(index .status.loadBalancer.ingress 0).ip}}/tcp/{{(index .spec.ports 0).port}}')"
+          $ export VALIDATOR_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-validator-validator-lb -o go-template='/ip4/{{(index .status.loadBalancer.ingress 0).ip}}/tcp/{{(index .spec.ports 0).port}}')"
+          $ export FULLNODE_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-validator-fullnode-lb -o go-template='/ip4/{{(index .status.loadBalancer.ingress 0).ip}}/tcp/{{(index .spec.ports 0).port}}')"
 
 26. Build the Diem genesis tool binary:
 
         $ git clone https://github.com/diem/diem
         $ cd diem
         $ git checkout <version>
-        $ cargo build -p diem-genesis-tool
-        $ cargo run -p diem-genesis-tool -- help
+        $ cargo build -p aptos-genesis-tool
+        $ cargo run -p aptos-genesis-tool -- help
 
     Follow [My first transaction][] to setup the environment for building Rust code.
 
 27. Use the genesis script to generate keys, create waypoints, and compile the genesis blob for your blockchain:
 
         $ cd ~/$WORKSPACE
-        $ export GENESIS=~/diem/target/debug/diem-genesis-tool
+        $ export GENESIS=~/diem/target/debug/aptos-genesis-tool
         $ export BACKEND="backend=vault;server=https://localhost:8200;ca_certificate=<full path to $WORKSPACE-vault.ca>;token=vault.token;namespace=diem"
         $ ~/diem/scripts/genesis-single.sh $GENESIS $BACKEND $VALIDATOR_ADDRESS $FULLNODE_ADDRESS
 
 28. Insert the genesis blob into the Kubernetes configmap for the chain era (defined in [helm/values.yaml][]):
 
-        $ kubectl create configmap $WORKSPACE-diem-validator-genesis-e<chain_era_number> --from-file=genesis.blob=genesis.blob
+        $ kubectl create configmap $WORKSPACE-aptos-validator-genesis-e<chain_era_number> --from-file=genesis.blob=genesis.blob
 
     change `<chain_era_number>` with current chain era number defined in [helm/values.yaml][].
 
@@ -237,7 +237,7 @@ Terraform with Vault
 
 30. To access the monitoring dashboard run the following:
 
-        $ kubectl port-forward $WORKSPACE-diem-validator-monitoring-0 3000
+        $ kubectl port-forward $WORKSPACE-aptos-validator-monitoring-0 3000
 
     And then load http://localhost:3000/d/validator
 

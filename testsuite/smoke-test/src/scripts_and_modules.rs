@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err};
-use diem_rest_client::Client as RestClient;
-use diem_sdk::{
+use aptos_rest_client::Client as RestClient;
+use aptos_sdk::{
     transaction_builder::{Currency, TransactionFactory},
     types::{
         account_address::AccountAddress,
@@ -11,7 +11,7 @@ use diem_sdk::{
         LocalAccount,
     },
 };
-use diem_temppath::TempPath;
+use aptos_temppath::TempPath;
 use forge::{AdminContext, AdminTest, Result, Test};
 use move_command_line_common::files::MOVE_EXTENSION;
 use move_ir_compiler::Compiler;

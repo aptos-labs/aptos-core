@@ -15,8 +15,8 @@ pub use cluster_helper::*;
 pub use node::K8sNode;
 pub use swarm::*;
 
-use diem_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
-use diem_secure_storage::{CryptoStorage, KVStorage, VaultStorage};
+use aptos_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
+use aptos_secure_storage::{CryptoStorage, KVStorage, VaultStorage};
 
 pub struct K8sFactory {
     root_key: [u8; ED25519_PRIVATE_KEY_LENGTH],
@@ -61,7 +61,7 @@ impl K8sFactory {
         );
         vault.available()?;
         let root_key = vault
-            .export_private_key("diem__diem_root")
+            .export_private_key("diem__aptos_root")
             .unwrap()
             .to_bytes();
         let treasury_compliance_key = vault

@@ -1,7 +1,7 @@
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-high
+  name: {{ include "aptos-validator.fullname" . }}-high
 value: 50000
 
 ---
@@ -9,5 +9,5 @@ value: 50000
 apiVersion: scheduling.k8s.io/v1
 kind: PriorityClass
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-medium
+  name: {{ include "aptos-validator.fullname" . }}-medium
 value: 30000

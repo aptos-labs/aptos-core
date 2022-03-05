@@ -7,7 +7,7 @@ use crate::{
     tests::common::{batch_add_signed_txn, TestTransaction},
     ConsensusRequest,
 };
-use diem_types::transaction::Transaction;
+use aptos_types::transaction::Transaction;
 use futures::{channel::oneshot, executor::block_on, sink::SinkExt};
 use mempool_notifications::MempoolNotificationSender;
 use tokio::runtime::Builder;

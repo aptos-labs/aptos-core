@@ -22,8 +22,8 @@ thiserror = "1.0.24"
 url = "2.2.2"
 uuid = { version = "0.8.2", features = ["serde"] }
 
-diem-sdk = { path = ".." }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptos-sdk = { path = ".." }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 
 [dev-dependencies]
 rand_core = "0.6"

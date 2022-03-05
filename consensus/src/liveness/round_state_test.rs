@@ -8,14 +8,14 @@ use crate::{
     util::mock_time_service::SimulatedTimeService,
 };
 
+use aptos_crypto::HashValue;
+use aptos_types::{
+    block_info::BlockInfo,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+};
 use consensus_types::{
     common::Round, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout::Timeout,
     timeout_certificate::TimeoutCertificate, vote_data::VoteData,
-};
-use diem_crypto::HashValue;
-use diem_types::{
-    block_info::BlockInfo,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
 use futures::StreamExt;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::on_chain_config::OnChainConfig;
-use diem_crypto::HashValue;
+use aptos_crypto::HashValue;
 use serde::{Deserialize, Serialize};
 
 /// Defines and holds the publishing policies for the VM. There are three possible configurations:

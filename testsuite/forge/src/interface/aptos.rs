@@ -2,8 +2,8 @@
 
 use super::Test;
 use crate::{CoreContext, Result, TestReport};
-use diem_rest_client::Client as RestClient;
-use diem_sdk::{
+use aptos_rest_client::Client as RestClient;
+use aptos_sdk::{
     crypto::ed25519::Ed25519PublicKey,
     transaction_builder::TransactionFactory,
     types::{
@@ -13,7 +13,7 @@ use diem_sdk::{
         LocalAccount,
     },
 };
-use diem_transaction_builder::aptos_stdlib;
+use aptos_transaction_builder::aptos_stdlib;
 use reqwest::Url;
 
 #[async_trait::async_trait]

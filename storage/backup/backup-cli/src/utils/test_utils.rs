@@ -1,12 +1,12 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_config::utils::get_available_port;
+use aptos_proptest_helpers::ValueGenerator;
+use aptos_temppath::TempPath;
+use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::TransactionToCommit};
+use aptosdb::{test_helper::arb_blocks_to_commit, DiemDB};
 use backup_service::start_backup_service;
-use diem_config::utils::get_available_port;
-use diem_proptest_helpers::ValueGenerator;
-use diem_temppath::TempPath;
-use diem_types::{ledger_info::LedgerInfoWithSignatures, transaction::TransactionToCommit};
-use diemdb::{test_helper::arb_blocks_to_commit, DiemDB};
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::Arc,

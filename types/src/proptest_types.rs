@@ -29,7 +29,7 @@ use crate::{
     vm_status::{KeptVMStatus, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::{self, Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     test_utils::KeyPair,
     traits::*,

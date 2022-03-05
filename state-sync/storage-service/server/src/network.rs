@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics;
+use aptos_types::PeerId;
 use bytes::Bytes;
-use channel::{diem_channel, message_queues::QueueStyle};
-use diem_types::PeerId;
+use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{
     channel::oneshot,
     future,
@@ -28,7 +28,7 @@ const INBOUND_CHANNEL_SIZE: usize = 100;
 pub fn network_endpoint_config() -> AppConfig {
     AppConfig::service(
         [ProtocolId::StorageServiceRpc],
-        diem_channel::Config::new(INBOUND_CHANNEL_SIZE)
+        aptos_channel::Config::new(INBOUND_CHANNEL_SIZE)
             .queue_style(QueueStyle::FIFO)
             .counters(&metrics::PENDING_STORAGE_SERVER_NETWORK_EVENTS),
     )
@@ -42,8 +42,8 @@ pub struct StorageServiceNetworkEvents(BoxStream<'static, NetworkRequest>);
 
 impl NewNetworkEvents for StorageServiceNetworkEvents {
     fn new(
-        peer_mgr_notifs_rx: diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
-        connection_notifs_rx: diem_channel::Receiver<PeerId, ConnectionNotification>,
+        peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
+        connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>,
     ) -> Self {
         let events = NetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx)
             .filter_map(|event| future::ready(Self::event_to_request(event)))

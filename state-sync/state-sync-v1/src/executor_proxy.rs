@@ -7,8 +7,8 @@ use crate::{
     logging::{LogEntry, LogEvent, LogSchema},
     shared_components::SyncState,
 };
-use diem_logger::prelude::*;
-use diem_types::{
+use aptos_logger::prelude::*;
+use aptos_types::{
     contract_event::ContractEvent, ledger_info::LedgerInfoWithSignatures,
     move_resource::MoveStorage, transaction::TransactionListWithProof,
 };
@@ -215,17 +215,16 @@ impl<C: ChunkExecutorTrait> ExecutorProxyTrait for ExecutorProxy<C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use claim::{assert_err, assert_ok};
-    use diem_crypto::{ed25519::*, PrivateKey, Uniform};
-    use diem_infallible::RwLock;
-    use diem_transaction_builder::stdlib::{
+    use aptos_crypto::{ed25519::*, PrivateKey, Uniform};
+    use aptos_infallible::RwLock;
+    use aptos_transaction_builder::stdlib::{
         encode_peer_to_peer_with_metadata_script,
         encode_set_validator_config_and_reconfigure_script,
         encode_update_diem_consensus_config_script_function, encode_update_diem_version_script,
     };
-    use diem_types::{
+    use aptos_types::{
         account_address::AccountAddress,
-        account_config::{diem_root_address, xus_tag},
+        account_config::{aptos_root_address, xus_tag},
         block_metadata::BlockMetadata,
         contract_event::ContractEvent,
         event::EventKey,
@@ -237,8 +236,9 @@ mod tests {
         },
         transaction::{Transaction, TransactionPayload, WriteSetPayload},
     };
-    use diem_vm::DiemVM;
-    use diemdb::DiemDB;
+    use aptos_vm::DiemVM;
+    use aptosdb::DiemDB;
+    use claim::{assert_err, assert_ok};
     use event_notifications::{EventSubscriptionService, ReconfigNotificationListener};
     use executor::{block_executor::BlockExecutor, chunk_executor::ChunkExecutor};
     use executor_test_helpers::{
@@ -364,7 +364,7 @@ mod tests {
         let (genesis, _validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
 
         // Create test diem database
-        let db_path = diem_temppath::TempPath::new();
+        let db_path = aptos_temppath::TempPath::new();
         assert_ok!(db_path.create_as_dir());
         let (db, db_rw) = DbReaderWriter::wrap(DiemDB::new_for_test(db_path.path()));
 
@@ -557,7 +557,7 @@ mod tests {
     #[test]
     fn test_missing_on_chain_config() {
         // Create a test diem database
-        let db_path = diem_temppath::TempPath::new();
+        let db_path = aptos_temppath::TempPath::new();
         db_path.create_as_dir().unwrap();
         let (db, db_rw) = DbReaderWriter::wrap(DiemDB::new_for_test(db_path.path()));
 
@@ -635,7 +635,7 @@ mod tests {
         let (genesis, validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
 
         // Create test diem database
-        let db_path = diem_temppath::TempPath::new();
+        let db_path = aptos_temppath::TempPath::new();
         assert_ok!(db_path.create_as_dir());
         let (db, db_rw) = DbReaderWriter::wrap(DiemDB::new_for_test(db_path.path()));
 
@@ -720,7 +720,7 @@ mod tests {
     fn create_new_update_diem_version_transaction(sequence_number: u64) -> Transaction {
         let genesis_key = vm_genesis::GENESIS_KEYPAIR.0.clone();
         get_test_signed_transaction(
-            diem_root_address(),
+            aptos_root_address(),
             sequence_number,
             genesis_key.clone(),
             genesis_key.public_key(),
@@ -735,7 +735,7 @@ mod tests {
     fn create_new_update_consensus_config_transaction(sequence_number: u64) -> Transaction {
         let genesis_key = vm_genesis::GENESIS_KEYPAIR.0.clone();
         get_test_signed_transaction(
-            diem_root_address(),
+            aptos_root_address(),
             sequence_number,
             genesis_key.clone(),
             genesis_key.public_key(),
@@ -756,7 +756,7 @@ mod tests {
     ) -> Transaction {
         let genesis_key = vm_genesis::GENESIS_KEYPAIR.0.clone();
         get_test_signed_transaction(
-            diem_root_address(),
+            aptos_root_address(),
             sequence_number,
             genesis_key.clone(),
             genesis_key.public_key(),

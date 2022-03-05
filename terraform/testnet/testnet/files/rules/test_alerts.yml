@@ -4,7 +4,7 @@ groups:
   rules:
 {{- if .Values.cluster_test.enabled }}
   - alert: Scheduled tests stopped making traffic
-    expr: absent(rate(diem_vm_user_transactions_executed[{{ .Values.cluster_test.intervalMins }}m]) > 0)
+    expr: absent(rate(aptos_vm_user_transactions_executed[{{ .Values.cluster_test.intervalMins }}m]) > 0)
     for: {{ .Values.cluster_test.intervalMins }}m
     labels:
       severity: warning

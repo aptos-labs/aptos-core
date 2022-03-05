@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error::Error, storage::StorageWrapper};
-use diem_config::config;
-use diem_types::chain_id::{self, ChainId};
+use aptos_config::config;
+use aptos_types::chain_id::{self, ChainId};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
@@ -13,7 +13,7 @@ use structopt::StructOpt;
 /// # Example:
 ///
 /// ```
-/// use diem_management::config::ConfigPath;
+/// use aptos_management::config::ConfigPath;
 /// use structopt::StructOpt;
 ///
 /// #[derive(Clone, Debug, StructOpt)]
@@ -38,7 +38,7 @@ use structopt::StructOpt;
 /// // Output:
 /// // ...
 /// // OPTIONS:
-/// //         --config <config>    Path to a diem-management configuration file
+/// //         --config <config>    Path to a aptos-management configuration file
 /// //         --test <test>
 ///
 /// // let none  = "cmd";
@@ -144,7 +144,7 @@ impl Config {
 
 #[derive(Clone, Debug, Default, StructOpt)]
 pub struct ConfigPath {
-    /// Path to a diem-management configuration file
+    /// Path to a aptos-management configuration file
     #[structopt(long)]
     config: Option<PathBuf>,
 }
@@ -162,8 +162,8 @@ impl ConfigPath {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diem_config::config::{SecureBackend, Token, VaultConfig};
-    use diem_types::chain_id::NamedChain;
+    use aptos_config::config::{SecureBackend, Token, VaultConfig};
+    use aptos_types::chain_id::NamedChain;
 
     #[test]
     fn example() {

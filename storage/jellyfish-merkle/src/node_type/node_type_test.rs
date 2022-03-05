@@ -6,11 +6,11 @@ use super::{
     NodeKey,
 };
 use crate::{node_type::NodeType, test_helper::ValueBlob};
-use diem_crypto::{
+use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use diem_types::{
+use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble},
     proof::{SparseMerkleInternalNode, SparseMerkleLeafNode},
     transaction::Version,

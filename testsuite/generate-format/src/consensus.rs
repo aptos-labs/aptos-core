@@ -1,13 +1,13 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
     traits::{SigningKey, Uniform},
 };
-use diem_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use diem_types::{contract_event, event, transaction, write_set};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_types::{contract_event, event, transaction, write_set};
 use move_core_types::language_storage;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};

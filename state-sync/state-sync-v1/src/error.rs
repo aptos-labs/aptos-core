@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_types::transaction::Version;
+use aptos_types::transaction::Version;
 use futures::channel::{mpsc::SendError, oneshot::Canceled};
 use mempool_notifications;
 use network::error::NetworkError;

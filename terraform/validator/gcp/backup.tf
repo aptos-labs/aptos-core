@@ -21,5 +21,5 @@ resource "google_storage_bucket_iam_member" "backup" {
 resource "google_service_account_iam_binding" "backup" {
   service_account_id = google_service_account.backup.name
   role               = "roles/iam.workloadIdentityUser"
-  members            = ["serviceAccount:${google_container_cluster.diem.workload_identity_config[0].identity_namespace}[default/${terraform.workspace}-diem-validator-backup]"]
+  members            = ["serviceAccount:${google_container_cluster.diem.workload_identity_config[0].identity_namespace}[default/${terraform.workspace}-aptos-validator-backup]"]
 }

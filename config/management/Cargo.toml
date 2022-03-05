@@ -1,5 +1,5 @@
 [package]
-name = "diem-management"
+name = "aptos-management"
 version = "0.1.0"
 authors = ["Diem Association <opensource@diem.com>"]
 description = "Diem Management is a tool used to manage the configuration of a Diem Node"
@@ -19,19 +19,19 @@ thiserror = "1.0.24"
 toml = { version = "0.5.8", default-features = false }
 
 bcs = "0.1.2"
-diem-config = { path = ".."}
-diem-crypto = { path = "../../crates/diem-crypto" }
-diem-global-constants = { path = "../global-constants"}
-diem-secure-storage = { path = "../../secure/storage" }
-diem-time-service = { path = "../../crates/diem-time-service" }
-diem-types = { path = "../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
-diem-temppath = { path = "../../crates/diem-temppath" }
-diem-transaction-builder = { path = "../../sdk/transaction-builder" }
+aptos-config = { path = ".."}
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-global-constants = { path = "../global-constants"}
+aptos-secure-storage = { path = "../../secure/storage" }
+aptos-time-service = { path = "../../crates/aptos-time-service" }
+aptos-types = { path = "../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
+aptos-temppath = { path = "../../crates/aptos-temppath" }
+aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 
 [dev-dependencies]
-diem-config = { path = "..", features = ["fuzzing"] }
+aptos-config = { path = "..", features = ["fuzzing"] }
 
 [features]
 testing = []
-fuzzing = ["diem-config/fuzzing"]
+fuzzing = ["aptos-config/fuzzing"]

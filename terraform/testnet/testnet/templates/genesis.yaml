@@ -8,7 +8,7 @@ data:
   layout.yaml: |-
     owners = [{{- range $i, $e := until (int .Values.genesis.numValidators) -}}"val{{$i}}", {{- end -}}]
     operators = [{{- range $i, $e := until (int .Values.genesis.numValidators) -}}"val{{$i}}", {{- end -}}]
-    diem_root = "diem"
+    aptos_root = "diem"
     treasury_compliance = "diem"
 
 ---
@@ -81,48 +81,48 @@ spec:
           export VAULT_TOKEN=$(vault write -field=token auth/approle/login role_id="{{ .Values.genesis.vaultRoleId }}" secret_id="{{ .Values.genesis.vaultSecretId }}")
 
           kubectl get pvc -o name | grep /fn- | grep -v "e{{ .Values.genesis.era }}-" | xargs -r kubectl delete
-          kubectl get configmap -o name | grep diem-validator-genesis-e | xargs -r kubectl delete
+          kubectl get configmap -o name | grep aptos-validator-genesis-e | xargs -r kubectl delete
           kubectl get configmap -o name | grep "{{ include "testnet.fullname" .}}-genesis-e" | xargs -r kubectl delete
           kubectl get secret -o name | grep "{{ include "testnet.fullname" . }}-faucet-e" | xargs -r kubectl delete
 
-          diem-genesis-tool set-layout --shared-backend "$FILE_BACKEND;namespace=common" --path /genesis/layout.yaml
-          diem-genesis-tool set-move-modules --shared-backend "$FILE_BACKEND;namespace=common" --dir {{ .Values.genesis.moveModuleDir | default "/diem/move/modules"}}
-          diem-genesis-tool diem-root-key --validator-backend "$VAULT_BACKEND;namespace=diem" --shared-backend "$FILE_BACKEND;namespace=diem"
-          diem-genesis-tool treasury-compliance-key --validator-backend "$VAULT_BACKEND;namespace=diem" --shared-backend "$FILE_BACKEND;namespace=diem"
+          aptos-genesis-tool set-layout --shared-backend "$FILE_BACKEND;namespace=common" --path /genesis/layout.yaml
+          aptos-genesis-tool set-move-modules --shared-backend "$FILE_BACKEND;namespace=common" --dir {{ .Values.genesis.moveModuleDir | default "/diem/move/modules"}}
+          aptos-genesis-tool aptos-root-key --validator-backend "$VAULT_BACKEND;namespace=diem" --shared-backend "$FILE_BACKEND;namespace=diem"
+          aptos-genesis-tool treasury-compliance-key --validator-backend "$VAULT_BACKEND;namespace=diem" --shared-backend "$FILE_BACKEND;namespace=diem"
 
           for N in $(seq 0 $(({{ .Values.genesis.numValidators}}-1))); do
             {{- if .Values.localVaultBackend }}
-            export VAULT_ADDR="http://val${N}-diem-validator-vault:8200"
+            export VAULT_ADDR="http://val${N}-aptos-validator-vault:8200"
             export VAULT_TOKEN="root"
             VAULT_BACKEND="backend=vault;server=$VAULT_ADDR;token=/tmp/vault.token"
             {{- end }}
             vault write -f "/transit/keys/val${N}__validator_network/rotate"
-            diem-genesis-tool owner-key --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N"
-            diem-genesis-tool operator-key --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N"
+            aptos-genesis-tool owner-key --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N"
+            aptos-genesis-tool operator-key --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N"
             {{- if .Values.service.fullnode.enableOnchainDiscovery }}
-            diem-genesis-tool validator-config --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N" --validator-address "/dns4/val$N-diem-validator-validator-lb/tcp/6180" --fullnode-address "/dns4/fn$N.{{.Values.service.domain}}/tcp/6182" --owner-name "val$N" --chain-id "{{ .Values.genesis.chain_id | default .Values.genesis.era }}"
+            aptos-genesis-tool validator-config --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N" --validator-address "/dns4/val$N-aptos-validator-validator-lb/tcp/6180" --fullnode-address "/dns4/fn$N.{{.Values.service.domain}}/tcp/6182" --owner-name "val$N" --chain-id "{{ .Values.genesis.chain_id | default .Values.genesis.era }}"
             {{- else }}
-            diem-genesis-tool validator-config --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N" --validator-address "/dns4/val$N-diem-validator-validator-lb/tcp/6180" --fullnode-address "/dns4/val$N-diem-validator-fullnode-lb/tcp/6182" --owner-name "val$N" --chain-id "{{ .Values.genesis.chain_id | default .Values.genesis.era }}"
+            aptos-genesis-tool validator-config --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N" --validator-address "/dns4/val$N-aptos-validator-validator-lb/tcp/6180" --fullnode-address "/dns4/val$N-aptos-validator-fullnode-lb/tcp/6182" --owner-name "val$N" --chain-id "{{ .Values.genesis.chain_id | default .Values.genesis.era }}"
             {{- end }}
-            diem-genesis-tool set-operator --shared-backend "$FILE_BACKEND;namespace=val$N" --operator-name "val$N"
+            aptos-genesis-tool set-operator --shared-backend "$FILE_BACKEND;namespace=val$N" --operator-name "val$N"
           done
 
-          diem-genesis-tool genesis --shared-backend "$FILE_BACKEND" --path /tmp/genesis.blob --chain-id "{{ .Values.genesis.chain_id | default .Values.genesis.era }}"
-          diem-genesis-tool create-waypoint --shared-backend "$FILE_BACKEND" --chain-id "{{ .Values.genesis.chain_id | default .Values.genesis.era }}" | grep -oE "[0-9]:[0-9a-zA-Z]+" | tee /tmp/waypoint.txt
+          aptos-genesis-tool genesis --shared-backend "$FILE_BACKEND" --path /tmp/genesis.blob --chain-id "{{ .Values.genesis.chain_id | default .Values.genesis.era }}"
+          aptos-genesis-tool create-waypoint --shared-backend "$FILE_BACKEND" --chain-id "{{ .Values.genesis.chain_id | default .Values.genesis.era }}" | grep -oE "[0-9]:[0-9a-zA-Z]+" | tee /tmp/waypoint.txt
 
           for N in $(seq 0 $(({{ .Values.genesis.numValidators}}-1))); do
             {{- if .Values.localVaultBackend }}
-            export VAULT_ADDR="http://val${N}-diem-validator-vault:8200"
+            export VAULT_ADDR="http://val${N}-aptos-validator-vault:8200"
             export VAULT_TOKEN="root"
             VAULT_BACKEND="backend=vault;server=$VAULT_ADDR;token=/tmp/vault.token"
             {{- end }}
-            diem-genesis-tool insert-waypoint --set-genesis --validator-backend "$VAULT_BACKEND;namespace=val$N" --waypoint "$(cat /tmp/waypoint.txt)"
-            kubectl create configmap val$N-diem-validator-genesis-e{{ .Values.genesis.era }} --from-file=genesis.blob=/tmp/genesis.blob
+            aptos-genesis-tool insert-waypoint --set-genesis --validator-backend "$VAULT_BACKEND;namespace=val$N" --waypoint "$(cat /tmp/waypoint.txt)"
+            kubectl create configmap val$N-aptos-validator-genesis-e{{ .Values.genesis.era }} --from-file=genesis.blob=/tmp/genesis.blob
             echo '{"safety_data": {"epoch": 0, "last_voted_round": 0, "preferred_round": 0, "last_vote": null}}' | vault kv put /secret/val$N/safety_data -
           done
 
           VAULT_BACKEND="backend=vault;server={{ .Values.vault.server.address }};ca_certificate={{ .Values.vault.server.ca_cert }};token=/opt/vault/token"
-          diem-operational-tool extract-private-key --key-name 'treasury_compliance' --key-file /tmp/mint.key --validator-backend "$VAULT_BACKEND;namespace=diem"
+          aptos-operational-tool extract-private-key --key-name 'treasury_compliance' --key-file /tmp/mint.key --validator-backend "$VAULT_BACKEND;namespace=diem"
           kubectl create secret generic {{ include "testnet.fullname" . }}-faucet-e{{ .Values.genesis.era }} --from-file=mint.key=/tmp/mint.key --from-file=waypoint.txt=/tmp/waypoint.txt --from-literal=chainid.txt="{{ .Values.genesis.chain_id | default .Values.genesis.era }}"
           kubectl create configmap {{ include "testnet.fullname" .}}-genesis-e{{ .Values.genesis.era }} --from-file=genesis.blob=/tmp/genesis.blob --from-file=waypoint.txt=/tmp/waypoint.txt --from-literal=chainid.txt="{{ .Values.genesis.chain_id | default .Values.genesis.era }}" --from-literal=era.txt="{{ .Values.genesis.era }}"
         resources:

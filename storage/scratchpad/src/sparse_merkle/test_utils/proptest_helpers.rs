@@ -6,8 +6,8 @@ use crate::{
     test_utils::{naive_smt::NaiveSmt, proof_reader::ProofReader},
     SparseMerkleTree,
 };
-use diem_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
-use diem_types::account_state_blob::AccountStateBlob;
+use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use aptos_types::account_state_blob::AccountStateBlob;
 use proptest::{
     collection::{hash_set, vec},
     prelude::*,

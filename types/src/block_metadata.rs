@@ -3,10 +3,10 @@
 
 use crate::{
     account_address::AccountAddress,
-    account_config::diem_root_address,
+    account_config::aptos_root_address,
     event::{EventHandle, EventKey},
 };
-use diem_crypto::HashValue;
+use aptos_crypto::HashValue;
 use move_core_types::{
     ident_str,
     identifier::IdentStr,
@@ -84,7 +84,7 @@ impl BlockMetadata {
 }
 
 pub fn new_block_event_key() -> EventKey {
-    EventKey::new_from_address(&diem_root_address(), 17)
+    EventKey::new_from_address(&aptos_root_address(), 17)
 }
 
 /// The path to the new block event handle under a DiemBlock::BlockMetadata resource.

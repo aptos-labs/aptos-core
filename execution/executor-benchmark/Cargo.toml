@@ -22,30 +22,30 @@ serde = "1.0.124"
 structopt = "0.3.21"
 toml = "0.5.8"
 
-diemdb = { path = "../../storage/diemdb" }
-diem-config = { path = "../../config" }
-diem-crypto = { path = "../../crates/diem-crypto" }
-diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
-diem-infallible = { path = "../../crates/diem-infallible" }
-diem-jellyfish-merkle = { path = "../../storage/jellyfish-merkle" }
-diem-logger = { path = "../../crates/diem-logger" }
-diem-secure-push-metrics = { path = "../../secure/push-metrics" }
-diem-types = { path = "../../types" }
-diem-vm= { path = "../../diem-move/diem-vm" }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptosdb = { path = "../../storage/aptosdb" }
+aptos-config = { path = "../../config" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
+aptos-infallible = { path = "../../crates/aptos-infallible" }
+aptos-jellyfish-merkle = { path = "../../storage/jellyfish-merkle" }
+aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-secure-push-metrics = { path = "../../secure/push-metrics" }
+aptos-types = { path = "../../types" }
+aptos-vm= { path = "../../aptos-move/aptos-vm" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 executor = { path = "../executor" }
 executor-types = { path = "../executor-types" }
 schemadb = { path = "../../storage/schemadb" }
 storage-client = { path = "../../storage/storage-client" }
 storage-interface = { path = "../../storage/storage-interface" }
-diem-transaction-builder = { path = "../../sdk/transaction-builder" }
+aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 
 [dev-dependencies]
-diem-temppath = { path = "../../crates/diem-temppath" }
+aptos-temppath = { path = "../../crates/aptos-temppath" }
 
 [features]
 default = []
-fuzzing = ["diem-config/fuzzing", "diem-crypto/fuzzing", "diem-types/fuzzing"]
+fuzzing = ["aptos-config/fuzzing", "aptos-crypto/fuzzing", "aptos-types/fuzzing"]
 
 [[bench]]
 name = "executor_benchmark"

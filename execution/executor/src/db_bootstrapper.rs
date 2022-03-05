@@ -5,12 +5,12 @@
 
 use crate::components::{apply_chunk_output::IntoLedgerView, chunk_output::ChunkOutput};
 use anyhow::{anyhow, ensure, format_err, Result};
-use diem_crypto::HashValue;
-use diem_logger::prelude::*;
-use diem_state_view::{StateView, StateViewId};
-use diem_types::{
+use aptos_crypto::HashValue;
+use aptos_logger::prelude::*;
+use aptos_state_view::{StateView, StateViewId};
+use aptos_types::{
     access_path::AccessPath,
-    account_config::diem_root_address,
+    account_config::aptos_root_address,
     block_info::{BlockInfo, GENESIS_EPOCH, GENESIS_ROUND, GENESIS_TIMESTAMP_USECS},
     diem_timestamp::DiemTimestampResource,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -18,7 +18,7 @@ use diem_types::{
     transaction::Transaction,
     waypoint::Waypoint,
 };
-use diem_vm::VMExecutor;
+use aptos_vm::VMExecutor;
 use executor_types::ExecutedChunk;
 use move_core_types::move_resource::MoveResource;
 use std::{collections::btree_map::BTreeMap, sync::Arc};
@@ -178,7 +178,7 @@ pub fn calculate_genesis<V: VMExecutor>(
 fn get_state_timestamp(state_view: &VerifiedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
         .get(&AccessPath::new(
-            diem_root_address(),
+            aptos_root_address(),
             DiemTimestampResource::resource_path(),
         ))?
         .ok_or_else(|| format_err!("DiemTimestampResource missing."))?;

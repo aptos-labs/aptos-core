@@ -1,23 +1,23 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_config::config::RocksdbConfig;
-use diem_global_constants::{
+use aptos_config::config::RocksdbConfig;
+use aptos_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, OPERATOR_ACCOUNT, OPERATOR_KEY, OWNER_ACCOUNT, OWNER_KEY,
     SAFETY_DATA, VALIDATOR_NETWORK_KEY, WAYPOINT,
 };
-use diem_management::{
+use aptos_management::{
     config::ConfigPath, error::Error, secure_backend::ValidatorBackend,
     storage::StorageWrapper as Storage,
 };
-use diem_temppath::TempPath;
-use diem_types::{
+use aptos_temppath::TempPath;
+use aptos_types::{
     account_address::AccountAddress, account_config, account_state::AccountState,
     network_address::NetworkAddress, on_chain_config::ValidatorSet,
     validator_config::ValidatorConfig, waypoint::Waypoint,
 };
-use diem_vm::DiemVM;
-use diemdb::DiemDB;
+use aptos_vm::DiemVM;
+use aptosdb::DiemDB;
 use executor::db_bootstrapper;
 use std::{
     convert::TryFrom,
@@ -209,7 +209,7 @@ fn compute_genesis(
     genesis_path: &Path,
     db_path: &Path,
 ) -> Result<(DbReaderWriter, Waypoint), Error> {
-    let diemdb = DiemDB::open(
+    let aptosdb = DiemDB::open(
         db_path,
         false,
         None,
@@ -217,7 +217,7 @@ fn compute_genesis(
         true, /* account_count_migration */
     )
     .map_err(|e| Error::UnexpectedError(e.to_string()))?;
-    let db_rw = DbReaderWriter::new(diemdb);
+    let db_rw = DbReaderWriter::new(aptosdb);
 
     let mut file = File::open(genesis_path)
         .map_err(|e| Error::UnexpectedError(format!("Unable to open genesis file: {}", e)))?;

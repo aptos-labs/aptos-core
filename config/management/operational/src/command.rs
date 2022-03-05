@@ -6,10 +6,10 @@ use crate::{
     validator_set::DecryptedValidatorInfo, validator_state::VerifyValidatorStateResult,
     TransactionContext,
 };
-use diem_config::config::Peer;
-use diem_crypto::{ed25519::Ed25519PublicKey, x25519};
-use diem_management::{error::Error, execute_command, execute_command_await};
-use diem_types::{account_address::AccountAddress, waypoint::Waypoint, PeerId};
+use aptos_config::config::Peer;
+use aptos_crypto::{ed25519::Ed25519PublicKey, x25519};
+use aptos_management::{error::Error, execute_command, execute_command_await};
+use aptos_types::{account_address::AccountAddress, waypoint::Waypoint, PeerId};
 use serde::Serialize;
 use std::collections::HashMap;
 use structopt::StructOpt;
@@ -42,7 +42,7 @@ pub enum Command {
     #[structopt(about = "Generate a PrivateKey to a file")]
     GenerateKey(crate::keys::GenerateKey),
     #[structopt(about = "Set the waypoint in the validator storage")]
-    InsertWaypoint(diem_management::waypoint::InsertWaypoint),
+    InsertWaypoint(aptos_management::waypoint::InsertWaypoint),
     #[structopt(about = "Prints an account from the validator storage")]
     PrintAccount(crate::print::PrintAccount),
     #[structopt(about = "Prints an ed25519 public key from the validator storage")]

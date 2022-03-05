@@ -340,7 +340,7 @@
       "pluginVersion": "8.4.2",
       "targets": [
         {
-          "expr": "up{job=\"federate\"} == 0 or up{job=\"diem-procs\", role=\"validator\"} == 0",
+          "expr": "up{job=\"federate\"} == 0 or up{job=\"aptos-procs\", role=\"validator\"} == 0",
           "format": "table",
           "instant": true,
           "interval": "",

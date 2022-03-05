@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::{Error, RootPath, SecureBackend};
-use diem_types::transaction::Transaction;
+use aptos_types::transaction::Transaction;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
@@ -120,8 +120,8 @@ pub struct RemoteExecutionService {
 #[cfg(test)]
 mod test {
     use super::*;
-    use diem_temppath::TempPath;
-    use diem_types::{
+    use aptos_temppath::TempPath;
+    use aptos_types::{
         transaction::{ChangeSet, Transaction, WriteSetPayload},
         write_set::WriteSetMut,
     };

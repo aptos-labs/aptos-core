@@ -3,9 +3,9 @@
 
 use crate::{common::Author, quorum_cert::QuorumCert};
 use anyhow::{ensure, Context};
-use diem_crypto::ed25519::Ed25519Signature;
-use diem_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use diem_types::{
+use aptos_crypto::ed25519::Ed25519Signature;
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_types::{
     block_info::Round, validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier,
 };
 use serde::{Deserialize, Serialize};
@@ -198,8 +198,8 @@ impl TwoChainTimeoutCertificate {
 #[test]
 fn test_2chain_timeout_certificate() {
     use crate::vote_data::VoteData;
-    use diem_crypto::hash::CryptoHash;
-    use diem_types::{
+    use aptos_crypto::hash::CryptoHash;
+    use aptos_types::{
         block_info::BlockInfo,
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
         validator_verifier::random_validator_verifier,

@@ -5,8 +5,8 @@
 
 #![forbid(unsafe_code)]
 
-use diem_config::config::{PersistableConfig, SafetyRulesConfig};
-use diem_secure_push_metrics::MetricsPusher;
+use aptos_config::config::{PersistableConfig, SafetyRulesConfig};
+use aptos_secure_push_metrics::MetricsPusher;
 use safety_rules::Process;
 use std::{env, process};
 
@@ -23,14 +23,14 @@ fn main() {
         process::exit(1);
     });
 
-    diem_logger::Logger::new()
+    aptos_logger::Logger::new()
         .channel_size(config.logger.chan_size)
         .is_async(config.logger.is_async)
         .level(config.logger.level)
         .read_env()
         .init();
 
-    diem_logger::info!(config = config, "Loaded SafetyRules config");
+    aptos_logger::info!(config = config, "Loaded SafetyRules config");
 
     crash_handler::setup_panic_handler();
     let _mp = MetricsPusher::start();

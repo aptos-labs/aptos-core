@@ -18,8 +18,8 @@ jobs:
     resource_class: medium
     steps:
       - dev-setup
-      - run: cargo nextest --nextest-profile ci --package diem-crypto --features='u32' --no-default-features
-      - run: cargo nextest --nextest-profile ci --package diem-crypto --features='u64' --no-default-features
+      - run: cargo nextest --nextest-profile ci --package aptos-crypto --features='u32' --no-default-features
+      - run: cargo nextest --nextest-profile ci --package aptos-crypto --features='u64' --no-default-features
   lint:
     docker:
       - image: cimg/base:2020.01

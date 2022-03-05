@@ -14,8 +14,8 @@ use crate::{
     TreeReader,
 };
 use anyhow::{bail, ensure, format_err, Result};
-use diem_crypto::HashValue;
-use diem_types::{
+use aptos_crypto::HashValue;
+use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     transaction::Version,
 };

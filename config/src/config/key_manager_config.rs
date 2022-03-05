@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::{Error, LoggerConfig, PersistableConfig, SecureBackend};
-use diem_types::chain_id::{self, ChainId};
+use aptos_types::chain_id::{self, ChainId};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 

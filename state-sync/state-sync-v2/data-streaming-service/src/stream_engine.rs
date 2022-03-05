@@ -17,10 +17,10 @@ use crate::{
         Epoch, GetAllAccountsRequest, GetAllEpochEndingLedgerInfosRequest, StreamRequest,
     },
 };
-use diem_data_client::{AdvertisedData, GlobalDataSummary, ResponsePayload};
-use diem_id_generator::{IdGenerator, U64IdGenerator};
-use diem_logger::prelude::*;
-use diem_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
+use aptos_data_client::{AdvertisedData, GlobalDataSummary, ResponsePayload};
+use aptos_id_generator::{IdGenerator, U64IdGenerator};
+use aptos_logger::prelude::*;
+use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use enum_dispatch::enum_dispatch;
 use std::{cmp, sync::Arc};
 

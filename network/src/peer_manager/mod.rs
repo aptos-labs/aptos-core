@@ -21,12 +21,12 @@ use crate::{
     },
     ProtocolId,
 };
-use channel::{self, diem_channel, message_queues::QueueStyle};
-use diem_config::network_id::NetworkContext;
-use diem_logger::prelude::*;
-use diem_rate_limiter::rate_limit::TokenBucketRateLimiter;
-use diem_time_service::{TimeService, TimeServiceTrait};
-use diem_types::{network_address::NetworkAddress, PeerId};
+use aptos_config::network_id::NetworkContext;
+use aptos_logger::prelude::*;
+use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
+use aptos_time_service::{TimeService, TimeServiceTrait};
+use aptos_types::{network_address::NetworkAddress, PeerId};
+use channel::{self, aptos_channel, message_queues::QueueStyle};
 use futures::{
     channel::oneshot,
     io::{AsyncRead, AsyncWrite, AsyncWriteExt},
@@ -59,8 +59,8 @@ use crate::{
     peer_manager::transport::{TransportHandler, TransportRequest},
     protocols::network::SerializedRequest,
 };
-use diem_config::config::{PeerRole, PeerSet};
-use diem_infallible::RwLock;
+use aptos_config::config::{PeerRole, PeerSet};
+use aptos_infallible::RwLock;
 pub use senders::*;
 pub use types::*;
 
@@ -86,7 +86,7 @@ where
         PeerId,
         (
             ConnectionMetadata,
-            diem_channel::Sender<ProtocolId, PeerRequest>,
+            aptos_channel::Sender<ProtocolId, PeerRequest>,
         ),
     >,
     /// Shared metadata storage about peers
@@ -94,11 +94,11 @@ where
     /// Known trusted peers from discovery
     trusted_peers: Arc<RwLock<PeerSet>>,
     /// Channel to receive requests from other actors.
-    requests_rx: diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+    requests_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
     /// Upstream handlers for RPC and DirectSend protocols. The handlers are promised fair delivery
     /// of messages across (PeerId, ProtocolId).
     upstream_handlers:
-        HashMap<ProtocolId, diem_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+        HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
     /// Channels to send NewPeer/LostPeer notifications to.
     connection_event_handlers: Vec<conn_notifs_channel::Sender>,
     /// Channel used to send Dial requests to the ConnectionHandler actor
@@ -106,7 +106,7 @@ where
     /// Sender for connection events.
     transport_notifs_tx: channel::Sender<TransportNotification<TSocket>>,
     /// Receiver for connection requests.
-    connection_reqs_rx: diem_channel::Receiver<PeerId, ConnectionRequest>,
+    connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
     /// Receiver for connection events.
     transport_notifs_rx: channel::Receiver<TransportNotification<TSocket>>,
     /// A map of outstanding disconnect requests.
@@ -143,11 +143,11 @@ where
         listen_addr: NetworkAddress,
         peer_metadata_storage: Arc<PeerMetadataStorage>,
         trusted_peers: Arc<RwLock<PeerSet>>,
-        requests_rx: diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
-        connection_reqs_rx: diem_channel::Receiver<PeerId, ConnectionRequest>,
+        requests_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+        connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
         upstream_handlers: HashMap<
             ProtocolId,
-            diem_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+            aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
         >,
         connection_event_handlers: Vec<conn_notifs_channel::Sender>,
         channel_size: usize,
@@ -659,13 +659,13 @@ where
         let outbound_rate_limiter = self.outbound_rate_limiters.bucket(ip_addr);
 
         // TODO: Add label for peer.
-        let (peer_reqs_tx, peer_reqs_rx) = diem_channel::new(
+        let (peer_reqs_tx, peer_reqs_rx) = aptos_channel::new(
             QueueStyle::FIFO,
             self.channel_size,
             Some(&counters::PENDING_NETWORK_REQUESTS),
         );
         // TODO: Add label for peer.
-        let (peer_notifs_tx, peer_notifs_rx) = diem_channel::new(
+        let (peer_notifs_tx, peer_notifs_rx) = aptos_channel::new(
             QueueStyle::FIFO,
             self.channel_size,
             Some(&counters::PENDING_NETWORK_NOTIFICATIONS),
@@ -726,7 +726,7 @@ where
     fn spawn_peer_network_events_handler(
         &self,
         peer_id: PeerId,
-        network_events: diem_channel::Receiver<ProtocolId, PeerNotification>,
+        network_events: aptos_channel::Receiver<ProtocolId, PeerNotification>,
     ) {
         let mut upstream_handlers = self.upstream_handlers.clone();
         let network_context = self.network_context;
@@ -752,7 +752,7 @@ fn handle_inbound_request(
     peer_id: PeerId,
     upstream_handlers: &mut HashMap<
         ProtocolId,
-        diem_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+        aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
     >,
 ) {
     let (protocol_id, notification) = match inbound_event {

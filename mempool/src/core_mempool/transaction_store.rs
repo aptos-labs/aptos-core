@@ -13,10 +13,10 @@ use crate::{
     counters,
     logging::{LogEntry, LogEvent, LogSchema, TxnsLog},
 };
-use diem_config::config::MempoolConfig;
-use diem_crypto::HashValue;
-use diem_logger::prelude::*;
-use diem_types::{
+use aptos_config::config::MempoolConfig;
+use aptos_crypto::HashValue;
+use aptos_logger::prelude::*;
+use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountSequenceInfo,
     mempool_status::{MempoolStatus, MempoolStatusCode},
@@ -455,7 +455,7 @@ impl TransactionStore {
         &mut self,
         metrics_cache: &TtlCache<(AccountAddress, u64), SystemTime>,
     ) {
-        let now = diem_infallible::duration_since_epoch();
+        let now = aptos_infallible::duration_since_epoch();
 
         self.gc(now, true, metrics_cache);
     }

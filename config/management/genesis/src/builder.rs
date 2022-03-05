@@ -3,13 +3,13 @@
 
 use crate::layout::Layout;
 use anyhow::Result;
-use diem_crypto::ed25519::Ed25519PublicKey;
-use diem_global_constants::{
-    DIEM_ROOT_KEY, MOVE_MODULES, OPERATOR_KEY, OWNER_KEY, TREASURY_COMPLIANCE_KEY,
+use aptos_crypto::ed25519::Ed25519PublicKey;
+use aptos_global_constants::{
+    APTOS_ROOT_KEY, MOVE_MODULES, OPERATOR_KEY, OWNER_KEY, TREASURY_COMPLIANCE_KEY,
 };
-use diem_management::constants::{self, VALIDATOR_CONFIG, VALIDATOR_OPERATOR};
-use diem_secure_storage::{KVStorage, Namespaced};
-use diem_types::{
+use aptos_management::constants::{self, VALIDATOR_CONFIG, VALIDATOR_OPERATOR};
+use aptos_secure_storage::{KVStorage, Namespaced};
+use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{OnChainConsensusConfig, VMPublishingOption},
     transaction::{
@@ -66,15 +66,15 @@ impl<S: KVStorage> GenesisBuilder<S> {
 
     pub fn set_root_key(&mut self, root_key: Ed25519PublicKey) -> Result<()> {
         let layout = self.layout()?;
-        self.with_namespace_mut(&layout.diem_root)
-            .set(DIEM_ROOT_KEY, root_key)
+        self.with_namespace_mut(&layout.aptos_root)
+            .set(APTOS_ROOT_KEY, root_key)
             .map_err(Into::into)
     }
 
     pub fn root_key(&self) -> Result<Ed25519PublicKey> {
         let layout = self.layout()?;
-        self.with_namespace(&layout.diem_root)
-            .get(DIEM_ROOT_KEY)
+        self.with_namespace(&layout.aptos_root)
+            .get(APTOS_ROOT_KEY)
             .map(|r| r.value)
             .map_err(Into::into)
     }
@@ -132,7 +132,7 @@ impl<S: KVStorage> GenesisBuilder<S> {
         let mut validators = Vec::new();
         for owner in &layout.owners {
             let name = owner.as_bytes().to_vec();
-            let address = diem_config::utils::default_validator_owner_auth_key_from_name(&name)
+            let address = aptos_config::utils::default_validator_owner_auth_key_from_name(&name)
                 .derived_address();
             let auth_key = self
                 .owner_key(owner)
@@ -217,13 +217,13 @@ impl<S: KVStorage> GenesisBuilder<S> {
         publishing_option: Option<VMPublishingOption>,
         consensus_config: OnChainConsensusConfig,
     ) -> Result<Transaction> {
-        let diem_root_key = self.root_key()?;
+        let aptos_root_key = self.root_key()?;
         let treasury_compliance_key = self.treasury_compliance_key()?;
         let validators = self.validators()?;
         let move_modules = self.move_modules()?;
 
         let genesis = vm_genesis::encode_genesis_transaction(
-            diem_root_key,
+            aptos_root_key,
             treasury_compliance_key,
             &validators,
             &move_modules,

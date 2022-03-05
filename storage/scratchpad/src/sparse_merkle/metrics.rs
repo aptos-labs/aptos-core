@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use diem_metrics::{register_histogram_vec, register_int_gauge, HistogramVec, IntGauge};
+use aptos_metrics::{register_histogram_vec, register_int_gauge, HistogramVec, IntGauge};
 use once_cell::sync::Lazy;
 
 pub static OLDEST_GENERATION: Lazy<IntGauge> = Lazy::new(|| {

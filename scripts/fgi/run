@@ -224,7 +224,7 @@ except Exception as e:
 
 end_ts_ms = int(time.time() * 1000)
 DASHBOARD_LINK = f"{grafana_url}/d/overview/overview?from={start_ts_ms}&to={end_ts_ms}&orgId=1"
-LOGGING_LINK = "https://diem-development.kb.us-west1.gcp.cloud.es.io:9243/app/discover#/?_g=(filters:!()," \
+LOGGING_LINK = "https://aptos-development.kb.us-west1.gcp.cloud.es.io:9243/app/discover#/?_g=(filters:!()," \
                "refreshInterval:(pause:!t,value:0),time:(from:now-15m,to:now))&_a=(columns:!(),filters:!()," \
                "index:'2da2a6e0-f70a-11eb-ad53-b979a6c9b83a',interval:auto,query:(language:kuery,query:'')," \
                "sort:!(!('@timestamp',desc)))"

@@ -6,6 +6,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use structopt::StructOpt;
 
+use aptos_logger::{prelude::*, Level, Logger};
+use aptos_secure_push_metrics::MetricsPusher;
 use backup_cli::{
     backup_types::{
         epoch_ending::backup::{EpochEndingBackupController, EpochEndingBackupOpt},
@@ -20,8 +22,6 @@ use backup_cli::{
         ConcurrentDownloadsOpt, GlobalBackupOpt,
     },
 };
-use diem_logger::{prelude::*, Level, Logger};
-use diem_secure_push_metrics::MetricsPusher;
 
 #[derive(StructOpt)]
 #[structopt(about = "Diem backup tool.")]

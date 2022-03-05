@@ -29,7 +29,7 @@ RUN apt-get update && apt-get install -y libssl1.1 nano net-tools tcpdump iprout
 
 RUN mkdir -p /opt/diem/bin  /diem/client/data/wallet/
 
-COPY --from=builder /diem/target/release/diem-faucet /opt/diem/bin
+COPY --from=builder /diem/target/release/aptos-faucet /opt/diem/bin
 
 # Test the docker container before shipping.
 FROM pre-test AS test

@@ -3,9 +3,9 @@
 
 use crate::{ChainInfo, FullNode, NodeExt, Result, Validator, Version};
 use anyhow::{anyhow, bail};
-use diem_config::config::NodeConfig;
-use diem_rest_client::Client as RestClient;
-use diem_sdk::types::PeerId;
+use aptos_config::config::NodeConfig;
+use aptos_rest_client::Client as RestClient;
+use aptos_sdk::types::PeerId;
 use futures::future::try_join_all;
 use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;

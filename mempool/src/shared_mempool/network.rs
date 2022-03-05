@@ -13,15 +13,15 @@ use crate::{
         },
     },
 };
-use async_trait::async_trait;
-use channel::{diem_channel, message_queues::QueueStyle};
-use diem_config::{
+use aptos_config::{
     config::{MempoolConfig, PeerRole, RoleType},
     network_id::{NetworkId, PeerNetworkId},
 };
-use diem_infallible::Mutex;
-use diem_logger::prelude::*;
-use diem_types::{transaction::SignedTransaction, PeerId};
+use aptos_infallible::Mutex;
+use aptos_logger::prelude::*;
+use aptos_types::{transaction::SignedTransaction, PeerId};
+use async_trait::async_trait;
+use channel::{aptos_channel, message_queues::QueueStyle};
 use fail::fail_point;
 use itertools::Itertools;
 use netcore::transport::ConnectionOrigin;
@@ -94,7 +94,7 @@ pub struct MempoolNetworkSender {
 pub fn network_endpoint_config(max_broadcasts_per_peer: usize) -> AppConfig {
     AppConfig::p2p(
         [ProtocolId::MempoolDirectSend],
-        diem_channel::Config::new(max_broadcasts_per_peer)
+        aptos_channel::Config::new(max_broadcasts_per_peer)
             .queue_style(QueueStyle::KLAST)
             .counters(&counters::PENDING_MEMPOOL_NETWORK_EVENTS),
     )
@@ -590,8 +590,8 @@ fn compare_prioritized_peers(
 #[cfg(test)]
 mod test {
     use super::*;
-    use diem_config::network_id::NetworkId;
-    use diem_types::PeerId;
+    use aptos_config::network_id::NetworkId;
+    use aptos_types::PeerId;
 
     #[test]
     fn check_peer_prioritization() {

@@ -27,7 +27,7 @@ pub use move_types::{
     MoveScriptBytecode, MoveStructTag, MoveStructValue, MoveType, MoveValue, ScriptFunctionId,
     U128, U64,
 };
-pub use response::{Response, X_DIEM_CHAIN_ID, X_DIEM_LEDGER_TIMESTAMP, X_DIEM_LEDGER_VERSION};
+pub use response::{Response, X_APTOS_CHAIN_ID, X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION};
 pub use transaction::{
     BlockMetadataTransaction, DirectWriteSet, Event, GenesisTransaction, PendingTransaction,
     ScriptFunctionPayload, ScriptPayload, ScriptWriteSet, Transaction, TransactionData,

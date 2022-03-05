@@ -5,16 +5,16 @@ use crate::{
     driver::DriverConfiguration, error::Error, notification_handlers::ConsensusSyncRequest,
     storage_synchronizer::StorageSynchronizerInterface, utils, utils::SpeculativeStreamState,
 };
+use aptos_config::config::ContinuousSyncingMode;
+use aptos_infallible::Mutex;
+use aptos_types::{
+    ledger_info::LedgerInfoWithSignatures,
+    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+};
 use data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     data_stream::DataStreamListener,
     streaming_client::{DataStreamingClient, NotificationFeedback, StreamingServiceClient},
-};
-use diem_config::config::ContinuousSyncingMode;
-use diem_infallible::Mutex;
-use diem_types::{
-    ledger_info::LedgerInfoWithSignatures,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
 use std::sync::Arc;
 use storage_interface::DbReader;

@@ -244,7 +244,7 @@ impl<'cfg> LintEngine<'cfg> {
         // TODO: make global exclusions configurable
         Ok(tracked_files
             .iter()
-            .filter(|f| !f.starts_with("testsuite/diem-fuzzer/artifacts/")))
+            .filter(|f| !f.starts_with("testsuite/aptos-fuzzer/artifacts/")))
     }
 }
 

@@ -11,16 +11,16 @@ use crate::{
         MockVM, DISCARD_STATUS, KEEP_STATUS,
     },
 };
-use diem_crypto::HashValue;
-use diem_state_view::StateViewId;
-use diem_types::{
+use aptos_crypto::HashValue;
+use aptos_state_view::StateViewId;
+use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::definition::LeafCount,
     transaction::{Transaction, TransactionListWithProof, TransactionStatus, Version},
 };
-use diemdb::DiemDB;
+use aptosdb::DiemDB;
 use executor_types::{BlockExecutorTrait, ChunkExecutorTrait, ExecutedTrees, TransactionReplayer};
 use proptest::prelude::*;
 use std::collections::BTreeMap;
@@ -47,14 +47,14 @@ fn execute_and_commit_block(
 }
 
 struct TestExecutor {
-    _path: diem_temppath::TempPath,
+    _path: aptos_temppath::TempPath,
     db: DbReaderWriter,
     executor: BlockExecutor<MockVM>,
 }
 
 impl TestExecutor {
     fn new() -> TestExecutor {
-        let path = diem_temppath::TempPath::new();
+        let path = aptos_temppath::TempPath::new();
         path.create_as_dir().unwrap();
         let db = DbReaderWriter::new(DiemDB::new_for_test(path.path()));
         let genesis = vm_genesis::test_genesis_transaction();

@@ -13,15 +13,15 @@ use crate::{
     storage_synchronizer::StorageSynchronizerInterface,
     utils,
 };
+use aptos_config::config::{RoleType, StateSyncDriverConfig};
+use aptos_data_client::DiemDataClient;
+use aptos_infallible::Mutex;
+use aptos_logger::*;
+use aptos_types::waypoint::Waypoint;
 use consensus_notifications::{
     ConsensusCommitNotification, ConsensusNotification, ConsensusSyncNotification,
 };
 use data_streaming_service::streaming_client::{NotificationFeedback, StreamingServiceClient};
-use diem_config::config::{RoleType, StateSyncDriverConfig};
-use diem_data_client::DiemDataClient;
-use diem_infallible::Mutex;
-use diem_logger::*;
-use diem_types::waypoint::Waypoint;
 use event_notifications::EventSubscriptionService;
 use futures::StreamExt;
 use mempool_notifications::MempoolNotificationSender;
@@ -75,7 +75,7 @@ pub struct StateSyncDriver<DataClient, MempoolNotifier, StorageSyncer> {
     continuous_syncer: ContinuousSyncer<StorageSyncer>,
 
     // The client for checking the global data summary of our peers
-    diem_data_client: DataClient,
+    aptos_data_client: DataClient,
 
     // The configuration for the driver
     driver_configuration: DriverConfiguration,
@@ -111,7 +111,7 @@ impl<
         event_subscription_service: EventSubscriptionService,
         mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
         storage_synchronizer: StorageSyncer,
-        diem_data_client: DataClient,
+        aptos_data_client: DataClient,
         streaming_service_client: StreamingServiceClient,
         storage: Arc<dyn DbReader>,
     ) -> Self {
@@ -135,7 +135,7 @@ impl<
             commit_notification_listener,
             consensus_notification_handler,
             continuous_syncer,
-            diem_data_client,
+            aptos_data_client,
             driver_configuration,
             error_notification_listener,
             event_subscription_service,
@@ -463,7 +463,7 @@ impl<
     /// Checks that state sync is making progress
     async fn drive_progress(&mut self) {
         // Fetch the global data summary and verify we have active peers
-        let global_data_summary = self.diem_data_client.get_global_data_summary();
+        let global_data_summary = self.aptos_data_client.get_global_data_summary();
         if global_data_summary.is_empty() {
             trace!("The global data summary is empty! It's likely that we have no active peers.");
             return self.check_auto_bootstrapping();

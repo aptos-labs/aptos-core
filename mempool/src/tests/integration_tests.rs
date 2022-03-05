@@ -5,7 +5,7 @@ use crate::tests::{
     common::TestTransaction,
     test_framework::{test_transaction, MempoolNode, MempoolTestFrameworkBuilder},
 };
-use diem_config::network_id::PeerNetworkId;
+use aptos_config::network_id::PeerNetworkId;
 use netcore::transport::ConnectionOrigin;
 use network::{
     testutils::{

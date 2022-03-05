@@ -13,11 +13,11 @@ use crate::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
+use aptos_logger::prelude::*;
+use aptos_types::{network_address::NetworkAddress, PeerId};
 use async_trait::async_trait;
 use bytes::Bytes;
-use channel::diem_channel;
-use diem_logger::prelude::*;
-use diem_types::{network_address::NetworkAddress, PeerId};
+use channel::aptos_channel;
 use futures::{
     channel::oneshot,
     future,
@@ -92,7 +92,7 @@ pub struct AppConfig {
     /// capacity.
     // TODO(philiphayes): only relevant for services
     // TODO(philiphayes): in the future, use a Service trait here instead?
-    pub inbound_queue: Option<diem_channel::Config>,
+    pub inbound_queue: Option<aptos_channel::Config>,
 }
 
 impl AppConfig {
@@ -109,7 +109,7 @@ impl AppConfig {
     /// service can handle and the queue configuration.
     pub fn service(
         protocols: impl IntoIterator<Item = ProtocolId>,
-        inbound_queue: diem_channel::Config,
+        inbound_queue: aptos_channel::Config,
     ) -> Self {
         Self {
             protocols: ProtocolIdSet::from_iter(protocols),
@@ -121,7 +121,7 @@ impl AppConfig {
     /// a client and a service.
     pub fn p2p(
         protocols: impl IntoIterator<Item = ProtocolId>,
-        inbound_queue: diem_channel::Config,
+        inbound_queue: aptos_channel::Config,
     ) -> Self {
         Self {
             protocols: ProtocolIdSet::from_iter(protocols),
@@ -142,12 +142,12 @@ pub struct NetworkEvents<TMessage> {
     #[pin]
     event_stream: Select<
         FilterMap<
-            diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
+            aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
             future::Ready<Option<Event<TMessage>>>,
             fn(PeerManagerNotification) -> future::Ready<Option<Event<TMessage>>>,
         >,
         Map<
-            diem_channel::Receiver<PeerId, ConnectionNotification>,
+            aptos_channel::Receiver<PeerId, ConnectionNotification>,
             fn(ConnectionNotification) -> Event<TMessage>,
         >,
     >,
@@ -157,15 +157,15 @@ pub struct NetworkEvents<TMessage> {
 /// Trait specifying the signature for `new()` `NetworkEvents`
 pub trait NewNetworkEvents {
     fn new(
-        peer_mgr_notifs_rx: diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
-        connection_notifs_rx: diem_channel::Receiver<PeerId, ConnectionNotification>,
+        peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
+        connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>,
     ) -> Self;
 }
 
 impl<TMessage: Message> NewNetworkEvents for NetworkEvents<TMessage> {
     fn new(
-        peer_mgr_notifs_rx: diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
-        connection_notifs_rx: diem_channel::Receiver<PeerId, ConnectionNotification>,
+        peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
+        connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>,
     ) -> Self {
         let data_event_stream = peer_mgr_notifs_rx.filter_map(
             peer_mgr_notif_to_event
@@ -250,7 +250,7 @@ impl<TMessage> FusedStream for NetworkEvents<TMessage> {
 /// keys.
 ///
 /// `NetworkSender` is in fact a thin wrapper around a `PeerManagerRequestSender`, which in turn is
-/// a thin wrapper on `diem_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>`,
+/// a thin wrapper on `aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>`,
 /// mostly focused on providing a more ergonomic API. However, network applications will usually
 /// provide their own thin wrapper around `NetworkSender` that narrows the API to the specific
 /// interface they need. For instance, `mempool` only requires direct-send functionality so its

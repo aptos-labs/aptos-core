@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::ProofRead;
-use diem_crypto::HashValue;
-use diem_types::proof::SparseMerkleProof;
+use aptos_crypto::HashValue;
+use aptos_types::proof::SparseMerkleProof;
 use std::collections::HashMap;
 
 pub struct ProofReader<V>(HashMap<HashValue, SparseMerkleProof<V>>);

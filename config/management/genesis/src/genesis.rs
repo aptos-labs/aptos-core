@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::builder::GenesisBuilder;
-use diem_management::{config::ConfigPath, error::Error, secure_backend::SharedBackend};
-use diem_secure_storage::Storage;
-use diem_types::on_chain_config::VMPublishingOption;
-use diem_types::{
+use aptos_management::{config::ConfigPath, error::Error, secure_backend::SharedBackend};
+use aptos_secure_storage::Storage;
+use aptos_types::{
     chain_id::ChainId,
-    on_chain_config::{ConsensusConfigV2, OnChainConsensusConfig},
+    on_chain_config::{ConsensusConfigV2, OnChainConsensusConfig, VMPublishingOption},
     transaction::Transaction,
 };
 use std::{fs::File, io::Write, path::PathBuf};
@@ -28,7 +27,7 @@ pub struct Genesis {
 }
 
 impl Genesis {
-    fn config(&self) -> Result<diem_management::config::Config, Error> {
+    fn config(&self) -> Result<aptos_management::config::Config, Error> {
         self.config
             .load()?
             .override_chain_id(self.chain_id)

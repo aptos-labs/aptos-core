@@ -16,10 +16,8 @@ use crate::{
     test_utils::{EmptyStateComputer, MockStorage, MockTransactionManager},
     util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
-use channel::{self, diem_channel, message_queues::QueueStyle};
-use consensus_types::proposal_msg::ProposalMsg;
-use diem_infallible::Mutex;
-use diem_types::{
+use aptos_infallible::Mutex;
+use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -28,6 +26,8 @@ use diem_types::{
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
+use channel::{self, aptos_channel, message_queues::QueueStyle};
+use consensus_types::proposal_msg::ProposalMsg;
 use futures::{channel::mpsc, executor::block_on};
 use network::{
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
@@ -112,8 +112,8 @@ fn create_node_for_fuzzing() -> RoundManager {
     safety_rules.initialize(&proof).unwrap();
 
     // TODO: mock channels
-    let (network_reqs_tx, _network_reqs_rx) = diem_channel::new(QueueStyle::FIFO, 8, None);
-    let (connection_reqs_tx, _) = diem_channel::new(QueueStyle::FIFO, 8, None);
+    let (network_reqs_tx, _network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+    let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
     let network_sender = ConsensusNetworkSender::new(
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),

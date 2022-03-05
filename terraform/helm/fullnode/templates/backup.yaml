@@ -44,7 +44,7 @@ spec:
         - "coordinator"
         - "run"
         - "--metadata-cache-dir"
-        - "/tmp/diem-backup-metadata"
+        - "/tmp/aptos-backup-metadata"
         - "--backup-service-address"
         - "http://{{ include "backup.backupService" . }}"
         {{- with .Values.backup }}

@@ -9,10 +9,10 @@
 #![forbid(unsafe_code)]
 
 /// Definitions of global cryptographic keys (e.g., as held in secure storage)
+pub const APTOS_ROOT_KEY: &str = "aptos_root";
 pub const CONSENSUS_KEY: &str = "consensus";
 pub const EXECUTION_KEY: &str = "execution";
 pub const FULLNODE_NETWORK_KEY: &str = "fullnode_network";
-pub const DIEM_ROOT_KEY: &str = "diem_root";
 pub const TREASURY_COMPLIANCE_KEY: &str = "treasury_compliance";
 pub const OPERATOR_ACCOUNT: &str = "operator_account";
 pub const OPERATOR_KEY: &str = "operator";

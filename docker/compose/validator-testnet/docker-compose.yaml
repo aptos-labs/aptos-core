@@ -31,12 +31,12 @@ services:
       shared:
     volumes:
       - type: volume
-        source: diem-shared
+        source: aptos-shared
         target: /opt/diem/var
       - type: bind
         source: ./validator_node_template.yaml
         target: /opt/diem/var/validator_node_template.yaml
-    command: ["/opt/diem/bin/diem-node", "--test", "--config", "/opt/diem/var"]
+    command: ["/opt/diem/bin/aptos-node", "--test", "--config", "/opt/diem/var"]
     ports:
       - "8080:8080"
     expose:
@@ -50,7 +50,7 @@ services:
       shared:
     volumes:
       - type: volume
-        source: diem-shared
+        source: aptos-shared
         target: /opt/diem/var
     command: >
       /bin/bash -c "
@@ -58,7 +58,7 @@ services:
         do
           if [[ -s /opt/diem/var/mint.key ]]
           then
-            /opt/diem/bin/diem-faucet \
+            /opt/diem/bin/aptos-faucet \
               --address 0.0.0.0 \
               --port 8000 \
               --chain-id TESTING \
@@ -77,11 +77,11 @@ services:
 
 networks:
   shared:
-    name: "diem-docker-compose-shared"
+    name: "aptos-docker-compose-shared"
     ipam:
       config:
         - subnet: 172.16.1.0/24
 
 volumes:
-  diem-shared:
-    name: diem-shared
+  aptos-shared:
+    name: aptos-shared

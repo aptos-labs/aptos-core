@@ -12,7 +12,7 @@
 
 #![allow(clippy::unnecessary_wraps)]
 #![allow(unused_imports)]
-use diem_types::{
+use aptos_types::{
     account_address::AccountAddress,
     transaction::{Script, ScriptFunction, TransactionArgument, TransactionPayload, VecBytes},
 };
@@ -654,7 +654,7 @@ pub enum ScriptCall {
     /// `DualAttestation::get_cur_microdiem_limit` XDX and `payer` and `payee` are distinct VASPs.
     /// However, a transaction sender can opt in to dual attestation even when it is not required
     /// (e.g., a DesignatedDealer -> VASP payment) by providing a non-empty `metadata_signature`.
-    /// Standardized `metadata` BCS format can be found in `diem_types::transaction::metadata::Metadata`.
+    /// Standardized `metadata` BCS format can be found in `aptos_types::transaction::metadata::Metadata`.
     ///
     /// ## Events
     /// Successful execution of this script emits two events:
@@ -2535,7 +2535,7 @@ pub fn encode_freeze_account_script(
 /// `DualAttestation::get_cur_microdiem_limit` XDX and `payer` and `payee` are distinct VASPs.
 /// However, a transaction sender can opt in to dual attestation even when it is not required
 /// (e.g., a DesignatedDealer -> VASP payment) by providing a non-empty `metadata_signature`.
-/// Standardized `metadata` BCS format can be found in `diem_types::transaction::metadata::Metadata`.
+/// Standardized `metadata` BCS format can be found in `aptos_types::transaction::metadata::Metadata`.
 ///
 /// ## Events
 /// Successful execution of this script emits two events:

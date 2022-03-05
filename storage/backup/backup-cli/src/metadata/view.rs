@@ -5,7 +5,7 @@ use crate::metadata::{
     EpochEndingBackupMeta, Metadata, StateSnapshotBackupMeta, TransactionBackupMeta,
 };
 use anyhow::{anyhow, ensure, Result};
-use diem_types::transaction::Version;
+use aptos_types::transaction::Version;
 use itertools::Itertools;
 use std::{fmt, str::FromStr};
 

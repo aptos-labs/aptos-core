@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{validate_transaction::ValidateTransaction, TransactionContext};
-use diem_management::error::Error;
+use aptos_management::error::Error;
 use std::{thread::sleep, time};
 use structopt::StructOpt;
 

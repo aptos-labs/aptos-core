@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::protocols::wire::handshake::v1::ProtocolId;
-use diem_config::network_id::NetworkContext;
-use diem_metrics::{
+use aptos_config::network_id::NetworkContext;
+use aptos_metrics::{
     register_histogram_vec, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
     Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
-use diem_types::PeerId;
+use aptos_types::PeerId;
 use netcore::transport::ConnectionOrigin;
 use once_cell::sync::Lazy;
 use short_hex_str::AsShortHexStr;

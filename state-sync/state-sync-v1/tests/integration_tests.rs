@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::test_harness::default_handler;
-use diem_config::{config::RoleType, network_id::NetworkId};
-use diem_types::{transaction::TransactionListWithProof, waypoint::Waypoint, PeerId};
+use aptos_config::{config::RoleType, network_id::NetworkId};
+use aptos_types::{transaction::TransactionListWithProof, waypoint::Waypoint, PeerId};
 use netcore::transport::ConnectionOrigin::*;
 use network::protocols::direct_send::Message;
 use state_sync_v1::{error::Error, network::StateSyncMessage};

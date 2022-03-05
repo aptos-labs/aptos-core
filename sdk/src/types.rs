@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-pub use diem_types::*;
+pub use aptos_types::*;
 
 #[derive(Debug)]
 pub struct LocalAccount {

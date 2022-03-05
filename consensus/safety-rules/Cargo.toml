@@ -14,19 +14,19 @@ rand_core = "0.6.2"
 
 crash-handler = { path = "../../crates/crash-handler" }
 consensus-types = { path = "../consensus-types" }
-diem-config = { path = "../../config" }
-diem-crypto = { path = "../../crates/diem-crypto" }
-diem-global-constants = { path = "../../config/global-constants"}
-diem-infallible = { path = "../../crates/diem-infallible" }
-diem-logger = { path = "../../crates/diem-logger" }
-diem-proptest-helpers = { path = "../../crates/diem-proptest-helpers", optional = true }
-diem-secure-net = { path = "../../secure/net" }
-diem-secure-push-metrics = { path = "../../secure/push-metrics" }
-diem-secure-storage = { path = "../../secure/storage" }
-diem-temppath = { path = "../../crates/diem-temppath" }
-diem-types = { path = "../../types" }
-diem-vault-client = { path = "../../secure/storage/vault" }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptos-config = { path = "../../config" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-global-constants = { path = "../../config/global-constants"}
+aptos-infallible = { path = "../../crates/aptos-infallible" }
+aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers", optional = true }
+aptos-secure-net = { path = "../../secure/net" }
+aptos-secure-push-metrics = { path = "../../secure/push-metrics" }
+aptos-secure-storage = { path = "../../secure/storage" }
+aptos-temppath = { path = "../../crates/aptos-temppath" }
+aptos-types = { path = "../../types" }
+aptos-vault-client = { path = "../../secure/storage/vault" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 serde = { version = "1.0.124", default-features = false }
 serde_json = "1.0.64"
 thiserror = "1.0.24"
@@ -37,9 +37,9 @@ tempfile = "3.2.0"
 proptest = "1.0.0"
 
 consensus-types = { path = "../consensus-types", features = ["fuzzing"] }
-diem-config = { path = "../../config", features = ["fuzzing"] }
-diem-proptest-helpers = { path = "../../crates/diem-proptest-helpers" }
-diem-secure-storage = { path = "../../secure/storage", features = ["testing"] }
+aptos-config = { path = "../../config", features = ["fuzzing"] }
+aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers" }
+aptos-secure-storage = { path = "../../secure/storage", features = ["testing"] }
 
 [[bench]]
 name = "safety_rules"
@@ -52,5 +52,5 @@ required-features = ["testing"]
 
 [features]
 default = []
-fuzzing = ["consensus-types/fuzzing", "diem-config/fuzzing", "proptest", "diem-proptest-helpers"]
-testing = ["diem-secure-storage/testing"]
+fuzzing = ["consensus-types/fuzzing", "aptos-config/fuzzing", "proptest", "aptos-proptest-helpers"]
+testing = ["aptos-secure-storage/testing"]

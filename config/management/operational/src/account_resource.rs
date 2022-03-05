@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{auto_validate::AutoValidate, rest_client::RestClient, TransactionContext};
-use diem_crypto::ed25519::Ed25519PublicKey;
-use diem_global_constants::{OPERATOR_ACCOUNT, OPERATOR_KEY};
-use diem_management::{error::Error, transaction::build_raw_transaction};
-use diem_transaction_builder::stdlib as transaction_builder;
-use diem_types::{
+use aptos_crypto::ed25519::Ed25519PublicKey;
+use aptos_global_constants::{OPERATOR_ACCOUNT, OPERATOR_KEY};
+use aptos_management::{error::Error, transaction::build_raw_transaction};
+use aptos_transaction_builder::stdlib as transaction_builder;
+use aptos_types::{
     account_address::AccountAddress,
     transaction::{authenticator::AuthenticationKey, Transaction},
 };
@@ -19,7 +19,7 @@ pub struct AccountResource {
     #[structopt(long, help = "Account address to display the account resource")]
     account_address: AccountAddress,
     #[structopt(flatten)]
-    config: diem_management::config::ConfigPath,
+    config: aptos_management::config::ConfigPath,
     /// JSON-RPC Endpoint (e.g. http://localhost:8080)
     #[structopt(long, required_unless = "config")]
     json_server: Option<String>,
@@ -57,7 +57,7 @@ pub struct RotateOperatorKey {
     #[structopt(long, required_unless = "config")]
     json_server: Option<String>,
     #[structopt(flatten)]
-    validator_config: diem_management::validator_config::ValidatorConfig,
+    validator_config: aptos_management::validator_config::ValidatorConfig,
     #[structopt(flatten)]
     auto_validate: AutoValidate,
 }

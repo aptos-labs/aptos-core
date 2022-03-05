@@ -12,9 +12,9 @@ use crate::{
     utils::{GlobalRestoreOptions, RestoreRunMode, TrustedWaypointOpt},
 };
 use anyhow::{ensure, Result};
-use diem_logger::prelude::*;
-use diem_types::transaction::Version;
-use diemdb::backup::restore_handler::RestoreHandler;
+use aptos_logger::prelude::*;
+use aptos_types::transaction::Version;
+use aptosdb::backup::restore_handler::RestoreHandler;
 use std::sync::Arc;
 
 pub struct ReplayVerifyCoordinator {

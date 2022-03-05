@@ -20,15 +20,15 @@ tokio = { version = "1.8.1", features = ["full"] }
 tokio-stream = "0.1.4"
 
 channel = { path = "../../../crates/channel" }
-diem-config = { path = "../../../config" }
-diem-crypto = { path = "../../../crates/diem-crypto" }
-diem-data-client = { path = "../../diem-data-client" }
-diem-id-generator = { path = "../../../crates/diem-id-generator" }
-diem-infallible = { path = "../../../crates/diem-infallible" }
-diem-logger = { path = "../../../crates/diem-logger" }
-diem-metrics = { path = "../../../crates/diem-metrics" }
-diem-types = { path = "../../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
+aptos-config = { path = "../../../config" }
+aptos-crypto = { path = "../../../crates/aptos-crypto" }
+aptos-data-client = { path = "../../aptos-data-client" }
+aptos-id-generator = { path = "../../../crates/aptos-id-generator" }
+aptos-infallible = { path = "../../../crates/aptos-infallible" }
+aptos-logger = { path = "../../../crates/aptos-logger" }
+aptos-metrics = { path = "../../../crates/aptos-metrics" }
+aptos-types = { path = "../../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
 network = { path = "../../../network" }
 short-hex-str = { path = "../../../crates/short-hex-str" }
 
@@ -37,5 +37,5 @@ claim = "0.5.0"
 rand = "0.8.3"
 tokio = { version = "1.8.1", features = ["full"] }
 
-diem-types = { path = "../../../types" }
+aptos-types = { path = "../../../types" }
 storage-service-types = { path = "../../storage-service/types" }

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err, Result};
-use diem_config::config::DEFAULT_PORT;
-use diem_sdk::{
+use aptos_config::config::DEFAULT_PORT;
+use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{chain_id::ChainId, LocalAccount},
 };

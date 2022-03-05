@@ -1,11 +1,11 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_api_types::{Error, LedgerInfo, MoveConverter, TransactionOnChainData};
-use diem_config::config::{ApiConfig, RoleType};
-use diem_crypto::HashValue;
-use diem_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
-use diem_types::{
+use aptos_api_types::{Error, LedgerInfo, MoveConverter, TransactionOnChainData};
+use aptos_config::config::{ApiConfig, RoleType};
+use aptos_crypto::HashValue;
+use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
+use aptos_types::{
     account_address::AccountAddress,
     account_state::AccountState,
     account_state_blob::AccountStateBlob,

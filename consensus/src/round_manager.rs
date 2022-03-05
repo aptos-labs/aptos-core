@@ -21,7 +21,14 @@ use crate::{
     persistent_liveness_storage::PersistentLivenessStorage,
 };
 use anyhow::{bail, ensure, Context, Result};
-use channel::diem_channel;
+use aptos_infallible::{checked, Mutex};
+use aptos_logger::prelude::*;
+use aptos_metrics::monitor;
+use aptos_types::{
+    epoch_state::EpochState, on_chain_config::OnChainConsensusConfig,
+    validator_verifier::ValidatorVerifier,
+};
+use channel::aptos_channel;
 use consensus_types::{
     block::Block,
     block_retrieval::{BlockRetrievalResponse, BlockRetrievalStatus},
@@ -34,13 +41,6 @@ use consensus_types::{
     timeout_certificate::TimeoutCertificate,
     vote::Vote,
     vote_msg::VoteMsg,
-};
-use diem_infallible::{checked, Mutex};
-use diem_logger::prelude::*;
-use diem_metrics::monitor;
-use diem_types::{
-    epoch_state::EpochState, on_chain_config::OnChainConsensusConfig,
-    validator_verifier::ValidatorVerifier,
 };
 use fail::fail_point;
 use futures::{channel::oneshot, FutureExt, StreamExt};
@@ -829,7 +829,7 @@ impl RoundManager {
     /// Mainloop of processing messages.
     pub async fn start(
         mut self,
-        mut event_rx: diem_channel::Receiver<
+        mut event_rx: aptos_channel::Receiver<
             (Author, Discriminant<VerifiedEvent>),
             (Author, VerifiedEvent),
         >,

@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use diem_state_view::StateViewId;
-use diem_types::{
+use aptos_state_view::StateViewId;
+use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, AccountSequenceInfo},
     account_state::AccountState,
     on_chain_config::{DiemVersion, OnChainConfigPayload, VMConfig, VMPublishingOption},
     transaction::{SignedTransaction, VMValidatorResult},
 };
-use diem_vm::DiemVM;
+use aptos_vm::DiemVM;
 use executor::components::apply_chunk_output::IntoLedgerView;
 use fail::fail_point;
 use std::{convert::TryFrom, sync::Arc};
@@ -21,7 +21,7 @@ use storage_interface::{state_view::VerifiedStateView, DbReader};
 mod vm_validator_test;
 
 pub trait TransactionValidation: Send + Sync + Clone {
-    type ValidationInstance: diem_vm::VMValidator;
+    type ValidationInstance: aptos_vm::VMValidator;
 
     /// Validate a txn from client
     fn validate_transaction(&self, _txn: SignedTransaction) -> Result<VMValidatorResult>;
@@ -83,7 +83,7 @@ impl TransactionValidation for VMValidator {
                 "Injected error in vm_validator::validate_transaction"
             ))
         });
-        use diem_vm::VMValidator;
+        use aptos_vm::VMValidator;
 
         Ok(self.vm.validate_transaction(txn, &self.cached_state_view))
     }

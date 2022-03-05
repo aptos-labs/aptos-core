@@ -26,19 +26,19 @@ format_change_in_dependency_output () {
 }
 
 get_total_deps () {
-    cargo guppy resolve-cargo --resolver-version v2 --target-platform x86_64-unknown-linux-gnu --host-platform x86_64-unknown-linux-gnu --build-kind target --kind thirdparty --omit-edges-into diem-workspace-hack | wc -l | tr -d ' '
+    cargo guppy resolve-cargo --resolver-version v2 --target-platform x86_64-unknown-linux-gnu --host-platform x86_64-unknown-linux-gnu --build-kind target --kind thirdparty --omit-edges-into aptos-workspace-hack | wc -l | tr -d ' '
 }
 
 get_total_direct_deps() {
-    cargo guppy resolve-cargo --resolver-version v2 --target-platform x86_64-unknown-linux-gnu --host-platform x86_64-unknown-linux-gnu --build-kind target --kind directthirdparty --omit-edges-into diem-workspace-hack | wc -l | tr -d ' '
+    cargo guppy resolve-cargo --resolver-version v2 --target-platform x86_64-unknown-linux-gnu --host-platform x86_64-unknown-linux-gnu --build-kind target --kind directthirdparty --omit-edges-into aptos-workspace-hack | wc -l | tr -d ' '
 }
 
 get_total_dsr_deps () {
-    cargo guppy resolve-cargo --resolver-version v2 --target-platform x86_64-unknown-linux-gnu --host-platform x86_64-unknown-linux-gnu --build-kind target --kind thirdparty --omit-edges-into diem-workspace-hack -p safety-rules | wc -l | tr -d ' '
+    cargo guppy resolve-cargo --resolver-version v2 --target-platform x86_64-unknown-linux-gnu --host-platform x86_64-unknown-linux-gnu --build-kind target --kind thirdparty --omit-edges-into aptos-workspace-hack -p safety-rules | wc -l | tr -d ' '
 }
 
 get_total_direct_dsr_deps () {
-    cargo guppy resolve-cargo --resolver-version v2 --target-platform x86_64-unknown-linux-gnu --host-platform x86_64-unknown-linux-gnu --build-kind target --kind directthirdparty --omit-edges-into diem-workspace-hack -p safety-rules | wc -l | tr -d ' '
+    cargo guppy resolve-cargo --resolver-version v2 --target-platform x86_64-unknown-linux-gnu --host-platform x86_64-unknown-linux-gnu --build-kind target --kind directthirdparty --omit-edges-into aptos-workspace-hack -p safety-rules | wc -l | tr -d ' '
 }
 
 get_total_dups () {

@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{Error, PersistentSafetyStorage};
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     hash::CryptoHash,
 };
-use diem_global_constants::CONSENSUS_KEY;
-use diem_types::{account_address::AccountAddress, validator_signer::ValidatorSigner};
+use aptos_global_constants::CONSENSUS_KEY;
+use aptos_types::{account_address::AccountAddress, validator_signer::ValidatorSigner};
 use serde::Serialize;
 
 /// A ConfigurableValidatorSigner is a ValidatorSigner wrapper that offers either

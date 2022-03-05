@@ -2,27 +2,26 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{context::Context, index, tests::pretty};
-use bytes::Bytes;
-use diem_api_types::{
-    mime_types, HexEncodedBytes, TransactionOnChainData, X_DIEM_CHAIN_ID, X_DIEM_LEDGER_TIMESTAMP,
-    X_DIEM_LEDGER_VERSION,
+use aptos_api_types::{
+    mime_types, HexEncodedBytes, TransactionOnChainData, X_APTOS_CHAIN_ID,
+    X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
 };
-use diem_config::config::{ApiConfig, RoleType};
-use diem_crypto::{hash::HashValue, SigningKey};
-use diem_genesis_tool::validator_builder::{RootKeys, ValidatorBuilder};
-use diem_global_constants::OWNER_ACCOUNT;
-use diem_mempool::mocks::MockSharedMempool;
-use diem_sdk::{
+use aptos_config::config::{ApiConfig, RoleType};
+use aptos_crypto::{hash::HashValue, SigningKey};
+use aptos_genesis_tool::validator_builder::{RootKeys, ValidatorBuilder};
+use aptos_global_constants::OWNER_ACCOUNT;
+use aptos_mempool::mocks::MockSharedMempool;
+use aptos_sdk::{
     transaction_builder::{Currency, TransactionFactory},
     types::{
-        account_config::{diem_root_address, treasury_compliance_account_address},
+        account_config::{aptos_root_address, treasury_compliance_account_address},
         transaction::SignedTransaction,
         AccountKey, LocalAccount,
     },
 };
-use diem_secure_storage::KVStorage;
-use diem_temppath::TempPath;
-use diem_types::{
+use aptos_secure_storage::KVStorage;
+use aptos_temppath::TempPath;
+use aptos_types::{
     account_address::AccountAddress,
     account_config::testnet_dd_account_address,
     block_info::BlockInfo,
@@ -32,8 +31,9 @@ use diem_types::{
     on_chain_config::VMPublishingOption,
     transaction::{Transaction, TransactionStatus},
 };
-use diem_vm::DiemVM;
-use diemdb::DiemDB;
+use aptos_vm::DiemVM;
+use aptosdb::DiemDB;
+use bytes::Bytes;
 use executor::db_bootstrapper;
 use executor_types::BlockExecutorTrait;
 use hyper::Response;
@@ -144,7 +144,7 @@ impl TestContext {
     }
 
     pub fn root_account(&self) -> LocalAccount {
-        LocalAccount::new(diem_root_address(), self.root_keys.root_key.clone(), 0)
+        LocalAccount::new(aptos_root_address(), self.root_keys.root_key.clone(), 0)
     }
 
     pub fn gen_account(&mut self) -> LocalAccount {
@@ -185,7 +185,7 @@ impl TestContext {
             .into_inner()
     }
 
-    pub fn get_latest_ledger_info(&self) -> diem_api_types::LedgerInfo {
+    pub fn get_latest_ledger_info(&self) -> aptos_api_types::LedgerInfo {
         self.context.get_latest_ledger_info().unwrap()
     }
 
@@ -370,13 +370,13 @@ impl TestContext {
 
         if self.expect_status_code < 300 {
             let ledger_info = self.get_latest_ledger_info();
-            assert_eq!(headers[X_DIEM_CHAIN_ID], "4");
+            assert_eq!(headers[X_APTOS_CHAIN_ID], "4");
             assert_eq!(
-                headers[X_DIEM_LEDGER_VERSION],
+                headers[X_APTOS_LEDGER_VERSION],
                 ledger_info.version().to_string()
             );
             assert_eq!(
-                headers[X_DIEM_LEDGER_TIMESTAMP],
+                headers[X_APTOS_LEDGER_TIMESTAMP],
                 ledger_info.timestamp().to_string()
             );
         }

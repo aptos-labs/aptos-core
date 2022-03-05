@@ -9,14 +9,14 @@ use crate::{
     network::StorageServiceNetworkEvents,
 };
 use ::network::ProtocolId;
-use bounded_executor::BoundedExecutor;
-use diem_config::config::StorageServiceConfig;
-use diem_logger::prelude::*;
-use diem_types::{
+use aptos_config::config::StorageServiceConfig;
+use aptos_logger::prelude::*;
+use aptos_types::{
     account_state_blob::AccountStatesChunkWithProof,
     epoch_change::EpochChangeProof,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
+use bounded_executor::BoundedExecutor;
 use futures::stream::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::Duration};

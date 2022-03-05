@@ -3,18 +3,18 @@
 
 use crate::{consensusdb::ConsensusDB, epoch_manager::LivenessStorageData, error::DbError};
 use anyhow::{format_err, Context, Result};
+use aptos_config::config::NodeConfig;
+use aptos_crypto::{ed25519::Ed25519Signature, HashValue};
+use aptos_logger::prelude::*;
+use aptos_types::{
+    epoch_change::EpochChangeProof,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    transaction::Version,
+};
 use consensus_types::{
     block::Block, common::Author, quorum_cert::QuorumCert,
     timeout_2chain::TwoChainTimeoutCertificate, timeout_certificate::TimeoutCertificate,
     vote::Vote, vote_data::VoteData,
-};
-use diem_config::config::NodeConfig;
-use diem_crypto::{ed25519::Ed25519Signature, HashValue};
-use diem_logger::prelude::*;
-use diem_types::{
-    epoch_change::EpochChangeProof,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    transaction::Version,
 };
 use executor::components::apply_chunk_output::IntoLedgerView;
 use serde::Deserialize;
@@ -57,7 +57,7 @@ pub trait PersistentLivenessStorage: Send + Sync {
     /// ValidatorVerifier.
     fn retrieve_epoch_change_proof(&self, version: u64) -> Result<EpochChangeProof>;
 
-    /// Returns a handle of the diemdb.
+    /// Returns a handle of the aptosdb.
     fn diem_db(&self) -> Arc<dyn DbReader>;
 }
 
@@ -166,7 +166,7 @@ impl RootMetadata {
 
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_empty() -> Self {
-        Self::new(0, *diem_crypto::hash::ACCUMULATOR_PLACEHOLDER_HASH, vec![])
+        Self::new(0, *aptos_crypto::hash::ACCUMULATOR_PLACEHOLDER_HASH, vec![])
     }
 }
 

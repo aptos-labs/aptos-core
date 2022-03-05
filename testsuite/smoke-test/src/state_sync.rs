@@ -155,7 +155,7 @@ async fn test_startup_sync_state() {
     let node_config = swarm.validator(node_to_restart).unwrap().config().clone();
     swarm.validator_mut(node_to_restart).unwrap().stop();
     // TODO Remove hardcoded path to state db
-    let state_db_path = node_config.storage.dir().join("diemdb");
+    let state_db_path = node_config.storage.dir().join("aptosdb");
     // Verify that state_db_path exists and
     // we are not deleting a non-existent directory
     assert!(state_db_path.as_path().exists());

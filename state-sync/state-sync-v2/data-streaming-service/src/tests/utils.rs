@@ -2,14 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{data_notification::DataNotification, data_stream::DataStreamListener, error::Error};
-use async_trait::async_trait;
-use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
-use diem_data_client::{
+use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
+use aptos_data_client::{
     AdvertisedData, DiemDataClient, GlobalDataSummary, OptimalChunkSizes, Response,
     ResponseCallback, ResponseContext, ResponseError,
 };
-use diem_logger::Level;
-use diem_types::{
+use aptos_logger::Level;
+use aptos_types::{
     account_address::AccountAddress,
     account_state_blob::AccountStatesChunkWithProof,
     block_info::BlockInfo,
@@ -24,6 +23,7 @@ use diem_types::{
     },
     write_set::WriteSet,
 };
+use async_trait::async_trait;
 use futures::StreamExt;
 use rand::{rngs::OsRng, Rng};
 use std::{
@@ -121,7 +121,7 @@ impl DiemDataClient for MockDiemDataClient {
         _version: Version,
         start_index: u64,
         end_index: u64,
-    ) -> Result<Response<AccountStatesChunkWithProof>, diem_data_client::Error> {
+    ) -> Result<Response<AccountStatesChunkWithProof>, aptos_data_client::Error> {
         self.emulate_network_latencies();
 
         // Create epoch ending ledger infos according to the requested epochs
@@ -146,7 +146,7 @@ impl DiemDataClient for MockDiemDataClient {
         &self,
         start_epoch: Epoch,
         end_epoch: Epoch,
-    ) -> Result<Response<Vec<LedgerInfoWithSignatures>>, diem_data_client::Error> {
+    ) -> Result<Response<Vec<LedgerInfoWithSignatures>>, aptos_data_client::Error> {
         self.emulate_network_latencies();
 
         // Fetch the epoch ending ledger infos according to the requested epochs
@@ -161,7 +161,7 @@ impl DiemDataClient for MockDiemDataClient {
     async fn get_number_of_account_states(
         &self,
         _version: Version,
-    ) -> Result<Response<u64>, diem_data_client::Error> {
+    ) -> Result<Response<u64>, aptos_data_client::Error> {
         Ok(create_data_client_response(TOTAL_NUM_ACCOUNTS))
     }
 
@@ -170,7 +170,7 @@ impl DiemDataClient for MockDiemDataClient {
         _proof_version: Version,
         start_version: Version,
         end_version: Version,
-    ) -> Result<Response<TransactionOutputListWithProof>, diem_data_client::Error> {
+    ) -> Result<Response<TransactionOutputListWithProof>, aptos_data_client::Error> {
         self.emulate_network_latencies();
 
         // Create the requested transactions and transaction outputs
@@ -192,7 +192,7 @@ impl DiemDataClient for MockDiemDataClient {
         start_version: Version,
         end_version: Version,
         include_events: bool,
-    ) -> Result<Response<TransactionListWithProof>, diem_data_client::Error> {
+    ) -> Result<Response<TransactionListWithProof>, aptos_data_client::Error> {
         self.emulate_network_latencies();
 
         let transaction_list_with_proof =
@@ -367,7 +367,7 @@ fn create_range_random_u64(min_value: u64, max_value: u64) -> u64 {
 
 /// Initializes the Diem logger for tests
 pub fn initialize_logger() {
-    diem_logger::DiemLogger::builder()
+    aptos_logger::DiemLogger::builder()
         .is_async(false)
         .level(Level::Info)
         .build();

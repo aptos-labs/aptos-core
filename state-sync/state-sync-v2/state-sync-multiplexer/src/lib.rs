@@ -3,11 +3,11 @@
 
 #![forbid(unsafe_code)]
 
+use aptos_config::{config::NodeConfig, network_id::NetworkId};
+use aptos_data_client::diemnet::DiemNetDataClient;
+use aptos_types::{move_resource::MoveStorage, waypoint::Waypoint};
 use consensus_notifications::ConsensusNotificationListener;
 use data_streaming_service::streaming_client::StreamingServiceClient;
-use diem_config::{config::NodeConfig, network_id::NetworkId};
-use diem_data_client::diemnet::DiemNetDataClient;
-use diem_types::{move_resource::MoveStorage, waypoint::Waypoint};
 use event_notifications::{EventNotificationSender, EventSubscriptionService};
 use executor_types::ChunkExecutorTrait;
 use futures::executor::block_on;
@@ -26,7 +26,7 @@ use tokio::runtime::Runtime;
 /// Note: it's useful to maintain separate runtimes because the logger
 /// can prepend all logs with the runtime thread name.
 pub struct StateSyncRuntimes {
-    _diem_data_client: Runtime,
+    _aptos_data_client: Runtime,
     state_sync: StateSyncMultiplexer,
     _storage_service: Runtime,
     _streaming_service: Runtime,
@@ -34,13 +34,13 @@ pub struct StateSyncRuntimes {
 
 impl StateSyncRuntimes {
     pub fn new(
-        diem_data_client: Runtime,
+        aptos_data_client: Runtime,
         state_sync: StateSyncMultiplexer,
         storage_service: Runtime,
         streaming_service: Runtime,
     ) -> Self {
         Self {
-            _diem_data_client: diem_data_client,
+            _aptos_data_client: aptos_data_client,
             state_sync,
             _storage_service: storage_service,
             _streaming_service: streaming_service,
@@ -73,7 +73,7 @@ impl StateSyncMultiplexer {
         node_config: &NodeConfig,
         waypoint: Waypoint,
         mut event_subscription_service: EventSubscriptionService,
-        diem_data_client: DiemNetDataClient,
+        aptos_data_client: DiemNetDataClient,
         streaming_service_client: StreamingServiceClient,
     ) -> Self {
         // Notify subscribers of the initial on-chain config values
@@ -110,7 +110,7 @@ impl StateSyncMultiplexer {
                 mempool_notifier,
                 consensus_listener,
                 event_subscription_service,
-                diem_data_client,
+                aptos_data_client,
                 streaming_service_client,
             ));
         } else {
@@ -164,21 +164,21 @@ pub fn state_sync_v1_network_config() -> AppConfig {
 #[cfg(any(test, feature = "fuzzing"))]
 mod tests {
     use crate::StateSyncMultiplexer;
-    use consensus_notifications::new_consensus_notifier_listener_pair;
-    use data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
-    use diem_config::{config::RocksdbConfig, utils::get_genesis_txn};
-    use diem_crypto::HashValue;
-    use diem_data_client::diemnet::DiemNetDataClient;
-    use diem_genesis_tool::test_config;
-    use diem_infallible::RwLock;
-    use diem_temppath::TempPath;
-    use diem_time_service::TimeService;
-    use diem_types::{
+    use aptos_config::{config::RocksdbConfig, utils::get_genesis_txn};
+    use aptos_crypto::HashValue;
+    use aptos_data_client::diemnet::DiemNetDataClient;
+    use aptos_genesis_tool::test_config;
+    use aptos_infallible::RwLock;
+    use aptos_temppath::TempPath;
+    use aptos_time_service::TimeService;
+    use aptos_types::{
         block_info::BlockInfo, ledger_info::LedgerInfo, on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
         waypoint::Waypoint,
     };
-    use diem_vm::DiemVM;
-    use diemdb::DiemDB;
+    use aptos_vm::DiemVM;
+    use aptosdb::DiemDB;
+    use consensus_notifications::new_consensus_notifier_listener_pair;
+    use data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
     use event_notifications::EventSubscriptionService;
     use executor::chunk_executor::ChunkExecutor;
     use executor_test_helpers::bootstrap_genesis;
@@ -221,8 +221,8 @@ mod tests {
             MultiNetworkSender::new(HashMap::new()),
             PeerMetadataStorage::new(&[]),
         );
-        let (diem_data_client, _) = DiemNetDataClient::new(
-            node_config.state_sync.diem_data_client,
+        let (aptos_data_client, _) = DiemNetDataClient::new(
+            node_config.state_sync.aptos_data_client,
             node_config.state_sync.storage_service,
             TimeService::mock(),
             network_client,
@@ -238,7 +238,7 @@ mod tests {
             &node_config,
             Waypoint::new_any(&LedgerInfo::new(BlockInfo::empty(), HashValue::random())),
             event_subscription_service,
-            diem_data_client,
+            aptos_data_client,
             streaming_service_client,
         );
 

@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_sdk::crypto::ed25519::ed25519_dalek::{self, Signature, Signer, Verifier};
+use aptos_sdk::crypto::ed25519::ed25519_dalek::{self, Signature, Signer, Verifier};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{convert::TryFrom, str};
 
@@ -150,7 +150,7 @@ impl std::error::Error for JwsError {
 mod test {
     use super::*;
     use crate::types::{CommandResponseObject, CommandStatus};
-    use diem_sdk::crypto::ed25519::ed25519_dalek::{Keypair, PublicKey};
+    use aptos_sdk::crypto::ed25519::ed25519_dalek::{Keypair, PublicKey};
 
     #[test]
     fn deserialize_example() {

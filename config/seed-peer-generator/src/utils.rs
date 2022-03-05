@@ -6,11 +6,11 @@
 use std::convert::TryFrom;
 
 use anyhow::Error;
-use diem_config::config::{Peer, PeerRole, PeerSet};
-use diem_logger::prelude::*;
-use diem_rest_client::Client;
-use diem_types::{
-    account_config::diem_root_address, account_state::AccountState,
+use aptos_config::config::{Peer, PeerRole, PeerSet};
+use aptos_logger::prelude::*;
+use aptos_rest_client::Client;
+use aptos_types::{
+    account_config::aptos_root_address, account_state::AccountState,
     account_state_blob::AccountStateBlob, network_address::NetworkAddress,
     on_chain_config::ValidatorSet, validator_info::ValidatorInfo, PeerId,
 };
@@ -38,7 +38,7 @@ pub(crate) fn to_fullnode_addresses(
 fn get_validator_set(client_endpoint: String) -> anyhow::Result<ValidatorSet> {
     let client = Client::new(url::Url::parse(&client_endpoint)?);
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let blob = rt.block_on(client.get_account_state_blob(diem_root_address()))?;
+    let blob = rt.block_on(client.get_account_state_blob(aptos_root_address()))?;
     let account_state_blob: AccountStateBlob = blob.inner().clone().into();
     let account_state = AccountState::try_from(&account_state_blob)?;
     if let Some(val) = account_state.get_validator_set()? {
@@ -95,9 +95,9 @@ fn to_seed_peer<T: Fn(&ValidatorInfo) -> Result<Vec<NetworkAddress>, bcs::Error>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diem_config::config::HANDSHAKE_VERSION;
-    use diem_crypto::{ed25519::Ed25519PrivateKey, x25519, PrivateKey as PK, Uniform};
-    use diem_types::validator_config::ValidatorConfig;
+    use aptos_config::config::HANDSHAKE_VERSION;
+    use aptos_crypto::{ed25519::Ed25519PrivateKey, x25519, PrivateKey as PK, Uniform};
+    use aptos_types::validator_config::ValidatorConfig;
     use rand::{prelude::StdRng, SeedableRng};
 
     fn validator_set(

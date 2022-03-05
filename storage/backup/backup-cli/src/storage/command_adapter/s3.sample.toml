@@ -1,6 +1,6 @@
 [[env_vars]]
 key = "BUCKET"
-value = "diem-backup/backup1"
+value = "aptos-backup/backup1"
 
 [[env_vars]]
 key = "SUB_DIR"

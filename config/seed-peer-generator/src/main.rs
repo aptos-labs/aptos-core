@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use diem_config::config::{PersistableConfig, RoleType};
+use aptos_config::config::{PersistableConfig, RoleType};
 use std::path::PathBuf;
 use structopt::StructOpt;
 

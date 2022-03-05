@@ -14,8 +14,8 @@ async-trait = "0.1.42"
 thiserror = "1.0.24"
 
 channel = { path = "../../../crates/channel" }
-diem-config = { path = "../../../config" }
-diem-types = { path = "../../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
+aptos-config = { path = "../../../config" }
+aptos-types = { path = "../../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
 network = { path = "../../../network" }
 storage-service-types = { path = "../types" }

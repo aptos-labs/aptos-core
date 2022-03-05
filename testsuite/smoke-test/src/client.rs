@@ -97,7 +97,7 @@ async fn test_concurrent_transfers_single_node() {
 
     for _ in 0..20 {
         let txn = account_0.sign_with_transaction_builder(transaction_factory.peer_to_peer(
-            diem_sdk::transaction_builder::Currency::XUS,
+            aptos_sdk::transaction_builder::Currency::XUS,
             account_1.address(),
             1,
         ));

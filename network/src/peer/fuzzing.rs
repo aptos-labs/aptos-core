@@ -11,11 +11,11 @@ use crate::{
     testutils::fake_socket::ReadOnlyTestSocketVec,
     transport::{Connection, ConnectionId, ConnectionMetadata},
 };
-use channel::{diem_channel, message_queues::QueueStyle};
-use diem_config::{config::PeerRole, network_id::NetworkContext};
-use diem_proptest_helpers::ValueGenerator;
-use diem_time_service::TimeService;
-use diem_types::{network_address::NetworkAddress, PeerId};
+use aptos_config::{config::PeerRole, network_id::NetworkContext};
+use aptos_proptest_helpers::ValueGenerator;
+use aptos_time_service::TimeService;
+use aptos_types::{network_address::NetworkAddress, PeerId};
+use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{executor::block_on, future, io::AsyncReadExt, sink::SinkExt, stream::StreamExt};
 use memsocket::MemorySocket;
 use netcore::transport::ConnectionOrigin;
@@ -90,8 +90,8 @@ pub fn fuzz(data: &[u8]) {
     let (connection_notifs_tx, connection_notifs_rx) = channel::new_test(8);
     let channel_size = 8;
 
-    let (peer_reqs_tx, peer_reqs_rx) = diem_channel::new(QueueStyle::FIFO, channel_size, None);
-    let (peer_notifs_tx, peer_notifs_rx) = diem_channel::new(QueueStyle::FIFO, channel_size, None);
+    let (peer_reqs_tx, peer_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, channel_size, None);
+    let (peer_notifs_tx, peer_notifs_rx) = aptos_channel::new(QueueStyle::FIFO, channel_size, None);
 
     // Spin up a new `Peer` actor
     let peer = Peer::new(

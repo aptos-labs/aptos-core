@@ -13,8 +13,8 @@
 //! [DiemNet Handshake v1 Specification]: https://github.com/diem/diem/blob/main/specifications/network/handshake-v1.md
 
 use anyhow::anyhow;
-use diem_config::network_id::NetworkId;
-use diem_types::chain_id::ChainId;
+use aptos_config::network_id::NetworkId;
+use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -244,13 +244,13 @@ impl fmt::Display for MessagingProtocolVersion {
 /// An enum to list the possible errors during the diem handshake negotiation
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum HandshakeError {
-    #[error("diem-handshake: the received message has a different chain id: {0}, expected: {1}")]
+    #[error("aptos-handshake: the received message has a different chain id: {0}, expected: {1}")]
     InvalidChainId(ChainId, ChainId),
     #[error(
-        "diem-handshake: the received message has an different network id: {0}, expected: {1}"
+        "aptos-handshake: the received message has an different network id: {0}, expected: {1}"
     )]
     InvalidNetworkId(NetworkId, NetworkId),
-    #[error("diem-handshake: could not find an intersection of supported protocol with the peer")]
+    #[error("aptos-handshake: could not find an intersection of supported protocol with the peer")]
     NoCommonProtocols,
 }
 

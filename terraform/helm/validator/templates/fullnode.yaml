@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-fullnode
+  name: {{ include "aptos-validator.fullname" . }}-fullnode
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 
 {{- range .Values.fullnode.groups }}
 
@@ -12,12 +12,12 @@ metadata:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "diem-validator.fullname" $ }}-{{ .name }}
+  name: {{ include "aptos-validator.fullname" $ }}-{{ .name }}
   labels:
-    {{- include "diem-validator.labels" $ | nindent 4 }}
+    {{- include "aptos-validator.labels" $ | nindent 4 }}
 spec:
   selector:
-    {{- include "diem-validator.selectorLabels" $ | nindent 4 }}
+    {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
     app.kubernetes.io/name: fullnode
     group: {{ .name }}
   ports:
@@ -33,18 +33,18 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "diem-validator.fullname" $ }}-{{ .name }}-e{{ $.Values.chain.era }}
+  name: {{ include "aptos-validator.fullname" $ }}-{{ .name }}-e{{ $.Values.chain.era }}
   labels:
-    {{- include "diem-validator.labels" $ | nindent 4 }}
+    {{- include "aptos-validator.labels" $ | nindent 4 }}
     app.kubernetes.io/name: fullnode
     group: {{ .name }}
 spec:
-  serviceName: {{ include "diem-validator.fullname" $ }}-{{ .name }}
+  serviceName: {{ include "aptos-validator.fullname" $ }}-{{ .name }}
   replicas: {{ .replicas }}
   podManagementPolicy: Parallel
   selector:
     matchLabels:
-      {{- include "diem-validator.selectorLabels" $ | nindent 6 }}
+      {{- include "aptos-validator.selectorLabels" $ | nindent 6 }}
       app.kubernetes.io/name: fullnode
       group: {{ .name }}
   volumeClaimTemplates:
@@ -60,7 +60,7 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "diem-validator.selectorLabels" $ | nindent 8 }}
+        {{- include "aptos-validator.selectorLabels" $ | nindent 8 }}
         app.kubernetes.io/name: fullnode
         group: {{ .name }}
       annotations:
@@ -68,7 +68,7 @@ spec:
         checksum/fullnode.yaml: {{ tpl ($.Files.Get "files/configs/fullnode.yaml") $ | sha256sum }}
         checksum/vault.json: {{ tpl ($.Files.Get "files/vault.json") $ | sha256sum }}
     spec:
-      priorityClassName: {{ include "diem-validator.fullname" $ }}-medium
+      priorityClassName: {{ include "aptos-validator.fullname" $ }}-medium
       terminationGracePeriodSeconds: 0
       containers:
       - name: fullnode
@@ -80,7 +80,7 @@ spec:
         - |-
           set -ex
           while [ ! -e /opt/vault/token ] && [ $SECONDS -lt 30 ]; do sleep 1; done
-          exec /opt/diem/bin/diem-node -f /opt/diem/etc/fullnode.yaml
+          exec /opt/diem/bin/aptos-node -f /opt/diem/etc/fullnode.yaml
       {{- with $.Values.fullnode }}
         resources:
           {{- toYaml .resources | nindent 10 }}
@@ -93,9 +93,9 @@ spec:
         - name: RUST_BACKTRACE
           value: "1"
         - name: STRUCT_LOG_TCP_ADDR
-          value: '{{ include "diem-validator.fullname" $ }}-logging:5044'
+          value: '{{ include "aptos-validator.fullname" $ }}-logging:5044'
         volumeMounts:
-        - name: diem-config
+        - name: aptos-config
           mountPath: /opt/diem/etc
         - name: genesis-config
           mountPath: /opt/diem/genesis
@@ -162,19 +162,19 @@ spec:
         fsGroup: 6180
       {{- end }}
       volumes:
-      - name: diem-config
+      - name: aptos-config
         configMap:
-          name: {{ include "diem-validator.fullname" $ }}
+          name: {{ include "aptos-validator.fullname" $ }}
       - name: genesis-config
         configMap:
-          name: {{ include "diem-validator.fullname" $ }}-genesis-e{{ $.Values.chain.era }}
+          name: {{ include "aptos-validator.fullname" $ }}-genesis-e{{ $.Values.chain.era }}
       - name: vault-config
         configMap:
-          name: {{ include "diem-validator.fullname" $ }}-vault
+          name: {{ include "aptos-validator.fullname" $ }}-vault
       - name: vault-token
         emptyDir:
           medium: Memory
-      serviceAccountName: {{ include "diem-validator.fullname" $ }}-fullnode
+      serviceAccountName: {{ include "aptos-validator.fullname" $ }}-fullnode
       {{- if $.Values.imagePullSecret }}
       imagePullSecrets:
       - name: {{ $.Values.imagePullSecret }}

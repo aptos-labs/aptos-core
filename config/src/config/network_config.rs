@@ -7,9 +7,9 @@ use crate::{
     network_id::NetworkId,
     utils,
 };
-use diem_crypto::{x25519, Uniform};
-use diem_secure_storage::{CryptoStorage, KVStorage, Storage};
-use diem_types::{
+use aptos_crypto::{x25519, Uniform};
+use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
+use aptos_types::{
     network_address::NetworkAddress, transaction::authenticator::AuthenticationKey, PeerId,
 };
 use rand::{
@@ -226,12 +226,12 @@ impl NetworkConfig {
                 let mut rng = StdRng::from_seed(OsRng.gen());
                 let key = x25519::PrivateKey::generate(&mut rng);
                 let peer_id =
-                    diem_types::account_address::from_identity_public_key(key.public_key());
+                    aptos_types::account_address::from_identity_public_key(key.public_key());
                 self.identity = Identity::from_config(key, peer_id);
             }
             Identity::FromConfig(config) => {
                 let peer_id =
-                    diem_types::account_address::from_identity_public_key(config.key.public_key());
+                    aptos_types::account_address::from_identity_public_key(config.key.public_key());
                 if config.peer_id == PeerId::ZERO {
                     config.peer_id = peer_id;
                 }

@@ -16,8 +16,8 @@ use crate::{
         MIN_ADVERTISED_TRANSACTION, MIN_ADVERTISED_TRANSACTION_OUTPUT, TOTAL_NUM_ACCOUNTS,
     },
 };
+use aptos_config::config::DataStreamingServiceConfig;
 use claim::{assert_le, assert_matches, assert_ok, assert_some};
-use diem_config::config::DataStreamingServiceConfig;
 
 macro_rules! unexpected_payload_type {
     ($received:expr) => {
@@ -949,10 +949,10 @@ fn create_new_streaming_client_and_service() -> StreamingServiceClient {
         new_streaming_service_client_listener_pair();
 
     // Create the streaming service and connect it to the listener
-    let diem_data_client = MockDiemDataClient::new();
+    let aptos_data_client = MockDiemDataClient::new();
     let streaming_service = DataStreamingService::new(
         DataStreamingServiceConfig::default(),
-        diem_data_client,
+        aptos_data_client,
         streaming_service_listener,
     );
     tokio::spawn(streaming_service.start_service());

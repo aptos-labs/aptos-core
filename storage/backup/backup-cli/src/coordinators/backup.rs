@@ -19,9 +19,9 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
-use diem_logger::prelude::*;
-use diem_types::transaction::Version;
-use diemdb::backup::backup_handler::DbState;
+use aptos_logger::prelude::*;
+use aptos_types::transaction::Version;
+use aptosdb::backup::backup_handler::DbState;
 use futures::{stream, Future, StreamExt};
 use std::{fmt::Debug, sync::Arc};
 use structopt::StructOpt;
@@ -360,7 +360,7 @@ fn get_next_snapshot(last_in_backup: Option<u64>, db_state: DbState, interval: u
 #[cfg(test)]
 mod tests {
     use crate::coordinators::backup::{get_batch_range, get_next_snapshot};
-    use diemdb::backup::backup_handler::DbState;
+    use aptosdb::backup::backup_handler::DbState;
 
     #[test]
     fn test_get_batch_range() {

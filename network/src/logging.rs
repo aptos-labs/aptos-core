@@ -5,9 +5,9 @@
 //! This module is to contain all networking logging information.
 //!
 //! ```
-//! use diem_config::network_id::NetworkContext;
-//! use diem_logger::info;
-//! use diem_types::{PeerId, network_address::NetworkAddress};
+//! use aptos_config::network_id::NetworkContext;
+//! use aptos_logger::info;
+//! use aptos_types::{PeerId, network_address::NetworkAddress};
 //! use network::logging::NetworkSchema;
 //!
 //! info!(
@@ -24,9 +24,9 @@ use crate::{
     connectivity_manager::DiscoverySource,
     transport::{ConnectionId, ConnectionMetadata},
 };
-use diem_config::network_id::NetworkContext;
-use diem_logger::Schema;
-use diem_types::{network_address::NetworkAddress, PeerId};
+use aptos_config::network_id::NetworkContext;
+use aptos_logger::Schema;
+use aptos_types::{network_address::NetworkAddress, PeerId};
 use netcore::transport::ConnectionOrigin;
 
 #[derive(Schema)]

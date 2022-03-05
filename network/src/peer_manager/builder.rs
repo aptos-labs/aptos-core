@@ -14,17 +14,17 @@ use crate::{
     transport::{self, Connection, DiemNetTransport, DIEM_TCP_TRANSPORT},
     ProtocolId,
 };
-use channel::{self, diem_channel, message_queues::QueueStyle};
-use diem_config::{
+use aptos_config::{
     config::{PeerSet, RateLimitConfig, HANDSHAKE_VERSION},
     network_id::NetworkContext,
 };
-use diem_crypto::x25519;
-use diem_infallible::RwLock;
-use diem_logger::prelude::*;
-use diem_rate_limiter::rate_limit::TokenBucketRateLimiter;
-use diem_time_service::TimeService;
-use diem_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
+use aptos_crypto::x25519;
+use aptos_infallible::RwLock;
+use aptos_logger::prelude::*;
+use aptos_rate_limiter::rate_limit::TokenBucketRateLimiter;
+use aptos_time_service::TimeService;
+use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
+use channel::{self, aptos_channel, message_queues::QueueStyle};
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 use netcore::transport::memory::MemoryTransport;
 use netcore::transport::{
@@ -64,15 +64,15 @@ impl TransportContext {
 
 struct PeerManagerContext {
     // TODO(philiphayes): better support multiple listening addrs
-    pm_reqs_tx: diem_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>,
-    pm_reqs_rx: diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
-    connection_reqs_tx: diem_channel::Sender<PeerId, ConnectionRequest>,
-    connection_reqs_rx: diem_channel::Receiver<PeerId, ConnectionRequest>,
+    pm_reqs_tx: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>,
+    pm_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+    connection_reqs_tx: aptos_channel::Sender<PeerId, ConnectionRequest>,
+    connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
 
     peer_metadata_storage: Arc<PeerMetadataStorage>,
     trusted_peers: Arc<RwLock<PeerSet>>,
     upstream_handlers:
-        HashMap<ProtocolId, diem_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+        HashMap<ProtocolId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
     connection_event_handlers: Vec<conn_notifs_channel::Sender>,
 
     max_concurrent_network_reqs: usize,
@@ -86,16 +86,16 @@ struct PeerManagerContext {
 impl PeerManagerContext {
     #[allow(clippy::too_many_arguments)]
     fn new(
-        pm_reqs_tx: diem_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>,
-        pm_reqs_rx: diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
-        connection_reqs_tx: diem_channel::Sender<PeerId, ConnectionRequest>,
-        connection_reqs_rx: diem_channel::Receiver<PeerId, ConnectionRequest>,
+        pm_reqs_tx: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>,
+        pm_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+        connection_reqs_tx: aptos_channel::Sender<PeerId, ConnectionRequest>,
+        connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
 
         peer_metadata_storage: Arc<PeerMetadataStorage>,
         trusted_peers: Arc<RwLock<PeerSet>>,
         upstream_handlers: HashMap<
             ProtocolId,
-            diem_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+            aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
         >,
         connection_event_handlers: Vec<conn_notifs_channel::Sender>,
 
@@ -129,7 +129,7 @@ impl PeerManagerContext {
     fn add_upstream_handler(
         &mut self,
         protocol_id: ProtocolId,
-        channel: diem_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+        channel: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
     ) -> &mut Self {
         self.upstream_handlers.insert(protocol_id, channel);
         self
@@ -184,14 +184,14 @@ impl PeerManagerBuilder {
         outbound_rate_limit_config: Option<RateLimitConfig>,
     ) -> Self {
         // Setup channel to send requests to peer manager.
-        let (pm_reqs_tx, pm_reqs_rx) = diem_channel::new(
+        let (pm_reqs_tx, pm_reqs_rx) = aptos_channel::new(
             QueueStyle::FIFO,
             channel_size,
             Some(&counters::PENDING_PEER_MANAGER_REQUESTS),
         );
         // Setup channel to send connection requests to peer manager.
         let (connection_reqs_tx, connection_reqs_rx) =
-            diem_channel::new(QueueStyle::FIFO, channel_size, None);
+            aptos_channel::new(QueueStyle::FIFO, channel_size, None);
 
         Self {
             network_context,
@@ -228,7 +228,7 @@ impl PeerManagerBuilder {
         self.listen_address.clone()
     }
 
-    pub fn connection_reqs_tx(&self) -> diem_channel::Sender<PeerId, ConnectionRequest> {
+    pub fn connection_reqs_tx(&self) -> aptos_channel::Sender<PeerId, ConnectionRequest> {
         self.peer_manager_context
             .as_ref()
             .expect("Cannot access connection_reqs once PeerManager has been built")
@@ -251,7 +251,7 @@ impl PeerManagerBuilder {
     /// Create the configured transport and start PeerManager.
     /// Return the actual NetworkAddress over which this peer is listening.
     pub fn build(&mut self, executor: &Handle) -> &mut Self {
-        use diem_types::network_address::Protocol::*;
+        use aptos_types::network_address::Protocol::*;
 
         let transport_context = self
             .transport_context
@@ -408,7 +408,7 @@ impl PeerManagerBuilder {
     ) -> (
         (PeerManagerRequestSender, ConnectionRequestSender),
         (
-            diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
+            aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
             conn_notifs_channel::Receiver,
         ),
     ) {
@@ -434,7 +434,7 @@ impl PeerManagerBuilder {
         &mut self,
         config: &AppConfig,
     ) -> (
-        diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
+        aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
         conn_notifs_channel::Receiver,
     ) {
         self.transport_context().add_protocols(&config.protocols);

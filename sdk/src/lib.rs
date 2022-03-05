@@ -18,7 +18,7 @@
 //!
 
 pub mod crypto {
-    pub use diem_crypto::*;
+    pub use aptos_crypto::*;
 }
 
 pub mod transaction_builder;

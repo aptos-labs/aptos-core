@@ -5,4 +5,4 @@ set -e
 
 DIR="$( cd "$( dirname "$0" )" && pwd )"
 
-$DIR/../diem-build.sh $DIR/Dockerfile diem/tools "$@"
+$DIR/../aptos-build.sh $DIR/Dockerfile diem/tools "$@"

@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_secure_push_metrics::{
+use aptos_secure_push_metrics::{
     register_histogram_vec, register_int_counter_vec, register_int_gauge_vec, HistogramTimer,
     HistogramVec, IntCounterVec, IntGaugeVec,
 };
@@ -14,7 +14,7 @@ pub const WAYPOINT_VERSION: &str = "waypoint_version";
 
 pub static LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "diem_safety_rules_latency",
+        "aptos_safety_rules_latency",
         "Time to perform an operation",
         &["source", "field"]
     )
@@ -23,7 +23,7 @@ pub static LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
 
 static QUERY_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "diem_safety_rules_queries",
+        "aptos_safety_rules_queries",
         "Outcome of calling into LSR",
         &["method", "result"]
     )
@@ -32,7 +32,7 @@ static QUERY_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
 
 static STATE_GAUGE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "diem_safety_rules_state",
+        "aptos_safety_rules_state",
         "Current internal state of LSR",
         &["field"]
     )

@@ -7,20 +7,20 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkEvents, ConsensusNetworkSender},
 };
 use anyhow::{anyhow, ensure};
+use aptos_logger::prelude::*;
+use aptos_metrics::monitor;
+use aptos_types::{
+    account_address::AccountAddress, epoch_change::EpochChangeProof,
+    ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
+};
 use bytes::Bytes;
-use channel::{self, diem_channel, message_queues::QueueStyle};
+use channel::{self, aptos_channel, message_queues::QueueStyle};
 use consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse, MAX_BLOCKS_PER_REQUEST},
     common::Author,
     experimental::commit_decision::CommitDecision,
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
-};
-use diem_logger::prelude::*;
-use diem_metrics::monitor;
-use diem_types::{
-    account_address::AccountAddress, epoch_change::EpochChangeProof,
-    ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
 };
 use futures::{channel::oneshot, stream::select, SinkExt, Stream, StreamExt};
 use network::{
@@ -48,11 +48,11 @@ pub struct IncomingBlockRetrievalRequest {
 /// Will be returned by the NetworkTask upon startup.
 pub struct NetworkReceivers {
     /// Provide a LIFO buffer for each (Author, MessageType) key
-    pub consensus_messages: diem_channel::Receiver<
+    pub consensus_messages: aptos_channel::Receiver<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
-    pub block_retrieval: diem_channel::Receiver<AccountAddress, IncomingBlockRetrievalRequest>,
+    pub block_retrieval: aptos_channel::Receiver<AccountAddress, IncomingBlockRetrievalRequest>,
 }
 
 /// Implements the actual networking support for all consensus messaging.
@@ -197,11 +197,11 @@ impl NetworkSender {
 }
 
 pub struct NetworkTask {
-    consensus_messages_tx: diem_channel::Sender<
+    consensus_messages_tx: aptos_channel::Sender<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
-    block_retrieval_tx: diem_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>,
+    block_retrieval_tx: aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>,
     all_events: Box<dyn Stream<Item = Event<ConsensusMsg>> + Send + Unpin>,
 }
 
@@ -212,8 +212,8 @@ impl NetworkTask {
         self_receiver: channel::Receiver<Event<ConsensusMsg>>,
     ) -> (NetworkTask, NetworkReceivers) {
         let (consensus_messages_tx, consensus_messages) =
-            diem_channel::new(QueueStyle::LIFO, 1, Some(&counters::CONSENSUS_CHANNEL_MSGS));
-        let (block_retrieval_tx, block_retrieval) = diem_channel::new(
+            aptos_channel::new(QueueStyle::LIFO, 1, Some(&counters::CONSENSUS_CHANNEL_MSGS));
+        let (block_retrieval_tx, block_retrieval) = aptos_channel::new(
             QueueStyle::LIFO,
             1,
             Some(&counters::BLOCK_RETRIEVAL_CHANNEL_MSGS),

@@ -9,8 +9,8 @@ use crate::{
     },
     Capability, CryptoStorage, Error, Identity, KVStorage, Namespaced, Permission, Policy, Storage,
 };
-use diem_crypto::{test_utils::TestDiemCrypto, Signature};
-use diem_vault_client::dev::{self, ROOT_TOKEN};
+use aptos_crypto::{test_utils::TestDiemCrypto, Signature};
+use aptos_vault_client::dev::{self, ROOT_TOKEN};
 
 /// VaultStorage namespace constants
 const VAULT_NAMESPACE_1: &str = "namespace_1";

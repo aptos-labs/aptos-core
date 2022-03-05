@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{AptosPublicInfo, Coffer, NFTPublicInfo, PublicInfo, Result};
-use diem_rest_client::Client as RestClient;
-use diem_sdk::{
+use aptos_rest_client::Client as RestClient;
+use aptos_sdk::{
     transaction_builder::{Currency, TransactionFactory},
     types::{
         account_address::AccountAddress, chain_id::ChainId,

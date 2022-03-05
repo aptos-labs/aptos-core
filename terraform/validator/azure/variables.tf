@@ -24,7 +24,7 @@ variable "record_name" {
 }
 
 variable "helm_chart" {
-  description = "Path to diem-validator Helm chart file"
+  description = "Path to aptos-validator Helm chart file"
   default     = "../helm"
 }
 

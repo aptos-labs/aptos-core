@@ -5,10 +5,10 @@ use crate::{
     operational_tooling::launch_swarm_with_op_tool_and_backend,
     test_utils::check_create_mint_transfer,
 };
-use diem_config::config::SecureBackend;
-use diem_sdk::types::on_chain_config::OnChainConsensusConfig;
-use diem_secure_storage::{KVStorage, Storage};
-use diem_types::network_address::NetworkAddress;
+use aptos_config::config::SecureBackend;
+use aptos_sdk::types::on_chain_config::OnChainConsensusConfig;
+use aptos_secure_storage::{KVStorage, Storage};
+use aptos_types::network_address::NetworkAddress;
 use forge::{NodeExt, Swarm};
 use std::{convert::TryInto, str::FromStr};
 

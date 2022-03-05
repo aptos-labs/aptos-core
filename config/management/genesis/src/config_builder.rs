@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::validator_builder::ValidatorBuilder;
-use diem_config::config::NodeConfig;
-use diem_crypto::ed25519::Ed25519PrivateKey;
-use diem_secure_storage::{CryptoStorage, KVStorage, Storage};
-use diem_temppath::TempPath;
+use aptos_config::config::NodeConfig;
+use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
+use aptos_temppath::TempPath;
 use rand::{rngs::StdRng, SeedableRng};
 
 pub fn test_config() -> (NodeConfig, Ed25519PrivateKey) {
@@ -30,37 +30,37 @@ pub fn test_config() -> (NodeConfig, Ed25519PrivateKey) {
         .identity_from_storage()
         .backend;
     let storage: Storage = std::convert::TryFrom::try_from(backend).unwrap();
-    let mut test = diem_config::config::TestConfig::new_with_temp_dir(Some(path));
+    let mut test = aptos_config::config::TestConfig::new_with_temp_dir(Some(path));
     test.execution_key(
         storage
-            .export_private_key(diem_global_constants::EXECUTION_KEY)
+            .export_private_key(aptos_global_constants::EXECUTION_KEY)
             .unwrap(),
     );
     test.operator_key(
         storage
-            .export_private_key(diem_global_constants::OPERATOR_KEY)
+            .export_private_key(aptos_global_constants::OPERATOR_KEY)
             .unwrap(),
     );
     test.owner_key(
         storage
-            .export_private_key(diem_global_constants::OWNER_KEY)
+            .export_private_key(aptos_global_constants::OWNER_KEY)
             .unwrap(),
     );
     config.test = Some(test);
 
     let owner_account = storage
-        .get(diem_global_constants::OWNER_ACCOUNT)
+        .get(aptos_global_constants::OWNER_ACCOUNT)
         .unwrap()
         .value;
-    let mut sr_test = diem_config::config::SafetyRulesTestConfig::new(owner_account);
+    let mut sr_test = aptos_config::config::SafetyRulesTestConfig::new(owner_account);
     sr_test.consensus_key(
         storage
-            .export_private_key(diem_global_constants::CONSENSUS_KEY)
+            .export_private_key(aptos_global_constants::CONSENSUS_KEY)
             .unwrap(),
     );
     sr_test.execution_key(
         storage
-            .export_private_key(diem_global_constants::EXECUTION_KEY)
+            .export_private_key(aptos_global_constants::EXECUTION_KEY)
             .unwrap(),
     );
     config.consensus.safety_rules.test = Some(sr_test);

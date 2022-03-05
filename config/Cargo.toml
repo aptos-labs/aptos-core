@@ -1,8 +1,8 @@
 [package]
-name = "diem-config"
+name = "aptos-config"
 version = "0.1.0"
 authors = ["Diem Association <opensource@diem.com>"]
-description = "Diem diem-config"
+description = "Diem aptos-config"
 repository = "https://github.com/diem/diem"
 homepage = "https://diem.com"
 license = "Apache-2.0"
@@ -19,20 +19,20 @@ serde_yaml = "0.8.17"
 thiserror = "1.0.24"
 
 bcs = "0.1.2"
-diem-crypto = { path = "../crates/diem-crypto" }
-diem-crypto-derive = { path = "../crates/diem-crypto-derive" }
-diem-global-constants = { path = "./global-constants"}
-diem-logger = { path = "../crates/diem-logger" }
-diem-secure-storage = { path = "../secure/storage" }
-diem-temppath = { path = "../crates/diem-temppath" }
-diem-types = { path = "../types" }
-diem-workspace-hack = { version = "0.1", path = "../crates/diem-workspace-hack" }
+aptos-crypto = { path = "../crates/aptos-crypto" }
+aptos-crypto-derive = { path = "../crates/aptos-crypto-derive" }
+aptos-global-constants = { path = "./global-constants"}
+aptos-logger = { path = "../crates/aptos-logger" }
+aptos-secure-storage = { path = "../secure/storage" }
+aptos-temppath = { path = "../crates/aptos-temppath" }
+aptos-types = { path = "../types" }
+aptos-workspace-hack = { version = "0.1", path = "../crates/aptos-workspace-hack" }
 short-hex-str = { path = "../crates/short-hex-str" }
 
 [dev-dependencies]
-diem-crypto = { path = "../crates/diem-crypto", features = ["fuzzing"] }
+aptos-crypto = { path = "../crates/aptos-crypto", features = ["fuzzing"] }
 
 [features]
 default = []
-fuzzing = ["diem-crypto/fuzzing", "diem-types/fuzzing"]
+fuzzing = ["aptos-crypto/fuzzing", "aptos-types/fuzzing"]
 testing = []

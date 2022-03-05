@@ -335,7 +335,7 @@ resource "local_file" "kubernetes" {
     kubernetes_host        = aws_eks_cluster.diem.endpoint
     kubernetes_ca_cert     = base64decode(aws_eks_cluster.diem.certificate_authority.0.data)
     issuer                 = aws_eks_cluster.diem.identity[0].oidc[0].issuer
-    service_account_prefix = "${local.workspace_name}-diem-validator"
+    service_account_prefix = "${local.workspace_name}-aptos-validator"
     pod_cidrs              = aws_subnet.private[*].cidr_block
   })
   file_permission = "0644"

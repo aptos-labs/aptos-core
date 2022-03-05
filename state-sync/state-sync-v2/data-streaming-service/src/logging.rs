@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error::Error;
-use diem_logger::Schema;
+use aptos_logger::Schema;
 use serde::Serialize;
 
 #[derive(Schema)]

@@ -1,5 +1,5 @@
 [package]
-name = "diem-vault-client"
+name = "aptos-vault-client"
 version = "0.1.0"
 authors = ["Diem Association <opensource@diem.com>"]
 repository = "https://github.com/diem/diem"
@@ -20,16 +20,16 @@ serde_json = "1.0.64"
 thiserror = "1.0.24"
 ureq = { version = "1.5.4", features = ["json", "native-tls"], default-features = false }
 
-diem-crypto = { path = "../../../crates/diem-crypto" }
-diem-proptest-helpers = { path = "../../../crates/diem-proptest-helpers", optional = true }
-diem-types = { path = "../../../types", optional = true }
-diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
+aptos-crypto = { path = "../../../crates/aptos-crypto" }
+aptos-proptest-helpers = { path = "../../../crates/aptos-proptest-helpers", optional = true }
+aptos-types = { path = "../../../types", optional = true }
+aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
 
 [dev-dependencies]
 proptest = "1.0.0"
 
-diem-proptest-helpers = { path = "../../../crates/diem-proptest-helpers" }
-diem-types = { path = "../../../types", features = ["fuzzing"] }
+aptos-proptest-helpers = { path = "../../../crates/aptos-proptest-helpers" }
+aptos-types = { path = "../../../types", features = ["fuzzing"] }
 
 [features]
-fuzzing = ["proptest", "diem-proptest-helpers", "diem-types", "diem-types/fuzzing"]
+fuzzing = ["proptest", "aptos-proptest-helpers", "aptos-types", "aptos-types/fuzzing"]

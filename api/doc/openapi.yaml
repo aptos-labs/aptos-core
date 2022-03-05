@@ -225,15 +225,15 @@ paths:
         **Submit transaction using signed transaction BCS bytes**
 
           * Generate Diem core types and transaction script functions for the client application langauge
-            by [Tranaction Builder](https://github.com/diem/diem/tree/main/diem-move/transaction-builder-generator)
-          * Create [RawTransaction](https://diem.github.io/diem/diem_types/transaction/struct.RawTransaction.html).
+            by [Tranaction Builder](https://github.com/diem/diem/tree/main/aptos-move/transaction-builder-generator)
+          * Create [RawTransaction](https://diem.github.io/diem/aptos_types/transaction/struct.RawTransaction.html).
           * Create transaction signing message: bytes("DIEM::RawTransaction") + BCS bytes of the RawTransaction.
             See [Crypto Spec](https://github.com/diem/diem/blob/main/specifications/crypto/README.md) for more details.
           * Sign the transaction signing message and create transaction signature.
-          * Create [SignedTransaction](https://diem.github.io/diem/diem_types/transaction/struct.SignedTransaction.html).
-          * Serialize [SignedTransaction](https://diem.github.io/diem/diem_types/transaction/struct.SignedTransaction.html)
+          * Create [SignedTransaction](https://diem.github.io/diem/aptos_types/transaction/struct.SignedTransaction.html).
+          * Serialize [SignedTransaction](https://diem.github.io/diem/aptos_types/transaction/struct.SignedTransaction.html)
             into BCS bytes.
-          * Submit the [SignedTransaction](https://diem.github.io/diem/diem_types/transaction/struct.SignedTransaction.html)
+          * Submit the [SignedTransaction](https://diem.github.io/diem/aptos_types/transaction/struct.SignedTransaction.html)
             BCS bytes (do not hex-encoded it). The request header "Content-Type" must set to "application/x.diem.signed_transaction+bcs".
       tags:
         - transactions
@@ -250,7 +250,7 @@ paths:
               type: string
               format: binary
               description: |
-                BCS bytes of the [SignedTransaction](https://diem.github.io/diem/diem_types/transaction/struct.SignedTransaction.html).
+                BCS bytes of the [SignedTransaction](https://diem.github.io/diem/aptos_types/transaction/struct.SignedTransaction.html).
       responses:
         "202":
           description: Transaction is accepted and submitted to mempool.
@@ -305,7 +305,7 @@ paths:
         When given transaction version, server looks up the transaction on-chain by version.
 
         To create transaction hash:
-          1. Create hash message bytes: "DIEM::Transaction" bytes + BCS bytes of [Transaction](https://diem.github.io/diem/diem_types/transaction/enum.Transaction.html).
+          1. Create hash message bytes: "DIEM::Transaction" bytes + BCS bytes of [Transaction](https://diem.github.io/diem/aptos_types/transaction/enum.Transaction.html).
           2. Apply hash algorithm `SHA3-256` to the hash message bytes.
           3. Hex-encode the hash bytes with `0x` prefix.
       operationId: get_transaction

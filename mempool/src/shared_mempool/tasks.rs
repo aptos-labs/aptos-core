@@ -14,12 +14,12 @@ use crate::{
     ConsensusRequest, ConsensusResponse, SubmissionStatus,
 };
 use anyhow::Result;
-use diem_config::network_id::PeerNetworkId;
-use diem_crypto::HashValue;
-use diem_infallible::{Mutex, RwLock};
-use diem_logger::prelude::*;
-use diem_metrics::HistogramTimer;
-use diem_types::{
+use aptos_config::network_id::PeerNetworkId;
+use aptos_crypto::HashValue;
+use aptos_infallible::{Mutex, RwLock};
+use aptos_logger::prelude::*;
+use aptos_metrics::HistogramTimer;
+use aptos_types::{
     mempool_status::{MempoolStatus, MempoolStatusCode},
     on_chain_config::OnChainConfigPayload,
     transaction::SignedTransaction,
@@ -381,7 +381,7 @@ pub(crate) fn process_consensus_request<V: TransactionValidation>(
                 let mut mempool = smp.mempool.lock();
                 // gc before pulling block as extra protection against txns that may expire in consensus
                 // Note: this gc operation relies on the fact that consensus uses the system time to determine block timestamp
-                let curr_time = diem_infallible::duration_since_epoch();
+                let curr_time = aptos_infallible::duration_since_epoch();
                 mempool.gc_by_expiration_time(curr_time);
                 let block_size = cmp::max(max_block_size, 1);
                 txns = mempool.get_block(block_size, exclude_transactions);

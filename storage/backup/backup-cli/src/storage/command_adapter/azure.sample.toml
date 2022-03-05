@@ -1,6 +1,6 @@
 [[env_vars]]
 key = "ACCOUNT"
-value = "diem-backup"
+value = "aptos-backup"
 
 [[env_vars]]
 key = "CONTAINER"

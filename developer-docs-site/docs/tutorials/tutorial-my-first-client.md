@@ -226,10 +226,10 @@ script = stdlib.encode_peer_to_peer_with_metadata_script(
     )
 
 # create transaction
-raw_transaction = diem_types.RawTransaction(
+raw_transaction = aptos_types.RawTransaction(
     sender=sender_auth_key.account_address(),
     sequence_number=sender_account.sequence_number,
-    payload=diem_types.TransactionPayload__Script(script),
+    payload=aptos_types.TransactionPayload__Script(script),
     max_gas_amount=1_000_000,
     gas_unit_price=0,
     gas_currency_code=CURRENCY,

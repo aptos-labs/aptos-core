@@ -5,15 +5,15 @@ resource "random_id" "helm-bucket" {
   byte_length = 4
 }
 
-resource "aws_s3_bucket" "diem-testnet-helm" {
+resource "aws_s3_bucket" "aptos-testnet-helm" {
   count = var.enable_forge ? 1 : 0
 
-  bucket = "diem-testnet-${terraform.workspace}-helm-${random_id.helm-bucket.hex}"
+  bucket = "aptos-testnet-${terraform.workspace}-helm-${random_id.helm-bucket.hex}"
 }
 
-resource "aws_s3_bucket_public_access_block" "diem-testnet-helm" {
+resource "aws_s3_bucket_public_access_block" "aptos-testnet-helm" {
   count                   = var.enable_forge ? 1 : 0
-  bucket                  = aws_s3_bucket.diem-testnet-helm[0].id
+  bucket                  = aws_s3_bucket.aptos-testnet-helm[0].id
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
@@ -25,7 +25,7 @@ resource "aws_s3_bucket_public_access_block" "diem-testnet-helm" {
 resource "null_resource" "helm-s3-init" {
   count = var.enable_forge ? 1 : 0
   depends_on = [
-    aws_s3_bucket.diem-testnet-helm
+    aws_s3_bucket.aptos-testnet-helm
   ]
 
   triggers = {
@@ -35,8 +35,8 @@ resource "null_resource" "helm-s3-init" {
   provisioner "local-exec" {
     command = <<-EOT
       helm plugin install https://github.com/hypnoglow/helm-s3.git || true
-      helm s3 init s3://${aws_s3_bucket.diem-testnet-helm[0].bucket}/charts
-      helm repo add testnet-${terraform.workspace} s3://${aws_s3_bucket.diem-testnet-helm[0].bucket}/charts
+      helm s3 init s3://${aws_s3_bucket.aptos-testnet-helm[0].bucket}/charts
+      helm repo add testnet-${terraform.workspace} s3://${aws_s3_bucket.aptos-testnet-helm[0].bucket}/charts
     EOT
   }
 }
@@ -62,8 +62,8 @@ resource "null_resource" "helm-s3-package" {
       helm package ${path.module}/../helm/validator -d "$TEMPDIR" --app-version 1.0.0 --version 1.0.0
       helm package ${path.module}/../helm/fullnode -d "$TEMPDIR" --app-version 1.0.0 --version 1.0.0
       helm s3 push --force "$TEMPDIR"/testnet-*.tgz testnet-${terraform.workspace}
-      helm s3 push --force "$TEMPDIR"/diem-validator-*.tgz testnet-${terraform.workspace}
-      helm s3 push --force "$TEMPDIR"/diem-fullnode-*.tgz testnet-${terraform.workspace}
+      helm s3 push --force "$TEMPDIR"/aptos-validator-*.tgz testnet-${terraform.workspace}
+      helm s3 push --force "$TEMPDIR"/aptos-fullnode-*.tgz testnet-${terraform.workspace}
       echo "pushed to fullnode"
     EOT
   }
@@ -106,8 +106,8 @@ data "aws_iam_policy_document" "forge" {
       "s3:ListBucket",
     ]
     resources = [
-      "arn:aws:s3:::${aws_s3_bucket.diem-testnet-helm[0].id}",
-      "arn:aws:s3:::${aws_s3_bucket.diem-testnet-helm[0].id}/*"
+      "arn:aws:s3:::${aws_s3_bucket.aptos-testnet-helm[0].id}",
+      "arn:aws:s3:::${aws_s3_bucket.aptos-testnet-helm[0].id}/*"
     ]
   }
 
@@ -130,7 +130,7 @@ data "aws_iam_policy_document" "forge" {
 
 resource "aws_iam_role" "forge" {
   count                = var.enable_forge ? 1 : 0
-  name                 = "diem-testnet-${terraform.workspace}-forge"
+  name                 = "aptos-testnet-${terraform.workspace}-forge"
   path                 = var.iam_path
   permissions_boundary = var.permissions_boundary_policy
   assume_role_policy   = data.aws_iam_policy_document.forge-assume-role[0].json

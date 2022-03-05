@@ -5,12 +5,12 @@
 
 use crate::{components::chunk_output::ChunkOutput, metrics::DIEM_EXECUTOR_ERRORS};
 use anyhow::{anyhow, bail, ensure, Result};
-use diem_crypto::{
+use aptos_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher},
     HashValue,
 };
-use diem_logger::error;
-use diem_types::{
+use aptos_logger::error;
+use aptos_types::{
     account_address::{AccountAddress, HashAccountAddress},
     account_state::AccountState,
     account_state_blob::AccountStateBlob,

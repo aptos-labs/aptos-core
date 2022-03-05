@@ -3,7 +3,7 @@
 
 #[allow(unused_imports)]
 use anyhow::{format_err, Result};
-use diem_api_types::Error;
+use aptos_api_types::Error;
 
 #[allow(unused_variables)]
 #[inline]

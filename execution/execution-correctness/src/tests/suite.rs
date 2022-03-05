@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::execution_correctness::ExecutionCorrectness;
+use aptos_crypto::{ed25519::*, traits::Signature};
 use consensus_types::{block::Block, vote_proposal::VoteProposal};
-use diem_crypto::{ed25519::*, traits::Signature};
 use executor_test_helpers::{extract_signer, gen_ledger_info_with_sigs};
 
 pub fn run_test_suite(executor_pair: (Box<dyn ExecutionCorrectness>, Option<Ed25519PublicKey>)) {
-    let (mut config, _genesis_key) = diem_genesis_tool::test_config();
+    let (mut config, _genesis_key) = aptos_genesis_tool::test_config();
     let signer = extract_signer(&mut config);
     let (executor, execution_pubkey) = executor_pair;
     let parent_block_id = executor.committed_block_id().unwrap();

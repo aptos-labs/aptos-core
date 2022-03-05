@@ -93,7 +93,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_vm_user_transactions_executed{status=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_user_transactions_executed{status=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -192,7 +192,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_vm_system_transactions_executed{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_system_transactions_executed{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -291,7 +291,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_vm_transactions_validated{status=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_transactions_validated{status=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -390,7 +390,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_vm_num_txns_per_block_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(diem_vm_num_txns_per_block_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_num_txns_per_block_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_vm_num_txns_per_block_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -503,7 +503,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_vm_txn_gas_usage_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(diem_vm_txn_gas_usage_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_txn_gas_usage_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_vm_txn_gas_usage_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -616,7 +616,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_vm_txn_total_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(diem_vm_txn_total_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_txn_total_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_vm_txn_total_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -715,7 +715,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_vm_txn_validation_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(diem_vm_txn_validation_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_txn_validation_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(aptos_vm_txn_validation_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -814,7 +814,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_vm_txn_total_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(diem_vm_txn_total_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])/(rate(diem_vm_txn_gas_usage_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(diem_vm_txn_gas_usage_count{owner=~\"$owner\", role=~\"$role\"}[$interval]))",
+          "expr": "rate(aptos_vm_txn_total_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(aptos_vm_txn_total_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])/(rate(aptos_vm_txn_gas_usage_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(aptos_vm_txn_gas_usage_count{owner=~\"$owner\", role=~\"$role\"}[$interval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,

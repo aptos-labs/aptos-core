@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::subaddress::{Subaddress, SubaddressParseError};
-use bech32::{self, u5, FromBase32, ToBase32};
-use diem_sdk::{
+use aptos_sdk::{
     move_types::account_address::AccountAddressParseError,
     transaction_builder::Currency,
     types::{
@@ -11,6 +10,7 @@ use diem_sdk::{
         account_config::{allowed_currency_code_string, XDX_NAME, XUS_NAME},
     },
 };
+use bech32::{self, u5, FromBase32, ToBase32};
 use std::{collections::HashMap, str::FromStr};
 use thiserror::Error;
 use url::Url;
@@ -274,8 +274,8 @@ fn currency_from_str(currency: &str) -> Result<Currency, IntentIdentifierError> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_sdk::types::account_address::AccountAddress;
     use bech32::{self, FromBase32, ToBase32};
-    use diem_sdk::types::account_address::AccountAddress;
     use rstest::rstest;
 
     const ACCOUNT_ADDRESS: &str = "f72589b71ff4f8d139674a3f7369c69b";

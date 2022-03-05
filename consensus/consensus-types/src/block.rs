@@ -7,9 +7,9 @@ use crate::{
     quorum_cert::QuorumCert,
 };
 use anyhow::{bail, ensure, format_err};
-use diem_crypto::{ed25519::Ed25519Signature, hash::CryptoHash, HashValue};
-use diem_infallible::duration_since_epoch;
-use diem_types::{
+use aptos_crypto::{ed25519::Ed25519Signature, hash::CryptoHash, HashValue};
+use aptos_infallible::duration_since_epoch;
+use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,

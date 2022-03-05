@@ -14,8 +14,8 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context, Result};
 #[cfg(any(test, feature = "fuzzing"))]
-use diem_crypto::hash::TestOnlyHasher;
-use diem_crypto::{
+use aptos_crypto::hash::TestOnlyHasher;
+use aptos_crypto::{
     hash::{
         CryptoHash, CryptoHasher, EventAccumulatorHasher, TransactionAccumulatorHasher,
         SPARSE_MERKLE_PLACEHOLDER_HASH,

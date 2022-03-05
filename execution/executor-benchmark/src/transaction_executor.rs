@@ -1,9 +1,9 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_crypto::hash::HashValue;
-use diem_types::transaction::{Transaction, Version};
-use diem_vm::DiemVM;
+use aptos_crypto::hash::HashValue;
+use aptos_types::transaction::{Transaction, Version};
+use aptos_vm::DiemVM;
 use executor::block_executor::BlockExecutor;
 use executor_types::BlockExecutorTrait;
 use std::{

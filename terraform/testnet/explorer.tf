@@ -33,6 +33,6 @@ module "explorer" {
   blockchain_restapi_url = "https://api.${local.domain}"
 
   create_service_account      = false
-  service_account_name        = "diem-testnet"
+  service_account_name        = "aptos-testnet"
   service_account_annotations = {}
 }

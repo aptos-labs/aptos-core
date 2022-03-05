@@ -3,7 +3,7 @@
 
 use crate::{HexEncodedBytes, U64};
 
-use diem_types::account_config::AccountResource;
+use aptos_types::account_config::AccountResource;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

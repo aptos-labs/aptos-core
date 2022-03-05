@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_crypto::HashValue;
+use aptos_crypto::HashValue;
 
 /// Swap template-type values if 'cond'=true - useful to determine left/right parameters.
 pub(crate) fn swap_if<T>(first: T, second: T, cond: bool) -> (T, T) {

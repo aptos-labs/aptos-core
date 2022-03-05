@@ -1,5 +1,5 @@
 [package]
-name = "diem-state-view"
+name = "aptos-state-view"
 version = "0.1.0"
 authors = ["Diem Association <opensource@diem.com>"]
 description = "Diem state view"
@@ -11,10 +11,10 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.52"
-diem-crypto = { path = "../../crates/diem-crypto" }
-diem-types = { path = "../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-types = { path = "../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 
 [features]
 default = []
-fuzzing = ["diem-types/fuzzing"]
+fuzzing = ["aptos-types/fuzzing"]

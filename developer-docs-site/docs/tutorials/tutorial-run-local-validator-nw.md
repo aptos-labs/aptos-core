@@ -28,9 +28,9 @@ You can run a local test validator network in two ways: using the Diem Core sour
     ./scripts/dev_setup.sh
     source ~/.cargo/env
     ```
-2. Run the process: `cargo run -p diem-node -- --test`. After starting up, the process should print its config path (e.g., `/private/var/folders/36/w0v54r116ls44q29wh8db0mh0000gn/T/f62a72f87940e3892a860c21b55b529b/0/node.yaml`) and other metadata.
+2. Run the process: `cargo run -p aptos-node -- --test`. After starting up, the process should print its config path (e.g., `/private/var/folders/36/w0v54r116ls44q29wh8db0mh0000gn/T/f62a72f87940e3892a860c21b55b529b/0/node.yaml`) and other metadata.
 
-Note: this command runs `diem-node` from a genesis-only ledger state. If you want to reuse the ledger state produced by a previous run of `diem-node`, use `cargo run -p diem-node -- --test --config <config-path>`.
+Note: this command runs `aptos-node` from a genesis-only ledger state. If you want to reuse the ledger state produced by a previous run of `aptos-node`, use `cargo run -p aptos-node -- --test --config <config-path>`.
 
 
 ### Using Docker
@@ -41,11 +41,11 @@ Note: this command runs `diem-node` from a genesis-only ledger state. If you wan
 4. Create configuration files in the same directory so that the data can be exported out of the docker container:
     ```
     # Linux / Mac
-    touch genesis.blob diem_root_key waypoint.txt
+    touch genesis.blob aptos_root_key waypoint.txt
 
     # Windows
     fsutil file createnew genesis.blob 0
-    fsutil file createnew diem_root_key 0
+    fsutil file createnew aptos_root_key 0
     fsutil file createnew waypoint.txt 0
     Run docker-compose: docker-compose up
     ```
@@ -67,13 +67,13 @@ validator_1  | 	ChainId: TESTING
 
 ```
 This output contains information required for starting the Diem CLI tool:
-* Diem root key path - The root (also known as a mint or faucet) key controls the account that can mint. Available in the docker compose folder under `diem_root_key`.
+* Diem root key path - The root (also known as a mint or faucet) key controls the account that can mint. Available in the docker compose folder under `aptos_root_key`.
 * Waypoint - a verifiable checkpoint into the blockchain (available in the docker compose folder under waypoint.txt)
 * JSON-RPC endpoint - `http://127.0.0.1:8080`.
 * ChainId - uniquely distinguishes this chain from other chains.
 
 
-Use the output from above to start a `diem-client` in another terminal:
+Use the output from above to start a `aptos-client` in another terminal:
 
 ```
 $ cd ~/diem

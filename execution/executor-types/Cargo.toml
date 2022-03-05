@@ -15,14 +15,14 @@ serde = { version = "1.0.124", default-features = false }
 thiserror = "1.0.24"
 
 bcs = "0.1.2"
-diem-crypto = { path = "../../crates/diem-crypto" }
-diem-secure-net = { path = "../../secure/net" }
-diem-state-view = { path = "../../storage/state-view" }
-diem-types = { path = "../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-secure-net = { path = "../../secure/net" }
+aptos-state-view = { path = "../../storage/state-view" }
+aptos-types = { path = "../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 scratchpad = { path = "../../storage/scratchpad" }
 storage-interface = { path = "../../storage/storage-interface" }
 
 [features]
 default = []
-fuzzing = ["diem-crypto/fuzzing", "diem-types/fuzzing"]
+fuzzing = ["aptos-crypto/fuzzing", "aptos-types/fuzzing"]

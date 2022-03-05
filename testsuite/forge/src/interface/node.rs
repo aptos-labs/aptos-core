@@ -3,10 +3,10 @@
 
 use crate::{Result, Version};
 use anyhow::anyhow;
+use aptos_config::{config::NodeConfig, network_id::NetworkId};
+use aptos_rest_client::Client as RestClient;
+use aptos_sdk::types::PeerId;
 use debug_interface::AsyncNodeDebugClient;
-use diem_config::{config::NodeConfig, network_id::NetworkId};
-use diem_rest_client::Client as RestClient;
-use diem_sdk::types::PeerId;
 use std::{
     collections::HashMap,
     time::{Duration, Instant},

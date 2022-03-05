@@ -5,8 +5,8 @@ use crate::{
     config::{LoggerConfig, SecureBackend},
     keys::ConfigKey,
 };
-use diem_crypto::{ed25519::Ed25519PrivateKey, Uniform};
-use diem_types::{network_address::NetworkAddress, waypoint::Waypoint, PeerId};
+use aptos_crypto::{ed25519::Ed25519PrivateKey, Uniform};
+use aptos_types::{network_address::NetworkAddress, waypoint::Waypoint, PeerId};
 use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
 use std::{

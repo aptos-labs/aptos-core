@@ -3,8 +3,8 @@
 
 #![forbid(unsafe_code)]
 
+use aptos_types::{account_address::AccountAddress, transaction::Transaction};
 use async_trait::async_trait;
-use diem_types::{account_address::AccountAddress, transaction::Transaction};
 use futures::{
     channel::{mpsc, oneshot},
     stream::FusedStream,
@@ -216,9 +216,8 @@ enum MempoolNotificationResponse {
 #[cfg(test)]
 mod tests {
     use crate::{CommittedTransaction, Error, MempoolNotificationSender};
-    use claim::{assert_matches, assert_ok};
-    use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
-    use diem_types::{
+    use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
+    use aptos_types::{
         account_address::AccountAddress,
         block_metadata::BlockMetadata,
         chain_id::ChainId,
@@ -228,6 +227,7 @@ mod tests {
         },
         write_set::WriteSetMut,
     };
+    use claim::{assert_matches, assert_ok};
     use futures::{executor::block_on, FutureExt, StreamExt};
     use tokio::runtime::{Builder, Runtime};
 

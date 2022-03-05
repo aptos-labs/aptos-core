@@ -3,8 +3,8 @@
 
 use crate::{sync_info::SyncInfo, vote::Vote};
 use anyhow::ensure;
-use diem_crypto::HashValue;
-use diem_types::validator_verifier::ValidatorVerifier;
+use aptos_crypto::HashValue;
+use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 

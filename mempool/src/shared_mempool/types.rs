@@ -7,13 +7,13 @@ use crate::{
     shared_mempool::network::MempoolNetworkSender,
 };
 use anyhow::Result;
-use diem_config::{
+use aptos_config::{
     config::{MempoolConfig, RoleType},
     network_id::{NetworkId, PeerNetworkId},
 };
-use diem_crypto::HashValue;
-use diem_infallible::{Mutex, RwLock};
-use diem_types::{
+use aptos_crypto::HashValue;
+use aptos_infallible::{Mutex, RwLock};
+use aptos_types::{
     account_address::AccountAddress, mempool_status::MempoolStatus, transaction::SignedTransaction,
     vm_status::DiscardedVMStatus,
 };

@@ -2,17 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{auto_validate::AutoValidate, rest_client::RestClient, TransactionContext};
-use diem_global_constants::DIEM_ROOT_KEY;
-use diem_management::{
+use aptos_global_constants::APTOS_ROOT_KEY;
+use aptos_management::{
     config::{Config, ConfigPath},
     error::Error,
     secure_backend::ValidatorBackend,
     transaction::build_raw_transaction,
 };
-use diem_transaction_builder::stdlib as transaction_builder;
-use diem_types::{
+use aptos_transaction_builder::stdlib as transaction_builder;
+use aptos_types::{
     account_address::AccountAddress,
-    account_config::diem_root_address,
+    account_config::aptos_root_address,
     chain_id::ChainId,
     transaction::{authenticator::AuthenticationKey, ScriptFunction, TransactionPayload},
 };
@@ -55,11 +55,11 @@ impl CreateAccount {
             .override_json_server(&self.json_server)
             .override_validator_backend(&self.validator_backend.validator_backend)?;
 
-        let key = diem_management::read_key_from_file(&self.path_to_key)
+        let key = aptos_management::read_key_from_file(&self.path_to_key)
             .map_err(|e| Error::UnableToReadFile(format!("{:?}", self.path_to_key), e))?;
         let client = RestClient::new(config.json_server.clone());
 
-        let seq_num = client.sequence_number(diem_root_address()).await?;
+        let seq_num = client.sequence_number(aptos_root_address()).await?;
         let auth_key = AuthenticationKey::ed25519(&key);
         let account_address = auth_key.derived_address();
         let script = script_callback(
@@ -70,7 +70,7 @@ impl CreateAccount {
         )
         .into_script_function();
         let mut transaction_context =
-            build_and_submit_diem_root_transaction(&config, seq_num, script, action).await?;
+            build_and_submit_aptos_root_transaction(&config, seq_num, script, action).await?;
 
         // Perform auto validation if required
         transaction_context = self
@@ -124,7 +124,7 @@ struct RootValidatorOperation {
     #[structopt(long, required_unless = "config")]
     json_server: Option<String>,
     #[structopt(flatten)]
-    validator_config: diem_management::validator_config::ValidatorConfig,
+    validator_config: aptos_management::validator_config::ValidatorConfig,
     #[structopt(flatten)]
     auto_validate: AutoValidate,
 }
@@ -156,7 +156,7 @@ impl AddValidator {
             .await?
             .human_name;
 
-        let seq_num = client.sequence_number(diem_root_address()).await?;
+        let seq_num = client.sequence_number(aptos_root_address()).await?;
         let script = transaction_builder::encode_add_validator_and_reconfigure_script_function(
             seq_num,
             name,
@@ -164,7 +164,7 @@ impl AddValidator {
         )
         .into_script_function();
         let mut transaction_context =
-            build_and_submit_diem_root_transaction(&config, seq_num, script, "add-validator")
+            build_and_submit_aptos_root_transaction(&config, seq_num, script, "add-validator")
                 .await?;
 
         // Perform auto validation if required
@@ -198,7 +198,7 @@ impl RemoveValidator {
             .await?
             .human_name;
 
-        let seq_num = client.sequence_number(diem_root_address()).await?;
+        let seq_num = client.sequence_number(aptos_root_address()).await?;
         let script = transaction_builder::encode_remove_validator_and_reconfigure_script_function(
             seq_num,
             name,
@@ -207,7 +207,7 @@ impl RemoveValidator {
         .into_script_function();
 
         let mut transaction_context =
-            build_and_submit_diem_root_transaction(&config, seq_num, script, "remove-validator")
+            build_and_submit_aptos_root_transaction(&config, seq_num, script, "remove-validator")
                 .await?;
 
         // Perform auto validation if required
@@ -221,7 +221,7 @@ impl RemoveValidator {
     }
 }
 
-async fn build_and_submit_diem_root_transaction(
+async fn build_and_submit_aptos_root_transaction(
     config: &Config,
     seq_num: u64,
     script_function: ScriptFunction,
@@ -229,13 +229,13 @@ async fn build_and_submit_diem_root_transaction(
 ) -> Result<TransactionContext, Error> {
     let txn = build_raw_transaction(
         config.chain_id,
-        diem_root_address(),
+        aptos_root_address(),
         seq_num,
         script_function,
     );
 
     let mut storage = config.validator_backend();
-    let signed_txn = storage.sign(DIEM_ROOT_KEY, action, txn)?;
+    let signed_txn = storage.sign(APTOS_ROOT_KEY, action, txn)?;
 
     let client = RestClient::new(config.json_server.clone());
     client.submit_transaction(signed_txn).await

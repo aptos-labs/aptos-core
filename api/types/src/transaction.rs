@@ -7,12 +7,12 @@ use crate::{
 };
 
 use anyhow::bail;
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::{self, Ed25519PublicKey},
     multi_ed25519::{self, MultiEd25519PublicKey},
     validatable::Validatable,
 };
-use diem_types::{
+use aptos_types::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
@@ -51,14 +51,14 @@ impl From<SignedTransaction> for TransactionData {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TransactionOnChainData {
     pub version: u64,
-    pub transaction: diem_types::transaction::Transaction,
-    pub info: diem_types::transaction::TransactionInfo,
+    pub transaction: aptos_types::transaction::Transaction,
+    pub info: aptos_types::transaction::TransactionInfo,
     pub events: Vec<ContractEvent>,
-    pub accumulator_root_hash: diem_crypto::HashValue,
+    pub accumulator_root_hash: aptos_crypto::HashValue,
 }
 
-impl From<(TransactionWithProof, diem_crypto::HashValue)> for TransactionOnChainData {
-    fn from((txn, accumulator_root_hash): (TransactionWithProof, diem_crypto::HashValue)) -> Self {
+impl From<(TransactionWithProof, aptos_crypto::HashValue)> for TransactionOnChainData {
+    fn from((txn, accumulator_root_hash): (TransactionWithProof, aptos_crypto::HashValue)) -> Self {
         Self {
             version: txn.version,
             transaction: txn.transaction,
@@ -72,19 +72,19 @@ impl From<(TransactionWithProof, diem_crypto::HashValue)> for TransactionOnChain
 impl
     From<(
         u64,
-        diem_types::transaction::Transaction,
-        diem_types::transaction::TransactionInfo,
+        aptos_types::transaction::Transaction,
+        aptos_types::transaction::TransactionInfo,
         Vec<ContractEvent>,
-        diem_crypto::HashValue,
+        aptos_crypto::HashValue,
     )> for TransactionOnChainData
 {
     fn from(
         (version, transaction, info, events, accumulator_root_hash): (
             u64,
-            diem_types::transaction::Transaction,
-            diem_types::transaction::TransactionInfo,
+            aptos_types::transaction::Transaction,
+            aptos_types::transaction::TransactionInfo,
             Vec<ContractEvent>,
-            diem_crypto::HashValue,
+            aptos_crypto::HashValue,
         ),
     ) -> Self {
         Self {
@@ -504,7 +504,7 @@ impl TryFrom<MultiEd25519Signature> for TransactionAuthenticator {
 
         Ok(TransactionAuthenticator::multi_ed25519(
             MultiEd25519PublicKey::new(ed25519_public_keys, threshold)?,
-            diem_crypto::multi_ed25519::MultiEd25519Signature::new_with_signatures_and_bitmap(
+            aptos_crypto::multi_ed25519::MultiEd25519Signature::new_with_signatures_and_bitmap(
                 ed25519_signatures,
                 bitmap.inner().try_into()?,
             ),
@@ -534,7 +534,7 @@ impl TryFrom<MultiEd25519Signature> for AccountAuthenticator {
 
         Ok(AccountAuthenticator::multi_ed25519(
             MultiEd25519PublicKey::new(ed25519_public_keys, threshold)?,
-            diem_crypto::multi_ed25519::MultiEd25519Signature::new_with_signatures_and_bitmap(
+            aptos_crypto::multi_ed25519::MultiEd25519Signature::new_with_signatures_and_bitmap(
                 ed25519_signatures,
                 bitmap.inner().try_into()?,
             ),

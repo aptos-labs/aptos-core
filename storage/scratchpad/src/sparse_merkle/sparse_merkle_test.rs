@@ -6,11 +6,11 @@ use crate::test_utils::{
     proof_reader::ProofReader,
     proptest_helpers::{arb_smt_correctness_case, test_smt_correctness_impl},
 };
-use diem_crypto::{
+use aptos_crypto::{
     hash::{CryptoHash, TestOnlyHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use diem_types::{
+use aptos_types::{
     account_state_blob::AccountStateBlob,
     proof::{SparseMerkleLeafNode, SparseMerkleProof},
 };
@@ -23,7 +23,7 @@ fn update_byte(original_key: &HashValue, n: usize, byte: u8) -> HashValue {
 }
 
 fn hash_internal(left_child: HashValue, right_child: HashValue) -> HashValue {
-    diem_types::proof::SparseMerkleInternalNode::new(left_child, right_child).hash()
+    aptos_types::proof::SparseMerkleInternalNode::new(left_child, right_child).hash()
 }
 
 fn hash_leaf(key: HashValue, value_hash: HashValue) -> HashValue {

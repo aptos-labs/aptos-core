@@ -13,10 +13,10 @@ edition = "2018"
 anyhow = "1.0.52"
 fail = "0.4.0"
 scratchpad = { path = "../storage/scratchpad" }
-diem-state-view = { path = "../storage/state-view" }
-diem-types = { path = "../types" }
-diem-vm = { path = "../diem-move/diem-vm" }
-diem-workspace-hack = { version = "0.1", path = "../crates/diem-workspace-hack" }
+aptos-state-view = { path = "../storage/state-view" }
+aptos-types = { path = "../types" }
+aptos-vm = { path = "../aptos-move/aptos-vm" }
+aptos-workspace-hack = { version = "0.1", path = "../crates/aptos-workspace-hack" }
 executor = { path = "../execution/executor" }
 storage-interface = { path = "../storage/storage-interface" }
 
@@ -24,16 +24,16 @@ storage-interface = { path = "../storage/storage-interface" }
 rand = "0.8.3"
 
 executor-test-helpers = { path = "../execution/executor-test-helpers" }
-diem-crypto = { path = "../crates/diem-crypto", features = ["fuzzing"] }
-diem-temppath = { path = "../crates/diem-temppath" }
-diem-transaction-builder = { path = "../sdk/transaction-builder" }
-diem-types = { path = "../types", features = ["fuzzing"] }
-diem-vm = { path = "../diem-move/diem-vm" }
-diemdb = { path = "../storage/diemdb", features = ["fuzzing"] }
-vm-genesis = { path = "../diem-move/vm-genesis" }
+aptos-crypto = { path = "../crates/aptos-crypto", features = ["fuzzing"] }
+aptos-temppath = { path = "../crates/aptos-temppath" }
+aptos-transaction-builder = { path = "../sdk/transaction-builder" }
+aptos-types = { path = "../types", features = ["fuzzing"] }
+aptos-vm = { path = "../aptos-move/aptos-vm" }
+aptosdb = { path = "../storage/aptosdb", features = ["fuzzing"] }
+vm-genesis = { path = "../aptos-move/vm-genesis" }
 move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 
 [features]
 default = []
 failpoints = ["fail/failpoints"]
-fuzzing = ["diem-types/fuzzing", "diem-crypto/fuzzing", "diemdb/fuzzing"]
+fuzzing = ["aptos-types/fuzzing", "aptos-crypto/fuzzing", "aptosdb/fuzzing"]

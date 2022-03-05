@@ -157,7 +157,7 @@ resource "local_file" "kubernetes" {
     kubernetes_host        = azurerm_kubernetes_cluster.diem.kube_config[0].host
     kubernetes_ca_cert     = base64decode(azurerm_kubernetes_cluster.diem.kube_config[0].cluster_ca_certificate)
     issuer                 = azurerm_kubernetes_cluster.diem.fqdn
-    service_account_prefix = "${terraform.workspace}-diem-validator"
+    service_account_prefix = "${terraform.workspace}-aptos-validator"
     pod_cidrs              = azurerm_subnet.nodes.address_prefixes
   })
   file_permission = "0644"

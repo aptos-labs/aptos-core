@@ -8,10 +8,10 @@ use crate::{
     param::{AddressParam, LedgerVersionParam, MoveIdentifierParam, MoveStructTagParam},
 };
 
-use diem_api_types::{
+use aptos_api_types::{
     AccountData, Address, Error, LedgerInfo, MoveModuleBytecode, Response, TransactionId,
 };
-use diem_types::{
+use aptos_types::{
     account_config::AccountResource,
     account_state::AccountState,
     event::{EventHandle, EventKey},

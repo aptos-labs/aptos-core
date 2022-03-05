@@ -15,11 +15,11 @@ use crate::{
     ConsensusRequest, MempoolEventsReceiver, TransactionSummary,
 };
 use ::network::protocols::network::Event;
+use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use aptos_infallible::Mutex;
+use aptos_logger::prelude::*;
+use aptos_types::on_chain_config::OnChainConfigPayload;
 use bounded_executor::BoundedExecutor;
-use diem_config::network_id::{NetworkId, PeerNetworkId};
-use diem_infallible::Mutex;
-use diem_logger::prelude::*;
-use diem_types::on_chain_config::OnChainConfigPayload;
 use event_notifications::ReconfigNotificationListener;
 use futures::{
     channel::mpsc,

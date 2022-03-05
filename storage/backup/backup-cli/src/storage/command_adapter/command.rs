@@ -3,7 +3,7 @@
 
 use crate::{storage::command_adapter::config::EnvVar, utils::error_notes::ErrorNotes};
 use anyhow::{bail, ensure, Result};
-use diem_logger::prelude::*;
+use aptos_logger::prelude::*;
 use futures::{
     future::BoxFuture,
     task::{Context, Poll},

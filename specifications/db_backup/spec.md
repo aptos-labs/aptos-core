@@ -1,6 +1,6 @@
 # DiemDB Backup
 
-Diem nodes runs on top of [DiemDB](../../storage/diemdb) that serves the [core data stucture](../data_structure/spec.md) to other parts of the system. While the DiemDB is designed to provide efficient access to the recent history of the block chain, and append data to it, the DiemDB Backup is a concise data format to archive the full history of the chain, away from the running Diem validator network. It's useful in at least these situations:
+Diem nodes runs on top of [DiemDB](../../storage/aptosdb) that serves the [core data stucture](../data_structure/spec.md) to other parts of the system. While the DiemDB is designed to provide efficient access to the recent history of the block chain, and append data to it, the DiemDB Backup is a concise data format to archive the full history of the chain, away from the running Diem validator network. It's useful in at least these situations:
 
 * In case a validator lost its DiemDB, restoring the full transaction history from a backup is supposed to be 10x or more faster than replying on synchronizing from a peer.
 * In case of a fatal bug in the software destroying the DB on every single Diem Node, we can recover the network using the backups. The backups are not likely to be corrupt at the same time because the format is 1. Different; 2. Simple.
@@ -294,7 +294,7 @@ Example config for a S3 storage based on the aws-cli command line:
 ```toml
 [[env_vars]]
 key = "BUCKET_AND_PREFIX"
-value = "diem-backup/backup1"
+value = "aptos-backup/backup1"
 
 [commands]
 create_backup = 'echo "$BACKUP_NAME"'
@@ -304,10 +304,10 @@ save_metadata_line= 'aws s3 cp - "s3://$BUCKET_AND_PREFIX/metadata/$FILE_NAME"'
 list_metadata_files = 'aws s3 ls s3://$BUCKET_AND_PREFIX/metadata/ | sed -ne "s/.* //p" | xargs -I{} echo s3://$BUCKET/metadata/{}'
 ```
 
-This will create a folder structure like the following in the s3 bucket diem-backup:
+This will create a folder structure like the following in the s3 bucket aptos-backup:
 
 ```
-s3://diem-backup/backup1/
+s3://aptos-backup/backup1/
   metadata/
     epoch_ending_0-0.meta
     state_snapshot_ver_0.meta

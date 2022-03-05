@@ -138,7 +138,7 @@ mod tests {
     #[test]
     fn verify_epoch_change_proof() {
         use crate::{ledger_info::LedgerInfo, validator_verifier::random_validator_verifier};
-        use diem_crypto::hash::HashValue;
+        use aptos_crypto::hash::HashValue;
         use std::collections::BTreeMap;
 
         let all_epoch: Vec<u64> = (1..=10).collect();

@@ -25,18 +25,18 @@ tokio-stream = "0.1.4"
 
 consensus-notifications = { path = "../inter-component/consensus-notifications" }
 channel = { path = "../../crates/channel" }
-diem-config = { path = "../../config" }
-diem-crypto = { path = "../../crates/diem-crypto" }
-diem-infallible = { path = "../../crates/diem-infallible" }
-diem-logger = { path = "../../crates/diem-logger" }
-diem-mempool = { path = "../../mempool"}
-diem-metrics = { path = "../../crates/diem-metrics" }
-diem-proptest-helpers = { path = "../../crates/diem-proptest-helpers", optional = true }
-diem-temppath = { path = "../../crates/diem-temppath" }
-diem-types = { path = "../../types" }
-diem-vm = { path = "../../diem-move/diem-vm" }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
-diemdb = { path = "../../storage/diemdb", optional = true }
+aptos-config = { path = "../../config" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-infallible = { path = "../../crates/aptos-infallible" }
+aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-mempool = { path = "../../mempool"}
+aptos-metrics = { path = "../../crates/aptos-metrics" }
+aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers", optional = true }
+aptos-temppath = { path = "../../crates/aptos-temppath" }
+aptos-types = { path = "../../types" }
+aptos-vm = { path = "../../aptos-move/aptos-vm" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
+aptosdb = { path = "../../storage/aptosdb", optional = true }
 event-notifications = { path = "../../state-sync/inter-component/event-notifications" }
 executor = { path = "../../execution/executor" }
 executor-test-helpers = { path = "../../execution/executor-test-helpers", optional = true }
@@ -47,7 +47,7 @@ netcore = { path = "../../network/netcore" }
 network = { path = "../../network" }
 short-hex-str = { path = "../../crates/short-hex-str" }
 storage-interface = { path = "../../storage/storage-interface" }
-vm-genesis = { path = "../../diem-move/vm-genesis", optional = true }
+vm-genesis = { path = "../../aptos-move/vm-genesis", optional = true }
 
 [dev-dependencies]
 bytes = "1.0.1"
@@ -55,23 +55,23 @@ claim = "0.5.0"
 proptest = "1.0.0"
 
 channel = { path = "../../crates/channel" }
-diem-framework-releases= { path = "../../diem-move/diem-framework/DPN/releases" }
-diem-crypto = { path = "../../crates/diem-crypto" }
-diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
-diem-mempool = { path = "../../mempool", features = ["fuzzing"] }
-diem-proptest-helpers = { path = "../../crates/diem-proptest-helpers" }
-diemdb = { path = "../../storage/diemdb" }
+diem-framework-releases= { path = "../../aptos-move/diem-framework/DPN/releases" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
+aptos-mempool = { path = "../../mempool", features = ["fuzzing"] }
+aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers" }
+aptosdb = { path = "../../storage/aptosdb" }
 executor-test-helpers = { path = "../../execution/executor-test-helpers" }
 memsocket = { path = "../../network/memsocket" }
 move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 network = { path = "../../network", features = ["fuzzing", "testing"] }
 network-builder = { path  = "../../network/builder" }
 storage-service = { path = "../../storage/storage-service" }
-diem-transaction-builder = { path = "../../sdk/transaction-builder" }
-diem-time-service = { path = "../../crates/diem-time-service", features = ["testing"] }
-vm-genesis = { path = "../../diem-move/vm-genesis", features = ["fuzzing"] }
+aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
+aptos-time-service = { path = "../../crates/aptos-time-service", features = ["testing"] }
+vm-genesis = { path = "../../aptos-move/vm-genesis", features = ["fuzzing"] }
 
 [features]
 default = []
 failpoints = ["fail/failpoints"]
-fuzzing = ["vm-genesis", "proptest", "executor-test-helpers", "diem-config/fuzzing", "diem-mempool/fuzzing", "diem-types/fuzzing", "diem-proptest-helpers", "memsocket/fuzzing"]
+fuzzing = ["vm-genesis", "proptest", "executor-test-helpers", "aptos-config/fuzzing", "aptos-mempool/fuzzing", "aptos-types/fuzzing", "aptos-proptest-helpers", "memsocket/fuzzing"]

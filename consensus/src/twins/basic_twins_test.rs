@@ -7,8 +7,8 @@ use crate::{
     test_utils::{consensus_runtime, timed_block_on},
     twins::twins_node::SMRNode,
 };
+use aptos_config::config::ConsensusProposerType::{FixedProposer, RotatingProposer, RoundProposer};
 use consensus_types::{block::Block, common::Round};
-use diem_config::config::ConsensusProposerType::{FixedProposer, RotatingProposer, RoundProposer};
 use futures::StreamExt;
 use std::collections::HashMap;
 

@@ -1,10 +1,10 @@
 [package]
-name = "diem-genesis-tool"
+name = "aptos-genesis-tool"
 version = "0.1.0"
 authors = ["Diem Association <opensource@diem.com>"]
 description = "A tool to manage genesis"
 repository = "https://github.com/diem/diem"
-homepage = "https://diem.com"
+homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 edition = "2018"
@@ -21,23 +21,23 @@ consensus-types = { path = "../../../consensus/consensus-types" }
 executor = { path = "../../../execution/executor" }
 generate-key = { path = "../../generate-key" }
 bcs = "0.1.2"
-diem-config = { path = "../.."}
-diem-crypto = { path = "../../../crates/diem-crypto" }
-diem-framework-releases = { path = "../../../diem-move/diem-framework/DPN/releases"}
-diem-global-constants = { path = "../../global-constants" }
-diem-management = { path = ".." }
-diem-secure-storage = { path = "../../../secure/storage" }
-diem-types = { path = "../../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
-diem-temppath = { path = "../../../crates/diem-temppath" }
-diem-vm = { path = "../../../diem-move/diem-vm" }
-diemdb = { path = "../../../storage/diemdb" }
+aptos-config = { path = "../.."}
+aptos-crypto = { path = "../../../crates/aptos-crypto" }
+diem-framework-releases = { path = "../../../aptos-move/diem-framework/DPN/releases"}
+aptos-global-constants = { path = "../../global-constants" }
+aptos-management = { path = ".." }
+aptos-secure-storage = { path = "../../../secure/storage" }
+aptos-types = { path = "../../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
+aptos-temppath = { path = "../../../crates/aptos-temppath" }
+aptos-vm = { path = "../../../aptos-move/aptos-vm" }
+aptosdb = { path = "../../../storage/aptosdb" }
 storage-interface = { path = "../../../storage/storage-interface" }
-vm-genesis = { path = "../../../diem-move/vm-genesis" }
+vm-genesis = { path = "../../../aptos-move/vm-genesis" }
 
 [dev-dependencies]
-diem-config = { path = "../..", features = ["fuzzing"]}
+aptos-config = { path = "../..", features = ["fuzzing"]}
 
 [features]
 testing = []
-fuzzing = ["diem-config/fuzzing"]
+fuzzing = ["aptos-config/fuzzing"]

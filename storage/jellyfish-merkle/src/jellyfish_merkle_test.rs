@@ -7,8 +7,8 @@ use crate::test_helper::{
     arb_tree_with_index, test_get_leaf_count, test_get_range_proof, test_get_with_proof,
     test_get_with_proof_with_distinct_last_nibble, ValueBlob,
 };
-use diem_crypto::HashValue;
-use diem_types::{nibble::Nibble, transaction::PRE_GENESIS_VERSION};
+use aptos_crypto::HashValue;
+use aptos_types::{nibble::Nibble, transaction::PRE_GENESIS_VERSION};
 use mock_tree_store::MockTreeStore;
 use proptest::{collection::hash_set, prelude::*};
 use rand::{rngs::StdRng, Rng, SeedableRng};

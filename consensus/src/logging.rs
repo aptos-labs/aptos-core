@@ -1,9 +1,9 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_logger::Schema;
+use aptos_types::block_info::Round;
 use consensus_types::common::Author;
-use diem_logger::Schema;
-use diem_types::block_info::Round;
 use serde::Serialize;
 
 #[derive(Schema)]

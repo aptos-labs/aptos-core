@@ -7,8 +7,8 @@ use crate::{
     test_utils::{build_empty_tree, MockTransactionManager, TreeInserter},
     util::mock_time_service::SimulatedTimeService,
 };
+use aptos_types::validator_signer::ValidatorSigner;
 use consensus_types::block::{block_test_utils::certificate_for_genesis, Block};
-use diem_types::validator_signer::ValidatorSigner;
 use futures::{future::BoxFuture, FutureExt};
 use std::sync::Arc;
 

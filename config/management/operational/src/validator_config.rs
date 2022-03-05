@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{auto_validate::AutoValidate, rest_client::RestClient, TransactionContext};
-use diem_crypto::{ed25519::Ed25519PublicKey, x25519};
-use diem_global_constants::{
+use aptos_crypto::{ed25519::Ed25519PublicKey, x25519};
+use aptos_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, OPERATOR_ACCOUNT, OWNER_ACCOUNT, VALIDATOR_NETWORK_KEY,
 };
-use diem_management::{error::Error, secure_backend::ValidatorBackend, storage::to_x25519};
-use diem_types::{
+use aptos_management::{error::Error, secure_backend::ValidatorBackend, storage::to_x25519};
+use aptos_types::{
     account_address::AccountAddress,
     network_address::{NetworkAddress, Protocol},
 };
@@ -22,7 +22,7 @@ pub struct SetValidatorConfig {
     #[structopt(long, required_unless = "config")]
     json_server: Option<String>,
     #[structopt(flatten)]
-    validator_config: diem_management::validator_config::ValidatorConfig,
+    validator_config: aptos_management::validator_config::ValidatorConfig,
     #[structopt(
         long,
         required_unless = "fullnode-address",
@@ -125,7 +125,7 @@ pub struct RotateKey {
     #[structopt(long, required_unless = "config")]
     json_server: Option<String>,
     #[structopt(flatten)]
-    validator_config: diem_management::validator_config::ValidatorConfig,
+    validator_config: aptos_management::validator_config::ValidatorConfig,
     #[structopt(flatten)]
     auto_validate: AutoValidate,
 }
@@ -263,7 +263,7 @@ pub struct ValidatorConfig {
     #[structopt(long, help = "Validator account address to display the config")]
     account_address: AccountAddress,
     #[structopt(flatten)]
-    config: diem_management::config::ConfigPath,
+    config: aptos_management::config::ConfigPath,
     /// JSON-RPC Endpoint (e.g. http://localhost:8080)
     #[structopt(long, required_unless = "config")]
     json_server: Option<String>,
@@ -296,7 +296,7 @@ pub struct DecodedValidatorConfig {
 
 impl DecodedValidatorConfig {
     pub fn from_validator_config_resource(
-        config_resource: &diem_types::validator_config::ValidatorConfigResource,
+        config_resource: &aptos_types::validator_config::ValidatorConfigResource,
     ) -> Result<Self, Error> {
         let config = config_resource
             .validator_config
@@ -309,7 +309,7 @@ impl DecodedValidatorConfig {
     }
 
     pub fn from_validator_config(
-        config: &diem_types::validator_config::ValidatorConfig,
+        config: &aptos_types::validator_config::ValidatorConfig,
     ) -> Result<Self, Error> {
         let fullnode_network_addresses = fullnode_addresses(config)?;
         let validator_network_addresses = validator_addresses(config).unwrap_or_else(|error| {
@@ -333,7 +333,7 @@ impl DecodedValidatorConfig {
 }
 
 pub fn fullnode_addresses(
-    config: &diem_types::validator_config::ValidatorConfig,
+    config: &aptos_types::validator_config::ValidatorConfig,
 ) -> Result<Vec<NetworkAddress>, Error> {
     config
         .fullnode_network_addresses()
@@ -341,7 +341,7 @@ pub fn fullnode_addresses(
 }
 
 pub fn validator_addresses(
-    config: &diem_types::validator_config::ValidatorConfig,
+    config: &aptos_types::validator_config::ValidatorConfig,
 ) -> Result<Vec<NetworkAddress>, Error> {
     config
         .validator_network_addresses()

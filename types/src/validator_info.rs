@@ -4,7 +4,7 @@
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::network_address::NetworkAddress;
 use crate::{account_address::AccountAddress, validator_config::ValidatorConfig};
-use diem_crypto::ed25519::Ed25519PublicKey;
+use aptos_crypto::ed25519::Ed25519PublicKey;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};

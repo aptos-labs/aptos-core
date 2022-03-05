@@ -10,10 +10,10 @@ use crate::{
     validator_state::VerifyValidatorStateResult,
     TransactionContext,
 };
-use diem_config::{config, config::Peer, network_id::NetworkId};
-use diem_crypto::{ed25519::Ed25519PublicKey, traits::ValidCryptoMaterialStringExt, x25519};
-use diem_management::{error::Error, secure_backend::DISK};
-use diem_types::{
+use aptos_config::{config, config::Peer, network_id::NetworkId};
+use aptos_crypto::{ed25519::Ed25519PublicKey, traits::ValidCryptoMaterialStringExt, x25519};
+use aptos_management::{error::Error, secure_backend::DISK};
+use aptos_types::{
     account_address::AccountAddress, chain_id::ChainId, network_address::NetworkAddress,
     waypoint::Waypoint, PeerId,
 };
@@ -24,7 +24,7 @@ use std::{
 };
 use structopt::StructOpt;
 
-const TOOL_NAME: &str = "diem-operational-tool";
+const TOOL_NAME: &str = "aptos-operational-tool";
 
 /// A helper to test the operational tool in tests
 pub struct OperationalTool {

@@ -33,7 +33,7 @@ pub trait ProposerElection {
 // next continuously mutates a state and returns a u64-index
 pub(crate) fn next(state: &mut Vec<u8>) -> u64 {
     // state = SHA-3-256(state)
-    *state = diem_crypto::HashValue::sha3_256_of(state).to_vec();
+    *state = aptos_crypto::HashValue::sha3_256_of(state).to_vec();
     let mut temp = [0u8; 8];
     copy_slice_to_vec(&state[..8], &mut temp).expect("next failed");
     // return state[0..8]

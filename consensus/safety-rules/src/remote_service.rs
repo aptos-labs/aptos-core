@@ -6,8 +6,8 @@ use crate::{
     serializer::{SafetyRulesInput, SerializerClient, SerializerService, TSerializerClient},
     Error, SafetyRules, TSafetyRules,
 };
-use diem_logger::warn;
-use diem_secure_net::{NetworkClient, NetworkServer};
+use aptos_logger::warn;
+use aptos_secure_net::{NetworkClient, NetworkServer};
 use std::net::SocketAddr;
 
 pub trait RemoteService {

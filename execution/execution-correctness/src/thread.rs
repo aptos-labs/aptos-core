@@ -8,8 +8,8 @@
 //! in testing correctness of the communication layer between ExecutionCorrectness and SafetyRules.
 
 use crate::remote_service::{self, RemoteService};
-use diem_config::utils;
-use diem_crypto::ed25519::Ed25519PrivateKey;
+use aptos_config::utils;
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     thread::{self, JoinHandle},

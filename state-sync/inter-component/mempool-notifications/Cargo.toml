@@ -16,10 +16,10 @@ serde = { version = "1.0.124", default-features = false }
 thiserror = "1.0.24"
 tokio = { version = "1.8.1" }
 
-diem-types = { path = "../../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
+aptos-types = { path = "../../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
 
 [dev-dependencies]
 claim = "0.5.0"
 
-diem-crypto = { path = "../../../crates/diem-crypto" }
+aptos-crypto = { path = "../../../crates/aptos-crypto" }

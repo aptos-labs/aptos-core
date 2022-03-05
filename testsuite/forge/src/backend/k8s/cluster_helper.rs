@@ -3,7 +3,7 @@
 
 use crate::{get_validators, k8s_retry_strategy, nodes_healthcheck, Result};
 use anyhow::{bail, format_err};
-use diem_logger::*;
+use aptos_logger::*;
 use futures::future::try_join_all;
 use hyper::{Client, Uri};
 use hyper_proxy::{Intercept, Proxy, ProxyConnector};
@@ -41,10 +41,10 @@ const TRUSTED_SCALING_FACTOR: i64 = 1;
 const GENESIS_MODULES_DIR: &str = "/diem/move/modules";
 
 async fn wait_genesis_job(kube_client: &K8sClient, era: &str) -> Result<()> {
-    diem_retrier::retry_async(k8s_retry_strategy(), || {
+    aptos_retrier::retry_async(k8s_retry_strategy(), || {
         let jobs: Api<Job> = Api::namespaced(kube_client.clone(), "default");
         Box::pin(async move {
-            let job_name = format!("diem-testnet-genesis-e{}", era);
+            let job_name = format!("aptos-testnet-genesis-e{}", era);
             debug!("Running get job: {}", &job_name);
             let genesis_job = jobs.get_status(&job_name).await.unwrap();
             debug!("Status: {:?}", genesis_job.status);
@@ -67,7 +67,7 @@ async fn nodegroup_state_check(desire_size: i64) -> Result<()> {
         return Ok(());
     }
 
-    diem_retrier::retry_async(k8s_retry_strategy(), || {
+    aptos_retrier::retry_async(k8s_retry_strategy(), || {
         Box::pin(async move {
             let status_args = ["get", "nodes"];
             let raw_nodegroup_values = Command::new(KUBECTL_BIN)
@@ -181,7 +181,7 @@ fn upgrade_helm_release(release_name: &str, helm_chart: &str, options: &[&str]) 
 fn upgrade_validator(validator_name: &str, helm_repo: &str, options: &[&str]) -> Result<()> {
     upgrade_helm_release(
         validator_name,
-        &format!("{}/diem-validator", helm_repo),
+        &format!("{}/aptos-validator", helm_repo),
         options,
     )
 }
@@ -373,7 +373,7 @@ fn era_to_string(era_value: &Value) -> Result<String> {
 
 pub async fn create_k8s_client() -> K8sClient {
     let _ = Command::new(KUBECTL_BIN).arg("proxy").spawn();
-    let _ = diem_retrier::retry_async(k8s_retry_strategy(), || {
+    let _ = aptos_retrier::retry_async(k8s_retry_strategy(), || {
         Box::pin(async move {
             debug!("Running local kube pod healthcheck on {}", HEALTH_CHECK_URL);
             reqwest::get(HEALTH_CHECK_URL).await?.text().await?;
@@ -558,7 +558,7 @@ async fn describe_update(
     nodegroup_name: String,
     update_id: String,
 ) -> Result<()> {
-    diem_retrier::retry_async(k8s_retry_strategy(), || {
+    aptos_retrier::retry_async(k8s_retry_strategy(), || {
         let client = eks_client.clone();
         let nodegroup_name = nodegroup_name.clone();
         let update_id = update_id.clone();

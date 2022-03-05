@@ -5,15 +5,15 @@ use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, str::FromStr};
 
 #[derive(Clone, Debug, PartialEq, Copy)]
-pub struct EventKey(diem_types::event::EventKey);
+pub struct EventKey(aptos_types::event::EventKey);
 
-impl From<diem_types::event::EventKey> for EventKey {
-    fn from(val: diem_types::event::EventKey) -> Self {
+impl From<aptos_types::event::EventKey> for EventKey {
+    fn from(val: aptos_types::event::EventKey) -> Self {
         Self(val)
     }
 }
 
-impl From<EventKey> for diem_types::event::EventKey {
+impl From<EventKey> for aptos_types::event::EventKey {
     fn from(val: EventKey) -> Self {
         val.0
     }
@@ -24,9 +24,9 @@ impl FromStr for EventKey {
 
     fn from_str(s: &str) -> anyhow::Result<Self, anyhow::Error> {
         if let Some(hex) = s.strip_prefix("0x") {
-            Ok(hex.parse::<diem_types::event::EventKey>()?.into())
+            Ok(hex.parse::<aptos_types::event::EventKey>()?.into())
         } else {
-            Ok(s.parse::<diem_types::event::EventKey>()?.into())
+            Ok(s.parse::<aptos_types::event::EventKey>()?.into())
         }
     }
 }

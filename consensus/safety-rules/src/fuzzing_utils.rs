@@ -2,22 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::serializer::SafetyRulesInput;
-#[cfg(any(test, feature = "fuzzing"))]
-use consensus_types::block::Block;
-use consensus_types::{
-    block_data::{BlockData, BlockType},
-    quorum_cert::QuorumCert,
-    timeout::Timeout,
-    vote_data::VoteData,
-    vote_proposal::{MaybeSignedVoteProposal, VoteProposal},
-};
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     hash::{HashValue, TransactionAccumulatorHasher},
     test_utils::TEST_SEED,
     traits::{SigningKey, Uniform},
 };
-use diem_types::{
+use aptos_types::{
     account_address::AccountAddress,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
@@ -26,6 +17,15 @@ use diem_types::{
     proptest_types::{AccountInfoUniverse, BlockInfoGen},
     transaction::SignedTransaction,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
+};
+#[cfg(any(test, feature = "fuzzing"))]
+use consensus_types::block::Block;
+use consensus_types::{
+    block_data::{BlockData, BlockType},
+    quorum_cert::QuorumCert,
+    timeout::Timeout,
+    vote_data::VoteData,
+    vote_proposal::{MaybeSignedVoteProposal, VoteProposal},
 };
 use proptest::prelude::*;
 use rand::{rngs::StdRng, SeedableRng};
@@ -247,11 +247,11 @@ pub fn arb_safety_rules_input() -> impl Strategy<Value = SafetyRulesInput> {
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod fuzzing {
     use crate::{error::Error, serializer::SafetyRulesInput, test_utils, TSafetyRules};
+    use aptos_crypto::ed25519::Ed25519Signature;
+    use aptos_types::epoch_change::EpochChangeProof;
     use consensus_types::{
         block_data::BlockData, timeout::Timeout, vote::Vote, vote_proposal::MaybeSignedVoteProposal,
     };
-    use diem_crypto::ed25519::Ed25519Signature;
-    use diem_types::epoch_change::EpochChangeProof;
 
     pub fn fuzz_initialize(proof: EpochChangeProof) -> Result<(), Error> {
         let mut safety_rules = test_utils::test_safety_rules_uninitialized();

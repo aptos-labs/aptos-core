@@ -7,8 +7,8 @@ use crate::{
     test_helper::{init_mock_db, ValueBlob},
     JellyfishMerkleTree, TreeReader,
 };
-use diem_crypto::HashValue;
-use diem_types::transaction::Version;
+use aptos_crypto::HashValue;
+use aptos_types::transaction::Version;
 use proptest::{collection::btree_map, prelude::*};
 use std::{collections::BTreeMap, sync::Arc};
 use storage_interface::StateSnapshotReceiver;

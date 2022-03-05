@@ -157,7 +157,7 @@ resource "local_file" "kubernetes" {
     kubernetes_host        = "https://${google_container_cluster.diem.private_cluster_config[0].private_endpoint}"
     kubernetes_ca_cert     = base64decode(google_container_cluster.diem.master_auth[0].cluster_ca_certificate)
     issuer                 = "https://container.googleapis.com/v1/${google_container_cluster.diem.id}"
-    service_account_prefix = "${terraform.workspace}-diem-validator"
+    service_account_prefix = "${terraform.workspace}-aptos-validator"
     pod_cidrs              = [google_container_cluster.diem.cluster_ipv4_cidr]
   })
   file_permission = "0644"

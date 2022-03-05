@@ -21,9 +21,9 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
-use diem_crypto::HashValue;
-use diem_logger::prelude::*;
-use diem_types::{
+use aptos_crypto::HashValue;
+use aptos_logger::prelude::*;
+use aptos_types::{
     account_state_blob::AccountStateBlob, ledger_info::LedgerInfoWithSignatures,
     proof::TransactionInfoWithProof, transaction::Version,
 };

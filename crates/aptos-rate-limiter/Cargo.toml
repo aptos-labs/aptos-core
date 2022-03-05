@@ -1,0 +1,20 @@
+[package]
+name = "aptos-rate-limiter"
+version = "0.1.0"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "Diem implementation for rate limiter"
+repository = "https://github.com/diem/diem"
+homepage = "https://diem.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+aptos-infallible = { path= "../../crates/aptos-infallible" }
+aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
+aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-metrics = { path = "../../crates/aptos-metrics" }
+futures = "0.3.12"
+pin-project = "1.0.5"
+tokio = { version = "1.8.1", features = ["full"] }
+tokio-util = { version = "0.6.4", features = ["compat"] }

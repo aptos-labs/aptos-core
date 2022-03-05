@@ -6,7 +6,10 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkEvents, ConsensusNetworkSender},
     test_utils::{self, consensus_runtime, placeholder_ledger_info, timed_block_on},
 };
-use channel::{self, diem_channel, message_queues::QueueStyle};
+use aptos_config::network_id::NetworkId;
+use aptos_infallible::{Mutex, RwLock};
+use aptos_types::{block_info::BlockInfo, PeerId};
+use channel::{self, aptos_channel, message_queues::QueueStyle};
 use consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::Author,
@@ -16,9 +19,6 @@ use consensus_types::{
     vote_data::VoteData,
     vote_msg::VoteMsg,
 };
-use diem_config::network_id::NetworkId;
-use diem_infallible::{Mutex, RwLock};
-use diem_types::{block_info::BlockInfo, PeerId};
 use futures::{channel::mpsc, SinkExt, StreamExt};
 use network::{
     application::storage::PeerMetadataStorage,
@@ -65,7 +65,9 @@ pub struct NetworkPlayground {
     /// `ConsensusNetworkImpl`.
     ///
     node_consensus_txs: Arc<
-        Mutex<HashMap<TwinId, diem_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>>,
+        Mutex<
+            HashMap<TwinId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+        >,
     >,
     /// Nodes' outbound handlers forward their outbound non-rpc messages to this
     /// queue.
@@ -117,13 +119,13 @@ impl NetworkPlayground {
     async fn start_node_outbound_handler(
         drop_config: Arc<RwLock<DropConfig>>,
         src_twin_id: TwinId,
-        mut network_reqs_rx: diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+        mut network_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
         mut outbound_msgs_tx: mpsc::Sender<(TwinId, PeerManagerRequest)>,
         node_consensus_txs: Arc<
             Mutex<
                 HashMap<
                     TwinId,
-                    diem_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+                    aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
                 >,
             >,
         >,
@@ -184,11 +186,11 @@ impl NetworkPlayground {
         twin_id: TwinId,
         // The `Sender` of inbound network events. The `Receiver` end of this
         // queue is usually wrapped in a `ConsensusNetworkEvents` adapter.
-        consensus_tx: diem_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+        consensus_tx: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
         // The `Receiver` of outbound network events this node sends. The
         // `Sender` side of this queue is usually wrapped in a
         // `ConsensusNetworkSender` adapter.
-        network_reqs_rx: diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+        network_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
         conn_mgr_reqs_rx: channel::Receiver<network::ConnectivityRequest>,
     ) {
         self.node_consensus_txs.lock().insert(twin_id, consensus_tx);
@@ -477,13 +479,13 @@ impl DropConfigRound {
 mod tests {
     use super::*;
     use crate::network::NetworkTask;
+    use aptos_config::network_id::NetworkId;
+    use aptos_crypto::HashValue;
+    use aptos_types::validator_verifier::random_validator_verifier;
     use bytes::Bytes;
     use consensus_types::block_retrieval::{
         BlockRetrievalRequest, BlockRetrievalResponse, BlockRetrievalStatus,
     };
-    use diem_config::network_id::NetworkId;
-    use diem_crypto::HashValue;
-    use diem_types::validator_verifier::random_validator_verifier;
     use futures::{channel::oneshot, future};
     use network::{
         application::storage::PeerMetadataStorage, protocols::direct_send::Message,
@@ -560,9 +562,9 @@ mod tests {
         let peer_metadata_storage = PeerMetadataStorage::new(&[NetworkId::Validator]);
 
         for (peer_id, peer) in peers.iter().enumerate() {
-            let (network_reqs_tx, network_reqs_rx) = diem_channel::new(QueueStyle::FIFO, 8, None);
-            let (connection_reqs_tx, _) = diem_channel::new(QueueStyle::FIFO, 8, None);
-            let (consensus_tx, consensus_rx) = diem_channel::new(QueueStyle::FIFO, 8, None);
+            let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+            let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+            let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
             let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = channel::new_test(8);
             let (_, conn_status_rx) = conn_notifs_channel::new();
             add_peer_to_storage(
@@ -657,9 +659,9 @@ mod tests {
         let peer_metadata_storage = PeerMetadataStorage::new(&[NetworkId::Validator]);
 
         for (peer_id, peer) in peers.iter().enumerate() {
-            let (network_reqs_tx, network_reqs_rx) = diem_channel::new(QueueStyle::FIFO, 8, None);
-            let (connection_reqs_tx, _) = diem_channel::new(QueueStyle::FIFO, 8, None);
-            let (consensus_tx, consensus_rx) = diem_channel::new(QueueStyle::FIFO, 8, None);
+            let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+            let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+            let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
             let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = channel::new_test(8);
             let (_, conn_status_rx) = conn_notifs_channel::new();
             let mut network_sender = ConsensusNetworkSender::new(
@@ -748,9 +750,10 @@ mod tests {
 
     #[test]
     fn test_bad_message() {
-        let (peer_mgr_notifs_tx, peer_mgr_notifs_rx) = diem_channel::new(QueueStyle::FIFO, 8, None);
+        let (peer_mgr_notifs_tx, peer_mgr_notifs_rx) =
+            aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (connection_notifs_tx, connection_notifs_rx) =
-            diem_channel::new(QueueStyle::FIFO, 8, None);
+            aptos_channel::new(QueueStyle::FIFO, 8, None);
         let consensus_network_events =
             ConsensusNetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx);
         let (self_sender, self_receiver) = channel::new_test(8);

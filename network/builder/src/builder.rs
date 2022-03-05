@@ -9,7 +9,7 @@
 //! authentication -- a network end-point running with remote authentication enabled will
 //! connect to or accept connections from an end-point running in authenticated mode as
 //! long as the latter is in its trusted peers set.
-use diem_config::{
+use aptos_config::{
     config::{
         DiscoveryMethod, NetworkConfig, Peer, PeerRole, PeerSet, RateLimitConfig, RoleType,
         CONNECTION_BACKOFF_BASE, CONNECTIVITY_CHECK_INTERVAL_MS, MAX_CONCURRENT_NETWORK_REQS,
@@ -18,11 +18,11 @@ use diem_config::{
     },
     network_id::NetworkContext,
 };
-use diem_crypto::x25519::PublicKey;
-use diem_infallible::RwLock;
-use diem_logger::prelude::*;
-use diem_time_service::TimeService;
-use diem_types::{chain_id::ChainId, network_address::NetworkAddress};
+use aptos_crypto::x25519::PublicKey;
+use aptos_infallible::RwLock;
+use aptos_logger::prelude::*;
+use aptos_time_service::TimeService;
+use aptos_types::{chain_id::ChainId, network_address::NetworkAddress};
 use event_notifications::{EventSubscriptionService, ReconfigNotificationListener};
 use network::{
     application::storage::PeerMetadataStorage,

@@ -9,16 +9,16 @@ use crate::{
     },
     tests::common::TestTransaction,
 };
-use channel::{diem_channel, message_queues::QueueStyle};
-use diem_config::{
+use aptos_config::{
     config::{Identity, NodeConfig, PeerRole, RoleType},
     network_id::{NetworkContext, NetworkId, PeerNetworkId},
 };
-use diem_crypto::{x25519::PrivateKey, Uniform};
-use diem_infallible::{Mutex, MutexGuard, RwLock};
-use diem_types::{
+use aptos_crypto::{x25519::PrivateKey, Uniform};
+use aptos_infallible::{Mutex, MutexGuard, RwLock};
+use aptos_types::{
     account_config::AccountSequenceInfo, on_chain_config::ON_CHAIN_CONFIG_REGISTRY, PeerId,
 };
+use channel::{aptos_channel, message_queues::QueueStyle};
 use enum_dispatch::enum_dispatch;
 use event_notifications::EventSubscriptionService;
 use futures::{
@@ -466,10 +466,10 @@ impl Node {
 /// Allows us to mock out the network without dealing with the details
 pub struct NodeNetworkInterface {
     /// Peer request receiver for messages
-    pub(crate) network_reqs_rx: diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+    pub(crate) network_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
     /// Peer notification sender for sending outgoing messages to other peers
     pub(crate) network_notifs_tx:
-        diem_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+        aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
     /// Sender for connecting / disconnecting peers
     pub(crate) network_conn_event_notifs_tx: conn_notifs_channel::Sender,
 }
@@ -537,10 +537,10 @@ fn setup_node_network_interface(
 ) -> (NodeNetworkInterface, MempoolNetworkHandle) {
     static MAX_QUEUE_SIZE: usize = 8;
     let (network_reqs_tx, network_reqs_rx) =
-        diem_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
-    let (connection_reqs_tx, _) = diem_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
+        aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
+    let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
     let (network_notifs_tx, network_notifs_rx) =
-        diem_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
+        aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
     let (network_conn_event_notifs_tx, conn_status_rx) = conn_notifs_channel::new();
     let network_sender = MempoolNetworkSender::new(
         PeerManagerRequestSender::new(network_reqs_tx),

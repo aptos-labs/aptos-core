@@ -2,7 +2,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "diem-logger.name" -}}
+{{- define "aptos-logger.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -11,7 +11,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "diem-logger.fullname" -}}
+{{- define "aptos-logger.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -27,16 +27,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "diem-logger.chart" -}}
+{{- define "aptos-logger.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "diem-logger.labels" -}}
-helm.sh/chart: {{ include "diem-logger.chart" . }}
-{{ include "diem-logger.selectorLabels" . }}
+{{- define "aptos-logger.labels" -}}
+helm.sh/chart: {{ include "aptos-logger.chart" . }}
+{{ include "aptos-logger.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -46,17 +46,17 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "diem-logger.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "diem-logger.name" . }}
+{{- define "aptos-logger.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "aptos-logger.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "diem-logger.serviceAccountName" -}}
+{{- define "aptos-logger.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "diem-logger.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "aptos-logger.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}

@@ -5,7 +5,7 @@
 
 use crate::{DbReader, DbWriter};
 use anyhow::Result;
-use diem_types::{
+use aptos_types::{
     account_address::AccountAddress, account_config::AccountResource, account_state::AccountState,
     account_state_blob::AccountStateBlob,
 };

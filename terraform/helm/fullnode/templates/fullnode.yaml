@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "diem-fullnode.fullname" . }}
+  name: {{ include "aptos-fullnode.fullname" . }}
   labels:
-    {{- include "diem-fullnode.labels" . | nindent 4 }}
+    {{- include "aptos-fullnode.labels" . | nindent 4 }}
     app.kubernetes.io/name: fullnode
 spec:
-  serviceName: {{ include "diem-fullnode.fullname" . }}
+  serviceName: {{ include "aptos-fullnode.fullname" . }}
   replicas: 1
   podManagementPolicy: Parallel
   selector:
     matchLabels:
-      {{- include "diem-fullnode.selectorLabels" . | nindent 6 }}
+      {{- include "aptos-fullnode.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/name: fullnode
   template:
     metadata:
       labels:
-        {{- include "diem-fullnode.selectorLabels" . | nindent 8 }}
+        {{- include "aptos-fullnode.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: fullnode
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
@@ -26,7 +26,7 @@ spec:
       - name: fullnode
         image: {{ .Values.image.repo }}:{{ .Values.image.tag }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
-        command: ["/opt/diem/bin/diem-node", "-f", "/opt/diem/etc/fullnode.yaml"]
+        command: ["/opt/diem/bin/aptos-node", "-f", "/opt/diem/etc/fullnode.yaml"]
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
         env:
@@ -41,11 +41,11 @@ spec:
         - name: RUST_BACKTRACE
           value: "1"
         volumeMounts:
-        - name: diem-config
+        - name: aptos-config
           mountPath: /opt/diem/etc
-        - name: diem-genesis
+        - name: aptos-genesis
           mountPath: /opt/diem/genesis
-        - name: diem-data
+        - name: aptos-data
           mountPath: /opt/diem/data
         - name: tmp
           mountPath: /tmp
@@ -85,22 +85,22 @@ spec:
         fsGroup: 6180
       {{- end }}
       volumes:
-      - name: diem-config
+      - name: aptos-config
         configMap:
-          name: {{ include "diem-fullnode.fullname" . }}
-      - name: diem-genesis
+          name: {{ include "aptos-fullnode.fullname" . }}
+      - name: aptos-genesis
         configMap:
           {{- if .Values.chain.genesisConfigmap }}
           name: {{ .Values.chain.genesisConfigmap }}
           {{- else }}
-          name: {{ include "diem-fullnode.fullname" . }}-genesis
+          name: {{ include "aptos-fullnode.fullname" . }}-genesis
           {{- end }}
-      - name: diem-data
+      - name: aptos-data
         persistentVolumeClaim:
-          claimName: {{ include "diem-fullnode.fullname" . }}-e{{ .Values.chain.era }}
+          claimName: {{ include "aptos-fullnode.fullname" . }}-e{{ .Values.chain.era }}
       - name: tmp
         emptyDir: {}
-      serviceAccountName: {{ include "diem-fullnode.serviceAccountName" . }}
+      serviceAccountName: {{ include "aptos-fullnode.serviceAccountName" . }}
       {{- if .Values.imagePullSecret }}
       imagePullSecrets:
       - name: {{.Values.imagePullSecret}}

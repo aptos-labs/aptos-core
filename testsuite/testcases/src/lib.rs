@@ -9,7 +9,7 @@ pub mod performance_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
 
-use diem_sdk::{transaction_builder::TransactionFactory, types::PeerId};
+use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use forge::{NetworkContext, NodeExt, Result, TxnEmitter, TxnStats, Version};
 use rand::SeedableRng;
 use std::{

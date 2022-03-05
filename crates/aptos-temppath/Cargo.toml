@@ -1,0 +1,15 @@
+[package]
+name = "aptos-temppath"
+version = "0.1.0"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "Diem aptos-temppath"
+repository = "https://github.com/diem/diem"
+homepage = "https://diem.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+hex = "0.4.3"
+aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
+rand = "0.8.3"

@@ -4,7 +4,7 @@
 use crate::{
     execution_correctness::ExecutionCorrectness, tests::suite, ExecutionCorrectnessManager,
 };
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     Uniform,
 };

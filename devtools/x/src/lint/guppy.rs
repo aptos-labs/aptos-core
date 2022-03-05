@@ -604,7 +604,7 @@ impl<'cfg> MoveCratesDontDependOnDiemCrates<'cfg> {
 
 impl<'cfg> Linter for MoveCratesDontDependOnDiemCrates<'cfg> {
     fn name(&self) -> &'static str {
-        "move-crates-dont-depend-on-diem-crates"
+        "move-crates-dont-depend-on-aptos-crates"
     }
 }
 
@@ -626,7 +626,7 @@ impl<'cfg> PackageLinter for MoveCratesDontDependOnDiemCrates<'cfg> {
         //   2. All crates inside language are considered Move crates, unless marked otherwise.
         let is_move_crate = |crate_path: &str, crate_name: &str| {
             if crate_path.starts_with("language/") {
-                if self.config.diem_crates_in_language.contains(crate_name) {
+                if self.config.aptos_crates_in_language.contains(crate_name) {
                     return false;
                 }
                 return true;
@@ -650,7 +650,7 @@ impl<'cfg> PackageLinter for MoveCratesDontDependOnDiemCrates<'cfg> {
                             "depending on non-move crate `{}`\n\
                                 Note: all crates in language/ are considered Move crates by default. \
                                 If you are creating a new Diem crate in language, you need to add its name to the \
-                                diem_crates_in_language list in x.toml to make the linter recognize it.",
+                                aptos_crates_in_language list in x.toml to make the linter recognize it.",
                             dep_name
                         ),
                     );

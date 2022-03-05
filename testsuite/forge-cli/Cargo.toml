@@ -11,8 +11,8 @@ edition = "2018"
 
 [dependencies]
 anyhow = { version = "1.0.52", features = ["backtrace"] }
-diem-sdk = { path = "../../sdk" }
-diem-rest-client = { path = "../../crates/diem-rest-client"}
+aptos-sdk = { path = "../../sdk" }
+aptos-rest-client = { path = "../../crates/aptos-rest-client"}
 forge = { path = "../forge" }
 itertools = "0.10.0"
 rand_core = "0.6.2"
@@ -20,7 +20,7 @@ structopt = "0.3.21"
 tokio = { version = "1.8.1", features = ["full"] }
 testcases = { path = "../testcases" }
 url = "2.2.2"
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 
 [[bin]]
 name = "forge"

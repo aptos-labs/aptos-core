@@ -20,7 +20,7 @@ mod network_checker;
 #[cfg(any(test, feature = "testing"))]
 pub mod test_helper;
 
-use diem_types::account_address::AccountAddress;
+use aptos_types::account_address::AccountAddress;
 use serde::Serialize;
 
 /// Information for validating a transaction after it's been submitted, or

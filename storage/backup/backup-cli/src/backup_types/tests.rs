@@ -19,9 +19,9 @@ use crate::{
         RocksdbOpt, TrustedWaypointOpt,
     },
 };
-use diem_temppath::TempPath;
-use diem_types::transaction::Version;
-use diemdb::DiemDB;
+use aptos_temppath::TempPath;
+use aptos_types::transaction::Version;
+use aptosdb::DiemDB;
 use executor_test_helpers::integration_test_impl::test_execution_with_storage_impl;
 use proptest::prelude::*;
 use std::{convert::TryInto, sync::Arc};

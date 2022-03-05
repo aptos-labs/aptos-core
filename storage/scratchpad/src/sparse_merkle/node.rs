@@ -21,11 +21,11 @@
 //! corresponding account content. The difference is that a `LeafNode` does not always have the
 //! value, in the case when the leaf was loaded into memory as part of a non-inclusion proof.
 
-use diem_crypto::{
+use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use diem_types::proof::{SparseMerkleInternalNode, SparseMerkleLeafNode};
+use aptos_types::proof::{SparseMerkleInternalNode, SparseMerkleLeafNode};
 use std::sync::{Arc, Weak};
 
 #[derive(Clone, Debug)]

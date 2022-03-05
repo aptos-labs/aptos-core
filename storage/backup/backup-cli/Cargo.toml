@@ -33,18 +33,18 @@ tokio-util = { version = "0.6.4", features = ["compat"] }
 executor = { path = "../../../execution/executor" }
 executor-test-helpers = { path = "../../../execution/executor-test-helpers", optional = true }
 executor-types = { path = "../../../execution/executor-types" }
-diem-jellyfish-merkle = { path = "../../jellyfish-merkle" }
+aptos-jellyfish-merkle = { path = "../../jellyfish-merkle" }
 bcs = "0.1.2"
-diem-config = { path = "../../../config" }
-diem-crypto = { path = "../../../crates/diem-crypto" }
-diem-infallible = { path = "../../../crates/diem-infallible" }
-diem-logger = { path = "../../../crates/diem-logger" }
-diem-secure-push-metrics = { path = "../../../secure/push-metrics" }
-diem-temppath = { path = "../../../crates/diem-temppath" }
-diem-types = { path = "../../../types" }
-diem-vm = { path = "../../../diem-move/diem-vm" }
-diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
-diemdb = { path = "../../diemdb" }
+aptos-config = { path = "../../../config" }
+aptos-crypto = { path = "../../../crates/aptos-crypto" }
+aptos-infallible = { path = "../../../crates/aptos-infallible" }
+aptos-logger = { path = "../../../crates/aptos-logger" }
+aptos-secure-push-metrics = { path = "../../../secure/push-metrics" }
+aptos-temppath = { path = "../../../crates/aptos-temppath" }
+aptos-types = { path = "../../../types" }
+aptos-vm = { path = "../../../aptos-move/aptos-vm" }
+aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
+aptosdb = { path = "../../aptosdb" }
 storage-interface = { path = "../../storage-interface" }
 
 [dev-dependencies]
@@ -53,10 +53,10 @@ warp = "0.3.2"
 
 backup-service = { path = "../backup-service" }
 executor-test-helpers = { path = "../../../execution/executor-test-helpers" }
-diemdb = { path = "../../diemdb", features = ["fuzzing"] }
-diem-config = { path = "../../../config" }
-diem-proptest-helpers = { path = "../../../crates/diem-proptest-helpers" }
+aptosdb = { path = "../../aptosdb", features = ["fuzzing"] }
+aptos-config = { path = "../../../config" }
+aptos-proptest-helpers = { path = "../../../crates/aptos-proptest-helpers" }
 storage-interface = { path = "../../storage-interface" }
 
 [features]
-fuzzing = ["diemdb/fuzzing"]
+fuzzing = ["aptosdb/fuzzing"]

@@ -8,9 +8,9 @@ use crate::{
     },
     ProtocolId,
 };
+use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
-use channel::{self, diem_channel};
-use diem_types::{network_address::NetworkAddress, PeerId};
+use channel::{self, aptos_channel};
 use futures::channel::oneshot;
 use std::time::Duration;
 
@@ -20,19 +20,19 @@ use crate::peer_manager::{types::PeerManagerRequest, ConnectionRequest, PeerMana
 /// from PeerManager.
 #[derive(Clone, Debug)]
 pub struct PeerManagerRequestSender {
-    inner: diem_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>,
+    inner: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>,
 }
 
 /// Convenience wrapper which makes it easy to issue connection requests and await the responses
 /// from PeerManager.
 #[derive(Clone, Debug)]
 pub struct ConnectionRequestSender {
-    inner: diem_channel::Sender<PeerId, ConnectionRequest>,
+    inner: aptos_channel::Sender<PeerId, ConnectionRequest>,
 }
 
 impl PeerManagerRequestSender {
     /// Construct a new PeerManagerRequestSender with a raw channel::Sender
-    pub fn new(inner: diem_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>) -> Self {
+    pub fn new(inner: aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>) -> Self {
         Self { inner }
     }
 
@@ -109,8 +109,8 @@ impl PeerManagerRequestSender {
 }
 
 impl ConnectionRequestSender {
-    /// Construct a new ConnectionRequestSender with a raw diem_channel::Sender
-    pub fn new(inner: diem_channel::Sender<PeerId, ConnectionRequest>) -> Self {
+    /// Construct a new ConnectionRequestSender with a raw aptos_channel::Sender
+    pub fn new(inner: aptos_channel::Sender<PeerId, ConnectionRequest>) -> Self {
         Self { inner }
     }
 

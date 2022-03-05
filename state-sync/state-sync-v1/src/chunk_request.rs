@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
+use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 

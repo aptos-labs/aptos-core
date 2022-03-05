@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_types::account_address::AccountAddress;
+use aptos_types::account_address::AccountAddress;
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, str::FromStr};
 
@@ -78,7 +78,7 @@ impl<'de> Deserialize<'de> for Address {
 mod tests {
     use crate::address::Address;
 
-    use diem_types::account_address::AccountAddress;
+    use aptos_types::account_address::AccountAddress;
 
     use serde_json::{json, Value};
 

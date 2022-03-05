@@ -20,16 +20,16 @@ tokio = { version = "1.8.1", features = ["full"] }
 url = "2.2.2"
 
 bcs = "0.1.2"
-diem-config = { path = ".." }
-diem-crypto = { path = "../../crates/diem-crypto" }
-diem-rest-client = { path = "../../crates/diem-rest-client" }
-diem-logger = { path = "../../crates/diem-logger" }
-diem-temppath = { path = "../../crates/diem-temppath" }
-diem-types = { path = "../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptos-config = { path = ".." }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-rest-client = { path = "../../crates/aptos-rest-client" }
+aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-temppath = { path = "../../crates/aptos-temppath" }
+aptos-types = { path = "../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 
 [dev-dependencies]
-diem-types = {path = "../../types", features = ["fuzzing"]}
+aptos-types = {path = "../../types", features = ["fuzzing"]}
 
 [features]
 default = []
