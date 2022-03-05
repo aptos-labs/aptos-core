@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) The Diem Core Contributors
+# Copyright (c) The Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
 REPOS=(diem/validator diem/init diem/validator_tcb)
