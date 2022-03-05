@@ -11,8 +11,8 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
-use diem_logger::prelude::*;
-use diem_types::{ledger_info::LedgerInfoWithSignatures, waypoint::Waypoint};
+use aptos_logger::prelude::*;
+use aptos_types::{ledger_info::LedgerInfoWithSignatures, waypoint::Waypoint};
 use once_cell::sync::Lazy;
 use std::{convert::TryInto, str::FromStr, sync::Arc};
 use structopt::StructOpt;

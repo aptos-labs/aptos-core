@@ -181,8 +181,8 @@ Error handling suggestions follow the [Rust book guidance](https://doc.rust-lang
 
 *Fallible functions*
 
-* `duration_since_epoch()` - to obtain the unix time, call the function provided by `diem-infallible`.
-* `RwLock` and `Mutex` - Instead of calling `unwrap()` on the standard library implementations of these functions, use the infallible equivalent types that we provide in `diem-infallible`.
+* `duration_since_epoch()` - to obtain the unix time, call the function provided by `aptos-infallible`.
+* `RwLock` and `Mutex` - Instead of calling `unwrap()` on the standard library implementations of these functions, use the infallible equivalent types that we provide in `aptos-infallible`.
 
 *Panic*
 
@@ -293,7 +293,7 @@ References:
 
 *Fuzzing*
 
-Diem contains harnesses for fuzzing crash-prone code like deserializers, using [`libFuzzer`](https://llvm.org/docs/LibFuzzer.html) through [`cargo fuzz`](https://rust-fuzz.github.io/book/cargo-fuzz.html). For more examples, see the `testsuite/diem_fuzzer` directory.
+Diem contains harnesses for fuzzing crash-prone code like deserializers, using [`libFuzzer`](https://llvm.org/docs/LibFuzzer.html) through [`cargo fuzz`](https://rust-fuzz.github.io/book/cargo-fuzz.html). For more examples, see the `testsuite/aptos_fuzzer` directory.
 
 ### Conditional compilation of tests
 

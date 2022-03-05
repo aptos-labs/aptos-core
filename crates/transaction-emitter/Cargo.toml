@@ -22,9 +22,9 @@ structopt = "0.3.21"
 termion = "1.5.6"
 tokio = { version = "1.8.1", features = ["full"] }
 
-diem-rest-client = { path = "../diem-rest-client"}
-diem-config = { path = "../../config" }
-diem-crypto = { path = "../diem-crypto" }
-diem-logger = { path = "../../crates/diem-logger" }
-diem-sdk = { path = "../../sdk" }
-diem-workspace-hack = { version = "0.1", path = "../diem-workspace-hack" }
+aptos-rest-client = { path = "../aptos-rest-client"}
+aptos-config = { path = "../../config" }
+aptos-crypto = { path = "../aptos-crypto" }
+aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-sdk = { path = "../../sdk" }
+aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }

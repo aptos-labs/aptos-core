@@ -19,20 +19,20 @@ tokio = { version = "1.8.1", features = ["full"] }
 channel = {path = "../../crates/channel"}
 bcs = "0.1.2"
 event-notifications = { path = "../../state-sync/inter-component/event-notifications" }
-diem-config = { path = "../../config"}
-diem-crypto = {path = "../../crates/diem-crypto"}
-diem-logger = {path = "../../crates/diem-logger"}
-diem-metrics = {path = "../../crates/diem-metrics"}
-diem-time-service = {path = "../../crates/diem-time-service"}
-diem-secure-storage = { path = "../../secure/storage" }
-diem-types = {path = "../../types"}
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptos-config = { path = "../../config"}
+aptos-crypto = {path = "../../crates/aptos-crypto"}
+aptos-logger = {path = "../../crates/aptos-logger"}
+aptos-metrics = {path = "../../crates/aptos-metrics"}
+aptos-time-service = {path = "../../crates/aptos-time-service"}
+aptos-secure-storage = { path = "../../secure/storage" }
+aptos-types = {path = "../../types"}
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 network = {path = "../../network"}
 short-hex-str = { path = "../../crates/short-hex-str" }
 
 [dev-dependencies]
-diem-config = { path = "../../config", features = ["testing"]}
-diem-temppath = { path = "../../crates/diem-temppath" }
+aptos-config = { path = "../../config", features = ["testing"]}
+aptos-temppath = { path = "../../crates/aptos-temppath" }
 netcore = { path = "../netcore", features = ["fuzzing"] }
 rand = "0.8.3"

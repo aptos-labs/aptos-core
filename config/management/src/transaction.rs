@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::constants;
-use diem_time_service::{TimeService, TimeServiceTrait};
-use diem_types::{
+use aptos_time_service::{TimeService, TimeServiceTrait};
+use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{RawTransaction, ScriptFunction},

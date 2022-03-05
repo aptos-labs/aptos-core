@@ -1,11 +1,11 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_crypto::{
+use aptos_crypto::{
     traits::Uniform,
     x25519::{PrivateKey, PublicKey},
 };
-use diem_types::network_address as address;
+use aptos_types::network_address as address;
 use network::protocols::wire::{handshake, messaging};
 use rand::{rngs::StdRng, SeedableRng};
 use serde_reflection::{Registry, Result, Samples, Tracer, TracerConfig};
@@ -49,7 +49,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<messaging::v1::NotSupportedType>(&samples)?;
     tracer.trace_type::<handshake::v1::ProtocolId>(&samples)?;
     tracer.trace_type::<address::Protocol>(&samples)?;
-    tracer.trace_type::<diem_config::network_id::NetworkId>(&samples)?;
+    tracer.trace_type::<aptos_config::network_id::NetworkId>(&samples)?;
 
     tracer.registry()
 }

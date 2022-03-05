@@ -5,13 +5,13 @@ use crate::{
     counters::{DISCOVERY_COUNTS, EVENT_PROCESSING_LOOP_BUSY_DURATION_S, NETWORK_KEY_MISMATCH},
     DiscoveryError,
 };
-use diem_config::{
+use aptos_config::{
     config::{Peer, PeerRole, PeerSet},
     network_id::NetworkContext,
 };
-use diem_crypto::x25519;
-use diem_logger::prelude::*;
-use diem_types::on_chain_config::{OnChainConfigPayload, ValidatorSet};
+use aptos_crypto::x25519;
+use aptos_logger::prelude::*;
+use aptos_types::on_chain_config::{OnChainConfigPayload, ValidatorSet};
 use event_notifications::ReconfigNotificationListener;
 use futures::Stream;
 use network::{counters::inc_by_with_context, logging::NetworkSchema};
@@ -153,17 +153,17 @@ fn extract_validator_set_updates(
 mod tests {
     use super::*;
     use crate::DiscoveryChangeListener;
-    use channel::{diem_channel, message_queues::QueueStyle};
-    use diem_config::config::HANDSHAKE_VERSION;
-    use diem_crypto::{
+    use aptos_config::config::HANDSHAKE_VERSION;
+    use aptos_crypto::{
         ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
         x25519::PrivateKey,
         PrivateKey as PK, Uniform,
     };
-    use diem_types::{
+    use aptos_types::{
         network_address::NetworkAddress, on_chain_config::OnChainConfig,
         validator_config::ValidatorConfig, validator_info::ValidatorInfo, PeerId,
     };
+    use channel::{aptos_channel, message_queues::QueueStyle};
     use event_notifications::ReconfigNotification;
     use futures::executor::block_on;
     use rand::{rngs::StdRng, SeedableRng};
@@ -175,17 +175,17 @@ mod tests {
 
     #[test]
     fn metric_if_key_mismatch() {
-        diem_logger::DiemLogger::init_for_testing();
+        aptos_logger::DiemLogger::init_for_testing();
         let runtime = Runtime::new().unwrap();
         let consensus_private_key = Ed25519PrivateKey::generate_for_testing();
         let consensus_pubkey = consensus_private_key.public_key();
         let pubkey = test_pubkey([0u8; 32]);
         let different_pubkey = test_pubkey([1u8; 32]);
-        let peer_id = diem_types::account_address::from_identity_public_key(pubkey);
+        let peer_id = aptos_types::account_address::from_identity_public_key(pubkey);
 
         // Build up the Reconfig Listener
         let (conn_mgr_reqs_tx, _rx) = channel::new_test(1);
-        let (mut reconfig_sender, reconfig_events) = diem_channel::new(QueueStyle::LIFO, 1, None);
+        let (mut reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
         let reconfig_listener = ReconfigNotificationListener {
             notification_receiver: reconfig_events,
         };
@@ -239,7 +239,7 @@ mod tests {
         peer_id: PeerId,
         consensus_pubkey: Ed25519PublicKey,
         pubkey: x25519::PublicKey,
-        reconfig_tx: &mut channel::diem_channel::Sender<(), ReconfigNotification>,
+        reconfig_tx: &mut channel::aptos_channel::Sender<(), ReconfigNotification>,
     ) {
         let validator_address =
             NetworkAddress::mock().append_prod_protos(pubkey, HANDSHAKE_VERSION);

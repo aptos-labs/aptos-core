@@ -1,12 +1,12 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_config::config::RocksdbConfig;
-use diem_management::{config::ConfigPath, error::Error, secure_backend::SharedBackend};
-use diem_temppath::TempPath;
-use diem_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
-use diem_vm::DiemVM;
-use diemdb::DiemDB;
+use aptos_config::config::RocksdbConfig;
+use aptos_management::{config::ConfigPath, error::Error, secure_backend::SharedBackend};
+use aptos_temppath::TempPath;
+use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
+use aptos_vm::DiemVM;
+use aptosdb::DiemDB;
 use executor::db_bootstrapper;
 use storage_interface::DbReaderWriter;
 use structopt::StructOpt;
@@ -40,7 +40,7 @@ impl CreateWaypoint {
 
 pub fn create_genesis_waypoint(genesis: &Transaction) -> Result<Waypoint, Error> {
     let path = TempPath::new();
-    let diemdb = DiemDB::open(
+    let aptosdb = DiemDB::open(
         &path,
         false,
         None,
@@ -48,7 +48,7 @@ pub fn create_genesis_waypoint(genesis: &Transaction) -> Result<Waypoint, Error>
         true, /* account_count_migration */
     )
     .map_err(|e| Error::UnexpectedError(e.to_string()))?;
-    let db_rw = DbReaderWriter::new(diemdb);
+    let db_rw = DbReaderWriter::new(aptosdb);
 
     db_bootstrapper::generate_waypoint::<DiemVM>(&db_rw, genesis)
         .map_err(|e| Error::UnexpectedError(e.to_string()))

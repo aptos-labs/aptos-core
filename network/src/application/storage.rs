@@ -5,9 +5,9 @@ use crate::{
     application::types::{PeerError, PeerInfo},
     transport::ConnectionMetadata,
 };
-use diem_config::network_id::{NetworkId, PeerNetworkId};
-use diem_infallible::{RwLock, RwLockWriteGuard};
-use diem_types::{account_address::AccountAddress, PeerId};
+use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use aptos_infallible::{RwLock, RwLockWriteGuard};
+use aptos_types::{account_address::AccountAddress, PeerId};
 use std::{
     collections::{hash_map::Entry, HashMap},
     fmt::Debug,

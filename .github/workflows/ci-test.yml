@@ -168,7 +168,7 @@ jobs:
 #    needs: prepare
 #    if: ${{ needs.prepare.outputs.test-rust == 'true' && needs.prepare.outputs.test-compatibility == 'true' }}
 #    container:
-#      image: ghcr.io/diem/diem_build_environment:${{ needs.prepare.outputs.changes-target-branch }}
+#      image: ghcr.io/diem/aptos_build_environment:${{ needs.prepare.outputs.changes-target-branch }}
 #      volumes:
 #        - "${{github.workspace}}:/opt/git/diem"
 #    steps:
@@ -202,9 +202,9 @@ jobs:
 #        with:
 #          ref: ${{ github.event.pull_request.head.sha }}
 #      - name: build validator docker image
-#        run: docker/diem-build.sh docker/validator/Dockerfile diem/validator:test
+#        run: docker/aptos-build.sh docker/validator/Dockerfile diem/validator:test
 #      - name: build faucet image
-#        run: docker/diem-build.sh docker/faucet/Dockerfile diem/faucet:test
+#        run: docker/aptos-build.sh docker/faucet/Dockerfile diem/faucet:test
 #      - name: run validator-client test
 #        run: docker/compose/test_docker_compose.sh
 #        env:
@@ -265,7 +265,7 @@ jobs:
 #        run: |
 #          echo "Sleep 30s while fullnode starts"
 #          sleep 30
-#          kubectl wait -l statefulset.kubernetes.io/pod-name=fullnode-diem-fullnode-0 --for=condition=ready pod --timeout=5m
+#          kubectl wait -l statefulset.kubernetes.io/pod-name=fullnode-aptos-fullnode-0 --for=condition=ready pod --timeout=5m
 #          echo "Sleep 1m while fullnode syncs"
 #          sleep 60
 #          kubectl get pods
@@ -283,9 +283,9 @@ jobs:
 #          kubectl describe pvc
 #          echo "===== pods ====="
 #          kubectl get pods
-#          kubectl describe pod fullnode-diem-fullnode-0
-#          kubectl logs fullnode-diem-fullnode-0
-#          kubectl logs fullnode-diem-fullnode-sync-test
+#          kubectl describe pod fullnode-aptos-fullnode-0
+#          kubectl logs fullnode-aptos-fullnode-0
+#          kubectl logs fullnode-aptos-fullnode-sync-test
 #      - name: Clean up
 #        if: ${{ always() }}
 #        run: minikube delete
@@ -302,7 +302,7 @@ jobs:
 #    needs: prepare
 #    if: ${{ needs.prepare.outputs.test-api-spec == 'true' }}
 #    container:
-#      image: ghcr.io/diem/diem_build_environment:${{ needs.prepare.outputs.changes-target-branch }}
+#      image: ghcr.io/diem/aptos_build_environment:${{ needs.prepare.outputs.changes-target-branch }}
 #      volumes:
 #        - "${{github.workspace}}:/opt/git/diem"
 #    steps:

@@ -2,7 +2,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "diem-fullnode.name" -}}
+{{- define "aptos-fullnode.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
@@ -11,7 +11,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "diem-fullnode.fullname" -}}
+{{- define "aptos-fullnode.fullname" -}}
 {{- if .Values.fullnameOverride -}}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
@@ -27,16 +27,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "diem-fullnode.chart" -}}
+{{- define "aptos-fullnode.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 {{/*
 Common labels
 */}}
-{{- define "diem-fullnode.labels" -}}
-helm.sh/chart: {{ include "diem-fullnode.chart" . }}
-{{ include "diem-fullnode.selectorLabels" . }}
+{{- define "aptos-fullnode.labels" -}}
+helm.sh/chart: {{ include "aptos-fullnode.chart" . }}
+{{ include "aptos-fullnode.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -46,23 +46,23 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "diem-fullnode.selectorLabels" -}}
-app.kubernetes.io/part-of: {{ include "diem-fullnode.name" . }}
+{{- define "aptos-fullnode.selectorLabels" -}}
+app.kubernetes.io/part-of: {{ include "aptos-fullnode.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "diem-fullnode.serviceAccountName" -}}
+{{- define "aptos-fullnode.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create -}}
-    {{ default (include "diem-fullnode.fullname" .) .Values.serviceAccount.name }}
+    {{ default (include "aptos-fullnode.fullname" .) .Values.serviceAccount.name }}
 {{- else -}}
     {{ default "default" .Values.serviceAccount.name }}
 {{- end -}}
 {{- end -}}
 
-{{- define "diem-fullnode.backupEnvironment" -}}
+{{- define "aptos-fullnode.backupEnvironment" -}}
 # awscli writes to ~/.aws/cli/cache/
 # gsutil writes to ~/.gsutil/
 # azcopy writes to ~/.azcopy/
@@ -101,27 +101,27 @@ Create the name of the service account to use
 {{- end -}}
 
 {{- define "backup.fullname" -}}
-{{ include "diem-fullnode.fullname" . }}
+{{ include "aptos-fullnode.fullname" . }}
 {{- end -}}
 
 {{- define "backup.labels" -}}
-{{ include "diem-fullnode.labels" . }}
+{{ include "aptos-fullnode.labels" . }}
 {{- end -}}
 
 {{- define "backup.selectorLabels" -}}
-{{ include "diem-fullnode.selectorLabels" . }}
+{{ include "aptos-fullnode.selectorLabels" . }}
 {{- end -}}
 
 {{- define "backup.serviceAccount" -}}
-{{ include "diem-fullnode.serviceAccountName" . }}
+{{ include "aptos-fullnode.serviceAccountName" . }}
 {{- end -}}
 
 {{- define "backup.backupService" -}}
-{{ include "diem-fullnode.fullname" . }}:6186
+{{ include "aptos-fullnode.fullname" . }}:6186
 {{- end -}}
 
 {{- define "backup.persistentVolumeClaim" -}}
-{{ include "diem-fullnode.fullname" . }}-e{{ .Values.chain.era }}
+{{ include "aptos-fullnode.fullname" . }}-e{{ .Values.chain.era }}
 {{- end -}}
 
 {{- define "backup.pushGateway" -}}

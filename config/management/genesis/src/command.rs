@@ -1,8 +1,8 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use diem_crypto::ed25519::Ed25519PublicKey;
-use diem_management::{error::Error, execute_command};
-use diem_types::{transaction::Transaction, waypoint::Waypoint};
+use aptos_crypto::ed25519::Ed25519PublicKey;
+use aptos_management::{error::Error, execute_command};
+use aptos_types::{transaction::Transaction, waypoint::Waypoint};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -13,9 +13,9 @@ pub enum Command {
     #[structopt(about = "Retrieves data from a store to produce genesis")]
     Genesis(crate::genesis::Genesis),
     #[structopt(about = "Set the waypoint in the validator storage")]
-    InsertWaypoint(diem_management::waypoint::InsertWaypoint),
-    #[structopt(about = "Submits an Ed25519PublicKey for the diem root")]
-    DiemRootKey(crate::key::DiemRootKey),
+    InsertWaypoint(aptos_management::waypoint::InsertWaypoint),
+    #[structopt(about = "Submits an Ed25519PublicKey for the aptos root")]
+    AptosRootKey(crate::key::AptosRootKey),
     #[structopt(about = "Submits an Ed25519PublicKey for the operator")]
     OperatorKey(crate::key::OperatorKey),
     #[structopt(about = "Submits an Ed25519PublicKey for the owner")]
@@ -39,7 +39,7 @@ pub enum CommandName {
     CreateWaypoint,
     Genesis,
     InsertWaypoint,
-    DiemRootKey,
+    AptosRootKey,
     OperatorKey,
     OwnerKey,
     SetLayout,
@@ -56,7 +56,7 @@ impl From<&Command> for CommandName {
             Command::CreateWaypoint(_) => CommandName::CreateWaypoint,
             Command::Genesis(_) => CommandName::Genesis,
             Command::InsertWaypoint(_) => CommandName::InsertWaypoint,
-            Command::DiemRootKey(_) => CommandName::DiemRootKey,
+            Command::AptosRootKey(_) => CommandName::AptosRootKey,
             Command::OperatorKey(_) => CommandName::OperatorKey,
             Command::OwnerKey(_) => CommandName::OwnerKey,
             Command::SetLayout(_) => CommandName::SetLayout,
@@ -75,7 +75,7 @@ impl std::fmt::Display for CommandName {
             CommandName::CreateWaypoint => "create-waypoint",
             CommandName::Genesis => "genesis",
             CommandName::InsertWaypoint => "insert-waypoint",
-            CommandName::DiemRootKey => "diem-root-key",
+            CommandName::AptosRootKey => "aptos-root-key",
             CommandName::OperatorKey => "operator-key",
             CommandName::OwnerKey => "owner-key",
             CommandName::SetLayout => "set-layout",
@@ -97,7 +97,7 @@ impl Command {
             }
             Command::Genesis(_) => self.genesis().map(|_| "Success!".to_string()),
             Command::InsertWaypoint(_) => self.insert_waypoint().map(|_| "Success!".to_string()),
-            Command::DiemRootKey(_) => self.diem_root_key().map(|_| "Success!".to_string()),
+            Command::AptosRootKey(_) => self.aptos_root_key().map(|_| "Success!".to_string()),
             Command::OperatorKey(_) => self.operator_key().map(|_| "Success!".to_string()),
             Command::OwnerKey(_) => self.owner_key().map(|_| "Success!".to_string()),
             Command::SetLayout(_) => self.set_layout().map(|_| "Success!".to_string()),
@@ -123,8 +123,8 @@ impl Command {
         execute_command!(self, Command::InsertWaypoint, CommandName::InsertWaypoint)
     }
 
-    pub fn diem_root_key(self) -> Result<Ed25519PublicKey, Error> {
-        execute_command!(self, Command::DiemRootKey, CommandName::DiemRootKey)
+    pub fn aptos_root_key(self) -> Result<Ed25519PublicKey, Error> {
+        execute_command!(self, Command::AptosRootKey, CommandName::AptosRootKey)
     }
 
     pub fn operator_key(self) -> Result<Ed25519PublicKey, Error> {
@@ -173,11 +173,11 @@ impl Command {
 pub mod tests {
     use super::*;
     use crate::storage_helper::StorageHelper;
-    use diem_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
-    use diem_global_constants::{OPERATOR_KEY, OWNER_KEY};
-    use diem_management::constants;
-    use diem_secure_storage::KVStorage;
-    use diem_types::{account_address, chain_id::ChainId, transaction::TransactionPayload};
+    use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
+    use aptos_global_constants::{OPERATOR_KEY, OWNER_KEY};
+    use aptos_management::constants;
+    use aptos_secure_storage::KVStorage;
+    use aptos_types::{account_address, chain_id::ChainId, transaction::TransactionPayload};
     use std::{
         fs::File,
         io::{Read, Write},
@@ -190,7 +190,7 @@ pub mod tests {
         // Each identity works in their own namespace
         // Alice, Bob, and Carol are owners.
         // Operator_Alice, Operator_Bob and Operator_Carol are operators.
-        // Dave is the diem root.
+        // Dave is the aptos root.
         // Each user will upload their contents to *_ns + "shared"
         // Common is used by the technical staff for coordination.
         let alice_ns = "alice";
@@ -208,11 +208,11 @@ pub mod tests {
         let layout_text = "\
             operators = [\"operator_alice_shared\", \"operator_bob_shared\", \"operator_carol_shared\"]\n\
             owners = [\"alice_shared\", \"bob_shared\", \"carol_shared\"]\n\
-            diem_root = \"dave_shared\"\n\
+            aptos_root = \"dave_shared\"\n\
             treasury_compliance = \"dave_shared\"\n\
         ";
 
-        let temppath = diem_temppath::TempPath::new();
+        let temppath = aptos_temppath::TempPath::new();
         temppath.create_as_file().unwrap();
         let mut file = File::create(temppath.path()).unwrap();
         file.write_all(&layout_text.to_string().into_bytes())
@@ -224,11 +224,11 @@ pub mod tests {
             .unwrap();
 
         // Step 2) Upload the Move modules
-        let tempdir = diem_temppath::TempPath::new();
+        let tempdir = aptos_temppath::TempPath::new();
         tempdir.create_as_dir().unwrap();
         for b in diem_framework_releases::current_module_blobs() {
             let mut temppath =
-                diem_temppath::TempPath::new_with_temp_dir(tempdir.path().to_path_buf());
+                aptos_temppath::TempPath::new_with_temp_dir(tempdir.path().to_path_buf());
             temppath.create_as_file().unwrap();
             temppath.persist(); // otherwise, file will disappear before we call set_move_modules
             let mut file = File::create(temppath.path()).unwrap();
@@ -242,7 +242,7 @@ pub mod tests {
         // Step 3) Upload the root keys:
         helper.initialize_by_idx(dave_ns.into(), storage_idx);
         helper
-            .diem_root_key(dave_ns, &(dave_ns.to_string() + shared))
+            .aptos_root_key(dave_ns, &(dave_ns.to_string() + shared))
             .unwrap();
         helper
             .treasury_compliance_key(dave_ns, &(dave_ns.to_string() + shared))
@@ -298,7 +298,7 @@ pub mod tests {
         }
 
         // Step 8) Produce genesis
-        let genesis_path = diem_temppath::TempPath::new();
+        let genesis_path = aptos_temppath::TempPath::new();
         genesis_path.create_as_file().unwrap();
         helper
             .genesis(ChainId::test(), genesis_path.path())
@@ -321,7 +321,7 @@ pub mod tests {
     fn test_set_layout() {
         let helper = StorageHelper::new();
 
-        let temppath = diem_temppath::TempPath::new();
+        let temppath = aptos_temppath::TempPath::new();
         helper
             .set_layout(temppath.path().to_str().unwrap())
             .unwrap_err();
@@ -331,7 +331,7 @@ pub mod tests {
         let layout_text = "\
             operators = [\"alice\", \"bob\"]\n\
             owners = [\"carol\"]\n\
-            diem_root = \"dave\"\n\
+            aptos_root = \"dave\"\n\
             treasury_compliance = \"other_dave\"\n\
         ";
         file.write_all(&layout_text.to_string().into_bytes())
@@ -348,7 +348,7 @@ pub mod tests {
 
     #[test]
     fn test_validator_config() {
-        use diem_types::account_address::AccountAddress;
+        use aptos_types::account_address::AccountAddress;
 
         let storage_helper = StorageHelper::new();
         let local_operator_ns = "local";
@@ -364,7 +364,7 @@ pub mod tests {
         let owner_name = "owner";
         let owner_key = Ed25519PrivateKey::generate_for_testing().public_key();
         let owner_account =
-            diem_config::utils::validator_owner_account_from_name(owner_name.as_bytes());
+            aptos_config::utils::validator_owner_account_from_name(owner_name.as_bytes());
         let mut shared_storage = storage_helper.storage(owner_name.into());
         shared_storage
             .set(OWNER_KEY, owner_key)

@@ -8,6 +8,10 @@ use crate::{
         build_empty_tree, build_simple_tree, consensus_runtime, timed_block_on, TreeInserter,
     },
 };
+use aptos_crypto::{HashValue, PrivateKey};
+use aptos_types::{
+    validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
+};
 use consensus_types::{
     block::{
         block_test_utils::{
@@ -19,10 +23,6 @@ use consensus_types::{
     common::Author,
     vote::Vote,
     vote_data::VoteData,
-};
-use diem_crypto::{HashValue, PrivateKey};
-use diem_types::{
-    validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
 };
 use proptest::prelude::*;
 use std::{cmp::min, collections::HashSet};
@@ -115,7 +115,7 @@ proptest! {
             // recursion depth
             50)
     ){
-        let authors: HashSet<Author> = private_keys.iter().map(|private_key| diem_types::account_address::from_public_key(&private_key.public_key())).collect();
+        let authors: HashSet<Author> = private_keys.iter().map(|private_key| aptos_types::account_address::from_public_key(&private_key.public_key())).collect();
         let mut runtime = consensus_runtime();
         let block_store = build_empty_tree();
         for block in blocks {
@@ -267,7 +267,7 @@ async fn test_path_from_root() {
 
 #[tokio::test]
 async fn test_insert_vote() {
-    ::diem_logger::Logger::init_for_testing();
+    ::aptos_logger::Logger::init_for_testing();
     // Set up enough different authors to support different votes for the same block.
     let (signers, validator_verifier) = random_validator_verifier(11, Some(10), false);
     let my_signer = signers[10].clone();

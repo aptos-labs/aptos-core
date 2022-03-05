@@ -3,10 +3,9 @@
 
 #![forbid(unsafe_code)]
 
-use channel::{diem_channel, message_queues::QueueStyle};
-use diem_id_generator::{IdGenerator, U64IdGenerator};
-use diem_infallible::RwLock;
-use diem_types::{
+use aptos_id_generator::{IdGenerator, U64IdGenerator};
+use aptos_infallible::RwLock;
+use aptos_types::{
     account_state::AccountState,
     contract_event::ContractEvent,
     event::EventKey,
@@ -15,6 +14,7 @@ use diem_types::{
     on_chain_config::{config_address, ConfigID, OnChainConfigPayload},
     transaction::Version,
 };
+use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{channel::mpsc::SendError, stream::FusedStream, Stream};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -117,7 +117,7 @@ impl EventSubscriptionService {
         }
 
         let (notification_sender, notification_receiver) =
-            diem_channel::new(QueueStyle::KLAST, EVENT_NOTIFICATION_CHANNEL_SIZE, None);
+            aptos_channel::new(QueueStyle::KLAST, EVENT_NOTIFICATION_CHANNEL_SIZE, None);
 
         // Create a new event subscription
         let subscription_id = self.get_new_subscription_id();
@@ -161,7 +161,7 @@ impl EventSubscriptionService {
     /// subscriber to ensure notifications are processed in a timely manner.
     pub fn subscribe_to_reconfigurations(&mut self) -> Result<ReconfigNotificationListener, Error> {
         let (notification_sender, notification_receiver) =
-            diem_channel::new(QueueStyle::KLAST, RECONFIG_NOTIFICATION_CHANNEL_SIZE, None);
+            aptos_channel::new(QueueStyle::KLAST, RECONFIG_NOTIFICATION_CHANNEL_SIZE, None);
 
         // Create a new reconfiguration subscription
         let subscription_id = self.get_new_subscription_id();
@@ -357,7 +357,7 @@ type SubscriptionId = u64;
 struct EventSubscription {
     pub subscription_id: SubscriptionId,
     pub event_buffer: Vec<ContractEvent>,
-    pub notification_sender: channel::diem_channel::Sender<(), EventNotification>,
+    pub notification_sender: channel::aptos_channel::Sender<(), EventNotification>,
 }
 
 impl EventSubscription {
@@ -382,7 +382,7 @@ impl EventSubscription {
 #[derive(Debug)]
 struct ReconfigSubscription {
     pub subscription_id: SubscriptionId,
-    pub notification_sender: channel::diem_channel::Sender<(), ReconfigNotification>,
+    pub notification_sender: channel::aptos_channel::Sender<(), ReconfigNotification>,
 }
 
 impl ReconfigSubscription {
@@ -425,7 +425,7 @@ pub type ReconfigNotificationListener = NotificationListener<ReconfigNotificatio
 /// The component responsible for listening to subscription notifications.
 #[derive(Debug)]
 pub struct NotificationListener<T> {
-    pub notification_receiver: channel::diem_channel::Receiver<(), T>,
+    pub notification_receiver: channel::aptos_channel::Receiver<(), T>,
 }
 
 impl<T> Stream for NotificationListener<T> {

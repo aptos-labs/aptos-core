@@ -3,9 +3,9 @@
 
 use crate::{FullNode, HealthCheckError, LocalVersion, Node, NodeExt, Validator, Version};
 use anyhow::{anyhow, Context, Result};
-use diem_config::config::NodeConfig;
-use diem_logger::{debug, warn};
-use diem_sdk::types::{account_address::AccountAddress, PeerId};
+use aptos_config::config::NodeConfig;
+use aptos_logger::{debug, warn};
+use aptos_sdk::types::{account_address::AccountAddress, PeerId};
 use std::{
     env,
     fs::{self, OpenOptions},

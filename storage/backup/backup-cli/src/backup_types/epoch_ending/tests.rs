@@ -14,15 +14,15 @@ use crate::{
         ConcurrentDownloadsOpt, GlobalBackupOpt, GlobalRestoreOpt, RocksdbOpt, TrustedWaypointOpt,
     },
 };
-use backup_service::start_backup_service;
-use diem_config::utils::get_available_port;
-use diem_temppath::TempPath;
-use diem_types::{
+use aptos_config::utils::get_available_port;
+use aptos_temppath::TempPath;
+use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proptest_types::{AccountInfoUniverse, LedgerInfoWithSignaturesGen},
     waypoint::Waypoint,
 };
-use diemdb::DiemDB;
+use aptosdb::DiemDB;
+use backup_service::start_backup_service;
 use proptest::{collection::vec, prelude::*, std_facade::BTreeMap};
 use std::{
     convert::TryInto,

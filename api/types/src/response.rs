@@ -7,9 +7,9 @@ use anyhow::Result;
 use serde::Serialize;
 use warp::http::header::{HeaderValue, CONTENT_TYPE};
 
-pub const X_DIEM_CHAIN_ID: &str = "X-Diem-Chain-Id";
-pub const X_DIEM_LEDGER_VERSION: &str = "X-Diem-Ledger-Version";
-pub const X_DIEM_LEDGER_TIMESTAMP: &str = "X-Diem-Ledger-TimestampUsec";
+pub const X_APTOS_CHAIN_ID: &str = "X-Aptos-Chain-Id";
+pub const X_APTOS_LEDGER_VERSION: &str = "X-Aptos-Ledger-Version";
+pub const X_APTOS_LEDGER_TIMESTAMP: &str = "X-Aptos-Ledger-TimestampUsec";
 
 pub struct Response {
     pub ledger_info: LedgerInfo,
@@ -31,13 +31,13 @@ impl warp::Reply for Response {
         let headers = res.headers_mut();
 
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-        headers.insert(X_DIEM_CHAIN_ID, (self.ledger_info.chain_id as u16).into());
+        headers.insert(X_APTOS_CHAIN_ID, (self.ledger_info.chain_id as u16).into());
         headers.insert(
-            X_DIEM_LEDGER_VERSION,
+            X_APTOS_LEDGER_VERSION,
             self.ledger_info.ledger_version.into(),
         );
         headers.insert(
-            X_DIEM_LEDGER_TIMESTAMP,
+            X_APTOS_LEDGER_TIMESTAMP,
             self.ledger_info.ledger_timestamp.into(),
         );
 

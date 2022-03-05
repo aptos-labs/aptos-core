@@ -8,19 +8,19 @@ lint:
 
 test-code-gen:
 	echo '{"generator-cli": {"version": "5.2.1"}}' > openapitools.json # v5.3 has bug, ping the version to 5.2.1
-	npx @openapitools/openapi-generator-cli generate -g rust -i doc/openapi.yaml -o /tmp/diem_api_client --package-name diem_api_client
-	cd /tmp/diem_api_client && cargo build
+	npx @openapitools/openapi-generator-cli generate -g rust -i doc/openapi.yaml -o /tmp/aptos_api_client --package-name aptos_api_client
+	cd /tmp/aptos_api_client && cargo build
 
 clean:
-	- pkill diem-node
-	- rm -rf /tmp/diem_api_client
+	- pkill aptos-node
+	- rm -rf /tmp/aptos_api_client
 	- rm -f openapitools.json
 	- rm -rf .hypothesis
 
 test-api-spec:
-	- pkill diem-node
-	cargo build -p diem-node
-	./../target/debug/diem-node --test --lazy &
+	- pkill aptos-node
+	cargo build -p aptos-node
+	./../target/debug/aptos-node --test --lazy &
 
 	curl https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh > /tmp/wait-for-it.sh
 	chmod +x /tmp/wait-for-it.sh

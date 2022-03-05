@@ -7,9 +7,8 @@ use crate::{
     Error, EventNotificationListener, EventNotificationSender, EventSubscriptionService,
     ReconfigNotificationListener,
 };
-use claim::{assert_lt, assert_matches, assert_ok};
-use diem_infallible::RwLock;
-use diem_types::{
+use aptos_infallible::RwLock;
+use aptos_types::{
     account_address::AccountAddress,
     contract_event::ContractEvent,
     event::EventKey,
@@ -17,8 +16,9 @@ use diem_types::{
     on_chain_config::{OnChainConfig, ON_CHAIN_CONFIG_REGISTRY},
     transaction::{Transaction, Version, WriteSetPayload},
 };
-use diem_vm::DiemVM;
-use diemdb::DiemDB;
+use aptos_vm::DiemVM;
+use aptosdb::DiemDB;
+use claim::{assert_lt, assert_matches, assert_ok};
 use executor_test_helpers::bootstrap_genesis;
 use futures::{FutureExt, StreamExt};
 use move_core_types::language_storage::TypeTag;
@@ -546,7 +546,7 @@ fn create_database() -> Arc<RwLock<DbReaderWriter>> {
     let (genesis, _) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
 
     // Create test diem database
-    let db_path = diem_temppath::TempPath::new();
+    let db_path = aptos_temppath::TempPath::new();
     assert_ok!(db_path.create_as_dir());
     let (_, db_rw) = DbReaderWriter::wrap(DiemDB::new_for_test(db_path.path()));
 

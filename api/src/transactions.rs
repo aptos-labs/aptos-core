@@ -9,11 +9,11 @@ use crate::{
     param::{AddressParam, TransactionIdParam},
 };
 
-use diem_api_types::{
+use aptos_api_types::{
     mime_types::BCS_SIGNED_TRANSACTION, Error, LedgerInfo, Response, Transaction, TransactionData,
     TransactionId, TransactionOnChainData, TransactionSigningMessage, UserTransactionRequest,
 };
-use diem_types::{
+use aptos_types::{
     mempool_status::MempoolStatusCode,
     transaction::{RawTransaction, SignedTransaction},
 };
@@ -313,7 +313,7 @@ impl Transactions {
     // because the period a transaction stay in the mempool is likely short.
     // Although the mempool get transation is async, but looking up txn in database is a sync call,
     // thus we keep it simple and call them in sequence.
-    async fn get_by_hash(&self, hash: diem_crypto::HashValue) -> Result<Option<TransactionData>> {
+    async fn get_by_hash(&self, hash: aptos_crypto::HashValue) -> Result<Option<TransactionData>> {
         let from_db = self
             .context
             .get_transaction_by_hash(hash, self.ledger_info.version())?;

@@ -5,8 +5,8 @@
 
 use crate::{ExecutedTrees, StateComputeResult, TransactionData};
 use anyhow::{ensure, Result};
-use diem_crypto::hash::{CryptoHash, TransactionAccumulatorHasher};
-use diem_types::{
+use aptos_crypto::hash::{CryptoHash, TransactionAccumulatorHasher};
+use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,

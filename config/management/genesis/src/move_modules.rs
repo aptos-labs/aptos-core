@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::builder::GenesisBuilder;
-use diem_management::{config::ConfigPath, error::Error, secure_backend::SharedBackend};
-use diem_secure_storage::Storage;
+use aptos_management::{config::ConfigPath, error::Error, secure_backend::SharedBackend};
+use aptos_secure_storage::Storage;
 use std::{fs, path::PathBuf};
 use structopt::StructOpt;
 

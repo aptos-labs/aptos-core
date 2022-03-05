@@ -1,5 +1,5 @@
 [package]
-name = "diem-sdk"
+name = "aptos-sdk"
 version = "0.0.3"
 authors = ["Diem Association <opensource@diem.com>"]
 description = "The Official Diem SDK"
@@ -14,8 +14,8 @@ bcs = "0.1"
 rand_core = "0.6.2"
 serde = { version = "1.0.124", features = ["derive"] }
 
-diem-crypto = { path = "../crates/diem-crypto", version = "0.0.3" }
-diem-types = { path = "../types", version = "0.0.3"}
+aptos-crypto = { path = "../crates/aptos-crypto", version = "0.0.3" }
+aptos-types = { path = "../types", version = "0.0.3"}
 move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860", version = "0.0.3" }
-diem-transaction-builder = { path = "./transaction-builder", version = "0.0.3" }
-diem-workspace-hack = { version = "0.1", path = "../crates/diem-workspace-hack" }
+aptos-transaction-builder = { path = "./transaction-builder", version = "0.0.3" }
+aptos-workspace-hack = { version = "0.1", path = "../crates/aptos-workspace-hack" }

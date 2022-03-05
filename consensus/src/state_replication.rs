@@ -3,9 +3,9 @@
 
 use crate::error::{MempoolError, StateSyncError};
 use anyhow::Result;
+use aptos_crypto::HashValue;
+use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use consensus_types::{block::Block, common::Payload, executed_block::ExecutedBlock};
-use diem_crypto::HashValue;
-use diem_types::ledger_info::LedgerInfoWithSignatures;
 use executor_types::{Error as ExecutionError, StateComputeResult};
 use futures::future::BoxFuture;
 use std::sync::Arc;

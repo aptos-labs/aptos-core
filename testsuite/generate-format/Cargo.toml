@@ -19,11 +19,11 @@ structopt = "0.3.21"
 consensus = { path = "../../consensus", features=["fuzzing"] }
 consensus-types = { path = "../../consensus/consensus-types", features=["fuzzing"] }
 bcs = "0.1.2"
-diem-config = { path = "../../config" }
-diem-crypto = { path = "../../crates/diem-crypto", features=["fuzzing"] }
-diem-crypto-derive = { path = "../../crates/diem-crypto-derive"}
-diem-types = { path = "../../types", features=["fuzzing"] }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptos-config = { path = "../../config" }
+aptos-crypto = { path = "../../crates/aptos-crypto", features=["fuzzing"] }
+aptos-crypto-derive = { path = "../../crates/aptos-crypto-derive"}
+aptos-types = { path = "../../types", features=["fuzzing"] }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 network = { path = "../../network" }
 move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860", features=["fuzzing"] }
 

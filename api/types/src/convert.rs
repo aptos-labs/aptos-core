@@ -7,9 +7,9 @@ use crate::{
     ScriptPayload, ScriptWriteSet, Transaction, TransactionInfo, TransactionOnChainData,
     TransactionPayload, UserTransactionRequest, WriteSet, WriteSetChange, WriteSetPayload,
 };
-use diem_crypto::HashValue;
-use diem_transaction_builder::error_explain;
-use diem_types::{
+use aptos_crypto::HashValue;
+use aptos_transaction_builder::error_explain;
+use aptos_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
     contract_event::ContractEvent,
@@ -74,7 +74,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         timestamp: u64,
         data: TransactionOnChainData,
     ) -> Result<Transaction> {
-        use diem_types::transaction::Transaction::*;
+        use aptos_types::transaction::Transaction::*;
         let info = self.into_transaction_info(data.version, &data.info, data.accumulator_root_hash);
         let events = self.try_into_events(&data.events)?;
         Ok(match data.transaction {
@@ -99,7 +99,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
     pub fn into_transaction_info(
         &self,
         version: u64,
-        info: &diem_types::transaction::TransactionInfo,
+        info: &aptos_types::transaction::TransactionInfo,
         accumulator_root_hash: HashValue,
     ) -> TransactionInfo {
         TransactionInfo {
@@ -116,9 +116,9 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
 
     pub fn try_into_transaction_payload(
         &self,
-        payload: diem_types::transaction::TransactionPayload,
+        payload: aptos_types::transaction::TransactionPayload,
     ) -> Result<TransactionPayload> {
-        use diem_types::transaction::TransactionPayload::*;
+        use aptos_types::transaction::TransactionPayload::*;
         let ret = match payload {
             WriteSet(v) => TransactionPayload::WriteSetPayload(self.try_into_write_set_payload(v)?),
             Script(s) => TransactionPayload::ScriptPayload(s.try_into()?),
@@ -159,9 +159,9 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
 
     pub fn try_into_write_set_payload(
         &self,
-        payload: diem_types::transaction::WriteSetPayload,
+        payload: aptos_types::transaction::WriteSetPayload,
     ) -> Result<WriteSetPayload> {
-        use diem_types::transaction::WriteSetPayload::*;
+        use aptos_types::transaction::WriteSetPayload::*;
         let ret = match payload {
             Script { execute_as, script } => WriteSetPayload {
                 write_set: WriteSet::ScriptWriteSet(ScriptWriteSet {
@@ -273,8 +273,8 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
     pub fn try_into_diem_core_transaction_payload(
         &self,
         payload: TransactionPayload,
-    ) -> Result<diem_types::transaction::TransactionPayload> {
-        use diem_types::transaction::TransactionPayload as Target;
+    ) -> Result<aptos_types::transaction::TransactionPayload> {
+        use aptos_types::transaction::TransactionPayload as Target;
 
         let ret = match payload {
             TransactionPayload::ScriptFunctionPayload(script_func_payload) => {

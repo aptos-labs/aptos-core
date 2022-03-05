@@ -3,10 +3,10 @@
 
 #![forbid(unsafe_code)]
 
-use async_trait::async_trait;
-use diem_types::{
+use aptos_types::{
     contract_event::ContractEvent, ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
 };
+use async_trait::async_trait;
 use futures::{
     channel::{mpsc, oneshot},
     stream::FusedStream,
@@ -271,9 +271,8 @@ impl ConsensusSyncNotification {
 #[cfg(test)]
 mod tests {
     use crate::{ConsensusNotification, ConsensusNotificationSender, Error};
-    use claim::{assert_err, assert_matches, assert_ok};
-    use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
-    use diem_types::{
+    use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
+    use aptos_types::{
         account_address::AccountAddress,
         block_info::BlockInfo,
         chain_id::ChainId,
@@ -282,6 +281,7 @@ mod tests {
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
         transaction::{RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload},
     };
+    use claim::{assert_err, assert_matches, assert_ok};
     use futures::{executor::block_on, FutureExt, StreamExt};
     use move_core_types::language_storage::TypeTag;
     use std::{collections::BTreeMap, time::Duration};

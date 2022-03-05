@@ -1,10 +1,10 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_config::config::{Identity, NodeConfig, SecureBackend};
-use diem_crypto::ed25519::Ed25519PublicKey;
-use diem_rest_client::Client as RestClient;
-use diem_sdk::{
+use aptos_config::config::{Identity, NodeConfig, SecureBackend};
+use aptos_crypto::ed25519::Ed25519PublicKey;
+use aptos_rest_client::Client as RestClient;
+use aptos_sdk::{
     transaction_builder::{Currency, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
@@ -105,10 +105,10 @@ pub async fn assert_balance(client: &RestClient, account: &LocalAccount, balance
 /// node swarm, or a public full node swarm.
 pub mod diem_swarm_utils {
     use crate::test_utils::fetch_backend_storage;
-    use diem_config::config::{NodeConfig, OnDiskStorageConfig, SecureBackend, WaypointConfig};
-    use diem_global_constants::{DIEM_ROOT_KEY, TREASURY_COMPLIANCE_KEY};
-    use diem_secure_storage::{CryptoStorage, KVStorage, OnDiskStorage, Storage};
-    use diem_types::waypoint::Waypoint;
+    use aptos_config::config::{NodeConfig, OnDiskStorageConfig, SecureBackend, WaypointConfig};
+    use aptos_global_constants::{APTOS_ROOT_KEY, TREASURY_COMPLIANCE_KEY};
+    use aptos_secure_storage::{CryptoStorage, KVStorage, OnDiskStorage, Storage};
+    use aptos_types::waypoint::Waypoint;
     use forge::{LocalNode, LocalSwarm, Swarm};
 
     /// Loads the nodes's storage backend identified by the node index in the given swarm.
@@ -130,7 +130,7 @@ pub mod diem_swarm_utils {
         root_storage_config.path = swarm.dir().join("root-storage.json");
         let mut root_storage = OnDiskStorage::new(root_storage_config.path());
         root_storage
-            .import_private_key(DIEM_ROOT_KEY, root_key)
+            .import_private_key(APTOS_ROOT_KEY, root_key)
             .unwrap();
         root_storage
             .import_private_key(TREASURY_COMPLIANCE_KEY, treasury_compliance_key)
@@ -143,10 +143,10 @@ pub mod diem_swarm_utils {
         let f = |backend: &SecureBackend| {
             let mut storage: Storage = backend.into();
             storage
-                .set(diem_global_constants::WAYPOINT, waypoint)
+                .set(aptos_global_constants::WAYPOINT, waypoint)
                 .expect("Unable to write waypoint");
             storage
-                .set(diem_global_constants::GENESIS_WAYPOINT, waypoint)
+                .set(aptos_global_constants::GENESIS_WAYPOINT, waypoint)
                 .expect("Unable to write waypoint");
         };
         let backend = &node_config.consensus.safety_rules.backend;

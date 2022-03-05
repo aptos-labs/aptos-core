@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_api_types::{Address, Error, EventKey, MoveStructTag, TransactionId};
+use aptos_api_types::{Address, Error, EventKey, MoveStructTag, TransactionId};
 use move_core_types::identifier::Identifier;
 use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Deserializer};

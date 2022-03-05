@@ -16,8 +16,8 @@ in your Vault deployment, but at a high level it creates:
   `diem/safety_data`
 * Transit keys: `diem__owner`, `diem__operator`, `diem__consensus`,
   `diem__validator_network`, `diem__fullnode_network`, `diem__execution`
-* Policies: `diem-validator`, `diem-safety-rules`, `diem-key-manager`,
-  `diem-fullnode`, `diem-management`
+* Policies: `aptos-validator`, `aptos-safety-rules`, `aptos-key-manager`,
+  `aptos-fullnode`, `aptos-management`
 
 Kubernetes Integration
 ----------------------
@@ -43,7 +43,7 @@ If you don't use Terraform or Cloud infrastructure, you can follow this instruct
 3. Create vault policies used by validator deployment
     * Create the policy content in HCL files (json format compatible) https://learn.hashicorp.com/tutorials/vault/getting-started-policies?in=vault/getting-started#policy-format
     * Write the policies into vault server https://learn.hashicorp.com/tutorials/vault/getting-started-policies?in=vault/getting-started#write-a-policy
-    * List of policies: diem-validator, diem-safety-rules, diem-key-manager, diem-fullnode, diem-management. Details of each policy can be found in this file [policy.tf][]
+    * List of policies: aptos-validator, aptos-safety-rules, aptos-key-manager, aptos-fullnode, aptos-management. Details of each policy can be found in this file [policy.tf][]
 
 4. Create KV-v2 data used by validator deployment
     * List of KV-v2 data can be found in this file as “vault_generic_secret” [main.tf][]

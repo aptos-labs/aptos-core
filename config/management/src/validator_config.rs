@@ -8,20 +8,20 @@ use crate::{
     storage::to_x25519,
     transaction::build_raw_transaction,
 };
-use core::str::FromStr;
-use diem_config::config::HANDSHAKE_VERSION;
-use diem_global_constants::{
+use aptos_config::config::HANDSHAKE_VERSION;
+use aptos_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, OPERATOR_ACCOUNT, OPERATOR_KEY, OWNER_ACCOUNT,
     VALIDATOR_NETWORK_KEY,
 };
-use diem_secure_storage::{CryptoStorage, KVStorage, Storage};
-use diem_transaction_builder::stdlib as transaction_builder;
-use diem_types::{
+use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
+use aptos_transaction_builder::stdlib as transaction_builder;
+use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     network_address::{NetworkAddress, Protocol},
     transaction::{SignedTransaction, Transaction},
 };
+use core::str::FromStr;
 use std::net::{Ipv4Addr, ToSocketAddrs};
 use structopt::StructOpt;
 

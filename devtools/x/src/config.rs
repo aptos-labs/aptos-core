@@ -132,7 +132,7 @@ pub struct WorkspaceConfig {
     /// Exceptions to whitespace linters
     pub whitespace_exceptions: Vec<String>,
     /// Move to Diem dependencies
-    pub move_to_diem_deps: MoveToDiemDepsConfig,
+    pub move_to_aptos_deps: MoveToDiemDepsConfig,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -161,7 +161,7 @@ pub struct DirectDepDupsConfig {
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct MoveToDiemDepsConfig {
-    pub diem_crates_in_language: HashSet<String>,
+    pub aptos_crates_in_language: HashSet<String>,
     pub exclude: HashSet<String>,
 }
 

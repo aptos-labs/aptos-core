@@ -5,17 +5,17 @@
 
 use crate::{instance::Instance, query_sequence_numbers};
 use anyhow::{format_err, Result};
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
     Uniform,
 };
-use diem_rest_client::Client as RestClient;
-use diem_sdk::{
+use aptos_rest_client::Client as RestClient;
+use aptos_sdk::{
     move_types::account_address::AccountAddress,
     types::{
         account_config::{
-            diem_root_address, testnet_dd_account_address, treasury_compliance_account_address,
+            aptos_root_address, testnet_dd_account_address, treasury_compliance_account_address,
         },
         chain_id::ChainId,
         AccountKey, LocalAccount,
@@ -98,8 +98,8 @@ impl Cluster {
         ))
     }
 
-    pub async fn load_diem_root_account(&self, client: &RestClient) -> Result<LocalAccount> {
-        self.load_account_with_mint_key(client, diem_root_address())
+    pub async fn load_aptos_root_account(&self, client: &RestClient) -> Result<LocalAccount> {
+        self.load_account_with_mint_key(client, aptos_root_address())
             .await
     }
 

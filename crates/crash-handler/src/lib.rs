@@ -3,8 +3,8 @@
 
 #![forbid(unsafe_code)]
 
+use aptos_logger::prelude::*;
 use backtrace::Backtrace;
-use diem_logger::prelude::*;
 use serde::Serialize;
 use std::{
     panic::{self, PanicInfo},
@@ -38,7 +38,7 @@ fn handle_panic(panic_info: &PanicInfo<'_>) {
     error!("{}", crash_info = toml::to_string_pretty(&info).unwrap());
 
     // Wait till the logs have been flushed
-    diem_logger::flush();
+    aptos_logger::flush();
 
     // Kill the process
     process::exit(12);

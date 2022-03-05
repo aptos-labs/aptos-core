@@ -5,20 +5,20 @@ use crate::{
     driver::DriverConfiguration, error::Error, storage_synchronizer::StorageSynchronizerInterface,
     utils, utils::SpeculativeStreamState,
 };
-use data_streaming_service::{
-    data_notification::{DataNotification, DataPayload, NotificationId},
-    data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, NotificationFeedback, StreamingServiceClient},
-};
-use diem_config::config::BootstrappingMode;
-use diem_data_client::GlobalDataSummary;
-use diem_logger::*;
-use diem_types::{
+use aptos_config::config::BootstrappingMode;
+use aptos_data_client::GlobalDataSummary;
+use aptos_logger::*;
+use aptos_types::{
     epoch_change::Verifier,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
     waypoint::Waypoint,
+};
+use data_streaming_service::{
+    data_notification::{DataNotification, DataPayload, NotificationId},
+    data_stream::DataStreamListener,
+    streaming_client::{DataStreamingClient, NotificationFeedback, StreamingServiceClient},
 };
 use futures::channel::oneshot;
 use std::{collections::BTreeMap, sync::Arc};

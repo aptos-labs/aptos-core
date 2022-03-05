@@ -6,9 +6,9 @@ use crate::{
     pending_votes::{PendingVotes, VoteReceptionResult},
     util::time_service::{SendTask, TimeService},
 };
+use aptos_logger::{prelude::*, Schema};
+use aptos_types::validator_verifier::ValidatorVerifier;
 use consensus_types::{common::Round, sync_info::SyncInfo, vote::Vote};
-use diem_logger::{prelude::*, Schema};
-use diem_types::validator_verifier::ValidatorVerifier;
 use futures::future::AbortHandle;
 use serde::Serialize;
 use std::{fmt, sync::Arc, time::Duration};

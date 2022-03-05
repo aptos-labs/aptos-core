@@ -47,7 +47,7 @@ If no param is provided, server returns 200 to indicate HTTP server is running h
 
 The request log level is set to DEBUG by default, 5xx error responses will be logged to ERROR level.
 
-You can add `diem_api=DEBUG` into RUST_LOG environment to configure the log output.
+You can add `aptos_api=DEBUG` into RUST_LOG environment to configure the log output.
 
 
 ## Metrics
@@ -55,7 +55,7 @@ You can add `diem_api=DEBUG` into RUST_LOG environment to configure the log outp
 ### Requests Processed by Handler
 
 The latency and counts of requests that are processed by a handler are recorded by a histogram
-named `diem_api_requests` and labelled by:
+named `aptos_api_requests` and labelled by:
 
 * method: HTTP request method
 * operation_id: request handler/operation id, it should be same `operationId` defined in [OpenAPI specification](doc/openapi.yaml), except couple cases that are not defined in the [OpenAPI specification](doc/openapi.yaml), e.g. `json_rpc`.
@@ -69,7 +69,7 @@ Note: this metrics also includes route not found count/latency cases, which ends
 ### All Requests by Status
 
 The latency and counts of requests regardless errors or hit any handlers are recorded by a histogram
-named `diem_api_response_status` and labelled by:
+named `aptos_api_response_status` and labelled by:
 
 * status: HTTP response status code
 

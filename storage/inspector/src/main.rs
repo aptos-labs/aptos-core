@@ -4,14 +4,14 @@
 #![forbid(unsafe_code)]
 
 use anyhow::Result;
-use diem_config::config::RocksdbConfig;
+use aptos_config::config::RocksdbConfig;
+use aptos_logger::info;
+use aptosdb::DiemDB;
 use diem_framework_releases::name_for_script;
-use diem_logger::info;
-use diemdb::DiemDB;
 use std::path::PathBuf;
 use storage_interface::DbReader;
 
-use diem_types::{
+use aptos_types::{
     account_address::AccountAddress, account_config::AccountResource, account_state::AccountState,
 };
 use std::convert::TryFrom;
@@ -153,7 +153,7 @@ fn list_accounts(db: &DiemDB) {
 }
 
 fn main() {
-    ::diem_logger::DiemLogger::builder().build();
+    ::aptos_logger::DiemLogger::builder().build();
 
     let opt = Opt::from_args();
 

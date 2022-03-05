@@ -86,4 +86,4 @@ volumes:
 # networks:
 #   default:
 #     external: true
-#     name: "diem-docker-compose-shared"
+#     name: "aptos-docker-compose-shared"

@@ -58,13 +58,13 @@ use crate::{
     ProtocolId,
 };
 use anyhow::anyhow;
+use aptos_config::network_id::NetworkContext;
+use aptos_id_generator::{IdGenerator, U32IdGenerator};
+use aptos_logger::prelude::*;
+use aptos_time_service::{timeout, TimeService, TimeServiceTrait};
+use aptos_types::PeerId;
 use bytes::Bytes;
-use channel::diem_channel;
-use diem_config::network_id::NetworkContext;
-use diem_id_generator::{IdGenerator, U32IdGenerator};
-use diem_logger::prelude::*;
-use diem_time_service::{timeout, TimeService, TimeServiceTrait};
-use diem_types::PeerId;
+use channel::aptos_channel;
 use error::RpcError;
 use futures::{
     channel::oneshot,
@@ -205,7 +205,7 @@ impl InboundRpcs {
     /// Handle a new inbound `RpcRequest` message off the wire.
     pub fn handle_inbound_request(
         &mut self,
-        peer_notifs_tx: &mut diem_channel::Sender<ProtocolId, PeerNotification>,
+        peer_notifs_tx: &mut aptos_channel::Sender<ProtocolId, PeerNotification>,
         request: RpcRequest,
     ) -> Result<(), RpcError> {
         let network_context = &self.network_context;

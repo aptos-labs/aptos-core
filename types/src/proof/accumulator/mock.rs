@@ -5,7 +5,7 @@ use crate::{
     proof::{AccumulatorConsistencyProof, MerkleTreeInternalNode, TransactionAccumulatorSummary},
     transaction::Version,
 };
-use diem_crypto::hash::{
+use aptos_crypto::hash::{
     CryptoHash, HashValue, TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH,
 };
 use std::{cell::RefCell, collections::HashMap};

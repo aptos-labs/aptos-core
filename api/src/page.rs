@@ -3,7 +3,7 @@
 
 use crate::param::{Param, TransactionVersionParam};
 
-use diem_api_types::{Error, TransactionId};
+use aptos_api_types::{Error, TransactionId};
 
 use anyhow::Result;
 use serde::Deserialize;

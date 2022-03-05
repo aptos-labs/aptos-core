@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_types::{
+use aptos_types::{
     account_address::AccountAddress,
     account_config::{from_currency_code_string, type_tag_for_currency_code},
 };

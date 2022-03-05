@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_metrics::{
+use aptos_metrics::{
     register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
     register_int_gauge, DurationHistogram, Histogram, HistogramVec, IntCounter, IntCounterVec,
     IntGauge,
@@ -13,8 +13,8 @@ use once_cell::sync::Lazy;
 //////////////////////
 
 /// Monitor counters, used by monitor! macro
-pub static OP_COUNTERS: Lazy<diem_metrics::OpMetrics> =
-    Lazy::new(|| diem_metrics::OpMetrics::new_and_registered("consensus"));
+pub static OP_COUNTERS: Lazy<aptos_metrics::OpMetrics> =
+    Lazy::new(|| aptos_metrics::OpMetrics::new_and_registered("consensus"));
 
 pub static ERROR_COUNT: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(

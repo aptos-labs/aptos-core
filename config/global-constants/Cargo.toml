@@ -1,5 +1,5 @@
 [package]
-name = "diem-global-constants"
+name = "aptos-global-constants"
 version = "0.1.0"
 authors = ["Diem Association <opensource@diem.com>"]
 description = "Diem's global constant crate: the source of truth for constant definitions that span multiple crates"

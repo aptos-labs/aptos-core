@@ -1,16 +1,16 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_config::config::{Peer, PeerRole};
-use diem_crypto::{
+use aptos_config::config::{Peer, PeerRole};
+use aptos_crypto::{
     ed25519::Ed25519PrivateKey, x25519, x25519::PUBLIC_KEY_SIZE, Uniform, ValidCryptoMaterial,
     ValidCryptoMaterialStringExt,
 };
-use diem_global_constants::OWNER_ACCOUNT;
-use diem_management::{
+use aptos_global_constants::OWNER_ACCOUNT;
+use aptos_management::{
     config::ConfigPath, error::Error, secure_backend::ValidatorBackend, storage::StorageWrapper,
 };
-use diem_types::{
+use aptos_types::{
     account_address::{from_identity_public_key, AccountAddress},
     PeerId,
 };

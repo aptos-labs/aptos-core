@@ -6,8 +6,8 @@ use crate::{
     timeout::Timeout,
 };
 use anyhow::Context;
-use diem_crypto::ed25519::Ed25519Signature;
-use diem_types::validator_verifier::ValidatorVerifier;
+use aptos_crypto::ed25519::Ed25519Signature;
+use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt};
 

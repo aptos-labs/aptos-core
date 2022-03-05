@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
-use diem_operational_tool::command::{Command, ResultWrapper};
+use aptos_operational_tool::command::{Command, ResultWrapper};
 use std::process::exit;
 use structopt::StructOpt;
 

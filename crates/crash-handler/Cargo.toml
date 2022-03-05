@@ -13,6 +13,6 @@ edition = "2018"
 backtrace = "0.3.56"
 toml = "0.5.8"
 
-diem-logger = { path = "../../crates/diem-logger" }
-diem-workspace-hack = { version = "0.1", path = "../diem-workspace-hack" }
+aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
 serde = { version = "1.0.124", features = ["derive"] }

@@ -10,12 +10,12 @@
 // Criterion API has changed, TODO: Remove parameterized groups, and bench()
 #![allow(deprecated)]
 
+use aptos_types::PeerId;
 use bytes::Bytes;
 use criterion::{
     criterion_group, criterion_main, AxisScale, Bencher, Criterion, ParameterizedBenchmark,
     PlotConfiguration, Throughput,
 };
-use diem_types::PeerId;
 use futures::{
     channel::mpsc,
     executor::block_on,
@@ -128,7 +128,7 @@ async fn send_rpc(
 }
 
 fn network_crate_benchmark(c: &mut Criterion) {
-    ::diem_logger::Logger::init_for_testing();
+    ::aptos_logger::Logger::init_for_testing();
 
     // Parameterize benchmarks over the message length.
     let msg_lens = vec![32usize, 256, 1 * KiB, 4 * KiB, 64 * KiB, 256 * KiB, 1 * MiB];

@@ -1256,7 +1256,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(diem_key_manager_state{state=\"keys_still_fresh\", owner=~\"$owner\"}[1h]) > bool 1",
+          "expr": "increase(aptos_key_manager_state{state=\"keys_still_fresh\", owner=~\"$owner\"}[1h]) > bool 1",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"

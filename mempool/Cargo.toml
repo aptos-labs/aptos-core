@@ -1,5 +1,5 @@
 [package]
-name = "diem-mempool"
+name = "aptos-mempool"
 version = "0.1.0"
 authors = ["Diem Association <opensource@diem.com>"]
 description = "Diem mempool"
@@ -26,14 +26,14 @@ tokio-stream = "0.1.4"
 bounded-executor = { path = "../crates/bounded-executor" }
 channel = { path = "../crates/channel" }
 bcs = "0.1.2"
-diem-config = { path = "../config" }
-diem-crypto = { path = "../crates/diem-crypto" }
-diem-logger = { path = "../crates/diem-logger" }
-diem-metrics = { path = "../crates/diem-metrics" }
-diem-infallible = { path = "../crates/diem-infallible" }
-diem-proptest-helpers = { path = "../crates/diem-proptest-helpers", optional = true }
-diem-types = { path = "../types" }
-diem-workspace-hack = { version = "0.1", path = "../crates/diem-workspace-hack" }
+aptos-config = { path = "../config" }
+aptos-crypto = { path = "../crates/aptos-crypto" }
+aptos-logger = { path = "../crates/aptos-logger" }
+aptos-metrics = { path = "../crates/aptos-metrics" }
+aptos-infallible = { path = "../crates/aptos-infallible" }
+aptos-proptest-helpers = { path = "../crates/aptos-proptest-helpers", optional = true }
+aptos-types = { path = "../types" }
+aptos-workspace-hack = { version = "0.1", path = "../crates/aptos-workspace-hack" }
 event-notifications = { path = "../state-sync/inter-component/event-notifications" }
 mirai-annotations = "1.10.1"
 mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
@@ -51,12 +51,12 @@ storage-service = { path = "../storage/storage-service", optional = true }
 enum_dispatch = "0.3.5"
 proptest = "1.0.0"
 
-diem-config = { path = "../config", features = ["fuzzing"] }
-diem-id-generator = { path = "../crates/diem-id-generator" }
+aptos-config = { path = "../config", features = ["fuzzing"] }
+aptos-id-generator = { path = "../crates/aptos-id-generator" }
 network = { path = "../network", features = ["fuzzing"] }
 storage-interface = { path = "../storage/storage-interface", features = ["fuzzing"] }
 
 [features]
 default = []
 failpoints = ["fail/failpoints", "vm-validator/failpoints"]
-fuzzing = ["proptest", "diem-types/fuzzing", "storage-interface/fuzzing", "diem-config/fuzzing"]
+fuzzing = ["proptest", "aptos-types/fuzzing", "storage-interface/fuzzing", "aptos-config/fuzzing"]

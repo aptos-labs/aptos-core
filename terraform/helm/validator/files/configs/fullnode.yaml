@@ -29,7 +29,7 @@ full_node_networks:
   seeds:
     d58bc7bb154b38039bc9096ce04e1237:
       addresses:
-      - "/dns4/{{ include "diem-validator.fullname" . }}-validator/tcp/6181/ln-noise-ik/f0274c2774519281a8332d0bb9d8101bd58bc7bb154b38039bc9096ce04e1237/ln-handshake/0"
+      - "/dns4/{{ include "aptos-validator.fullname" . }}-validator/tcp/6181/ln-noise-ik/f0274c2774519281a8332d0bb9d8101bd58bc7bb154b38039bc9096ce04e1237/ln-handshake/0"
       role: "Validator"
 
 - network_id: "public"

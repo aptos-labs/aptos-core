@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
+use aptos_logger::{prelude::*, Level, Logger};
+use aptos_types::transaction::Version;
+use aptosdb::{DiemDB, GetRestoreHandler};
 use backup_cli::{
     coordinators::replay_verify::ReplayVerifyCoordinator,
     metadata::cache::MetadataCacheOpt,
     storage::StorageOpt,
     utils::{ConcurrentDownloadsOpt, RocksdbOpt, TrustedWaypointOpt},
 };
-use diem_logger::{prelude::*, Level, Logger};
-use diem_types::transaction::Version;
-use diemdb::{DiemDB, GetRestoreHandler};
 use std::{path::PathBuf, sync::Arc};
 use structopt::StructOpt;
 

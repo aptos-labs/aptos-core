@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_types::block_info::BlockInfo;
+use aptos_types::block_info::BlockInfo;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

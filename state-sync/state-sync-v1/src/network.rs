@@ -4,9 +4,9 @@
 //! Interface between State Sync and Network layers.
 
 use crate::{chunk_request::GetChunkRequest, chunk_response::GetChunkResponse, counters};
+use aptos_types::PeerId;
 use async_trait::async_trait;
-use channel::{diem_channel, message_queues::QueueStyle};
-use diem_types::PeerId;
+use channel::{aptos_channel, message_queues::QueueStyle};
 use network::{
     error::NetworkError,
     peer_manager::{ConnectionRequestSender, PeerManagerRequestSender},
@@ -81,7 +81,7 @@ impl ApplicationNetworkSender<StateSyncMessage> for StateSyncSender {
 pub fn network_endpoint_config() -> AppConfig {
     AppConfig::p2p(
         [ProtocolId::StateSyncDirectSend],
-        diem_channel::Config::new(STATE_SYNC_MAX_BUFFER_SIZE)
+        aptos_channel::Config::new(STATE_SYNC_MAX_BUFFER_SIZE)
             .queue_style(QueueStyle::LIFO)
             .counters(&counters::PENDING_STATE_SYNC_NETWORK_EVENTS),
     )

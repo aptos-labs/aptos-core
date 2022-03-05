@@ -11,18 +11,18 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.52"
-diem-crypto = { path = "../../crates/diem-crypto" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
 mirai-annotations = "1.10.1"
-diem-types = { path = "../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptos-types = { path = "../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 proptest = { version = "1.0.0", optional = true }
 
 [dev-dependencies]
 rand = "0.8.3"
 proptest = "1.0.0"
 
-diem-crypto = { path = "../../crates/diem-crypto", features = ["fuzzing"] }
+aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
 
 [features]
 default = []
-fuzzing = ["proptest", "diem-crypto/fuzzing", "diem-types/fuzzing"]
+fuzzing = ["proptest", "aptos-crypto/fuzzing", "aptos-types/fuzzing"]

@@ -7,12 +7,12 @@ use crate::{
     peer_manager::{conn_notifs_channel, ConnectionRequest},
     transport::ConnectionMetadata,
 };
-use channel::{diem_channel, message_queues::QueueStyle};
-use diem_config::config::{Peer, PeerRole, PeerSet, HANDSHAKE_VERSION};
-use diem_crypto::{test_utils::TEST_SEED, x25519, Uniform};
-use diem_logger::info;
-use diem_time_service::{MockTimeService, TimeService};
-use diem_types::network_address::NetworkAddress;
+use aptos_config::config::{Peer, PeerRole, PeerSet, HANDSHAKE_VERSION};
+use aptos_crypto::{test_utils::TEST_SEED, x25519, Uniform};
+use aptos_logger::info;
+use aptos_time_service::{MockTimeService, TimeService};
+use aptos_types::network_address::NetworkAddress;
+use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{executor::block_on, future, SinkExt};
 use maplit::{hashmap, hashset};
 use rand::rngs::StdRng;
@@ -76,7 +76,7 @@ fn update_peer_with_address(mut peer: Peer, addr_str: &'static str) -> (Peer, Ne
 struct TestHarness {
     trusted_peers: Arc<RwLock<PeerSet>>,
     mock_time: MockTimeService,
-    connection_reqs_rx: diem_channel::Receiver<PeerId, ConnectionRequest>,
+    connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
     connection_notifs_tx: conn_notifs_channel::Sender,
     conn_mgr_reqs_tx: channel::Sender<ConnectivityRequest>,
 }
@@ -85,7 +85,8 @@ impl TestHarness {
     fn new(seeds: PeerSet) -> (Self, ConnectivityManager<FixedInterval>) {
         let network_context = NetworkContext::mock();
         let time_service = TimeService::mock();
-        let (connection_reqs_tx, connection_reqs_rx) = diem_channel::new(QueueStyle::FIFO, 1, None);
+        let (connection_reqs_tx, connection_reqs_rx) =
+            aptos_channel::new(QueueStyle::FIFO, 1, None);
         let (connection_notifs_tx, connection_notifs_rx) = conn_notifs_channel::new();
         let (conn_mgr_reqs_tx, conn_mgr_reqs_rx) = channel::new_test(0);
         let trusted_peers = Arc::new(RwLock::new(HashMap::new()));

@@ -11,7 +11,7 @@ use crate::{
     },
     write_set::WriteSet,
 };
-use diem_crypto::{ed25519::*, traits::*};
+use aptos_crypto::{ed25519::*, traits::*};
 
 const MAX_GAS_AMOUNT: u64 = 1_000_000;
 const TEST_GAS_PRICE: u64 = 0;

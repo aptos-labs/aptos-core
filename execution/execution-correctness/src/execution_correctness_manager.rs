@@ -9,12 +9,12 @@ use crate::{
     serializer::{SerializerClient, SerializerService},
     thread::ThreadService,
 };
-use diem_config::config::{ExecutionCorrectnessService, NodeConfig};
-use diem_crypto::ed25519::Ed25519PrivateKey;
-use diem_global_constants::EXECUTION_KEY;
-use diem_secure_storage::{CryptoStorage, Storage};
+use aptos_config::config::{ExecutionCorrectnessService, NodeConfig};
+use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_global_constants::EXECUTION_KEY;
+use aptos_secure_storage::{CryptoStorage, Storage};
 
-use diem_vm::DiemVM;
+use aptos_vm::DiemVM;
 use executor::block_executor::BlockExecutor;
 use std::{convert::TryInto, net::SocketAddr, sync::Arc};
 use storage_client::StorageClient;

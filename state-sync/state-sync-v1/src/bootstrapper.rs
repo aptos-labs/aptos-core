@@ -6,9 +6,9 @@ use crate::{
     executor_proxy::{ExecutorProxy, ExecutorProxyTrait},
     network::{StateSyncEvents, StateSyncSender},
 };
+use aptos_config::{config::NodeConfig, network_id::NetworkId};
+use aptos_types::waypoint::Waypoint;
 use consensus_notifications::ConsensusNotificationListener;
-use diem_config::{config::NodeConfig, network_id::NetworkId};
-use diem_types::waypoint::Waypoint;
 use event_notifications::EventSubscriptionService;
 use executor_types::ChunkExecutorTrait;
 use futures::channel::mpsc;

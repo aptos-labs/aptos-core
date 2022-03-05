@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::execution_correctness::ExecutionCorrectness;
+use aptos_crypto::{ed25519::Ed25519PrivateKey, traits::SigningKey, HashValue};
+use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use consensus_types::{block::Block, vote_proposal::VoteProposal};
-use diem_crypto::{ed25519::Ed25519PrivateKey, traits::SigningKey, HashValue};
-use diem_types::ledger_info::LedgerInfoWithSignatures;
 use executor_types::{BlockExecutorTrait, Error, StateComputeResult};
 use std::{boxed::Box, sync::Arc};
 

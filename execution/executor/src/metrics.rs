@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_metrics::{register_histogram, register_int_counter, Histogram, IntCounter};
+use aptos_metrics::{register_histogram, register_int_counter, Histogram, IntCounter};
 use once_cell::sync::Lazy;
 
 pub static DIEM_EXECUTOR_EXECUTE_CHUNK_SECONDS: Lazy<Histogram> = Lazy::new(|| {

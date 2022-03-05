@@ -5,13 +5,13 @@ use crate::{
     error::Error,
     notification_handlers::{CommitNotification, ErrorNotification},
 };
-use data_streaming_service::data_notification::NotificationId;
-use diem_logger::prelude::*;
-use diem_types::{
+use aptos_logger::prelude::*;
+use aptos_types::{
     account_state_blob::AccountStatesChunkWithProof,
     ledger_info::LedgerInfoWithSignatures,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof},
 };
+use data_streaming_service::data_notification::NotificationId;
 use executor_types::ChunkExecutorTrait;
 use futures::{channel::mpsc, SinkExt, StreamExt};
 use std::{

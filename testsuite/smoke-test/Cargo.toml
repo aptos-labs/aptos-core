@@ -18,18 +18,18 @@ tokio = { version = "1.8.1", features = ["full"] }
 walkdir = "2.3.1"
 reqwest = { version = "0.11.2", features = ["json"] }
 
-aptos-framework-releases = { path = "../../diem-move/diem-framework/aptos-framework/releases" }
-diem-config = { path = "../../config" }
-diem-crypto = { path = "../../crates/diem-crypto" }
-diem-experimental-framework-releases = { path = "../../diem-move/diem-framework/experimental/releases" }
-diem-framework = { path = "../../diem-move/diem-framework" }
-diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
-diem-rest-client = { path = "../../crates/diem-rest-client" }
-diem-sdk = { path = "../../sdk" }
-diem-temppath = { path = "../../crates/diem-temppath" }
-diem-transaction-builder = { path = "../../sdk/transaction-builder" }
-diem-types = { path = "../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptos-framework-releases = { path = "../../aptos-move/diem-framework/aptos-framework/releases" }
+aptos-config = { path = "../../config" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+diem-experimental-framework-releases = { path = "../../aptos-move/diem-framework/experimental/releases" }
+diem-framework = { path = "../../aptos-move/diem-framework" }
+diem-framework-releases = { path = "../../aptos-move/diem-framework/DPN/releases" }
+aptos-rest-client = { path = "../../crates/aptos-rest-client" }
+aptos-sdk = { path = "../../sdk" }
+aptos-temppath = { path = "../../crates/aptos-temppath" }
+aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
+aptos-types = { path = "../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 forge = { path = "../forge" }
 move-command-line-common = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 move-ir-compiler = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
@@ -47,17 +47,17 @@ futures = "0.3.12"
 backup-cli = { path = "../../storage/backup/backup-cli" }
 debug-interface = { path = "../../crates/debug-interface" }
 generate-key = { path = "../../config/generate-key" }
-diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
-diem-global-constants = { path = "../../config/global-constants" }
-diem-infallible = { path = "../../crates/diem-infallible" }
-diem-logger = { path = "../../crates/diem-logger" }
-diem-management = { path = "../../config/management", features = ["testing"] }
-diem-operational-tool = {path = "../../config/management/operational", features = ["testing"] }
-diem-secure-storage = { path = "../../secure/storage", features = ["testing"] }
-diem-time-service = { path = "../../crates/diem-time-service", features = ["testing"] }
-diem-vault-client = { path = "../../secure/storage/vault", features = ["fuzzing"] }
-diem-writeset-generator = { path = "../../diem-move/writeset-transaction-generator" }
-diem-transaction-builder = { path = "../../sdk/transaction-builder" }
+aptos-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
+aptos-global-constants = { path = "../../config/global-constants" }
+aptos-infallible = { path = "../../crates/aptos-infallible" }
+aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-management = { path = "../../config/management", features = ["testing"] }
+aptos-operational-tool = {path = "../../config/management/operational", features = ["testing"] }
+aptos-secure-storage = { path = "../../secure/storage", features = ["testing"] }
+aptos-time-service = { path = "../../crates/aptos-time-service", features = ["testing"] }
+aptos-vault-client = { path = "../../secure/storage/vault", features = ["fuzzing"] }
+aptos-writeset-generator = { path = "../../aptos-move/writeset-transaction-generator" }
+aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 
 [[test]]
 name = "forge"

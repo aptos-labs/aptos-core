@@ -3,9 +3,9 @@
 
 use crate::tests::new_test_context;
 
-use diem_api_types::Address;
-use diem_crypto::ed25519::Ed25519PrivateKey;
-use diem_sdk::types::LocalAccount;
+use aptos_api_types::Address;
+use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_sdk::types::LocalAccount;
 use serde_json::json;
 
 use std::convert::TryInto;

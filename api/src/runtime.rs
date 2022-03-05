@@ -3,9 +3,9 @@
 
 use crate::{context::Context, index};
 
-use diem_config::config::{ApiConfig, JsonRpcConfig, NodeConfig};
-use diem_mempool::MempoolClientSender;
-use diem_types::chain_id::ChainId;
+use aptos_config::config::{ApiConfig, JsonRpcConfig, NodeConfig};
+use aptos_mempool::MempoolClientSender;
+use aptos_types::chain_id::ChainId;
 use storage_interface::MoveDbReader;
 use warp::{Filter, Reply};
 
@@ -96,8 +96,8 @@ impl WebServer {
 mod tests {
     use std::time::Duration;
 
-    use diem_config::config::NodeConfig;
-    use diem_types::chain_id::ChainId;
+    use aptos_config::config::NodeConfig;
+    use aptos_types::chain_id::ChainId;
 
     use crate::{
         runtime::bootstrap,

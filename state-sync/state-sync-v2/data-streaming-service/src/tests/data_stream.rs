@@ -18,15 +18,15 @@ use crate::{
         MIN_ADVERTISED_ACCOUNTS, MIN_ADVERTISED_EPOCH_END, MIN_ADVERTISED_TRANSACTION_OUTPUT,
     },
 };
-use claim::{assert_err, assert_ge, assert_none, assert_ok};
-use diem_config::config::DataStreamingServiceConfig;
-use diem_data_client::{
+use aptos_config::config::DataStreamingServiceConfig;
+use aptos_data_client::{
     AdvertisedData, GlobalDataSummary, OptimalChunkSizes, Response, ResponseContext,
     ResponsePayload,
 };
-use diem_id_generator::U64IdGenerator;
-use diem_infallible::Mutex;
-use diem_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
+use aptos_id_generator::U64IdGenerator;
+use aptos_infallible::Mutex;
+use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
+use claim::{assert_err, assert_ge, assert_none, assert_ok};
 use futures::{FutureExt, StreamExt};
 use std::{sync::Arc, time::Duration};
 use storage_service_types::CompleteDataRange;
@@ -188,7 +188,7 @@ async fn test_stream_data_error() {
     });
     let pending_response = PendingClientResponse {
         client_request: client_request.clone(),
-        client_response: Some(Err(diem_data_client::Error::DataIsUnavailable(
+        client_response: Some(Err(aptos_data_client::Error::DataIsUnavailable(
             "Missing data!".into(),
         ))),
     };
@@ -376,7 +376,7 @@ fn create_data_stream(
     };
 
     // Create a diem data client mock and notification generator
-    let diem_data_client = MockDiemDataClient::new();
+    let aptos_data_client = MockDiemDataClient::new();
     let notification_generator = Arc::new(U64IdGenerator::new());
 
     // Return the data stream and listener pair
@@ -384,7 +384,7 @@ fn create_data_stream(
         streaming_service_config,
         create_random_u64(10000),
         &stream_request,
-        diem_data_client,
+        aptos_data_client,
         notification_generator,
         &advertised_data,
     )

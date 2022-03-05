@@ -38,17 +38,17 @@ executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
 fallible = { path = "../crates/fallible" }
 bcs = "0.1.2"
-diem-config = { path = "../config" }
-diem-crypto = { path = "../crates/diem-crypto" }
-diem-logger = { path = "../crates/diem-logger" }
-diem-mempool = { path = "../mempool" }
-diem-metrics = { path = "../crates/diem-metrics" }
-diem-infallible = { path = "../crates/diem-infallible" }
-diem-secure-storage = { path = "../secure/storage" }
-diem-temppath = { path = "../crates/diem-temppath" }
-diem-types = { path = "../types" }
-diem-vm = { path = "../diem-move/diem-vm" }
-diem-workspace-hack = { version = "0.1", path = "../crates/diem-workspace-hack" }
+aptos-config = { path = "../config" }
+aptos-crypto = { path = "../crates/aptos-crypto" }
+aptos-logger = { path = "../crates/aptos-logger" }
+aptos-mempool = { path = "../mempool" }
+aptos-metrics = { path = "../crates/aptos-metrics" }
+aptos-infallible = { path = "../crates/aptos-infallible" }
+aptos-secure-storage = { path = "../secure/storage" }
+aptos-temppath = { path = "../crates/aptos-temppath" }
+aptos-types = { path = "../types" }
+aptos-vm = { path = "../aptos-move/aptos-vm" }
+aptos-workspace-hack = { version = "0.1", path = "../crates/aptos-workspace-hack" }
 network = { path = "../network" }
 safety-rules = { path = "safety-rules" }
 short-hex-str = { path = "../crates/short-hex-str" }
@@ -62,14 +62,14 @@ tempfile = "3.2.0"
 
 consensus-types = { path = "consensus-types", default-features = false, features = ["fuzzing"] }
 executor-test-helpers = { path = "../execution/executor-test-helpers" }
-diem-config = { path = "../config", features = ["fuzzing"] }
-diem-mempool = { path = "../mempool", features = ["fuzzing"] }
+aptos-config = { path = "../config", features = ["fuzzing"] }
+aptos-mempool = { path = "../mempool", features = ["fuzzing"] }
 network = { path = "../network", features = ["fuzzing"] }
 safety-rules = { path = "safety-rules", features = ["testing"] }
-vm-genesis = { path = "../diem-move/vm-genesis" }
+vm-genesis = { path = "../aptos-move/vm-genesis" }
 vm-validator = { path = "../vm-validator" }
 
 [features]
 default = []
-fuzzing = ["proptest", "consensus-types/fuzzing", "diem-config/fuzzing", "diem-crypto/fuzzing", "diem-mempool/fuzzing", "diem-types/fuzzing", "safety-rules/testing"]
+fuzzing = ["proptest", "consensus-types/fuzzing", "aptos-config/fuzzing", "aptos-crypto/fuzzing", "aptos-mempool/fuzzing", "aptos-types/fuzzing", "safety-rules/testing"]
 failpoints = ["fail/failpoints"]

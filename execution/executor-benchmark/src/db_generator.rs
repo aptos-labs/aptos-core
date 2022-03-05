@@ -5,13 +5,13 @@ use crate::{
     transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
     TransactionCommitter,
 };
-use diem_config::{config::RocksdbConfig, utils::get_genesis_txn};
-use diem_jellyfish_merkle::metrics::{
+use aptos_config::{config::RocksdbConfig, utils::get_genesis_txn};
+use aptos_jellyfish_merkle::metrics::{
     DIEM_JELLYFISH_INTERNAL_ENCODED_BYTES, DIEM_JELLYFISH_LEAF_ENCODED_BYTES,
     DIEM_JELLYFISH_STORAGE_READS,
 };
-use diem_vm::DiemVM;
-use diemdb::{
+use aptos_vm::DiemVM;
+use aptosdb::{
     metrics::DIEM_STORAGE_ROCKSDB_PROPERTIES, schema::JELLYFISH_MERKLE_NODE_CF_NAME, DiemDB,
 };
 use executor::{
@@ -36,12 +36,12 @@ pub fn run(
     println!("Initializing...");
 
     if db_dir.as_ref().exists() {
-        fs::remove_dir_all(db_dir.as_ref().join("diemdb")).unwrap_or(());
+        fs::remove_dir_all(db_dir.as_ref().join("aptosdb")).unwrap_or(());
     }
     // create if not exists
     fs::create_dir_all(db_dir.as_ref()).unwrap();
 
-    let (config, genesis_key) = diem_genesis_tool::test_config();
+    let (config, genesis_key) = aptos_genesis_tool::test_config();
     // Create executor.
     let (db, db_rw) = DbReaderWriter::wrap(
         DiemDB::open(

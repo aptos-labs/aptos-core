@@ -4,10 +4,10 @@
 #![forbid(unsafe_code)]
 
 use anyhow::Result;
-use diem_infallible::Mutex;
-use diem_logger::warn;
-use diem_secure_net::NetworkClient;
-use diem_types::{
+use aptos_infallible::Mutex;
+use aptos_logger::warn;
+use aptos_secure_net::NetworkClient;
+use aptos_types::{
     account_address::AccountAddress,
     account_state_blob::AccountStateBlob,
     ledger_info::LedgerInfoWithSignatures,

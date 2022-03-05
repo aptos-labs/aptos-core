@@ -101,7 +101,7 @@ scrape_configs:
       owner: {{ .Values.validator.name }}
 {{ end }}
 
-- job_name: "diem-procs"
+- job_name: "aptos-procs"
 
   kubernetes_sd_configs:
   - role: pod

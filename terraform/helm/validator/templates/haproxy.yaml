@@ -1,18 +1,18 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-haproxy
+  name: {{ include "aptos-validator.fullname" . }}-haproxy
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 
 ---
 
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-haproxy
+  name: {{ include "aptos-validator.fullname" . }}-haproxy
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 data:
   haproxy.cfg: |-
 {{ (tpl (.Files.Get "files/haproxy.cfg") .) | indent 4 }}
@@ -23,15 +23,15 @@ data:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-validator-lb
+  name: {{ include "aptos-validator.fullname" . }}-validator-lb
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
   annotations:
     service.beta.kubernetes.io/aws-load-balancer-type: nlb
     service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: All
 spec:
   selector:
-    {{- include "diem-validator.selectorLabels" . | nindent 4 }}
+    {{- include "aptos-validator.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/name: haproxy
   ports:
   - name: validator
@@ -55,15 +55,15 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "diem-validator.fullname" $ }}-{{ $config.name }}-lb
+  name: {{ include "aptos-validator.fullname" $ }}-{{ $config.name }}-lb
   labels:
-    {{- include "diem-validator.labels" $ | nindent 4 }}
+    {{- include "aptos-validator.labels" $ | nindent 4 }}
   annotations:
     service.beta.kubernetes.io/aws-load-balancer-type: nlb
     service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: All
 spec:
   selector:
-    {{- include "diem-validator.selectorLabels" $ | nindent 4 }}
+    {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
     app.kubernetes.io/name: haproxy
   ports:
   - name: diemnet
@@ -93,9 +93,9 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-haproxy
+  name: {{ include "aptos-validator.fullname" . }}-haproxy
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
     app.kubernetes.io/name: haproxy
 spec:
   replicas: {{ .Values.haproxy.replicas }}
@@ -104,12 +104,12 @@ spec:
       maxUnavailable: 1
   selector:
     matchLabels:
-      {{- include "diem-validator.selectorLabels" . | nindent 6 }}
+      {{- include "aptos-validator.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/name: haproxy
   template:
     metadata:
       labels:
-        {{- include "diem-validator.selectorLabels" . | nindent 8 }}
+        {{- include "aptos-validator.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: haproxy
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
@@ -173,13 +173,13 @@ spec:
       volumes:
       - name: haproxy-config
         configMap:
-          name: {{ include "diem-validator.fullname" . }}-haproxy
+          name: {{ include "aptos-validator.fullname" . }}-haproxy
       {{- if .Values.haproxy.tls_secret }}
       - name: haproxy-tls
         secret:
           secretName: {{ .Values.haproxy.tls_secret }}
       {{- end }}
-      serviceAccountName: {{ include "diem-validator.fullname" . }}-haproxy
+      serviceAccountName: {{ include "aptos-validator.fullname" . }}-haproxy
       {{- if .Values.imagePullSecret }}
       imagePullSecrets:
       - name: {{.Values.imagePullSecret}}

@@ -50,7 +50,7 @@ warn = [
 
 [hakari]
 resolver = "2"
-hakari-package = "diem-workspace-hack"
+hakari-package = "aptos-workspace-hack"
 exact-versions = true
 platforms = [
     "x86_64-unknown-linux-gnu",
@@ -64,8 +64,8 @@ platforms = [
 [hakari.traversal-excludes]
 workspace-members = [
     # Don't consider the crypto packages as they do weird things with mutually exclusive features.
-    "diem-crypto",
-    "diem-crypto-derive",
+    "aptos-crypto",
+    "aptos-crypto-derive",
 
     # Also exclude the devtools packages since they get compiled with a different set of options.
     "x",
@@ -101,7 +101,7 @@ target-features = "all"
 
 [summaries.default.omitted-packages]
 workspace-members = [
-    "diem-workspace-hack",
+    "aptos-workspace-hack",
 ]
 
 [summaries.full]
@@ -165,19 +165,19 @@ members = [
     # Please keep this list in alphabetical order!
 
     "testcases",
+    "aptos-documentation-tool",
+    "aptos-e2e-tests-replay",
     "aptos-framework-releases",
-    "diem-documentation-tool",
-    "diem-e2e-tests-replay",
+    "aptos-fuzz",
+    "aptos-fuzzer",
+    "aptos-keygen",
+    "aptos-proptest-helpers",
+    "aptos-retrier",
+    "aptos-transactional-test-harness",
+    "aptos-transaction-benchmarks",
+    "aptos-wallet",
+    "aptos-writeset-generator",
     "diem-experimental-framework-releases",
-    "diem-fuzz",
-    "diem-fuzzer",
-    "diem-keygen",
-    "diem-proptest-helpers",
-    "diem-retrier",
-    "diem-transactional-test-harness",
-    "diem-transaction-benchmarks",
-    "diem-wallet",
-    "diem-writeset-generator",
     "executor-benchmark",
     "executor-test-helpers",
     "forge",
@@ -197,7 +197,7 @@ members = [
     # Please keep this list in alphabetical order!
 ]
 
-[workspace.move-to-diem-deps]
+[workspace.move-to-aptos-deps]
 # By default, all crates in the language directory are considered Move crates
 # and are forbidden from depending on any Diem crates.
 #
@@ -207,7 +207,7 @@ members = [
 # Note: if your crate is indeed a Move crate and you are getting the linter
 # yelling at you, you should redesign your crate and properly remove that
 # dependency, instead of adding the crate to this list and silencing the lint.
-diem_crates_in_language = [
+aptos_crates_in_language = [
 ]
 # A special set of diem crates Move crates are allowed to depend on.
 #
@@ -218,7 +218,7 @@ diem_crates_in_language = [
 # about Move crates depending on Diem ones. Again, you should instead fix
 # the design of your crate so it doesn't have to depend on Diem.
 exclude = [
-    "diem-workspace-hack",
+    "aptos-workspace-hack",
 ]
 
 # Interesting subsets of the workspace, These are used for generating and
@@ -241,9 +241,9 @@ root-members = [
 root-members = [
     "backup-cli",
     "db-bootstrapper",
-    "diem-genesis-tool",
-    "diem-node",
-    "diem-operational-tool",
+    "aptos-genesis-tool",
+    "aptos-node",
+    "aptos-operational-tool",
     "execution-correctness",
     "safety-rules",
 ]
@@ -279,7 +279,7 @@ mark-changed = []
 
 [[determinator.path-rule]]
 # Required by get_stdlib_script_abis in transaction-builder-generator.
-globs = ["diem-move/diem-framework/DPN/releases/artifacts/current/**/*"]
+globs = ["aptos-move/diem-framework/DPN/releases/artifacts/current/**/*"]
 mark-changed = ["transaction-builder-generator"]
 post-rule = "skip-rules"
 

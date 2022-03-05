@@ -15,11 +15,11 @@ serde = { version = "1.0.124", default-features = false }
 
 executor-types = { path = "../../execution/executor-types" }
 bcs = "0.1.2"
-diem-crypto = { path = "../../crates/diem-crypto" }
-diem-crypto-derive = { path = "../../crates/diem-crypto-derive" }
-diem-infallible = { path = "../../crates/diem-infallible" }
-diem-types = { path = "../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-crypto-derive = { path = "../../crates/aptos-crypto-derive" }
+aptos-infallible = { path = "../../crates/aptos-infallible" }
+aptos-types = { path = "../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 short-hex-str = { path = "../../crates/short-hex-str" }
 
 
@@ -27,8 +27,8 @@ short-hex-str = { path = "../../crates/short-hex-str" }
 proptest = "1.0.0"
 serde_json = "1.0.64"
 
-diem-types = { path = "../../types", features = ["fuzzing"] }
+aptos-types = { path = "../../types", features = ["fuzzing"] }
 
 [features]
 default = []
-fuzzing = ["proptest", "diem-types/fuzzing", "diem-crypto/fuzzing"]
+fuzzing = ["proptest", "aptos-types/fuzzing", "aptos-crypto/fuzzing"]

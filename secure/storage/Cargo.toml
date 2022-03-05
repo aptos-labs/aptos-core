@@ -1,5 +1,5 @@
 [package]
-name = "diem-secure-storage"
+name = "aptos-secure-storage"
 version = "0.1.0"
 authors = ["Diem Association <opensource@diem.com>"]
 repository = "https://github.com/diem/diem"
@@ -19,20 +19,20 @@ serde_json = "1.0.64"
 thiserror = "1.0.24"
 
 bcs = "0.1.2"
-diem-crypto = { path = "../../crates/diem-crypto" }
-diem-github-client = { path = "github" }
-diem-infallible = { path = "../../crates/diem-infallible" }
-diem-logger = { path = "../../crates/diem-logger" }
-diem-temppath = { path = "../../crates/diem-temppath" }
-diem-time-service = { path = "../../crates/diem-time-service" }
-diem-vault-client = { path = "vault" }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-github-client = { path = "github" }
+aptos-infallible = { path = "../../crates/aptos-infallible" }
+aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-temppath = { path = "../../crates/aptos-temppath" }
+aptos-time-service = { path = "../../crates/aptos-time-service" }
+aptos-vault-client = { path = "vault" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 
 [dev-dependencies]
-diem-crypto = { path = "../../crates/diem-crypto", features = ["fuzzing"] }
-diem-crypto-derive = { path = "../../crates/diem-crypto-derive" }
+aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
+aptos-crypto-derive = { path = "../../crates/aptos-crypto-derive" }
 rand = "0.8.3"
 
 [features]
-fuzzing = ["diem-crypto/fuzzing"]
+fuzzing = ["aptos-crypto/fuzzing"]
 testing = []

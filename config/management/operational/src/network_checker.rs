@@ -5,13 +5,13 @@ use crate::{
     rest_client::RestClient,
     validator_set::{validator_set_full_node_addresses, validator_set_validator_addresses},
 };
-use diem_config::{
+use aptos_config::{
     config::{RoleType, HANDSHAKE_VERSION},
     network_id::{NetworkContext, NetworkId},
 };
-use diem_crypto::{x25519, x25519::PRIVATE_KEY_SIZE};
-use diem_management::error::Error;
-use diem_types::{account_address, chain_id::ChainId, network_address::NetworkAddress, PeerId};
+use aptos_crypto::{x25519, x25519::PRIVATE_KEY_SIZE};
+use aptos_management::error::Error;
+use aptos_types::{account_address, chain_id::ChainId, network_address::NetworkAddress, PeerId};
 use fallible::copy_from_slice::copy_slice_to_vec;
 use futures::{AsyncReadExt, AsyncWriteExt};
 use netcore::transport::tcp::{resolve_and_connect, TcpSocket};

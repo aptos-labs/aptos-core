@@ -21,7 +21,19 @@ use crate::{
     },
     util::time_service::{ClockTimeService, TimeService},
 };
-use channel::{self, diem_channel, message_queues::QueueStyle};
+use aptos_config::network_id::NetworkId;
+use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, Uniform};
+use aptos_infallible::Mutex;
+use aptos_secure_storage::Storage;
+use aptos_types::{
+    epoch_state::EpochState,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    on_chain_config::OnChainConsensusConfig,
+    validator_signer::ValidatorSigner,
+    validator_verifier::random_validator_verifier,
+    waypoint::Waypoint,
+};
+use channel::{self, aptos_channel, message_queues::QueueStyle};
 use consensus_types::{
     block::{
         block_test_utils::{certificate_for_genesis, gen_test_certificate},
@@ -34,18 +46,6 @@ use consensus_types::{
     timeout::Timeout,
     timeout_certificate::TimeoutCertificate,
     vote_msg::VoteMsg,
-};
-use diem_config::network_id::NetworkId;
-use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, Uniform};
-use diem_infallible::Mutex;
-use diem_secure_storage::Storage;
-use diem_types::{
-    epoch_state::EpochState,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::OnChainConsensusConfig,
-    validator_signer::ValidatorSigner,
-    validator_verifier::random_validator_verifier,
-    waypoint::Waypoint,
 };
 use futures::{
     channel::{mpsc, oneshot},
@@ -119,7 +119,7 @@ impl NodeSetup {
             let (initial_data, storage) = MockStorage::start_for_testing((&validators).into());
 
             let safety_storage = PersistentSafetyStorage::initialize(
-                Storage::from(diem_secure_storage::InMemoryStorage::new()),
+                Storage::from(aptos_secure_storage::InMemoryStorage::new()),
                 signer.author(),
                 signer.private_key().clone(),
                 Ed25519PrivateKey::generate_for_testing(),
@@ -157,9 +157,9 @@ impl NodeSetup {
             verifier: storage.get_validator_set().into(),
         };
         let validators = epoch_state.verifier.clone();
-        let (network_reqs_tx, network_reqs_rx) = diem_channel::new(QueueStyle::FIFO, 8, None);
-        let (connection_reqs_tx, _) = diem_channel::new(QueueStyle::FIFO, 8, None);
-        let (consensus_tx, consensus_rx) = diem_channel::new(QueueStyle::FIFO, 8, None);
+        let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+        let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+        let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = channel::new_test(8);
         let (_, conn_status_rx) = conn_notifs_channel::new();
         let mut network_sender = ConsensusNetworkSender::new(
@@ -890,7 +890,7 @@ fn safety_rules_crash() {
 
     fn reset_safety_rules(node: &mut NodeSetup) {
         let safety_storage = PersistentSafetyStorage::initialize(
-            Storage::from(diem_secure_storage::InMemoryStorage::new()),
+            Storage::from(aptos_secure_storage::InMemoryStorage::new()),
             node.signer.author(),
             node.signer.private_key().clone(),
             Ed25519PrivateKey::generate_for_testing(),

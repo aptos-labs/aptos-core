@@ -14,7 +14,7 @@ use crate::{
     },
     tests::utils::{create_ledger_info, initialize_logger},
 };
-use channel::{diem_channel, message_queues::QueueStyle};
+use channel::{aptos_channel, message_queues::QueueStyle};
 use claim::assert_ok;
 use futures::{executor::block_on, FutureExt, StreamExt};
 use std::thread::JoinHandle;
@@ -281,11 +281,11 @@ fn spawn_service_and_respond_with_error(
 
 /// Creates and returns a new data stream sender and listener pair.
 fn new_data_stream_sender_listener() -> (
-    channel::diem_channel::Sender<(), DataNotification>,
+    channel::aptos_channel::Sender<(), DataNotification>,
     DataStreamListener,
 ) {
     let (notification_sender, notification_receiver) =
-        diem_channel::new(QueueStyle::KLAST, 1, None);
+        aptos_channel::new(QueueStyle::KLAST, 1, None);
     let data_stream_listener = DataStreamListener::new(notification_receiver);
 
     (notification_sender, data_stream_listener)

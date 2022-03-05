@@ -30,7 +30,7 @@ pub struct StateSyncConfig {
 
     // Everything above belongs to state sync v1 and will be removed in the future.
     pub data_streaming_service: DataStreamingServiceConfig,
-    pub diem_data_client: DiemDataClientConfig,
+    pub aptos_data_client: DiemDataClientConfig,
     pub state_sync_driver: StateSyncDriverConfig,
     pub storage_service: StorageServiceConfig,
 }
@@ -48,7 +48,7 @@ impl Default for StateSyncConfig {
             sync_request_timeout_ms: 60_000,
             tick_interval_ms: 100,
             data_streaming_service: DataStreamingServiceConfig::default(),
-            diem_data_client: DiemDataClientConfig::default(),
+            aptos_data_client: DiemDataClientConfig::default(),
             state_sync_driver: StateSyncDriverConfig::default(),
             storage_service: StorageServiceConfig::default(),
         }

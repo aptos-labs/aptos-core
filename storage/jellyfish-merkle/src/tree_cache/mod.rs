@@ -75,8 +75,8 @@ use crate::{
     NodeBatch, NodeStats, StaleNodeIndex, StaleNodeIndexBatch, TreeReader, TreeUpdateBatch,
 };
 use anyhow::{bail, Result};
-use diem_crypto::HashValue;
-use diem_types::transaction::{Version, PRE_GENESIS_VERSION};
+use aptos_crypto::HashValue;
+use aptos_types::transaction::{Version, PRE_GENESIS_VERSION};
 use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet};
 
 /// `FrozenTreeCache` is used as a field of `TreeCache` storing all the nodes and values that

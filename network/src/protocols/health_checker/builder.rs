@@ -8,8 +8,8 @@ use crate::{
         HealthCheckerNetworkSender,
     },
 };
-use diem_config::network_id::NetworkContext;
-use diem_time_service::TimeService;
+use aptos_config::network_id::NetworkContext;
+use aptos_time_service::TimeService;
 use std::{sync::Arc, time::Duration};
 use tokio::runtime::Handle;
 

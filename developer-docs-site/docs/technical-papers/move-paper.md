@@ -27,6 +27,6 @@ protocol in Move, including Diem coin, transaction processing, and validator man
 ### Downloads
 <PublicationLink
   image="/img/docs/move-language-pdf.png"
-  doc_link="/papers/diem-move-a-language-with-programmable-resources/2020-05-26.pdf"
+  doc_link="/papers/aptos-move-a-language-with-programmable-resources/2020-05-26.pdf"
   title="Move: A Language With Programmable Resources"
 />

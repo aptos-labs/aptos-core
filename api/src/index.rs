@@ -10,7 +10,7 @@ use crate::{
     metrics::{metrics, status_metrics},
     transactions,
 };
-use diem_api_types::{Error, Response};
+use aptos_api_types::{Error, Response};
 
 use std::convert::Infallible;
 use warp::{

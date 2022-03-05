@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::storage::FileHandle;
-use diem_crypto::HashValue;
-use diem_types::transaction::Version;
+use aptos_crypto::HashValue;
+use aptos_types::transaction::Version;
 use serde::{Deserialize, Serialize};
 
 /// A chunk of a state snapshot manifest, representing accounts in the key range

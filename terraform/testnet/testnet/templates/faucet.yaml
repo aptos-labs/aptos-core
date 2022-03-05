@@ -43,7 +43,7 @@ spec:
           value: "1"
         image: {{ .Values.faucet.image.repo }}:{{ .Values.faucet.image.tag | default .Values.imageTag }}
         imagePullPolicy: {{ .Values.faucet.image.pullPolicy }}
-        command: ["/opt/diem/bin/diem-faucet"]
+        command: ["/opt/diem/bin/aptos-faucet"]
         args:
         - "--address=0.0.0.0"
         - "--port=8080"

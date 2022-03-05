@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{format_err, Result};
-use diem_rest_client::Client as RestClient;
+use aptos_rest_client::Client as RestClient;
 use reqwest::{Client, Url};
 use std::{
     fmt,

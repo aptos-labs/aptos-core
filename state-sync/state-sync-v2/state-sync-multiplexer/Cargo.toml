@@ -15,10 +15,10 @@ tokio = { version = "1.8.1", features = ["full"] }
 
 consensus-notifications = { path = "../../../state-sync/inter-component/consensus-notifications" }
 data-streaming-service = { path = "../data-streaming-service" }
-diem-config = { path = "../../../config" }
-diem-data-client = { path = "../../diem-data-client" }
-diem-types = { path = "../../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
+aptos-config = { path = "../../../config" }
+aptos-data-client = { path = "../../aptos-data-client" }
+aptos-types = { path = "../../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
 event-notifications = { path = "../../../state-sync/inter-component/event-notifications" }
 executor-types = { path = "../../../execution/executor-types" }
 mempool-notifications = { path = "../../../state-sync/inter-component/mempool-notifications" }
@@ -28,13 +28,13 @@ state-sync-v1 = { path = "../../../state-sync/state-sync-v1" }
 storage-interface = { path = "../../../storage/storage-interface" }
 
 [dev-dependencies]
-diem-crypto = { path = "../../../crates/diem-crypto" }
-diem-genesis-tool = {path = "../../../config/management/genesis", features = ["testing"] }
-diem-infallible = { path = "../../../crates/diem-infallible" }
-diem-temppath = { path = "../../../crates/diem-temppath" }
-diem-time-service = { path = "../../../crates/diem-time-service", features = ["async", "testing"] }
-diem-vm = { path = "../../../diem-move/diem-vm" }
-diemdb = { path = "../../../storage/diemdb" }
+aptos-crypto = { path = "../../../crates/aptos-crypto" }
+aptos-genesis-tool = {path = "../../../config/management/genesis", features = ["testing"] }
+aptos-infallible = { path = "../../../crates/aptos-infallible" }
+aptos-temppath = { path = "../../../crates/aptos-temppath" }
+aptos-time-service = { path = "../../../crates/aptos-time-service", features = ["async", "testing"] }
+aptos-vm = { path = "../../../aptos-move/aptos-vm" }
+aptosdb = { path = "../../../storage/aptosdb" }
 executor = { path = "../../../execution/executor" }
 executor-test-helpers = { path = "../../../execution/executor-test-helpers" }
 mempool-notifications = { path = "../../../state-sync/inter-component/mempool-notifications" }

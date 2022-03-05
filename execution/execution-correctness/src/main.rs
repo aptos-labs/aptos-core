@@ -5,7 +5,7 @@
 
 #![forbid(unsafe_code)]
 
-use diem_config::config::NodeConfig;
+use aptos_config::config::NodeConfig;
 use execution_correctness::Process;
 use std::{env, process};
 
@@ -22,7 +22,7 @@ fn main() {
         process::exit(1);
     });
 
-    diem_logger::Logger::new()
+    aptos_logger::Logger::new()
         .channel_size(config.logger.chan_size)
         .is_async(config.logger.is_async)
         .level(config.logger.level)

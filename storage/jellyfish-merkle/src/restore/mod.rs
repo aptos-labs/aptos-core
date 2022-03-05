@@ -15,11 +15,11 @@ use crate::{
     NibbleExt, NodeBatch, TreeReader, TreeWriter, ROOT_NIBBLE_HEIGHT,
 };
 use anyhow::{bail, ensure, Result};
-use diem_crypto::{
+use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use diem_types::{
+use aptos_types::{
     nibble::{
         nibble_path::{NibbleIterator, NibblePath},
         Nibble,

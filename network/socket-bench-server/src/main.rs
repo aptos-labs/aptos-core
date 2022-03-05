@@ -16,13 +16,13 @@
 //!
 //! `RUSTFLAGS="-Ctarget-cpu=skylake -Ctarget-feature=+aes,+sse2,+sse4.1,+ssse3" TCP_ADDR=/ip6/::1/tcp/12345 cargo x bench -p network remote_tcp`
 
-use diem_logger::info;
+use aptos_logger::info;
 use netcore::transport::tcp::TcpTransport;
 use socket_bench_server::{build_tcp_noise_transport, start_stream_server, Args};
 use tokio::runtime::Builder;
 
 fn main() {
-    ::diem_logger::Logger::new().init();
+    ::aptos_logger::Logger::new().init();
 
     let args = Args::from_env();
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::{assert_json, find_value, new_test_context};
-use diem_api_types::HexEncodedBytes;
+use aptos_api_types::HexEncodedBytes;
 use serde_json::json;
 
 #[tokio::test]
@@ -178,7 +178,7 @@ async fn test_get_module_with_script_functions() {
 }
 
 #[tokio::test]
-async fn test_get_module_diem_config() {
+async fn test_get_module_aptos_config() {
     let context = new_test_context();
     let address = "0x1";
 

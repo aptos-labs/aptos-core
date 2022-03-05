@@ -20,15 +20,15 @@ use crate::{
     },
 };
 use anyhow::{anyhow, ensure, Result};
-use diem_logger::prelude::*;
-use diem_types::{
+use aptos_logger::prelude::*;
+use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::{TransactionAccumulatorRangeProof, TransactionInfoListWithProof},
     transaction::{Transaction, TransactionInfo, TransactionListWithProof, Version},
 };
-use diem_vm::DiemVM;
-use diemdb::backup::restore_handler::RestoreHandler;
+use aptos_vm::DiemVM;
+use aptosdb::backup::restore_handler::RestoreHandler;
 use executor::{chunk_executor::ChunkExecutor, components::apply_chunk_output::IntoLedgerView};
 use executor_types::TransactionReplayer;
 use futures::{
@@ -409,7 +409,7 @@ impl TransactionRestoreBatchController {
     ) -> Result<()> {
         let replay_start = Instant::now();
         let first_version = self.replay_from_version.unwrap();
-        let db = DbReaderWriter::from_arc(Arc::clone(&restore_handler.diemdb));
+        let db = DbReaderWriter::from_arc(Arc::clone(&restore_handler.aptosdb));
         let persisted_view = restore_handler
             .get_tree_state(first_version)?
             .into_ledger_view(&db.reader)?;

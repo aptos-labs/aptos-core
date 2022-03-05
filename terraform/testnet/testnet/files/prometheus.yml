@@ -23,14 +23,14 @@ scrape_configs:
   metrics_path: '/federate'
   params:
     'match[]':
-      - '{job="diem-procs"}'
+      - '{job="aptos-procs"}'
       - '{job="kubernetes-cadvisor"}'
       - '{job="kubernetes-nodes"}'
       - '{job="pushgateway"}'
 
   static_configs:
   {{- range $i, $e := .Values.genesis.numValidators | int | until }}
-  - targets: {{ printf "val%d-diem-validator-monitoring:443" $i | quote | list }}
+  - targets: {{ printf "val%d-aptos-validator-monitoring:443" $i | quote | list }}
     labels:
       owner: {{ printf "val%d" $i | quote }}
   {{- end }}
@@ -39,7 +39,7 @@ scrape_configs:
 
   static_configs:
   {{- range $i, $e := .Values.genesis.numPublicFullnodes | int | until }}
-  - targets: {{ printf "pfn%d-diem-fullnode:9101" $i | quote | list }}
+  - targets: {{ printf "pfn%d-aptos-fullnode:9101" $i | quote | list }}
     labels:
       owner: {{ printf "pfn%d" $i | quote }}
   {{- end }}
@@ -110,7 +110,7 @@ scrape_configs:
   static_configs:
   {{- if .Values.localVaultBackend }}
   {{- range $i, $e := .Values.genesis.numValidators | int | until }}
-  - targets: {{ printf "val%d-diem-validator-vault:8200" $i | quote | list }}
+  - targets: {{ printf "val%d-aptos-validator-vault:8200" $i | quote | list }}
     labels:
       owner: {{ printf "val%d" $i | quote }}
   {{- end }}

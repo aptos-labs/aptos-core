@@ -19,20 +19,20 @@ tokio = { version = "1.8.1", features = ["full"] }
 warp = "0.3.2"
 
 bcs = "0.1.2"
-diem-crypto = { path = "../../../crates/diem-crypto" }
-diem-logger = { path = "../../../crates/diem-logger" }
-diem-metrics = { path = "../../../crates/diem-metrics" }
-diem-types = { path = "../../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
-diemdb = { path = "../../diemdb" }
+aptos-crypto = { path = "../../../crates/aptos-crypto" }
+aptos-logger = { path = "../../../crates/aptos-logger" }
+aptos-metrics = { path = "../../../crates/aptos-metrics" }
+aptos-types = { path = "../../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
+aptosdb = { path = "../../aptosdb" }
 storage-interface = { path = "../../storage-interface" }
 
 [dev-dependencies]
-diemdb = { path = "../../diemdb", features = ["fuzzing"] }
-diem-config = { path = "../../../config" }
-diem-temppath = { path = "../../../crates/diem-temppath" }
+aptosdb = { path = "../../aptosdb", features = ["fuzzing"] }
+aptos-config = { path = "../../../config" }
+aptos-temppath = { path = "../../../crates/aptos-temppath" }
 
 reqwest = { version = "0.11.2", features = ["blocking", "json"], default_features = false }
 
 [features]
-fuzzing = ["diemdb/fuzzing"]
+fuzzing = ["aptosdb/fuzzing"]

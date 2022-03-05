@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{ensure, format_err, Context, Result};
-use diem_config::config::RocksdbConfig;
-use diem_temppath::TempPath;
-use diem_types::{transaction::Transaction, waypoint::Waypoint};
-use diem_vm::DiemVM;
-use diemdb::DiemDB;
+use aptos_config::config::RocksdbConfig;
+use aptos_temppath::TempPath;
+use aptos_types::{transaction::Transaction, waypoint::Waypoint};
+use aptos_vm::DiemVM;
+use aptosdb::DiemDB;
 use executor::db_bootstrapper::calculate_genesis;
 use std::{
     fs::File,

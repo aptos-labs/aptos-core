@@ -7,8 +7,8 @@ use crate::{
     counters,
     logging::{LogEntry, LogSchema},
 };
-use diem_logger::prelude::*;
-use diem_types::account_address::AccountAddress;
+use aptos_logger::prelude::*;
+use aptos_types::account_address::AccountAddress;
 use rand::seq::SliceRandom;
 use std::{
     cmp::Ordering,

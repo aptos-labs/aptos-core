@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{block::Block, vote_data::VoteData};
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::Ed25519Signature,
     hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
 };
-use diem_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use diem_types::{
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_types::{
     epoch_state::EpochState,
     proof::{accumulator::InMemoryAccumulator, AccumulatorExtensionProof},
 };

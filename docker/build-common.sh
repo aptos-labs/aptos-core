@@ -25,20 +25,20 @@ cargo x generate-workspace-hack --mode disable
 if [ "$IMAGE_TARGETS" = "release" ] || [ "$IMAGE_TARGETS" = "all" ]; then
   # Build release binaries (TODO: use x to run this?)
   cargo build --release \
-          -p diem-genesis-tool \
-          -p diem-operational-tool \
-          -p diem-node \
+          -p aptos-genesis-tool \
+          -p aptos-operational-tool \
+          -p aptos-node \
           -p safety-rules \
           -p db-bootstrapper \
           -p backup-cli \
-          -p diem-transaction-replay \
-          -p diem-writeset-generator \
+          -p aptos-transaction-replay \
+          -p aptos-writeset-generator \
           "$@"
 
-  # Build and overwrite the diem-node binary with feature failpoints if $ENABLE_FAILPOINTS is configured
+  # Build and overwrite the aptos-node binary with feature failpoints if $ENABLE_FAILPOINTS is configured
   if [ "$ENABLE_FAILPOINTS" = "1" ]; then
-    echo "Building diem-node with failpoints feature"
-    (cd diem-node && cargo build --release --features failpoints "$@")
+    echo "Building aptos-node with failpoints feature"
+    (cd aptos-node && cargo build --release --features failpoints "$@")
   fi
 fi
 
@@ -46,7 +46,7 @@ fi
 if [ "$IMAGE_TARGETS" = "test" ] || [ "$IMAGE_TARGETS" = "all"  ]; then
   # These non-release binaries are built separately to avoid feature unification issues
   cargo build --release \
-          -p diem-faucet \
+          -p aptos-faucet \
           -p forge-cli \
           "$@"
 fi
@@ -54,4 +54,4 @@ fi
 rm -rf target/release/{build,deps,incremental}
 
 STRIP_DIR=${STRIP_DIR:-/diem/target}
-find "$STRIP_DIR/release" -maxdepth 1 -executable -type f | grep -Ev 'diem-node|safety-rules' | xargs strip
+find "$STRIP_DIR/release" -maxdepth 1 -executable -type f | grep -Ev 'aptos-node|safety-rules' | xargs strip

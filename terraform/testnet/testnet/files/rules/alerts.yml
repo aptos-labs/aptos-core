@@ -42,7 +42,7 @@ groups:
 
     # Mempool alerts
   - alert: Mempool has no active upstream peers
-    expr: (sum by (owner, kubernetes_pod_name) (diem_mempool_active_upstream_peers_count)) == 0
+    expr: (sum by (owner, kubernetes_pod_name) (aptos_mempool_active_upstream_peers_count)) == 0
     for: 3m
     labels:
       severity: error
@@ -106,7 +106,7 @@ groups:
   # DB Backup and Backup Verify
   - alert: Backup Coordinator Liveness
     # It's okay if one of these metrics stops changing but the pushgateway still reports the old value, since the alerts following this will detect the staleness. In fact this one is just to detect the absence of these metrics.
-    expr: absent(irate(diem_backup_metadata_num_file_downloads[1m]) > 0) and on() (absent(diem_db_backup_coordinator_heartbeat_timestamp_s) or absent(diem_db_backup_coordinator_epoch_ending_epoch) or absent(diem_db_backup_coordinator_transaction_version) or absent(diem_db_backup_coordinator_state_snapshot_version))
+    expr: absent(irate(aptos_backup_metadata_num_file_downloads[1m]) > 0) and on() (absent(diem_db_backup_coordinator_heartbeat_timestamp_s) or absent(diem_db_backup_coordinator_epoch_ending_epoch) or absent(diem_db_backup_coordinator_transaction_version) or absent(diem_db_backup_coordinator_state_snapshot_version))
     for: 10m
     labels:
       severity: warning

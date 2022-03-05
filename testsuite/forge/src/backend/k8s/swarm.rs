@@ -6,9 +6,9 @@ use crate::{
     set_validator_image_tag, ChainInfo, FullNode, Node, Result, Swarm, Validator, Version,
 };
 use anyhow::{anyhow, bail, format_err};
-use diem_config::config::NodeConfig;
-use diem_logger::*;
-use diem_sdk::{
+use aptos_config::config::NodeConfig;
+use aptos_logger::*;
+use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{
         chain_id::{ChainId, NamedChain},
@@ -59,7 +59,7 @@ impl K8sSwarm {
         let client = validators.values().next().unwrap().rest_client();
         let key = load_root_key(root_key);
         let account_key = AccountKey::from_private_key(key);
-        let address = diem_sdk::types::account_config::diem_root_address();
+        let address = aptos_sdk::types::account_config::aptos_root_address();
         let sequence_number = query_sequence_numbers(&client, &[address])
             .await
             .map_err(|e| {
@@ -73,7 +73,7 @@ impl K8sSwarm {
 
         let key = load_tc_key(treasury_compliance_key);
         let account_key = AccountKey::from_private_key(key);
-        let address = diem_sdk::types::account_config::treasury_compliance_account_address();
+        let address = aptos_sdk::types::account_config::treasury_compliance_account_address();
         let sequence_number = query_sequence_numbers(&client, &[address])
             .await
             .map_err(|e| {
@@ -87,7 +87,7 @@ impl K8sSwarm {
 
         let key = load_tc_key(treasury_compliance_key);
         let account_key = AccountKey::from_private_key(key);
-        let address = diem_sdk::types::account_config::testnet_dd_account_address();
+        let address = aptos_sdk::types::account_config::testnet_dd_account_address();
         let sequence_number = query_sequence_numbers(&client, &[address])
             .await
             .map_err(|e| {
@@ -251,7 +251,7 @@ impl Swarm for K8sSwarm {
 }
 
 pub(crate) fn k8s_retry_strategy() -> impl Iterator<Item = Duration> {
-    diem_retrier::exp_retry_strategy(1000, 10000, 50)
+    aptos_retrier::exp_retry_strategy(1000, 10000, 50)
 }
 
 #[derive(Clone, Debug)]
@@ -295,7 +295,7 @@ pub(crate) async fn get_validators(
             let node_id = parse_node_id(&s.name).expect("error to parse node id");
             let node = K8sNode {
                 name: format!("val{}", node_id),
-                sts_name: format!("val{}-diem-validator-validator", node_id),
+                sts_name: format!("val{}-aptos-validator-validator", node_id),
                 // TODO: fetch this from running node
                 peer_id: PeerId::random(),
                 node_id,
@@ -333,7 +333,7 @@ pub(crate) async fn get_fullnodes(
             let node_id = parse_node_id(&s.name).expect("error to parse node id");
             let node = K8sNode {
                 name: format!("val{}", node_id),
-                sts_name: format!("val{}-diem-validator-fullnode-e{}", node_id, era),
+                sts_name: format!("val{}-aptos-validator-fullnode-e{}", node_id, era),
                 // TODO: fetch this from running node
                 peer_id: PeerId::random(),
                 node_id,
@@ -373,7 +373,7 @@ pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
         let node_name = node.name().to_string();
         println!("Attempting health check: {}", node_name);
         // perform healthcheck with retry, returning unhealthy
-        let check = diem_retrier::retry_async(k8s_retry_strategy(), || {
+        let check = aptos_retrier::retry_async(k8s_retry_strategy(), || {
             Box::pin(async move {
                 match node.rest_client().get_ledger_information().await {
                     Ok(_) => {

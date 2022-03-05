@@ -107,8 +107,8 @@
 pub mod test_helpers;
 
 use anyhow::{ensure, format_err, Result};
-use diem_crypto::hash::{CryptoHash, CryptoHasher, HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
-use diem_types::proof::{
+use aptos_crypto::hash::{CryptoHash, CryptoHasher, HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
+use aptos_types::proof::{
     definition::{LeafCount, MAX_ACCUMULATOR_PROOF_DEPTH},
     position::{FrozenSubTreeIterator, FrozenSubtreeSiblingIterator, Position},
     AccumulatorConsistencyProof, AccumulatorProof, AccumulatorRangeProof, MerkleTreeInternalNode,
@@ -151,7 +151,7 @@ where
     /// `num_leaves` leaves in total. Siblings are read via `reader` (or generated dynamically
     /// if they are non-frozen).
     ///
-    /// See [`diem_types::proof::AccumulatorProof`] for proof format.
+    /// See [`aptos_types::proof::AccumulatorProof`] for proof format.
     pub fn get_proof(
         reader: &R,
         num_leaves: LeafCount,
@@ -162,7 +162,7 @@ where
 
     /// Gets a proof that shows the full accumulator is consistent with a smaller accumulator.
     ///
-    /// See [`diem_types::proof::AccumulatorConsistencyProof`] for proof format.
+    /// See [`aptos_types::proof::AccumulatorConsistencyProof`] for proof format.
     pub fn get_consistency_proof(
         reader: &R,
         full_acc_leaves: LeafCount,
@@ -174,7 +174,7 @@ where
 
     /// Gets a proof that shows a range of leaves are part of the accumulator.
     ///
-    /// See [`diem_types::proof::AccumulatorRangeProof`] for proof format.
+    /// See [`aptos_types::proof::AccumulatorRangeProof`] for proof format.
     pub fn get_range_proof(
         reader: &R,
         full_acc_leaves: LeafCount,

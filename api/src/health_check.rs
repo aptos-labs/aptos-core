@@ -47,7 +47,7 @@ async fn health_check(
         check_latest_ledger_info_timestamp(duration, timestamp, now)
             .map_err(|_| reject::custom(HealthCheckError))?;
     }
-    Ok(Box::new("diem-node:ok"))
+    Ok(Box::new("aptos-node:ok"))
 }
 
 pub fn check_latest_ledger_info_timestamp(

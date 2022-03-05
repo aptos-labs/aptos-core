@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{format_err, Context, Result};
-use diem_logger::*;
-use diem_rest_client::{views::AmountView, Client as RestClient, PendingTransaction, Response};
-use diem_sdk::{
+use aptos_logger::*;
+use aptos_rest_client::{views::AmountView, Client as RestClient, PendingTransaction, Response};
+use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{Currency, TransactionFactory},
     types::{
@@ -39,9 +39,9 @@ pub mod atomic_histogram;
 pub mod cluster;
 pub mod instance;
 
+use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_sdk::types::AccountKey;
 use atomic_histogram::*;
-use diem_crypto::ed25519::Ed25519PrivateKey;
-use diem_sdk::types::AccountKey;
 use rand::rngs::StdRng;
 
 /// Max transactions per account in mempool

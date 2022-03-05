@@ -18,12 +18,12 @@ tokio-stream = "0.1.4"
 
 consensus-notifications = { path = "../../inter-component/consensus-notifications" }
 data-streaming-service = { path = "../data-streaming-service" }
-diem-config = { path = "../../../config" }
-diem-data-client = { path = "../../diem-data-client" }
-diem-infallible = { path = "../../../crates/diem-infallible" }
-diem-logger = { path = "../../../crates/diem-logger" }
-diem-types = { path = "../../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
+aptos-config = { path = "../../../config" }
+aptos-data-client = { path = "../../aptos-data-client" }
+aptos-infallible = { path = "../../../crates/aptos-infallible" }
+aptos-logger = { path = "../../../crates/aptos-logger" }
+aptos-types = { path = "../../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
 event-notifications = { path = "../../inter-component/event-notifications" }
 executor = { path = "../../../execution/executor" }
 executor-types = { path = "../../../execution/executor-types" }
@@ -34,12 +34,12 @@ storage-interface = { path = "../../../storage/storage-interface" }
 claim = "0.5.0"
 
 channel = { path = "../../../crates/channel" }
-diemdb = { path = "../../../storage/diemdb" }
-diem-crypto = { path = "../../../crates/diem-crypto" }
-diem-temppath = { path = "../../../crates/diem-temppath" }
-diem-time-service = { path = "../../../crates/diem-time-service", features = ["async", "testing"] }
-diem-vm = { path = "../../../diem-move/diem-vm" }
+aptosdb = { path = "../../../storage/aptosdb" }
+aptos-crypto = { path = "../../../crates/aptos-crypto" }
+aptos-temppath = { path = "../../../crates/aptos-temppath" }
+aptos-time-service = { path = "../../../crates/aptos-time-service", features = ["async", "testing"] }
+aptos-vm = { path = "../../../aptos-move/aptos-vm" }
 executor-test-helpers = { path = "../../../execution/executor-test-helpers" }
 network = { path = "../../../network", features = ["fuzzing"] }
 storage-service-client = { path = "../../storage-service/client" }
-vm-genesis = { path = "../../../diem-move/vm-genesis", features = ["fuzzing"] }
+vm-genesis = { path = "../../../aptos-move/vm-genesis", features = ["fuzzing"] }

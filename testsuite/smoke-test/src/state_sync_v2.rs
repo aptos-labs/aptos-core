@@ -5,9 +5,9 @@ use crate::{
     smoke_test_environment::new_local_swarm,
     test_utils::{create_and_fund_account, transfer_and_reconfig, transfer_coins},
 };
-use diem_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
-use diem_rest_client::Client as RestClient;
-use diem_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
+use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
+use aptos_rest_client::Client as RestClient;
+use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
 use std::{
     fs,
@@ -238,7 +238,7 @@ async fn test_validator_sync(mut swarm: LocalSwarm) {
     let validator_1 = validator_peer_ids[1];
     swarm.validator_mut(validator_1).unwrap().stop();
     let node_config = swarm.validator_mut(validator_1).unwrap().config().clone();
-    let state_db_path = node_config.storage.dir().join("diemdb");
+    let state_db_path = node_config.storage.dir().join("aptosdb");
     assert!(state_db_path.as_path().exists());
     fs::remove_dir_all(state_db_path).unwrap();
 

@@ -14,11 +14,11 @@ use crate::{
     validator_verifier::{random_validator_verifier, ValidatorConsensusInfo, ValidatorVerifier},
     waypoint::Waypoint,
 };
-use bcs::test_helpers::assert_canonical_encode_decode;
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::Ed25519Signature,
     hash::{CryptoHash, CryptoHasher, HashValue},
 };
+use bcs::test_helpers::assert_canonical_encode_decode;
 use proptest::{
     collection::{size_range, vec, SizeRange},
     prelude::*,

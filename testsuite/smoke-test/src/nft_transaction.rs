@@ -1,13 +1,13 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_rest_client::Client as RestClient;
-use diem_sdk::{
+use aptos_rest_client::Client as RestClient;
+use aptos_sdk::{
     crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform},
     types::transaction::{authenticator::AuthenticationKey, SignedTransaction},
 };
-use diem_transaction_builder::experimental_stdlib;
-use diem_types::nft::tokens;
+use aptos_transaction_builder::experimental_stdlib;
+use aptos_types::nft::tokens;
 use forge::{NFTPublicUsageContext, NFTPublicUsageTest, Result, Test};
 
 pub struct NFTTransaction;

@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-vault
+  name: {{ include "aptos-validator.fullname" . }}-vault
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 data:
   safetyrules.json: |-
     {{- tpl (.Files.Get "files/vault.json") . | replace "<role>" "safety-rules" | nindent 4 }}
@@ -20,9 +20,9 @@ data:
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-tokenreview
+  name: {{ include "aptos-validator.fullname" . }}-tokenreview
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 rules:
 - apiGroups: ["authentication.k8s.io"]
   resources: ["tokenreviews"]
@@ -33,20 +33,20 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-tokenreview
+  name: {{ include "aptos-validator.fullname" . }}-tokenreview
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "diem-validator.fullname" . }}-tokenreview
+  name: {{ include "aptos-validator.fullname" . }}-tokenreview
 subjects:
 - kind: ServiceAccount
-  name: {{ include "diem-validator.fullname" . }}-safety-rules
+  name: {{ include "aptos-validator.fullname" . }}-safety-rules
   namespace: {{ .Release.Namespace }}
 - kind: ServiceAccount
-  name: {{ include "diem-validator.fullname" . }}-validator
+  name: {{ include "aptos-validator.fullname" . }}-validator
   namespace: {{ .Release.Namespace }}
 - kind: ServiceAccount
-  name: {{ include "diem-validator.fullname" . }}-fullnode
+  name: {{ include "aptos-validator.fullname" . }}-fullnode
   namespace: {{ .Release.Namespace }}

@@ -1,8 +1,8 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_crypto::HashValue;
-use diem_logger::Schema;
+use aptos_crypto::HashValue;
+use aptos_logger::Schema;
 use serde::Serialize;
 
 #[derive(Schema)]

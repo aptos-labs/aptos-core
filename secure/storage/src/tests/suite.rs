@@ -3,7 +3,7 @@
 
 use crate::{CryptoStorage, Error, KVStorage, Storage};
 
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::Ed25519PrivateKey, test_utils::TestDiemCrypto, HashValue, PrivateKey, Signature,
     Uniform,
 };

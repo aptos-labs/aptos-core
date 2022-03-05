@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{format_err, Result};
-use diem_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
-use diem_types::{
+use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::diem_root_address,
+    account_config::aptos_root_address,
     account_state::AccountState,
     account_state_blob::{AccountStateBlob, AccountStateWithProof, AccountStatesChunkWithProof},
     contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
@@ -65,7 +65,7 @@ impl StartupInfo {
 
     #[cfg(any(feature = "fuzzing"))]
     pub fn new_for_testing() -> Self {
-        use diem_types::on_chain_config::ValidatorSet;
+        use aptos_types::on_chain_config::ValidatorSet;
 
         let latest_ledger_info =
             LedgerInfoWithSignatures::genesis(HashValue::zero(), ValidatorSet::empty());
@@ -167,8 +167,8 @@ impl From<bcs::Error> for Error {
     }
 }
 
-impl From<diem_secure_net::Error> for Error {
-    fn from(error: diem_secure_net::Error) -> Self {
+impl From<aptos_secure_net::Error> for Error {
+    fn from(error: aptos_secure_net::Error) -> Self {
         Self::ServiceError {
             error: format!("{}", error),
         }
@@ -188,7 +188,7 @@ pub trait DbReader: Send + Sync {
     /// See [`DiemDB::get_epoch_ending_ledger_infos`].
     ///
     /// [`DiemDB::get_epoch_ending_ledger_infos`]:
-    /// ../diemdb/struct.DiemDB.html#method.get_epoch_ending_ledger_infos
+    /// ../aptosdb/struct.DiemDB.html#method.get_epoch_ending_ledger_infos
     fn get_epoch_ending_ledger_infos(
         &self,
         start_epoch: u64,
@@ -199,7 +199,7 @@ pub trait DbReader: Send + Sync {
 
     /// See [`DiemDB::get_transactions`].
     ///
-    /// [`DiemDB::get_transactions`]: ../diemdb/struct.DiemDB.html#method.get_transactions
+    /// [`DiemDB::get_transactions`]: ../aptosdb/struct.DiemDB.html#method.get_transactions
     fn get_transactions(
         &self,
         start_version: Version,
@@ -212,7 +212,7 @@ pub trait DbReader: Send + Sync {
 
     /// See [`DiemDB::get_transaction_by_hash`].
     ///
-    /// [`DiemDB::get_transaction_by_hash`]: ../diemdb/struct.DiemDB.html#method.get_transaction_by_hash
+    /// [`DiemDB::get_transaction_by_hash`]: ../aptosdb/struct.DiemDB.html#method.get_transaction_by_hash
     fn get_transaction_by_hash(
         &self,
         hash: HashValue,
@@ -224,7 +224,7 @@ pub trait DbReader: Send + Sync {
 
     /// See [`DiemDB::get_transaction_by_version`].
     ///
-    /// [`DiemDB::get_transaction_by_version`]: ../diemdb/struct.DiemDB.html#method.get_transaction_by_version
+    /// [`DiemDB::get_transaction_by_version`]: ../aptosdb/struct.DiemDB.html#method.get_transaction_by_version
     fn get_transaction_by_version(
         &self,
         version: Version,
@@ -236,21 +236,21 @@ pub trait DbReader: Send + Sync {
 
     /// See [`DiemDB::get_txn_set_version`].
     ///
-    /// [`DiemDB::get_first_txn_version`]: ../diemdb/struct.DiemDB.html#method.get_first_txn_version
+    /// [`DiemDB::get_first_txn_version`]: ../aptosdb/struct.DiemDB.html#method.get_first_txn_version
     fn get_first_txn_version(&self) -> Result<Option<Version>> {
         unimplemented!()
     }
 
     /// See [`DiemDB::get_first_write_set_version`].
     ///
-    /// [`DiemDB::get_first_write_set_version`]: ../diemdb/struct.DiemDB.html#method.get_first_write_set_version
+    /// [`DiemDB::get_first_write_set_version`]: ../aptosdb/struct.DiemDB.html#method.get_first_write_set_version
     fn get_first_write_set_version(&self) -> Result<Option<Version>> {
         unimplemented!()
     }
 
     /// See [`DiemDB::get_transaction_outputs`].
     ///
-    /// [`DiemDB::get_transaction_outputs`]: ../diemdb/struct.DiemDB.html#method.get_transaction_outputs
+    /// [`DiemDB::get_transaction_outputs`]: ../aptosdb/struct.DiemDB.html#method.get_transaction_outputs
     fn get_transaction_outputs(
         &self,
         start_version: Version,
@@ -286,7 +286,7 @@ pub trait DbReader: Send + Sync {
     /// See [`DiemDB::get_block_timestamp`].
     ///
     /// [`DiemDB::get_block_timestamp`]:
-    /// ../diemdb/struct.DiemDB.html#method.get_block_timestamp
+    /// ../aptosdb/struct.DiemDB.html#method.get_block_timestamp
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {
         unimplemented!()
     }
@@ -316,7 +316,7 @@ pub trait DbReader: Send + Sync {
     /// See [`DiemDB::get_latest_account_state`].
     ///
     /// [`DiemDB::get_latest_account_state`]:
-    /// ../diemdb/struct.DiemDB.html#method.get_latest_account_state
+    /// ../aptosdb/struct.DiemDB.html#method.get_latest_account_state
     fn get_latest_account_state(
         &self,
         address: AccountAddress,
@@ -345,7 +345,7 @@ pub trait DbReader: Send + Sync {
     /// See [`DiemDB::get_startup_info`].
     ///
     /// [`DiemDB::get_startup_info`]:
-    /// ../diemdb/struct.DiemDB.html#method.get_startup_info
+    /// ../aptosdb/struct.DiemDB.html#method.get_startup_info
     fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
         unimplemented!()
     }
@@ -408,7 +408,7 @@ pub trait DbReader: Send + Sync {
     // See [`DiemDB::get_account_state_with_proof_by_version`].
     //
     // [`DiemDB::get_account_state_with_proof_by_version`]:
-    // ../diemdb/struct.DiemDB.html#method.get_account_state_with_proof_by_version
+    // ../aptosdb/struct.DiemDB.html#method.get_account_state_with_proof_by_version
     //
     // This is used by diem core (executor) internally.
     fn get_account_state_with_proof_by_version(
@@ -529,18 +529,18 @@ impl MoveStorage for &dyn DbReader {
     }
 
     fn fetch_config_by_version(&self, config_id: ConfigID, version: Version) -> Result<Vec<u8>> {
-        let diem_root_state = AccountState::try_from(
+        let aptos_root_state = AccountState::try_from(
             &self
-                .get_account_state_with_proof_by_version(diem_root_address(), version)?
+                .get_account_state_with_proof_by_version(aptos_root_address(), version)?
                 .0
                 .ok_or_else(|| {
                     format_err!("missing blob in account state/account does not exist")
                 })?,
         )?;
 
-        match diem_root_state.get(&experimental_access_path_for_config(config_id).path) {
+        match aptos_root_state.get(&experimental_access_path_for_config(config_id).path) {
             Some(config) => Ok(config.to_vec()),
-            _ => diem_root_state
+            _ => aptos_root_state
                 .get(&default_access_path_for_config(config_id).path)
                 .map_or_else(
                     || {
@@ -576,7 +576,7 @@ pub trait DbWriter: Send + Sync {
     /// blocks during normal operation.
     /// See [`DiemDB::save_transactions`].
     ///
-    /// [`DiemDB::save_transactions`]: ../diemdb/struct.DiemDB.html#method.save_transactions
+    /// [`DiemDB::save_transactions`]: ../aptosdb/struct.DiemDB.html#method.save_transactions
     fn save_transactions(
         &self,
         txns_to_commit: &[TransactionToCommit],

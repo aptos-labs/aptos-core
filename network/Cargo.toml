@@ -32,21 +32,21 @@ tokio-retry = "0.3.0"
 tokio-stream = "0.1.4"
 tokio-util = { version = "0.6.4", features = ["compat", "codec"] }
 
-bitvec = { path = "../crates/diem-bitvec", package = "diem-bitvec" }
+bitvec = { path = "../crates/aptos-bitvec", package = "aptos-bitvec" }
 channel = { path = "../crates/channel" }
 bcs = "0.1.2"
-diem-config = { path = "../config" }
-diem-crypto = { path = "../crates/diem-crypto" }
-diem-crypto-derive = { path = "../crates/diem-crypto-derive" }
-diem-id-generator = { path = "../crates/diem-id-generator" }
-diem-infallible = { path = "../crates/diem-infallible" }
-diem-logger = { path = "../crates/diem-logger" }
-diem-metrics = { path = "../crates/diem-metrics" }
-diem-proptest-helpers = { path = "../crates/diem-proptest-helpers", optional = true }
-diem-rate-limiter = { path = "../crates/diem-rate-limiter"}
-diem-time-service = { path = "../crates/diem-time-service", features = ["async"] }
-diem-types = { path = "../types" }
-diem-workspace-hack = { version = "0.1", path = "../crates/diem-workspace-hack" }
+aptos-config = { path = "../config" }
+aptos-crypto = { path = "../crates/aptos-crypto" }
+aptos-crypto-derive = { path = "../crates/aptos-crypto-derive" }
+aptos-id-generator = { path = "../crates/aptos-id-generator" }
+aptos-infallible = { path = "../crates/aptos-infallible" }
+aptos-logger = { path = "../crates/aptos-logger" }
+aptos-metrics = { path = "../crates/aptos-metrics" }
+aptos-proptest-helpers = { path = "../crates/aptos-proptest-helpers", optional = true }
+aptos-rate-limiter = { path = "../crates/aptos-rate-limiter"}
+aptos-time-service = { path = "../crates/aptos-time-service", features = ["async"] }
+aptos-types = { path = "../types" }
+aptos-workspace-hack = { version = "0.1", path = "../crates/aptos-workspace-hack" }
 memsocket = { path = "./memsocket", optional = true }
 netcore = { path = "./netcore" }
 num-variants = { path = "../crates/num-variants" }
@@ -54,8 +54,8 @@ short-hex-str = { path = "../crates/short-hex-str" }
 
 [dev-dependencies]
 criterion = "0.3.4"
-diem-proptest-helpers = { path = "../crates/diem-proptest-helpers" }
-diem-types = { path = "../types", features = ["fuzzing"] }
+aptos-proptest-helpers = { path = "../crates/aptos-proptest-helpers" }
+aptos-types = { path = "../types", features = ["fuzzing"] }
 maplit = "1.0.2"
 memsocket = { path = "./memsocket" }
 network-builder = {path = "./builder"}
@@ -67,8 +67,8 @@ socket-bench-server = { path = "./socket-bench-server" }
 
 [features]
 default = []
-fuzzing = ["bitvec/fuzzing", "diem-config/fuzzing", "diem-crypto/fuzzing", "diem-types/fuzzing", "diem-proptest-helpers", "diem-time-service/testing", "diem-types/fuzzing", "memsocket/testing", "netcore/fuzzing", "proptest", "proptest-derive", "rand_core"]
-testing = ["diem-config/testing", "diem-time-service/testing", "memsocket/testing", "netcore/testing"]
+fuzzing = ["bitvec/fuzzing", "aptos-config/fuzzing", "aptos-crypto/fuzzing", "aptos-types/fuzzing", "aptos-proptest-helpers", "aptos-time-service/testing", "aptos-types/fuzzing", "memsocket/testing", "netcore/fuzzing", "proptest", "proptest-derive", "rand_core"]
+testing = ["aptos-config/testing", "aptos-time-service/testing", "memsocket/testing", "netcore/testing"]
 
 [[bench]]
 name = "socket_bench"

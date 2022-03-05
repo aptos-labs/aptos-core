@@ -10,8 +10,8 @@
 //! over-the-wire.
 
 use crate::protocols::wire::handshake::v1::ProtocolId;
+use aptos_rate_limiter::{async_lib::AsyncRateLimiter, rate_limit::SharedBucket};
 use bytes::Bytes;
-use diem_rate_limiter::{async_lib::AsyncRateLimiter, rate_limit::SharedBucket};
 use futures::{
     io::{AsyncRead, AsyncWrite},
     sink::Sink,

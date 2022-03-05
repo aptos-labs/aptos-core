@@ -1,9 +1,9 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_crypto::HashValue;
+use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use consensus_types::block::Block;
-use diem_crypto::HashValue;
-use diem_types::ledger_info::LedgerInfoWithSignatures;
 use executor_types::{Error, StateComputeResult};
 
 /// Interface for ExecutionCorrectness.

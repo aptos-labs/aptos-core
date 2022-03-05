@@ -7,11 +7,11 @@ use crate::liveness::{
     },
     proposer_election::{next, ProposerElection},
 };
+use aptos_types::{block_metadata::NewBlockEvent, validator_signer::ValidatorSigner};
 use consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::{Author, Round},
 };
-use diem_types::{block_metadata::NewBlockEvent, validator_signer::ValidatorSigner};
 
 struct MockHistory {
     window_size: usize,

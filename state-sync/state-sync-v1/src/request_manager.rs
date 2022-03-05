@@ -8,11 +8,11 @@ use crate::{
     logging::{LogEntry, LogEvent, LogSchema},
     network::{StateSyncMessage, StateSyncSender},
 };
-use diem_config::{
+use aptos_config::{
     config::PeerRole,
     network_id::{NetworkId, PeerNetworkId},
 };
-use diem_logger::prelude::*;
+use aptos_logger::prelude::*;
 use itertools::Itertools;
 use netcore::transport::ConnectionOrigin;
 use network::{protocols::network::ApplicationNetworkSender, transport::ConnectionMetadata};

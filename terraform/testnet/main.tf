@@ -233,7 +233,7 @@ resource "helm_release" "public-fullnode" {
       chain = {
         name             = "diem-${terraform.workspace}"
         era              = var.era
-        genesisConfigmap = "diem-testnet-genesis-e${var.era}"
+        genesisConfigmap = "aptos-testnet-genesis-e${var.era}"
       }
       diem_chains = {
         "diem-${terraform.workspace}" = {
@@ -244,7 +244,7 @@ resource "helm_release" "public-fullnode" {
         tag = local.image_tag
       }
       logging = {
-        address = var.enable_pfn_logger ? "testnet-pfn-diem-logger:5044" : ""
+        address = var.enable_pfn_logger ? "testnet-pfn-aptos-logger:5044" : ""
       }
     }),
   ]
@@ -296,7 +296,7 @@ resource "helm_release" "forge" {
     jsonencode({
       forge = {
         numValidators = var.num_validators
-        helmBucket    = aws_s3_bucket.diem-testnet-helm[0].bucket
+        helmBucket    = aws_s3_bucket.aptos-testnet-helm[0].bucket
         image = {
           tag = local.image_tag
         }

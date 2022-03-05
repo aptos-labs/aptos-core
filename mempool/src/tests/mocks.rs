@@ -8,16 +8,16 @@ use crate::{
     ConsensusRequest, MempoolClientSender,
 };
 use anyhow::{format_err, Result};
-use channel::{self, diem_channel, message_queues::QueueStyle};
-use diem_config::{
+use aptos_config::{
     config::{NetworkConfig, NodeConfig},
     network_id::NetworkId,
 };
-use diem_infallible::{Mutex, RwLock};
-use diem_types::{
+use aptos_infallible::{Mutex, RwLock};
+use aptos_types::{
     account_config::AccountSequenceInfo, mempool_status::MempoolStatusCode,
     on_chain_config::ON_CHAIN_CONFIG_REGISTRY, transaction::SignedTransaction,
 };
+use channel::{self, aptos_channel, message_queues::QueueStyle};
 use event_notifications::EventSubscriptionService;
 use futures::channel::mpsc;
 use mempool_notifications::{self, MempoolNotifier};
@@ -101,9 +101,9 @@ impl MockSharedMempool {
         config.validator_network = Some(NetworkConfig::network_with_id(NetworkId::Validator));
 
         let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
-        let (network_reqs_tx, _network_reqs_rx) = diem_channel::new(QueueStyle::FIFO, 8, None);
-        let (connection_reqs_tx, _) = diem_channel::new(QueueStyle::FIFO, 8, None);
-        let (_network_notifs_tx, network_notifs_rx) = diem_channel::new(QueueStyle::FIFO, 8, None);
+        let (network_reqs_tx, _network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+        let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+        let (_network_notifs_tx, network_notifs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_, conn_notifs_rx) = conn_notifs_channel::new();
         let network_sender = MempoolNetworkSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),

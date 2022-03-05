@@ -32,15 +32,15 @@ use crate::{
     peer_manager::{self, conn_notifs_channel, ConnectionRequestSender, PeerManagerError},
     transport::ConnectionMetadata,
 };
-use diem_config::{
+use aptos_config::{
     config::{Peer, PeerRole, PeerSet},
     network_id::NetworkContext,
 };
-use diem_crypto::x25519;
-use diem_infallible::RwLock;
-use diem_logger::prelude::*;
-use diem_time_service::{TimeService, TimeServiceTrait};
-use diem_types::{network_address::NetworkAddress, PeerId};
+use aptos_crypto::x25519;
+use aptos_infallible::RwLock;
+use aptos_logger::prelude::*;
+use aptos_time_service::{TimeService, TimeServiceTrait};
+use aptos_types::{network_address::NetworkAddress, PeerId};
 use futures::{
     channel::oneshot,
     future::{BoxFuture, FutureExt},

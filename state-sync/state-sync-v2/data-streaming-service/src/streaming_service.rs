@@ -11,10 +11,10 @@ use crate::{
         StreamRequest, StreamRequestMessage, StreamingServiceListener, TerminateStreamRequest,
     },
 };
-use diem_config::config::DataStreamingServiceConfig;
-use diem_data_client::{DiemDataClient, GlobalDataSummary, OptimalChunkSizes};
-use diem_id_generator::{IdGenerator, U64IdGenerator};
-use diem_logger::prelude::*;
+use aptos_config::config::DataStreamingServiceConfig;
+use aptos_data_client::{DiemDataClient, GlobalDataSummary, OptimalChunkSizes};
+use aptos_id_generator::{IdGenerator, U64IdGenerator};
+use aptos_logger::prelude::*;
 use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::interval;
@@ -29,7 +29,7 @@ pub struct DataStreamingService<T> {
     config: DataStreamingServiceConfig,
 
     // The data client through which to fetch data from the Diem network
-    diem_data_client: T,
+    aptos_data_client: T,
 
     // Cached global data summary
     global_data_summary: GlobalDataSummary,
@@ -48,12 +48,12 @@ pub struct DataStreamingService<T> {
 impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
     pub fn new(
         config: DataStreamingServiceConfig,
-        diem_data_client: T,
+        aptos_data_client: T,
         stream_requests: StreamingServiceListener,
     ) -> Self {
         Self {
             config,
-            diem_data_client,
+            aptos_data_client,
             global_data_summary: GlobalDataSummary::empty(),
             data_streams: HashMap::new(),
             stream_requests,
@@ -177,7 +177,7 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
             self.config,
             stream_id,
             &request_message.stream_request,
-            self.diem_data_client.clone(),
+            self.aptos_data_client.clone(),
             self.notification_id_generator.clone(),
             &self.global_data_summary.advertised_data,
         )?;
@@ -221,7 +221,7 @@ impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
     }
 
     fn fetch_global_data_summary(&mut self) -> Result<(), Error> {
-        let global_data_summary = self.diem_data_client.get_global_data_summary();
+        let global_data_summary = self.aptos_data_client.get_global_data_summary();
         verify_optimal_chunk_sizes(&global_data_summary.optimal_chunk_sizes)?;
         self.global_data_summary = global_data_summary;
         Ok(())

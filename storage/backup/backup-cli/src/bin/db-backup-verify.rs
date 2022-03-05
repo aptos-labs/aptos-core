@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
+use aptos_logger::{prelude::*, Level, Logger};
+use aptos_secure_push_metrics::MetricsPusher;
 use backup_cli::{
     coordinators::verify::VerifyCoordinator,
     metadata::cache::MetadataCacheOpt,
     storage::StorageOpt,
     utils::{ConcurrentDownloadsOpt, TrustedWaypointOpt},
 };
-use diem_logger::{prelude::*, Level, Logger};
-use diem_secure_push_metrics::MetricsPusher;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]

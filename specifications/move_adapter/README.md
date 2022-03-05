@@ -313,7 +313,7 @@ functions are defined in the `DiemAccount` module of the Diem Framework:
 * Single-agent `ScriptFunction` and `Script`: The prologue function is `script_prologue`.
 In addition to the common checks listed below, it also calls the `is_script_allowed`
 function in the `DiemTransactionPublishingOption` module to determine if the script
-should be allowed. A script sent by an account with `has_diem_root_role` is always
+should be allowed. A script sent by an account with `has_aptos_root_role` is always
 allowed. Otherwise, a `Script` payload is allowed if the hash of the
 script bytecode is on the list of allowed scripts published at
 `0x1::DiemTransactionPublishingOption::DiemTransactionPublishingOption.script_allowlist`.
@@ -342,7 +342,7 @@ for the transaction sender. If not, validation fails with a
 
 * `WriteSet`: The prologue function is `writeset_prologue`. In addition to the
 common checks listed below, it also checks that the sender is the Diem root
-address and that `Roles::has_diem_root_role(sender)` is true. If those checks
+address and that `Roles::has_aptos_root_role(sender)` is true. If those checks
 fail, the status code is set to `REJECTED_WRITE_SET`.
 
 The following checks are performed by all the prologue functions:
@@ -457,11 +457,11 @@ the entire system.
 
 * Monitoring:
 
-    - `diem_vm_transactions_validated`: Number of transactions processed by
+    - `aptos_vm_transactions_validated`: Number of transactions processed by
       the validator, with either "success" or "failure" labels
-    - `diem_vm_txn_validation_seconds`: Histogram of validation time (in
+    - `aptos_vm_txn_validation_seconds`: Histogram of validation time (in
       seconds) per transaction
-    - `diem_vm_critical_errors`: Counter for critical internal errors;
+    - `aptos_vm_critical_errors`: Counter for critical internal errors;
       intended to trigger alerts, not for display on a dashboard
 
 * Logging on catastrophic events must report enough info to debug.
@@ -793,14 +793,14 @@ certain error type.
 
 * Monitoring:
 
-    - `diem_vm_user_transactions_executed`: Number of user transactions executed,
+    - `aptos_vm_user_transactions_executed`: Number of user transactions executed,
       with either "success" or "failure" labels
-    - `diem_vm_system_transactions_executed`: Number of system transactions
+    - `aptos_vm_system_transactions_executed`: Number of system transactions
       executed, with either "success" or "failure" labels
-    - `diem_vm_txn_total_seconds`: Histogram of execution time (in seconds) per
+    - `aptos_vm_txn_total_seconds`: Histogram of execution time (in seconds) per
       user transaction
-    - `diem_vm_num_txns_per_block`: Histogram of number of transactions per block
-    - `diem_vm_critical_errors`: Counter for critical internal errors; intended
+    - `aptos_vm_num_txns_per_block`: Histogram of number of transactions per block
+    - `aptos_vm_critical_errors`: Counter for critical internal errors; intended
       to trigger alerts, not for display on a dashboard
 
 * Logging on catastrophic events must report enough info to debug.

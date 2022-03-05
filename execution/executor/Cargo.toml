@@ -21,16 +21,16 @@ serde = { version = "1.0.124", features = ["derive"] }
 consensus-types = { path = "../../consensus/consensus-types"}
 executor-types = { path = "../executor-types" }
 bcs = "0.1.2"
-diem-crypto = { path = "../../crates/diem-crypto" }
-diem-logger = { path = "../../crates/diem-logger" }
-diem-metrics = { path = "../../crates/diem-metrics" }
-diem-infallible = { path = "../../crates/diem-infallible" }
-diem-secure-net = { path = "../../secure/net" }
-diem-state-view = { path = "../../storage/state-view" }
-diem-types = { path = "../../types" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-metrics = { path = "../../crates/aptos-metrics" }
+aptos-infallible = { path = "../../crates/aptos-infallible" }
+aptos-secure-net = { path = "../../secure/net" }
+aptos-state-view = { path = "../../storage/state-view" }
+aptos-types = { path = "../../types" }
 move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
-diem-vm = { path = "../../diem-move/diem-vm" }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptos-vm = { path = "../../aptos-move/aptos-vm" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 scratchpad = { path = "../../storage/scratchpad" }
 storage-interface = { path = "../../storage/storage-interface" }
 
@@ -40,18 +40,18 @@ proptest = { version = "1.0.0", optional = true }
 proptest = "1.0.0"
 rand = "0.8.3"
 
-diem-framework-releases = { path = "../../diem-move/diem-framework/DPN/releases" }
+diem-framework-releases = { path = "../../aptos-move/diem-framework/DPN/releases" }
 executor-test-helpers = { path = "../executor-test-helpers" }
-diem-config = { path = "../../config" }
-diem-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
-diem-temppath = { path = "../../crates/diem-temppath" }
-diemdb = { path = "../../storage/diemdb" }
+aptos-config = { path = "../../config" }
+aptos-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
+aptos-temppath = { path = "../../crates/aptos-temppath" }
+aptosdb = { path = "../../storage/aptosdb" }
 move-ir-compiler = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 storage-interface = { path = "../../storage/storage-interface", features=["fuzzing"] }
-diem-transaction-builder = { path = "../../sdk/transaction-builder" }
-vm-genesis = { path = "../../diem-move/vm-genesis" }
+aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
+vm-genesis = { path = "../../aptos-move/vm-genesis" }
 
 [features]
 default = []
-fuzzing = ["consensus-types/fuzzing", "diem-crypto/fuzzing", "diem-types/fuzzing", "proptest", "storage-interface/fuzzing"]
-failpoints = ["fail/failpoints", "diem-vm/failpoints"]
+fuzzing = ["consensus-types/fuzzing", "aptos-crypto/fuzzing", "aptos-types/fuzzing", "proptest", "storage-interface/fuzzing"]
+failpoints = ["fail/failpoints", "aptos-vm/failpoints"]

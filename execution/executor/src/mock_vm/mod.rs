@@ -4,12 +4,12 @@
 #[cfg(test)]
 mod mock_vm_test;
 
-use diem_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
-use diem_state_view::StateView;
-use diem_types::{
+use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
+use aptos_state_view::StateView;
+use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{diem_root_address, validator_set_address, XUS_NAME},
+    account_config::{aptos_root_address, validator_set_address, XUS_NAME},
     chain_id::ChainId,
     contract_event::ContractEvent,
     event::EventKey,
@@ -24,7 +24,7 @@ use diem_types::{
     vm_status::{KeptVMStatus, StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use diem_vm::VMExecutor;
+use aptos_vm::VMExecutor;
 use move_core_types::{language_storage::TypeTag, move_resource::MoveResource};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -146,7 +146,7 @@ impl VMExecutor for MockVM {
                 }
                 MockVMTransaction::Reconfiguration => {
                     read_balance_from_storage(state_view, &balance_ap(validator_set_address()));
-                    read_balance_from_storage(state_view, &balance_ap(diem_root_address()));
+                    read_balance_from_storage(state_view, &balance_ap(aptos_root_address()));
                     outputs.push(TransactionOutput::new(
                         // WriteSet cannot be empty so use genesis writeset only for testing.
                         gen_genesis_writeset(),

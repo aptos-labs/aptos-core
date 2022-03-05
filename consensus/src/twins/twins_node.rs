@@ -10,9 +10,7 @@ use crate::{
     test_utils::{MockStateComputer, MockStorage, MockTransactionManager},
     util::time_service::ClockTimeService,
 };
-use channel::{self, diem_channel, message_queues::QueueStyle};
-use consensus_types::common::{Author, Payload, Round};
-use diem_config::{
+use aptos_config::{
     config::{
         ConsensusProposerType::{self, RoundProposer},
         NodeConfig, WaypointConfig,
@@ -20,13 +18,15 @@ use diem_config::{
     generator::{self, ValidatorSwarm},
     network_id::NetworkId,
 };
-use diem_mempool::mocks::MockSharedMempool;
-use diem_types::{
+use aptos_mempool::mocks::MockSharedMempool;
+use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{OnChainConfig, OnChainConfigPayload, ValidatorSet},
     validator_info::ValidatorInfo,
     waypoint::Waypoint,
 };
+use channel::{self, aptos_channel, message_queues::QueueStyle};
+use consensus_types::common::{Author, Payload, Round};
 use event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use futures::channel::mpsc;
 use network::{
@@ -62,9 +62,9 @@ impl SMRNode {
         storage: Arc<MockStorage>,
         twin_id: TwinId,
     ) -> Self {
-        let (network_reqs_tx, network_reqs_rx) = diem_channel::new(QueueStyle::FIFO, 8, None);
-        let (connection_reqs_tx, _) = diem_channel::new(QueueStyle::FIFO, 8, None);
-        let (consensus_tx, consensus_rx) = diem_channel::new(QueueStyle::FIFO, 8, None);
+        let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+        let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+        let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = channel::new_test(8);
         let (_, conn_notifs_channel) = conn_notifs_channel::new();
         let mut network_sender = ConsensusNetworkSender::new(
@@ -88,7 +88,7 @@ impl SMRNode {
         let txn_manager = Arc::new(MockTransactionManager::new(Some(
             consensus_to_mempool_sender,
         )));
-        let (reconfig_sender, reconfig_events) = diem_channel::new(QueueStyle::LIFO, 1, None);
+        let (reconfig_sender, reconfig_events) = aptos_channel::new(QueueStyle::LIFO, 1, None);
         let reconfig_listener = ReconfigNotificationListener {
             notification_receiver: reconfig_events,
         };

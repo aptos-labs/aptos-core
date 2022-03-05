@@ -1,8 +1,8 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_rest_client::Client as RestClient;
-use diem_sdk::{move_types::account_address::AccountAddress, transaction_builder::Currency};
+use aptos_rest_client::Client as RestClient;
+use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::Currency};
 use forge::{ForgeConfig, Options, Result, *};
 use std::{env, num::NonZeroUsize, process, time::Duration};
 use structopt::StructOpt;

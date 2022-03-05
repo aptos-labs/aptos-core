@@ -1,16 +1,15 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use chrono::Local;
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey, SigningKey, Uniform,
 };
-use diem_logger::info;
-use diem_transaction_builder::stdlib::{
+use aptos_logger::info;
+use aptos_transaction_builder::stdlib::{
     encode_create_parent_vasp_account_script, encode_peer_to_peer_with_metadata_script,
 };
-use diem_types::{
+use aptos_types::{
     account_address::AccountAddress,
     account_config::{
         testnet_dd_account_address, treasury_compliance_account_address, xus_tag, AccountResource,
@@ -22,6 +21,7 @@ use diem_types::{
         Version,
     },
 };
+use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
@@ -143,7 +143,7 @@ impl TransactionGenerator {
         for _i in 0..num_accounts {
             let private_key = Ed25519PrivateKey::generate(&mut rng);
             let public_key = private_key.public_key();
-            let address = diem_types::account_address::from_public_key(&public_key);
+            let address = aptos_types::account_address::from_public_key(&public_key);
             let account = AccountData {
                 private_key,
                 public_key,
@@ -387,7 +387,7 @@ fn create_transaction(
     public_key: Ed25519PublicKey,
     program: Script,
 ) -> Transaction {
-    let now = diem_infallible::duration_since_epoch();
+    let now = aptos_infallible::duration_since_epoch();
     let expiration_time = now.as_secs() + 3600;
 
     let raw_txn = RawTransaction::new_script(

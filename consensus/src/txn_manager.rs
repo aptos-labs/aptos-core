@@ -3,11 +3,11 @@
 
 use crate::{error::MempoolError, state_replication::TxnManager};
 use anyhow::{format_err, Result};
+use aptos_logger::prelude::*;
+use aptos_mempool::{ConsensusRequest, ConsensusResponse, TransactionSummary};
+use aptos_metrics::monitor;
+use aptos_types::transaction::TransactionStatus;
 use consensus_types::{block::Block, common::Payload};
-use diem_logger::prelude::*;
-use diem_mempool::{ConsensusRequest, ConsensusResponse, TransactionSummary};
-use diem_metrics::monitor;
-use diem_types::transaction::TransactionStatus;
 use executor_types::StateComputeResult;
 use fail::fail_point;
 use futures::{

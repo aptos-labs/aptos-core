@@ -14,12 +14,12 @@ anyhow = "1.0.52"
 serde = "1.0.124"
 
 bcs = "0.1.2"
-diem-crypto = { path = "../../crates/diem-crypto" }
-diem-logger = { path = "../../crates/diem-logger" }
-diem-infallible = { path = "../../crates/diem-infallible" }
-diem-secure-net = { path = "../../secure/net" }
-diem-types = { path = "../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-infallible = { path = "../../crates/aptos-infallible" }
+aptos-secure-net = { path = "../../secure/net" }
+aptos-types = { path = "../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 storage-interface = { path = "../storage-interface" }
 
 [features]

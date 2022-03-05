@@ -7,7 +7,7 @@ use crate::proof::{
     position::{FrozenSubtreeSiblingIterator, Position},
     TestAccumulatorInternalNode,
 };
-use diem_crypto::{
+use aptos_crypto::{
     hash::{CryptoHash, TestOnlyHash, TestOnlyHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
 };

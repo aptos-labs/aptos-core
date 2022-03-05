@@ -1,11 +1,11 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_config::{
+use aptos_config::{
     config::{NodeConfig, PersistableConfig, RemoteService, SafetyRulesService},
     utils,
 };
-use diem_types::validator_signer::ValidatorSigner;
+use aptos_types::validator_signer::ValidatorSigner;
 use safety_rules::{test_utils, SafetyRulesManager};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
@@ -24,7 +24,7 @@ fn test_consensus_state() {
     let server_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), server_port).into();
     config.service = SafetyRulesService::Process(RemoteService { server_address });
 
-    let config_path = diem_temppath::TempPath::new();
+    let config_path = aptos_temppath::TempPath::new();
     config_path.create_as_file().unwrap();
     config.save_config(config_path.path()).unwrap();
 

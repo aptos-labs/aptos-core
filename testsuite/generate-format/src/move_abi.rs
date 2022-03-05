@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_types::transaction;
+use aptos_types::transaction;
 use move_core_types::language_storage;
 use serde_reflection::{Registry, Result, Samples, Tracer, TracerConfig};
 

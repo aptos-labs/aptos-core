@@ -2,18 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{counters, logging::LogEntry, ConsensusState, Error, SafetyRules, TSafetyRules};
+use aptos_crypto::ed25519::Ed25519Signature;
+use aptos_infallible::RwLock;
+use aptos_types::{
+    epoch_change::EpochChangeProof,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+};
 use consensus_types::{
     block_data::BlockData,
     timeout::Timeout,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_proposal::MaybeSignedVoteProposal,
-};
-use diem_crypto::ed25519::Ed25519Signature;
-use diem_infallible::RwLock;
-use diem_types::{
-    epoch_change::EpochChangeProof,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

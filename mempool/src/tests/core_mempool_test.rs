@@ -8,9 +8,9 @@ use crate::{
         TestTransaction,
     },
 };
-use diem_config::config::NodeConfig;
-use diem_crypto::HashValue;
-use diem_types::{account_config::AccountSequenceInfo, transaction::SignedTransaction};
+use aptos_config::config::NodeConfig;
+use aptos_crypto::HashValue;
+use aptos_types::{account_config::AccountSequenceInfo, transaction::SignedTransaction};
 use std::{
     collections::HashSet,
     time::{Duration, SystemTime},

@@ -8,9 +8,9 @@ use crate::{
     streaming_client::{GetAllEpochEndingLedgerInfosRequest, StreamRequest},
     tests::utils::initialize_logger,
 };
+use aptos_data_client::{GlobalDataSummary, OptimalChunkSizes, ResponsePayload};
+use aptos_id_generator::U64IdGenerator;
 use claim::{assert_matches, assert_ok};
-use diem_data_client::{GlobalDataSummary, OptimalChunkSizes, ResponsePayload};
-use diem_id_generator::U64IdGenerator;
 use std::{cmp, sync::Arc};
 use storage_service_types::CompleteDataRange;
 

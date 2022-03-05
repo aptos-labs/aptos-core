@@ -10,11 +10,11 @@ use crate::{
     transaction::Version,
 };
 use anyhow::{anyhow, ensure, Error, Result};
-use diem_crypto::{
+use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
 };
-use diem_crypto_derive::CryptoHasher;
+use aptos_crypto_derive::CryptoHasher;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{arbitrary::Arbitrary, prelude::*};
 #[cfg(any(test, feature = "fuzzing"))]

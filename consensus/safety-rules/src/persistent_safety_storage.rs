@@ -6,15 +6,15 @@ use crate::{
     logging::{self, LogEntry, LogEvent},
     Error,
 };
-use consensus_types::{common::Author, safety_data::SafetyData};
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     hash::CryptoHash,
 };
-use diem_global_constants::{CONSENSUS_KEY, EXECUTION_KEY, OWNER_ACCOUNT, SAFETY_DATA, WAYPOINT};
-use diem_logger::prelude::*;
-use diem_secure_storage::{CryptoStorage, KVStorage, Storage};
-use diem_types::waypoint::Waypoint;
+use aptos_global_constants::{CONSENSUS_KEY, EXECUTION_KEY, OWNER_ACCOUNT, SAFETY_DATA, WAYPOINT};
+use aptos_logger::prelude::*;
+use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
+use aptos_types::waypoint::Waypoint;
+use consensus_types::{common::Author, safety_data::SafetyData};
 use serde::Serialize;
 
 /// SafetyRules needs an abstract storage interface to act as a common utility for storing
@@ -82,7 +82,7 @@ impl PersistentSafetyStorage {
         // inconsistencies or why they did not reset storage between rounds. Do not repeat the
         // checks again below, because it is just too strange to have a partially configured
         // storage.
-        if let Err(diem_secure_storage::Error::KeyAlreadyExists(_)) = result {
+        if let Err(aptos_secure_storage::Error::KeyAlreadyExists(_)) = result {
             warn!("Attempted to re-initialize existing storage");
             return Ok(());
         }
@@ -195,9 +195,9 @@ impl PersistentSafetyStorage {
 mod tests {
     use super::*;
     use crate::counters;
-    use diem_crypto::{hash::HashValue, Uniform};
-    use diem_secure_storage::InMemoryStorage;
-    use diem_types::{
+    use aptos_crypto::{hash::HashValue, Uniform};
+    use aptos_secure_storage::InMemoryStorage;
+    use aptos_types::{
         block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo,
         transaction::Version, validator_signer::ValidatorSigner, waypoint::Waypoint,
     };

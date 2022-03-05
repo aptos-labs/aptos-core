@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_secure_push_metrics::MetricsPusher;
+use aptos_secure_push_metrics::MetricsPusher;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -84,7 +84,7 @@ fn main() {
             checkpoint_dir,
             verify,
         } => {
-            diem_logger::Logger::new().init();
+            aptos_logger::Logger::new().init();
             executor_benchmark::run_benchmark(
                 opt.block_size,
                 blocks,

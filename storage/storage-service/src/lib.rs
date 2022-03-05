@@ -9,11 +9,11 @@
 //! [`storage-client`](../storage-client/index.html) instead of via
 
 use anyhow::Result;
-use diem_config::config::NodeConfig;
-use diem_logger::prelude::*;
-use diem_secure_net::NetworkServer;
-use diem_types::{account_state_blob::AccountStateBlob, proof::SparseMerkleProof};
-use diemdb::DiemDB;
+use aptos_config::config::NodeConfig;
+use aptos_logger::prelude::*;
+use aptos_secure_net::NetworkServer;
+use aptos_types::{account_state_blob::AccountStateBlob, proof::SparseMerkleProof};
+use aptosdb::DiemDB;
 use std::{
     sync::Arc,
     thread::{self, JoinHandle},

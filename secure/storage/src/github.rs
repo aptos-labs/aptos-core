@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{CryptoKVStorage, Error, GetResponse, KVStorage};
-use diem_github_client::Client;
-use diem_time_service::{TimeService, TimeServiceTrait};
+use aptos_github_client::Client;
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use serde::{de::DeserializeOwned, Serialize};
 
 /// GitHubStorage leverages a GitHub repository to provide a file system approach to key / value

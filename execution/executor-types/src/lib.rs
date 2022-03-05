@@ -9,7 +9,7 @@ mod executed_chunk;
 pub use error::Error;
 
 use anyhow::Result;
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::Ed25519Signature,
     hash::{
         EventAccumulatorHasher, TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH,
@@ -17,8 +17,8 @@ use diem_crypto::{
     },
     HashValue,
 };
-use diem_state_view::StateViewId;
-use diem_types::{
+use aptos_state_view::StateViewId;
+use aptos_types::{
     account_address::AccountAddress,
     account_state_blob::AccountStateBlob,
     contract_event::ContractEvent,
@@ -40,7 +40,7 @@ use storage_interface::DbReader;
 pub use executed_chunk::ExecutedChunk;
 use storage_interface::state_view::VerifiedStateView;
 
-type SparseMerkleProof = diem_types::proof::SparseMerkleProof<AccountStateBlob>;
+type SparseMerkleProof = aptos_types::proof::SparseMerkleProof<AccountStateBlob>;
 type SparseMerkleTree = scratchpad::SparseMerkleTree<AccountStateBlob>;
 
 pub trait ChunkExecutorTrait: Send + Sync {

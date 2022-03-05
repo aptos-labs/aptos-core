@@ -31,7 +31,7 @@ spec:
             - --emit-tx
             - --mint-file=/opt/diem/etc/mint.key
             - --chain-id={{ .Values.genesis.chain_id | default .Values.genesis.era }}
-            - --peers={{- range $i, $e := until (int .Values.genesis.numValidators) -}}val{{$i}}-diem-validator-fullnode-lb:80,{{- end -}}
+            - --peers={{- range $i, $e := until (int .Values.genesis.numValidators) -}}val{{$i}}-aptos-validator-fullnode-lb:80,{{- end -}}
           {{- with .Values.cluster_test }}
             - --duration={{ .config.duration }}
             - --accounts-per-client={{ .config.accounts_per_client }}

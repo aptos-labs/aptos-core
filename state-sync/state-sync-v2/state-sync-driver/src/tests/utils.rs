@@ -2,17 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::driver_factory::DriverFactory;
-use consensus_notifications::ConsensusNotifier;
-use data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
-use diem_config::config::{NodeConfig, RoleType};
-use diem_crypto::{
+use aptos_config::config::{NodeConfig, RoleType};
+use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
     HashValue, PrivateKey, Uniform,
 };
-use diem_data_client::diemnet::DiemNetDataClient;
-use diem_infallible::RwLock;
-use diem_time_service::TimeService;
-use diem_types::{
+use aptos_data_client::diemnet::DiemNetDataClient;
+use aptos_infallible::RwLock;
+use aptos_time_service::TimeService;
+use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     chain_id::ChainId,
@@ -25,8 +23,10 @@ use diem_types::{
     },
     waypoint::Waypoint,
 };
-use diem_vm::DiemVM;
-use diemdb::DiemDB;
+use aptos_vm::DiemVM;
+use aptosdb::DiemDB;
+use consensus_notifications::ConsensusNotifier;
+use data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
 use event_notifications::{
     EventNotificationSender, EventSubscriptionService, ReconfigNotificationListener,
 };
@@ -92,7 +92,7 @@ fn create_driver_for_tests(
     ReconfigNotificationListener,
 ) {
     // Create test diem database
-    let db_path = diem_temppath::TempPath::new();
+    let db_path = aptos_temppath::TempPath::new();
     db_path.create_as_dir().unwrap();
     let (db, db_rw) = DbReaderWriter::wrap(DiemDB::new_for_test(db_path.path()));
 
@@ -132,8 +132,8 @@ fn create_driver_for_tests(
         MultiNetworkSender::new(HashMap::new()),
         PeerMetadataStorage::new(&[]),
     );
-    let (diem_data_client, _) = DiemNetDataClient::new(
-        node_config.state_sync.diem_data_client,
+    let (aptos_data_client, _) = DiemNetDataClient::new(
+        node_config.state_sync.aptos_data_client,
         node_config.state_sync.storage_service,
         TimeService::mock(),
         network_client,
@@ -149,7 +149,7 @@ fn create_driver_for_tests(
         mempool_notifier,
         consensus_listener,
         event_subscription_service,
-        diem_data_client,
+        aptos_data_client,
         streaming_service_client,
     );
 

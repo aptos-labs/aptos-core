@@ -7,11 +7,11 @@ use crate::{
     transport::Connection,
 };
 use anyhow::format_err;
+use aptos_config::network_id::NetworkContext;
+use aptos_logger::prelude::*;
+use aptos_time_service::{TimeService, TimeServiceTrait};
+use aptos_types::{network_address::NetworkAddress, PeerId};
 use channel::{self};
-use diem_config::network_id::NetworkContext;
-use diem_logger::prelude::*;
-use diem_time_service::{TimeService, TimeServiceTrait};
-use diem_types::{network_address::NetworkAddress, PeerId};
 use futures::{
     channel::oneshot,
     future::{BoxFuture, FutureExt},

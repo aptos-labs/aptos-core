@@ -14,11 +14,11 @@
 //! use network::noise::{AntiReplayTimestamps, HandshakeAuthMode, NoiseUpgrader};
 //! use futures::{executor, future, io::{AsyncReadExt, AsyncWriteExt}};
 //! use memsocket::MemorySocket;
-//! use diem_config::{config::{Peer, PeerRole, RoleType}, network_id::{NetworkContext, NetworkId}};
-//! use diem_crypto::{x25519, ed25519, Uniform, PrivateKey, test_utils::TEST_SEED};
-//! use diem_infallible::RwLock;
+//! use aptos_config::{config::{Peer, PeerRole, RoleType}, network_id::{NetworkContext, NetworkId}};
+//! use aptos_crypto::{x25519, ed25519, Uniform, PrivateKey, test_utils::TEST_SEED};
+//! use aptos_infallible::RwLock;
 //! use rand::{rngs::StdRng, SeedableRng};
-//! use diem_types::PeerId;
+//! use aptos_types::PeerId;
 //! use std::{collections::{HashSet, HashMap}, io, sync::Arc};
 //!
 //! fn example() -> io::Result<()> {
@@ -95,7 +95,7 @@
 //!
 //! [noise]: http://noiseprotocol.org/
 //! [ik]: https://noiseexplorer.com/patterns/IK
-//! [crypto]: ../diem_crypto/noise/index.html
+//! [crypto]: ../aptos_crypto/noise/index.html
 
 pub mod error;
 pub mod handshake;

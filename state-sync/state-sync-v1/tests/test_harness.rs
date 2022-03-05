@@ -1,21 +1,18 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use channel::{diem_channel, message_queues::QueueStyle};
-use claim::assert_ok;
-use consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
-use diem_config::{
+use aptos_config::{
     config::{NodeConfig, Peer, PeerRole, RoleType, HANDSHAKE_VERSION},
     network_id::{NetworkContext, NetworkId},
 };
-use diem_crypto::{
+use aptos_crypto::{
     hash::ACCUMULATOR_PLACEHOLDER_HASH, test_utils::TEST_SEED, x25519, HashValue, Uniform,
 };
-use diem_infallible::RwLock;
-use diem_mempool::mocks::MockSharedMempool;
-use diem_time_service::TimeService;
-use diem_transaction_builder::stdlib::encode_peer_to_peer_with_metadata_script;
-use diem_types::{
+use aptos_infallible::RwLock;
+use aptos_mempool::mocks::MockSharedMempool;
+use aptos_time_service::TimeService;
+use aptos_transaction_builder::stdlib::encode_peer_to_peer_with_metadata_script;
+use aptos_types::{
     account_address::AccountAddress,
     account_config::xus_tag,
     block_info::BlockInfo,
@@ -38,6 +35,9 @@ use diem_types::{
     waypoint::Waypoint,
     PeerId,
 };
+use channel::{aptos_channel, message_queues::QueueStyle};
+use claim::assert_ok;
+use consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
 use executor_types::ExecutedTrees;
 use futures::{executor::block_on, future::FutureExt, StreamExt};
 use memsocket::MemoryListener;
@@ -190,9 +190,9 @@ impl StateSyncPeer {
 pub struct StateSyncEnvironment {
     network_conn_event_notifs_txs: HashMap<PeerId, conn_notifs_channel::Sender>,
     network_notifs_txs:
-        HashMap<PeerId, diem_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+        HashMap<PeerId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
     network_reqs_rxs:
-        HashMap<PeerId, diem_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>>,
+        HashMap<PeerId, aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>>,
     peers: Vec<RefCell<StateSyncPeer>>,
     runtime: Runtime,
 }
@@ -203,7 +203,7 @@ impl StateSyncEnvironment {
     }
 
     pub fn new(num_peers: usize) -> Self {
-        ::diem_logger::Logger::init_for_testing();
+        ::aptos_logger::Logger::init_for_testing();
 
         let (signers, public_keys, network_keys, network_addrs) = initial_setup(num_peers);
 
@@ -353,10 +353,10 @@ impl StateSyncEnvironment {
                 // mock the StateSyncEvents and StateSyncSender to allow manually controlling
                 // msg delivery in test
                 let (network_reqs_tx, network_reqs_rx) =
-                    diem_channel::new(QueueStyle::LIFO, 1, None);
-                let (connection_reqs_tx, _) = diem_channel::new(QueueStyle::LIFO, 1, None);
+                    aptos_channel::new(QueueStyle::LIFO, 1, None);
+                let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
                 let (network_notifs_tx, network_notifs_rx) =
-                    diem_channel::new(QueueStyle::LIFO, 1, None);
+                    aptos_channel::new(QueueStyle::LIFO, 1, None);
                 let (conn_status_tx, conn_status_rx) = conn_notifs_channel::new();
                 let network_sender = StateSyncSender::new(
                     PeerManagerRequestSender::new(network_reqs_tx),
@@ -553,7 +553,7 @@ fn setup_state_sync_config(
     timeout_ms: u64,
     multicast_timeout_ms: u64,
 ) -> (NodeConfig, NetworkId) {
-    let mut config = diem_config::config::NodeConfig::default_for_validator();
+    let mut config = aptos_config::config::NodeConfig::default_for_validator();
     config.base.role = role;
     config.state_sync.sync_request_timeout_ms = timeout_ms;
     config.state_sync.multicast_timeout_ms = multicast_timeout_ms;

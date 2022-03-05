@@ -8,8 +8,8 @@ use crate::{
     JellyfishMerkleTree,
 };
 use anyhow::Result;
-use diem_crypto::HashValue;
-use diem_types::transaction::Version;
+use aptos_crypto::HashValue;
+use aptos_types::transaction::Version;
 use rand::{rngs::StdRng, SeedableRng};
 use std::{collections::BTreeMap, sync::Arc};
 

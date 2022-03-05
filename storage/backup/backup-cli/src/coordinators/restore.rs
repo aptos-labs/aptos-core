@@ -16,8 +16,8 @@ use crate::{
     utils::{unix_timestamp_sec, GlobalRestoreOptions, RestoreRunMode},
 };
 use anyhow::{bail, Result};
-use diem_logger::prelude::*;
-use diem_types::transaction::Version;
+use aptos_logger::prelude::*;
+use aptos_types::transaction::Version;
 use std::sync::Arc;
 use structopt::StructOpt;
 

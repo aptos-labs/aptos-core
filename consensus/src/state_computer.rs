@@ -7,14 +7,14 @@ use crate::{
     state_replication::{StateComputer, StateComputerCommitCallBackType, TxnManager},
 };
 use anyhow::Result;
-use consensus_notifications::ConsensusNotificationSender;
-use consensus_types::{block::Block, executed_block::ExecutedBlock};
-use diem_crypto::HashValue;
-use diem_logger::prelude::*;
-use diem_metrics::monitor;
-use diem_types::{
+use aptos_crypto::HashValue;
+use aptos_logger::prelude::*;
+use aptos_metrics::monitor;
+use aptos_types::{
     contract_event::ContractEvent, ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
 };
+use consensus_notifications::ConsensusNotificationSender;
+use consensus_types::{block::Block, executed_block::ExecutedBlock};
 use execution_correctness::ExecutionCorrectness;
 use executor_types::{Error as ExecutionError, StateComputeResult};
 use fail::fail_point;

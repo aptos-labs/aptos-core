@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{ensure, Result};
-use diem_config::{
+use aptos_config::{
     config::{Identity, NodeConfig, PeerRole, RoleType, WaypointConfig},
     generator::build_seed_for_network,
     network_id::NetworkId,
 };
-use diem_crypto::{x25519, Uniform};
-use diem_types::{transaction::Transaction, waypoint::Waypoint};
+use aptos_crypto::{x25519, Uniform};
+use aptos_types::{transaction::Transaction, waypoint::Waypoint};
 use rand::rngs::OsRng;
 use std::{
     fs::File,
@@ -104,7 +104,7 @@ impl FullnodeConfig {
 
         if let Identity::None = network_config.identity {
             let key = x25519::PrivateKey::generate(&mut OsRng);
-            let peer_id = diem_types::account_address::from_identity_public_key(key.public_key());
+            let peer_id = aptos_types::account_address::from_identity_public_key(key.public_key());
             network_config.identity = Identity::from_config(key, peer_id);
         }
     }
@@ -154,7 +154,7 @@ impl FullnodeConfig {
 
         if let Identity::None = fullnode_vfn_network.identity {
             let key = x25519::PrivateKey::generate(&mut OsRng);
-            let peer_id = diem_types::account_address::from_identity_public_key(key.public_key());
+            let peer_id = aptos_types::account_address::from_identity_public_key(key.public_key());
             fullnode_vfn_network.identity = Identity::from_config(key, peer_id);
         }
 

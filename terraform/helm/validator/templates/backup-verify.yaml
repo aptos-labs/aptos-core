@@ -33,7 +33,7 @@ spec:
             - {{ . }}
             {{- end }}
             - --metadata-cache-dir
-            - /tmp/diem-backup-verify-metadata
+            - /tmp/aptos-backup-verify-metadata
             - command-adapter
             - --config
             # use the same config with the backup sts

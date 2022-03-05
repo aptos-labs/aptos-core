@@ -9,12 +9,12 @@ use crate::{
     network::StateSyncMessage,
     shared_components::test_utils,
 };
-use diem_config::network_id::NetworkId;
-use diem_infallible::Mutex;
-use diem_types::{
+use aptos_config::network_id::NetworkId;
+use aptos_infallible::Mutex;
+use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, transaction::TransactionListWithProof, PeerId,
 };
-use diem_vm::DiemVM;
+use aptos_vm::DiemVM;
 use executor::chunk_executor::ChunkExecutor;
 use futures::executor::block_on;
 use mempool_notifications::MempoolNotifier;

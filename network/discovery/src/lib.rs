@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{counters::DISCOVERY_COUNTS, file::FileStream, validator_set::ValidatorSetStream};
-use diem_config::{config::PeerSet, network_id::NetworkContext};
-use diem_crypto::x25519;
-use diem_logger::prelude::*;
-use diem_time_service::TimeService;
+use aptos_config::{config::PeerSet, network_id::NetworkContext};
+use aptos_crypto::x25519;
+use aptos_logger::prelude::*;
+use aptos_time_service::TimeService;
 use event_notifications::ReconfigNotificationListener;
 use futures::{Stream, StreamExt};
 use network::{

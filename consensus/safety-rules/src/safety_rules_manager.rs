@@ -10,9 +10,9 @@ use crate::{
     thread::ThreadService,
     SafetyRules, TSafetyRules,
 };
-use diem_config::config::{SafetyRulesConfig, SafetyRulesService};
-use diem_infallible::RwLock;
-use diem_secure_storage::{KVStorage, Storage};
+use aptos_config::config::{SafetyRulesConfig, SafetyRulesService};
+use aptos_infallible::RwLock;
+use aptos_secure_storage::{KVStorage, Storage};
 use std::{convert::TryInto, net::SocketAddr, sync::Arc};
 
 pub fn storage(config: &SafetyRulesConfig) -> PersistentSafetyStorage {

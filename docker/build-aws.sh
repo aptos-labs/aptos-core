@@ -23,25 +23,25 @@ BUILD_PROJECTS=()
 
 while [[ "$1" =~ ^- ]]; do case $1 in
   --build-all )
-    BUILD_PROJECTS=(diem-validator diem-init diem-faucet diem-safety-rules diem-tools diem-forge)
+    BUILD_PROJECTS=(aptos-validator aptos-init aptos-faucet aptos-safety-rules aptos-tools aptos-forge)
     ;;
   --build-validator )
-    BUILD_PROJECTS=(diem-validator)
+    BUILD_PROJECTS=(aptos-validator)
     ;;
   --build-init )
-    BUILD_PROJECTS=(diem-init)
+    BUILD_PROJECTS=(aptos-init)
     ;;
   --build-faucet )
-      BUILD_PROJECTS=(diem-faucet)
+      BUILD_PROJECTS=(aptos-faucet)
     ;;
   --build-safety-rules )
-    BUILD_PROJECTS=(diem-safety-rules)
+    BUILD_PROJECTS=(aptos-safety-rules)
     ;;
   --build-tools )
-    BUILD_PROJECTS=(diem-tools)
+    BUILD_PROJECTS=(aptos-tools)
     ;;
   --build-forge )
-    BUILD_PROJECTS=(diem-forge diem-validator diem-init diem-faucet diem-safety-rules diem-tools)
+    BUILD_PROJECTS=(aptos-forge aptos-validator aptos-init aptos-faucet aptos-safety-rules aptos-tools)
     ;;
   --version )
     shift;

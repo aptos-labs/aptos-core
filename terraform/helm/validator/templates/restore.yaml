@@ -29,13 +29,13 @@ spec:
         - -c
         - |-
           set -ex
-          # cleanup diemdb
+          # cleanup aptosdb
           if [ ! -f /opt/diem/data/restore-uid ] || [ "$(cat /opt/diem/data/restore-uid)" != "$CONTROLLER_UID" ]; then
               rm -rf /opt/diem/data/db
               echo "$CONTROLLER_UID" > /opt/diem/data/restore-uid
           fi
           # start restore process
-          /usr/local/bin/db-restore --concurrent-downloads {{ .config.concurrent_downloads }}{{ range .config.trusted_waypoints }} --trust-waypoint {{ . }}{{ end }} --target-db-dir /opt/diem/data/db auto --metadata-cache-dir /tmp/diem-restore-metadata command-adapter --config /opt/diem/etc/{{ .config.location }}.toml
+          /usr/local/bin/db-restore --concurrent-downloads {{ .config.concurrent_downloads }}{{ range .config.trusted_waypoints }} --trust-waypoint {{ . }}{{ end }} --target-db-dir /opt/diem/data/db auto --metadata-cache-dir /tmp/aptos-restore-metadata command-adapter --config /opt/diem/etc/{{ .config.location }}.toml
         env:
         - name: RUST_LOG
           value: "debug"
@@ -55,7 +55,7 @@ spec:
         volumeMounts:
         - name: backup-config
           mountPath: /opt/diem/etc
-        - name: diem-data
+        - name: aptos-data
           mountPath: /opt/diem/data
         - name: tmp
           mountPath: /tmp
@@ -89,7 +89,7 @@ spec:
           name: {{ include "backup.fullname" . }}-backup
       - name: tmp
         emptyDir: {}
-      - name: diem-data
+      - name: aptos-data
         persistentVolumeClaim:
           claimName: {{ include "backup.persistentVolumeClaim" . }}
       serviceAccountName: {{ include "backup.serviceAccount" . }}

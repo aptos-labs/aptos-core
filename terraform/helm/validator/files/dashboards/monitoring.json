@@ -138,7 +138,7 @@
       "pluginVersion": "7.0.0",
       "targets": [
         {
-          "expr": "up{job=\"federate\"} == 0 or up{job=\"diem-procs\"} == 0 or up{job=\"kubernetes-cadvisor\"} == 0 or up{job=\"pushgateway\"} == 0",
+          "expr": "up{job=\"federate\"} == 0 or up{job=\"aptos-procs\"} == 0 or up{job=\"kubernetes-cadvisor\"} == 0 or up{job=\"pushgateway\"} == 0",
           "format": "table",
           "instant": true,
           "interval": "",

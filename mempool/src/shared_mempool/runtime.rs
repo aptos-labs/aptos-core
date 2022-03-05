@@ -10,8 +10,8 @@ use crate::{
     },
     ConsensusRequest,
 };
-use diem_config::{config::NodeConfig, network_id::NetworkId};
-use diem_infallible::{Mutex, RwLock};
+use aptos_config::{config::NodeConfig, network_id::NetworkId};
+use aptos_infallible::{Mutex, RwLock};
 
 use event_notifications::ReconfigNotificationListener;
 use futures::channel::mpsc::{self, Receiver, UnboundedSender};

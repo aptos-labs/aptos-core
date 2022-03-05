@@ -10,8 +10,8 @@ use crate::{
     protocols::health_checker::HealthCheckerMsg,
     transport::ConnectionMetadata,
 };
-use diem_config::network_id::{NetworkId, PeerNetworkId};
-use diem_types::PeerId;
+use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use aptos_types::PeerId;
 use std::{collections::hash_map::Entry, sync::Arc};
 
 #[derive(Clone)]

@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_metrics::{
+use aptos_metrics::{
     register_histogram, register_int_counter_vec, register_int_gauge_vec, DurationHistogram,
     IntCounterVec, IntGaugeVec,
 };

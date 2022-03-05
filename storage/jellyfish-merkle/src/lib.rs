@@ -81,8 +81,8 @@ pub mod test_helper;
 mod tree_cache;
 
 use anyhow::{bail, ensure, format_err, Result};
-use diem_crypto::{hash::CryptoHash, HashValue};
-use diem_types::{
+use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_types::{
     nibble::{
         nibble_path::{skip_common_prefix, NibbleIterator, NibblePath},
         Nibble, ROOT_NIBBLE_HEIGHT,
@@ -143,9 +143,9 @@ pub trait TestValue: Value + Arbitrary + std::fmt::Debug + Eq + PartialEq + 'sta
 // This crate still depends on types for a few things, therefore we implement `Value` and
 // `TestValue` for `AccountStateBlob` here. Ideally the module that defines the specific value like
 // `AccountStateBlob` should import the `Value` trait and implement it there.
-impl Value for diem_types::account_state_blob::AccountStateBlob {}
+impl Value for aptos_types::account_state_blob::AccountStateBlob {}
 #[cfg(any(test, feature = "fuzzing"))]
-impl TestValue for diem_types::account_state_blob::AccountStateBlob {}
+impl TestValue for aptos_types::account_state_blob::AccountStateBlob {}
 
 /// Node batch that will be written into db atomically with other batches.
 pub type NodeBatch<V> = BTreeMap<NodeKey, Node<V>>;
@@ -1034,8 +1034,8 @@ impl NibbleExt for HashValue {
 #[cfg(test)]
 mod test {
     use super::NibbleExt;
-    use diem_crypto::hash::{HashValue, TestOnlyHash};
-    use diem_types::nibble::Nibble;
+    use aptos_crypto::hash::{HashValue, TestOnlyHash};
+    use aptos_types::nibble::Nibble;
 
     #[test]
     fn test_common_prefix_nibbles_len() {

@@ -3,14 +3,14 @@
 
 use crate::tests::{assert_json, find_value, new_test_context, pretty, TestContext};
 
-use diem_api_types::{HashValue, HexEncodedBytes};
-use diem_crypto::{
+use aptos_api_types::{HashValue, HexEncodedBytes};
+use aptos_crypto::{
     hash::CryptoHash,
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
     SigningKey, Uniform,
 };
-use diem_sdk::{transaction_builder::Currency, types::LocalAccount};
-use diem_types::{
+use aptos_sdk::{transaction_builder::Currency, types::LocalAccount};
+use aptos_types::{
     access_path::{AccessPath, Path},
     account_address::AccountAddress,
     account_config::{from_currency_code_string, xus_tag, XUS_NAME},
@@ -32,7 +32,7 @@ use serde_json::json;
 async fn test_deserialize_genesis_transaction() {
     let context = new_test_context();
     let resp = context.get("/transactions/0").await;
-    serde_json::from_value::<diem_api_types::Transaction>(resp).unwrap();
+    serde_json::from_value::<aptos_api_types::Transaction>(resp).unwrap();
 }
 
 #[tokio::test]

@@ -238,7 +238,7 @@ fn test_invalid_vasp_domain_identifier() {
     assert!(identifier.is_ok());
 
     // Test using "-" character is invalid
-    let raw_identifier = "diem-domain";
+    let raw_identifier = "aptos-domain";
     let identifier = DiemIdVaspDomainIdentifier::new(raw_identifier);
     assert_eq!(
         identifier.unwrap_err(),

@@ -13,11 +13,11 @@ use crate::{
     workspace_builder::workspace_root,
 };
 use anyhow::anyhow;
-use diem_operational_tool::test_helper::OperationalTool;
-use diem_temppath::TempPath;
-use diem_transaction_builder::stdlib::encode_remove_validator_and_reconfigure_script;
-use diem_types::{
-    account_config::diem_root_address,
+use aptos_operational_tool::test_helper::OperationalTool;
+use aptos_temppath::TempPath;
+use aptos_transaction_builder::stdlib::encode_remove_validator_and_reconfigure_script;
+use aptos_types::{
+    account_config::aptos_root_address,
     transaction::{Transaction, WriteSetPayload},
     waypoint::Waypoint,
 };
@@ -36,7 +36,7 @@ use std::{
 #[tokio::test]
 /// This test verifies the flow of a genesis transaction after the chain starts.
 /// 1. Test the consensus sync_only mode, every node should stop at the same version.
-/// 2. Test the db-bootstrapper applying a manual genesis transaction (remove validator 0) on diemdb directly
+/// 2. Test the db-bootstrapper applying a manual genesis transaction (remove validator 0) on aptosdb directly
 /// 3. Test the nodes and clients resume working after updating waypoint
 /// 4. Test a node lagging behind can sync to the waypoint
 async fn test_genesis_transaction_flow() {
@@ -145,9 +145,9 @@ async fn test_genesis_transaction_flow() {
             .to_string(),
         chain_id,
     );
-    let diem_root = create_root_storage(&mut swarm);
+    let aptos_root = create_root_storage(&mut swarm);
     let config = op_tool
-        .validator_config(validator_address, Some(&diem_root))
+        .validator_config(validator_address, Some(&aptos_root))
         .await
         .unwrap();
     let name = config.name.as_bytes().to_vec();
@@ -156,7 +156,7 @@ async fn test_genesis_transaction_flow() {
         validator.stop()
     }
     let genesis_transaction = Transaction::GenesisTransaction(WriteSetPayload::Script {
-        execute_as: diem_root_address(),
+        execute_as: aptos_root_address(),
         script: encode_remove_validator_and_reconfigure_script(0, name, validator_address),
     });
     let genesis_path = TempPath::new();
@@ -259,7 +259,7 @@ async fn test_genesis_transaction_flow() {
         chain_id,
     );
     let _ = op_tool
-        .add_validator(validator_address, &diem_root, false)
+        .add_validator(validator_address, &aptos_root, false)
         .await
         .unwrap();
 

@@ -57,11 +57,11 @@ You can configure a public FullNode in two ways: using the Diem Core source code
        * 
 
        * Reading through the config and making any other desired changes. You can see what configurations the `public_full_node.yaml` file should have by checking the following file as an example: `docker/compose/public_full_node/public_full_node.yaml`
-4. Run the diem-node using `cargo run -p diem-node --release -- -f ./public_full_node.yaml`
+4. Run the aptos-node using `cargo run -p aptos-node --release -- -f ./public_full_node.yaml`
 
 You have now successfully configured and started running a public FullNode in testnet..
 
-Note: This will build a release binary under `target/release/diem-node`. The release binaries tend to be substantially faster than debug binaries but lack debugging information useful for development. Simply omit the `--release` flag to build a debug binary.
+Note: This will build a release binary under `target/release/aptos-node`. The release binaries tend to be substantially faster than debug binaries but lack debugging information useful for development. Simply omit the `--release` flag to build a debug binary.
 
 ## Using Docker
 

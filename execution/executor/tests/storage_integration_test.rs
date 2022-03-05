@@ -1,12 +1,12 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_crypto::{ed25519::*, PrivateKey, Uniform};
-use diem_transaction_builder::stdlib::{
+use aptos_crypto::{ed25519::*, PrivateKey, Uniform};
+use aptos_transaction_builder::stdlib::{
     encode_peer_to_peer_with_metadata_script, encode_set_validator_config_and_reconfigure_script,
 };
-use diem_types::{
-    account_config::{diem_root_address, treasury_compliance_account_address, xus_tag},
+use aptos_types::{
+    account_config::{aptos_root_address, treasury_compliance_account_address, xus_tag},
     account_state::AccountState,
     block_metadata::BlockMetadata,
     transaction::{Script, Transaction, TransactionPayload, WriteSetPayload},
@@ -25,7 +25,7 @@ use std::convert::TryFrom;
 
 #[test]
 fn test_genesis() {
-    let path = diem_temppath::TempPath::new();
+    let path = aptos_temppath::TempPath::new();
     path.create_as_dir().unwrap();
     let genesis = vm_genesis::test_genesis_transaction();
     let (_, db, _executor, waypoint) = create_db_and_executor(path.path(), &genesis);
@@ -43,12 +43,12 @@ fn test_genesis() {
     let li = state_proof.latest_ledger_info();
     assert_eq!(li.version(), 0);
 
-    let diem_root_account = db
+    let aptos_root_account = db
         .reader
-        .get_account_state_with_proof(diem_root_address(), 0, 0)
+        .get_account_state_with_proof(aptos_root_address(), 0, 0)
         .unwrap();
-    diem_root_account
-        .verify(li, 0, diem_root_address())
+    aptos_root_account
+        .verify(li, 0, aptos_root_address())
         .unwrap();
 }
 
@@ -57,7 +57,7 @@ fn test_reconfiguration() {
     // When executing a transaction emits a validator set change,
     // storage should propagate the new validator set
 
-    let path = diem_temppath::TempPath::new();
+    let path = aptos_temppath::TempPath::new();
     path.create_as_dir().unwrap();
     let (genesis, validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_key = &vm_genesis::GENESIS_KEYPAIR.0;
@@ -74,12 +74,12 @@ fn test_reconfiguration() {
         .reader
         .get_account_state_with_proof(validator_account, current_version, current_version)
         .unwrap();
-    let diem_root_account_state_with_proof = db
+    let aptos_root_account_state_with_proof = db
         .reader
-        .get_account_state_with_proof(diem_root_address(), current_version, current_version)
+        .get_account_state_with_proof(aptos_root_address(), current_version, current_version)
         .unwrap();
     assert_eq!(
-        AccountState::try_from(&diem_root_account_state_with_proof.blob.unwrap())
+        AccountState::try_from(&aptos_root_account_state_with_proof.blob.unwrap())
             .unwrap()
             .get_validator_set()
             .unwrap()
@@ -189,12 +189,12 @@ fn test_reconfiguration() {
         .reader
         .get_account_state_with_proof(validator_account, current_version, current_version)
         .unwrap();
-    let diem_root_account_state_with_proof = db
+    let aptos_root_account_state_with_proof = db
         .reader
-        .get_account_state_with_proof(diem_root_address(), current_version, current_version)
+        .get_account_state_with_proof(aptos_root_address(), current_version, current_version)
         .unwrap();
     assert_eq!(
-        AccountState::try_from(&diem_root_account_state_with_proof.blob.unwrap())
+        AccountState::try_from(&aptos_root_account_state_with_proof.blob.unwrap())
             .unwrap()
             .get_validator_set()
             .unwrap()
@@ -212,11 +212,11 @@ fn test_reconfiguration() {
     );
 
     // test validator's key in the validator set is as expected
-    let diem_root_account_state_with_proof = db
+    let aptos_root_account_state_with_proof = db
         .reader
-        .get_account_state_with_proof(diem_root_address(), current_version, current_version)
+        .get_account_state_with_proof(aptos_root_address(), current_version, current_version)
         .unwrap();
-    let blob = &diem_root_account_state_with_proof.blob.unwrap();
+    let blob = &aptos_root_account_state_with_proof.blob.unwrap();
     assert_eq!(
         AccountState::try_from(blob)
             .unwrap()
@@ -231,7 +231,7 @@ fn test_reconfiguration() {
 
 #[test]
 fn test_change_publishing_option_to_custom() {
-    let path = diem_temppath::TempPath::new();
+    let path = aptos_temppath::TempPath::new();
     path.create_as_dir().unwrap();
     let (genesis, validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_key = &vm_genesis::GENESIS_KEYPAIR.0;
@@ -241,7 +241,7 @@ fn test_change_publishing_option_to_custom() {
     let parent_block_id = executor.committed_block_id();
 
     let treasury_compliance_account = treasury_compliance_account_address();
-    let genesis_account = diem_root_address();
+    let genesis_account = aptos_root_address();
 
     let signer = ValidatorSigner::new(validators[0].data.address, validators[0].key.clone());
     let validator_account = signer.author();

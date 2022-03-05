@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use diem_crypto::{ed25519::Ed25519PrivateKey, Uniform};
+use aptos_crypto::{ed25519::Ed25519PrivateKey, Uniform};
 use rand::{rngs::OsRng, Rng, SeedableRng};
 use std::{
     fs::{self, File},
@@ -45,7 +45,7 @@ pub fn load_key<P: AsRef<Path>>(input_file: P) -> Ed25519PrivateKey {
 #[cfg(test)]
 mod test {
     use super::*;
-    use diem_temppath::TempPath;
+    use aptos_temppath::TempPath;
 
     #[test]
     fn verify_test_create_and_load_key() {

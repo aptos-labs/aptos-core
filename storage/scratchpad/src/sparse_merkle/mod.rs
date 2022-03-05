@@ -86,12 +86,12 @@ use crate::sparse_merkle::{
     updater::SubTreeUpdater,
     utils::partition,
 };
-use diem_crypto::{
+use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use diem_infallible::Mutex;
-use diem_types::{
+use aptos_infallible::Mutex;
+use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
     proof::SparseMerkleProof,
 };

@@ -10,11 +10,11 @@ use crate::{
     },
     storage_synchronizer::StorageSynchronizer,
 };
+use aptos_config::config::NodeConfig;
+use aptos_data_client::diemnet::DiemNetDataClient;
+use aptos_types::waypoint::Waypoint;
 use consensus_notifications::ConsensusNotificationListener;
 use data_streaming_service::streaming_client::StreamingServiceClient;
-use diem_config::config::NodeConfig;
-use diem_data_client::diemnet::DiemNetDataClient;
-use diem_types::waypoint::Waypoint;
 use event_notifications::EventSubscriptionService;
 use executor_types::ChunkExecutorTrait;
 use futures::channel::mpsc;
@@ -43,7 +43,7 @@ impl DriverFactory {
         mempool_notification_sender: MempoolNotifier,
         consensus_listener: ConsensusNotificationListener,
         event_subscription_service: EventSubscriptionService,
-        diem_data_client: DiemNetDataClient,
+        aptos_data_client: DiemNetDataClient,
         streaming_service_client: StreamingServiceClient,
     ) -> Self {
         // Create the notification handlers
@@ -96,7 +96,7 @@ impl DriverFactory {
             event_subscription_service,
             mempool_notification_handler,
             storage_synchronizer,
-            diem_data_client,
+            aptos_data_client,
             streaming_service_client,
             storage,
         );

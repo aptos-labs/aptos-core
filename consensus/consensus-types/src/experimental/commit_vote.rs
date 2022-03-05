@@ -3,8 +3,8 @@
 
 use crate::common::{Author, Round};
 use anyhow::Context;
-use diem_crypto::ed25519::Ed25519Signature;
-use diem_types::{
+use aptos_crypto::ed25519::Ed25519Signature;
+use aptos_types::{
     block_info::BlockInfo, ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };

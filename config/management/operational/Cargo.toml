@@ -1,5 +1,5 @@
 [package]
-name = "diem-operational-tool"
+name = "aptos-operational-tool"
 version = "0.1.0"
 authors = ["Diem Association <opensource@diem.com>"]
 description = "Diem Management is a tool for operators to manage nodes"
@@ -27,21 +27,21 @@ toml = { version = "0.5.8", default-features = false }
 url = "2.2.2"
 
 bcs = "0.1.2"
-diem-rest-client = { path = "../../../crates/diem-rest-client" }
-diem-config = { path = "../.."}
-diem-crypto = { path = "../../../crates/diem-crypto" }
-diem-global-constants = { path = "../../global-constants" }
-diem-infallible = { path = "../../../crates/diem-infallible" }
-diem-management = { path = ".." }
-diem-secure-storage = { path = "../../../secure/storage" }
-diem-types = { path = "../../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
-diem-temppath = { path = "../../../crates/diem-temppath" }
+aptos-rest-client = { path = "../../../crates/aptos-rest-client" }
+aptos-config = { path = "../.."}
+aptos-crypto = { path = "../../../crates/aptos-crypto" }
+aptos-global-constants = { path = "../../global-constants" }
+aptos-infallible = { path = "../../../crates/aptos-infallible" }
+aptos-management = { path = ".." }
+aptos-secure-storage = { path = "../../../secure/storage" }
+aptos-types = { path = "../../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
+aptos-temppath = { path = "../../../crates/aptos-temppath" }
 fallible = { path = "../../../crates/fallible" }
 netcore = { path = "../../../network/netcore" }
 network = { path = "../../../network" }
-diem-transaction-builder = { path = "../../../sdk/transaction-builder" }
+aptos-transaction-builder = { path = "../../../sdk/transaction-builder" }
 
 [features]
 testing = []
-fuzzing = ["diem-config/fuzzing"]
+fuzzing = ["aptos-config/fuzzing"]

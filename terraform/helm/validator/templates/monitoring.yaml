@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-grafana
+  name: {{ include "aptos-validator.fullname" . }}-grafana
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 data:
   prometheus.yml: |-
     apiVersion: 1
@@ -28,9 +28,9 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-monitoring-tls
+  name: {{ include "aptos-validator.fullname" . }}-monitoring-tls
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 type: kubernetes.io/tls
 data:
   tls.crt: {{ .Values.tlsCert }}
@@ -44,9 +44,9 @@ data:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-prometheus
+  name: {{ include "aptos-validator.fullname" . }}-prometheus
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 spec:
   accessModes:
   - ReadWriteOnce
@@ -60,9 +60,9 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-monitoring
+  name: {{ include "aptos-validator.fullname" . }}-monitoring
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 data:
 {{ (tpl (.Files.Glob "files/rules/*.yml").AsConfig .) | indent 2 }}
   prometheus.yml: |-
@@ -77,12 +77,12 @@ data:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-pushgateway
+  name: {{ include "aptos-validator.fullname" . }}-pushgateway
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 spec:
   selector:
-    {{- include "diem-validator.selectorLabels" . | nindent 4 }}
+    {{- include "aptos-validator.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/name: monitoring
   ports:
   - port: 9091
@@ -92,16 +92,16 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-monitoring
+  name: {{ include "aptos-validator.fullname" . }}-monitoring
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
   annotations:
     service.beta.kubernetes.io/aws-load-balancer-type: nlb
     service.beta.kubernetes.io/oci-load-balancer-shape: 10Mbps
     service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: All
 spec:
   selector:
-    {{- include "diem-validator.selectorLabels" . | nindent 4 }}
+    {{- include "aptos-validator.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/name: monitoring
   ports:
   - port: 443
@@ -117,18 +117,18 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-prometheus
+  name: {{ include "aptos-validator.fullname" . }}-prometheus
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 
 ---
 
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-prometheus
+  name: {{ include "aptos-validator.fullname" . }}-prometheus
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 rules:
 - apiGroups: [""]
   resources:
@@ -151,16 +151,16 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-prometheus
+  name: {{ include "aptos-validator.fullname" . }}-prometheus
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "diem-validator.fullname" . }}-prometheus
+  name: {{ include "aptos-validator.fullname" . }}-prometheus
 subjects:
 - kind: ServiceAccount
-  name: {{ include "diem-validator.fullname" . }}-prometheus
+  name: {{ include "aptos-validator.fullname" . }}-prometheus
   namespace: {{ .Release.Namespace }}
 
 ---
@@ -168,22 +168,22 @@ subjects:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-monitoring
+  name: {{ include "aptos-validator.fullname" . }}-monitoring
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
     app.kubernetes.io/name: monitoring
 spec:
-  serviceName: {{ include "diem-validator.fullname" . }}-monitoring
+  serviceName: {{ include "aptos-validator.fullname" . }}-monitoring
   replicas: 1
   podManagementPolicy: Parallel
   selector:
     matchLabels:
-      {{- include "diem-validator.selectorLabels" . | nindent 6 }}
+      {{- include "aptos-validator.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/name: monitoring
   template:
     metadata:
       labels:
-        {{- include "diem-validator.selectorLabels" . | nindent 8 }}
+        {{- include "aptos-validator.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: monitoring
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
@@ -193,7 +193,7 @@ spec:
         checksum/rules.yml: {{ (tpl (.Files.Glob "files/rules/*.yml").AsConfig .) | sha256sum }}
         checksum/dashboards.json: {{ (.Files.Glob "files/dashboards/*.json.gz").AsSecrets | sha256sum }}
     spec:
-      priorityClassName: {{ include "diem-validator.fullname" . }}-medium
+      priorityClassName: {{ include "aptos-validator.fullname" . }}-medium
       {{- with .Values.monitoring }}
       containers:
       - name: prometheus
@@ -374,7 +374,7 @@ spec:
       volumes:
       - name: grafana-provisioning
         configMap:
-          name: {{ include "diem-validator.fullname" . }}-grafana
+          name: {{ include "aptos-validator.fullname" . }}-grafana
           items:
           - key: prometheus.yml
             path: datasources/prometheus.yml
@@ -382,15 +382,15 @@ spec:
             path: dashboards/dashboards.yml
       - name: grafana-dashboards-archive
         configMap:
-          name: {{ include "diem-validator.fullname" . }}-dashboards
+          name: {{ include "aptos-validator.fullname" . }}-dashboards
       - name: grafana-dashboards
         emptyDir: {}
       - name: monitoring-config
         configMap:
-          name: {{ include "diem-validator.fullname" . }}-monitoring
+          name: {{ include "aptos-validator.fullname" . }}-monitoring
       - name: prometheus-data
         persistentVolumeClaim:
-          claimName: {{ include "diem-validator.fullname" . }}-prometheus
+          claimName: {{ include "aptos-validator.fullname" . }}-prometheus
       - name: pushgateway-data
         emptyDir: {}
       - name: alertmanager-data
@@ -400,9 +400,9 @@ spec:
       {{- if .Values.tlsCert }}
       - name: monitoring-tls
         secret:
-          secretName: {{ include "diem-validator.fullname" . }}-monitoring-tls
+          secretName: {{ include "aptos-validator.fullname" . }}-monitoring-tls
       {{- end }}
-      serviceAccountName: {{ include "diem-validator.fullname" . }}-prometheus
+      serviceAccountName: {{ include "aptos-validator.fullname" . }}-prometheus
       {{- if .Values.imagePullSecret }}
       imagePullSecrets:
       - name: {{.Values.imagePullSecret}}

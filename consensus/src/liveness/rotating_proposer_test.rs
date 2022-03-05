@@ -4,8 +4,8 @@
 use crate::liveness::{
     proposer_election::ProposerElection, rotating_proposer_election::RotatingProposer,
 };
+use aptos_types::validator_signer::ValidatorSigner;
 use consensus_types::block::{block_test_utils::certificate_for_genesis, Block};
-use diem_types::validator_signer::ValidatorSigner;
 
 #[test]
 fn test_rotating_proposer() {

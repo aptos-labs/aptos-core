@@ -20,14 +20,14 @@ tokio = { version = "1.8.1", features = ["full"] }
 
 channel = { path = "../../crates/channel" }
 bcs = "0.1.2"
-diem-config = { path = "../../config" }
-diem-crypto = { path = "../../crates/diem-crypto" }
-diem-infallible = { path = "../../crates/diem-infallible" }
-diem-logger = { path = "../../crates/diem-logger" }
-diem-secure-storage = { path = "../../secure/storage" }
-diem-time-service = { path = "../../crates/diem-time-service", features = ["async"] }
-diem-types = { path = "../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptos-config = { path = "../../config" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-infallible = { path = "../../crates/aptos-infallible" }
+aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-secure-storage = { path = "../../secure/storage" }
+aptos-time-service = { path = "../../crates/aptos-time-service", features = ["async"] }
+aptos-types = { path = "../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 event-notifications = { path = "../../state-sync/inter-component/event-notifications" }
 netcore = { path = "../netcore" }
 network = { path = "../." }

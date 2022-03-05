@@ -1,9 +1,9 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_global_constants::OWNER_ACCOUNT;
-use diem_management::{constants, error::Error, secure_backend::SharedBackend};
-use diem_types::{network_address::NetworkAddress, transaction::Transaction};
+use aptos_global_constants::OWNER_ACCOUNT;
+use aptos_management::{constants, error::Error, secure_backend::SharedBackend};
+use aptos_types::{network_address::NetworkAddress, transaction::Transaction};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -11,7 +11,7 @@ pub struct ValidatorConfig {
     #[structopt(long)]
     owner_name: String,
     #[structopt(flatten)]
-    validator_config: diem_management::validator_config::ValidatorConfig,
+    validator_config: aptos_management::validator_config::ValidatorConfig,
     #[structopt(long)]
     validator_address: NetworkAddress,
     #[structopt(long)]
@@ -31,7 +31,7 @@ impl ValidatorConfig {
 
         // Retrieve and set owner account
         let owner_account =
-            diem_config::utils::validator_owner_account_from_name(self.owner_name.as_bytes());
+            aptos_config::utils::validator_owner_account_from_name(self.owner_name.as_bytes());
         let mut validator_storage = config.validator_backend();
         validator_storage.set(OWNER_ACCOUNT, owner_account)?;
 

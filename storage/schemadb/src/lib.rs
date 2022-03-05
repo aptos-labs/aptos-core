@@ -27,7 +27,7 @@ use crate::{
     schema::{KeyCodec, Schema, SeekKeyCodec, ValueCodec},
 };
 use anyhow::{ensure, format_err, Result};
-use diem_logger::prelude::*;
+use aptos_logger::prelude::*;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     iter::Iterator,

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_transaction_builder::aptos_stdlib;
+use aptos_transaction_builder::aptos_stdlib;
 use forge::{AptosContext, AptosTest, Result, Test};
 
 pub struct MintTransfer;

@@ -15,11 +15,11 @@ structopt = "0.3.21"
 
 executor = { path = "../executor" }
 bcs = "0.1.2"
-diemdb = { path = "../../storage/diemdb" }
-diem-config = { path = "../../config" }
-diem-crypto = { path = "../../crates/diem-crypto" }
-diem-temppath = { path = "../../crates/diem-temppath" }
-diem-types = { path = "../../types" }
-diem-vm = { path = "../../diem-move/diem-vm" }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptosdb = { path = "../../storage/aptosdb" }
+aptos-config = { path = "../../config" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-temppath = { path = "../../crates/aptos-temppath" }
+aptos-types = { path = "../../types" }
+aptos-vm = { path = "../../aptos-move/aptos-vm" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 storage-interface = { path = "../../storage/storage-interface" }

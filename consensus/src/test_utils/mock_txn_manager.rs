@@ -3,14 +3,14 @@
 
 use crate::{error::MempoolError, state_replication::TxnManager, txn_manager::MempoolProxy};
 use anyhow::Result;
+use aptos_mempool::ConsensusRequest;
+use aptos_types::{
+    transaction::TransactionStatus,
+    vm_status::{KeptVMStatus, StatusCode},
+};
 use consensus_types::{
     block::{block_test_utils::random_payload, Block},
     common::Payload,
-};
-use diem_mempool::ConsensusRequest;
-use diem_types::{
-    transaction::TransactionStatus,
-    vm_status::{KeptVMStatus, StatusCode},
 };
 use executor_types::StateComputeResult;
 use futures::{channel::mpsc, future::BoxFuture};

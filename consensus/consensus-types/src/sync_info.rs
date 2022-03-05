@@ -6,7 +6,7 @@ use crate::{
     timeout_certificate::TimeoutCertificate,
 };
 use anyhow::{ensure, Context};
-use diem_types::{
+use aptos_types::{
     block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures,
     validator_verifier::ValidatorVerifier,
 };

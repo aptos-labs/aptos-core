@@ -9,15 +9,15 @@ use crate::{
         wire::handshake::v1::{HandshakeMsg, MessagingProtocolVersion, ProtocolIdSet},
     },
 };
-use diem_config::{
+use aptos_config::{
     config::{PeerRole, HANDSHAKE_VERSION},
     network_id::{NetworkContext, NetworkId},
 };
-use diem_crypto::x25519;
-use diem_id_generator::{IdGenerator, U32IdGenerator};
-use diem_logger::prelude::*;
-use diem_time_service::{timeout, TimeService, TimeServiceTrait};
-use diem_types::{
+use aptos_crypto::x25519;
+use aptos_id_generator::{IdGenerator, U32IdGenerator};
+use aptos_logger::prelude::*;
+use aptos_time_service::{timeout, TimeService, TimeServiceTrait};
+use aptos_types::{
     chain_id::ChainId,
     network_address::{parse_dns_tcp, parse_ip_tcp, parse_memory, NetworkAddress},
     PeerId,
@@ -454,7 +454,7 @@ where
     fn parse_dial_addr(
         addr: &NetworkAddress,
     ) -> io::Result<(NetworkAddress, x25519::PublicKey, u8)> {
-        use diem_types::network_address::Protocol::*;
+        use aptos_types::network_address::Protocol::*;
 
         let protos = addr.as_slice();
 

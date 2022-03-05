@@ -5,24 +5,14 @@ use crate::{
     persistent_safety_storage::PersistentSafetyStorage, serializer::SerializerService, SafetyRules,
     TSafetyRules,
 };
-use consensus_types::{
-    block::Block,
-    common::{Payload, Round},
-    quorum_cert::QuorumCert,
-    timeout::Timeout,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
-    vote::Vote,
-    vote_data::VoteData,
-    vote_proposal::{MaybeSignedVoteProposal, VoteProposal},
-};
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::Ed25519PrivateKey,
     hash::{CryptoHash, TransactionAccumulatorHasher},
     traits::SigningKey,
     Uniform,
 };
-use diem_secure_storage::{InMemoryStorage, Storage};
-use diem_types::{
+use aptos_secure_storage::{InMemoryStorage, Storage};
+use aptos_types::{
     block_info::BlockInfo,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
@@ -32,6 +22,16 @@ use diem_types::{
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
     waypoint::Waypoint,
+};
+use consensus_types::{
+    block::Block,
+    common::{Payload, Round},
+    quorum_cert::QuorumCert,
+    timeout::Timeout,
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
+    vote::Vote,
+    vote_data::VoteData,
+    vote_proposal::{MaybeSignedVoteProposal, VoteProposal},
 };
 use std::collections::BTreeMap;
 

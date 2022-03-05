@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::components::block_tree::{epoch_genesis_block_id, BlockLookup, BlockTree};
-use diem_crypto::{hash::PRE_GENESIS_BLOCK_ID, HashValue};
-use diem_infallible::Mutex;
-use diem_types::{block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo};
+use aptos_crypto::{hash::PRE_GENESIS_BLOCK_ID, HashValue};
+use aptos_infallible::Mutex;
+use aptos_types::{block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo};
 use executor_types::{ExecutedChunk, ExecutedTrees};
 use std::sync::Arc;
 

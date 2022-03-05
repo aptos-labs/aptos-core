@@ -1,0 +1,22 @@
+[package]
+name = "aptossum"
+version = "0.1.0"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "Diem aptosdb data access tool for data analysis or human read"
+repository = "https://github.com/diem/diem"
+homepage = "https://diem.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.52"
+structopt = "0.3.21"
+serde = "1.0.124"
+serde_json = "1.0.64"
+
+aptosdb = { path = "../aptosdb", features = ["aptossum"] }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-types = { path = "../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
+storage-interface = { path = "../storage-interface" }

@@ -1597,13 +1597,13 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(diem_key_manager_state{state=\"liveness_error_encountered\", owner=~\"$owner\"}[1h])",
+          "expr": "increase(aptos_key_manager_state{state=\"liveness_error_encountered\", owner=~\"$owner\"}[1h])",
           "interval": "",
           "legendFormat": "{{owner}}_liveness_error",
           "refId": "A"
         },
         {
-          "expr": "increase(diem_key_manager_state{state=\"unexpected_error_encountered\", owner=~\"$owner\"}[1h])",
+          "expr": "increase(aptos_key_manager_state{state=\"unexpected_error_encountered\", owner=~\"$owner\"}[1h])",
           "interval": "",
           "legendFormat": "{{owner}}_unexpected_error",
           "refId": "B"
@@ -1700,7 +1700,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(diem_key_manager_state{state=\"keys_still_fresh\", owner=~\"$owner\"}[1h])",
+          "expr": "increase(aptos_key_manager_state{state=\"keys_still_fresh\", owner=~\"$owner\"}[1h])",
           "interval": "",
           "legendFormat": "{{owner}}_keys_still_fresh",
           "refId": "A"
@@ -2123,7 +2123,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role) (rate(diem_shared_mempool_transaction_broadcast_sum{role=~\"$role\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "sum by (owner, role) (rate(aptos_shared_mempool_transaction_broadcast_sum{role=~\"$role\", owner=~\"$owner\"}[$AggInterval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2238,7 +2238,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(diem_safety_rules_queries{owner=~\"$owner\", result=\"error\"}[$AggInterval])",
+          "expr": "increase(aptos_safety_rules_queries{owner=~\"$owner\", result=\"error\"}[$AggInterval])",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -2341,7 +2341,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_safety_rules_state{field=\"epoch\", owner=~\"$owner\"}",
+          "expr": "aptos_safety_rules_state{field=\"epoch\", owner=~\"$owner\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -2444,7 +2444,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_safety_rules_state{field=\"last_voted_round\", owner=~\"$owner\"}",
+          "expr": "aptos_safety_rules_state{field=\"last_voted_round\", owner=~\"$owner\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -2547,7 +2547,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_safety_rules_state{field=\"preferred_round\", owner=~\"$owner\"}",
+          "expr": "aptos_safety_rules_state{field=\"preferred_round\", owner=~\"$owner\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -2776,7 +2776,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_vm_user_transactions_executed{owner=~\"$owner\",role=~\"$role\",status=\"success\"}[1m])",
+          "expr": "rate(aptos_vm_user_transactions_executed{owner=~\"$owner\",role=~\"$role\",status=\"success\"}[1m])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2875,7 +2875,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_vm_system_transactions_executed{owner=~\"$owner\",role=~\"$role\"}[1m])",
+          "expr": "rate(aptos_vm_system_transactions_executed{owner=~\"$owner\",role=~\"$role\"}[1m])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2974,7 +2974,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_vm_txn_total_seconds_sum{owner=~\"$owner\",role=~\"$role\"}[1m])/rate(diem_vm_txn_total_seconds_count{owner=~\"$owner\",role=~\"$role\"}[1m])",
+          "expr": "rate(aptos_vm_txn_total_seconds_sum{owner=~\"$owner\",role=~\"$role\"}[1m])/rate(aptos_vm_txn_total_seconds_count{owner=~\"$owner\",role=~\"$role\"}[1m])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -3087,7 +3087,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, type) (rate(diem_client_service_rpc_requests_count{role=~\"$role\", type=~\"$requesttype\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "sum by (owner, role, type) (rate(aptos_client_service_rpc_requests_count{role=~\"$role\", type=~\"$requesttype\", owner=~\"$owner\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}-{{type}}",
           "refId": "A"
@@ -3189,7 +3189,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, method, errorcode) (rate(diem_client_service_internal_error_count{role=~\"$role\", type=~\"$requesttype\", method=~\"$method\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "sum by (owner, role, method, errorcode) (rate(aptos_client_service_internal_error_count{role=~\"$role\", type=~\"$requesttype\", method=~\"$method\", owner=~\"$owner\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}-{{method}} {{errortype}}",
           "refId": "A"
@@ -3291,7 +3291,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, method, errortype) (rate(diem_client_service_invalid_requests_count{role=~\"$role\", type=~\"$requesttype\", method=~\"$method\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "sum by (owner, role, method, errortype) (rate(aptos_client_service_invalid_requests_count{role=~\"$role\", type=~\"$requesttype\", method=~\"$method\", owner=~\"$owner\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}-{{method}} {{errortype}}",
           "refId": "A"
@@ -3404,7 +3404,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum  by (owner, role, le)(rate(diem_client_service_rpc_request_latency_seconds_bucket{role=~\"$role\", owner=~\"$owner\",type=~\"$requesttype\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.50, sum  by (owner, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{role=~\"$role\", owner=~\"$owner\",type=~\"$requesttype\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -3518,7 +3518,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.90, sum  by (owner, role, le)(rate(diem_client_service_rpc_request_latency_seconds_bucket{role=~\"$role\", owner=~\"$owner\",type=~\"$requesttype\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.90, sum  by (owner, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{role=~\"$role\", owner=~\"$owner\",type=~\"$requesttype\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -3632,7 +3632,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum  by (owner, role, le)(rate(diem_client_service_rpc_request_latency_seconds_bucket{role=~\"$role\", owner=~\"$owner\",type=~\"$requesttype\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.99, sum  by (owner, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{role=~\"$role\", owner=~\"$owner\",type=~\"$requesttype\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",

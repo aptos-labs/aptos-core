@@ -2,18 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error::Error;
+use aptos_infallible::Mutex;
+use aptos_logger::prelude::*;
+use aptos_types::{
+    contract_event::ContractEvent,
+    ledger_info::LedgerInfoWithSignatures,
+    transaction::{Transaction, Version},
+};
 use consensus_notifications::{
     ConsensusCommitNotification, ConsensusNotification, ConsensusNotificationListener,
     ConsensusSyncNotification,
 };
 use data_streaming_service::data_notification::NotificationId;
-use diem_infallible::Mutex;
-use diem_logger::prelude::*;
-use diem_types::{
-    contract_event::ContractEvent,
-    ledger_info::LedgerInfoWithSignatures,
-    transaction::{Transaction, Version},
-};
 use event_notifications::{EventNotificationSender, EventSubscriptionService};
 use futures::{channel::mpsc, stream::FusedStream, Stream};
 use mempool_notifications::MempoolNotificationSender;

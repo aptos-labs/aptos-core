@@ -1,8 +1,8 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_rest_client::Client;
-use diem_sdk::types::account_config::testnet_dd_account_address;
+use aptos_rest_client::Client;
+use aptos_sdk::types::account_config::testnet_dd_account_address;
 use forge::{PublicUsageContext, PublicUsageTest, Result, Test};
 
 pub struct GetIndex;
@@ -54,7 +54,7 @@ impl BasicClient {
         ctx.fund(account2.address(), 10).await?;
 
         let tx = account1.sign_with_transaction_builder(ctx.transaction_factory().peer_to_peer(
-            diem_sdk::transaction_builder::Currency::XUS,
+            aptos_sdk::transaction_builder::Currency::XUS,
             account2.address(),
             1,
         ));

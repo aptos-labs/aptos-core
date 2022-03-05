@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-tools
+  name: {{ include "aptos-validator.fullname" . }}-tools
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 spec:
-  serviceName: {{ include "diem-validator.fullname" . }}-tools
+  serviceName: {{ include "aptos-validator.fullname" . }}-tools
   replicas: 0
   podManagementPolicy: Parallel
   selector:
     matchLabels:
-      {{- include "diem-validator.selectorLabels" . | nindent 6 }}
+      {{- include "aptos-validator.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/name: tools
   template:
     metadata:
       labels:
-        {{- include "diem-validator.selectorLabels" . | nindent 8 }}
+        {{- include "aptos-validator.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: tools
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
@@ -28,7 +28,7 @@ spec:
       {{- end }}
         command: ["sleep", "infinity"]
         volumeMounts:
-        - name: diem-data
+        - name: aptos-data
           mountPath: /opt/diem/data
         - name: tmp
           mountPath: /tmp
@@ -56,9 +56,9 @@ spec:
         runAsGroup: 6180
         fsGroup: 6180
       volumes:
-      - name: diem-data
+      - name: aptos-data
         persistentVolumeClaim:
-          claimName: {{ include "diem-validator.fullname" . }}-validator-e{{ .Values.chain.era }}
+          claimName: {{ include "aptos-validator.fullname" . }}-validator-e{{ .Values.chain.era }}
       - name: tmp
         emptyDir: {}
-      serviceAccountName: {{ include "diem-validator.serviceAccountName" . }}
+      serviceAccountName: {{ include "aptos-validator.serviceAccountName" . }}

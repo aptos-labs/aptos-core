@@ -53,21 +53,21 @@ impl From<serde_json::Error> for Error {
     }
 }
 
-impl From<diem_vault_client::Error> for Error {
-    fn from(error: diem_vault_client::Error) -> Self {
+impl From<aptos_vault_client::Error> for Error {
+    fn from(error: aptos_vault_client::Error) -> Self {
         match error {
-            diem_vault_client::Error::NotFound(_, key) => Self::KeyNotSet(key),
-            diem_vault_client::Error::HttpError(403, _, _) => Self::PermissionDenied,
+            aptos_vault_client::Error::NotFound(_, key) => Self::KeyNotSet(key),
+            aptos_vault_client::Error::HttpError(403, _, _) => Self::PermissionDenied,
             _ => Self::InternalError(format!("{}", error)),
         }
     }
 }
 
-impl From<diem_github_client::Error> for Error {
-    fn from(error: diem_github_client::Error) -> Self {
+impl From<aptos_github_client::Error> for Error {
+    fn from(error: aptos_github_client::Error) -> Self {
         match error {
-            diem_github_client::Error::NotFound(key) => Self::KeyNotSet(key),
-            diem_github_client::Error::HttpError(403, _, _) => Self::PermissionDenied,
+            aptos_github_client::Error::NotFound(key) => Self::KeyNotSet(key),
+            aptos_github_client::Error::HttpError(403, _, _) => Self::PermissionDenied,
             _ => Self::InternalError(format!("{}", error)),
         }
     }

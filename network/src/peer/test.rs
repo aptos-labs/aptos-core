@@ -22,11 +22,11 @@ use crate::{
     transport::{Connection, ConnectionId, ConnectionMetadata},
     ProtocolId,
 };
+use aptos_config::{config::PeerRole, network_id::NetworkContext};
+use aptos_time_service::{MockTimeService, TimeService};
+use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
-use channel::{self, diem_channel, message_queues::QueueStyle};
-use diem_config::{config::PeerRole, network_id::NetworkContext};
-use diem_time_service::{MockTimeService, TimeService};
-use diem_types::{network_address::NetworkAddress, PeerId};
+use channel::{self, aptos_channel, message_queues::QueueStyle};
 use futures::{
     channel::oneshot,
     future::{self, FutureExt},
@@ -53,7 +53,7 @@ fn build_test_peer(
     PeerHandle,
     MemorySocket,
     channel::Receiver<TransportNotification<MemorySocket>>,
-    diem_channel::Receiver<ProtocolId, PeerNotification>,
+    aptos_channel::Receiver<ProtocolId, PeerNotification>,
 ) {
     let (a, b) = MemorySocket::new_pair();
     let peer_id = PeerId::random();
@@ -72,9 +72,9 @@ fn build_test_peer(
 
     let (connection_notifs_tx, connection_notifs_rx) = channel::new_test(1);
     let (peer_reqs_tx, peer_reqs_rx) =
-        diem_channel::new(QueueStyle::FIFO, NETWORK_CHANNEL_SIZE, None);
+        aptos_channel::new(QueueStyle::FIFO, NETWORK_CHANNEL_SIZE, None);
     let (peer_notifs_tx, peer_notifs_rx) =
-        diem_channel::new(QueueStyle::FIFO, NETWORK_CHANNEL_SIZE, None);
+        aptos_channel::new(QueueStyle::FIFO, NETWORK_CHANNEL_SIZE, None);
 
     let peer = Peer::new(
         NetworkContext::mock(),
@@ -104,13 +104,13 @@ fn build_test_connected_peers(
         Peer<MemorySocket>,
         PeerHandle,
         channel::Receiver<TransportNotification<MemorySocket>>,
-        diem_channel::Receiver<ProtocolId, PeerNotification>,
+        aptos_channel::Receiver<ProtocolId, PeerNotification>,
     ),
     (
         Peer<MemorySocket>,
         PeerHandle,
         channel::Receiver<TransportNotification<MemorySocket>>,
-        diem_channel::Receiver<ProtocolId, PeerNotification>,
+        aptos_channel::Receiver<ProtocolId, PeerNotification>,
     ),
 ) {
     let (peer_a, peer_handle_a, connection_a, connection_notifs_rx_a, peer_notifs_rx_a) =
@@ -167,7 +167,7 @@ async fn assert_disconnected_event(
 }
 
 #[derive(Clone)]
-struct PeerHandle(diem_channel::Sender<ProtocolId, PeerRequest>);
+struct PeerHandle(aptos_channel::Sender<ProtocolId, PeerRequest>);
 
 impl PeerHandle {
     fn send_direct_send(&mut self, message: Message) {
@@ -198,7 +198,7 @@ impl PeerHandle {
 // Sending an outbound DirectSend should write it to the wire.
 #[test]
 fn peer_send_message() {
-    ::diem_logger::Logger::init_for_testing();
+    ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (peer, mut peer_handle, mut connection, _connection_notifs_rx, _peer_notifs_rx) =
         build_test_peer(
@@ -241,7 +241,7 @@ fn peer_send_message() {
 // an inbound DirectSend.
 #[test]
 fn peer_recv_message() {
-    ::diem_logger::Logger::init_for_testing();
+    ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (peer, _peer_handle, connection, _connection_notifs_rx, mut peer_notifs_rx) =
         build_test_peer(
@@ -284,7 +284,7 @@ fn peer_recv_message() {
 // other and then shutdown gracefully.
 #[test]
 fn peers_send_message_concurrent() {
-    ::diem_logger::Logger::init_for_testing();
+    ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (
         (peer_a, mut peer_handle_a, mut connection_notifs_rx_a, mut peer_notifs_rx_a),
@@ -338,7 +338,7 @@ fn peers_send_message_concurrent() {
 
 #[test]
 fn peer_recv_rpc() {
-    ::diem_logger::Logger::init_for_testing();
+    ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (peer, _peer_handle, mut connection, _connection_notifs_rx, mut peer_notifs_rx) =
         build_test_peer(
@@ -397,7 +397,7 @@ fn peer_recv_rpc() {
 
 #[test]
 fn peer_recv_rpc_concurrent() {
-    ::diem_logger::Logger::init_for_testing();
+    ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (peer, _peer_handle, mut connection, _connection_notifs_rx, mut peer_notifs_rx) =
         build_test_peer(
@@ -463,7 +463,7 @@ fn peer_recv_rpc_concurrent() {
 
 #[test]
 fn peer_recv_rpc_timeout() {
-    ::diem_logger::Logger::init_for_testing();
+    ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let mock_time = MockTimeService::new();
     let (peer, _peer_handle, mut connection, _connection_notifs_rx, mut peer_notifs_rx) =
@@ -522,7 +522,7 @@ fn peer_recv_rpc_timeout() {
 
 #[test]
 fn peer_recv_rpc_cancel() {
-    ::diem_logger::Logger::init_for_testing();
+    ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (peer, _peer_handle, mut connection, _connection_notifs_rx, mut peer_notifs_rx) =
         build_test_peer(
@@ -576,7 +576,7 @@ fn peer_recv_rpc_cancel() {
 
 #[test]
 fn peer_send_rpc() {
-    ::diem_logger::Logger::init_for_testing();
+    ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (peer, mut peer_handle, mut connection, _connection_notifs_rx, _peer_notifs_rx) =
         build_test_peer(
@@ -635,7 +635,7 @@ fn peer_send_rpc() {
 
 #[test]
 fn peer_send_rpc_concurrent() {
-    ::diem_logger::Logger::init_for_testing();
+    ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (peer, peer_handle, mut connection, _connection_notifs_rx, _peer_notifs_rx) =
         build_test_peer(
@@ -704,7 +704,7 @@ fn peer_send_rpc_concurrent() {
 
 #[test]
 fn peer_send_rpc_cancel() {
-    ::diem_logger::Logger::init_for_testing();
+    ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (peer, peer_handle, mut connection, _connection_notifs_rx, _peer_notifs_rx) =
         build_test_peer(
@@ -764,7 +764,7 @@ fn peer_send_rpc_cancel() {
 
 #[test]
 fn peer_send_rpc_timeout() {
-    ::diem_logger::Logger::init_for_testing();
+    ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let mock_time = MockTimeService::new();
     let (peer, peer_handle, mut connection, _connection_notifs_rx, _peer_notifs_rx) =
@@ -829,7 +829,7 @@ fn peer_send_rpc_timeout() {
 // PeerManager can request a Peer to shutdown.
 #[test]
 fn peer_disconnect_request() {
-    ::diem_logger::Logger::init_for_testing();
+    ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (peer, peer_handle, _connection, mut connection_notifs_rx, _peer_notifs_rx) =
         build_test_peer(
@@ -855,7 +855,7 @@ fn peer_disconnect_request() {
 // Peer will shutdown if the underlying connection is lost.
 #[test]
 fn peer_disconnect_connection_lost() {
-    ::diem_logger::Logger::init_for_testing();
+    ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (peer, _peer_handle, mut connection, mut connection_notifs_rx, _peer_notifs_rx) =
         build_test_peer(
@@ -879,7 +879,7 @@ fn peer_disconnect_connection_lost() {
 
 #[test]
 fn peer_terminates_when_request_tx_has_dropped() {
-    ::diem_logger::Logger::init_for_testing();
+    ::aptos_logger::Logger::init_for_testing();
     let rt = Runtime::new().unwrap();
     let (peer, peer_handle, _connection, _connection_notifs_rx, _peer_notifs_rx) = build_test_peer(
         rt.handle().clone(),

@@ -9,27 +9,27 @@ use crate::{
     },
 };
 use anyhow::{bail, Result};
-use diem_config::{
+use aptos_config::{
     config::{PeerRole, SecureBackend},
     network_id::NetworkId,
 };
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, HashValue, PrivateKey, Uniform, ValidCryptoMaterialStringExt,
 };
-use diem_global_constants::{
+use aptos_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, GENESIS_WAYPOINT, OPERATOR_ACCOUNT, OPERATOR_KEY,
     OWNER_ACCOUNT, OWNER_KEY, VALIDATOR_NETWORK_ADDRESS_KEYS, VALIDATOR_NETWORK_KEY, WAYPOINT,
 };
-use diem_management::storage::to_x25519;
-use diem_operational_tool::{
+use aptos_management::storage::to_x25519;
+use aptos_operational_tool::{
     keys::{EncodingType, KeyType},
     test_helper::OperationalTool,
 };
-use diem_rest_client::Client as RestClient;
-use diem_secure_storage::{CryptoStorage, KVStorage, Storage};
-use diem_temppath::TempPath;
-use diem_types::{
+use aptos_rest_client::Client as RestClient;
+use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
+use aptos_temppath::TempPath;
+use aptos_types::{
     account_address::{from_identity_public_key, AccountAddress},
     account_state::AccountState,
     account_state_blob::AccountStateBlob,

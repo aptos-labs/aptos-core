@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error::Error;
+use aptos_logger::prelude::*;
+use aptos_types::{
+    epoch_change::Verifier, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    transaction::Version,
+};
 use data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     data_stream::DataStreamListener,
     streaming_client::{DataStreamingClient, NotificationFeedback, StreamingServiceClient},
-};
-use diem_logger::prelude::*;
-use diem_types::{
-    epoch_change::Verifier, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
-    transaction::Version,
 };
 use futures::StreamExt;
 use std::{sync::Arc, time::Duration};

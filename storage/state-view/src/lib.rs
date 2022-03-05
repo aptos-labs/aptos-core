@@ -6,8 +6,8 @@
 //! This crate defines [`trait StateView`](StateView).
 
 use anyhow::Result;
-use diem_crypto::HashValue;
-use diem_types::{access_path::AccessPath, transaction::Version};
+use aptos_crypto::HashValue;
+use aptos_types::{access_path::AccessPath, transaction::Version};
 
 /// `StateView` is a trait that defines a read-only snapshot of the global state. It is passed to
 /// the VM for transaction execution, during which the VM is guaranteed to read anything at the

@@ -3,8 +3,8 @@
 
 #![forbid(unsafe_code)]
 
-use diem_config::config::StorageServiceConfig;
-use diem_types::{
+use aptos_config::config::StorageServiceConfig;
+use aptos_types::{
     account_state_blob::AccountStatesChunkWithProof,
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
@@ -584,9 +584,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_crypto::hash::HashValue;
+    use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfo};
     use claim::{assert_err, assert_ok};
-    use diem_crypto::hash::HashValue;
-    use diem_types::{block_info::BlockInfo, ledger_info::LedgerInfo};
     use proptest::prelude::*;
     use std::collections::BTreeMap;
 

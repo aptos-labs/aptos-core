@@ -14,7 +14,7 @@ consensus:
   safety_rules:
     service:
       type: "process"
-      server_address: "/dns4/{{ include "diem-validator.fullname" . }}-safety-rules/tcp/6185"
+      server_address: "/dns4/{{ include "aptos-validator.fullname" . }}-safety-rules/tcp/6185"
   sync_only: {{ .Values.validator.config.sync_only | default false}}
   {{- if .Values.validator.config.mempool_poll_count }}
   mempool_poll_count: {{ .Values.validator.config.mempool_poll_count }}

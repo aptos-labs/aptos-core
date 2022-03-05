@@ -10,6 +10,19 @@ use crate::{
     persistent_safety_storage::PersistentSafetyStorage,
     t_safety_rules::TSafetyRules,
 };
+use aptos_crypto::{
+    ed25519::{Ed25519PublicKey, Ed25519Signature},
+    hash::{CryptoHash, HashValue},
+    traits::Signature,
+};
+use aptos_logger::prelude::*;
+use aptos_types::{
+    block_info::BlockInfo,
+    epoch_change::EpochChangeProof,
+    epoch_state::EpochState,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    waypoint::Waypoint,
+};
 use consensus_types::{
     block::Block,
     block_data::BlockData,
@@ -21,19 +34,6 @@ use consensus_types::{
     vote::Vote,
     vote_data::VoteData,
     vote_proposal::MaybeSignedVoteProposal,
-};
-use diem_crypto::{
-    ed25519::{Ed25519PublicKey, Ed25519Signature},
-    hash::{CryptoHash, HashValue},
-    traits::Signature,
-};
-use diem_logger::prelude::*;
-use diem_types::{
-    block_info::BlockInfo,
-    epoch_change::EpochChangeProof,
-    epoch_state::EpochState,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    waypoint::Waypoint,
 };
 use serde::Serialize;
 use std::cmp::Ordering;

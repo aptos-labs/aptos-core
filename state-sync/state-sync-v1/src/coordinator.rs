@@ -13,21 +13,21 @@ use crate::{
     request_manager::RequestManager,
     shared_components::SyncState,
 };
-use consensus_notifications::{
-    ConsensusCommitNotification, ConsensusNotification, ConsensusNotificationListener,
-    ConsensusSyncNotification,
-};
-use diem_config::{
+use aptos_config::{
     config::{NodeConfig, RoleType, StateSyncConfig},
     network_id::{NetworkId, PeerNetworkId},
 };
-use diem_logger::prelude::*;
-use diem_types::{
+use aptos_logger::prelude::*;
+use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     transaction::{Transaction, TransactionListWithProof, Version},
     waypoint::Waypoint,
     PeerId,
+};
+use consensus_notifications::{
+    ConsensusCommitNotification, ConsensusNotification, ConsensusNotificationListener,
+    ConsensusSyncNotification,
 };
 use fail::fail_point;
 use futures::{
@@ -636,7 +636,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
         );
         counters::set_timestamp(
             counters::TimestampType::Real,
-            diem_infallible::duration_since_epoch().as_micros() as u64,
+            aptos_infallible::duration_since_epoch().as_micros() as u64,
         );
 
         debug!(LogSchema::new(LogEntry::LocalState)
@@ -1750,19 +1750,15 @@ mod tests {
         network::StateSyncMessage,
         shared_components::{test_utils, test_utils::create_coordinator_with_config_and_waypoint},
     };
-    use claim::{assert_err, assert_matches, assert_ok};
-    use consensus_notifications::{
-        ConsensusCommitNotification, ConsensusNotificationResponse, ConsensusSyncNotification,
-    };
-    use diem_config::{
+    use aptos_config::{
         config::{NodeConfig, PeerRole, RoleType},
         network_id::{NetworkId, PeerNetworkId},
     };
-    use diem_crypto::{
+    use aptos_crypto::{
         ed25519::{Ed25519PrivateKey, Ed25519Signature},
         HashValue, PrivateKey, Uniform,
     };
-    use diem_types::{
+    use aptos_types::{
         account_address::AccountAddress,
         block_info::BlockInfo,
         chain_id::ChainId,
@@ -1775,6 +1771,10 @@ mod tests {
         },
         waypoint::Waypoint,
         PeerId,
+    };
+    use claim::{assert_err, assert_matches, assert_ok};
+    use consensus_notifications::{
+        ConsensusCommitNotification, ConsensusNotificationResponse, ConsensusSyncNotification,
     };
     use executor_types::ChunkExecutorTrait;
     use futures::{channel::oneshot, executor::block_on};

@@ -1,8 +1,10 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_global_constants::OPERATOR_KEY;
-use diem_management::{config::ConfigPath, constants, error::Error, secure_backend::SharedBackend};
+use aptos_global_constants::OPERATOR_KEY;
+use aptos_management::{
+    config::ConfigPath, constants, error::Error, secure_backend::SharedBackend,
+};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]

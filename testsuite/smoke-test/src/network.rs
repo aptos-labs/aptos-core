@@ -2,17 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::new_local_swarm;
-use diem_config::{
+use aptos_config::{
     config::{DiscoveryMethod, Identity, NetworkConfig, NodeConfig, PeerSet, PersistableConfig},
     network_id::NetworkId,
 };
-use diem_crypto::{x25519, x25519::PrivateKey};
-use diem_operational_tool::{
+use aptos_crypto::{x25519, x25519::PrivateKey};
+use aptos_operational_tool::{
     keys::{EncodingType, KeyType},
     test_helper::OperationalTool,
 };
-use diem_temppath::TempPath;
-use diem_types::network_address::{NetworkAddress, Protocol};
+use aptos_temppath::TempPath;
+use aptos_types::network_address::{NetworkAddress, Protocol};
 use forge::{FullNode, LocalNode, NodeExt, Swarm};
 use std::{
     collections::HashMap,

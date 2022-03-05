@@ -1,10 +1,10 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_crypto::{ed25519::Ed25519PublicKey, x25519};
+use aptos_crypto::{ed25519::Ed25519PublicKey, x25519};
 
-use diem_management::{config::ConfigPath, error::Error, secure_backend::ValidatorBackend};
-use diem_types::{account_address::AccountAddress, waypoint::Waypoint};
+use aptos_management::{config::ConfigPath, error::Error, secure_backend::ValidatorBackend};
+use aptos_types::{account_address::AccountAddress, waypoint::Waypoint};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]

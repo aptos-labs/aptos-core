@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{account_address::AccountAddress, network_address::NetworkAddress};
-use diem_crypto::ed25519::Ed25519PublicKey;
+use aptos_crypto::ed25519::Ed25519PublicKey;
 use move_core_types::{
     ident_str,
     identifier::IdentStr,

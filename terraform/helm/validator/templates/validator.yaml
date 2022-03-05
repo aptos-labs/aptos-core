@@ -1,18 +1,18 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-validator
+  name: {{ include "aptos-validator.fullname" . }}-validator
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 
 ---
 
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-validator
+  name: {{ include "aptos-validator.fullname" . }}-validator
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 type: Opaque
 stringData:
   seed: "{{ .Values.validator.configSeed }}"
@@ -23,9 +23,9 @@ stringData:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-validator-e{{ .Values.chain.era }}
+  name: {{ include "aptos-validator.fullname" . }}-validator-e{{ .Values.chain.era }}
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 spec:
   accessModes:
   - ReadWriteOnce
@@ -39,12 +39,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-validator
+  name: {{ include "aptos-validator.fullname" . }}-validator
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 spec:
   selector:
-    {{- include "diem-validator.selectorLabels" . | nindent 4 }}
+    {{- include "aptos-validator.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/name: validator
   ports:
   - name: validator
@@ -61,29 +61,29 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-validator
+  name: {{ include "aptos-validator.fullname" . }}-validator
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
     app.kubernetes.io/name: validator
 spec:
-  serviceName: {{ include "diem-validator.fullname" . }}-validator
+  serviceName: {{ include "aptos-validator.fullname" . }}-validator
   replicas: 1
   podManagementPolicy: Parallel
   selector:
     matchLabels:
-      {{- include "diem-validator.selectorLabels" . | nindent 6 }}
+      {{- include "aptos-validator.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/name: validator
   template:
     metadata:
       labels:
-        {{- include "diem-validator.selectorLabels" . | nindent 8 }}
+        {{- include "aptos-validator.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: validator
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
         checksum/validator.yaml: {{ tpl (.Files.Get "files/configs/validator.yaml") . | sha256sum }}
         checksum/vault.json: {{ tpl (.Files.Get "files/vault.json") . | sha256sum }}
     spec:
-      priorityClassName: {{ include "diem-validator.fullname" . }}-high
+      priorityClassName: {{ include "aptos-validator.fullname" . }}-high
       terminationGracePeriodSeconds: 0
       containers:
       - name: validator
@@ -96,7 +96,7 @@ spec:
         - |-
           set -ex
           while [ ! -e /opt/vault/token ] && [ $SECONDS -lt 30 ]; do sleep 1; done
-          exec /opt/diem/bin/diem-node -f /opt/diem/etc/validator.yaml
+          exec /opt/diem/bin/aptos-node -f /opt/diem/etc/validator.yaml
         resources:
           {{- toYaml .resources | nindent 10 }}
         env:
@@ -106,15 +106,15 @@ spec:
           value: {{ .rust_log_remote }}
       {{- end }}
         - name: STRUCT_LOG_TCP_ADDR
-          value: '{{ include "diem-validator.fullname" . }}-logging:5044'
+          value: '{{ include "aptos-validator.fullname" . }}-logging:5044'
         - name: RUST_BACKTRACE
           value: "1"
         volumeMounts:
-        - name: diem-config
+        - name: aptos-config
           mountPath: /opt/diem/etc
         - name: genesis-config
           mountPath: /opt/diem/genesis
-        - name: diem-data
+        - name: aptos-data
           mountPath: /opt/diem/data
         - name: vault-config
           mountPath: /etc/vault
@@ -177,22 +177,22 @@ spec:
         fsGroup: 6180
       {{- end }}
       volumes:
-      - name: diem-config
+      - name: aptos-config
         configMap:
-          name: {{ include "diem-validator.fullname" . }}
+          name: {{ include "aptos-validator.fullname" . }}
       - name: genesis-config
         configMap:
-          name: {{ include "diem-validator.fullname" . }}-genesis-e{{ .Values.chain.era }}
-      - name: diem-data
+          name: {{ include "aptos-validator.fullname" . }}-genesis-e{{ .Values.chain.era }}
+      - name: aptos-data
         persistentVolumeClaim:
-          claimName: {{ include "diem-validator.fullname" . }}-validator-e{{ .Values.chain.era }}
+          claimName: {{ include "aptos-validator.fullname" . }}-validator-e{{ .Values.chain.era }}
       - name: vault-config
         configMap:
-          name: {{ include "diem-validator.fullname" . }}-vault
+          name: {{ include "aptos-validator.fullname" . }}-vault
       - name: vault-token
         emptyDir:
           medium: Memory
-      serviceAccountName: {{ include "diem-validator.fullname" . }}-validator
+      serviceAccountName: {{ include "aptos-validator.fullname" . }}-validator
       {{- if .Values.imagePullSecret }}
       imagePullSecrets:
       - name: {{.Values.imagePullSecret}}
@@ -203,13 +203,13 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "diem-validator.fullname" . }}-validator
+  name: {{ include "aptos-validator.fullname" . }}-validator
   labels:
-    {{- include "diem-validator.labels" . | nindent 4 }}
+    {{- include "aptos-validator.labels" . | nindent 4 }}
 spec:
   podSelector:
     matchLabels:
-      {{- include "diem-validator.selectorLabels" . | nindent 6 }}
+      {{- include "aptos-validator.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/name: validator
   policyTypes:
   - Ingress
@@ -219,7 +219,7 @@ spec:
   - from:
     - podSelector:
         matchLabels:
-          {{- include "diem-validator.selectorLabels" . | nindent 10 }}
+          {{- include "aptos-validator.selectorLabels" . | nindent 10 }}
           app.kubernetes.io/name: haproxy
     ports:
     - protocol: TCP
@@ -229,7 +229,7 @@ spec:
   - from:
     - podSelector:
         matchLabels:
-          {{- include "diem-validator.selectorLabels" $ | nindent 10 }}
+          {{- include "aptos-validator.selectorLabels" $ | nindent 10 }}
           app.kubernetes.io/name: haproxy
     ports:
     - protocol: TCP
@@ -239,7 +239,7 @@ spec:
   - from:
     - podSelector:
         matchLabels:
-          {{- include "diem-validator.selectorLabels" . | nindent 10 }}
+          {{- include "aptos-validator.selectorLabels" . | nindent 10 }}
           app.kubernetes.io/name: fullnode
     ports:
     - protocol: TCP
@@ -248,7 +248,7 @@ spec:
   - from:
     - podSelector:
         matchLabels:
-          {{- include "diem-validator.selectorLabels" . | nindent 10 }}
+          {{- include "aptos-validator.selectorLabels" . | nindent 10 }}
           app.kubernetes.io/name: monitoring
     ports:
     - protocol: TCP
@@ -262,7 +262,7 @@ spec:
   - to:
     - podSelector:
         matchLabels:
-          {{- include "diem-validator.selectorLabels" . | nindent 10 }}
+          {{- include "aptos-validator.selectorLabels" . | nindent 10 }}
           app.kubernetes.io/name: safety-rules
     ports:
     - protocol: TCP
@@ -282,7 +282,7 @@ spec:
   - to:
     - podSelector:
         matchLabels:
-          {{- include "diem-validator.selectorLabels" . | nindent 10 }}
+          {{- include "aptos-validator.selectorLabels" . | nindent 10 }}
           app.kubernetes.io/name: logging
     ports:
     - protocol: TCP

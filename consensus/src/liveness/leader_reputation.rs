@@ -5,14 +5,14 @@ use crate::{
     counters::{COMMITTED_PROPOSALS_IN_WINDOW, COMMITTED_VOTES_IN_WINDOW},
     liveness::proposer_election::{next, ProposerElection},
 };
+use aptos_crypto::HashValue;
+use aptos_infallible::Mutex;
+use aptos_logger::prelude::*;
+use aptos_types::block_metadata::{new_block_event_key, NewBlockEvent};
 use consensus_types::{
     block::Block,
     common::{Author, Round},
 };
-use diem_crypto::HashValue;
-use diem_infallible::Mutex;
-use diem_logger::prelude::*;
-use diem_types::block_metadata::{new_block_event_key, NewBlockEvent};
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},

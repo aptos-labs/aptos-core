@@ -15,8 +15,8 @@
 //! Internally both the client and server leverage a NetworkStream that communications in blocks
 //! where a block is a length prefixed array of bytes.
 
-use diem_logger::{info, trace, warn, Schema};
-use diem_secure_push_metrics::{register_int_counter_vec, IntCounterVec};
+use aptos_logger::{info, trace, warn, Schema};
+use aptos_secure_push_metrics::{register_int_counter_vec, IntCounterVec};
 use once_cell::sync::Lazy;
 use serde::Serialize;
 use std::{
@@ -78,7 +78,7 @@ impl NetworkMode {
 
 static EVENT_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "diem_secure_net_events",
+        "aptos_secure_net_events",
         "Outcome of secure net events",
         &["service", "mode", "method", "result"]
     )
@@ -517,7 +517,7 @@ impl NetworkStream {
 #[cfg(test)]
 mod test {
     use super::*;
-    use diem_config::utils;
+    use aptos_config::utils;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     /// Read, Write, Connect timeout in milliseconds.

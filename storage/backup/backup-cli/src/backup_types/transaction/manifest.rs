@@ -3,7 +3,7 @@
 
 use crate::storage::FileHandle;
 use anyhow::{ensure, Result};
-use diem_types::transaction::Version;
+use aptos_types::transaction::Version;
 use serde::{Deserialize, Serialize};
 
 /// A chunk of a transaction backup manifest to represent the

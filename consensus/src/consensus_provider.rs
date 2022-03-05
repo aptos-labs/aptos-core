@@ -11,10 +11,10 @@ use crate::{
     txn_manager::MempoolProxy,
     util::time_service::ClockTimeService,
 };
+use aptos_config::config::NodeConfig;
+use aptos_logger::prelude::*;
+use aptos_mempool::ConsensusRequest;
 use consensus_notifications::ConsensusNotificationSender;
-use diem_config::config::NodeConfig;
-use diem_logger::prelude::*;
-use diem_mempool::ConsensusRequest;
 use event_notifications::ReconfigNotificationListener;
 use execution_correctness::ExecutionCorrectnessManager;
 use futures::channel::mpsc;

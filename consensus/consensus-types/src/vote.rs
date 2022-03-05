@@ -6,8 +6,8 @@ use crate::{
     vote_data::VoteData,
 };
 use anyhow::{ensure, Context};
-use diem_crypto::{ed25519::Ed25519Signature, hash::CryptoHash};
-use diem_types::{
+use aptos_crypto::{ed25519::Ed25519Signature, hash::CryptoHash};
+use aptos_types::{
     ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };

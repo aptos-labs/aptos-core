@@ -7,8 +7,8 @@ use crate::{
     transaction::{RawTransaction, SignedTransaction, TransactionPayload},
 };
 use anyhow::Result;
+use aptos_crypto::{ed25519::*, test_utils::KeyPair, traits::SigningKey};
 use chrono::Utc;
-use diem_crypto::{ed25519::*, test_utils::KeyPair, traits::SigningKey};
 
 pub fn create_unsigned_txn(
     payload: TransactionPayload,

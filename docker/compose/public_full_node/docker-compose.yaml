@@ -1,4 +1,4 @@
-# This compose file defines a Public Fullnode docker compose wrapper around diem-node.
+# This compose file defines a Public Fullnode docker compose wrapper around aptos-node.
 #
 # In order to use, place a copy of the proper genesis.blob and waypoint.txt in this directory.
 #
@@ -56,7 +56,7 @@ services:
         source: ./waypoint.txt
         target: /opt/diem/etc/waypoint.txt
         read_only: true
-    command: ["/opt/diem/bin/diem-node", "-f", "/opt/diem/etc/node.yaml"]
+    command: ["/opt/diem/bin/aptos-node", "-f", "/opt/diem/etc/node.yaml"]
     ports:
       - "8080:8080"
     expose:

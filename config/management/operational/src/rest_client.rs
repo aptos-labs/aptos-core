@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{TransactionContext, TransactionStatus};
-use diem_management::error::Error;
-use diem_rest_client::Client;
-use diem_types::{
+use aptos_management::error::Error;
+use aptos_rest_client::Client;
+use aptos_types::{
     account_address::AccountAddress, account_config, account_config::AccountResource,
     account_state::AccountState, account_state_blob::AccountStateBlob,
     transaction::SignedTransaction, validator_config::ValidatorConfigResource,

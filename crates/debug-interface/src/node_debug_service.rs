@@ -3,9 +3,9 @@
 
 //! Debug interface to access information in a specific node.
 
-use diem_config::config::NodeConfig;
-use diem_logger::{info, Filter, Logger};
-use diem_metrics::json_metrics::get_git_rev;
+use aptos_config::config::NodeConfig;
+use aptos_logger::{info, Filter, Logger};
+use aptos_metrics::json_metrics::get_git_rev;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::runtime::{Builder, Runtime};
@@ -34,7 +34,7 @@ impl NodeDebugService {
 
         // GET /metrics
         let metrics =
-            warp::path("metrics").map(|| warp::reply::json(&diem_metrics::get_all_metrics()));
+            warp::path("metrics").map(|| warp::reply::json(&aptos_metrics::get_all_metrics()));
 
         // Post /log/filter
         let local_filter = {

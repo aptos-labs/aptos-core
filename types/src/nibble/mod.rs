@@ -7,7 +7,7 @@
 
 pub mod nibble_path;
 
-use diem_crypto::HashValue;
+use aptos_crypto::HashValue;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::prelude::*;
 use serde::{Deserialize, Serialize};

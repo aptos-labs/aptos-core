@@ -18,10 +18,10 @@ thiserror = "1.0.24"
 tokio = { version = "1.8.1" }
 
 channel = { path = "../../../crates/channel" }
-diem-id-generator = { path = "../../../crates/diem-id-generator" }
-diem-infallible = { path = "../../../crates/diem-infallible" }
-diem-types = { path = "../../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../../crates/diem-workspace-hack" }
+aptos-id-generator = { path = "../../../crates/aptos-id-generator" }
+aptos-infallible = { path = "../../../crates/aptos-infallible" }
+aptos-types = { path = "../../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
 storage-interface = { path = "../../../storage/storage-interface" }
 
 
@@ -29,10 +29,10 @@ storage-interface = { path = "../../../storage/storage-interface" }
 bcs = "0.1.2"
 claim = "0.5.0"
 
-diem-crypto = { path = "../../../crates/diem-crypto" }
-diem-temppath = { path = "../../../crates/diem-temppath" }
-diem-vm = { path = "../../../diem-move/diem-vm" }
-diemdb = { path = "../../../storage/diemdb" }
+aptos-crypto = { path = "../../../crates/aptos-crypto" }
+aptos-temppath = { path = "../../../crates/aptos-temppath" }
+aptos-vm = { path = "../../../aptos-move/aptos-vm" }
+aptosdb = { path = "../../../storage/aptosdb" }
 executor-test-helpers = { path = "../../../execution/executor-test-helpers" }
 move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
-vm-genesis = { path = "../../../diem-move/vm-genesis", features = ["fuzzing"] }
+vm-genesis = { path = "../../../aptos-move/vm-genesis", features = ["fuzzing"] }

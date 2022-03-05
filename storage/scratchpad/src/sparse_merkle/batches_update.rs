@@ -9,11 +9,11 @@ use crate::{
     },
     FrozenSparseMerkleTree, ProofRead, SparseMerkleTree,
 };
-use diem_crypto::{
+use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use diem_types::proof::{SparseMerkleInternalNode, SparseMerkleLeafNode};
+use aptos_types::proof::{SparseMerkleInternalNode, SparseMerkleLeafNode};
 use std::{borrow::Borrow, cmp, collections::BTreeMap};
 
 impl<V> SparseMerkleTree<V>

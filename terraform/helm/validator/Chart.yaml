@@ -1,5 +1,5 @@
 apiVersion: v2
-name: diem-validator
+name: aptos-validator
 version: 1.5.0-rc.1
 appVersion: 1.5.0-rc.1
 description: Diem blockchain validator

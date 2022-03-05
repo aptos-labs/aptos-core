@@ -1,8 +1,8 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use diem_types::block_info::BlockInfo;
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_types::block_info::BlockInfo;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 

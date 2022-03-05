@@ -17,14 +17,14 @@ thiserror = "1.0.24"
 parking_lot = "0.11.1"
 
 bcs = "0.1.2"
-diem-crypto = { path = "../../crates/diem-crypto" }
-diem-secure-net = { path = "../../secure/net" }
-diem-state-view = { path = "../state-view" }
-diem-types = { path = "../../types" }
-diem-workspace-hack = { version = "0.1", path = "../../crates/diem-workspace-hack" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-secure-net = { path = "../../secure/net" }
+aptos-state-view = { path = "../state-view" }
+aptos-types = { path = "../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 scratchpad = { path = "../scratchpad" }
 move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 
 [features]
 default = []
-fuzzing = ["diem-types/fuzzing"]
+fuzzing = ["aptos-types/fuzzing"]

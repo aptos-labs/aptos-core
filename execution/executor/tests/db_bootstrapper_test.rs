@@ -4,12 +4,12 @@
 #![forbid(unsafe_code)]
 
 use anyhow::Result;
-use diem_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
-use diem_temppath::TempPath;
-use diem_transaction_builder::stdlib::{
+use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
+use aptos_temppath::TempPath;
+use aptos_transaction_builder::stdlib::{
     encode_create_parent_vasp_account_script, encode_peer_to_peer_with_metadata_script,
 };
-use diem_types::{
+use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::{
@@ -34,8 +34,8 @@ use diem_types::{
     waypoint::Waypoint,
     write_set::{WriteOp, WriteSetMut},
 };
-use diem_vm::DiemVM;
-use diemdb::{DiemDB, GetRestoreHandler};
+use aptos_vm::DiemVM;
+use aptosdb::{DiemDB, GetRestoreHandler};
 use executor::{
     block_executor::BlockExecutor,
     components::apply_chunk_output::IntoLedgerView,
@@ -132,16 +132,16 @@ fn get_demo_accounts() -> (
 }
 
 fn get_mint_transaction(
-    diem_root_key: &Ed25519PrivateKey,
-    diem_root_seq_num: u64,
+    aptos_root_key: &Ed25519PrivateKey,
+    aptos_root_seq_num: u64,
     account: &AccountAddress,
     amount: u64,
 ) -> Transaction {
     get_test_signed_transaction(
         testnet_dd_account_address(),
-        /* sequence_number = */ diem_root_seq_num,
-        diem_root_key.clone(),
-        diem_root_key.public_key(),
+        /* sequence_number = */ aptos_root_seq_num,
+        aptos_root_key.clone(),
+        aptos_root_key.public_key(),
         Some(TransactionPayload::Script(
             encode_peer_to_peer_with_metadata_script(xus_tag(), *account, amount, vec![], vec![]),
         )),
@@ -149,17 +149,17 @@ fn get_mint_transaction(
 }
 
 fn get_account_transaction(
-    diem_root_key: &Ed25519PrivateKey,
-    diem_root_seq_num: u64,
+    aptos_root_key: &Ed25519PrivateKey,
+    aptos_root_seq_num: u64,
     account: &AccountAddress,
     account_key: &Ed25519PrivateKey,
 ) -> Transaction {
     let account_auth_key = AuthenticationKey::ed25519(&account_key.public_key());
     get_test_signed_transaction(
         treasury_compliance_account_address(),
-        /* sequence_number = */ diem_root_seq_num,
-        diem_root_key.clone(),
-        diem_root_key.public_key(),
+        /* sequence_number = */ aptos_root_seq_num,
+        aptos_root_key.clone(),
+        aptos_root_key.public_key(),
         Some(TransactionPayload::Script(
             encode_create_parent_vasp_account_script(
                 xus_tag(),

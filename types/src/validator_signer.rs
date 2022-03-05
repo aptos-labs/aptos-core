@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::account_address::AccountAddress;
-use diem_crypto::{
+use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     hash::CryptoHash,
     test_utils::TEST_SEED,
@@ -78,7 +78,7 @@ impl ValidatorSigner {
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptests {
     use super::*;
-    use diem_crypto::Genesis;
+    use aptos_crypto::Genesis;
     use proptest::{prelude::*, sample, strategy::LazyJust};
 
     #[allow(clippy::redundant_closure)]

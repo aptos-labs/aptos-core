@@ -1,14 +1,14 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_metrics::{register_histogram_vec, HistogramVec};
+use aptos_metrics::{register_histogram_vec, HistogramVec};
 
 use once_cell::sync::Lazy;
 use warp::log::{custom, Info, Log};
 
 static HISTOGRAM: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "diem_api_requests",
+        "aptos_api_requests",
         "API requests latency grouped by method, operation_id and status",
         &["method", "operation_id", "status"]
     )
@@ -17,7 +17,7 @@ static HISTOGRAM: Lazy<HistogramVec> = Lazy::new(|| {
 
 static RESPONSE_STATUS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "diem_api_response_status",
+        "aptos_api_response_status",
         "API requests latency grouped by status code only",
         &["status"]
     )

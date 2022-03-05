@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "diem-logger.fullname" . }}-vector
+  name: {{ include "aptos-logger.fullname" . }}-vector
   labels:
-    {{- include "diem-logger.labels" . | nindent 4 }}
+    {{- include "aptos-logger.labels" . | nindent 4 }}
 data:
   vector.toml: |-
 {{ (tpl (.Files.Get "files/vector.toml") .) | indent 4 }}
@@ -13,9 +13,9 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "diem-logger.fullname" . }}-vector
+  name: {{ include "aptos-logger.fullname" . }}-vector
   labels:
-    {{- include "diem-logger.labels" . | nindent 4 }}
+    {{- include "aptos-logger.labels" . | nindent 4 }}
 type: kubernetes.io/tls
 data:
   tls.crt: {{.Values.loggingClientCert}}
@@ -27,12 +27,12 @@ data:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "diem-logger.fullname" . }}
+  name: {{ include "aptos-logger.fullname" . }}
   labels:
-    {{- include "diem-logger.labels" . | nindent 4 }}
+    {{- include "aptos-logger.labels" . | nindent 4 }}
 spec:
   selector:
-    {{- include "diem-logger.selectorLabels" . | nindent 4 }}
+    {{- include "aptos-logger.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/name: logging
   ports:
   - name: json
@@ -46,22 +46,22 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "diem-logger.fullname" . }}
+  name: {{ include "aptos-logger.fullname" . }}
   labels:
-    {{- include "diem-logger.labels" . | nindent 4 }}
+    {{- include "aptos-logger.labels" . | nindent 4 }}
     app.kubernetes.io/name: logging
 spec:
-  serviceName: {{ include "diem-logger.fullname" . }}
+  serviceName: {{ include "aptos-logger.fullname" . }}
   replicas: 1
   podManagementPolicy: Parallel
   selector:
     matchLabels:
-      {{- include "diem-logger.selectorLabels" . | nindent 6 }}
+      {{- include "aptos-logger.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/name: logging
   template:
     metadata:
       labels:
-        {{- include "diem-logger.selectorLabels" . | nindent 8 }}
+        {{- include "aptos-logger.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: logging
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: runtime/default
@@ -74,10 +74,10 @@ spec:
       {{- end }}
       - name: vector-config
         configMap:
-          name: {{ include "diem-logger.fullname" . }}-vector
+          name: {{ include "aptos-logger.fullname" . }}-vector
       - name: vector-secret
         secret:
-          secretName: {{ include "diem-logger.fullname" . }}-vector
+          secretName: {{ include "aptos-logger.fullname" . }}-vector
       {{- with .Values.logging }}
       containers:
       - name: vector
@@ -130,4 +130,4 @@ spec:
         runAsNonRoot: true
         fsGroup: 65534
       {{- end }}
-      serviceAccountName: {{ include "diem-logger.serviceAccountName" . }}
+      serviceAccountName: {{ include "aptos-logger.serviceAccountName" . }}

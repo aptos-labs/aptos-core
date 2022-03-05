@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error::Error;
-use diem_config::config::{self, GitHubConfig, OnDiskStorageConfig, Token, VaultConfig};
+use aptos_config::config::{self, GitHubConfig, OnDiskStorageConfig, Token, VaultConfig};
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn test_disk() {
-        let path = diem_temppath::TempPath::new();
+        let path = aptos_temppath::TempPath::new();
         path.create_as_file().unwrap();
         let disk = format!("backend=disk;path={}", path.path().to_str().unwrap());
         storage(&disk).unwrap();
@@ -214,7 +214,7 @@ mod tests {
 
     #[test]
     fn test_github() {
-        let path = diem_temppath::TempPath::new();
+        let path = aptos_temppath::TempPath::new();
         path.create_as_file().unwrap();
         let mut file = File::create(path.path()).unwrap();
         file.write_all(b"disk_token").unwrap();
@@ -245,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_vault() {
-        let path = diem_temppath::TempPath::new();
+        let path = aptos_temppath::TempPath::new();
         path.create_as_file().unwrap();
         let mut file = File::create(path.path()).unwrap();
         file.write_all(b"disk_token").unwrap();

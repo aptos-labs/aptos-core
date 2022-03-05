@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_crypto::{
+use aptos_crypto::{
     traits::{CryptoMaterialError, ValidCryptoMaterialStringExt},
     x25519,
 };
@@ -88,7 +88,7 @@ const MAX_DNS_NAME_SIZE: usize = 255;
 /// //               \  '-- uvarint number of protocols
 /// //                '-- length of encoded network address
 ///
-/// use diem_types::network_address::NetworkAddress;
+/// use aptos_types::network_address::NetworkAddress;
 /// use bcs;
 /// use std::{str::FromStr, convert::TryFrom};
 ///
@@ -218,8 +218,8 @@ impl NetworkAddress {
     /// ### Example
     ///
     /// ```rust
-    /// use diem_crypto::{traits::ValidCryptoMaterialStringExt, x25519};
-    /// use diem_types::network_address::NetworkAddress;
+    /// use aptos_crypto::{traits::ValidCryptoMaterialStringExt, x25519};
+    /// use aptos_types::network_address::NetworkAddress;
     /// use std::str::FromStr;
     ///
     /// let pubkey_str = "080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120";
@@ -260,7 +260,7 @@ impl NetworkAddress {
     /// ### Example
     ///
     /// ```rust
-    /// use diem_types::network_address::NetworkAddress;
+    /// use aptos_types::network_address::NetworkAddress;
     /// use std::str::FromStr;
     ///
     /// let addr_str = "/ip4/1.2.3.4/tcp/6180/ln-noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/ln-handshake/0";

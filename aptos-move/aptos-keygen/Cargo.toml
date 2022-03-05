@@ -1,0 +1,19 @@
+[package]
+name = "aptos-keygen"
+version = "0.1.0"
+authors = ["Diem Association <opensource@diem.com>"]
+description = "Command line utility to generate Ed25519 key pairs for testing"
+repository = "https://github.com/diem/diem"
+homepage = "https://diem.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+rand = "0.8.3"
+sha3 = "0.9.1"
+hex = "0.4.3"
+
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-types = { path = "../../types" }
+aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }

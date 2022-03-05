@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::experimental::hashable::Hashable;
-use diem_crypto::HashValue;
+use aptos_crypto::HashValue;
 use std::collections::HashMap;
 
 pub struct LinkedItem<T: Hashable> {
@@ -143,7 +143,7 @@ impl<T: Hashable> Buffer<T> {
 mod test {
     use super::Buffer;
     use crate::experimental::hashable::Hashable;
-    use diem_crypto::HashValue;
+    use aptos_crypto::HashValue;
     use std::fmt::{Debug, Formatter};
 
     #[derive(PartialEq, Eq)]
