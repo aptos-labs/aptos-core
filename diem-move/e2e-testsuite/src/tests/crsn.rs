@@ -1,4 +1,4 @@
-// Copyright (c) The Diem Core Contributors
+// Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use diem_transaction_builder::stdlib;
 use diem_types::{account_config, vm_status::StatusCode};

@@ -1,4 +1,4 @@
-// Copyright (c) The Diem Core Contributors
+// Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{diem_channel, diem_channel::ElementStatus, message_queues::QueueStyle};

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) The Diem Core Contributors
+# Copyright (c) The Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 # This script sets up the environment for the Diem build by installing necessary dependencies.
 #

@@ -8,7 +8,7 @@ info:
     url: http://www.apache.org/licenses/LICENSE-2.0.html
   version: 0.1.0
   contact:
-    name: The Diem Core Contributors
+    name: The Aptos Foundation
     url: https://github.com/diem/diem
 tags:
   - name: general
