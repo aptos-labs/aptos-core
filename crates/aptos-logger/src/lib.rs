@@ -157,7 +157,7 @@ mod security;
 mod struct_log;
 
 pub use crate::aptos_logger::{
-    DiemLogger, DiemLogger as Logger, DiemLoggerBuilder, Writer, CHANNEL_SIZE,
+    AptosData, AptosData as Logger, AptosDataBuilder, Writer, CHANNEL_SIZE,
 };
 pub use event::Event;
 pub use filter::{Filter, LevelFilter};

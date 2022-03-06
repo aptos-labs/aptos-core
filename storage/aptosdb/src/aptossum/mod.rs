@@ -14,11 +14,11 @@ use aptos_types::{
 use std::{convert::AsRef, path::Path};
 use storage_interface::{DbReader, StartupInfo};
 
-pub struct Diemsum {
+pub struct Aptossum {
     db: AptosDB,
 }
 
-impl Diemsum {
+impl Aptossum {
     pub fn new<P: AsRef<Path> + Clone>(db_root_path: P) -> Result<Self> {
         let db = AptosDB::open(
             db_root_path,
@@ -27,7 +27,7 @@ impl Diemsum {
             RocksdbConfig::default(),
             true, /* account_count_migration, ignored anyway */
         )?;
-        Ok(Diemsum { db })
+        Ok(Aptossum { db })
     }
 
     pub fn get_startup_info(&self) -> Result<StartupInfo> {

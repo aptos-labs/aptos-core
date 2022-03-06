@@ -149,8 +149,8 @@ impl LogEntry {
     }
 }
 
-/// A builder for a `DiemLogger`, configures what, where, and how to write logs.
-pub struct DiemLoggerBuilder {
+/// A builder for a `AptosData`, configures what, where, and how to write logs.
+pub struct AptosDataBuilder {
     channel_size: usize,
     level: Level,
     remote_level: Level,
@@ -160,7 +160,7 @@ pub struct DiemLoggerBuilder {
     custom_format: Option<fn(&LogEntry) -> Result<String, fmt::Error>>,
 }
 
-impl DiemLoggerBuilder {
+impl AptosDataBuilder {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
@@ -223,7 +223,7 @@ impl DiemLoggerBuilder {
         self.build();
     }
 
-    pub fn build(&mut self) -> Arc<DiemLogger> {
+    pub fn build(&mut self) -> Arc<AptosData> {
         let filter = {
             let local_filter = {
                 let mut filter_builder = Filter::builder();
@@ -262,7 +262,7 @@ impl DiemLoggerBuilder {
 
         let logger = if self.is_async {
             let (sender, receiver) = mpsc::sync_channel(self.channel_size);
-            let logger = Arc::new(DiemLogger {
+            let logger = Arc::new(AptosData {
                 sender: Some(sender),
                 printer: None,
                 filter: RwLock::new(filter),
@@ -278,7 +278,7 @@ impl DiemLoggerBuilder {
             thread::spawn(move || service.run());
             logger
         } else {
-            Arc::new(DiemLogger {
+            Arc::new(AptosData {
                 sender: None,
                 printer: self.printer.take(),
                 filter: RwLock::new(filter),
@@ -305,20 +305,20 @@ impl DiemFilter {
     }
 }
 
-pub struct DiemLogger {
+pub struct AptosData {
     sender: Option<SyncSender<LoggerServiceEvent>>,
     printer: Option<Box<dyn Writer>>,
     filter: RwLock<DiemFilter>,
     pub(crate) formatter: fn(&LogEntry) -> Result<String, fmt::Error>,
 }
 
-impl DiemLogger {
-    pub fn builder() -> DiemLoggerBuilder {
-        DiemLoggerBuilder::new()
+impl AptosData {
+    pub fn builder() -> AptosDataBuilder {
+        AptosDataBuilder::new()
     }
 
     #[allow(clippy::new_ret_no_self)]
-    pub fn new() -> DiemLoggerBuilder {
+    pub fn new() -> AptosDataBuilder {
         Self::builder()
     }
 
@@ -356,7 +356,7 @@ impl DiemLogger {
     }
 }
 
-impl Logger for DiemLogger {
+impl Logger for AptosData {
     fn enabled(&self, metadata: &Metadata) -> bool {
         self.filter.read().enabled(metadata)
     }
@@ -384,12 +384,12 @@ enum LoggerServiceEvent {
 }
 
 /// A service for running a log listener, that will continually export logs through a local printer
-/// or to a `DiemLogger` for external logging.
+/// or to a `AptosData` for external logging.
 struct LoggerService {
     receiver: Receiver<LoggerServiceEvent>,
     address: Option<String>,
     printer: Option<Box<dyn Writer>>,
-    facade: Arc<DiemLogger>,
+    facade: Arc<AptosData>,
 }
 
 impl LoggerService {

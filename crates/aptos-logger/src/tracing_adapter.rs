@@ -11,7 +11,7 @@ use tracing::{
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
 /// A layer that translates tracing events into aptos-logger events.
-pub struct TracingToDiemLoggerLayer;
+pub struct TracingToAptosDataLayer;
 
 fn translate_level(level: &Level) -> Option<dl::Level> {
     if *level == Level::ERROR {
@@ -114,7 +114,7 @@ impl<'a, 'b> dl::Schema for EventKeyValueAdapter<'a, 'b> {
     }
 }
 
-impl<S> Layer<S> for TracingToDiemLoggerLayer
+impl<S> Layer<S> for TracingToAptosDataLayer
 where
     S: tracing::Subscriber + for<'span> LookupSpan<'span>,
 {

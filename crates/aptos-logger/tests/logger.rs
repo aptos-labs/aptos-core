@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_infallible::RwLock;
-use aptos_logger::{info, DiemLogger, Writer};
+use aptos_logger::{info, AptosData, Writer};
 use std::sync::Arc;
 
 #[derive(Default)]
@@ -20,7 +20,7 @@ impl Writer for VecWriter {
 fn verify_end_to_end() {
     let writer = VecWriter::default();
     let logs = writer.logs.clone();
-    DiemLogger::builder()
+    AptosData::builder()
         .is_async(false)
         .printer(Box::new(writer))
         .build();

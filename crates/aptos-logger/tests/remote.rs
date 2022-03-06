@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_logger::{debug, error, trace, DiemLogger, Level};
+use aptos_logger::{debug, error, trace, AptosData, Level};
 use serde::Deserialize;
 use std::{
     io::{BufRead, BufReader},
@@ -21,7 +21,7 @@ fn remote_end_to_end() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap().to_string();
 
-    DiemLogger::builder().address(addr).is_async(true).build();
+    AptosData::builder().address(addr).is_async(true).build();
 
     let handle = std::thread::spawn(|| {
         error!("Hello");

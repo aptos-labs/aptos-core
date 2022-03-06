@@ -11,7 +11,7 @@ use crate::{
     storage_synchronizer::StorageSynchronizer,
 };
 use aptos_config::config::NodeConfig;
-use aptos_data_client::diemnet::DiemNetDataClient;
+use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_types::waypoint::Waypoint;
 use consensus_notifications::ConsensusNotificationListener;
 use data_streaming_service::streaming_client::StreamingServiceClient;
@@ -43,7 +43,7 @@ impl DriverFactory {
         mempool_notification_sender: MempoolNotifier,
         consensus_listener: ConsensusNotificationListener,
         event_subscription_service: EventSubscriptionService,
-        aptos_data_client: DiemNetDataClient,
+        aptos_data_client: AptosNetDataClient,
         streaming_service_client: StreamingServiceClient,
     ) -> Self {
         // Create the notification handlers

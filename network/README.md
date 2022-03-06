@@ -6,11 +6,11 @@ custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/network/READ
 
 ## Overview
 
-For more detailed info, see the [DiemNet Specification](../specifications/network/README.md).
+For more detailed info, see the [AptosNet Specification](../specifications/network/README.md).
 
-DiemNet is the primary protocol for communication between any two nodes in the
+AptosNet is the primary protocol for communication between any two nodes in the
 Diem ecosystem. It is specifically designed to facilitate the consensus, shared
-mempool, and state sync protocols. DiemNet tries to maintain at-most one connection
+mempool, and state sync protocols. AptosNet tries to maintain at-most one connection
 with each remote peer; the application protocols to that remote peer are then
 multiplexed over the single peer connection.
 
@@ -72,7 +72,7 @@ independent "tasks." The [tokio](https://tokio.rs/) framework is used as the tas
 runtime. The primary subcomponents in the network module are:
 
 * [`Network Interface`] &mdash; The interface provided to application modules
-using DiemNet.
+using AptosNet.
 
 * [`PeerManager`] &mdash; Listens for incoming connections, and dials outbound
 connections to other peers. Demultiplexes and forwards inbound messages from
@@ -86,8 +86,8 @@ protocols: DirectSend and Rpc.
 
 + [`DiemTransport`] &mdash; A secure, reliable transport. It uses [NoiseIK] over
 TCP to negotiate an encrypted and authenticated connection between peers.
-The DiemNet version and any Diem-specific application protocols are negotiated
-afterward using the [DiemNet Handshake Protocol].
+The AptosNet version and any Diem-specific application protocols are negotiated
+afterward using the [AptosNet Handshake Protocol].
 
 * [`ConnectivityManager`] &mdash; Establishes connections to known peers found
 via Discovery. Notifies [`PeerManager`] to make outbound dials, or disconnects based
@@ -125,12 +125,12 @@ configurable static timeout.
         │   ├── direct_send        # Protocol for fire-and-forget style message delivery
         │   ├── health_checker     # Protocol for health probing
         │   ├── rpc                # Protocol for remote procedure calls
-        │   └── wire               # Protocol for DiemNet handshakes and messaging
+        │   └── wire               # Protocol for AptosNet handshakes and messaging
         ├── transport              # The base transport layer for dialing/listening
         └── noise                  # Noise handshaking and wire integration
 
 [`ConnectivityManager`]: ./src/connectivity_manager/mod.rs
-[DiemNet Handshake Protocol]: ../specifications/network/handshake-v1.md
+[AptosNet Handshake Protocol]: ../specifications/network/handshake-v1.md
 [`DiemSystem::validators`]: ../aptos-move/diem-framework/core/doc/DiemSystem.md#struct-diemsystem
 [`DiemTransport`]: ./src/transport/mod.rs
 [`HealthChecker`]: ./src/protocols/health_checker/mod.rs

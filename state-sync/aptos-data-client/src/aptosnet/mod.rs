@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    diemnet::{
+    aptosnet::{
         logging::{LogEntry, LogEvent, LogSchema},
         metrics::{increment_counter, start_timer},
         state::{ErrorType, PeerStates},
@@ -50,11 +50,11 @@ const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 5;
 const POLLER_ERROR_LOG_FREQ_SECS: u64 = 1;
 
 /// A [`DiemDataClient`] that fulfills requests from remote peers' Storage Service
-/// over DiemNet.
+/// over AptosNet.
 ///
-/// The `DiemNetDataClient`:
+/// The `AptosNetDataClient`:
 ///
-/// 1. Sends requests to connected DiemNet peers.
+/// 1. Sends requests to connected AptosNet peers.
 /// 2. Does basic type conversions and error handling on the responses.
 /// 3. Routes requests to peers that advertise availability for that data.
 /// 4. Maintains peer scores based on each peer's observed quality of service
@@ -68,10 +68,10 @@ const POLLER_ERROR_LOG_FREQ_SECS: u64 = 1;
 /// The client is expected to be cloneable and usable from many concurrent tasks
 /// and/or threads.
 #[derive(Clone, Debug)]
-pub struct DiemNetDataClient {
-    /// Config for DiemNet data client.
+pub struct AptosNetDataClient {
+    /// Config for AptosNet data client.
     data_client_config: DiemDataClientConfig,
-    /// The underlying DiemNet storage service client.
+    /// The underlying AptosNet storage service client.
     network_client: StorageServiceClient,
     /// All of the data-client specific data we have on each network peer.
     peer_states: Arc<RwLock<PeerStates>>,
@@ -81,7 +81,7 @@ pub struct DiemNetDataClient {
     response_id_generator: Arc<U64IdGenerator>,
 }
 
-impl DiemNetDataClient {
+impl AptosNetDataClient {
     pub fn new(
         data_client_config: DiemDataClientConfig,
         storage_service_config: StorageServiceConfig,
@@ -138,7 +138,7 @@ impl DiemNetDataClient {
 
         if all_connected.is_empty() {
             return Err(Error::DataIsUnavailable(
-                "No connected diemnet peers".to_owned(),
+                "No connected aptosnet peers".to_owned(),
             ));
         }
 
@@ -255,7 +255,7 @@ impl DiemNetDataClient {
 
                 // Package up all of the context needed to fully report an error
                 // with this RPC.
-                let response_callback = DiemNetResponseCallback {
+                let response_callback = AptosNetResponseCallback {
                     data_client: self.clone(),
                     id,
                     peer,
@@ -313,7 +313,7 @@ impl DiemNetDataClient {
 }
 
 #[async_trait]
-impl DiemDataClient for DiemNetDataClient {
+impl DiemDataClient for AptosNetDataClient {
     fn get_global_data_summary(&self) -> GlobalDataSummary {
         self.global_summary_cache.read().clone()
     }
@@ -387,15 +387,15 @@ impl DiemDataClient for DiemNetDataClient {
     }
 }
 
-/// The DiemNet-specific request context needed to update a peer's scoring.
-struct DiemNetResponseCallback {
-    data_client: DiemNetDataClient,
+/// The AptosNet-specific request context needed to update a peer's scoring.
+struct AptosNetResponseCallback {
+    data_client: AptosNetDataClient,
     id: ResponseId,
     peer: PeerNetworkId,
     request: StorageServiceRequest,
 }
 
-impl ResponseCallback for DiemNetResponseCallback {
+impl ResponseCallback for AptosNetResponseCallback {
     fn notify_bad_response(&self, error: ResponseError) {
         let error_type = ErrorType::from(error);
         self.data_client
@@ -403,9 +403,9 @@ impl ResponseCallback for DiemNetResponseCallback {
     }
 }
 
-impl fmt::Debug for DiemNetResponseCallback {
+impl fmt::Debug for AptosNetResponseCallback {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DiemNetResponseCallback")
+        f.debug_struct("AptosNetResponseCallback")
             .field("data_client", &"..")
             .field("id", &self.id)
             .field("peer", &self.peer)
@@ -424,14 +424,14 @@ impl fmt::Debug for DiemNetResponseCallback {
 // + ofc, in prod we will never cancel lol
 pub struct DataSummaryPoller {
     time_service: TimeService,
-    data_client: DiemNetDataClient,
+    data_client: AptosNetDataClient,
     poll_interval: Duration,
 }
 
 impl DataSummaryPoller {
     fn new(
         time_service: TimeService,
-        data_client: DiemNetDataClient,
+        data_client: AptosNetDataClient,
         poll_interval: Duration,
     ) -> Self {
         Self {

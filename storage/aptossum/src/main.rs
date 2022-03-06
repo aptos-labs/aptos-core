@@ -5,7 +5,7 @@
 use anyhow::Result;
 
 use aptos_types::{account_address::AccountAddress, event::EventKey};
-use aptosdb::aptossum::Diemsum;
+use aptosdb::aptossum::Aptossum;
 use serde::Serialize;
 use serde_json::to_string_pretty;
 use std::path::PathBuf;
@@ -13,7 +13,7 @@ use structopt::StructOpt;
 
 #[derive(StructOpt)]
 #[structopt(
-    name = "Diemsum",
+    name = "Aptossum",
     about = "A command line tool that offers multiple data access commands for AptosDB"
 )]
 struct Opt {
@@ -120,7 +120,7 @@ fn main() {
 
 fn run_cmd() -> Result<()> {
     let opt = Opt::from_args();
-    let aptossum = Diemsum::new(opt.db_dir)?;
+    let aptossum = Aptossum::new(opt.db_dir)?;
     let is_json = opt.json;
     match opt.cmd {
         Command::Status => {

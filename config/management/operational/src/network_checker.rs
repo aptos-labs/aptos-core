@@ -203,7 +203,7 @@ fn timeout_duration(maybe_secs: Option<u64>) -> Duration {
 }
 
 fn validate_address(address: &NetworkAddress) -> Result<(), Error> {
-    if !address.is_diemnet_addr() {
+    if !address.is_aptosnet_addr() {
         Err(Error::CommandArgumentError(
             "Address must have ip, tcp, noise key, and handshake".to_string(),
         ))

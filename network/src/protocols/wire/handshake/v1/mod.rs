@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module defines the structs transported during the network handshake protocol v1.
-//! These should serialize as per the [DiemNet Handshake v1 Specification].
+//! These should serialize as per the [AptosNet Handshake v1 Specification].
 //!
 //! During the v1 Handshake protocol, both end-points of a connection send a serialized and
 //! length-prefixed [`HandshakeMsg`] to each other. The handshake message contains a map from
@@ -10,7 +10,7 @@
 //! supported over that messaging protocol. On receipt, both ends will determine the highest
 //! intersecting messaging protocol version and use that for the remainder of the session.
 //!
-//! [DiemNet Handshake v1 Specification]: https://github.com/aptos-labs/aptos-core/blob/main/specifications/network/handshake-v1.md
+//! [AptosNet Handshake v1 Specification]: https://github.com/aptos-labs/aptos-core/blob/main/specifications/network/handshake-v1.md
 
 use anyhow::anyhow;
 use aptos_config::network_id::NetworkId;
@@ -139,8 +139,8 @@ impl fmt::Display for ProtocolId {
 /// bitvec which supports at most 256 bits.
 ///
 /// These sets are sent over-the-wire in the initial [`HandshakeMsg`] to other
-/// DiemNet peers in order to negotiate the set of common supported protocols for
-/// use on a new DiemNet connection.
+/// AptosNet peers in order to negotiate the set of common supported protocols for
+/// use on a new AptosNet connection.
 #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct ProtocolIdSet(bitvec::BitVec);

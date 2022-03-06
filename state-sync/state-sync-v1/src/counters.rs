@@ -286,7 +286,7 @@ pub static PROCESS_COORDINATOR_MSG_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Time it takes to process a state sync message from DiemNet
+/// Time it takes to process a state sync message from AptosNet
 pub static PROCESS_MSG_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "diem_state_sync_process_msg_latency",

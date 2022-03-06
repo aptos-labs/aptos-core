@@ -10,7 +10,7 @@ This document is organized as follows:
 
 1. Overview: high-level outline of the mempool architecture
 2. Module Specifications: spec of mempool components
-3. Network Protocol: the Mempool DiemNet protocol used to participate in the Diem
+3. Network Protocol: the Mempool AptosNet protocol used to participate in the Diem
 Payment Network
 4. Abstracted Modules: external components that mempool interfaces with
 

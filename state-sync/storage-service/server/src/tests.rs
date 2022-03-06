@@ -552,7 +552,7 @@ impl DbReader for MockDbReader {
 
 /// Initializes the Diem logger for tests
 pub fn initialize_logger() {
-    aptos_logger::DiemLogger::builder()
+    aptos_logger::AptosData::builder()
         .is_async(false)
         .level(Level::Debug)
         .build();

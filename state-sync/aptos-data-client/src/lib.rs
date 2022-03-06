@@ -18,7 +18,7 @@ use thiserror::Error;
 
 pub type ResponseId = u64;
 
-pub mod diemnet;
+pub mod aptosnet;
 
 pub type Result<T, E = Error> = ::std::result::Result<T, E>;
 

@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use aptos_config::{config::NodeConfig, network_id::NetworkId};
-use aptos_data_client::diemnet::DiemNetDataClient;
+use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_types::{move_resource::MoveStorage, waypoint::Waypoint};
 use consensus_notifications::ConsensusNotificationListener;
 use data_streaming_service::streaming_client::StreamingServiceClient;
@@ -73,7 +73,7 @@ impl StateSyncMultiplexer {
         node_config: &NodeConfig,
         waypoint: Waypoint,
         mut event_subscription_service: EventSubscriptionService,
-        aptos_data_client: DiemNetDataClient,
+        aptos_data_client: AptosNetDataClient,
         streaming_service_client: StreamingServiceClient,
     ) -> Self {
         // Notify subscribers of the initial on-chain config values
@@ -166,7 +166,7 @@ mod tests {
     use crate::StateSyncMultiplexer;
     use aptos_config::{config::RocksdbConfig, utils::get_genesis_txn};
     use aptos_crypto::HashValue;
-    use aptos_data_client::diemnet::DiemNetDataClient;
+    use aptos_data_client::aptosnet::AptosNetDataClient;
     use aptos_genesis_tool::test_config;
     use aptos_infallible::RwLock;
     use aptos_temppath::TempPath;
@@ -221,7 +221,7 @@ mod tests {
             MultiNetworkSender::new(HashMap::new()),
             PeerMetadataStorage::new(&[]),
         );
-        let (aptos_data_client, _) = DiemNetDataClient::new(
+        let (aptos_data_client, _) = AptosNetDataClient::new(
             node_config.state_sync.aptos_data_client,
             node_config.state_sync.storage_service,
             TimeService::mock(),

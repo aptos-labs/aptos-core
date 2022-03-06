@@ -367,7 +367,7 @@ fn create_range_random_u64(min_value: u64, max_value: u64) -> u64 {
 
 /// Initializes the Diem logger for tests
 pub fn initialize_logger() {
-    aptos_logger::DiemLogger::builder()
+    aptos_logger::AptosData::builder()
         .is_async(false)
         .level(Level::Info)
         .build();
