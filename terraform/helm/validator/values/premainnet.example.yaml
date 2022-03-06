@@ -35,8 +35,8 @@ vault:
   # section, with "<role>" replaced with "safety-rules/validator/fullnode".
   auth:
     type: kubernetes
-    mount_path: auth/kubernetes-diem
+    mount_path: auth/kubernetes-aptos
     config:
-      role: diem-<role>
+      role: aptos-<role>
   # If you changed the default vault-init namespace update it here
-  namespace: diem
+  namespace: aptos

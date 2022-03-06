@@ -30,7 +30,7 @@ variable "zone_project" {
 
 variable "record_name" {
   description = "DNS record name to use (<workspace> is replaced with the TF workspace name)"
-  default     = "<workspace>.diem"
+  default     = "<workspace>.aptos"
 }
 
 variable "helm_chart" {

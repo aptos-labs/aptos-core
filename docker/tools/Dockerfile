@@ -10,14 +10,14 @@ RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
 ENV PATH "$PATH:/root/.cargo/bin"
 
-WORKDIR /diem
-COPY rust-toolchain /diem/rust-toolchain
+WORKDIR /aptos
+COPY rust-toolchain /aptos/rust-toolchain
 RUN rustup install $(cat rust-toolchain)
 
 FROM toolchain AS builder
 
 ARG ENABLE_FAILPOINTS
-COPY . /diem
+COPY . /aptos
 
 RUN IMAGE_TARGETS="release" ./docker/build-common.sh
 
@@ -38,32 +38,32 @@ COPY docker/tools/boto.cfg /etc
 RUN cd /usr/local/bin && wget https://azcopyvnext.azureedge.net/release20210226/azcopy_linux_amd64_10.9.0.tar.gz -O- | tar --gzip --wildcards --extract '*/azcopy' --strip-components=1 --no-same-owner && chmod +x azcopy
 RUN wget https://storage.googleapis.com/pub/gsutil.tar.gz -O- | tar --gzip --directory /opt --extract && ln -s /opt/gsutil/gsutil /usr/local/bin
 
-COPY --from=builder /diem/target/release/aptos-genesis-tool /usr/local/bin
-COPY --from=builder /diem/target/release/aptos-operational-tool /usr/local/bin
-COPY --from=builder /diem/target/release/db-bootstrapper /usr/local/bin
-COPY --from=builder /diem/target/release/db-backup /usr/local/bin
-COPY --from=builder /diem/target/release/db-backup-verify /usr/local/bin
-COPY --from=builder /diem/target/release/db-restore /usr/local/bin
-COPY --from=builder /diem/target/release/aptos-transaction-replay /usr/local/bin
+COPY --from=builder /aptos/target/release/aptos-genesis-tool /usr/local/bin
+COPY --from=builder /aptos/target/release/aptos-operational-tool /usr/local/bin
+COPY --from=builder /aptos/target/release/db-bootstrapper /usr/local/bin
+COPY --from=builder /aptos/target/release/db-backup /usr/local/bin
+COPY --from=builder /aptos/target/release/db-backup-verify /usr/local/bin
+COPY --from=builder /aptos/target/release/db-restore /usr/local/bin
+COPY --from=builder /aptos/target/release/aptos-transaction-replay /usr/local/bin
 
 ### Get DPN Move modules bytecodes for genesis ceremony
-RUN mkdir -p /diem/move/build
-RUN mkdir -p /diem/move/modules
-COPY --from=builder /diem/aptos-move/diem-framework/DPN/releases/artifacts/current/build /diem/move/build
-RUN mv /diem/move/build/**/bytecode_modules/*.mv /diem/move/modules
-RUN rm -rf /diem/move/build
+RUN mkdir -p /aptos/move/build
+RUN mkdir -p /aptos/move/modules
+COPY --from=builder /aptos/aptos-move/diem-framework/DPN/releases/artifacts/current/build /aptos/move/build
+RUN mv /aptos/move/build/**/bytecode_modules/*.mv /aptos/move/modules
+RUN rm -rf /aptos/move/build
 
 ### Get experimental Move modules bytecodes for genesis ceremony
 RUN mkdir -p /experimental/move/build
 RUN mkdir -p /experimental/move/modules
-COPY --from=builder /diem/aptos-move/diem-framework/experimental/releases/artifacts/current/build /experimental/move/build
+COPY --from=builder /aptos/aptos-move/diem-framework/experimental/releases/artifacts/current/build /experimental/move/build
 RUN mv /experimental/move/build/**/bytecode_modules/*.mv /experimental/move/modules
 RUN rm -rf /experimental/move/build
 
 ### Get Aptos Move modules bytecodes for genesis ceremony
 RUN mkdir -p /aptos-framework/move/build
 RUN mkdir -p /aptos-framework/move/modules
-COPY --from=builder /diem/aptos-move/diem-framework/aptos-framework/releases/artifacts/current/build /aptos-framework/move/build
+COPY --from=builder /aptos/aptos-move/diem-framework/aptos-framework/releases/artifacts/current/build /aptos-framework/move/build
 RUN mv /aptos-framework/move/build/**/bytecode_modules/*.mv /aptos-framework/move/modules
 RUN rm -rf /aptos-framework/move/build
 

@@ -10,7 +10,7 @@ data "aws_iam_policy_document" "eks-assume-role" {
 }
 
 resource "aws_iam_role" "cluster" {
-  name                 = "diem-${local.workspace_name}-cluster"
+  name                 = "aptos-${local.workspace_name}-cluster"
   path                 = var.iam_path
   assume_role_policy   = data.aws_iam_policy_document.eks-assume-role.json
   permissions_boundary = var.permissions_boundary_policy
@@ -39,7 +39,7 @@ data "aws_iam_policy_document" "ec2-assume-role" {
 }
 
 resource "aws_iam_role" "nodes" {
-  name                 = "diem-${local.workspace_name}-nodes"
+  name                 = "aptos-${local.workspace_name}-nodes"
   path                 = var.iam_path
   assume_role_policy   = data.aws_iam_policy_document.ec2-assume-role.json
   permissions_boundary = var.permissions_boundary_policy
@@ -47,7 +47,7 @@ resource "aws_iam_role" "nodes" {
 }
 
 resource "aws_iam_instance_profile" "nodes" {
-  name = "diem-${local.workspace_name}-nodes"
+  name = "aptos-${local.workspace_name}-nodes"
   role = aws_iam_role.nodes.name
   path = var.iam_path
 }

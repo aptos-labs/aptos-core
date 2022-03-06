@@ -18,10 +18,10 @@ data:
     apiVersion: 1
     providers:
     - name: 'default'
-      folder: 'diem'
+      folder: 'aptos'
       type: file
       options:
-        path: /etc/grafana/dashboards/diem
+        path: /etc/grafana/dashboards/aptos
 
 ---
 {{- if .Values.tlsCert }}
@@ -291,7 +291,7 @@ spec:
         image: {{ .grafana.image.repo }}:{{ .grafana.image.tag }}
         imagePullPolicy: {{ .grafana.image.pullPolicy }}
         command: ["/bin/sh", "-c"]
-        args: ["cp /dashboards/* /etc/grafana/dashboards/diem && gunzip -f /etc/grafana/dashboards/diem/*.json.gz && exec /run.sh"]
+        args: ["cp /dashboards/* /etc/grafana/dashboards/aptos && gunzip -f /etc/grafana/dashboards/aptos/*.json.gz && exec /run.sh"]
         resources:
           {{- toYaml .grafana.resources | nindent 10 }}
         ports:
@@ -311,7 +311,7 @@ spec:
         - name: grafana-dashboards-archive
           mountPath: /dashboards
         - name: grafana-dashboards
-          mountPath: /etc/grafana/dashboards/diem
+          mountPath: /etc/grafana/dashboards/aptos
         - name: grafana-data
           mountPath: /var/lib/grafana
         env:

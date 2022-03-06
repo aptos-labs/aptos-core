@@ -54,7 +54,7 @@ spec:
         - "{{ int .config.transaction_batch_size }}"
         - "command-adapter"
         - "--config"
-        - "/opt/diem/etc/{{ .config.location }}.toml"
+        - "/opt/aptos/etc/{{ .config.location }}.toml"
         env:
         - name: RUST_LOG
           value: "debug"
@@ -69,7 +69,7 @@ spec:
         {{- include "backup.backupEnvironment" (dict "config" .config "era" $.Values.chain.era) | nindent 8 }}
         volumeMounts:
         - name: backup-config
-          mountPath: /opt/diem/etc
+          mountPath: /opt/aptos/etc
         - name: tmp
           mountPath: /tmp
         securityContext:

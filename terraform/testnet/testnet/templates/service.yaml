@@ -25,7 +25,7 @@ spec:
     app.kubernetes.io/part-of: aptos-validator
     app.kubernetes.io/name: haproxy
   ports:
-  - name: diemnet
+  - name: aptosnet
     port: 6182
   type: LoadBalancer
   externalTrafficPolicy: Local

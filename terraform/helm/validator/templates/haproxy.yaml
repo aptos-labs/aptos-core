@@ -66,7 +66,7 @@ spec:
     {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
     app.kubernetes.io/name: haproxy
   ports:
-  - name: diemnet
+  - name: aptosnet
     port: 6182
     targetPort: {{ add 6182 $index }}
   {{- if $config.enableRestApi }}

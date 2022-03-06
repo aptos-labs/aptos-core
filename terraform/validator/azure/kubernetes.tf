@@ -1,16 +1,16 @@
 provider "kubernetes" {
-  host                   = azurerm_kubernetes_cluster.diem.kube_config[0].host
-  client_key             = base64decode(azurerm_kubernetes_cluster.diem.kube_config[0].client_key)
-  client_certificate     = base64decode(azurerm_kubernetes_cluster.diem.kube_config[0].client_certificate)
-  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.diem.kube_config[0].cluster_ca_certificate)
+  host                   = azurerm_kubernetes_cluster.aptos.kube_config[0].host
+  client_key             = base64decode(azurerm_kubernetes_cluster.aptos.kube_config[0].client_key)
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.aptos.kube_config[0].client_certificate)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.aptos.kube_config[0].cluster_ca_certificate)
 }
 
 provider "helm" {
   kubernetes {
-    host                   = azurerm_kubernetes_cluster.diem.kube_config[0].host
-    client_key             = base64decode(azurerm_kubernetes_cluster.diem.kube_config[0].client_key)
-    client_certificate     = base64decode(azurerm_kubernetes_cluster.diem.kube_config[0].client_certificate)
-    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.diem.kube_config[0].cluster_ca_certificate)
+    host                   = azurerm_kubernetes_cluster.aptos.kube_config[0].host
+    client_key             = base64decode(azurerm_kubernetes_cluster.aptos.kube_config[0].client_key)
+    client_certificate     = base64decode(azurerm_kubernetes_cluster.aptos.kube_config[0].client_certificate)
+    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.aptos.kube_config[0].cluster_ca_certificate)
   }
 }
 
@@ -36,7 +36,7 @@ resource "helm_release" "validator" {
           "agentpool" = azurerm_kubernetes_cluster_node_pool.validators.name
         }
         tolerations = [{
-          key    = "diem.org/nodepool"
+          key    = "aptos.org/nodepool"
           value  = azurerm_kubernetes_cluster_node_pool.validators.name
           effect = "NoExecute"
         }]
@@ -46,7 +46,7 @@ resource "helm_release" "validator" {
           "agentpool" = azurerm_kubernetes_cluster_node_pool.trusted.name
         }
         tolerations = [{
-          key    = "diem.org/nodepool"
+          key    = "aptos.org/nodepool"
           value  = azurerm_kubernetes_cluster_node_pool.trusted.name
           effect = "NoExecute"
         }]
@@ -56,7 +56,7 @@ resource "helm_release" "validator" {
           "agentpool" = azurerm_kubernetes_cluster_node_pool.trusted.name
         }
         tolerations = [{
-          key    = "diem.org/nodepool"
+          key    = "aptos.org/nodepool"
           value  = azurerm_kubernetes_cluster_node_pool.trusted.name
           effect = "NoExecute"
         }]
@@ -69,7 +69,7 @@ resource "helm_release" "validator" {
           "agentpool" = azurerm_kubernetes_cluster_node_pool.validators.name
         }
         tolerations = [{
-          key    = "diem.org/nodepool"
+          key    = "aptos.org/nodepool"
           value  = azurerm_kubernetes_cluster_node_pool.validators.name
           effect = "NoExecute"
         }]
@@ -79,7 +79,7 @@ resource "helm_release" "validator" {
           "agentpool" = azurerm_kubernetes_cluster_node_pool.validators.name
         }
         tolerations = [{
-          key    = "diem.org/nodepool"
+          key    = "aptos.org/nodepool"
           value  = azurerm_kubernetes_cluster_node_pool.validators.name
           effect = "NoExecute"
         }]
@@ -106,7 +106,7 @@ resource "helm_release" "validator" {
           "agentpool" = azurerm_kubernetes_cluster_node_pool.validators.name
         }
         tolerations = [{
-          key    = "diem.org/nodepool"
+          key    = "aptos.org/nodepool"
           value  = azurerm_kubernetes_cluster_node_pool.validators.name
           effect = "NoExecute"
         }]
@@ -124,7 +124,7 @@ resource "helm_release" "validator" {
           "agentpool" = azurerm_kubernetes_cluster_node_pool.validators.name
         }
         tolerations = [{
-          key    = "diem.org/nodepool"
+          key    = "aptos.org/nodepool"
           value  = azurerm_kubernetes_cluster_node_pool.validators.name
           effect = "NoExecute"
         }]
@@ -154,9 +154,9 @@ resource "helm_release" "kube-state-metrics" {
 resource "local_file" "kubernetes" {
   filename = "${terraform.workspace}-kubernetes.json"
   content = jsonencode({
-    kubernetes_host        = azurerm_kubernetes_cluster.diem.kube_config[0].host
-    kubernetes_ca_cert     = base64decode(azurerm_kubernetes_cluster.diem.kube_config[0].cluster_ca_certificate)
-    issuer                 = azurerm_kubernetes_cluster.diem.fqdn
+    kubernetes_host        = azurerm_kubernetes_cluster.aptos.kube_config[0].host
+    kubernetes_ca_cert     = base64decode(azurerm_kubernetes_cluster.aptos.kube_config[0].cluster_ca_certificate)
+    issuer                 = azurerm_kubernetes_cluster.aptos.fqdn
     service_account_prefix = "${terraform.workspace}-aptos-validator"
     pod_cidrs              = azurerm_subnet.nodes.address_prefixes
   })

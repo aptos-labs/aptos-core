@@ -1,24 +1,24 @@
-Diem Single Validator Network Deployment
+Aptos Single Validator Network Deployment
 ========================================
 
-These instructions are for deploying a Diem blockchain network with one single validator node from scratch, this would be good for training new operators.
+These instructions are for deploying a Aptos blockchain network with one single validator node from scratch, this would be good for training new operators.
 
 Deployment Package
 ------------------
 
 The deployment package is in this directory. Clone the repo and checkout the branch corresponding to the version you want to deploy:
 
-       $ git clone https://github.com/diem/diem
-       $ cd diem/terraform/validator
+       $ git clone https://github.com/aptos/aptos
+       $ cd aptos/terraform/validator
        $ git checkout <version>
 
 The release branch is usually named as `release-xx`, you can checkout to the latest one (e.g. `release-1.4`)
 
 Once you have the correct validator directory version follow the instructions below.
 
-Working with Diem Source Code
+Working with Aptos Source Code
 -----------------------------
-If you haven't yet, it's highly recommended that you finish the "My first transaction" training: https://developers.diem.com/docs/my-first-transaction.
+If you haven't yet, it's highly recommended that you finish the "My first transaction" training: https://developers.aptos.com/docs/my-first-transaction.
 
 The training will guide you through the steps to setup environment and build Rust code, which we will use to build our operational tools.
 
@@ -87,21 +87,21 @@ Terraform with Vault
 10. Configure your Kubernetes client:
     * aws:
 
-          $ aws eks update-kubeconfig --name diem-$WORKSPACE
+          $ aws eks update-kubeconfig --name aptos-$WORKSPACE
 
     * azure:
 
-          $ az aks get-credentials --resource-group diem-$WORKSPACE --name diem-$WORKSPACE
+          $ az aks get-credentials --resource-group aptos-$WORKSPACE --name aptos-$WORKSPACE
 
     * gcp:
 
-          $ gcloud container clusters get-credentials diem-$WORKSPACE --zone us-central1-a --project diem
+          $ gcloud container clusters get-credentials aptos-$WORKSPACE --zone us-central1-a --project aptos
 
 11. Find the private IP of one of the `vault` instances, and the public IP of the `bastion` instance.
     * aws:
 
           $ terraform state show 'aws_instance.bastion[0]' | grep public_dns
-          $ aws ec2 describe-instances --filters "Name=tag:Name,Values=diem-$WORKSPACE/vault" --query "Reservations[*].Instances[*].PrivateDnsName" --output=text
+          $ aws ec2 describe-instances --filters "Name=tag:Name,Values=aptos-$WORKSPACE/vault" --query "Reservations[*].Instances[*].PrivateDnsName" --output=text
 
     * gcp:
 
@@ -111,14 +111,14 @@ Terraform with Vault
     * azure:
 
           $ terraform state show 'azurerm_linux_virtual_machine.bastion[0]' | grep public_ip
-          $ az vmss nic list-vm-nics -g diem-$WORKSPACE --vmss-name diem-$WORKSPACE-vault --instance-id 1  | grep privateIp
+          $ az vmss nic list-vm-nics -g aptos-$WORKSPACE --vmss-name aptos-$WORKSPACE-vault --instance-id 1  | grep privateIp
 
         * alternatively, cut-n-past this:
 
 ```sh
                 public_ip=$(terraform state show 'azurerm_linux_virtual_machine.bastion[0]' | egrep 'public_ip_address\W' | awk -F'"' '{print $2}')
                 echo public_ip=$public_ip
-                private_ip=$(az vmss nic list -g diem-$WORKSPACE --vmss-name diem-$WORKSPACE-vault --query '[].ipConfigurations[].privateIpAddress' --output tsv)
+                private_ip=$(az vmss nic list -g aptos-$WORKSPACE --vmss-name aptos-$WORKSPACE-vault --query '[].ipConfigurations[].privateIpAddress' --output tsv)
                 echo private_ip=$private_ip
 ```
 
@@ -179,7 +179,7 @@ Terraform with Vault
 
         $ vault kv list transit/keys
 
-    You should be able to see a list of keys, e.g. `diem__root`, `diem__operator`
+    You should be able to see a list of keys, e.g. `aptos__root`, `aptos__operator`
 
 23. Change into your configuration directory:
 
@@ -193,7 +193,7 @@ Terraform with Vault
 
     * If using the included DNS setup:
 
-          $ cd ~/diem/terraform/validator/<aws|azure|gcp>
+          $ cd ~/aptos/terraform/validator/<aws|azure|gcp>
           $ export VALIDATOR_ADDRESS="$(terraform output validator_endpoint)"
           $ export FULLNODE_ADDRESS="$(terraform output fullnode_endpoint)"
           $ cd -
@@ -208,10 +208,10 @@ Terraform with Vault
           $ export VALIDATOR_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-validator-validator-lb -o go-template='/ip4/{{(index .status.loadBalancer.ingress 0).ip}}/tcp/{{(index .spec.ports 0).port}}')"
           $ export FULLNODE_ADDRESS="$(kubectl get svc ${WORKSPACE}-aptos-validator-fullnode-lb -o go-template='/ip4/{{(index .status.loadBalancer.ingress 0).ip}}/tcp/{{(index .spec.ports 0).port}}')"
 
-26. Build the Diem genesis tool binary:
+26. Build the Aptos genesis tool binary:
 
-        $ git clone https://github.com/diem/diem
-        $ cd diem
+        $ git clone https://github.com/aptos/aptos
+        $ cd aptos
         $ git checkout <version>
         $ cargo build -p aptos-genesis-tool
         $ cargo run -p aptos-genesis-tool -- help
@@ -221,9 +221,9 @@ Terraform with Vault
 27. Use the genesis script to generate keys, create waypoints, and compile the genesis blob for your blockchain:
 
         $ cd ~/$WORKSPACE
-        $ export GENESIS=~/diem/target/debug/aptos-genesis-tool
-        $ export BACKEND="backend=vault;server=https://localhost:8200;ca_certificate=<full path to $WORKSPACE-vault.ca>;token=vault.token;namespace=diem"
-        $ ~/diem/scripts/genesis-single.sh $GENESIS $BACKEND $VALIDATOR_ADDRESS $FULLNODE_ADDRESS
+        $ export GENESIS=~/aptos/target/debug/aptos-genesis-tool
+        $ export BACKEND="backend=vault;server=https://localhost:8200;ca_certificate=<full path to $WORKSPACE-vault.ca>;token=vault.token;namespace=aptos"
+        $ ~/aptos/scripts/genesis-single.sh $GENESIS $BACKEND $VALIDATOR_ADDRESS $FULLNODE_ADDRESS
 
 28. Insert the genesis blob into the Kubernetes configmap for the chain era (defined in [helm/values.yaml][]):
 
@@ -247,7 +247,7 @@ Destroy existing deployment
 
 1. Make sure you select the terraform workspace you want to destroy:
 
-         $ cd ~/diem/terraform/validator/<cloud>
+         $ cd ~/aptos/terraform/validator/<cloud>
          $ export WORKSPACE=testnet
          $ terraform workspace select $WORKSPACE
 
@@ -268,4 +268,4 @@ Destroy existing deployment
 [azure]: azure/
 [vault-init]: vault-init/
 [helm/values.yaml]: helm/values.yaml
-[My first transaction]: https://developers.diem.com/docs/core/my-first-transaction
+[My first transaction]: https://developers.aptos.com/docs/core/my-first-transaction

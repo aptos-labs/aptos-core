@@ -5,4 +5,4 @@ set -e
 
 DIR="$( cd "$( dirname "$0" )" && pwd )"
 
-$DIR/../aptos-build.sh $DIR/Dockerfile diem/faucet "$@"
+$DIR/../aptos-build.sh $DIR/Dockerfile aptos/faucet "$@"

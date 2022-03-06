@@ -37,7 +37,7 @@ spec:
             - command-adapter
             - --config
             # use the same config with the backup sts
-            - /opt/diem/etc/{{ .Values.backup.config.location }}.toml
+            - /opt/aptos/etc/{{ .Values.backup.config.location }}.toml
             env:
             - name: RUST_LOG
               value: "debug"
@@ -53,7 +53,7 @@ spec:
             {{- toYaml .resources | nindent 14 }}
             volumeMounts:
             - name: backup-config
-              mountPath: /opt/diem/etc
+              mountPath: /opt/aptos/etc
             - name: tmp
               mountPath: /tmp
             securityContext:

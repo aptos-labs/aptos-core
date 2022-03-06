@@ -17,7 +17,7 @@ resource "tls_self_signed_cert" "ca" {
 
   subject {
     common_name  = "Vault CA"
-    organization = "diem-${terraform.workspace}"
+    organization = "aptos-${terraform.workspace}"
   }
 }
 
@@ -40,7 +40,7 @@ resource "tls_cert_request" "vault" {
 
   subject {
     common_name  = azurerm_lb.vault.private_ip_address
-    organization = "diem-${terraform.workspace}"
+    organization = "aptos-${terraform.workspace}"
   }
 }
 
@@ -66,8 +66,8 @@ locals {
 
 resource "azurerm_storage_account" "vault_" {
   name                     = "vault${local.workspace_sanitised}${random_string.vault-storage.result}"
-  resource_group_name      = azurerm_resource_group.diem.name
-  location                 = azurerm_resource_group.diem.location
+  resource_group_name      = azurerm_resource_group.aptos.name
+  location                 = azurerm_resource_group.aptos.location
   account_kind             = "BlockBlobStorage"
   account_tier             = "Premium"
   account_replication_type = "LRS"
@@ -90,8 +90,8 @@ resource "azurerm_storage_container" "vault_" {
 
 resource "azurerm_key_vault" "vault_" {
   name                = "vault${local.workspace_sanitised}${random_string.vault-storage.result}"
-  resource_group_name = azurerm_resource_group.diem.name
-  location            = azurerm_resource_group.diem.location
+  resource_group_name = azurerm_resource_group.aptos.name
+  location            = azurerm_resource_group.aptos.location
   tenant_id           = data.azurerm_client_config.current.tenant_id
   sku_name            = "standard"
 
@@ -138,17 +138,17 @@ resource "azurerm_key_vault_secret" "vault-tls" {
 }
 
 resource "azurerm_public_ip" "bastion" {
-  name                = "diem-${terraform.workspace}-bastion"
-  resource_group_name = azurerm_resource_group.diem.name
-  location            = azurerm_resource_group.diem.location
+  name                = "aptos-${terraform.workspace}-bastion"
+  resource_group_name = azurerm_resource_group.aptos.name
+  location            = azurerm_resource_group.aptos.location
   allocation_method   = "Static"
   sku                 = "Standard"
 }
 
 resource "azurerm_network_interface" "bastion" {
-  name                = "diem-${terraform.workspace}-bastion"
-  resource_group_name = azurerm_resource_group.diem.name
-  location            = azurerm_resource_group.diem.location
+  name                = "aptos-${terraform.workspace}-bastion"
+  resource_group_name = azurerm_resource_group.aptos.name
+  location            = azurerm_resource_group.aptos.location
 
   ip_configuration {
     name                          = "internal"
@@ -166,9 +166,9 @@ resource "azurerm_network_interface_application_security_group_association" "bas
 
 resource "azurerm_linux_virtual_machine" "bastion" {
   count                 = var.bastion_enable ? 1 : 0
-  name                  = "diem-${terraform.workspace}-bastion"
-  resource_group_name   = azurerm_resource_group.diem.name
-  location              = azurerm_resource_group.diem.location
+  name                  = "aptos-${terraform.workspace}-bastion"
+  resource_group_name   = azurerm_resource_group.aptos.name
+  location              = azurerm_resource_group.aptos.location
   size                  = "Standard_B1LS"
   admin_username        = "az-user"
   network_interface_ids = [azurerm_network_interface.bastion.id]
@@ -235,9 +235,9 @@ locals {
 }
 
 resource "azurerm_linux_virtual_machine_scale_set" "vault" {
-  name                = "diem-${terraform.workspace}-vault"
-  resource_group_name = azurerm_resource_group.diem.name
-  location            = azurerm_resource_group.diem.location
+  name                = "aptos-${terraform.workspace}-vault"
+  resource_group_name = azurerm_resource_group.aptos.name
+  location            = azurerm_resource_group.aptos.location
   sku                 = "Standard_F2s_v2"
   instances           = var.vault_num
   admin_username      = "az-user"
@@ -280,9 +280,9 @@ resource "azurerm_linux_virtual_machine_scale_set" "vault" {
 }
 
 resource "azurerm_lb" "vault" {
-  name                = "diem-${terraform.workspace}-vault"
-  resource_group_name = azurerm_resource_group.diem.name
-  location            = azurerm_resource_group.diem.location
+  name                = "aptos-${terraform.workspace}-vault"
+  resource_group_name = azurerm_resource_group.aptos.name
+  location            = azurerm_resource_group.aptos.location
   sku                 = "Standard"
 
   frontend_ip_configuration {
@@ -299,7 +299,7 @@ resource "azurerm_lb_backend_address_pool" "vault" {
 
 resource "azurerm_lb_probe" "vault" {
   name                = "vault-active"
-  resource_group_name = azurerm_resource_group.diem.name
+  resource_group_name = azurerm_resource_group.aptos.name
   loadbalancer_id     = azurerm_lb.vault.id
   protocol            = "Https"
   port                = 8200
@@ -308,7 +308,7 @@ resource "azurerm_lb_probe" "vault" {
 
 resource "azurerm_lb_rule" "vault" {
   name                           = "vault"
-  resource_group_name            = azurerm_resource_group.diem.name
+  resource_group_name            = azurerm_resource_group.aptos.name
   loadbalancer_id                = azurerm_lb.vault.id
   protocol                       = "Tcp"
   frontend_port                  = 8200

@@ -4,10 +4,10 @@
 set -e
 
 DOCKERFILE=$1
-if [ -z "$DIEM_BUILD_TAG" ]; then
+if [ -z "$APTOS_BUILD_TAG" ]; then
   TAGS="--tag $2"
 else
-  TAGS="--tag $2 --tag $DIEM_BUILD_TAG"
+  TAGS="--tag $2 --tag $APTOS_BUILD_TAG"
 fi
 
 RESTORE='\001\033[0m\002'
@@ -50,7 +50,7 @@ if [ "$1" = "--incremental" ]; then
       echo "${BLUE}Build container does not exist, setting up new one${RESTORE}"
       IMAGE=circleci/rust:${TOOLCHAIN}-buster
       mkdir -p "$OUT_TARGET"
-      docker run -u root -d -t -v "$OUT_TARGET:/out-target" -v "$DIR/..:/diem" -w /diem --name "$CONTAINER" "$IMAGE" sh > /dev/null
+      docker run -u root -d -t -v "$OUT_TARGET:/out-target" -v "$DIR/..:/aptos" -w /aptos --name "$CONTAINER" "$IMAGE" sh > /dev/null
       docker exec -i -t "$CONTAINER" apt-get update
       docker exec -i -t "$CONTAINER" apt-get install -y cmake curl clang git
       echo "${BLUE}Container is set up, starting build${RESTORE}"
@@ -65,7 +65,7 @@ if [ "$1" = "--incremental" ]; then
   docker exec -i -t "$CONTAINER" sh -c 'find /target/release -maxdepth 1 -executable -type f | xargs -I F cp F /out-target'
   TMP_DOCKERFILE="$DOCKERFILE.tmp"
   trap 'rm -f $TMP_DOCKERFILE' EXIT
-  sed -e "s+$DOCKERFILE_BUILD_RE+RUN mkdir -p /diem/target/release/; cp target-out-docker/* /diem/target/release/+g" \
+  sed -e "s+$DOCKERFILE_BUILD_RE+RUN mkdir -p /aptos/target/release/; cp target-out-docker/* /aptos/target/release/+g" \
       "$DOCKERFILE" > "$TMP_DOCKERFILE"
   DOCKERFILE=$TMP_DOCKERFILE
   echo "${BLUE}Starting docker build process${RESTORE}"

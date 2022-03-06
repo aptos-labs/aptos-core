@@ -1,4 +1,4 @@
-# Diem Dashboard Templates
+# Aptos Dashboard Templates
 
 The dashboard templates are loaded as ConfigMap in compressed binary format because of the ConfigMap size limit.
 

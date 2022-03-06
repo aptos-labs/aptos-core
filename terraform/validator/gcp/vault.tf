@@ -18,7 +18,7 @@ resource "tls_self_signed_cert" "ca" {
 
   subject {
     common_name  = "Vault CA"
-    organization = "diem-${terraform.workspace}"
+    organization = "aptos-${terraform.workspace}"
   }
 }
 
@@ -41,7 +41,7 @@ resource "tls_cert_request" "vault" {
 
   subject {
     common_name  = "vault"
-    organization = "diem-${terraform.workspace}"
+    organization = "aptos-${terraform.workspace}"
   }
 }
 
@@ -57,7 +57,7 @@ resource "tls_locally_signed_cert" "vault" {
 
 resource "google_secret_manager_secret" "vault-tls" {
   provider  = google-beta
-  secret_id = "diem-${terraform.workspace}-vault-tls"
+  secret_id = "aptos-${terraform.workspace}-vault-tls"
   replication {
     automatic = true
   }
@@ -80,27 +80,27 @@ resource "random_id" "key" {
   byte_length = 4
 }
 
-resource "google_kms_key_ring" "diem" {
-  name     = "diem-${terraform.workspace}"
+resource "google_kms_key_ring" "aptos" {
+  name     = "aptos-${terraform.workspace}"
   location = var.keyring_location
 }
 
 resource "google_kms_crypto_key" "vault" {
-  name     = "diem-${terraform.workspace}-vault-${random_id.key.hex}"
-  key_ring = google_kms_key_ring.diem.self_link
+  name     = "aptos-${terraform.workspace}-vault-${random_id.key.hex}"
+  key_ring = google_kms_key_ring.aptos.self_link
 
   lifecycle {
     prevent_destroy = true
   }
 }
 
-resource "google_spanner_instance" "diem" {
+resource "google_spanner_instance" "aptos" {
   config       = var.spanner_config
-  display_name = "diem-${terraform.workspace}"
+  display_name = "aptos-${terraform.workspace}"
 }
 
 resource "google_spanner_database" "vault" {
-  instance = google_spanner_instance.diem.name
+  instance = google_spanner_instance.aptos.name
   name     = "vault"
   ddl = [
     "CREATE TABLE Vault (Key STRING(MAX) NOT NULL, Value BYTES(MAX)) PRIMARY KEY (Key)",
@@ -113,14 +113,14 @@ resource "google_spanner_database" "vault" {
 }
 
 resource "google_spanner_database_iam_member" "vault" {
-  instance = google_spanner_instance.diem.name
+  instance = google_spanner_instance.aptos.name
   database = google_spanner_database.vault.name
   role     = "roles/spanner.databaseUser"
   member   = "serviceAccount:${google_service_account.vault.email}"
 }
 
 resource "google_service_account" "vault" {
-  account_id = "diem-${terraform.workspace}-vault"
+  account_id = "aptos-${terraform.workspace}-vault"
 }
 
 resource "google_kms_crypto_key_iam_member" "vault" {
@@ -132,8 +132,8 @@ resource "google_kms_crypto_key_iam_member" "vault" {
 data "google_compute_lb_ip_ranges" "ranges" {}
 
 resource "google_compute_firewall" "bastion-ssh" {
-  name    = "diem-${terraform.workspace}-bastion-ssh"
-  network = google_compute_network.diem.id
+  name    = "aptos-${terraform.workspace}-bastion-ssh"
+  network = google_compute_network.aptos.id
 
   allow {
     protocol = "tcp"
@@ -145,8 +145,8 @@ resource "google_compute_firewall" "bastion-ssh" {
 }
 
 resource "google_compute_firewall" "bastion-vault-ssh" {
-  name    = "diem-${terraform.workspace}-bastion-vault-ssh"
-  network = google_compute_network.diem.id
+  name    = "aptos-${terraform.workspace}-bastion-vault-ssh"
+  network = google_compute_network.aptos.id
 
   allow {
     protocol = "tcp"
@@ -158,21 +158,21 @@ resource "google_compute_firewall" "bastion-vault-ssh" {
 }
 
 resource "google_compute_firewall" "vault-api" {
-  name    = "diem-${terraform.workspace}-vault-api"
-  network = google_compute_network.diem.id
+  name    = "aptos-${terraform.workspace}-vault-api"
+  network = google_compute_network.aptos.id
 
   allow {
     protocol = "tcp"
     ports    = ["8200"]
   }
 
-  source_ranges = concat([google_container_cluster.diem.cluster_ipv4_cidr], data.google_compute_lb_ip_ranges.ranges.http_ssl_tcp_internal)
+  source_ranges = concat([google_container_cluster.aptos.cluster_ipv4_cidr], data.google_compute_lb_ip_ranges.ranges.http_ssl_tcp_internal)
   target_tags   = ["vault"]
 }
 
 resource "google_compute_firewall" "vault-ha" {
-  name    = "diem-${terraform.workspace}-vault-ha"
-  network = google_compute_network.diem.id
+  name    = "aptos-${terraform.workspace}-vault-ha"
+  network = google_compute_network.aptos.id
 
   allow {
     protocol = "tcp"
@@ -190,7 +190,7 @@ data "google_compute_image" "debian" {
 
 resource "google_compute_instance" "bastion" {
   count        = var.bastion_enable ? 1 : 0
-  name         = "diem-${terraform.workspace}-bastion"
+  name         = "aptos-${terraform.workspace}-bastion"
   zone         = local.zone
   machine_type = "f1-micro"
   tags         = ["bastion"]
@@ -203,7 +203,7 @@ resource "google_compute_instance" "bastion" {
   }
 
   network_interface {
-    network = google_compute_network.diem.id
+    network = google_compute_network.aptos.id
     access_config {}
   }
 
@@ -228,7 +228,7 @@ locals {
         spanner = {
           ha_enabled = "true"
           # google_spanner_database.vault.id is supposed to be this whole string, but it's not
-          database = "projects/${var.project}/instances/${google_spanner_instance.diem.name}/databases/${google_spanner_database.vault.name}"
+          database = "projects/${var.project}/instances/${google_spanner_instance.aptos.name}/databases/${google_spanner_database.vault.name}"
         }
       }
       listener = {
@@ -245,7 +245,7 @@ locals {
         gcpckms = {
           project    = var.project
           region     = var.keyring_location
-          key_ring   = google_kms_key_ring.diem.name
+          key_ring   = google_kms_key_ring.aptos.name
           crypto_key = google_kms_crypto_key.vault.name
         }
       }
@@ -257,7 +257,7 @@ locals {
 }
 
 resource "google_compute_instance_template" "vault" {
-  name_prefix  = "diem-${terraform.workspace}-vault-"
+  name_prefix  = "aptos-${terraform.workspace}-vault-"
   tags         = ["vault"]
   machine_type = "n1-standard-1"
 
@@ -268,7 +268,7 @@ resource "google_compute_instance_template" "vault" {
   }
 
   network_interface {
-    network = google_compute_network.diem.name
+    network = google_compute_network.aptos.name
   }
 
   service_account {
@@ -288,7 +288,7 @@ resource "google_compute_instance_template" "vault" {
 }
 
 resource "google_compute_health_check" "vault" {
-  name = "diem-${terraform.workspace}-vault"
+  name = "aptos-${terraform.workspace}-vault"
 
   https_health_check {
     port         = "8200"
@@ -297,8 +297,8 @@ resource "google_compute_health_check" "vault" {
 }
 
 resource "google_compute_instance_group_manager" "vault" {
-  name               = "diem-${terraform.workspace}-vault"
-  base_instance_name = "diem-${terraform.workspace}-vault"
+  name               = "aptos-${terraform.workspace}-vault"
+  base_instance_name = "aptos-${terraform.workspace}-vault"
   zone               = local.zone
   target_size        = var.vault_num
 
@@ -313,7 +313,7 @@ resource "google_compute_instance_group_manager" "vault" {
 }
 
 resource "google_compute_health_check" "vault-active" {
-  name = "diem-${terraform.workspace}-vault-active"
+  name = "aptos-${terraform.workspace}-vault-active"
 
   https_health_check {
     port         = "8200"
@@ -322,7 +322,7 @@ resource "google_compute_health_check" "vault-active" {
 }
 
 resource "google_compute_region_backend_service" "vault" {
-  name          = "diem-${terraform.workspace}-vault"
+  name          = "aptos-${terraform.workspace}-vault"
   health_checks = [google_compute_health_check.vault-active.self_link]
 
   backend {
@@ -331,14 +331,14 @@ resource "google_compute_region_backend_service" "vault" {
 }
 
 resource "google_compute_address" "vault-lb" {
-  name         = "diem-${terraform.workspace}-vault-lb"
+  name         = "aptos-${terraform.workspace}-vault-lb"
   address_type = "INTERNAL"
   subnetwork   = data.google_compute_subnetwork.region.self_link
 }
 
 resource "google_compute_forwarding_rule" "vault" {
-  name                  = "diem-${terraform.workspace}-vault"
-  network               = google_compute_network.diem.name
+  name                  = "aptos-${terraform.workspace}-vault"
+  network               = google_compute_network.aptos.name
   backend_service       = google_compute_region_backend_service.vault.self_link
   load_balancing_scheme = "INTERNAL"
   ip_address            = google_compute_address.vault-lb.address

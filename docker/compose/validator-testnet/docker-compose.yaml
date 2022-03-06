@@ -6,9 +6,9 @@
 # * The faucet can be accessed at 127.0.0.1:8000
 
 # Additional information:
-# * If you use this compose for different Diem Networks, you will need remove the db volume first.
-# * If you would like to use the current Diem version within this repository, execute the
-#     `build.sh` in `docker/validator` and change the image tag below to diem_e2e:latest
+# * If you use this compose for different Aptos Networks, you will need remove the db volume first.
+# * If you would like to use the current Aptos version within this repository, execute the
+#     `build.sh` in `docker/validator` and change the image tag below to aptos_e2e:latest
 # * Validator images can be found at https://hub.docker.com/r/devnet/validator/tags
 # * Faucet images can be found at https://hub.docker.com/r/devnet/faucet/tags
 
@@ -26,24 +26,24 @@ services:
   validator:
     # Note this image currently does not support this, will update to the appropriate minimum
     # version shortly
-    image: "diem/validator:${IMAGE_TAG:-devnet}"
+    image: "aptos/validator:${IMAGE_TAG:-devnet}"
     networks:
       shared:
     volumes:
       - type: volume
         source: aptos-shared
-        target: /opt/diem/var
+        target: /opt/aptos/var
       - type: bind
         source: ./validator_node_template.yaml
-        target: /opt/diem/var/validator_node_template.yaml
-    command: ["/opt/diem/bin/aptos-node", "--test", "--config", "/opt/diem/var"]
+        target: /opt/aptos/var/validator_node_template.yaml
+    command: ["/opt/aptos/bin/aptos-node", "--test", "--config", "/opt/aptos/var"]
     ports:
       - "8080:8080"
     expose:
       - 9101
 
   faucet:
-    image: "diem/faucet:${IMAGE_TAG:-devnet}"
+    image: "aptos/faucet:${IMAGE_TAG:-devnet}"
     depends_on:
       - validator
     networks:
@@ -51,18 +51,18 @@ services:
     volumes:
       - type: volume
         source: aptos-shared
-        target: /opt/diem/var
+        target: /opt/aptos/var
     command: >
       /bin/bash -c "
         for i in {1..10}
         do
-          if [[ -s /opt/diem/var/mint.key ]]
+          if [[ -s /opt/aptos/var/mint.key ]]
           then
-            /opt/diem/bin/aptos-faucet \
+            /opt/aptos/bin/aptos-faucet \
               --address 0.0.0.0 \
               --port 8000 \
               --chain-id TESTING \
-              --mint-key-file-path /opt/diem/var/mint.key \
+              --mint-key-file-path /opt/aptos/var/mint.key \
               --server-url http://validator:8080/v1
             exit $$?
           else

@@ -88,7 +88,7 @@
       "pluginVersion": "7.0.0",
       "targets": [
         {
-          "expr": "quantile(0.67, diem_consensus_current_epoch_validators)",
+          "expr": "quantile(0.67, aptos_consensus_current_epoch_validators)",
           "format": "time_series",
           "instant": true,
           "interval": "",
@@ -145,7 +145,7 @@
       "pluginVersion": "7.0.0",
       "targets": [
         {
-          "expr": "quantile(0.67, diem_consensus_current_epoch_validators) - (count(rate(diem_consensus_current_round[10m]) > 0) OR on() vector(0))",
+          "expr": "quantile(0.67, aptos_consensus_current_epoch_validators) - (count(rate(aptos_consensus_current_round[10m]) > 0) OR on() vector(0))",
           "format": "time_series",
           "instant": true,
           "interval": "",
@@ -211,7 +211,7 @@
       "pluginVersion": "7.0.0",
       "targets": [
         {
-          "expr": "1 - (count(rate(diem_consensus_current_round[10m]) > 0) OR on() vector(0)) / quantile(0.67, diem_consensus_current_epoch_validators)",
+          "expr": "1 - (count(rate(aptos_consensus_current_round[10m]) > 0) OR on() vector(0)) / quantile(0.67, aptos_consensus_current_epoch_validators)",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -271,7 +271,7 @@
       "pluginVersion": "7.0.0",
       "targets": [
         {
-          "expr": "rate(diem_consensus_current_round{role=\"validator\"}[1m]) == 0",
+          "expr": "rate(aptos_consensus_current_round{role=\"validator\"}[1m]) == 0",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -468,7 +468,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner)(diem_connections{network_id=\"Validator\", role_type=\"validator\", owner=~\"$owner\"})",
+          "expr": "sum by (owner)(aptos_connections{network_id=\"Validator\", role_type=\"validator\", owner=~\"$owner\"})",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -565,7 +565,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_state_sync_version{type=\"committed\", role=\"validator\", owner=~\"$owner\"}",
+          "expr": "aptos_state_sync_version{type=\"committed\", role=\"validator\", owner=~\"$owner\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -573,7 +573,7 @@
           "refId": "A"
         },
         {
-          "expr": "diem_state_sync_version{type=\"synced\", role=\"validator\", owner=~\"$owner\"}",
+          "expr": "aptos_state_sync_version{type=\"synced\", role=\"validator\", owner=~\"$owner\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -670,7 +670,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_current_round{owner=~\"$owner\"}[1m])",
+          "expr": "rate(aptos_consensus_current_round{owner=~\"$owner\"}[1m])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -769,7 +769,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_last_committed_round{owner=~\"$owner\"}[1m])",
+          "expr": "rate(aptos_consensus_last_committed_round{owner=~\"$owner\"}[1m])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -866,7 +866,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_last_committed_version{owner=~\"$owner\"}[1m])",
+          "expr": "rate(aptos_consensus_last_committed_version{owner=~\"$owner\"}[1m])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -963,7 +963,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum without (state) (rate(diem_consensus_committed_txns_count{state=\"failed\", owner=~\"$owner\"}[1m])) / sum without (state) (rate(diem_consensus_committed_txns_count{owner=~\"$owner\"}[1m]))",
+          "expr": "sum without (state) (rate(aptos_consensus_committed_txns_count{state=\"failed\", owner=~\"$owner\"}[1m])) / sum without (state) (rate(aptos_consensus_committed_txns_count{owner=~\"$owner\"}[1m]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1060,7 +1060,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted|commit_rejected\", owner=~\"$owner\"}[1m])/rate(diem_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted|commit_rejected\", owner=~\"$owner\"}[1m])",
+          "expr": "rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted|commit_rejected\", owner=~\"$owner\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted|commit_rejected\", owner=~\"$owner\"}[1m])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1159,7 +1159,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_core_mempool_index_size{index=\"system_ttl\", owner=~\"$owner\"}",
+          "expr": "aptos_core_mempool_index_size{index=\"system_ttl\", owner=~\"$owner\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,

@@ -93,7 +93,7 @@
       "pluginVersion": "8.4.2",
       "targets": [
         {
-          "expr": "quantile(0.67, diem_consensus_current_epoch_validators)",
+          "expr": "quantile(0.67, aptos_consensus_current_epoch_validators)",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -151,7 +151,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "exemplar": false,
-          "expr": "quantile(0.67, diem_consensus_current_round)",
+          "expr": "quantile(0.67, aptos_consensus_current_round)",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -216,7 +216,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "exemplar": false,
-          "expr": "irate(diem_consensus_last_committed_version[1m])",
+          "expr": "irate(aptos_consensus_last_committed_version[1m])",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -284,7 +284,7 @@
       "pluginVersion": "8.4.2",
       "targets": [
         {
-          "expr": "1 - (count(rate(diem_consensus_current_round[10m]) > 0) OR on() vector(0)) / quantile(0.67, diem_consensus_current_epoch_validators)",
+          "expr": "1 - (count(rate(aptos_consensus_current_round[10m]) > 0) OR on() vector(0)) / quantile(0.67, aptos_consensus_current_epoch_validators)",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -413,7 +413,7 @@
       "pluginVersion": "8.4.2",
       "targets": [
         {
-          "expr": "rate(diem_consensus_last_committed_round{role=\"validator\"}[1m]) == 0 OR vector(0)",
+          "expr": "rate(aptos_consensus_last_committed_round{role=\"validator\"}[1m]) == 0 OR vector(0)",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -774,7 +774,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner)(diem_connections{network_id=\"Validator\", role_type=\"validator\", owner=~\"$owner\"})",
+              "expr": "sum by (owner)(aptos_connections{network_id=\"Validator\", role_type=\"validator\", owner=~\"$owner\"})",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -861,7 +861,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_state_sync_version{type=\"committed\", role=\"validator\", owner=~\"$owner\"}",
+              "expr": "aptos_state_sync_version{type=\"committed\", role=\"validator\", owner=~\"$owner\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -869,7 +869,7 @@
               "refId": "A"
             },
             {
-              "expr": "diem_state_sync_version{type=\"synced\", role=\"validator\", owner=~\"$owner\"}",
+              "expr": "aptos_state_sync_version{type=\"synced\", role=\"validator\", owner=~\"$owner\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -956,7 +956,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(diem_consensus_last_committed_round{owner=~\"$owner\"}[1m])",
+              "expr": "rate(aptos_consensus_last_committed_round{owner=~\"$owner\"}[1m])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -1070,7 +1070,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, network_id)(diem_connections{role_type=\"full_node\", owner=~\"$owner\"})",
+              "expr": "sum by (owner, network_id)(aptos_connections{role_type=\"full_node\", owner=~\"$owner\"})",
               "interval": "",
               "legendFormat": "{{owner}}-{{network_id}}",
               "refId": "A"
@@ -1155,7 +1155,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_state_sync_active_upstream_peers{role=\"fullnode\", owner=~\"$owner\"}",
+              "expr": "aptos_state_sync_active_upstream_peers{role=\"fullnode\", owner=~\"$owner\"}",
               "interval": "",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -1240,7 +1240,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_state_sync_version{type=\"synced\", role=\"fullnode\", owner=~\"$owner\"}",
+              "expr": "aptos_state_sync_version{type=\"synced\", role=\"fullnode\", owner=~\"$owner\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -1341,7 +1341,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(diem_consensus_error_count{owner=~\"$owner\"}[1m]) / on (owner) rate(consensus_duration_count{op='main_loop', owner=~\"$owner\"}[1m])",
+              "expr": "rate(aptos_consensus_error_count{owner=~\"$owner\"}[1m]) / on (owner) rate(consensus_duration_count{op='main_loop', owner=~\"$owner\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -1426,7 +1426,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(diem_consensus_timeout_rounds_count{owner=~\"$owner\"}[1m])",
+              "expr": "rate(aptos_consensus_timeout_rounds_count{owner=~\"$owner\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -1511,7 +1511,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_consensus_current_round{owner=~\"$owner\"}",
+              "expr": "aptos_consensus_current_round{owner=~\"$owner\"}",
               "instant": false,
               "interval": "",
               "legendFormat": "{{owner}}",
@@ -1610,7 +1610,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_core_mempool_index_size{index=\"system_ttl\", owner=~\"$owner\"}",
+              "expr": "aptos_core_mempool_index_size{index=\"system_ttl\", owner=~\"$owner\"}",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -1701,7 +1701,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(diem_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted|commit_rejected\", owner=~\"$owner\"}[1m])/rate(diem_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted|commit_rejected\", owner=~\"$owner\"}[1m])",
+              "expr": "rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted|commit_rejected\", owner=~\"$owner\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted|commit_rejected\", owner=~\"$owner\"}[1m])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -1789,7 +1789,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, sum(rate(diem_executor_execute_block_seconds_bucket{role=\"validator\", owner=~\"$owner\"}[1m])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(aptos_executor_execute_block_seconds_bucket{role=\"validator\", owner=~\"$owner\"}[1m])) by (le))",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -1798,7 +1798,7 @@
               "refId": "C"
             },
             {
-              "expr": "histogram_quantile(0.95, sum(rate(diem_executor_execute_block_seconds_bucket{role=\"validator\", owner=~\"$owner\"}[1m])) by (le))",
+              "expr": "histogram_quantile(0.95, sum(rate(aptos_executor_execute_block_seconds_bucket{role=\"validator\", owner=~\"$owner\"}[1m])) by (le))",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -1807,7 +1807,7 @@
               "refId": "B"
             },
             {
-              "expr": "histogram_quantile(0.50, sum(rate(diem_executor_execute_block_seconds_bucket{role=\"validator\", owner=~\"$owner\"}[1m])) by (le))",
+              "expr": "histogram_quantile(0.50, sum(rate(aptos_executor_execute_block_seconds_bucket{role=\"validator\", owner=~\"$owner\"}[1m])) by (le))",
               "format": "time_series",
               "hide": false,
               "interval": "",

@@ -28,7 +28,7 @@ expect_before {
 }
 send "cd validator-testnet\r"
 send "docker-compose logs -f validator\r"
-expect "validator_1*Diem is running"
+expect "validator_1*Aptos is running"
 
 
 ### Ensure faucet is started

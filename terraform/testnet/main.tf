@@ -52,30 +52,30 @@ module "validator" {
   trusted_instance_type   = var.trusted_instance_type
 }
 
-data "aws_eks_cluster" "diem" {
-  name = "diem-${terraform.workspace}"
+data "aws_eks_cluster" "aptos" {
+  name = "aptos-${terraform.workspace}"
 }
 
-data "aws_eks_cluster_auth" "diem" {
-  name = data.aws_eks_cluster.diem.name
+data "aws_eks_cluster_auth" "aptos" {
+  name = data.aws_eks_cluster.aptos.name
 }
 
 provider "helm" {
   kubernetes {
     host                   = module.validator.kubernetes.kubernetes_host
     cluster_ca_certificate = module.validator.kubernetes.kubernetes_ca_cert
-    token                  = data.aws_eks_cluster_auth.diem.token
+    token                  = data.aws_eks_cluster_auth.aptos.token
   }
 }
 
 provider "kubernetes" {
   host                   = module.validator.kubernetes.kubernetes_host
   cluster_ca_certificate = module.validator.kubernetes.kubernetes_ca_cert
-  token                  = data.aws_eks_cluster_auth.diem.token
+  token                  = data.aws_eks_cluster_auth.aptos.token
 }
 
 resource "helm_release" "testnet" {
-  name        = "diem"
+  name        = "aptos"
   chart       = "${path.module}/testnet"
   max_history = var.enable_forge ? 2 : 10
   wait        = false
@@ -124,10 +124,10 @@ resource "helm_release" "testnet" {
       }
       aws = {
         region       = var.region
-        cluster_name = data.aws_eks_cluster.diem.name
+        cluster_name = data.aws_eks_cluster.aptos.name
         vpc_id       = module.validator.vpc_id
         role_arn     = aws_iam_role.k8s-aws-integrations.arn
-        zone_name    = var.zone_id != "" ? data.aws_route53_zone.diem[0].name : null
+        zone_name    = var.zone_id != "" ? data.aws_route53_zone.aptos[0].name : null
       }
     }),
     jsonencode(var.testnet_helm_values),
@@ -157,7 +157,7 @@ resource "helm_release" "validator" {
         }
       }
       chain = {
-        name     = "diem-${terraform.workspace}"
+        name     = "aptos-${terraform.workspace}"
         era      = var.era
         chain_id = var.chain_id
       }
@@ -231,12 +231,12 @@ resource "helm_release" "public-fullnode" {
     jsonencode(jsondecode(module.validator.helm_values)["fullnode"]),
     jsonencode({
       chain = {
-        name             = "diem-${terraform.workspace}"
+        name             = "aptos-${terraform.workspace}"
         era              = var.era
         genesisConfigmap = "aptos-testnet-genesis-e${var.era}"
       }
-      diem_chains = {
-        "diem-${terraform.workspace}" = {
+      aptos_chains = {
+        "aptos-${terraform.workspace}" = {
           seeds = []
         }
       }
@@ -270,7 +270,7 @@ resource "helm_release" "pfn-logger" {
         name = "novi-testnet-pfn"
       }
       chain = {
-        name = "diem-${terraform.workspace}"
+        name = "aptos-${terraform.workspace}"
       }
     }),
   ]

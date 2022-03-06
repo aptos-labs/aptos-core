@@ -29,7 +29,7 @@ spec:
         command: ["sleep", "infinity"]
         volumeMounts:
         - name: aptos-data
-          mountPath: /opt/diem/data
+          mountPath: /opt/aptos/data
         - name: tmp
           mountPath: /tmp
         securityContext:

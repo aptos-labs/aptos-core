@@ -188,7 +188,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count[1m]))",
+          "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count[1m]))",
           "interval": "",
           "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
           "refId": "A"
@@ -198,7 +198,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "DiemDB API Success Rate",
+      "title": "AptosDB API Success Rate",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -285,7 +285,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_schemadb_get_latency_seconds_count[1m]))",
+          "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_schemadb_get_latency_seconds_count[1m]))",
           "interval": "",
           "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
           "refId": "A"
@@ -403,7 +403,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(diem_storage_api_latency_seconds_count[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(aptos_storage_api_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -511,7 +511,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(diem_storage_api_latency_seconds_count[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(aptos_storage_api_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -619,7 +619,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(diem_storage_api_latency_seconds_count[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(aptos_storage_api_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -727,7 +727,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(diem_storage_api_latency_seconds_count[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(aptos_storage_api_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -835,7 +835,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(diem_storage_api_latency_seconds_count[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(aptos_storage_api_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -943,7 +943,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(diem_storage_api_latency_seconds_count[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(aptos_storage_api_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -1051,7 +1051,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(diem_storage_api_latency_seconds_count[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(aptos_storage_api_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -1159,7 +1159,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(diem_storage_api_latency_seconds_count[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(aptos_storage_api_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -1267,7 +1267,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(diem_storage_api_latency_seconds_count[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(aptos_storage_api_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -1375,7 +1375,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(diem_storage_api_latency_seconds_count[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(aptos_storage_api_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -1483,7 +1483,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(diem_storage_api_latency_seconds_count[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(aptos_storage_api_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -1591,7 +1591,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(diem_storage_api_latency_seconds_count[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(aptos_storage_api_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -1699,7 +1699,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(diem_storage_api_latency_seconds_count[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(aptos_storage_api_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -1807,7 +1807,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(diem_storage_api_latency_seconds_count[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(aptos_storage_api_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -1915,7 +1915,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(diem_storage_api_latency_seconds_count[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(aptos_storage_api_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -2023,7 +2023,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(diem_storage_api_latency_seconds_count[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(aptos_storage_api_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -2131,7 +2131,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(diem_storage_api_latency_seconds_count[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m]) / irate(aptos_storage_api_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -2179,7 +2179,7 @@
           }
         }
       ],
-      "title": "DiemDB API Latency by api_name",
+      "title": "AptosDB API Latency by api_name",
       "type": "row"
     },
     {
@@ -2242,7 +2242,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=~\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{api_name=~\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=~\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{api_name=~\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -2349,7 +2349,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -2467,7 +2467,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -2584,7 +2584,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -2702,7 +2702,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -2820,7 +2820,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -2938,7 +2938,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -3056,7 +3056,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -3174,7 +3174,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -3292,7 +3292,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -3410,7 +3410,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -3528,7 +3528,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -3646,7 +3646,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -3764,7 +3764,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -3882,7 +3882,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -4000,7 +4000,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -4118,7 +4118,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -4236,7 +4236,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Ok\", api_name=\"$api_name\"}[1m])) / sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{api_name=\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -4296,7 +4296,7 @@
           }
         }
       ],
-      "title": "DiemDB API Success Rate by api_name",
+      "title": "AptosDB API Success Rate by api_name",
       "type": "row"
     },
     {
@@ -4358,7 +4358,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=~\"$api_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=~\"$api_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -4466,7 +4466,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -4574,7 +4574,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -4682,7 +4682,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -4790,7 +4790,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -4897,7 +4897,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -5005,7 +5005,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -5113,7 +5113,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -5221,7 +5221,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -5329,7 +5329,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -5437,7 +5437,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -5545,7 +5545,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -5653,7 +5653,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -5761,7 +5761,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -5869,7 +5869,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -5977,7 +5977,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -6085,7 +6085,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -6193,7 +6193,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -6241,7 +6241,7 @@
           }
         }
       ],
-      "title": "DiemDB API Call per Second by api_name",
+      "title": "AptosDB API Call per Second by api_name",
       "type": "row"
     },
     {
@@ -6303,7 +6303,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=~\"$api_name\", result=\"Err\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", api_name=~\"$api_name\", result=\"Err\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -6409,7 +6409,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -6515,7 +6515,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -6621,7 +6621,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -6727,7 +6727,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -6832,7 +6832,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -6938,7 +6938,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -7044,7 +7044,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -7150,7 +7150,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -7256,7 +7256,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -7362,7 +7362,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -7468,7 +7468,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -7574,7 +7574,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -7680,7 +7680,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -7786,7 +7786,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -7892,7 +7892,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -7998,7 +7998,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -8104,7 +8104,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
+              "expr": "irate(aptos_storage_api_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", result=\"Err\", api_name=\"$api_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -8152,7 +8152,7 @@
           }
         }
       ],
-      "title": "DiemDB API Error per Second by api_name",
+      "title": "AptosDB API Error per Second by api_name",
       "type": "row"
     },
     {
@@ -8226,7 +8226,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(diem_schemadb_get_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(aptos_schemadb_get_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -8334,7 +8334,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(diem_schemadb_get_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(aptos_schemadb_get_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -8442,7 +8442,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(diem_schemadb_get_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(aptos_schemadb_get_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -8550,7 +8550,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(diem_schemadb_get_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(aptos_schemadb_get_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -8658,7 +8658,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(diem_schemadb_get_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(aptos_schemadb_get_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -8766,7 +8766,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(diem_schemadb_get_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(aptos_schemadb_get_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -8874,7 +8874,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(diem_schemadb_get_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(aptos_schemadb_get_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -8982,7 +8982,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(diem_schemadb_get_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(aptos_schemadb_get_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -9090,7 +9090,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(diem_schemadb_get_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(aptos_schemadb_get_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -9198,7 +9198,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(diem_schemadb_get_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(aptos_schemadb_get_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -9306,7 +9306,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(diem_schemadb_get_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(aptos_schemadb_get_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -9414,7 +9414,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(diem_schemadb_get_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(aptos_schemadb_get_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -9522,7 +9522,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(diem_schemadb_get_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(aptos_schemadb_get_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -9630,7 +9630,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(diem_schemadb_get_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(aptos_schemadb_get_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -9738,7 +9738,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(diem_schemadb_get_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/ irate(aptos_schemadb_get_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -9852,7 +9852,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=~\"$cf_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=~\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -9960,7 +9960,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -10068,7 +10068,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -10175,7 +10175,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -10283,7 +10283,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -10391,7 +10391,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -10499,7 +10499,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -10607,7 +10607,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -10715,7 +10715,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -10823,7 +10823,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -10931,7 +10931,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -11039,7 +11039,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -11147,7 +11147,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -11255,7 +11255,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -11363,7 +11363,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -11471,7 +11471,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_get_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -11585,7 +11585,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(owner, kubernetes_pod_name) (irate(diem_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=~\"$cf_name\"}[1m]))",
+              "expr": "sum by(owner, kubernetes_pod_name) (irate(aptos_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=~\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -11693,7 +11693,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(owner, kubernetes_pod_name) (irate(diem_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
+              "expr": "sum by(owner, kubernetes_pod_name) (irate(aptos_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -11801,7 +11801,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(owner, kubernetes_pod_name) (irate(diem_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
+              "expr": "sum by(owner, kubernetes_pod_name) (irate(aptos_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -11908,7 +11908,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(owner, kubernetes_pod_name) (irate(diem_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
+              "expr": "sum by(owner, kubernetes_pod_name) (irate(aptos_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -12016,7 +12016,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(owner, kubernetes_pod_name) (irate(diem_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
+              "expr": "sum by(owner, kubernetes_pod_name) (irate(aptos_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -12124,7 +12124,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(owner, kubernetes_pod_name) (irate(diem_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
+              "expr": "sum by(owner, kubernetes_pod_name) (irate(aptos_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -12232,7 +12232,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(owner, kubernetes_pod_name) (irate(diem_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
+              "expr": "sum by(owner, kubernetes_pod_name) (irate(aptos_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -12340,7 +12340,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(owner, kubernetes_pod_name) (irate(diem_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
+              "expr": "sum by(owner, kubernetes_pod_name) (irate(aptos_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -12448,7 +12448,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(owner, kubernetes_pod_name) (irate(diem_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
+              "expr": "sum by(owner, kubernetes_pod_name) (irate(aptos_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -12556,7 +12556,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(owner, kubernetes_pod_name) (irate(diem_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
+              "expr": "sum by(owner, kubernetes_pod_name) (irate(aptos_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -12664,7 +12664,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(owner, kubernetes_pod_name) (irate(diem_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
+              "expr": "sum by(owner, kubernetes_pod_name) (irate(aptos_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -12772,7 +12772,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(owner, kubernetes_pod_name) (irate(diem_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
+              "expr": "sum by(owner, kubernetes_pod_name) (irate(aptos_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -12880,7 +12880,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(owner, kubernetes_pod_name) (irate(diem_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
+              "expr": "sum by(owner, kubernetes_pod_name) (irate(aptos_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -12988,7 +12988,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(owner, kubernetes_pod_name) (irate(diem_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
+              "expr": "sum by(owner, kubernetes_pod_name) (irate(aptos_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -13096,7 +13096,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(owner, kubernetes_pod_name) (irate(diem_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
+              "expr": "sum by(owner, kubernetes_pod_name) (irate(aptos_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -13204,7 +13204,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by(owner, kubernetes_pod_name) (irate(diem_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
+              "expr": "sum by(owner, kubernetes_pod_name) (irate(aptos_schemadb_get_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -13326,7 +13326,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(diem_schemadb_iter_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(aptos_schemadb_iter_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -13434,7 +13434,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(diem_schemadb_iter_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(aptos_schemadb_iter_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -13542,7 +13542,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(diem_schemadb_iter_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(aptos_schemadb_iter_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -13650,7 +13650,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(diem_schemadb_iter_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(aptos_schemadb_iter_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -13758,7 +13758,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(diem_schemadb_iter_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(aptos_schemadb_iter_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -13866,7 +13866,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(diem_schemadb_iter_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(aptos_schemadb_iter_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -13974,7 +13974,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(diem_schemadb_iter_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(aptos_schemadb_iter_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -14082,7 +14082,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(diem_schemadb_iter_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(aptos_schemadb_iter_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -14190,7 +14190,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(diem_schemadb_iter_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(aptos_schemadb_iter_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -14298,7 +14298,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(diem_schemadb_iter_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(aptos_schemadb_iter_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -14406,7 +14406,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(diem_schemadb_iter_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(aptos_schemadb_iter_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -14514,7 +14514,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(diem_schemadb_iter_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(aptos_schemadb_iter_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -14622,7 +14622,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(diem_schemadb_iter_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(aptos_schemadb_iter_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -14730,7 +14730,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(diem_schemadb_iter_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(aptos_schemadb_iter_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -14838,7 +14838,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(diem_schemadb_iter_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])/irate(aptos_schemadb_iter_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -14952,7 +14952,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=~\"$cf_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=~\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -15060,7 +15060,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -15168,7 +15168,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -15275,7 +15275,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -15383,7 +15383,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -15491,7 +15491,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -15599,7 +15599,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -15707,7 +15707,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -15815,7 +15815,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -15923,7 +15923,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -16031,7 +16031,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -16139,7 +16139,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -16247,7 +16247,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -16355,7 +16355,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -16463,7 +16463,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -16571,7 +16571,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -16685,7 +16685,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (irate(diem_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=~\"$cf_name\"}[1m]))",
+              "expr": "sum by (owner, kubernetes_pod_name) (irate(aptos_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=~\"$cf_name\"}[1m]))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -16793,7 +16793,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -16901,7 +16901,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -17008,7 +17008,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -17116,7 +17116,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -17224,7 +17224,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -17332,7 +17332,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -17440,7 +17440,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -17548,7 +17548,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -17656,7 +17656,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -17764,7 +17764,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -17872,7 +17872,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -17980,7 +17980,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -18088,7 +18088,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -18196,7 +18196,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -18304,7 +18304,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_iter_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -18417,7 +18417,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_batch_commit_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", db_name=~\"$db_name\"}[1m])/irate(diem_schemadb_batch_commit_latency_seconds_count[1m])",
+              "expr": "irate(aptos_schemadb_batch_commit_latency_seconds_sum{owner=~\"$owner\", role=~\"$role\", db_name=~\"$db_name\"}[1m])/irate(aptos_schemadb_batch_commit_latency_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}} {{db_name}}",
               "refId": "A"
@@ -18515,7 +18515,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_batch_commit_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", db_name=~\"$db_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_batch_commit_latency_seconds_count{owner=~\"$owner\", role=~\"$role\", db_name=~\"$db_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}} {{db_name}}",
               "refId": "A"
@@ -18613,7 +18613,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_batch_commit_bytes_sum{owner=~\"$owner\", role=~\"$role\", db_name=~\"$db_name\"}[1m])",
+              "expr": "irate(aptos_schemadb_batch_commit_bytes_sum{owner=~\"$owner\", role=~\"$role\", db_name=~\"$db_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}} {{db_name}}",
               "refId": "A"
@@ -18711,7 +18711,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_schemadb_batch_commit_bytes_sum{owner=~\"$owner\", role=~\"$role\", db_name=~\"$db_name\"}[1m]) / irate(diem_schemadb_batch_commit_bytes_count[1m])",
+              "expr": "irate(aptos_schemadb_batch_commit_bytes_sum{owner=~\"$owner\", role=~\"$role\", db_name=~\"$db_name\"}[1m]) / irate(aptos_schemadb_batch_commit_bytes_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}} {{db_name}}",
               "refId": "A"
@@ -18831,7 +18831,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_other_timers_seconds_sum{owner=~\"$owner\", role=~\"$role\", name=\"$timer_name\"}[1m])/ irate(diem_storage_other_timers_seconds_count[1m])",
+              "expr": "irate(aptos_storage_other_timers_seconds_sum{owner=~\"$owner\", role=~\"$role\", name=\"$timer_name\"}[1m])/ irate(aptos_storage_other_timers_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -18937,7 +18937,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_other_timers_seconds_sum{owner=~\"$owner\", role=~\"$role\", name=\"$timer_name\"}[1m])/ irate(diem_storage_other_timers_seconds_count[1m])",
+              "expr": "irate(aptos_storage_other_timers_seconds_sum{owner=~\"$owner\", role=~\"$role\", name=\"$timer_name\"}[1m])/ irate(aptos_storage_other_timers_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -19043,7 +19043,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_other_timers_seconds_sum{owner=~\"$owner\", role=~\"$role\", name=\"$timer_name\"}[1m])/ irate(diem_storage_other_timers_seconds_count[1m])",
+              "expr": "irate(aptos_storage_other_timers_seconds_sum{owner=~\"$owner\", role=~\"$role\", name=\"$timer_name\"}[1m])/ irate(aptos_storage_other_timers_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -19149,7 +19149,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_other_timers_seconds_sum{owner=~\"$owner\", role=~\"$role\", name=\"$timer_name\"}[1m])/ irate(diem_storage_other_timers_seconds_count[1m])",
+              "expr": "irate(aptos_storage_other_timers_seconds_sum{owner=~\"$owner\", role=~\"$role\", name=\"$timer_name\"}[1m])/ irate(aptos_storage_other_timers_seconds_count[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -19263,7 +19263,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (diem_rocksdb_properties{property_name=\"diem_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=~\"$cf_name\"})",
+              "expr": "sum by (owner, kubernetes_pod_name) (aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=~\"$cf_name\"})",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -19373,7 +19373,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_rocksdb_properties{property_name=\"diem_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -19483,7 +19483,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_rocksdb_properties{property_name=\"diem_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -19592,7 +19592,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_rocksdb_properties{property_name=\"diem_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -19702,7 +19702,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_rocksdb_properties{property_name=\"diem_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -19812,7 +19812,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_rocksdb_properties{property_name=\"diem_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -19922,7 +19922,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_rocksdb_properties{property_name=\"diem_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -20032,7 +20032,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_rocksdb_properties{property_name=\"diem_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -20142,7 +20142,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_rocksdb_properties{property_name=\"diem_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -20252,7 +20252,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_rocksdb_properties{property_name=\"diem_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -20362,7 +20362,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_rocksdb_properties{property_name=\"diem_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -20472,7 +20472,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_rocksdb_properties{property_name=\"diem_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -20582,7 +20582,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_rocksdb_properties{property_name=\"diem_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -20692,7 +20692,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_rocksdb_properties{property_name=\"diem_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -20802,7 +20802,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_rocksdb_properties{property_name=\"diem_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -20912,7 +20912,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_rocksdb_properties{property_name=\"diem_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -21026,19 +21026,19 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_storage_latest_transaction_version{owner=~\"$owner\", role=~\"$role\"}",
+              "expr": "aptos_storage_latest_transaction_version{owner=~\"$owner\", role=~\"$role\"}",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}} synced",
               "refId": "A"
             },
             {
-              "expr": "diem_storage_ledger_version{owner=~\"$owner\", role=~\"$role\"}",
+              "expr": "aptos_storage_ledger_version{owner=~\"$owner\", role=~\"$role\"}",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}} committed",
               "refId": "C"
             },
             {
-              "expr": "diem_storage_pruner_least_readable_state_version{owner=~\"$owner\", role=~\"$role\"}",
+              "expr": "aptos_storage_pruner_least_readable_state_version{owner=~\"$owner\", role=~\"$role\"}",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}} pruned-till",
               "refId": "B"
@@ -21135,7 +21135,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_storage_next_block_epoch{owner=~\"$owner\", role=~\"$role\"}",
+              "expr": "aptos_storage_next_block_epoch{owner=~\"$owner\", role=~\"$role\"}",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -21231,13 +21231,13 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_rocksdb_properties{property_name=\"diem_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"jellyfish_merkle_node\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"jellyfish_merkle_node\"}",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}} rocksdb",
               "refId": "A"
             },
             {
-              "expr": "rate(diem_schemadb_put_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"jellyfish_merkle_node\"}[10m]) / rate(diem_schemadb_put_bytes_count[10m]) * ignoring(cf_name) ((diem_storage_ledger{type=\"new_state_nodes\"} - ignoring(type) diem_storage_ledger{type=\"stale_state_nodes\"}) + 1000000 * (log2(diem_storage_ledger{type=\"new_state_leaves\"} - ignoring(type) diem_storage_ledger{type=\"stale_state_leaves\"}) / 2 - 1))",
+              "expr": "rate(aptos_schemadb_put_bytes_sum{owner=~\"$owner\", role=~\"$role\", cf_name=\"jellyfish_merkle_node\"}[10m]) / rate(aptos_schemadb_put_bytes_count[10m]) * ignoring(cf_name) ((aptos_storage_ledger{type=\"new_state_nodes\"} - ignoring(type) aptos_storage_ledger{type=\"stale_state_nodes\"}) + 1000000 * (log2(aptos_storage_ledger{type=\"new_state_leaves\"} - ignoring(type) aptos_storage_ledger{type=\"stale_state_leaves\"}) / 2 - 1))",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}} calculated",
               "refId": "B"
@@ -21334,13 +21334,13 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_storage_ledger{owner=~\"$owner\", role=~\"$role\", type=\"new_state_leaves\"} - ignoring(type) diem_storage_ledger{type=\"stale_state_leaves\"}",
+              "expr": "aptos_storage_ledger{owner=~\"$owner\", role=~\"$role\", type=\"new_state_leaves\"} - ignoring(type) aptos_storage_ledger{type=\"stale_state_leaves\"}",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}} accounts",
               "refId": "A"
             },
             {
-              "expr": "diem_storage_ledger{owner=~\"$owner\", role=~\"$role\", type=\"new_state_nodes\"} - ignoring(type) diem_storage_ledger{type=\"stale_state_nodes\"} - ignoring(type) diem_storage_ledger{type=\"new_state_leaves\"} + ignoring(type) diem_storage_ledger{type=\"stale_state_leaves\"}",
+              "expr": "aptos_storage_ledger{owner=~\"$owner\", role=~\"$role\", type=\"new_state_nodes\"} - ignoring(type) aptos_storage_ledger{type=\"stale_state_nodes\"} - ignoring(type) aptos_storage_ledger{type=\"new_state_leaves\"} + ignoring(type) aptos_storage_ledger{type=\"stale_state_leaves\"}",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}} internal_nodes",
               "refId": "B"
@@ -21438,7 +21438,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "avg by(cf_name)(diem_rocksdb_properties{property_name=\"diem_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\"})",
+              "expr": "avg by(cf_name)(aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\"})",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -21540,7 +21540,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "avg by(cf_name)(irate(diem_schemadb_put_bytes_sum{owner=~\"$owner\", role=~\"$role\"}[1m])) / avg by(cf_name)(irate(diem_schemadb_put_bytes_count[1m]))",
+              "expr": "avg by(cf_name)(irate(aptos_schemadb_put_bytes_sum{owner=~\"$owner\", role=~\"$role\"}[1m])) / avg by(cf_name)(irate(aptos_schemadb_put_bytes_count[1m]))",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -21640,7 +21640,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_ledger{owner=~\"$owner\", role=~\"$role\", type=\"new_state_leaves\"}[1m]) / ignoring(type) irate(diem_storage_latest_transaction_version[1m])",
+              "expr": "irate(aptos_storage_ledger{owner=~\"$owner\", role=~\"$role\", type=\"new_state_leaves\"}[1m]) / ignoring(type) irate(aptos_storage_latest_transaction_version[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -21738,7 +21738,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_ledger{owner=~\"$owner\", role=~\"$role\", type=\"events_created\"}[1m]) / on(owner, kubernetes_pod_name) irate(diem_storage_latest_transaction_version[1m])",
+              "expr": "irate(aptos_storage_ledger{owner=~\"$owner\", role=~\"$role\", type=\"events_created\"}[1m]) / on(owner, kubernetes_pod_name) irate(aptos_storage_latest_transaction_version[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -21836,7 +21836,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_ledger{owner=~\"$owner\", role=~\"$role\", type=\"new_state_nodes\"}[1m]) / ignoring(type) irate(diem_storage_ledger{type=\"new_state_leaves\"}[1m]) - 1",
+              "expr": "irate(aptos_storage_ledger{owner=~\"$owner\", role=~\"$role\", type=\"new_state_nodes\"}[1m]) / ignoring(type) irate(aptos_storage_ledger{type=\"new_state_leaves\"}[1m]) - 1",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -21933,7 +21933,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_latest_transaction_version{owner=~\"$owner\", role=~\"$role\"}[1m])",
+              "expr": "irate(aptos_storage_latest_transaction_version{owner=~\"$owner\", role=~\"$role\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "A"
@@ -22029,7 +22029,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_storage_latest_transaction_version{owner=~\"$owner\", role=~\"$role\"}[1m]) / on (owner, kubernetes_pod_name) irate(diem_storage_api_latency_seconds_count{api_name=\"save_transactions\", result=\"Ok\"}[1m])",
+              "expr": "irate(aptos_storage_latest_transaction_version{owner=~\"$owner\", role=~\"$role\"}[1m]) / on (owner, kubernetes_pod_name) irate(aptos_storage_api_latency_seconds_count{api_name=\"save_transactions\", result=\"Ok\"}[1m])",
               "hide": false,
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
@@ -22160,19 +22160,19 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_db_restore_coordinator_start_timestamp_s{owner=~\"$owner\"} * 1000\nunless diem_db_restore_coordinator_succeed_timestamp_s > diem_db_restore_coordinator_start_timestamp_s\nunless diem_db_restore_coordinator_fail_timestamp_s > diem_db_restore_coordinator_start_timestamp_s\n\n# any restore activity:\nand (rate(diem_db_restore_epoch_ending_epoch[1m]) > 0 or rate(diem_db_restore_state_snapshot_leaf_index[1m]) > 0 or rate(diem_db_restore_transaction_save_version[1m]) > 0 or rate(diem_db_restore_transaction_replay_version[1m]) > 0) == bool 1",
+              "expr": "aptos_db_restore_coordinator_start_timestamp_s{owner=~\"$owner\"} * 1000\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\n\n# any restore activity:\nand (rate(aptos_db_restore_epoch_ending_epoch[1m]) > 0 or rate(aptos_db_restore_state_snapshot_leaf_index[1m]) > 0 or rate(aptos_db_restore_transaction_save_version[1m]) > 0 or rate(aptos_db_restore_transaction_replay_version[1m]) > 0) == bool 1",
               "interval": "",
               "legendFormat": "{{owner}} running since",
               "refId": "A"
             },
             {
-              "expr": "diem_db_restore_coordinator_succeed_timestamp_s{owner=~\"$owner\"} * 1000\nunless diem_db_restore_coordinator_start_timestamp_s > diem_db_restore_coordinator_succeed_timestamp_s\nunless diem_db_restore_coordinator_fail_timestamp_s > diem_db_restore_coordinator_succeed_timestamp_s",
+              "expr": "aptos_db_restore_coordinator_succeed_timestamp_s{owner=~\"$owner\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s",
               "interval": "",
               "legendFormat": "{{owner}} succeeded since",
               "refId": "B"
             },
             {
-              "expr": "diem_db_restore_coordinator_fail_timestamp_s{owner=~\"$owner\"} * 1000\nunless diem_db_restore_coordinator_start_timestamp_s > diem_db_restore_coordinator_fail_timestamp_s\nunless diem_db_restore_coordinator_succeed_timestamp_s > diem_db_restore_coordinator_fail_timestamp_s",
+              "expr": "aptos_db_restore_coordinator_fail_timestamp_s{owner=~\"$owner\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s",
               "hide": false,
               "interval": "",
               "legendFormat": "{{owner}} failed since",
@@ -22269,19 +22269,19 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_db_restore_transaction_save_version and irate(diem_db_restore_transaction_save_version[1m]) > 0",
+              "expr": "aptos_db_restore_transaction_save_version and irate(aptos_db_restore_transaction_save_version[1m]) > 0",
               "interval": "",
               "legendFormat": "{{owner}} saved",
               "refId": "A"
             },
             {
-              "expr": "diem_db_restore_transaction_replay_version and irate(diem_db_restore_transaction_replay_version[1m]) > 0",
+              "expr": "aptos_db_restore_transaction_replay_version and irate(aptos_db_restore_transaction_replay_version[1m]) > 0",
               "interval": "",
               "legendFormat": "{{owner}}  replayed",
               "refId": "B"
             },
             {
-              "expr": "diem_db_restore_coordinator_target_version and (irate(diem_db_restore_transaction_save_version[1m]) > 0 or irate(diem_db_restore_transaction_replay_version[1m]) > 0)",
+              "expr": "aptos_db_restore_coordinator_target_version and (irate(aptos_db_restore_transaction_save_version[1m]) > 0 or irate(aptos_db_restore_transaction_replay_version[1m]) > 0)",
               "interval": "",
               "legendFormat": "{{owner}} target",
               "refId": "C"
@@ -22377,13 +22377,13 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "(diem_db_restore_transaction_save_version and irate(diem_db_restore_transaction_save_version[1m]) > 0) / diem_db_restore_coordinator_target_version",
+              "expr": "(aptos_db_restore_transaction_save_version and irate(aptos_db_restore_transaction_save_version[1m]) > 0) / aptos_db_restore_coordinator_target_version",
               "interval": "",
               "legendFormat": "{{owner}} saved",
               "refId": "A"
             },
             {
-              "expr": "(diem_db_restore_transaction_replay_version and irate(diem_db_restore_transaction_replay_version[1m]) > 0) / diem_db_restore_coordinator_target_version",
+              "expr": "(aptos_db_restore_transaction_replay_version and irate(aptos_db_restore_transaction_replay_version[1m]) > 0) / aptos_db_restore_coordinator_target_version",
               "interval": "",
               "legendFormat": "{{owner}} replayed",
               "refId": "B"
@@ -22480,13 +22480,13 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_storage_latest_transaction_version{role=~\"validator|fullnode\"}",
+              "expr": "aptos_storage_latest_transaction_version{role=~\"validator|fullnode\"}",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}} synced",
               "refId": "A"
             },
             {
-              "expr": "diem_storage_ledger_version{role=~\"validator|fullnode\"}",
+              "expr": "aptos_storage_ledger_version{role=~\"validator|fullnode\"}",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}} committed",
               "refId": "B"
@@ -22584,7 +22584,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_consensus_current_round",
+              "expr": "aptos_consensus_current_round",
               "format": "time_series",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
@@ -23099,7 +23099,7 @@
               "refId": "A"
             },
             {
-              "expr": "diem_storage_next_block_epoch{owner=~\"$owner\", role=~\"$role\"} and irate(aptos_backup_handler_epoch_ending_epoch[1m]) > 0",
+              "expr": "aptos_storage_next_block_epoch{owner=~\"$owner\", role=~\"$role\"} and irate(aptos_backup_handler_epoch_ending_epoch[1m]) > 0",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "B"
@@ -23204,7 +23204,7 @@
               "refId": "A"
             },
             {
-              "expr": "diem_storage_latest_transaction_version{owner=~\"$owner\", role=~\"$role\"} and aptos_backup_handler_state_snapshot_version",
+              "expr": "aptos_storage_latest_transaction_version{owner=~\"$owner\", role=~\"$role\"} and aptos_backup_handler_state_snapshot_version",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}-latest",
               "refId": "B"
@@ -23309,7 +23309,7 @@
               "refId": "A"
             },
             {
-              "expr": "(diem_storage_ledger{owner=~\"$owner\", role=~\"$role\", type=\"new_state_leaves\"} - ignoring(type) diem_storage_ledger{type=\"stale_state_leaves\"}) and aptos_backup_handler_state_snapshot_leaf_index",
+              "expr": "(aptos_storage_ledger{owner=~\"$owner\", role=~\"$role\", type=\"new_state_leaves\"} - ignoring(type) aptos_storage_ledger{type=\"stale_state_leaves\"}) and aptos_backup_handler_state_snapshot_leaf_index",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}-total",
               "refId": "B"
@@ -23513,7 +23513,7 @@
               "refId": "A"
             },
             {
-              "expr": "diem_storage_latest_transaction_version{owner=~\"$owner\", role=~\"$role\"} and irate(aptos_backup_handler_transaction_version[1m]) > 0",
+              "expr": "aptos_storage_latest_transaction_version{owner=~\"$owner\", role=~\"$role\"} and irate(aptos_backup_handler_transaction_version[1m]) > 0",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}}",
               "refId": "B"
@@ -24606,19 +24606,19 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_db_restore_coordinator_start_timestamp_s{owner=~\"$owner\"} * 1000\nunless diem_db_restore_coordinator_succeed_timestamp_s > diem_db_restore_coordinator_start_timestamp_s\nunless diem_db_restore_coordinator_fail_timestamp_s > diem_db_restore_coordinator_start_timestamp_s\n\n# any restore activity:\nand (rate(diem_db_restore_epoch_ending_epoch[1m]) > 0 or rate(diem_db_restore_state_snapshot_leaf_index[1m]) > 0 or rate(diem_db_restore_transaction_save_version[1m]) > 0 or rate(diem_db_restore_transaction_replay_version[1m]) > 0) == bool 1",
+              "expr": "aptos_db_restore_coordinator_start_timestamp_s{owner=~\"$owner\"} * 1000\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_start_timestamp_s\n\n# any restore activity:\nand (rate(aptos_db_restore_epoch_ending_epoch[1m]) > 0 or rate(aptos_db_restore_state_snapshot_leaf_index[1m]) > 0 or rate(aptos_db_restore_transaction_save_version[1m]) > 0 or rate(aptos_db_restore_transaction_replay_version[1m]) > 0) == bool 1",
               "interval": "",
               "legendFormat": "{{owner}} running since",
               "refId": "A"
             },
             {
-              "expr": "diem_db_restore_coordinator_succeed_timestamp_s{owner=~\"$owner\"} * 1000\nunless diem_db_restore_coordinator_start_timestamp_s > diem_db_restore_coordinator_succeed_timestamp_s\nunless diem_db_restore_coordinator_fail_timestamp_s > diem_db_restore_coordinator_succeed_timestamp_s",
+              "expr": "aptos_db_restore_coordinator_succeed_timestamp_s{owner=~\"$owner\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s\nunless aptos_db_restore_coordinator_fail_timestamp_s > aptos_db_restore_coordinator_succeed_timestamp_s",
               "interval": "",
               "legendFormat": "{{owner}} succeeded since",
               "refId": "B"
             },
             {
-              "expr": "diem_db_restore_coordinator_fail_timestamp_s{owner=~\"$owner\"} * 1000\nunless diem_db_restore_coordinator_start_timestamp_s > diem_db_restore_coordinator_fail_timestamp_s\nunless diem_db_restore_coordinator_succeed_timestamp_s > diem_db_restore_coordinator_fail_timestamp_s",
+              "expr": "aptos_db_restore_coordinator_fail_timestamp_s{owner=~\"$owner\"} * 1000\nunless aptos_db_restore_coordinator_start_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s\nunless aptos_db_restore_coordinator_succeed_timestamp_s > aptos_db_restore_coordinator_fail_timestamp_s",
               "hide": false,
               "interval": "",
               "legendFormat": "{{owner}} failed since",
@@ -24714,7 +24714,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_db_restore_epoch_ending_epoch{owner=~\"$owner\"} and irate(diem_db_restore_epoch_ending_epoch[1m]) != 0",
+              "expr": "aptos_db_restore_epoch_ending_epoch{owner=~\"$owner\"} and irate(aptos_db_restore_epoch_ending_epoch[1m]) != 0",
               "interval": "",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -24809,7 +24809,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_db_restore_epoch_ending_version{owner=~\"$owner\"} and irate(diem_db_restore_epoch_ending_version[1m]) != 0",
+              "expr": "aptos_db_restore_epoch_ending_version{owner=~\"$owner\"} and irate(aptos_db_restore_epoch_ending_version[1m]) != 0",
               "interval": "",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -24904,7 +24904,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_db_restore_state_snapshot_version{owner=~\"$owner\"} and irate(diem_db_restore_state_snapshot_target_leaf_index[1m]) != 0",
+              "expr": "aptos_db_restore_state_snapshot_version{owner=~\"$owner\"} and irate(aptos_db_restore_state_snapshot_target_leaf_index[1m]) != 0",
               "interval": "",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -25000,19 +25000,19 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_db_restore_transaction_save_version{owner=~\"$owner\"} and irate(diem_db_restore_transaction_save_version[1m]) != 0",
+              "expr": "aptos_db_restore_transaction_save_version{owner=~\"$owner\"} and irate(aptos_db_restore_transaction_save_version[1m]) != 0",
               "interval": "",
               "legendFormat": "{{owner}} saved",
               "refId": "A"
             },
             {
-              "expr": "diem_db_restore_transaction_replay_version{owner=~\"$owner\"} and irate(diem_db_restore_transaction_replay_version[1m]) != 0",
+              "expr": "aptos_db_restore_transaction_replay_version{owner=~\"$owner\"} and irate(aptos_db_restore_transaction_replay_version[1m]) != 0",
               "interval": "",
               "legendFormat": "{{owner}}  replayed",
               "refId": "B"
             },
             {
-              "expr": "diem_db_restore_coordinator_target_version{owner=~\"$owner\"} and (irate(diem_db_restore_transaction_save_version[1m]) != 0 or irate(diem_db_restore_transaction_replay_version[1m]) != 0)",
+              "expr": "aptos_db_restore_coordinator_target_version{owner=~\"$owner\"} and (irate(aptos_db_restore_transaction_save_version[1m]) != 0 or irate(aptos_db_restore_transaction_replay_version[1m]) != 0)",
               "interval": "",
               "legendFormat": "{{owner}} target",
               "refId": "C"
@@ -25108,13 +25108,13 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "(diem_db_restore_transaction_save_version{owner=~\"$owner\"} and irate(diem_db_restore_transaction_save_version[1m]) != 0) / diem_db_restore_coordinator_target_version",
+              "expr": "(aptos_db_restore_transaction_save_version{owner=~\"$owner\"} and irate(aptos_db_restore_transaction_save_version[1m]) != 0) / aptos_db_restore_coordinator_target_version",
               "interval": "",
               "legendFormat": "{{owner}} saved",
               "refId": "A"
             },
             {
-              "expr": "(diem_db_restore_transaction_replay_version{owner=~\"$owner\"} and irate(diem_db_restore_transaction_replay_version[1m]) != 0) / diem_db_restore_coordinator_target_version",
+              "expr": "(aptos_db_restore_transaction_replay_version{owner=~\"$owner\"} and irate(aptos_db_restore_transaction_replay_version[1m]) != 0) / aptos_db_restore_coordinator_target_version",
               "interval": "",
               "legendFormat": "{{owner}} replayed",
               "refId": "B"
@@ -25209,7 +25209,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_db_restore_transaction_save_version{owner=~\"$owner\"}[1m]) != 0",
+              "expr": "irate(aptos_db_restore_transaction_save_version{owner=~\"$owner\"}[1m]) != 0",
               "interval": "",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -25304,7 +25304,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_db_restore_transaction_replay_version{owner=~\"$owner\"}[1m]) != 0",
+              "expr": "irate(aptos_db_restore_transaction_replay_version{owner=~\"$owner\"}[1m]) != 0",
               "interval": "",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -25432,19 +25432,19 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_db_backup_verify_coordinator_start_timestamp_s{owner=~\"$owner\"} * 1000\nunless diem_db_backup_verify_coordinator_succeed_timestamp_s > diem_db_backup_verify_coordinator_start_timestamp_s\nunless diem_db_backup_verify_coordinator_fail_timestamp_s > diem_db_backup_verify_coordinator_start_timestamp_s\n\n# any restore activity:\nand (rate(diem_db_backup_verify_epoch_ending_epoch[1m]) > 0 or rate(diem_db_backup_verify_state_snapshot_leaf_index[1m]) > 0 or rate(diem_db_backup_verify_transaction_version[1m]) > 0)",
+              "expr": "aptos_db_backup_verify_coordinator_start_timestamp_s{owner=~\"$owner\"} * 1000\nunless aptos_db_backup_verify_coordinator_succeed_timestamp_s > aptos_db_backup_verify_coordinator_start_timestamp_s\nunless aptos_db_backup_verify_coordinator_fail_timestamp_s > aptos_db_backup_verify_coordinator_start_timestamp_s\n\n# any restore activity:\nand (rate(aptos_db_backup_verify_epoch_ending_epoch[1m]) > 0 or rate(aptos_db_backup_verify_state_snapshot_leaf_index[1m]) > 0 or rate(aptos_db_backup_verify_transaction_version[1m]) > 0)",
               "interval": "",
               "legendFormat": "{{owner}} running since",
               "refId": "A"
             },
             {
-              "expr": "diem_db_backup_verify_coordinator_succeed_timestamp_s{owner=~\"$owner\"} * 1000\nunless diem_db_backup_verify_coordinator_start_timestamp_s > diem_db_backup_verify_coordinator_succeed_timestamp_s\nunless diem_db_backup_verify_coordinator_fail_timestamp_s > diem_db_backup_verify_coordinator_succeed_timestamp_s",
+              "expr": "aptos_db_backup_verify_coordinator_succeed_timestamp_s{owner=~\"$owner\"} * 1000\nunless aptos_db_backup_verify_coordinator_start_timestamp_s > aptos_db_backup_verify_coordinator_succeed_timestamp_s\nunless aptos_db_backup_verify_coordinator_fail_timestamp_s > aptos_db_backup_verify_coordinator_succeed_timestamp_s",
               "interval": "",
               "legendFormat": "{{owner}} succeeded since",
               "refId": "B"
             },
             {
-              "expr": "diem_db_backup_verify_coordinator_fail_timestamp_s{owner=~\"$owner\"} * 1000\nunless diem_db_backup_verify_coordinator_start_timestamp_s > diem_db_backup_verify_coordinator_fail_timestamp_s\nunless diem_db_backup_verify_coordinator_succeed_timestamp_s > diem_db_backup_verify_coordinator_fail_timestamp_s",
+              "expr": "aptos_db_backup_verify_coordinator_fail_timestamp_s{owner=~\"$owner\"} * 1000\nunless aptos_db_backup_verify_coordinator_start_timestamp_s > aptos_db_backup_verify_coordinator_fail_timestamp_s\nunless aptos_db_backup_verify_coordinator_succeed_timestamp_s > aptos_db_backup_verify_coordinator_fail_timestamp_s",
               "hide": false,
               "interval": "",
               "legendFormat": "{{owner}} failed since",
@@ -25541,7 +25541,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_db_backup_verify_epoch_ending_epoch{owner=~\"$owner\"} and irate(diem_db_backup_verify_epoch_ending_epoch{owner=~\"$owner\"}[1m]) != 0",
+              "expr": "aptos_db_backup_verify_epoch_ending_epoch{owner=~\"$owner\"} and irate(aptos_db_backup_verify_epoch_ending_epoch{owner=~\"$owner\"}[1m]) != 0",
               "interval": "",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -25637,7 +25637,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_db_backup_verify_epoch_ending_version{owner=~\"$owner\"} and irate(diem_db_backup_verify_epoch_ending_version{owner=~\"$owner\"}[1m]) != 0",
+              "expr": "aptos_db_backup_verify_epoch_ending_version{owner=~\"$owner\"} and irate(aptos_db_backup_verify_epoch_ending_version{owner=~\"$owner\"}[1m]) != 0",
               "interval": "",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -25733,7 +25733,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_db_backup_verify_state_snapshot_version{owner=~\"$owner\"} and irate(diem_db_backup_verify_state_snapshot_leaf_index[1m]) != 0",
+              "expr": "aptos_db_backup_verify_state_snapshot_version{owner=~\"$owner\"} and irate(aptos_db_backup_verify_state_snapshot_leaf_index[1m]) != 0",
               "interval": "",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -25829,7 +25829,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diem_db_backup_verify_transaction_version{owner=~\"$owner\"} and irate(diem_db_backup_verify_transaction_version{owner=~\"$owner\"}[1m]) != 0",
+              "expr": "aptos_db_backup_verify_transaction_version{owner=~\"$owner\"} and irate(aptos_db_backup_verify_transaction_version{owner=~\"$owner\"}[1m]) != 0",
               "interval": "",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -25925,7 +25925,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "irate(diem_db_backup_verify_transaction_version{owner=~\"$owner\"}[1m]) > 0",
+              "expr": "irate(aptos_db_backup_verify_transaction_version{owner=~\"$owner\"}[1m]) > 0",
               "interval": "",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -26086,14 +26086,14 @@
           ]
         },
         "datasource": "Prometheus",
-        "definition": "diem_storage_api_latency_seconds_count",
+        "definition": "aptos_storage_api_latency_seconds_count",
         "hide": 0,
         "includeAll": true,
         "label": null,
         "multi": true,
         "name": "api_name",
         "options": [],
-        "query": "diem_storage_api_latency_seconds_count",
+        "query": "aptos_storage_api_latency_seconds_count",
         "refresh": 1,
         "regex": "/api_name=\"(\\w+)\"/",
         "skipUrlSync": false,
@@ -26146,14 +26146,14 @@
           ]
         },
         "datasource": "Prometheus",
-        "definition": "diem_storage_other_timers_seconds_sum",
+        "definition": "aptos_storage_other_timers_seconds_sum",
         "hide": 0,
         "includeAll": true,
         "label": null,
         "multi": true,
         "name": "timer_name",
         "options": [],
-        "query": "diem_storage_other_timers_seconds_sum",
+        "query": "aptos_storage_other_timers_seconds_sum",
         "refresh": 1,
         "regex": "/name=\"(\\w+)\"/",
         "skipUrlSync": false,

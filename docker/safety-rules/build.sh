@@ -5,4 +5,4 @@ set -e
 
 DIR="$( cd "$( dirname "$0" )" && pwd )"
 
-$DIR/../aptos-build.sh $DIR/Dockerfile diem/validator_tcb "$@"
+$DIR/../aptos-build.sh $DIR/Dockerfile aptos/validator_tcb "$@"

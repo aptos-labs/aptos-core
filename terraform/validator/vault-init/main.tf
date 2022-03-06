@@ -1,6 +1,6 @@
 variable "namespace" {
   description = "Prefix to use when naming secrets and transit keys"
-  default     = "diem"
+  default     = "aptos"
 }
 
 variable "kv_v2_mount" {
@@ -19,7 +19,7 @@ variable "mount_engines" {
 }
 
 variable "reset_safety_data" {
-  description = "Reset the Diem Safety Rules counters when applying"
+  description = "Reset the Aptos Safety Rules counters when applying"
   default     = true
 }
 

@@ -1,8 +1,8 @@
-Diem Public Fullnode Deployment
+Aptos Public Fullnode Deployment
 ================================
 
-This Helm chart deploys a public fullnode for the Diem blockchain network. The
-fullnode connects to Diem validators and synchronises the blockchain state to
+This Helm chart deploys a public fullnode for the Aptos blockchain network. The
+fullnode connects to Aptos validators and synchronises the blockchain state to
 a persistent volume. It provides a [JSON-RPC interface][] for interacting with
 the blockchain.
 
@@ -13,7 +13,7 @@ Configuration
 See [values.yaml][] for the full list of options you can configure.
 
 * `chain.name`: Select which blockchain to connect to. Current values:
-  - "testnet": Diem testnet
+  - "testnet": Aptos testnet
 * `storage.class`: This needs to be set to a StorageClass available in your
   Kubernetes cluster. Example values:
   - AWS: "gp2"
@@ -24,7 +24,7 @@ See [values.yaml][] for the full list of options you can configure.
   "LoadBalancer".
 * `service.loadBalancerSourceRanges`: If you enable the LoadBalancer service you
   can set this to a list of IP ranges to restrict access to.
-* `image.tag`: Select the image tag to deploy. Backup and restore images are specified separately in `backup.image.tag` and `restore.image.tag`. For a full list of image tags, check out the [Diem dockerhub][]. Some useful tags:
+* `image.tag`: Select the image tag to deploy. Backup and restore images are specified separately in `backup.image.tag` and `restore.image.tag`. For a full list of image tags, check out the [Aptos dockerhub][]. Some useful tags:
   - `testnet`: the image Testnet validators are running
   - `devnet`: nightly build off of main
   - `release-*`: build off of the corresponding release branch
@@ -32,14 +32,14 @@ See [values.yaml][] for the full list of options you can configure.
 Connecting to Testnet
 -------------
 
-To connect to the Diem testnet, you must have the correct genesis blob and waypoint. The source of truth for these are hosted here:
-* https://testnet.diem.com/waypoint.txt
-* https://testnet.diem.com/genesis.blob
+To connect to the Aptos testnet, you must have the correct genesis blob and waypoint. The source of truth for these are hosted here:
+* https://testnet.aptos.com/waypoint.txt
+* https://testnet.aptos.com/genesis.blob
 
-The waypoint is configured as a helm value in `diem_chains.testnet.waypoint`, and the genesis blob should be copied to `files/genesis/testnet.blob`
+The waypoint is configured as a helm value in `aptos_chains.testnet.waypoint`, and the genesis blob should be copied to `files/genesis/testnet.blob`
 
 You may also need to change the chain era helm value in `chain.era` to the source of truth hosted at:
-* https://testnet.diem.com/era.txt
+* https://testnet.aptos.com/era.txt
 
 Deployment
 ----------
@@ -51,6 +51,6 @@ Deployment
        $ helm install fullnode --set storage.class=gp2 .
 
 
-[json-rpc interface]: https://github.com/diem/diem/blob/main/json-rpc/json-rpc-spec.md
+[json-rpc interface]: https://github.com/aptos/aptos/blob/main/json-rpc/json-rpc-spec.md
 [values.yaml]: values.yaml
-[Diem dockerhub]: https://hub.docker.com/r/diem/validator/tags?page=1&ordering=last_updated
+[Aptos dockerhub]: https://hub.docker.com/r/aptos/validator/tags?page=1&ordering=last_updated

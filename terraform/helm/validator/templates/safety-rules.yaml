@@ -61,7 +61,7 @@ spec:
         - |-
           set -ex
           while [ ! -e /opt/vault/token ] && [ $SECONDS -lt 30 ]; do sleep 1; done
-          exec /opt/diem/bin/safety-rules /opt/diem/etc/safetyrules.yaml
+          exec /opt/aptos/bin/safety-rules /opt/aptos/etc/safetyrules.yaml
         resources:
           {{- toYaml .resources | nindent 10 }}
         env:
@@ -78,14 +78,14 @@ spec:
           value: '{{ include "aptos-validator.fullname" . }}-logging:5044'
         volumeMounts:
         - name: config-volume
-          mountPath: /opt/diem/etc
+          mountPath: /opt/aptos/etc
         - name: vault-config
           mountPath: /etc/vault
         - name: vault-token
           mountPath: /opt/vault
         # Dummy dependency so safety-rules doesn't start before safety-data is reset
         - name: genesis-config
-          mountPath: /opt/diem/genesis
+          mountPath: /opt/aptos/genesis
         ports:
         - containerPort: 6185
         securityContext:
@@ -168,7 +168,7 @@ spec:
   - Ingress
   - Egress
   ingress:
-  # DiemNet from validator
+  # AptosNet from validator
   - from:
     - podSelector:
         matchLabels:

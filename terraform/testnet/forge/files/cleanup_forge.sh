@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Script to be run in a Forge pod after the test runs as cleanup
-# This separates the pod lifecycle from diem/diem
+# This separates the pod lifecycle from aptos/aptos
 
 # CoreDNS in EKS needs to scale down to avoid cluster resource contention
 # after the cluster has been scaled down by forge test cleanup

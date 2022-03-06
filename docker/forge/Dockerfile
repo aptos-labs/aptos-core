@@ -10,14 +10,14 @@ RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
 ENV PATH "$PATH:/root/.cargo/bin"
 
-WORKDIR /diem
-COPY rust-toolchain /diem/rust-toolchain
+WORKDIR /aptos
+COPY rust-toolchain /aptos/rust-toolchain
 RUN rustup install $(cat rust-toolchain)
 
 FROM toolchain AS builder
 
 ARG ENABLE_FAILPOINTS
-COPY . /diem
+COPY . /aptos
 
 RUN IMAGE_TARGETS="test" ./docker/build-common.sh
 
@@ -25,8 +25,8 @@ FROM debian-base
 
 RUN apt-get update && apt-get install -y libssl1.1 openssh-client wget busybox git unzip awscli && apt-get clean && rm -r /var/lib/apt/lists/*
 
-RUN mkdir /diem
-COPY rust-toolchain /diem/rust-toolchain
+RUN mkdir /aptos
+COPY rust-toolchain /aptos/rust-toolchain
 
 RUN cd /usr/local/bin && wget "https://storage.googleapis.com/kubernetes-release/release/v1.18.6/bin/linux/amd64/kubectl" -O kubectl && chmod +x kubectl
 RUN cd /usr/local/bin && wget "https://releases.hashicorp.com/vault/1.5.0/vault_1.5.0_linux_amd64.zip" -O- | busybox unzip - && chmod +x vault
@@ -37,7 +37,7 @@ RUN helm plugin install https://github.com/hypnoglow/helm-s3.git --version 0.10.
 
 RUN mkdir /etc/forge
 WORKDIR /etc/forge
-COPY --from=builder /diem/target/release/forge /usr/local/bin/forge
+COPY --from=builder /aptos/target/release/forge /usr/local/bin/forge
 ENTRYPOINT ["forge"]
 ARG BUILD_DATE
 ARG GIT_REV

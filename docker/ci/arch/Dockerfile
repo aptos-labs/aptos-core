@@ -1,9 +1,9 @@
 # while using circle we'll use circle's base image.
 FROM archlinux:base-devel-20211024.0.37588@sha256:4371fd5b5d2d99ee73e25b3b9a8d7b2258e371852dd0c5681802bf94b069aadf AS setup_ci_arch
 
-WORKDIR /diem
-COPY rust-toolchain /diem/rust-toolchain
-COPY scripts/dev_setup.sh /diem/scripts/dev_setup.sh
+WORKDIR /aptos
+COPY rust-toolchain /aptos/rust-toolchain
+COPY scripts/dev_setup.sh /aptos/scripts/dev_setup.sh
 
 ENV HOME "/github/home"
 #Needed for sccache to function, and to work around home dir being blatted.
@@ -21,7 +21,7 @@ RUN pacman -Sy archlinux-keyring --noconfirm && \
     mkdir -p /github/home && \
     mkdir -p /opt/cargo/ && \
     mkdir -p /opt/git/ && \
-    /diem/scripts/dev_setup.sh -t -o -b -p -y -n && \
+    /aptos/scripts/dev_setup.sh -t -o -b -p -y -n && \
     pacman -Scc --noconfirm
 
 ENV DOTNET_ROOT "/opt/dotnet"
@@ -49,7 +49,7 @@ RUN [ -x "$(set -x; command -v shellcheck)" ] \
     && [ -x "$(set -x; command -v aws)" ] \
     && [ -x "$(set -x; command -v z3)" ] \
     && [ -x "$(set -x; command -v "$BOOGIE_EXE")" ] \
-    && [ -x "$(set -x; xargs rustup which cargo --toolchain < /diem/rust-toolchain )" ] \
+    && [ -x "$(set -x; xargs rustup which cargo --toolchain < /aptos/rust-toolchain )" ] \
     && [ -x "$(set -x; command -v tidy)" ] \
     && [ -x "$(set -x; command -v xsltproc)" ]
 # These should eventually be installed and tested, but since we don't automate on arch, low pri.

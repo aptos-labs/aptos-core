@@ -1,8 +1,8 @@
-resource "google_container_cluster" "diem" {
+resource "google_container_cluster" "aptos" {
   provider = google-beta
-  name     = "diem-${terraform.workspace}"
+  name     = "aptos-${terraform.workspace}"
   location = local.zone
-  network  = google_compute_network.diem.id
+  network  = google_compute_network.aptos.id
 
   remove_default_node_pool = true
   initial_node_count       = 1
@@ -68,7 +68,7 @@ resource "google_container_node_pool" "utilities" {
   provider   = google-beta
   name       = "utilities"
   location   = local.zone
-  cluster    = google_container_cluster.diem.name
+  cluster    = google_container_cluster.aptos.name
   node_count = lookup(var.node_pool_sizes, "utilities", 3)
 
   node_config {
@@ -92,7 +92,7 @@ resource "google_container_node_pool" "validators" {
   provider   = google-beta
   name       = "validators"
   location   = local.zone
-  cluster    = google_container_cluster.diem.name
+  cluster    = google_container_cluster.aptos.name
   node_count = lookup(var.node_pool_sizes, "validators", 3)
 
   node_config {
@@ -111,7 +111,7 @@ resource "google_container_node_pool" "validators" {
     }
 
     taint {
-      key    = "diem.org/nodepool"
+      key    = "aptos.org/nodepool"
       value  = "validators"
       effect = "NO_EXECUTE"
     }
@@ -122,7 +122,7 @@ resource "google_container_node_pool" "trusted" {
   provider   = google-beta
   name       = "trusted"
   location   = local.zone
-  cluster    = google_container_cluster.diem.name
+  cluster    = google_container_cluster.aptos.name
   node_count = lookup(var.node_pool_sizes, "trusted", 1)
 
   node_config {
@@ -141,7 +141,7 @@ resource "google_container_node_pool" "trusted" {
     }
 
     taint {
-      key    = "diem.org/nodepool"
+      key    = "aptos.org/nodepool"
       value  = "trusted"
       effect = "NO_EXECUTE"
     }

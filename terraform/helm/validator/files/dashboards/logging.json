@@ -91,7 +91,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_struct_log_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -188,7 +188,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_struct_log_processed_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_processed_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -285,7 +285,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_struct_log_tcp_submit_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_tcp_submit_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -382,7 +382,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_struct_log_processed_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])/rate(diem_struct_log_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_processed_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])/rate(aptos_struct_log_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -479,7 +479,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_struct_log_tcp_submit_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])/rate(diem_struct_log_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_tcp_submit_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])/rate(aptos_struct_log_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -590,7 +590,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_struct_log_tcp_connect_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_tcp_connect_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -687,7 +687,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(rate(diem_struct_log_connect_error_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval]) or 0 * rate(diem_struct_log_tcp_connect_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])) / rate(diem_struct_log_tcp_connect_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "(rate(aptos_struct_log_connect_error_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval]) or 0 * rate(aptos_struct_log_tcp_connect_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])) / rate(aptos_struct_log_tcp_connect_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -798,7 +798,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "1-(rate(diem_struct_log_tcp_submit_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])/rate(diem_struct_log_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "1-(rate(aptos_struct_log_tcp_submit_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])/rate(aptos_struct_log_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -895,7 +895,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(rate(diem_struct_log_send_error_count{owner=~\"$owner\", role=~\"$role\"}[$AggInterval]) or\n      rate(diem_struct_log_queue_error_count{owner=~\"$owner\", role=~\"$role\"}[$AggInterval]) * 0) + (rate(diem_struct_log_send_error_count{owner=~\"$owner\", role=~\"$role\"}[$AggInterval]) * 0 or rate(diem_struct_log_queue_error_count{owner=~\"$owner\", role=~\"$role\"}[$AggInterval]))",
+          "expr": "(rate(aptos_struct_log_send_error_count{owner=~\"$owner\", role=~\"$role\"}[$AggInterval]) or\n      rate(aptos_struct_log_queue_error_count{owner=~\"$owner\", role=~\"$role\"}[$AggInterval]) * 0) + (rate(aptos_struct_log_send_error_count{owner=~\"$owner\", role=~\"$role\"}[$AggInterval]) * 0 or rate(aptos_struct_log_queue_error_count{owner=~\"$owner\", role=~\"$role\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -992,7 +992,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(rate(diem_struct_log_queue_error_count{owner=~\"$owner\",role=~\"$role\"}[$AggInterval]) or 0 * rate(diem_struct_log_count{owner=~\"$owner\", role=~\"$role\"}[$AggInterval]))/rate(diem_struct_log_count{owner=~\"$owner\",role=~\"$role\"}[$AggInterval])",
+          "expr": "(rate(aptos_struct_log_queue_error_count{owner=~\"$owner\",role=~\"$role\"}[$AggInterval]) or 0 * rate(aptos_struct_log_count{owner=~\"$owner\", role=~\"$role\"}[$AggInterval]))/rate(aptos_struct_log_count{owner=~\"$owner\",role=~\"$role\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -1089,7 +1089,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(rate(diem_struct_log_send_error_count{owner=~\"$owner\", role=~\"$role\"}[$AggInterval]) or 0 * rate(diem_struct_log_count{owner=~\"$owner\", role=~\"$role\"}[$AggInterval]))/rate(diem_struct_log_processed_count{owner=~\"$owner\",role=~\"$role\"}[$AggInterval])",
+          "expr": "(rate(aptos_struct_log_send_error_count{owner=~\"$owner\", role=~\"$role\"}[$AggInterval]) or 0 * rate(aptos_struct_log_count{owner=~\"$owner\", role=~\"$role\"}[$AggInterval]))/rate(aptos_struct_log_processed_count{owner=~\"$owner\",role=~\"$role\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"

@@ -1,4 +1,4 @@
-resource "azurerm_kubernetes_cluster" "diem" {
+resource "azurerm_kubernetes_cluster" "aptos" {
   role_based_access_control {
     enabled = true
     azure_active_directory {
@@ -10,17 +10,17 @@ resource "azurerm_kubernetes_cluster" "diem" {
 }
 
 provider "kubernetes" {
-  host                   = azurerm_kubernetes_cluster.diem.kube_admin_config[0].host
-  client_key             = base64decode(azurerm_kubernetes_cluster.diem.kube_admin_config[0].client_key)
-  client_certificate     = base64decode(azurerm_kubernetes_cluster.diem.kube_admin_config[0].client_certificate)
-  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.diem.kube_admin_config[0].cluster_ca_certificate)
+  host                   = azurerm_kubernetes_cluster.aptos.kube_admin_config[0].host
+  client_key             = base64decode(azurerm_kubernetes_cluster.aptos.kube_admin_config[0].client_key)
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.aptos.kube_admin_config[0].client_certificate)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.aptos.kube_admin_config[0].cluster_ca_certificate)
 }
 
 provider "helm" {
   kubernetes {
-    host                   = azurerm_kubernetes_cluster.diem.kube_admin_config[0].host
-    client_key             = base64decode(azurerm_kubernetes_cluster.diem.kube_admin_config[0].client_key)
-    client_certificate     = base64decode(azurerm_kubernetes_cluster.diem.kube_admin_config[0].client_certificate)
-    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.diem.kube_admin_config[0].cluster_ca_certificate)
+    host                   = azurerm_kubernetes_cluster.aptos.kube_admin_config[0].host
+    client_key             = base64decode(azurerm_kubernetes_cluster.aptos.kube_admin_config[0].client_key)
+    client_certificate     = base64decode(azurerm_kubernetes_cluster.aptos.kube_admin_config[0].client_certificate)
+    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.aptos.kube_admin_config[0].cluster_ca_certificate)
   }
 }

@@ -1,8 +1,8 @@
-Diem Validator Vault Initialisation
+Aptos Validator Vault Initialisation
 ===================================
 
 This directory contains Terraform configuration to initialise the keys and data
-in Hashicorp Vault needed by a Diem Validator deployment. It does not deploy
+in Hashicorp Vault needed by a Aptos Validator deployment. It does not deploy
 Vault itself; for that please see the cloud-specific Terraform configs. You
 will need a root token (or similar) to apply this configuration.
 
@@ -12,21 +12,21 @@ What it does
 You should review the Terraform configuration to understand what is being done
 in your Vault deployment, but at a high level it creates:
 
-* KV-v2 data: `diem/owner_account`, `diem/operator_account`, `diem/waypoint`,
-  `diem/safety_data`
-* Transit keys: `diem__owner`, `diem__operator`, `diem__consensus`,
-  `diem__validator_network`, `diem__fullnode_network`, `diem__execution`
+* KV-v2 data: `aptos/owner_account`, `aptos/operator_account`, `aptos/waypoint`,
+  `aptos/safety_data`
+* Transit keys: `aptos__owner`, `aptos__operator`, `aptos__consensus`,
+  `aptos__validator_network`, `aptos__fullnode_network`, `aptos__execution`
 * Policies: `aptos-validator`, `aptos-safety-rules`, `aptos-key-manager`,
   `aptos-fullnode`, `aptos-management`
 
 Kubernetes Integration
 ----------------------
 
-This also configures authentication with the Kubernetes cluster which the Diem
+This also configures authentication with the Kubernetes cluster which the Aptos
 Validator runs in, and maps the Kubernetes Service Accounts to the appropriate
 Vault policies. If you want to configure authentication yourself please delete
 `kubernetes.tf` before applying. Otherwise you will need to provide some
-information about your Kubernetes cluster. If you are using the Diem
+information about your Kubernetes cluster. If you are using the Aptos
 cloud-specific Terraform configs to create your Kubernetes cluster, this
 information will be written to `kubernetes.json` by that Terraform and can be
 directly provided to this Terraform.

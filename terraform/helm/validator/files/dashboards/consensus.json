@@ -94,7 +94,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_last_committed_round{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_last_committed_round{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -204,7 +204,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_last_committed_version{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_last_committed_version{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -319,7 +319,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"signed\"}[$interval]) / rate(diem_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"signed\"}[$interval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"signed\"}[$interval]) / rate(aptos_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"signed\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -419,7 +419,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"received\"}[$interval]) / rate(diem_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"received\"}[$interval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"received\"}[$interval]) / rate(aptos_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"received\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -519,7 +519,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"synced\"}[$interval]) / rate(diem_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"synced\"}[$interval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"synced\"}[$interval]) / rate(aptos_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"synced\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -619,7 +619,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"executed\"}[$interval]) / rate(diem_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"executed\"}[$interval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"executed\"}[$interval]) / rate(aptos_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"executed\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -719,7 +719,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"voted\"}[$interval]) / rate(diem_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"voted\"}[$interval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"voted\"}[$interval]) / rate(aptos_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"voted\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -819,7 +819,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"qc_aggregated\"}[$interval]) / rate(diem_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"qc_aggregated\"}[$interval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"qc_aggregated\"}[$interval]) / rate(aptos_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"qc_aggregated\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -919,7 +919,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"qc_added\"}[$interval]) / rate(diem_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"qc_added\"}[$interval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"qc_added\"}[$interval]) / rate(aptos_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"qc_added\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1019,7 +1019,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"committed\"}[$interval]) / rate(diem_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"committed\"}[$interval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"committed\"}[$interval]) / rate(aptos_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"committed\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "C"
@@ -1824,7 +1824,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_error_count{owner=~\"$owner\", role=~\"$role\"}[$interval]) / on (owner, role) rate(consensus_duration_count{op='main_loop', owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_error_count{owner=~\"$owner\", role=~\"$role\"}[$interval]) / on (owner, role) rate(consensus_duration_count{op='main_loop', owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -2078,7 +2078,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_consensus_current_round{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_current_round{owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -2176,7 +2176,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_consensus_qc_rounds_count{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_qc_rounds_count{owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2276,7 +2276,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_consensus_timeout_rounds_count{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_timeout_rounds_count{owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2376,7 +2376,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_consensus_timeout_count{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_timeout_count{owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2476,7 +2476,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_consensus_round_timeout_s{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_round_timeout_s{owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2590,7 +2590,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_consensus_epoch{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_epoch{owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -2689,7 +2689,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_consensus_current_epoch_validators{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_current_epoch_validators{owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -2802,7 +2802,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_consensus_num_blocks_in_tree{owner=~\"$owner\", role=~\"$role\"} - 1",
+          "expr": "aptos_consensus_num_blocks_in_tree{owner=~\"$owner\", role=~\"$role\"} - 1",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2902,7 +2902,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_num_txns_per_block_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(diem_consensus_num_txns_per_block_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_num_txns_per_block_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_consensus_num_txns_per_block_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -3002,7 +3002,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_consensus_wait_duration_s_sum{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_wait_duration_s_sum{owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -3910,7 +3910,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_consensus_sync_info_msg_sent_count{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_sync_info_msg_sent_count{owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -4224,7 +4224,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_proposals_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_proposals_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -4324,7 +4324,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_consensus_vote_nil_count{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_vote_nil_count{owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -4437,7 +4437,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_consensus_pending_network_events{state=\"enqueued\", owner=~\"$owner\", role=~\"$role\"} - on (owner, role) diem_consensus_pending_network_events{state=\"dequeued\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_pending_network_events{state=\"enqueued\", owner=~\"$owner\", role=~\"$role\"} - on (owner, role) aptos_consensus_pending_network_events{state=\"dequeued\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -4534,7 +4534,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_pending_network_events{state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_pending_network_events{state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "C"
@@ -4631,7 +4631,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_consensus_block_retrieval_channel_msgs_count{state=\"enqueued\", owner=~\"$owner\", role=~\"$role\"} - on (owner, role) diem_consensus_block_retrieval_channel_msgs_count{state=\"dequeued\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_block_retrieval_channel_msgs_count{state=\"enqueued\", owner=~\"$owner\", role=~\"$role\"} - on (owner, role) aptos_consensus_block_retrieval_channel_msgs_count{state=\"dequeued\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -4728,7 +4728,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_block_retrieval_channel_msgs_count{state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_block_retrieval_channel_msgs_count{state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "C"
@@ -4825,7 +4825,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_consensus_channel_msgs_count{state=\"enqueued\", owner=~\"$owner\", role=~\"$role\"} - on (owner, role) diem_consensus_channel_msgs_count{state=\"dequeued\", owner=~\"$owner\", role=~\"$role\"} - on (owner, role) diem_consensus_channel_msgs_count{state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_channel_msgs_count{state=\"enqueued\", owner=~\"$owner\", role=~\"$role\"} - on (owner, role) aptos_consensus_channel_msgs_count{state=\"dequeued\", owner=~\"$owner\", role=~\"$role\"} - on (owner, role) aptos_consensus_channel_msgs_count{state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -4922,7 +4922,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_channel_msgs_count{state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_channel_msgs_count{state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "C"
@@ -5019,7 +5019,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_consensus_pending_self_messages{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_pending_self_messages{owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -5116,7 +5116,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_consensus_pending_round_timeouts{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_pending_round_timeouts{owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "C"

@@ -29,7 +29,7 @@ spec:
             - cluster-test
             - --swarm
             - --emit-tx
-            - --mint-file=/opt/diem/etc/mint.key
+            - --mint-file=/opt/aptos/etc/mint.key
             - --chain-id={{ .Values.genesis.chain_id | default .Values.genesis.era }}
             - --peers={{- range $i, $e := until (int .Values.genesis.numValidators) -}}val{{$i}}-aptos-validator-fullnode-lb:80,{{- end -}}
           {{- with .Values.cluster_test }}
@@ -43,7 +43,7 @@ spec:
               value: "1"
             volumeMounts:
             - name: faucet-configs
-              mountPath: /opt/diem/etc
+              mountPath: /opt/aptos/etc
             securityContext:
               readOnlyRootFilesystem: true
               allowPrivilegeEscalation: false

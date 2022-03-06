@@ -458,7 +458,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_last_committed_round{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_consensus_last_committed_round{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -568,7 +568,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_block_tracing_sum{role=~\"$role\", owner=~\"$owner\", stage=\"committed\"}[$AggInterval])/rate(diem_consensus_block_tracing_count{role=~\"$role\", owner=~\"$owner\", stage=\"committed\"}[$AggInterval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{role=~\"$role\", owner=~\"$owner\", stage=\"committed\"}[$AggInterval])/rate(aptos_consensus_block_tracing_count{role=~\"$role\", owner=~\"$owner\", stage=\"committed\"}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -668,7 +668,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_timeout_rounds_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_consensus_timeout_rounds_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -768,7 +768,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_timeout_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_consensus_timeout_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -868,7 +868,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_consensus_error_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval]) / on (owner) rate(consensus_duration_count{role=~\"$role\", owner=~\"$owner\", op='main_loop'}[$AggInterval])",
+          "expr": "rate(aptos_consensus_error_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval]) / on (owner) rate(consensus_duration_count{role=~\"$role\", owner=~\"$owner\", op='main_loop'}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -981,7 +981,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (owner, role, le)(rate(diem_executor_execute_block_seconds_bucket{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.50, sum by (owner, role, le)(rate(aptos_executor_execute_block_seconds_bucket{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1082,7 +1082,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.90, sum by (owner, role, le)(rate(diem_executor_execute_block_seconds_bucket{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.90, sum by (owner, role, le)(rate(aptos_executor_execute_block_seconds_bucket{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1183,7 +1183,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum by (owner, role, le) (rate(diem_executor_execute_block_seconds_bucket{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.99, sum by (owner, role, le) (rate(aptos_executor_execute_block_seconds_bucket{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1284,7 +1284,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.5, sum by (owner, role, le)(rate(diem_executor_commit_blocks_seconds_bucket{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.5, sum by (owner, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1384,7 +1384,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.9, sum by (owner, role, le)(rate(diem_executor_commit_blocks_seconds_bucket{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.9, sum by (owner, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1484,7 +1484,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum by (owner, role, le)(rate(diem_executor_commit_blocks_seconds_bucket{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.99, sum by (owner, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1811,7 +1811,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_connections{network_id=~\"$network_id\", role=~\"$role\", owner=~\"$owner\", direction=\"inbound\"}",
+          "expr": "aptos_connections{network_id=~\"$network_id\", role=~\"$role\", owner=~\"$owner\", direction=\"inbound\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -1908,7 +1908,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_connections{network_id=~\"$network_id\", role=~\"$role\", owner=~\"$owner\", direction=\"outbound\"}",
+          "expr": "aptos_connections{network_id=~\"$network_id\", role=~\"$role\", owner=~\"$owner\", direction=\"outbound\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -2021,7 +2021,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_core_mempool_index_size{role=~\"$role\",owner=~\"$owner\",index=\"system_ttl\"}",
+          "expr": "aptos_core_mempool_index_size{role=~\"$role\",owner=~\"$owner\",index=\"system_ttl\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -2665,7 +2665,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_schemadb_get_latency_seconds_sum{role=~\"$role\",owner=~\"$owner\"}[$AggInterval])/rate(diem_schemadb_get_latency_seconds_count{role=~\"$role\",owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_schemadb_get_latency_seconds_sum{role=~\"$role\",owner=~\"$owner\"}[$AggInterval])/rate(aptos_schemadb_get_latency_seconds_count{role=~\"$role\",owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -3744,7 +3744,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_struct_log_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -3841,7 +3841,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "1-(rate(diem_struct_log_tcp_submit_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])/rate(diem_struct_log_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "1-(rate(aptos_struct_log_tcp_submit_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])/rate(aptos_struct_log_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -3938,7 +3938,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(rate(diem_struct_log_connect_error_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval]) or 0 * rate(diem_struct_log_tcp_connect_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])) / rate(diem_struct_log_tcp_connect_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "(rate(aptos_struct_log_connect_error_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval]) or 0 * rate(aptos_struct_log_tcp_connect_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])) / rate(aptos_struct_log_tcp_connect_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
