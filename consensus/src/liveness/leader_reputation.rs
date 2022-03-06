@@ -29,15 +29,15 @@ pub trait MetadataBackend: Send + Sync {
 
 pub struct AptosDBBackend {
     window_size: usize,
-    diem_db: Arc<dyn DbReader>,
+    aptos_db: Arc<dyn DbReader>,
     window: Mutex<Vec<(u64, NewBlockEvent)>>,
 }
 
 impl AptosDBBackend {
-    pub fn new(window_size: usize, diem_db: Arc<dyn DbReader>) -> Self {
+    pub fn new(window_size: usize, aptos_db: Arc<dyn DbReader>) -> Self {
         Self {
             window_size,
-            diem_db,
+            aptos_db,
             window: Mutex::new(vec![]),
         }
     }
@@ -45,7 +45,7 @@ impl AptosDBBackend {
     fn refresh_window(&self, target_round: Round) -> anyhow::Result<()> {
         // assumes target round is not too far from latest commit
         let buffer = 10;
-        let events = self.diem_db.get_events(
+        let events = self.aptos_db.get_events(
             &new_block_event_key(),
             u64::max_value(),
             Order::Descending,
@@ -73,7 +73,7 @@ impl MetadataBackend for AptosDBBackend {
             .map(|(v, e)| (*v, e.round()))
             .unwrap_or((0, 0));
         if !(known_round == target_round
-            || known_version == self.diem_db.get_latest_version().unwrap_or(0))
+            || known_version == self.aptos_db.get_latest_version().unwrap_or(0))
         {
             if let Err(e) = self.refresh_window(target_round) {
                 error!(

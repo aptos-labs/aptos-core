@@ -39,7 +39,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     let path = aptos_temppath::TempPath::new();
     path.create_as_dir().unwrap();
-    let (diem_db, db, executor, waypoint) = create_db_and_executor(path.path(), &genesis_txn);
+    let (aptos_db, db, executor, waypoint) = create_db_and_executor(path.path(), &genesis_txn);
 
     let parent_block_id = executor.committed_block_id();
     let signer = aptos_types::validator_signer::ValidatorSigner::new(
@@ -506,7 +506,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     assert_eq!(account3_received_events_batch2.len(), 7);
     assert_eq!(account3_received_events_batch2[0].1.sequence_number(), 6);
 
-    diem_db
+    aptos_db
 }
 
 pub fn create_db_and_executor<P: AsRef<std::path::Path>>(

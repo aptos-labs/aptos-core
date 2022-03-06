@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! The following is a minimalist version of a hierarchical key derivation library for the
-//! DiemWallet.
+//! AptosWallet.
 //!
 //! Note that the Diem Blockchain makes use of ed25519 Edwards Digital Signature Algorithm
 //! (EdDSA) and therefore, BIP32 Public Key derivation is not available without falling back to
-//! a non-deterministic Schnorr signature scheme. As DiemWallet is meant to be a minimalist
+//! a non-deterministic Schnorr signature scheme. As AptosWallet is meant to be a minimalist
 //! reference implementation of a simple wallet, the following does not deviate from the
 //! ed25519 spec. In a future iteration of this wallet, we will also provide an implementation
 //! of a Schnorr variant over curve25519 and demonstrate our proposal for BIP32-like public key
@@ -85,7 +85,7 @@ pub struct ExtendedPrivKey {
 
 impl ExtendedPrivKey {
     /// Constructor for creating an ExtendedPrivKey from a ed25519 PrivateKey. Note that the
-    /// ChildNumber are not used in this iteration of DiemWallet, but in order to
+    /// ChildNumber are not used in this iteration of AptosWallet, but in order to
     /// enable more general Hierarchical KeyDerivation schemes, we include it for completeness.
     pub fn new(_child_number: ChildNumber, private_key: Ed25519PrivateKey) -> Self {
         Self {

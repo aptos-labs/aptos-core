@@ -63,7 +63,7 @@ impl From<UnexpectedResponseError> for Error {
 
 /// The API offered by the Diem Data Client.
 #[async_trait]
-pub trait DiemDataClient {
+pub trait AptosDataClient {
     /// Returns a global summary of the data currently available in the network.
     ///
     /// This API is intended to be relatively cheap to call, usually returning a

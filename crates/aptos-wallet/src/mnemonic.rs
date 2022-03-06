@@ -53,7 +53,7 @@ impl Mnemonic {
         let words: Vec<_> = s.split(' ').collect();
         let len = words.len();
         if !(12..=24).contains(&len) || len % 3 != 0 {
-            return Err(WalletError::DiemWalletGeneric(
+            return Err(WalletError::AptosWalletGeneric(
                 "Mnemonic must have a word count of the following lengths: 24, 21, 18, 15, 12"
                     .to_string(),
             )
@@ -67,7 +67,7 @@ impl Mnemonic {
                 mnemonic.push(WORDS[idx]);
                 bit_writer.write_u11(idx as u16);
             } else {
-                return Err(WalletError::DiemWalletGeneric(
+                return Err(WalletError::AptosWalletGeneric(
                     "Mnemonic contains an unknown word".to_string(),
                 )
                 .into());
@@ -85,7 +85,7 @@ impl Mnemonic {
         // Checksum validation.
         if *checksum != computed_checksum {
             return Err(
-                WalletError::DiemWalletGeneric("Mnemonic checksum failed".to_string()).into(),
+                WalletError::AptosWalletGeneric("Mnemonic checksum failed".to_string()).into(),
             );
         }
         Ok(Mnemonic(mnemonic))
@@ -95,7 +95,7 @@ impl Mnemonic {
     pub fn mnemonic(entropy: &[u8]) -> Result<Mnemonic> {
         let len = entropy.len();
         if !(16..=32).contains(&len) || len % 4 != 0 {
-            return Err(WalletError::DiemWalletGeneric(
+            return Err(WalletError::AptosWalletGeneric(
                 "Entropy data for mnemonic must have one of the following byte lengths: \
                  32, 28, 24, 20, 16"
                     .to_string(),
@@ -123,7 +123,7 @@ impl Mnemonic {
     /// Write mnemonic to output_file_path.
     pub fn write(&self, output_file_path: &Path) -> Result<()> {
         if output_file_path.exists() && !output_file_path.is_file() {
-            return Err(WalletError::DiemWalletGeneric(format!(
+            return Err(WalletError::AptosWalletGeneric(format!(
                 "Output file {:?} for mnemonic backup is reserved",
                 output_file_path.to_str(),
             ))
@@ -140,7 +140,7 @@ impl Mnemonic {
             let mnemonic_string: String = fs::read_to_string(input_file_path)?;
             return Self::from(&mnemonic_string[..]);
         }
-        Err(WalletError::DiemWalletGeneric(
+        Err(WalletError::AptosWalletGeneric(
             "Input file for mnemonic backup does not exist".to_string(),
         )
         .into())

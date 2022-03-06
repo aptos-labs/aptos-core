@@ -4,7 +4,7 @@
 use crate::{data_notification::DataNotification, data_stream::DataStreamListener, error::Error};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_data_client::{
-    AdvertisedData, DiemDataClient, GlobalDataSummary, OptimalChunkSizes, Response,
+    AdvertisedData, AptosDataClient, GlobalDataSummary, OptimalChunkSizes, Response,
     ResponseCallback, ResponseContext, ResponseError,
 };
 use aptos_logger::Level;
@@ -53,12 +53,12 @@ pub const MAX_NOTIFICATION_TIMEOUT_SECS: u64 = 10;
 
 /// A simple mock of the Diem Data Client
 #[derive(Clone, Debug)]
-pub struct MockDiemDataClient {
+pub struct MockAptosDataClient {
     pub epoch_ending_ledger_infos: HashMap<Epoch, LedgerInfoWithSignatures>,
     pub synced_ledger_infos: Vec<LedgerInfoWithSignatures>,
 }
 
-impl MockDiemDataClient {
+impl MockAptosDataClient {
     pub fn new() -> Self {
         let epoch_ending_ledger_infos = create_epoch_ending_ledger_infos();
         let synced_ledger_infos = create_synced_ledger_infos(&epoch_ending_ledger_infos);
@@ -76,7 +76,7 @@ impl MockDiemDataClient {
 }
 
 #[async_trait]
-impl DiemDataClient for MockDiemDataClient {
+impl AptosDataClient for MockAptosDataClient {
     fn get_global_data_summary(&self) -> GlobalDataSummary {
         // Create a random set of optimal chunk sizes to emulate changing environments
         let optimal_chunk_sizes = OptimalChunkSizes {

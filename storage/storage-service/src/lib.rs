@@ -21,8 +21,11 @@ use std::{
 use storage_interface::{DbReader, DbWriter, Error, StartupInfo};
 
 /// Starts storage service with a given AptosDB
-pub fn start_storage_service_with_db(config: &NodeConfig, diem_db: Arc<AptosDB>) -> JoinHandle<()> {
-    let storage_service = StorageService { db: diem_db };
+pub fn start_storage_service_with_db(
+    config: &NodeConfig,
+    aptos_db: Arc<AptosDB>,
+) -> JoinHandle<()> {
+    let storage_service = StorageService { db: aptos_db };
     storage_service.run(config)
 }
 

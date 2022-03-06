@@ -79,7 +79,7 @@ pub const UNKNOWN_PEER: &str = "unknown_peer";
 /// Counter tracking size of various indices in core mempool
 static CORE_MEMPOOL_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "diem_core_mempool_index_size",
+        "aptos_core_mempool_index_size",
         "Size of a core mempool index",
         &["index"]
     )
@@ -95,7 +95,7 @@ pub fn core_mempool_index_size(label: &'static str, size: usize) {
 /// Counter tracking number of txns removed from core mempool
 pub static CORE_MEMPOOL_REMOVED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "diem_core_mempool_removed_txns_count",
+        "aptos_core_mempool_removed_txns_count",
         "Number of txns removed from core mempool"
     )
     .unwrap()
@@ -105,7 +105,7 @@ pub static CORE_MEMPOOL_REMOVED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
 /// (e.g. time from txn entering core mempool to being pulled in consensus block)
 pub static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "diem_core_mempool_txn_commit_latency",
+        "aptos_core_mempool_txn_commit_latency",
         "Latency of txn reaching various stages in core mempool after insertion",
         &["stage"]
     )
@@ -116,7 +116,7 @@ pub static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
 /// how many txns were actually cleaned up in this GC event
 pub static CORE_MEMPOOL_GC_EVENT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "diem_core_mempool_gc_event_count",
+        "aptos_core_mempool_gc_event_count",
         "Number of times the periodic garbage-collection event occurs, regardless of how many txns were actually removed",
         &["type"])
        .unwrap()
@@ -125,7 +125,7 @@ pub static CORE_MEMPOOL_GC_EVENT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Counter tracking time for how long a transaction stayed in core-mempool before being garbage-collected
 pub static CORE_MEMPOOL_GC_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "diem_core_mempool_gc_latency",
+        "aptos_core_mempool_gc_latency",
         "How long a transaction stayed in core mempool before garbage-collected",
         &["type", "status"]
     )

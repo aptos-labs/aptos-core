@@ -61,7 +61,7 @@ partial membership views, sophisticated failure detectors, or network overlays.
                       +----------------------+--------------------+   +---------------------+
                       |        Peer(s)       |                    |
                       +----------------------+                    |
-                      |                DiemTransport              |
+                      |                AptosTransport              |
                       +-------------------------------------------+
 ```
 
@@ -84,7 +84,7 @@ components of new or closed connections. Optionally can be connected to
 writes [`NetworkMessage`]es from/to the wire. Currently, it implements the two
 protocols: DirectSend and Rpc.
 
-+ [`DiemTransport`] &mdash; A secure, reliable transport. It uses [NoiseIK] over
++ [`AptosTransport`] &mdash; A secure, reliable transport. It uses [NoiseIK] over
 TCP to negotiate an encrypted and authenticated connection between peers.
 The AptosNet version and any Diem-specific application protocols are negotiated
 afterward using the [AptosNet Handshake Protocol].
@@ -132,7 +132,7 @@ configurable static timeout.
 [`ConnectivityManager`]: ./src/connectivity_manager/mod.rs
 [AptosNet Handshake Protocol]: ../specifications/network/handshake-v1.md
 [`DiemSystem::validators`]: ../aptos-move/diem-framework/core/doc/DiemSystem.md#struct-diemsystem
-[`DiemTransport`]: ./src/transport/mod.rs
+[`AptosTransport`]: ./src/transport/mod.rs
 [`HealthChecker`]: ./src/protocols/health_checker/mod.rs
 [`Network Interface`]: ./src/protocols/network/mod.rs
 [`NetworkMessage`]: ./src/protocols/wire/messaging/v1/mod.rs

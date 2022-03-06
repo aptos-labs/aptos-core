@@ -23,11 +23,11 @@ struct HealthCheckParams {
 struct HealthCheckError;
 impl reject::Reject for HealthCheckError {}
 
-pub fn health_check_route(health_diem_db: Arc<dyn MoveDbReader>) -> BoxedFilter<(impl Reply,)> {
+pub fn health_check_route(health_aptos_db: Arc<dyn MoveDbReader>) -> BoxedFilter<(impl Reply,)> {
     warp::path!("-" / "healthy")
         .and(warp::path::end())
         .and(warp::query().map(move |params: HealthCheckParams| params))
-        .and(warp::any().map(move || health_diem_db.clone()))
+        .and(warp::any().map(move || health_aptos_db.clone()))
         .and(warp::any().map(SystemTime::now))
         .and_then(health_check)
         .boxed()

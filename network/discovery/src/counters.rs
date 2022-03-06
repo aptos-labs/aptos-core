@@ -29,7 +29,7 @@ pub static DISCOVERY_COUNTS: Lazy<IntCounterVec> = Lazy::new(|| {
 
 pub static NETWORK_KEY_MISMATCH: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "diem_network_key_mismatch",
+        "aptos_network_key_mismatch",
         "Gauge of whether the network key mismatches onchain state",
         &["role_type", "network_id", "peer_id"]
     )

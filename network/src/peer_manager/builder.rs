@@ -11,7 +11,7 @@ use crate::{
         PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
     },
     protocols::{network::AppConfig, wire::handshake::v1::ProtocolIdSet},
-    transport::{self, Connection, AptosNetTransport, DIEM_TCP_TRANSPORT},
+    transport::{self, AptosNetTransport, Connection, DIEM_TCP_TRANSPORT},
     ProtocolId,
 };
 use aptos_config::{

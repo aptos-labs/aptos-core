@@ -10,7 +10,7 @@ use crate::{
         ED25519_PUBLIC_KEY_LENGTH, ED25519_SIGNATURE_LENGTH,
     },
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey, MultiEd25519Signature},
-    test_utils::{TestDiemCrypto, TEST_SEED},
+    test_utils::{TestAptosCrypto, TEST_SEED},
     Signature, SigningKey, Uniform,
 };
 
@@ -31,7 +31,7 @@ fn ed25519_bcs_material() {
         bcs::from_bytes(&serialized_public_key).unwrap();
     assert_eq!(deserialized_public_key, public_key);
 
-    let message = TestDiemCrypto("Hello, World".to_string());
+    let message = TestAptosCrypto("Hello, World".to_string());
     let signature: Ed25519Signature = private_key.sign(&message);
 
     let serialized_signature = bcs::to_bytes(&Cow::Borrowed(&signature)).unwrap();
@@ -81,7 +81,7 @@ fn multi_ed25519_bcs_material() {
         bcs::from_bytes(&serialized_multi_public_key).unwrap();
     assert_eq!(deserialized_multi_public_key, multi_public_key_7of10);
 
-    let message = TestDiemCrypto("Hello, World".to_string());
+    let message = TestAptosCrypto("Hello, World".to_string());
 
     // Verifying a 7-of-10 signature against a public key with the same threshold should pass.
     let multi_signature_7of10: MultiEd25519Signature = multi_private_key_7of10.sign(&message);

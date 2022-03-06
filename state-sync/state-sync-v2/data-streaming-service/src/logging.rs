@@ -30,7 +30,7 @@ impl<'a> LogSchema<'a> {
 #[serde(rename_all = "snake_case")]
 pub enum LogEntry {
     CheckStreamProgress,
-    DiemDataClient,
+    AptosDataClient,
     EndOfStreamNotification,
     HandleTerminateRequest,
     HandleStreamRequest,

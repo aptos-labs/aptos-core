@@ -99,9 +99,9 @@ pub async fn assert_balance(client: &RestClient, account: &LocalAccount, balance
 }
 
 /// This module provides useful functions for operating, handling and managing
-/// DiemSwarm instances. It is particularly useful for working with tests that
+/// AptosSwarm instances. It is particularly useful for working with tests that
 /// require a SmokeTestEnvironment, as it provides a generic interface across
-/// DiemSwarms, regardless of if the swarm is a validator swarm, validator full
+/// AptosSwarms, regardless of if the swarm is a validator swarm, validator full
 /// node swarm, or a public full node swarm.
 pub mod diem_swarm_utils {
     use crate::test_utils::fetch_backend_storage;

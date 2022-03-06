@@ -184,8 +184,10 @@ impl EpochManager {
                 ))
             }
             ConsensusProposerType::LeaderReputation(heuristic_config) => {
-                let backend =
-                    Box::new(AptosDBBackend::new(proposers.len(), self.storage.diem_db()));
+                let backend = Box::new(AptosDBBackend::new(
+                    proposers.len(),
+                    self.storage.aptos_db(),
+                ));
                 let heuristic = Box::new(ActiveInactiveHeuristic::new(
                     self.author,
                     heuristic_config.active_weights,
@@ -222,7 +224,7 @@ impl EpochManager {
         );
         let proof = self
             .storage
-            .diem_db()
+            .aptos_db()
             .get_epoch_ending_ledger_infos(request.start_epoch, request.end_epoch)
             .map_err(DbError::from)
             .context("[EpochManager] Failed to get epoch proof")?;

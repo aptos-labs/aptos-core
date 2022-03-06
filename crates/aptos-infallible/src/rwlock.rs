@@ -45,7 +45,7 @@ mod tests {
     use std::{sync::Arc, thread};
 
     #[test]
-    fn test_diem_rwlock() {
+    fn test_aptos_rwlock() {
         let a = 7u8;
         let rwlock = Arc::new(RwLock::new(a));
         let rwlock2 = rwlock.clone();
