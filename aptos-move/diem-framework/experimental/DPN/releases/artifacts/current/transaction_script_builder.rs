@@ -360,7 +360,7 @@ pub enum ScriptFunctionCall {
     /// Creates a `ChildVASP` account for the sender `parent_vasp` at `child_address` with a balance of
     /// `child_initial_balance` in `CoinType` and an initial authentication key of
     /// `auth_key_prefix | child_address`. Authentication key prefixes, and how to construct them from an ed25519 public key is described
-    /// [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+    /// [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
     ///
     /// If `add_all_currencies` is true, the child address will have a zero balance in all available
     /// currencies in the system.
@@ -428,7 +428,7 @@ pub enum ScriptFunctionCall {
     /// 0 balances for all available currencies in the system will also be added. This can only be
     /// invoked by an account with the TreasuryCompliance role.
     /// Authentication keys, prefixes, and how to construct them from an ed25519 public key are described
-    /// [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+    /// [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
     ///
     /// At the time of creation the account is also initialized with default mint tiers of (500_000,
     /// 5000_000, 50_000_000, 500_000_000), and preburn areas for each currency that is added to the
@@ -487,7 +487,7 @@ pub enum ScriptFunctionCall {
     /// also be added. This can only be invoked by an TreasuryCompliance account.
     /// `sliding_nonce` is a unique nonce for operation, see `SlidingNonce` for details.
     /// Authentication keys, prefixes, and how to construct them from an ed25519 public key are described
-    /// [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+    /// [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
     ///
     /// # Events
     /// Successful execution will emit:
@@ -579,7 +579,7 @@ pub enum ScriptFunctionCall {
     /// This script does not add the validator to the validator set or the system,
     /// but only creates the account.
     /// Authentication keys, prefixes, and how to construct them from an ed25519 public key are described
-    /// [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+    /// [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
     ///
     /// # Events
     /// Successful execution will emit:
@@ -632,7 +632,7 @@ pub enum ScriptFunctionCall {
     /// `ValidatorOperatorConfig::ValidatorOperatorConfig` resource with the specified `human_name`.
     /// This script does not assign the validator operator to any validator accounts but only creates the account.
     /// Authentication key prefixes, and how to construct them from an ed25519 public key are described
-    /// [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+    /// [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
     ///
     /// # Events
     /// Successful execution will emit:
@@ -985,7 +985,7 @@ pub enum ScriptFunctionCall {
     ///
     /// # Technical Description
     /// Rotates the authentication key of the sending account to the
-    /// [authentication key derived from `public_key`](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys)
+    /// [authentication key derived from `public_key`](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys)
     /// and publishes a `SharedEd25519PublicKey::SharedEd25519PublicKey` resource
     /// containing the 32-byte ed25519 `public_key` and the `DiemAccount::KeyRotationCapability` for
     /// `account` under `account`.
@@ -1133,7 +1133,7 @@ pub enum ScriptFunctionCall {
     /// # Technical Description
     /// Rotate the `account`'s `DiemAccount::DiemAccount` `authentication_key`
     /// field to `new_key`. `new_key` must be a valid authentication key that
-    /// corresponds to an ed25519 public key as described [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
+    /// corresponds to an ed25519 public key as described [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
     /// and `account` must not have previously delegated its `DiemAccount::KeyRotationCapability`.
     ///
     /// # Parameters
@@ -1162,7 +1162,7 @@ pub enum ScriptFunctionCall {
     /// # Technical Description
     /// Rotates the `account`'s `DiemAccount::DiemAccount` `authentication_key`
     /// field to `new_key`. `new_key` must be a valid authentication key that
-    /// corresponds to an ed25519 public key as described [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
+    /// corresponds to an ed25519 public key as described [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
     /// and `account` must not have previously delegated its `DiemAccount::KeyRotationCapability`.
     ///
     /// # Parameters
@@ -1195,7 +1195,7 @@ pub enum ScriptFunctionCall {
     /// # Technical Description
     /// Rotate the `account`'s `DiemAccount::DiemAccount` `authentication_key` field to `new_key`.
     /// `new_key` must be a valid authentication key that corresponds to an ed25519
-    /// public key as described [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
+    /// public key as described [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
     /// and `account` must not have previously delegated its `DiemAccount::KeyRotationCapability`.
     ///
     /// # Parameters
@@ -1231,7 +1231,7 @@ pub enum ScriptFunctionCall {
     /// Rotates the authentication key of the `to_recover` account to `new_key` using the
     /// `DiemAccount::KeyRotationCapability` stored in the `RecoveryAddress::RecoveryAddress` resource
     /// published under `recovery_address`. `new_key` must be a valide authentication key as described
-    /// [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+    /// [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
     /// This transaction can be sent either by the `to_recover` account, or by the account where the
     /// `RecoveryAddress::RecoveryAddress` resource is published that contains `to_recover`'s `DiemAccount::KeyRotationCapability`.
     ///
@@ -1308,7 +1308,7 @@ pub enum ScriptFunctionCall {
     /// `public_key` must be a valid ed25519 public key.  This transaction first rotates the public key stored in `account`'s
     /// `SharedEd25519PublicKey::SharedEd25519PublicKey` resource to `public_key`, after which it
     /// rotates the `account`'s authentication key to the new authentication key derived from `public_key` as defined
-    /// [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys)
+    /// [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys)
     /// using the `DiemAccount::KeyRotationCapability` stored in `account`'s `SharedEd25519PublicKey::SharedEd25519PublicKey`.
     ///
     /// # Parameters
@@ -2482,7 +2482,7 @@ pub fn encode_cancel_burn_with_amount_script_function(
 /// Creates a `ChildVASP` account for the sender `parent_vasp` at `child_address` with a balance of
 /// `child_initial_balance` in `CoinType` and an initial authentication key of
 /// `auth_key_prefix | child_address`. Authentication key prefixes, and how to construct them from an ed25519 public key is described
-/// [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+/// [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
 ///
 /// If `add_all_currencies` is true, the child address will have a zero balance in all available
 /// currencies in the system.
@@ -2565,7 +2565,7 @@ pub fn encode_create_child_vasp_account_script_function(
 /// 0 balances for all available currencies in the system will also be added. This can only be
 /// invoked by an account with the TreasuryCompliance role.
 /// Authentication keys, prefixes, and how to construct them from an ed25519 public key are described
-/// [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+/// [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
 ///
 /// At the time of creation the account is also initialized with default mint tiers of (500_000,
 /// 5000_000, 50_000_000, 500_000_000), and preburn areas for each currency that is added to the
@@ -2640,7 +2640,7 @@ pub fn encode_create_designated_dealer_script_function(
 /// also be added. This can only be invoked by an TreasuryCompliance account.
 /// `sliding_nonce` is a unique nonce for operation, see `SlidingNonce` for details.
 /// Authentication keys, prefixes, and how to construct them from an ed25519 public key are described
-/// [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+/// [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
 ///
 /// # Events
 /// Successful execution will emit:
@@ -2758,7 +2758,7 @@ pub fn encode_create_recovery_address_script_function() -> TransactionPayload {
 /// This script does not add the validator to the validator set or the system,
 /// but only creates the account.
 /// Authentication keys, prefixes, and how to construct them from an ed25519 public key are described
-/// [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+/// [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
 ///
 /// # Events
 /// Successful execution will emit:
@@ -2826,7 +2826,7 @@ pub fn encode_create_validator_account_script_function(
 /// `ValidatorOperatorConfig::ValidatorOperatorConfig` resource with the specified `human_name`.
 /// This script does not assign the validator operator to any validator accounts but only creates the account.
 /// Authentication key prefixes, and how to construct them from an ed25519 public key are described
-/// [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+/// [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
 ///
 /// # Events
 /// Successful execution will emit:
@@ -3287,7 +3287,7 @@ pub fn encode_preburn_script_function(token: TypeTag, amount: u64) -> Transactio
 ///
 /// # Technical Description
 /// Rotates the authentication key of the sending account to the
-/// [authentication key derived from `public_key`](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys)
+/// [authentication key derived from `public_key`](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys)
 /// and publishes a `SharedEd25519PublicKey::SharedEd25519PublicKey` resource
 /// containing the 32-byte ed25519 `public_key` and the `DiemAccount::KeyRotationCapability` for
 /// `account` under `account`.
@@ -3489,7 +3489,7 @@ pub fn encode_remove_vasp_domain_script_function(
 /// # Technical Description
 /// Rotate the `account`'s `DiemAccount::DiemAccount` `authentication_key`
 /// field to `new_key`. `new_key` must be a valid authentication key that
-/// corresponds to an ed25519 public key as described [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
+/// corresponds to an ed25519 public key as described [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
 /// and `account` must not have previously delegated its `DiemAccount::KeyRotationCapability`.
 ///
 /// # Parameters
@@ -3528,7 +3528,7 @@ pub fn encode_rotate_authentication_key_script_function(new_key: Vec<u8>) -> Tra
 /// # Technical Description
 /// Rotates the `account`'s `DiemAccount::DiemAccount` `authentication_key`
 /// field to `new_key`. `new_key` must be a valid authentication key that
-/// corresponds to an ed25519 public key as described [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
+/// corresponds to an ed25519 public key as described [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
 /// and `account` must not have previously delegated its `DiemAccount::KeyRotationCapability`.
 ///
 /// # Parameters
@@ -3577,7 +3577,7 @@ pub fn encode_rotate_authentication_key_with_nonce_script_function(
 /// # Technical Description
 /// Rotate the `account`'s `DiemAccount::DiemAccount` `authentication_key` field to `new_key`.
 /// `new_key` must be a valid authentication key that corresponds to an ed25519
-/// public key as described [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
+/// public key as described [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
 /// and `account` must not have previously delegated its `DiemAccount::KeyRotationCapability`.
 ///
 /// # Parameters
@@ -3629,7 +3629,7 @@ pub fn encode_rotate_authentication_key_with_nonce_admin_script_function(
 /// Rotates the authentication key of the `to_recover` account to `new_key` using the
 /// `DiemAccount::KeyRotationCapability` stored in the `RecoveryAddress::RecoveryAddress` resource
 /// published under `recovery_address`. `new_key` must be a valide authentication key as described
-/// [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+/// [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
 /// This transaction can be sent either by the `to_recover` account, or by the account where the
 /// `RecoveryAddress::RecoveryAddress` resource is published that contains `to_recover`'s `DiemAccount::KeyRotationCapability`.
 ///
@@ -3736,7 +3736,7 @@ pub fn encode_rotate_dual_attestation_info_script_function(
 /// `public_key` must be a valid ed25519 public key.  This transaction first rotates the public key stored in `account`'s
 /// `SharedEd25519PublicKey::SharedEd25519PublicKey` resource to `public_key`, after which it
 /// rotates the `account`'s authentication key to the new authentication key derived from `public_key` as defined
-/// [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys)
+/// [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys)
 /// using the `DiemAccount::KeyRotationCapability` stored in `account`'s `SharedEd25519PublicKey::SharedEd25519PublicKey`.
 ///
 /// # Parameters

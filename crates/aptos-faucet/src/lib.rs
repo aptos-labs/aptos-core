@@ -12,7 +12,7 @@
 //!
 //! ```bash
 //! cargo run -p aptos-faucet -- -a 127.0.0.1 -p 8080 -c TESTNET \
-//!     -m <treasury-compliance-private-key-path> -s https://testnet.diem.com/v1
+//!     -m <treasury-compliance-private-key-path> -s https://testnet.aptos-labs.com/v1
 //! ```
 //!
 //! Check help doc for options details:

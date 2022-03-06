@@ -24,7 +24,7 @@ struct Args {
     #[structopt(short = "p", long, default_value = "80")]
     pub port: u16,
     /// Diem fullnode/validator server URL
-    #[structopt(short = "s", long, default_value = "https://testnet.diem.com/")]
+    #[structopt(short = "s", long, default_value = "https://testnet.aptos-labs.com/")]
     pub server_url: String,
     /// Path to the private key for creating test account and minting coins.
     /// To keep Testnet simple, we used one private key for both treasury compliance account and testnet

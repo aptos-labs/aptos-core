@@ -127,7 +127,7 @@ pub enum OffChainErrorType {
     Protocol,
 }
 
-// https://dip.diem.com/dip-1/#list-of-error-codes
+// https://dip.aptos-labs.com/dip-1/#list-of-error-codes
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorCode {
@@ -371,7 +371,7 @@ pub struct PaymentActionObject {
     pub amount: u64,
 
     /// One of the supported on-chain currency types - ex. XUS, etc.
-    // TODO Should be an enum per https://dip.diem.com/dip-1/#paymentactionobject
+    // TODO Should be an enum per https://dip.aptos-labs.com/dip-1/#paymentactionobject
     pub currency: String,
 
     /// Populated in the request. This value indicates the requested action to perform, and the

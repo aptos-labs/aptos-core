@@ -2,10 +2,10 @@
 name = "aptos-fuzz"
 version = "0.1.0"
 edition = "2018"
-authors = ["Diem Association <opensource@diem.com>"]
+authors = ["Diem Association <opensource@aptos-labs.com>"]
 description = "Diem fuzzer fuzz"
-repository = "https://github.com/diem/diem"
-homepage = "https://diem.com"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptos-labs.com"
 license = "Apache-2.0"
 publish = false
 

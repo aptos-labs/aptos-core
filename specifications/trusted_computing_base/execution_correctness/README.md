@@ -44,7 +44,7 @@ For example, in the above diagram, A was already committed at this point. The sy
 Since B conflicts with E, all of B's descendants and B itself are no longer valid and will be discarded.
 
 To ensure the correnctness of execution, i.e., the enforcement of the state-changing rule,
-a secure and audited execution service is necessary to guarantee this statement. In Diem Core, it is LEC that plays
+a secure and audited execution service is necessary to guarantee this statement. In Aptos Core, it is LEC that plays
 this role, which is built on top of `Executor` library which has the following two jobs to help :
 
 * **execution**: Executor can accept transactions to execute based on a specific state merkle tree and generates a new speculative tree according to the changeset produced by the VM processing the transactions.
@@ -231,7 +231,7 @@ pub trait VMExecutor: Send {
 
 #### Storage
 
-Storage of Diem Core is implemented as `DiemDB`, a rocksdb based storage system highly customized for
+Storage of Aptos Core is implemented as `DiemDB`, a rocksdb based storage system highly customized for
 Diem. It stores all the required data consistutes the Diem blockchain. After executing a block, LEC will store the
 speculative execution result in its own cache and commit it later to storage if consensus commands. The commit
 will persist the result into storage and make the execution effect live on chain. Since the commit, all the

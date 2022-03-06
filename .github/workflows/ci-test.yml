@@ -340,7 +340,7 @@ jobs:
       # Test that building the site is successful
       - name: Build Site
         run: |
-          cd developers.diem.com
+          cd developers.aptos-labs.com
           # Only build the straight Docusaurus site now. Do not build rust `-r`
           # or python docs `-p` on CI checks until we resolve the best way to
           # build them for deployment

@@ -17,7 +17,7 @@ pub enum ResponseLedgerInfo {
     /// local trusted validator set.
     /// **DEPRECATED**: `VerifiableLedgerInfo` is only required for backward compatibility. State
     /// sync avoids sending these response types and instead uses `ProgressiveLedgerInfo` below.
-    /// This message will be removed on the next breaking release: https://github.com/diem/diem/issues/8013
+    /// This message will be removed on the next breaking release: https://github.com/aptos-labs/aptos-core/issues/8013
     VerifiableLedgerInfo(LedgerInfoWithSignatures),
     /// A response to `TargetType::HighestAvailable` chunk request type.
     ProgressiveLedgerInfo {

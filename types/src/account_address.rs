@@ -17,7 +17,7 @@ pub fn from_public_key(public_key: &Ed25519PublicKey) -> AccountAddress {
 // from consensus key which is of type Ed25519PublicKey. Since AccountAddress does
 // not mean anything in a setting without remote authentication, we use the network
 // public key to generate a peer_id for the peer.
-// See this issue for potential improvements: https://github.com/diem/diem/issues/3960
+// See this issue for potential improvements: https://github.com/aptos-labs/aptos-core/issues/3960
 pub fn from_identity_public_key(identity_public_key: x25519::PublicKey) -> AccountAddress {
     let mut array = [0u8; AccountAddress::LENGTH];
     let pubkey_slice = identity_public_key.as_slice();

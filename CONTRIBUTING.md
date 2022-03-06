@@ -5,16 +5,16 @@ title: Contributing to Diem
 
 Our goal is to make contributing to the Diem project easy and transparent.
 
-> **Note**: As the Diem Core project is currently an early-stage prototype, it
+> **Note**: As the Aptos Core project is currently an early-stage prototype, it
 > is undergoing rapid development. While we welcome contributions, before
 > making substantial contributions be sure to discuss them in the Discourse
 > forum to ensure that they fit into the project roadmap.
 
 ## On Contributing
 
-### Diem Core
+### Aptos Core
 
-To contribute to the Diem Core implementation, first start with the proper
+To contribute to the Aptos Core implementation, first start with the proper
 development copy.
 
 To get the development installation with all the necessary dependencies for
@@ -32,17 +32,17 @@ cargo xtest
 #### Code Style, Hints, and Testing
 
 Refer to our [Coding
-Guidelines](https://github.com/diem/diem/blob/main/documentation/coding_guidelines.md) for
+Guidelines](https://github.com/aptos-labs/aptos-core/blob/main/documentation/coding_guidelines.md) for
 detailed guidance about how to contribute to the project.
 
 #### Documentation
 
 Diem's developer website is also open source (the code can be found in this
-[repository](https://github.com/diem/diem/developers.diem.com/website/)).  It is built using
+[repository](https://github.com/aptos-labs/aptos-core/developers.aptos-labs.com/website/)).  It is built using
 [Docusaurus](https://docusaurus.io/):
 
 If you know Markdown, you can already contribute! How to contribute can be found in the [website
-repo](https://github.com/diem/developers.diem.com/website/CONTRIBUTING.md).
+repo](https://github.com/diem/developers.aptos-labs.com/website/CONTRIBUTING.md).
 
 ## Developer Workflow
 
@@ -170,13 +170,13 @@ able to be built and passes all checks performed by CI.
 For pull request to be accepted by any Diem projects, a CLA must be signed.
 You will only need to do this once to work on any of Diem's open source
 projects. Individuals contributing on their own behalf can sign the [Individual
-CLA](https://github.com/diem/diem/blob/main/documentation/contributing/individual-cla.pdf).
+CLA](https://github.com/aptos-labs/aptos-core/blob/main/documentation/contributing/individual-cla.pdf).
 If you are contributing on behalf of your employer, please ask them to sign the
 [Corporate
-CLA](https://github.com/diem/diem/blob/main/documentation/contributing/corporate-cla.pdf).
+CLA](https://github.com/aptos-labs/aptos-core/blob/main/documentation/contributing/corporate-cla.pdf).
 
 ## Issues
 
-Diem uses [GitHub issues](https://github.com/diem/diem/issues) to track
+Diem uses [GitHub issues](https://github.com/aptos-labs/aptos-core/issues) to track
 bugs. Please include necessary information and instructions to reproduce your
 issue.

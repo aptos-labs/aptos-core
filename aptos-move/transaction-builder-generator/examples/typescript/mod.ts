@@ -42,7 +42,7 @@ function demoPeerToPeerScript() {
   script.serialize(bcsSerializer);
 
   // add a trailing space so output has parity w legacy implementations:
-  // https://github.com/diem/diem/blob/main/aptos-move/transaction-builder-generator/examples/rust/tx_script_demo.rs#L45
+  // https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/transaction-builder-generator/examples/rust/tx_script_demo.rs#L45
   console.log(bcsSerializer.getBytes().join(" ") + " ");
 }
 
@@ -78,7 +78,7 @@ function demoPeerToPeerScriptFunction() {
   payload.serialize(bcsSerializer);
 
   // add a trailing space so output has parity w legacy implementations:
-  // https://github.com/diem/diem/blob/main/aptos-move/transaction-builder-generator/examples/rust/tx_script_demo.rs#L45
+  // https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/transaction-builder-generator/examples/rust/tx_script_demo.rs#L45
   console.log(bcsSerializer.getBytes().join(" ") + " ");
 }
 

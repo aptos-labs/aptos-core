@@ -1,3 +1,3 @@
 # github actions
 
-These actions are custom for Diem Core workflows.
+These actions are custom for Aptos Core workflows.
