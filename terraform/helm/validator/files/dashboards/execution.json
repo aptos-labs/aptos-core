@@ -94,7 +94,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(diem_executor_execute_block_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
+          "expr": "histogram_quantile(0.50, sum(rate(aptos_executor_execute_block_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -195,7 +195,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.90, sum(rate(diem_executor_execute_block_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
+          "expr": "histogram_quantile(0.90, sum(rate(aptos_executor_execute_block_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -296,7 +296,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum(rate(diem_executor_execute_block_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
+          "expr": "histogram_quantile(0.99, sum(rate(aptos_executor_execute_block_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -397,7 +397,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(diem_executor_save_transactions_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role,le))",
+          "expr": "histogram_quantile(0.50, sum(rate(aptos_executor_save_transactions_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role,le))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -497,7 +497,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.90, sum(rate(diem_executor_save_transactions_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role,le))",
+          "expr": "histogram_quantile(0.90, sum(rate(aptos_executor_save_transactions_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role,le))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -597,7 +597,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum(rate(diem_executor_save_transactions_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role,le))",
+          "expr": "histogram_quantile(0.99, sum(rate(aptos_executor_save_transactions_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role,le))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -697,7 +697,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(diem_executor_vm_execute_block_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
+          "expr": "histogram_quantile(0.50, sum(rate(aptos_executor_vm_execute_block_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -797,7 +797,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.90, sum(rate(diem_executor_vm_execute_block_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
+          "expr": "histogram_quantile(0.90, sum(rate(aptos_executor_vm_execute_block_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -897,7 +897,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum(rate(diem_executor_vm_execute_block_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
+          "expr": "histogram_quantile(0.99, sum(rate(aptos_executor_vm_execute_block_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -997,7 +997,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(diem_executor_commit_blocks_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
+          "expr": "histogram_quantile(0.50, sum(rate(aptos_executor_commit_blocks_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1098,7 +1098,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.90, sum(rate(diem_executor_commit_blocks_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
+          "expr": "histogram_quantile(0.90, sum(rate(aptos_executor_commit_blocks_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1199,7 +1199,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum(rate(diem_executor_commit_blocks_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
+          "expr": "histogram_quantile(0.99, sum(rate(aptos_executor_commit_blocks_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1314,7 +1314,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_executor_execute_block_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(diem_executor_execute_block_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_executor_execute_block_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_executor_execute_block_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1414,7 +1414,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_executor_vm_execute_block_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(diem_executor_vm_execute_block_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_executor_vm_execute_block_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_executor_vm_execute_block_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1514,7 +1514,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_executor_commit_blocks_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(diem_executor_commit_blocks_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_executor_commit_blocks_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_executor_commit_blocks_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1614,7 +1614,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_executor_save_transactions_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(diem_executor_save_transactions_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_executor_save_transactions_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_executor_save_transactions_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1712,7 +1712,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_executor_execute_and_commit_chunk_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(diem_executor_execute_and_commit_chunk_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_executor_execute_and_commit_chunk_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_executor_execute_and_commit_chunk_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -1808,7 +1808,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_executor_error_total{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_executor_error_total{owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"

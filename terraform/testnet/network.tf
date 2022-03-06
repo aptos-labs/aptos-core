@@ -1,11 +1,11 @@
-data "aws_route53_zone" "diem" {
+data "aws_route53_zone" "aptos" {
   count   = var.zone_id != "" ? 1 : 0
   zone_id = var.zone_id
 }
 
 locals {
   dns_prefix = var.workspace_dns ? "${terraform.workspace}." : ""
-  domain     = var.zone_id != "" ? "${local.dns_prefix}${data.aws_route53_zone.diem[0].name}" : null
+  domain     = var.zone_id != "" ? "${local.dns_prefix}${data.aws_route53_zone.aptos[0].name}" : null
 }
 
 resource "aws_acm_certificate" "ingress" {

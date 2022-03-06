@@ -8,7 +8,7 @@ imageTag: release-1.5_b0cbf54f
 validator:
   name:
   image:
-    repo: diem/validator
+    repo: aptos/validator
     tag:
     pullPolicy: IfNotPresent
   resources:
@@ -34,7 +34,7 @@ validator:
 
 tools:
   image:
-    repo: diem/tools
+    repo: aptos/tools
     tag:
     pullPolicy: IfNotPresent
   resources:
@@ -50,7 +50,7 @@ tools:
 
 backup:
   image:
-    repo: diem/tools
+    repo: aptos/tools
     tag:
     pullPolicy: IfNotPresent
   resources:
@@ -100,7 +100,7 @@ backup_verify:
 
 restore:
   image:
-    repo: diem/tools
+    repo: aptos/tools
     tag:
     pullPolicy: IfNotPresent
   resources:
@@ -129,7 +129,7 @@ restore:
 
 safetyrules:
   image:
-    repo: diem/validator_tcb
+    repo: aptos/validator_tcb
     tag:
     pullPolicy: IfNotPresent
   resources:
@@ -170,7 +170,7 @@ fullnode:
 
 keymanager:
   image:
-    repo: diem/validator_tcb
+    repo: aptos/validator_tcb
     tag:
     pullPolicy: IfNotPresent
   resources:
@@ -205,10 +205,10 @@ vault:
   tls: {}
   auth:
     type: kubernetes
-    mount_path: auth/kubernetes-diem
+    mount_path: auth/kubernetes-aptos
     config:
-      role: diem-<role>
-  namespace: diem
+      role: aptos-<role>
+  namespace: aptos
 
 haproxy:
   replicas: 1

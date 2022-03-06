@@ -8,7 +8,7 @@ provider "azurerm" {
 
 data "azurerm_client_config" "current" {}
 
-resource "azurerm_resource_group" "diem" {
-  name     = "diem-${terraform.workspace}"
+resource "azurerm_resource_group" "aptos" {
+  name     = "aptos-${terraform.workspace}"
   location = var.region
 }

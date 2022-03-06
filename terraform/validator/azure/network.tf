@@ -2,41 +2,41 @@ locals {
   vnet_address = "192.168.0.0/16"
 }
 
-resource "azurerm_virtual_network" "diem" {
-  name                = "diem-${terraform.workspace}"
-  resource_group_name = azurerm_resource_group.diem.name
-  location            = azurerm_resource_group.diem.location
+resource "azurerm_virtual_network" "aptos" {
+  name                = "aptos-${terraform.workspace}"
+  resource_group_name = azurerm_resource_group.aptos.name
+  location            = azurerm_resource_group.aptos.location
   address_space       = [local.vnet_address]
 }
 
 resource "azurerm_subnet" "nodes" {
   name                 = "nodes"
-  resource_group_name  = azurerm_resource_group.diem.name
-  virtual_network_name = azurerm_virtual_network.diem.name
+  resource_group_name  = azurerm_resource_group.aptos.name
+  virtual_network_name = azurerm_virtual_network.aptos.name
   address_prefixes     = [cidrsubnet(local.vnet_address, 4, 0)]
   service_endpoints    = ["Microsoft.Storage"]
 }
 
 resource "azurerm_subnet" "other" {
   name                 = "other"
-  resource_group_name  = azurerm_resource_group.diem.name
-  virtual_network_name = azurerm_virtual_network.diem.name
+  resource_group_name  = azurerm_resource_group.aptos.name
+  virtual_network_name = azurerm_virtual_network.aptos.name
   address_prefixes     = [cidrsubnet(local.vnet_address, 4, 1)]
   service_endpoints    = ["Microsoft.KeyVault", "Microsoft.Storage"]
 }
 
 resource "azurerm_public_ip" "nat" {
-  name                = "diem-${terraform.workspace}-nat"
-  resource_group_name = azurerm_resource_group.diem.name
-  location            = azurerm_resource_group.diem.location
+  name                = "aptos-${terraform.workspace}-nat"
+  resource_group_name = azurerm_resource_group.aptos.name
+  location            = azurerm_resource_group.aptos.location
   allocation_method   = "Static"
   sku                 = "Standard"
 }
 
 resource "azurerm_nat_gateway" "nat" {
-  name                  = "diem-${terraform.workspace}-nat"
-  resource_group_name   = azurerm_resource_group.diem.name
-  location              = azurerm_resource_group.diem.location
+  name                  = "aptos-${terraform.workspace}-nat"
+  resource_group_name   = azurerm_resource_group.aptos.name
+  location              = azurerm_resource_group.aptos.location
 }
 
 resource "azurerm_nat_gateway_public_ip_association" "nat" {
@@ -50,21 +50,21 @@ resource "azurerm_subnet_nat_gateway_association" "nat" {
 }
 
 resource "azurerm_application_security_group" "bastion" {
-  name                = "diem-${terraform.workspace}-bastion"
-  resource_group_name = azurerm_resource_group.diem.name
-  location            = azurerm_resource_group.diem.location
+  name                = "aptos-${terraform.workspace}-bastion"
+  resource_group_name = azurerm_resource_group.aptos.name
+  location            = azurerm_resource_group.aptos.location
 }
 
 resource "azurerm_application_security_group" "vault" {
-  name                = "diem-${terraform.workspace}-vault"
-  resource_group_name = azurerm_resource_group.diem.name
-  location            = azurerm_resource_group.diem.location
+  name                = "aptos-${terraform.workspace}-vault"
+  resource_group_name = azurerm_resource_group.aptos.name
+  location            = azurerm_resource_group.aptos.location
 }
 
 resource "azurerm_network_security_group" "other" {
-  name                = "diem-${terraform.workspace}-other"
-  resource_group_name = azurerm_resource_group.diem.name
-  location            = azurerm_resource_group.diem.location
+  name                = "aptos-${terraform.workspace}-other"
+  resource_group_name = azurerm_resource_group.aptos.name
+  location            = azurerm_resource_group.aptos.location
 
   security_rule {
     name                                       = "bastion-ssh"
@@ -195,15 +195,15 @@ resource "azurerm_subnet_network_security_group_association" "other" {
 locals {
   cluster_ips = concat(
     azurerm_subnet.nodes.address_prefixes,
-    [azurerm_kubernetes_cluster.diem.network_profile[0].service_cidr,
-    azurerm_kubernetes_cluster.diem.network_profile[0].pod_cidr]
+    [azurerm_kubernetes_cluster.aptos.network_profile[0].service_cidr,
+    azurerm_kubernetes_cluster.aptos.network_profile[0].pod_cidr]
   )
 }
 
 resource "azurerm_network_security_group" "nodes" {
-  name                = "diem-${terraform.workspace}-nodes"
-  resource_group_name = azurerm_resource_group.diem.name
-  location            = azurerm_resource_group.diem.location
+  name                = "aptos-${terraform.workspace}-nodes"
+  resource_group_name = azurerm_resource_group.aptos.name
+  location            = azurerm_resource_group.aptos.location
 
   security_rule {
     name                         = "nodes-tcp"

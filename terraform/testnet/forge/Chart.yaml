@@ -1,4 +1,4 @@
 apiVersion: v2
 name: forge
-description: Diem Forge test framework
+description: Aptos Forge test framework
 version: 0.1.0

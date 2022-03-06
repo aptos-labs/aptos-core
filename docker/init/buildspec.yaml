@@ -25,4 +25,4 @@ phases:
       # Tag and push the docker images
       - echo Logging in to Amazon ECR...
       - $(aws ecr get-login --no-include-email --region us-west-2)
-      - SOURCE=diem/init:latest TARGET_REPO=$DIEM_INIT_REPO TARGET_TAGS="${TAGS}:dev_$(git rev-parse --short=8  HEAD)" docker/tag-and-push.sh
+      - SOURCE=aptos/init:latest TARGET_REPO=$APTOS_INIT_REPO TARGET_TAGS="${TAGS}:dev_$(git rev-parse --short=8  HEAD)" docker/tag-and-push.sh

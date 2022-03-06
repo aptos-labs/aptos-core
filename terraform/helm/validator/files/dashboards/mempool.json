@@ -95,7 +95,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_core_mempool_index_size{index=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_core_mempool_index_size{index=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -296,7 +296,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_core_mempool_removed_txns_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_core_mempool_removed_txns_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -848,7 +848,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": null,
-      "description": "number of times a diem network send failed",
+      "description": "number of times a aptos network send failed",
       "fieldConfig": {
         "defaults": {
           "custom": {},
@@ -1294,7 +1294,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_core_mempool_gc_latency_count{type=\"client_expiration\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_core_mempool_gc_latency_count{type=\"client_expiration\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} : {{status}}",
           "refId": "A"
@@ -1391,7 +1391,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_core_mempool_gc_latency_count{type=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_core_mempool_gc_latency_count{type=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} : {{status}}",
           "refId": "A"
@@ -1488,7 +1488,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_core_mempool_index_size{index=\"parking_lot\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_core_mempool_index_size{index=\"parking_lot\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -1585,7 +1585,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_core_mempool_index_size{index=\"timeline\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_core_mempool_index_size{index=\"timeline\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -1682,7 +1682,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_core_mempool_index_size{index=\"priority\", role=\"validator\", owner=~\"$owner\"}",
+          "expr": "aptos_core_mempool_index_size{index=\"priority\", role=\"validator\", owner=~\"$owner\"}",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"
@@ -1876,7 +1876,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_core_mempool_gc_event_count{type=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_core_mempool_gc_event_count{type=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -1973,7 +1973,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_core_mempool_gc_latency_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(diem_core_mempool_gc_latency_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_core_mempool_gc_latency_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(aptos_core_mempool_gc_latency_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -3607,7 +3607,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_broadcast_latency_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_broadcast_latency_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} -> ({{network}} network:{{recipient}})",
           "refId": "A"
@@ -3704,7 +3704,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_broadcast_latency_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(diem_broadcast_latency_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_broadcast_latency_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_broadcast_latency_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} -> ({{network}} network,{{recipient}})",
           "refId": "A"

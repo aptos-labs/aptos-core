@@ -121,9 +121,9 @@ data "aws_iam_policy_document" "forge" {
       "eks:UpdateNodegroupVersion"
     ]
     resources = [
-      data.aws_eks_cluster.diem.arn,
-      "arn:aws:eks:${var.region}:${data.aws_caller_identity.current.account_id}:cluster/${data.aws_eks_cluster.diem.name}/*",
-      "arn:aws:eks:${var.region}:${data.aws_caller_identity.current.account_id}:nodegroup/${data.aws_eks_cluster.diem.name}/*"
+      data.aws_eks_cluster.aptos.arn,
+      "arn:aws:eks:${var.region}:${data.aws_caller_identity.current.account_id}:cluster/${data.aws_eks_cluster.aptos.name}/*",
+      "arn:aws:eks:${var.region}:${data.aws_caller_identity.current.account_id}:nodegroup/${data.aws_eks_cluster.aptos.name}/*"
     ]
   }
 }

@@ -60,12 +60,12 @@ spec:
             workingDir: /tmp
             command: ["/bin/sh", "-c"]
             args:
-            - /opt/diem/bin/cli
+            - /opt/aptos/bin/cli
               --chain-id={{ .Values.genesis.chain_id | default .Values.genesis.era }}
               --url=http://{{ include "testnet.fullname" . }}-jsonrpc
               --faucet-url=http://{{ include "testnet.fullname" . }}-faucet
-              --waypoint=$(cat /opt/diem/etc/waypoint.txt)
-              < /opt/diem/cmd/commands.txt 2>&1 | tee /tmp/out.txt;
+              --waypoint=$(cat /opt/aptos/etc/waypoint.txt)
+              < /opt/aptos/cmd/commands.txt 2>&1 | tee /tmp/out.txt;
               grep -i error /tmp/out.txt && echo "Failure" && exit 1 || echo "Success" && exit 0
           {{- with .Values.faucet_test }}
             env:
@@ -73,9 +73,9 @@ spec:
               value: "1"
             volumeMounts:
             - name: faucet-test-commands
-              mountPath: /opt/diem/cmd
+              mountPath: /opt/aptos/cmd
             - name: genesis
-              mountPath: /opt/diem/etc
+              mountPath: /opt/aptos/etc
             - name: tmp
               mountPath: /tmp
             securityContext:

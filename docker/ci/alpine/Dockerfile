@@ -1,9 +1,9 @@
 # while using circle we'll use circle's base image.
 FROM alpine:3.14.2@sha256:e1c082e3d3c45cccac829840a25941e679c25d438cc8412c2fa221cf1a824e6a AS setup_ci_alpine
 
-WORKDIR /diem
-COPY rust-toolchain /diem/rust-toolchain
-COPY scripts/dev_setup.sh /diem/scripts/dev_setup.sh
+WORKDIR /aptos
+COPY rust-toolchain /aptos/rust-toolchain
+COPY scripts/dev_setup.sh /aptos/scripts/dev_setup.sh
 
 ENV HOME "/github/home"
 #Needed for sccache to function, and to work around home dir being blatted.
@@ -14,7 +14,7 @@ RUN apk add bash=5.1.4-r0 --no-cache && \
     mkdir -p /github/home && \
     mkdir -p /opt/cargo/ && \
     mkdir -p /opt/git/ && \
-    /diem/scripts/dev_setup.sh -t -o -b -p -y -s -n
+    /aptos/scripts/dev_setup.sh -t -o -b -p -y -s -n
 
 ENV DOTNET_ROOT "/opt/dotnet"
 ENV Z3_EXE "/opt/bin/z3"
@@ -40,7 +40,7 @@ RUN [ -x "$(set -x; command -v shellcheck)" ] \
     && [ -x "$(set -x; command -v aws)" ] \
     && [ -x "$(set -x; command -v z3)" ] \
     && [ -x "$(set -x; command -v "$BOOGIE_EXE")" ] \
-    && [ -x "$(set -x; xargs rustup which cargo --toolchain < /diem/rust-toolchain )" ] \
+    && [ -x "$(set -x; xargs rustup which cargo --toolchain < /aptos/rust-toolchain )" ] \
     && [ -x "$(set -x; command -v tidy)" ] \
     && [ -x "$(set -x; command -v xsltproc)" ] \
     && [ -x "$(set -x; command -v javac)" ] \

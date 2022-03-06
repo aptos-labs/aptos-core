@@ -96,7 +96,7 @@ spec:
         - |-
           set -ex
           while [ ! -e /opt/vault/token ] && [ $SECONDS -lt 30 ]; do sleep 1; done
-          exec /opt/diem/bin/aptos-node -f /opt/diem/etc/validator.yaml
+          exec /opt/aptos/bin/aptos-node -f /opt/aptos/etc/validator.yaml
         resources:
           {{- toYaml .resources | nindent 10 }}
         env:
@@ -111,11 +111,11 @@ spec:
           value: "1"
         volumeMounts:
         - name: aptos-config
-          mountPath: /opt/diem/etc
+          mountPath: /opt/aptos/etc
         - name: genesis-config
-          mountPath: /opt/diem/genesis
+          mountPath: /opt/aptos/genesis
         - name: aptos-data
-          mountPath: /opt/diem/data
+          mountPath: /opt/aptos/data
         - name: vault-config
           mountPath: /etc/vault
         - name: vault-token
@@ -215,7 +215,7 @@ spec:
   - Ingress
   - Egress
   ingress:
-  # DiemNet from HAproxy
+  # AptosNet from HAproxy
   - from:
     - podSelector:
         matchLabels:
@@ -235,7 +235,7 @@ spec:
     - protocol: TCP
       port: 8080
   {{- end }}
-  # DiemNet from local full nodes
+  # AptosNet from local full nodes
   - from:
     - podSelector:
         matchLabels:
@@ -254,11 +254,11 @@ spec:
     - protocol: TCP
       port: 9101
   egress:
-  # DiemNet to other validators
+  # AptosNet to other validators
   - ports:
     - protocol: TCP
       port: 6180
-  # DiemNet to safety-rules
+  # AptosNet to safety-rules
   - to:
     - podSelector:
         matchLabels:

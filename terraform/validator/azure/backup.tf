@@ -6,8 +6,8 @@ resource "random_string" "backup-storage" {
 
 resource "azurerm_storage_account" "backup" {
   name                     = "backup${local.workspace_sanitised}${random_string.backup-storage.result}"
-  resource_group_name      = azurerm_resource_group.diem.name
-  location                 = azurerm_resource_group.diem.location
+  resource_group_name      = azurerm_resource_group.aptos.name
+  location                 = azurerm_resource_group.aptos.location
   account_tier             = "Standard"
   account_replication_type = var.backup_replication_type
   allow_blob_public_access = var.backup_public_access

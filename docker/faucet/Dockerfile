@@ -10,14 +10,14 @@ RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
 ENV PATH "$PATH:/root/.cargo/bin"
 
-WORKDIR /diem
-COPY rust-toolchain /diem/rust-toolchain
+WORKDIR /aptos
+COPY rust-toolchain /aptos/rust-toolchain
 RUN rustup install $(cat rust-toolchain)
 
 FROM toolchain AS builder
 
 ARG ENABLE_FAILPOINTS
-COPY . /diem
+COPY . /aptos
 
 RUN IMAGE_TARGETS="test" ./docker/build-common.sh
 
@@ -27,9 +27,9 @@ FROM debian-base AS pre-test
 RUN apt-get update && apt-get install -y libssl1.1 nano net-tools tcpdump iproute2 netcat \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
-RUN mkdir -p /opt/diem/bin  /diem/client/data/wallet/
+RUN mkdir -p /opt/aptos/bin  /aptos/client/data/wallet/
 
-COPY --from=builder /diem/target/release/aptos-faucet /opt/diem/bin
+COPY --from=builder /aptos/target/release/aptos-faucet /opt/aptos/bin
 
 # Test the docker container before shipping.
 FROM pre-test AS test

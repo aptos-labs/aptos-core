@@ -3,7 +3,7 @@ resource "random_id" "backup-bucket" {
 }
 
 resource "aws_s3_bucket" "backup" {
-  bucket = "diem-${local.workspace_name}-backup-${random_id.backup-bucket.hex}"
+  bucket = "aptos-${local.workspace_name}-backup-${random_id.backup-bucket.hex}"
   tags   = local.default_tags
 }
 
@@ -18,7 +18,7 @@ resource "aws_s3_bucket_public_access_block" "backup" {
 resource "aws_iam_openid_connect_provider" "cluster" {
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = ["9e99a48a9960b14926bb7f3b02e22da2b0ab7280"] # Thumbprint of Root CA for EKS OIDC, Valid until 2037
-  url             = aws_eks_cluster.diem.identity[0].oidc[0].issuer
+  url             = aws_eks_cluster.aptos.identity[0].oidc[0].issuer
 }
 
 locals {
@@ -65,7 +65,7 @@ data "aws_iam_policy_document" "backup" {
 }
 
 resource "aws_iam_role" "backup" {
-  name                 = "diem-${local.workspace_name}-backup"
+  name                 = "aptos-${local.workspace_name}-backup"
   path                 = var.iam_path
   permissions_boundary = var.permissions_boundary_policy
   assume_role_policy   = data.aws_iam_policy_document.backup-assume-role.json

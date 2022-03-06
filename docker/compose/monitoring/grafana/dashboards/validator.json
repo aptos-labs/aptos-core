@@ -93,7 +93,7 @@
         "targets": [
           {
             "exemplar": true,
-            "expr": "diem_consensus_current_round",
+            "expr": "aptos_consensus_current_round",
             "format": "time_series",
             "interval": "",
             "intervalFactor": 1,
@@ -194,7 +194,7 @@
         "targets": [
           {
             "exemplar": true,
-            "expr": "diem_consensus_last_committed_round",
+            "expr": "aptos_consensus_last_committed_round",
             "format": "time_series",
             "interval": "",
             "intervalFactor": 1,
@@ -295,7 +295,7 @@
         "targets": [
           {
             "exemplar": true,
-            "expr": "diem_state_sync_version{type=\"committed\"}",
+            "expr": "aptos_state_sync_version{type=\"committed\"}",
             "format": "time_series",
             "interval": "",
             "intervalFactor": 1,
@@ -304,7 +304,7 @@
           },
           {
             "exemplar": true,
-            "expr": "diem_state_sync_version{type=\"synced\"}",
+            "expr": "aptos_state_sync_version{type=\"synced\"}",
             "format": "time_series",
             "interval": "",
             "intervalFactor": 1,
@@ -405,7 +405,7 @@
         "targets": [
           {
             "exemplar": true,
-            "expr": "diem_core_mempool_index_size{index=\"system_ttl\"}",
+            "expr": "aptos_core_mempool_index_size{index=\"system_ttl\"}",
             "format": "time_series",
             "interval": "",
             "intervalFactor": 1,
@@ -506,7 +506,7 @@
         "targets": [
           {
             "exemplar": true,
-            "expr": "rate(diem_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted|commit_rejected\"}[5m])/rate(diem_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted|commit_rejected\"}[5m])",
+            "expr": "rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted|commit_rejected\"}[5m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted|commit_rejected\"}[5m])",
             "format": "time_series",
             "interval": "",
             "intervalFactor": 1,
@@ -607,7 +607,7 @@
         "targets": [
           {
             "exemplar": true,
-            "expr": "rate(diem_consensus_last_committed_round[5m])",
+            "expr": "rate(aptos_consensus_last_committed_round[5m])",
             "format": "time_series",
             "interval": "",
             "intervalFactor": 1,
@@ -708,7 +708,7 @@
         "targets": [
           {
             "exemplar": true,
-            "expr": "rate(diem_consensus_block_tracing_sum{stage=\"signed\"}[5m]) / rate(diem_consensus_block_tracing_count{stage=\"signed\"}[5m])",
+            "expr": "rate(aptos_consensus_block_tracing_sum{stage=\"signed\"}[5m]) / rate(aptos_consensus_block_tracing_count{stage=\"signed\"}[5m])",
             "format": "time_series",
             "interval": "",
             "intervalFactor": 1,
@@ -809,7 +809,7 @@
         "targets": [
           {
             "exemplar": true,
-            "expr": "irate(diem_consensus_last_committed_version[5m])",
+            "expr": "irate(aptos_consensus_last_committed_version[5m])",
             "format": "time_series",
             "interval": "",
             "intervalFactor": 1,

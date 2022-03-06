@@ -29,7 +29,7 @@ data "kubernetes_service" "fullnode-lb" {
   depends_on = [time_sleep.lb_creation]
 }
 
-data "google_dns_managed_zone" "diem" {
+data "google_dns_managed_zone" "aptos" {
   count   = var.zone_name != "" ? 1 : 0
   name    = var.zone_name
   project = var.zone_project != "" ? var.zone_project : var.project
@@ -37,9 +37,9 @@ data "google_dns_managed_zone" "diem" {
 
 resource "google_dns_record_set" "validator" {
   count        = var.zone_name != "" ? 1 : 0
-  managed_zone = data.google_dns_managed_zone.diem[0].name
-  project      = data.google_dns_managed_zone.diem[0].project
-  name         = "${random_string.validator-dns.result}.${local.record_name}.${data.google_dns_managed_zone.diem[0].dns_name}"
+  managed_zone = data.google_dns_managed_zone.aptos[0].name
+  project      = data.google_dns_managed_zone.aptos[0].project
+  name         = "${random_string.validator-dns.result}.${local.record_name}.${data.google_dns_managed_zone.aptos[0].dns_name}"
   type         = "A"
   ttl          = 3600
   rrdatas      = [data.kubernetes_service.validator-lb[0].status[0].load_balancer[0].ingress[0].ip]
@@ -47,9 +47,9 @@ resource "google_dns_record_set" "validator" {
 
 resource "google_dns_record_set" "fullnode" {
   count        = var.zone_name != "" ? 1 : 0
-  managed_zone = data.google_dns_managed_zone.diem[0].name
-  project      = data.google_dns_managed_zone.diem[0].project
-  name         = "${local.record_name}.${data.google_dns_managed_zone.diem[0].dns_name}"
+  managed_zone = data.google_dns_managed_zone.aptos[0].name
+  project      = data.google_dns_managed_zone.aptos[0].project
+  name         = "${local.record_name}.${data.google_dns_managed_zone.aptos[0].dns_name}"
   type         = "A"
   ttl          = 3600
   rrdatas      = [data.kubernetes_service.fullnode-lb[0].status[0].load_balancer[0].ingress[0].ip]

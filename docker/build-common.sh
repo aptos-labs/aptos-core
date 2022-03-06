@@ -53,5 +53,5 @@ fi
 
 rm -rf target/release/{build,deps,incremental}
 
-STRIP_DIR=${STRIP_DIR:-/diem/target}
+STRIP_DIR=${STRIP_DIR:-/aptos/target}
 find "$STRIP_DIR/release" -maxdepth 1 -executable -type f | grep -Ev 'aptos-node|safety-rules' | xargs strip

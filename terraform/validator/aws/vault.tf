@@ -32,7 +32,7 @@ resource "tls_self_signed_cert" "ca" {
 
   subject {
     common_name  = "Vault CA"
-    organization = "diem-${local.workspace_name}"
+    organization = "aptos-${local.workspace_name}"
   }
 }
 
@@ -55,7 +55,7 @@ resource "tls_cert_request" "vault" {
 
   subject {
     common_name  = aws_lb.vault.dns_name
-    organization = "diem-${local.workspace_name}"
+    organization = "aptos-${local.workspace_name}"
   }
 }
 
@@ -70,7 +70,7 @@ resource "tls_locally_signed_cert" "vault" {
 }
 
 resource "aws_secretsmanager_secret" "vault-tls" {
-  name                    = "diem-${local.workspace_name}/vault-tls"
+  name                    = "aptos-${local.workspace_name}/vault-tls"
   recovery_window_in_days = 0
   tags                    = local.default_tags
 }
@@ -80,13 +80,13 @@ resource "aws_secretsmanager_secret_version" "vault-tls" {
   secret_string = tls_private_key.vault-key.private_key_pem
 }
 
-resource "aws_key_pair" "diem" {
-  key_name   = "diem-${local.workspace_name}"
+resource "aws_key_pair" "aptos" {
+  key_name   = "aptos-${local.workspace_name}"
   public_key = var.ssh_pub_key
 }
 
 resource "aws_dynamodb_table" "vault" {
-  name         = "diem-${local.workspace_name}-vault"
+  name         = "aptos-${local.workspace_name}-vault"
   billing_mode = "PAY_PER_REQUEST"
   tags         = local.default_tags
 
@@ -112,11 +112,11 @@ resource "aws_dynamodb_table" "vault" {
 }
 
 resource "aws_kms_key" "vault" {
-  description             = "diem-${local.workspace_name}/vault"
+  description             = "aptos-${local.workspace_name}/vault"
   deletion_window_in_days = 7
 
   tags = merge(local.default_tags, {
-    Name = "diem-${local.workspace_name}/vault"
+    Name = "aptos-${local.workspace_name}/vault"
   })
 
   lifecycle {
@@ -140,7 +140,7 @@ data "aws_iam_policy_document" "vault" {
 }
 
 resource "aws_iam_role" "vault" {
-  name                 = "diem-${local.workspace_name}-vault"
+  name                 = "aptos-${local.workspace_name}-vault"
   path                 = var.iam_path
   assume_role_policy   = data.aws_iam_policy_document.ec2-assume-role.json
   permissions_boundary = var.permissions_boundary_policy
@@ -154,13 +154,13 @@ resource "aws_iam_role_policy" "vault" {
 }
 
 resource "aws_iam_instance_profile" "vault" {
-  name = "diem-${local.workspace_name}-vault"
+  name = "aptos-${local.workspace_name}-vault"
   path = var.iam_path
   role = aws_iam_role.vault.name
 }
 
 resource "aws_security_group" "bastion" {
-  name        = "diem-${local.workspace_name}/bastion"
+  name        = "aptos-${local.workspace_name}/bastion"
   description = "SSH bastion server"
   vpc_id      = aws_vpc.vpc.id
   tags        = local.default_tags
@@ -191,7 +191,7 @@ resource "aws_security_group" "bastion" {
 }
 
 resource "aws_security_group" "vault" {
-  name        = "diem-${local.workspace_name}/vault"
+  name        = "aptos-${local.workspace_name}/vault"
   description = "Vault servers"
   vpc_id      = aws_vpc.vpc.id
   tags        = local.default_tags
@@ -264,11 +264,11 @@ resource "aws_instance" "bastion" {
   subnet_id                   = aws_subnet.public[0].id
   vpc_security_group_ids      = [aws_security_group.bastion.id]
   associate_public_ip_address = true
-  key_name                    = aws_key_pair.diem.key_name
+  key_name                    = aws_key_pair.aptos.key_name
   user_data                   = file("${path.module}/templates/bastion_user_data.cloud")
 
   tags = merge(local.default_tags, {
-    Name = "diem-${local.workspace_name}/bastion"
+    Name = "aptos-${local.workspace_name}/bastion"
   })
 }
 
@@ -312,10 +312,10 @@ locals {
 }
 
 resource "aws_launch_template" "vault" {
-  name                   = "diem-${local.workspace_name}/vault"
+  name                   = "aptos-${local.workspace_name}/vault"
   image_id               = data.aws_ami.amazon.id
   instance_type          = "c5.large"
-  key_name               = aws_key_pair.diem.key_name
+  key_name               = aws_key_pair.aptos.key_name
   vpc_security_group_ids = [aws_security_group.vault.id]
   user_data              = base64encode(local.vault_user_data)
 
@@ -324,12 +324,12 @@ resource "aws_launch_template" "vault" {
   }
 
   tags = merge(local.default_tags, {
-    Name = "diem-${local.workspace_name}/vault"
+    Name = "aptos-${local.workspace_name}/vault"
   })
 }
 
 resource "aws_autoscaling_group" "vault" {
-  name             = "diem-${local.workspace_name}/vault"
+  name             = "aptos-${local.workspace_name}/vault"
   desired_capacity = var.vault_num
   min_size         = var.vault_num
   max_size         = var.vault_num + 1
@@ -344,7 +344,7 @@ resource "aws_autoscaling_group" "vault" {
 
   tag {
     key                 = "Name"
-    value               = "diem-${local.workspace_name}/vault"
+    value               = "aptos-${local.workspace_name}/vault"
     propagate_at_launch = true
   }
 
@@ -362,7 +362,7 @@ resource "aws_autoscaling_group" "vault" {
 }
 
 resource "aws_lb" "vault" {
-  name                             = "diem-${local.workspace_name}-vault"
+  name                             = "aptos-${local.workspace_name}-vault"
   internal                         = var.vault_lb_internal
   load_balancer_type               = "network"
   subnets                          = var.vault_lb_internal ? aws_subnet.private.*.id : aws_subnet.public.*.id
@@ -371,7 +371,7 @@ resource "aws_lb" "vault" {
 }
 
 resource "aws_lb_target_group" "vault" {
-  name     = "diem-${local.workspace_name}-vault"
+  name     = "aptos-${local.workspace_name}-vault"
   port     = 8200
   protocol = "TCP"
   vpc_id   = aws_vpc.vpc.id

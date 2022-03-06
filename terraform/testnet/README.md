@@ -1,7 +1,7 @@
 Libra Testnet Deployment
 ========================
 
-This directory contains Terraform configs to deploy a self-contained Diem
+This directory contains Terraform configs to deploy a self-contained Aptos
 testnet with multiple validators. It uses the [Helm chart][],
 [AWS Terraform][] and [vault-init Terraform][] to create an environment which
 is very similar to production and able to test most of the production configs.
@@ -39,7 +39,7 @@ Using an existing deployment
 
 6. Configure `kubectl` with the Kubernetes cluster:
 
-       $ aws eks update-kubeconfig --name diem-<workspace>
+       $ aws eks update-kubeconfig --name aptos-<workspace>
 
 Creating a new deployment
 -------------------------
@@ -77,7 +77,7 @@ Creating a new deployment
 
 8. Configure `kubectl` with the Kubernetes cluster:
 
-       $ aws eks update-kubeconfig --name diem-<workspace>
+       $ aws eks update-kubeconfig --name aptos-<workspace>
 
 [Helm chart]: ../../helm/validator
 [AWS Terraform]: ../validator/aws/

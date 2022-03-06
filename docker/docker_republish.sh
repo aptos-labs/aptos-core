@@ -10,12 +10,12 @@
 
 function usage {
   echo "Usage:"
-  echo "Copies a diem dockerhub image to another docker location (server / repo / tag )"
+  echo "Copies a aptos dockerhub image to another docker location (server / repo / tag )"
   echo "docker_republish.sh -t <dockerhub_tag> [ -r <REPO> ]"
   echo "-t the tag that exists in hub.docker.com."
   echo "-o override tag that should be pushed to target repo."
   echo "-r target repo of image push"
-  echo "-g target org, defaults to 'diem'"
+  echo "-g target org, defaults to 'aptos'"
   echo "-d disable signing for target repository (ecr requires this)"
   echo "-h this message"
 }
@@ -23,7 +23,7 @@ function usage {
 DOCKERHUB_TAG=;
 OUTPUT_TAG=;
 TARGET_REPO="docker.io"
-TARGET_ORG="diem"
+TARGET_ORG="aptos"
 DISABLE_TRUST="false"
 IMAGES="init faucet tools validator validator_tcb forge"
 
@@ -67,7 +67,7 @@ IFS=' ' read -ra TARGET_IMAGES <<< "$IMAGES"
 
 for image in "${TARGET_IMAGES[@]}"; do
   renamed_image="${image//-/_}"
-  docker pull --disable-content-trust=false docker.io/diem/"$renamed_image":"$DOCKERHUB_TAG"
+  docker pull --disable-content-trust=false docker.io/aptos/"$renamed_image":"$DOCKERHUB_TAG"
 done
 
 if [[ $DISABLE_TRUST == "true" ]]; then
@@ -77,7 +77,7 @@ fi
 # retag images for new location
 for image in "${TARGET_IMAGES[@]}"; do
   renamed_image="${image//-/_}"
-  docker tag diem/"$renamed_image":"$DOCKERHUB_TAG" "$TARGET_REPO"/"$TARGET_ORG"/"$renamed_image":"$OUTPUT_TAG"
+  docker tag aptos/"$renamed_image":"$DOCKERHUB_TAG" "$TARGET_REPO"/"$TARGET_ORG"/"$renamed_image":"$OUTPUT_TAG"
 done
 
 #Push the proper locations to novi ecr.

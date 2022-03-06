@@ -10,14 +10,14 @@ RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
 ENV PATH "$PATH:/root/.cargo/bin"
 
-WORKDIR /diem
-COPY rust-toolchain /diem/rust-toolchain
+WORKDIR /aptos
+COPY rust-toolchain /aptos/rust-toolchain
 RUN rustup install $(cat rust-toolchain)
 
 FROM toolchain AS builder
 
 ARG ENABLE_FAILPOINTS
-COPY . /diem
+COPY . /aptos
 
 RUN IMAGE_TARGETS="release" ./docker/build-common.sh
 
@@ -26,11 +26,11 @@ FROM debian-base AS prod
 
 RUN apt-get update && apt-get install -y libssl1.1 && apt-get clean && rm -r /var/lib/apt/lists/*
 
-RUN addgroup --system --gid 6180 diem && adduser --system --ingroup diem --no-create-home --uid 6180 diem
+RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-create-home --uid 6180 aptos
 
-RUN mkdir -p /opt/diem/bin /opt/diem/etc /opt/diem/data
+RUN mkdir -p /opt/aptos/bin /opt/aptos/etc /opt/aptos/data
 
-COPY --from=builder /diem/target/release/safety-rules /opt/diem/bin
+COPY --from=builder /aptos/target/release/safety-rules /opt/aptos/bin
 
 ENV RUST_BACKTRACE 1
 

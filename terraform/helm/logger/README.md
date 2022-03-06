@@ -1,7 +1,7 @@
-Diem Logger Deployment
+Aptos Logger Deployment
 ================================
 
-This Helm chart deploys a central logger that aggregates logs from diem nodes
+This Helm chart deploys a central logger that aggregates logs from aptos nodes
 using [Vector][]. The logger can be used to output logs to our central logging
 system using mutual TLS, to file for debugging purposes, and any other outputs
 possible with Vector output configuration.

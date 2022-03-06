@@ -21,7 +21,7 @@ spec:
     app.kubernetes.io/name: fullnode
     group: {{ .name }}
   ports:
-  - name: diemnet
+  - name: aptosnet
     port: 6182
   - name: api
     port: 8080
@@ -80,7 +80,7 @@ spec:
         - |-
           set -ex
           while [ ! -e /opt/vault/token ] && [ $SECONDS -lt 30 ]; do sleep 1; done
-          exec /opt/diem/bin/aptos-node -f /opt/diem/etc/fullnode.yaml
+          exec /opt/aptos/bin/aptos-node -f /opt/aptos/etc/fullnode.yaml
       {{- with $.Values.fullnode }}
         resources:
           {{- toYaml .resources | nindent 10 }}
@@ -96,11 +96,11 @@ spec:
           value: '{{ include "aptos-validator.fullname" $ }}-logging:5044'
         volumeMounts:
         - name: aptos-config
-          mountPath: /opt/diem/etc
+          mountPath: /opt/aptos/etc
         - name: genesis-config
-          mountPath: /opt/diem/genesis
+          mountPath: /opt/aptos/genesis
         - name: fn
-          mountPath: /opt/diem/data
+          mountPath: /opt/aptos/data
         - name: vault-config
           mountPath: /etc/vault
         - name: vault-token

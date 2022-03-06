@@ -47,7 +47,7 @@ variable "num_public_fullnodes" {
 }
 
 variable "image_tag" {
-  description = "Docker image tag for diem components. Overrides ecr_repo method."
+  description = "Docker image tag for aptos components. Overrides ecr_repo method."
   default     = ""
 }
 
@@ -62,7 +62,7 @@ variable "era" {
 }
 
 variable "chain_id" {
-  description = "diem chain ID"
+  description = "aptos chain ID"
   default     = "DEVNET"
 }
 
@@ -112,7 +112,7 @@ variable "pfn_logger_helm_values" {
 }
 
 variable "enable_explorer" {
-  description = "Enable Diem Explorer on the cluster"
+  description = "Enable Aptos Explorer on the cluster"
   default     = false
 }
 
@@ -143,7 +143,7 @@ variable "trusted_instance_type" {
 }
 
 variable "explorer_image_repo" {
-  default = "ghcr.io/diem/explorer"
+  default = "ghcr.io/aptos/explorer"
 }
 
 variable "explorer_image_tag" {

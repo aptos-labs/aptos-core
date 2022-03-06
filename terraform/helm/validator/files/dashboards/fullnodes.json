@@ -91,14 +91,14 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "(diem_state_sync_timestamp{type=\"real\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"} - on(owner, kubernetes_pod_name) diem_state_sync_timestamp{type=\"synced\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"})",
+          "expr": "(aptos_state_sync_timestamp{type=\"real\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"} - on(owner, kubernetes_pod_name) aptos_state_sync_timestamp{type=\"synced\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"})",
           "interval": "",
           "legendFormat": "{{owner}}-{{kubernetes_pod_name}}",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "(diem_state_sync_timestamp{type=\"real\", job=~\".*fullnode.*\", owner=~\"$owner\"} - on(owner, job) diem_state_sync_timestamp{type=\"synced\", job=~\".*fullnode.*\", owner=~\"$owner\"})",
+          "expr": "(aptos_state_sync_timestamp{type=\"real\", job=~\".*fullnode.*\", owner=~\"$owner\"} - on(owner, job) aptos_state_sync_timestamp{type=\"synced\", job=~\".*fullnode.*\", owner=~\"$owner\"})",
           "hide": false,
           "interval": "",
           "legendFormat": "{{owner}}-{{job}}",
@@ -177,14 +177,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(diem_state_sync_version{type=\"highest\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"} - on(owner, kubernetes_pod_name) diem_state_sync_version{type=\"committed\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}) < bool 15",
+          "expr": "(aptos_state_sync_version{type=\"highest\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"} - on(owner, kubernetes_pod_name) aptos_state_sync_version{type=\"committed\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}) < bool 15",
           "interval": "",
           "legendFormat": "{{owner}}-{{kubernetes_pod_name}}",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "(diem_state_sync_version{type=\"highest\", job=~\".*fullnode.*\", owner=~\"$owner\"} - on(owner, job) diem_state_sync_version{type=\"committed\", job=~\".*fullnode.*\", owner=~\"$owner\"}) < bool 15",
+          "expr": "(aptos_state_sync_version{type=\"highest\", job=~\".*fullnode.*\", owner=~\"$owner\"} - on(owner, job) aptos_state_sync_version{type=\"committed\", job=~\".*fullnode.*\", owner=~\"$owner\"}) < bool 15",
           "hide": false,
           "interval": "",
           "legendFormat": "{{owner}}-{{job}}",
@@ -265,14 +265,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_state_sync_version{type=\"synced\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(aptos_state_sync_version{type=\"synced\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{kubernetes_pod_name}}",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "rate(diem_state_sync_version{type=\"synced\", job=~\".*fullnode.*\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(aptos_state_sync_version{type=\"synced\", job=~\".*fullnode.*\", owner=~\"$owner\"}[$interval])",
           "hide": false,
           "interval": "",
           "legendFormat": "{{owner}}-{{job}}",
@@ -352,14 +352,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(diem_state_sync_active_upstream_peers{kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}) by (kubernetes_pod_name, owner) ",
+          "expr": "sum(aptos_state_sync_active_upstream_peers{kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}) by (kubernetes_pod_name, owner) ",
           "interval": "",
           "legendFormat": "{{owner}}-{{kubernetes_pod_name}}",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "sum(diem_state_sync_active_upstream_peers{job=~\".*fullnode.*\", owner=~\"$owner\"}) by (job, owner) ",
+          "expr": "sum(aptos_state_sync_active_upstream_peers{job=~\".*fullnode.*\", owner=~\"$owner\"}) by (job, owner) ",
           "hide": false,
           "interval": "",
           "legendFormat": "{{owner}}-{{job}}",
@@ -451,14 +451,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_core_mempool_index_size{index=\"system_ttl\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}",
+          "expr": "aptos_core_mempool_index_size{index=\"system_ttl\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{kubernetes_pod_name}}",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "diem_core_mempool_index_size{index=\"system_ttl\", job=~\".*fullnode.*\", owner=~\"$owner\"}",
+          "expr": "aptos_core_mempool_index_size{index=\"system_ttl\", job=~\".*fullnode.*\", owner=~\"$owner\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "{{owner}}-{{job}}",
@@ -537,14 +537,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "diem_core_mempool_txn_commit_latency_sum{kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"} / diem_core_mempool_txn_commit_latency_count{kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}",
+          "expr": "aptos_core_mempool_txn_commit_latency_sum{kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"} / aptos_core_mempool_txn_commit_latency_count{kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{kubernetes_pod_name}}",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "diem_core_mempool_txn_commit_latency_sum{job=~\".*fullnode.*\", owner=~\"$owner\"} / diem_core_mempool_txn_commit_latency_count{job=~\".*fullnode.*\", owner=~\"$owner\"}",
+          "expr": "aptos_core_mempool_txn_commit_latency_sum{job=~\".*fullnode.*\", owner=~\"$owner\"} / aptos_core_mempool_txn_commit_latency_count{job=~\".*fullnode.*\", owner=~\"$owner\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "{{owner}}-{{job}}",
@@ -599,7 +599,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "description": "Number of Inbound Connections as measured by DiemNet",
+      "description": "Number of Inbound Connections as measured by AptosNet",
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
@@ -636,7 +636,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner,kubernetes_pod_name)(diem_connections{direction=\"inbound\",network_id=\"Public\", owner=~\"$owner\"})",
+          "expr": "sum by (owner,kubernetes_pod_name)(aptos_connections{direction=\"inbound\",network_id=\"Public\", owner=~\"$owner\"})",
           "interval": "",
           "legendFormat": "{{owner}}-{{kubernetes_pod_name}}",
           "refId": "A"
@@ -677,7 +677,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "description": "Number of  Outbound Network Connections as measured by DiemNet",
+      "description": "Number of  Outbound Network Connections as measured by AptosNet",
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
@@ -714,7 +714,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, kubernetes_pod_name)(diem_connections{direction=\"outbound\",network_id=\"Public\", owner=~\"$owner\"})",
+          "expr": "sum by (owner, kubernetes_pod_name)(aptos_connections{direction=\"outbound\",network_id=\"Public\", owner=~\"$owner\"})",
           "interval": "",
           "legendFormat": "{{owner}}-{{kubernetes_pod_name}}",
           "refId": "A"

@@ -26,7 +26,7 @@ spec:
       - name: fullnode
         image: {{ .Values.image.repo }}:{{ .Values.image.tag }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
-        command: ["/opt/diem/bin/aptos-node", "-f", "/opt/diem/etc/fullnode.yaml"]
+        command: ["/opt/aptos/bin/aptos-node", "-f", "/opt/aptos/etc/fullnode.yaml"]
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
         env:
@@ -42,11 +42,11 @@ spec:
           value: "1"
         volumeMounts:
         - name: aptos-config
-          mountPath: /opt/diem/etc
+          mountPath: /opt/aptos/etc
         - name: aptos-genesis
-          mountPath: /opt/diem/genesis
+          mountPath: /opt/aptos/genesis
         - name: aptos-data
-          mountPath: /opt/diem/data
+          mountPath: /opt/aptos/data
         - name: tmp
           mountPath: /tmp
         ports:

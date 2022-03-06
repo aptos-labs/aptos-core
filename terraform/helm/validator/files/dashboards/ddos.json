@@ -93,7 +93,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id) (diem_connections{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\"})",
+          "expr": "sum by (owner, role_type, network_id) (aptos_connections{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\"})",
           "interval": "",
           "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
           "refId": "A"
@@ -192,7 +192,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id) (rate(diem_network_pending_connection_upgrades{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\" }[$AggInterval]))",
+          "expr": "sum by (owner, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\" }[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
           "refId": "A"
@@ -289,7 +289,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_connections_rejected{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\"}[1m])",
+          "expr": "rate(aptos_connections_rejected{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\"}[1m])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
           "refId": "A"
@@ -387,7 +387,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id)(rate(diem_network_rpc_bytes{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_rpc_bytes{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -487,7 +487,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id)(rate(diem_network_rpc_messages{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", type=\"request\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_rpc_messages{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", type=\"request\", state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -587,7 +587,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id)(rate(diem_network_direct_send_bytes{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_direct_send_bytes{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -686,7 +686,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id)(rate(diem_network_direct_send_messages{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_direct_send_messages{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
           "refId": "A"
@@ -784,7 +784,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_network_rate_limit_sum{metric=\"allowed\", direction=\"inbound\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{metric=\"allowed\", direction=\"inbound\", owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"
@@ -882,7 +882,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(diem_network_rate_limit_sum{metric=\"throttled\", direction=\"inbound\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{metric=\"throttled\", direction=\"inbound\", owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"

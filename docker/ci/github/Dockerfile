@@ -1,8 +1,8 @@
 FROM debian:buster-20211011@sha256:f9182ead292f45165f4a851e5ff98ea0800e172ccedce7d17764ffaae5ed4d6e AS setup_ci
 
-RUN mkdir /diem
-COPY rust-toolchain /diem/rust-toolchain
-COPY scripts/dev_setup.sh /diem/scripts/dev_setup.sh
+RUN mkdir /aptos
+COPY rust-toolchain /aptos/rust-toolchain
+COPY scripts/dev_setup.sh /aptos/scripts/dev_setup.sh
 
 #this is the default home on docker images in gha, until it's not?
 ENV HOME "/github/home"
@@ -14,7 +14,7 @@ ENV RUSTUP_HOME "/opt/rustup"
 RUN mkdir -p /github/home && \
     mkdir -p /opt/cargo/ && \
     mkdir -p /opt/git/ && \
-    /diem/scripts/dev_setup.sh -t -o -b -p -y -s -n -a && \
+    /aptos/scripts/dev_setup.sh -t -o -b -p -y -s -n -a && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -42,7 +42,7 @@ RUN [ -x "$(set -x; command -v shellcheck)" ] \
     && [ -x "$(set -x; command -v aws)" ] \
     && [ -x "$(set -x; command -v z3)" ] \
     && [ -x "$(set -x; command -v "$BOOGIE_EXE")" ] \
-    && [ -x "$(set -x; xargs rustup which cargo --toolchain < /diem/rust-toolchain )" ] \
+    && [ -x "$(set -x; xargs rustup which cargo --toolchain < /aptos/rust-toolchain )" ] \
     && [ -x "$(set -x; command -v tidy)" ] \
     && [ -x "$(set -x; command -v xsltproc)" ] \
     && [ -x "$(set -x; command -v javac)" ] \
@@ -54,6 +54,6 @@ RUN [ -x "$(set -x; command -v shellcheck)" ] \
 
 # should be a no-op
 # sccache builds fine, but is not executable ??? in alpine, ends up being recompiled.  Wierd.
-RUN /diem/scripts/dev_setup.sh -t -o -y -b -p -s -a
+RUN /aptos/scripts/dev_setup.sh -t -o -y -b -p -s -a
 
 FROM setup_ci as build_environment

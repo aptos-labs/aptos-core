@@ -58,7 +58,7 @@ module "vault" {
 
 resource "vault_transit_secret_backend_key" "aptos_root" {
   backend          = vault_mount.transit.path
-  name             = "diem__aptos_root"
+  name             = "aptos__aptos_root"
   type             = "ed25519"
   deletion_allowed = true
   exportable       = true
@@ -66,7 +66,7 @@ resource "vault_transit_secret_backend_key" "aptos_root" {
 
 resource "vault_transit_secret_backend_key" "treasury_compliance" {
   backend          = vault_mount.transit.path
-  name             = "diem__treasury_compliance"
+  name             = "aptos__treasury_compliance"
   type             = "ed25519"
   deletion_allowed = true
   exportable       = true
@@ -76,12 +76,12 @@ data "vault_policy_document" "genesis-root" {
   rule {
     path         = "${vault_mount.transit.path}/keys/${vault_transit_secret_backend_key.aptos_root.name}"
     capabilities = ["read"]
-    description  = "Allow reading the Diem root public key"
+    description  = "Allow reading the Aptos root public key"
   }
   rule {
     path         = "${vault_mount.transit.path}/export/signing-key/${vault_transit_secret_backend_key.aptos_root.name}"
     capabilities = ["read"]
-    description  = "Allow reading the Diem root private key"
+    description  = "Allow reading the Aptos root private key"
   }
 
   rule {

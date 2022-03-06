@@ -15,7 +15,7 @@ variable "issuer" {
 
 variable "service_account_prefix" {
   type        = string
-  description = "Prefix for Diem service accounts, e.g. default-aptos-validator"
+  description = "Prefix for Aptos service accounts, e.g. default-aptos-validator"
 }
 
 variable "pod_cidrs" {

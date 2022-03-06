@@ -18,12 +18,12 @@ echo "[$(date)] Using tag $TAG"
 for (( i=0; i < ${#BUILD_PROJECTS[@]}; i++ ));
 do
    PROJECT=${BUILD_PROJECTS[$i]}
-   export DIEM_BUILD_TAG="$REPO/diem_${PROJECT/-/_}:$TAG"
+   export APTOS_BUILD_TAG="$REPO/aptos_${PROJECT/-/_}:$TAG"
    DOCKER_BUILDER="$PROJECT"
    echo "[$(date)] Building $PROJECT via $DOCKER_BUILDER"
    "./docker/${DOCKER_BUILDER}/build.sh" --incremental
    echo "[$(date)] Pushing $PROJECT"
-   time docker push "$DIEM_BUILD_TAG"
+   time docker push "$APTOS_BUILD_TAG"
 done
 
 echo "[$(date)] Build complete"

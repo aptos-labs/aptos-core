@@ -1,5 +1,5 @@
-resource "google_compute_network" "diem" {
-  name                    = "diem-${terraform.workspace}"
+resource "google_compute_network" "aptos" {
+  name                    = "aptos-${terraform.workspace}"
   auto_create_subnetworks = true
 }
 
@@ -8,25 +8,25 @@ resource "google_compute_network" "diem" {
 # in the vault-lb address being created in the default network.
 resource "time_sleep" "create-subnetworks" {
   create_duration = "30s"
-  depends_on      = [google_compute_network.diem]
+  depends_on      = [google_compute_network.aptos]
 }
 
 data "google_compute_subnetwork" "region" {
-  name       = google_compute_network.diem.name
+  name       = google_compute_network.aptos.name
   depends_on = [time_sleep.create-subnetworks]
 }
 
 resource "google_compute_router" "nat" {
-  name    = "diem-${terraform.workspace}-nat"
-  network = google_compute_network.diem.id
+  name    = "aptos-${terraform.workspace}-nat"
+  network = google_compute_network.aptos.id
 }
 
 resource "google_compute_address" "nat" {
-  name = "diem-${terraform.workspace}-nat"
+  name = "aptos-${terraform.workspace}-nat"
 }
 
 resource "google_compute_router_nat" "nat" {
-  name                               = "diem-${terraform.workspace}-nat"
+  name                               = "aptos-${terraform.workspace}-nat"
   router                             = google_compute_router.nat.name
   nat_ip_allocate_option             = "MANUAL_ONLY"
   nat_ips                            = [google_compute_address.nat.self_link]

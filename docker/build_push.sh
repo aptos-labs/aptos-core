@@ -10,14 +10,14 @@ function usage {
   echo "-b the branch we're building on, or the branch we're targeting if a prebuild"
   echo "-n name, one of init, faucet, validator, validator-tcb, forge"
   echo "-u 'upload', or 'push' the docker images will be pushed to dockerhub, otherwise only locally tag"
-  echo "-o the org to target on dockerhub.  Defaults to 'diem'"
-  echo "should be called from the root folder of the diem project, and must have it's .git history"
+  echo "-o the org to target on dockerhub.  Defaults to 'aptos'"
+  echo "should be called from the root folder of the aptos project, and must have it's .git history"
 }
 
 PREBUILD=false;
 INPUT_NAME=
 BRANCH=
-ORG=diem
+ORG=aptos
 PUSH=false
 
 #parse args

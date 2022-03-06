@@ -3,7 +3,7 @@ forge:
   numValidators:
   helmBucket:
   image:
-    repo: diem/forge
+    repo: aptos/forge
     tag:
     pullPolicy: IfNotPresent
   resources:

@@ -1,11 +1,11 @@
 resource "aws_cloudwatch_log_group" "eks" {
-  name              = "/aws/eks/diem-${local.workspace_name}/cluster"
+  name              = "/aws/eks/aptos-${local.workspace_name}/cluster"
   retention_in_days = 7
   tags              = local.default_tags
 }
 
-resource "aws_eks_cluster" "diem" {
-  name                      = "diem-${local.workspace_name}"
+resource "aws_eks_cluster" "aptos" {
+  name                      = "aptos-${local.workspace_name}"
   role_arn                  = aws_iam_role.cluster.arn
   version                   = "1.21"
   enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
@@ -29,8 +29,8 @@ resource "aws_eks_cluster" "diem" {
   }
 }
 
-data "aws_eks_cluster_auth" "diem" {
-  name = aws_eks_cluster.diem.name
+data "aws_eks_cluster_auth" "aptos" {
+  name = aws_eks_cluster.aptos.name
 }
 
 locals {
@@ -55,27 +55,27 @@ locals {
 
 resource "aws_launch_template" "nodes" {
   for_each      = local.pools
-  name          = "diem-${local.workspace_name}/${each.key}"
+  name          = "aptos-${local.workspace_name}/${each.key}"
   instance_type = each.value.instance_type
   user_data     = base64encode(
     templatefile("${path.module}/templates/eks_user_data.sh", {
-      taints = each.value.taint ? "diem.org/nodepool=${each.key}:NoExecute" : ""
+      taints = each.value.taint ? "aptos.org/nodepool=${each.key}:NoExecute" : ""
     })
   )
 
   tag_specifications {
     resource_type = "instance"
     tags = merge(local.default_tags, {
-      Name = "diem-${local.workspace_name}/${each.key}",
+      Name = "aptos-${local.workspace_name}/${each.key}",
     })
   }
 }
 
 resource "aws_eks_node_group" "nodes" {
   for_each        = local.pools
-  cluster_name    = aws_eks_cluster.diem.name
+  cluster_name    = aws_eks_cluster.aptos.name
   node_group_name = each.key
-  version         = aws_eks_cluster.diem.version
+  version         = aws_eks_cluster.aptos.version
   node_role_arn   = aws_iam_role.nodes.arn
   subnet_ids      = [aws_subnet.private[0].id]
   tags            = local.default_tags

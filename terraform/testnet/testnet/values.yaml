@@ -9,7 +9,7 @@ genesis:
   vaultRoleId:
   vaultSecretId:
   image:
-    repo: diem/init
+    repo: aptos/init
     tag:
     pullPolicy: IfNotPresent
   resources:
@@ -57,7 +57,7 @@ serviceAccount:
 faucet:
   enabled: true
   image:
-    repo: diem/faucet
+    repo: aptos/faucet
     tag:
     pullPolicy: IfNotPresent
   resources:
@@ -145,7 +145,7 @@ monitoring:
 cluster_test:
   enabled: true
   image:
-    repo: diem/cluster_test
+    repo: aptos/cluster_test
     tag:
     pullPolicy: IfNotPresent
   resources:

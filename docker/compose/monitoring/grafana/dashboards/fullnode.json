@@ -89,7 +89,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "(diem_state_sync_timestamp{type=\"real\"} - on (instance, job) diem_state_sync_timestamp{type=\"synced\"})",
+          "expr": "(aptos_state_sync_timestamp{type=\"real\"} - on (instance, job) aptos_state_sync_timestamp{type=\"synced\"})",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -186,14 +186,14 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "diem_state_sync_version{type=\"committed\"}",
+          "expr": "aptos_state_sync_version{type=\"committed\"}",
           "interval": "",
           "legendFormat": "committed",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "diem_state_sync_version{type=\"synced\"}",
+          "expr": "aptos_state_sync_version{type=\"synced\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "synced",
@@ -291,7 +291,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "rate(diem_state_sync_version{type=\"synced\"}[5m])",
+          "expr": "rate(aptos_state_sync_version{type=\"synced\"}[5m])",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -386,7 +386,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "(diem_state_sync_version{type=\"highest\"} - on(instance, job) diem_state_sync_version{type=\"committed\"}) < bool 15",
+          "expr": "(aptos_state_sync_version{type=\"highest\"} - on(instance, job) aptos_state_sync_version{type=\"committed\"}) < bool 15",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -481,7 +481,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "diem_state_sync_epoch",
+          "expr": "aptos_state_sync_epoch",
           "interval": "",
           "legendFormat": "epoch",
           "refId": "A"
@@ -578,7 +578,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum(diem_state_sync_active_upstream_peers) by (instance, job) ",
+          "expr": "sum(aptos_state_sync_active_upstream_peers) by (instance, job) ",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -687,7 +687,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "diem_core_mempool_index_size{index=\"system_ttl\"}",
+          "expr": "aptos_core_mempool_index_size{index=\"system_ttl\"}",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -782,7 +782,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "diem_core_mempool_txn_commit_latency_sum / diem_core_mempool_txn_commit_latency_count",
+          "expr": "aptos_core_mempool_txn_commit_latency_sum / aptos_core_mempool_txn_commit_latency_count",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -849,7 +849,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": null,
-      "description": "Number of Inbound Connections as measured by DiemNet",
+      "description": "Number of Inbound Connections as measured by AptosNet",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -891,7 +891,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "diem_connections{direction=\"inbound\",network_id=\"Public\"}",
+          "expr": "aptos_connections{direction=\"inbound\",network_id=\"Public\"}",
           "interval": "",
           "legendFormat": "{{peer_id}}",
           "refId": "A"
@@ -944,7 +944,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": null,
-      "description": "Number of  Outbound Network Connections as measured by DiemNet",
+      "description": "Number of  Outbound Network Connections as measured by AptosNet",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -986,7 +986,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "diem_connections{direction=\"outbound\",network_id=\"Public\"}",
+          "expr": "aptos_connections{direction=\"outbound\",network_id=\"Public\"}",
           "interval": "",
           "legendFormat": "{{peer_id}}",
           "refId": "A"
