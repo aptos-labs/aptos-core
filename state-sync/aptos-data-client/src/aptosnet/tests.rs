@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{DataSummaryPoller, DiemDataClient, DiemNetDataClient, Error};
+use super::{DataSummaryPoller, DiemDataClient, AptosNetDataClient, Error};
 use aptos_config::{
     config::{DiemDataClientConfig, StorageServiceConfig},
     network_id::{NetworkId, PeerNetworkId},
@@ -67,7 +67,7 @@ struct MockNetwork {
 }
 
 impl MockNetwork {
-    fn new() -> (Self, MockTimeService, DiemNetDataClient, DataSummaryPoller) {
+    fn new() -> (Self, MockTimeService, AptosNetDataClient, DataSummaryPoller) {
         let queue_cfg = aptos_channel::Config::new(10).queue_style(QueueStyle::FIFO);
         let (peer_mgr_reqs_tx, peer_mgr_reqs_rx) = queue_cfg.build();
         let (connection_reqs_tx, _connection_reqs_rx) = queue_cfg.build();
@@ -83,7 +83,7 @@ impl MockNetwork {
         let network_client = StorageServiceClient::new(network_sender, peer_infos.clone());
 
         let mock_time = TimeService::mock();
-        let (client, poller) = DiemNetDataClient::new(
+        let (client, poller) = AptosNetDataClient::new(
             DiemDataClientConfig::default(),
             StorageServiceConfig::default(),
             mock_time.clone(),

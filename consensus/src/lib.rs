@@ -38,7 +38,7 @@ mod util;
 
 /// DiemBFT implementation
 pub mod consensus_provider;
-/// DiemNet interface.
+/// AptosNet interface.
 pub mod network_interface;
 
 #[cfg(feature = "fuzzing")]

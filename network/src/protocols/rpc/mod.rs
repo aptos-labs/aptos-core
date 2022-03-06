@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Implementation of the unary RPC protocol as per [DiemNet wire protocol v1].
+//! Implementation of the unary RPC protocol as per [AptosNet wire protocol v1].
 //!
 //! ## Design:
 //!
@@ -40,7 +40,7 @@
 //! We limit the number of pending inbound and outbound RPC tasks to ensure that
 //! resource usage is bounded.
 //!
-//! [DiemNet wire protocol v1]: https://github.com/aptos-labs/aptos-core/blob/main/specifications/network/messaging-v1.md
+//! [AptosNet wire protocol v1]: https://github.com/aptos-labs/aptos-core/blob/main/specifications/network/messaging-v1.md
 //! [`Peer`]: crate::peer::Peer
 
 use crate::{

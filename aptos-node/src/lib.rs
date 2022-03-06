@@ -10,7 +10,7 @@ use aptos_config::{
     network_id::NetworkId,
     utils::get_genesis_txn,
 };
-use aptos_data_client::diemnet::DiemNetDataClient;
+use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, Logger};
 use aptos_metrics::metric_server;
@@ -306,7 +306,7 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
 
 fn setup_data_streaming_service(
     config: DataStreamingServiceConfig,
-    aptos_data_client: DiemNetDataClient,
+    aptos_data_client: AptosNetDataClient,
 ) -> (StreamingServiceClient, Runtime) {
     // Create the data streaming service
     let (streaming_service_client, streaming_service_listener) =
@@ -330,7 +330,7 @@ fn setup_aptos_data_client(
     aptos_data_client_config: DiemDataClientConfig,
     network_handles: HashMap<NetworkId, storage_service_client::StorageServiceNetworkSender>,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
-) -> (DiemNetDataClient, Runtime) {
+) -> (AptosNetDataClient, Runtime) {
     // Combine all storage service client handles
     let network_client = StorageServiceClient::new(
         StorageServiceMultiSender::new(network_handles),
@@ -338,7 +338,7 @@ fn setup_aptos_data_client(
     );
 
     // Create the diem data client
-    let (aptos_data_client, data_summary_poller) = DiemNetDataClient::new(
+    let (aptos_data_client, data_summary_poller) = AptosNetDataClient::new(
         aptos_data_client_config,
         storage_service_config,
         TimeService::real(),
@@ -366,7 +366,7 @@ fn setup_state_sync_storage_service(
         .thread_name("storage-service-server")
         .enable_all()
         .build()
-        .expect("Failed to start the DiemNet storage-service runtime.");
+        .expect("Failed to start the AptosNet storage-service runtime.");
 
     // Spawn all state sync storage service servers on the same runtime
     let storage_reader = StorageReader::new(Arc::clone(&db_rw.reader));

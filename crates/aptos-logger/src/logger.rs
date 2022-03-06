@@ -46,7 +46,7 @@ pub fn set_global_logger(logger: Arc<dyn Logger>) {
         eprintln!("Global logger has already been set");
     }
     let _ = tracing::subscriber::set_global_default(
-        crate::tracing_adapter::TracingToDiemLoggerLayer
+        crate::tracing_adapter::TracingToAptosDataLayer
             .with_subscriber(tracing_subscriber::Registry::default()),
     );
 }

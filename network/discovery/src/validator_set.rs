@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn metric_if_key_mismatch() {
-        aptos_logger::DiemLogger::init_for_testing();
+        aptos_logger::AptosData::init_for_testing();
         let runtime = Runtime::new().unwrap();
         let consensus_private_key = Ed25519PrivateKey::generate_for_testing();
         let consensus_pubkey = consensus_private_key.public_key();

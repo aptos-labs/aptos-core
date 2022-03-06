@@ -257,7 +257,7 @@ impl NetworkConfig {
 
     fn verify_address(peer_id: &PeerId, addr: &NetworkAddress) -> Result<(), Error> {
         crate::config::invariant(
-            addr.is_diemnet_addr(),
+            addr.is_aptosnet_addr(),
             format!(
                 "Unexpected seed peer address format: peer_id: {}, addr: '{}'",
                 peer_id.short_str(),
@@ -279,7 +279,7 @@ impl NetworkConfig {
                 Self::verify_address(peer_id, addr)?;
             }
 
-            // Require there to be a pubkey somewhere, either in the address (assumed by `is_diemnet_addr`)
+            // Require there to be a pubkey somewhere, either in the address (assumed by `is_aptosnet_addr`)
             crate::config::invariant(
                 !seed.keys.is_empty() || !seed.addresses.is_empty(),
                 format!("Seed peer {} has no pubkeys", peer_id.short_str()),

@@ -153,7 +153,7 @@ fn list_accounts(db: &AptosDB) {
 }
 
 fn main() {
-    ::aptos_logger::DiemLogger::builder().build();
+    ::aptos_logger::AptosData::builder().build();
 
     let opt = Opt::from_args();
 

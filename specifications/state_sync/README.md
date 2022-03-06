@@ -12,7 +12,7 @@ This document is organized as follows:
 functionality.
 2. Sync Protocols: specify technical requirements of various sync protocols
 recognized in the Diem Network.
-3. Network Protocol: the State Synchronizer DiemNet protocol used to participate
+3. Network Protocol: the State Synchronizer AptosNet protocol used to participate
 as a node in the Diem Network
 4. Abstracted Modules: external components that state synchronizer interfaces with
 

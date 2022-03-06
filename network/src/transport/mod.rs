@@ -288,7 +288,7 @@ async fn upgrade_inbound<T: TSocket>(
         .await
         .map_err(|err| add_pp_addr(proxy_protocol_enabled, err, &addr))?;
 
-    // try to negotiate common diemnet version and supported application protocols
+    // try to negotiate common aptosnet version and supported application protocols
     let (messaging_protocol, application_protocols) = handshake_msg
         .perform_handshake(&remote_handshake)
         .map_err(|err| {
@@ -363,7 +363,7 @@ pub async fn upgrade_outbound<T: TSocket>(
     };
     let remote_handshake = exchange_handshake(&handshake_msg, &mut socket).await?;
 
-    // try to negotiate common diemnet version and supported application protocols
+    // try to negotiate common aptosnet version and supported application protocols
     let (messaging_protocol, application_protocols) = handshake_msg
         .perform_handshake(&remote_handshake)
         .map_err(|e| {
@@ -389,7 +389,7 @@ pub async fn upgrade_outbound<T: TSocket>(
     })
 }
 
-/// The common DiemNet Transport.
+/// The common AptosNet Transport.
 ///
 /// The base transport layer is pluggable, so long as it provides a reliable,
 /// ordered, connection-oriented, byte-stream abstraction (e.g., TCP). We currently
@@ -401,7 +401,7 @@ pub async fn upgrade_outbound<T: TSocket>(
 /// the `Handshake` protocol.
 // TODO(philiphayes): rework Transport trait, possibly include Upgrade trait.
 // ideas in this PR thread: https://github.com/aptos-labs/aptos-core/pull/3478#issuecomment-617385633
-pub struct DiemNetTransport<TTransport> {
+pub struct AptosNetTransport<TTransport> {
     base_transport: TTransport,
     ctxt: Arc<UpgradeContext>,
     time_service: TimeService,
@@ -409,7 +409,7 @@ pub struct DiemNetTransport<TTransport> {
     enable_proxy_protocol: bool,
 }
 
-impl<TTransport> DiemNetTransport<TTransport>
+impl<TTransport> AptosNetTransport<TTransport>
 where
     TTransport: Transport<Error = io::Error>,
     TTransport::Output: TSocket,
@@ -477,7 +477,7 @@ where
                 )
             })?;
 
-        // parse out the diemnet protocols (noise ik and handshake)
+        // parse out the aptosnet protocols (noise ik and handshake)
         match base_transport_suffix {
             [NoiseIK(pubkey), Handshake(version)] => {
                 let base_addr = NetworkAddress::try_from(base_transport_protos.to_vec())
@@ -524,7 +524,7 @@ where
     ) -> io::Result<
         impl Future<Output = io::Result<Connection<NoiseStream<TTransport::Output>>>> + Send + 'static,
     > {
-        // parse diemnet protocols
+        // parse aptosnet protocols
         // TODO(philiphayes): `Transport` trait should include parsing in `dial`?
         let (base_addr, pubkey, handshake_version) = Self::parse_dial_addr(&addr)?;
 
@@ -609,14 +609,14 @@ where
     }
 }
 
-// If using `DiemNetTransport` as a `Transport` trait, then all upgrade futures
+// If using `AptosNetTransport` as a `Transport` trait, then all upgrade futures
 // and listening streams must be boxed, since `upgrade_inbound` and `upgrade_outbound`
 // are async fns (and therefore unnamed types).
 //
 // TODO(philiphayes): We can change these `Pin<Box<dyn Future<..>>> to `impl Future<..>`
 // when/if this rust feature is stabilized: https://github.com/rust-lang/rust/issues/63063
 
-impl<TTransport: Transport> Transport for DiemNetTransport<TTransport>
+impl<TTransport: Transport> Transport for AptosNetTransport<TTransport>
 where
     TTransport: Transport<Error = io::Error> + Send + 'static,
     TTransport::Output: TSocket,

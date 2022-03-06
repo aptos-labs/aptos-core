@@ -12,7 +12,7 @@ This document is organized as follows:
 4. [Abstracted modules](#Abstracted-modules) - The components this specification depends on.
 5. [Consensus modules](#Consensus-modules) - The components built upon common data structures that are described as a part of this specification.
 
-All network communication occurs over DiemNet and any serialization, deserialization and hashing is determined by [BCS](https://docs.rs/bcs/).
+All network communication occurs over AptosNet and any serialization, deserialization and hashing is determined by [BCS](https://docs.rs/bcs/).
 
 ## Architecture
 

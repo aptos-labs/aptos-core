@@ -1,4 +1,4 @@
-# DiemNet
+# AptosNet
 
 ## Version and Status
 
@@ -6,7 +6,7 @@
 
 ## Introduction
 
-This document describes **DiemNet**, the primary network protocol used for communication between any two nodes in the Diem ecosystem. The protocol only describes the structure and order of messages on the wire, while relying on an underlying transport (TCP) for the actual message delivery. In addition, all communication between peers MUST be encrypted and authenticated using [Noise protocol](noise.md). DiemNet supports multiplexing several application protocols concurrently over a single connection. For each application protocol, DiemNet provides two kinds of messaging semantics: (1) a fire-and-forget DirectSend and (2) a unary RPC.
+This document describes **AptosNet**, the primary network protocol used for communication between any two nodes in the Diem ecosystem. The protocol only describes the structure and order of messages on the wire, while relying on an underlying transport (TCP) for the actual message delivery. In addition, all communication between peers MUST be encrypted and authenticated using [Noise protocol](noise.md). AptosNet supports multiplexing several application protocols concurrently over a single connection. For each application protocol, AptosNet provides two kinds of messaging semantics: (1) a fire-and-forget DirectSend and (2) a unary RPC.
 
 ## Terminology
 
@@ -20,7 +20,7 @@ This document describes **DiemNet**, the primary network protocol used for commu
 
 ## Standard Network Topology
 
-While DiemNet does not assume a specific network topology, we will frame the specification in terms of the standard Diem network topology for clarity.
+While AptosNet does not assume a specific network topology, we will frame the specification in terms of the standard Diem network topology for clarity.
 
 ### Node Types
 
@@ -43,36 +43,36 @@ While DiemNet does not assume a specific network topology, we will frame the spe
 
 Below is a diagram that illustrates the set of standard Diem node types, the different network configurations, and the different connection authentication modes.
 
-![Standard Diem Network Topology](../images/diemnet_network_topology.png)
+![Standard Diem Network Topology](../images/aptosnet_network_topology.png)
 
 ## Base Transport
 
-DiemNet makes the following assumptions about the underlying transport:
+AptosNet makes the following assumptions about the underlying transport:
 
 * Connection-oriented
 * Ordered and reliable delivery of messages
 * Unicast communication
 * Session-local state - protocol state is not preserved across transport protocol sessions
 
-Today, DiemNet only supports TCP as the base transport, with the capacity to upgrade to new base transports using the addressing scheme.
+Today, AptosNet only supports TCP as the base transport, with the capacity to upgrade to new base transports using the addressing scheme.
 
 ## Secure Transport
 
-All communication between nodes MUST be encrypted and authenticated using the [DiemNet Noise IK protocol](noise.md).
+All communication between nodes MUST be encrypted and authenticated using the [AptosNet Noise IK protocol](noise.md).
 
 By virtue of using the Noise IK handshake, the client always authenticates the server, as the initial noise handshake message is encrypted so only a server with the intended keypair can decrypt it and respond to it. This pattern is analogous to the client using TLS certificate pinning, pinned to a specific public key, for every connection.
 
 In contrast, the server may or may not authenticate the client, depending on the specific network configuration. In Diem v1, only the Validator Network uses mutual authentication, where validators will only allow inbound connections from other current validators.
 
-## DiemNet Versioning Scheme
+## AptosNet Versioning Scheme
 
-In an effort to prevent protocol ossification and allow backwards-incompatible protocol upgrades, all DiemNet protocols are versioned and can be negotiated in various ways.
+In an effort to prevent protocol ossification and allow backwards-incompatible protocol upgrades, all AptosNet protocols are versioned and can be negotiated in various ways.
 
-Primarily, the [DiemNet handshake protocol](handshake-v1.md) is responsible for negotiating the [DiemNet messaging protocol](messaging-v1.md) version and supported application protocol versions. The handshake protocol is "pre-negoiated" in nodes' advertised network addresses as it is not intended to be changed very frequently.
+Primarily, the [AptosNet handshake protocol](handshake-v1.md) is responsible for negotiating the [AptosNet messaging protocol](messaging-v1.md) version and supported application protocol versions. The handshake protocol is "pre-negoiated" in nodes' advertised network addresses as it is not intended to be changed very frequently.
 
-## DiemNet NetworkAddress
+## AptosNet NetworkAddress
 
-DiemNet uses [`NetworkAddress`](network-address.md) to encapsulate the precise set of protocols used to dial a peer. Canonical DiemNet addresses in v1 contain the following protocols, in sequence, in human-readable format:
+AptosNet uses [`NetworkAddress`](network-address.md) to encapsulate the precise set of protocols used to dial a peer. Canonical AptosNet addresses in v1 contain the following protocols, in sequence, in human-readable format:
 
 1. Base Transport: one of:
     * `"/ip4/<ipaddr>/tcp/<port>"`
@@ -82,26 +82,26 @@ DiemNet uses [`NetworkAddress`](network-address.md) to encapsulate the precise s
     * `"/dns6/<name>/tcp/<port>"`
 2. Secure Transport Upgrade:
     * `"/ln-noise-ik/<x25519-public-key>"`
-3. DiemNet Handshake Upgrade:
+3. AptosNet Handshake Upgrade:
     * `"/ln-handshake/<version>"`
 
-For example, a full DiemNet `NetworkAddress` in human-readable format:
+For example, a full AptosNet `NetworkAddress` in human-readable format:
 
 ```
 "/ip4/10.0.0.61/tcp/6080/ln-noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/ln-handshake/0"
 ```
 
-DiemNet `NetworkAddress`es are advertised via the [onchain discovery protocol](onchain-discovery.md) or stored in local configurations.
+AptosNet `NetworkAddress`es are advertised via the [onchain discovery protocol](onchain-discovery.md) or stored in local configurations.
 
 ## Discovery
 
-DiemNet does not prescribe a method for node discovery. Different discovery mechanisms are used in the validator and full-node networks:
+AptosNet does not prescribe a method for node discovery. Different discovery mechanisms are used in the validator and full-node networks:
 
 * Validators use the [onchain discovery protocol](onchain-discovery.md) to discover each other.
 * All nodes use the [onchain discovery protocol](onchain-discovery.md) to discover VFNs.
 * Discovery information needed to bootstrap initially is provided as "seed" peers through configuration.
 
-These protocols operate on top of the core DiemNet protocol.
+These protocols operate on top of the core AptosNet protocol.
 
 ## Connection Lifecycle
 
@@ -119,11 +119,11 @@ client: discover server_address = "/ip4/[address]/ln-noise-ik/[public_key]/ln-ha
 client: TCP::connect [address]
 server: TCP::accept
 
-// DiemNet Noise IK handshake
+// AptosNet Noise IK handshake
 client: server_peer_id = Noise::upgrade_outbound [public_key]
 server: client_peer_id = Noise::upgrade_inbound
 
-// DiemNet version handshake
+// AptosNet version handshake
 client: (server_version, server_protocols) = Handshake::upgrade [version]
 server: (client_version, client_protocols) = Handshake::upgrade [version]
 ```
@@ -132,11 +132,11 @@ where `Noise::upgrade_outbound` and `Noise::upgrade_inbound` are defined in [Noi
 
 ### Connection Deduplication
 
-DiemNet v1 tries to maintain at-most-one connection per peer. If a peer attempts to open more than one connection to a server, the server will only keep the most recent connection and close the older connection. When operating in peer-to-peer mode, two nodes can also simultaneously dial each other. In the event two peers simultaneously dial each other, we need to be able to do tie-breaking to determine which connection to keep and which to drop in a deterministic way. In this case, both peers will compare the dialer `PeerId` of both connections and keep the connection with the greater dialer `PeerId` (in lexicographic order).
+AptosNet v1 tries to maintain at-most-one connection per peer. If a peer attempts to open more than one connection to a server, the server will only keep the most recent connection and close the older connection. When operating in peer-to-peer mode, two nodes can also simultaneously dial each other. In the event two peers simultaneously dial each other, we need to be able to do tie-breaking to determine which connection to keep and which to drop in a deterministic way. In this case, both peers will compare the dialer `PeerId` of both connections and keep the connection with the greater dialer `PeerId` (in lexicographic order).
 
 ### Messaging Protocol
 
-After establishing and negotiating a complete connection, peers may begin exchanging DiemNet messages as defined in the [DiemNet messaging protocol](messaging-v1.md). These messages are framed, encrypted, and decrypted using the `Noise::encrypt` and `Noise::decrypt` protocols defined in [Noise#Post-handshake](noise.md#post-handshake) before sending or receiving over the base TCP connection. Note that multiple `NetworkMsg` may be sent or received in a single Noise frame.
+After establishing and negotiating a complete connection, peers may begin exchanging AptosNet messages as defined in the [AptosNet messaging protocol](messaging-v1.md). These messages are framed, encrypted, and decrypted using the `Noise::encrypt` and `Noise::decrypt` protocols defined in [Noise#Post-handshake](noise.md#post-handshake) before sending or receiving over the base TCP connection. Note that multiple `NetworkMsg` may be sent or received in a single Noise frame.
 
 Since the Noise layer limits frame sizes to at-most `65535` bytes, of which `16` bytes are always reserved for the AES GCM authentication tag, sending a serialized `NetworkMsg` (include the big-endian 4-byte length prefix) over-the-write first requires splitting it into chunks of size at most `65535 - 16 = 65519` bytes.
 

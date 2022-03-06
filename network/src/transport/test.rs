@@ -60,8 +60,8 @@ fn setup<TTransport>(
 ) -> (
     Runtime,
     MockTimeService,
-    (PeerId, DiemNetTransport<TTransport>),
-    (PeerId, DiemNetTransport<TTransport>),
+    (PeerId, AptosNetTransport<TTransport>),
+    (PeerId, AptosNetTransport<TTransport>),
     Arc<RwLock<PeerSet>>,
     ProtocolIdSet,
 )
@@ -146,7 +146,7 @@ where
     let supported_protocols =
         ProtocolIdSet::from_iter([ProtocolId::ConsensusRpcBcs, ProtocolId::DiscoveryDirectSend]);
     let chain_id = ChainId::default();
-    let listener_transport = DiemNetTransport::new(
+    let listener_transport = AptosNetTransport::new(
         base_transport.clone(),
         NetworkContext::mock_with_peer_id(listener_peer_id),
         time_service.clone(),
@@ -158,7 +158,7 @@ where
         false, /* Disable proxy protocol */
     );
 
-    let dialer_transport = DiemNetTransport::new(
+    let dialer_transport = AptosNetTransport::new(
         base_transport,
         NetworkContext::mock_with_peer_id(dialer_peer_id),
         time_service.clone(),
@@ -490,7 +490,7 @@ fn test_transport_maybe_mutual<TTransport>(
 }
 
 ////////////////////////////////////////
-// DiemNetTransport<MemoryTransport> //
+// AptosNetTransport<MemoryTransport> //
 ////////////////////////////////////////
 
 #[test]
@@ -532,7 +532,7 @@ fn test_memory_transport_maybe_mutual() {
 }
 
 /////////////////////////////////////
-// DiemNetTransport<TcpTransport> //
+// AptosNetTransport<TcpTransport> //
 /////////////////////////////////////
 
 #[test]

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    diemnet::logging::{LogEntry, LogEvent, LogSchema},
+    aptosnet::logging::{LogEntry, LogEvent, LogSchema},
     AdvertisedData, GlobalDataSummary, OptimalChunkSizes, ResponseError,
 };
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};

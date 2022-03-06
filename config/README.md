@@ -162,7 +162,7 @@ The Diem Node configuration contains several modules:
   that defines the Move standard library and the initial Validator set.
 - MempoolConfig - Parameters for configuring uncommitted transaction storage
 - MetricsConfig - Local storage for metrics
-- NetworkConfig - DiemNet configuration file that specifies peers with keys,
+- NetworkConfig - AptosNet configuration file that specifies peers with keys,
   seed addresses to connect to upstream peers, the local peers network keys,
 and other network configuration parameters
 - NodeConfig - Hosts all configuration files for a Diem Node

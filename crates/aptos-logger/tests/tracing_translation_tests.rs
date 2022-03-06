@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_infallible::RwLock;
-use aptos_logger::{DiemLogger, Writer};
+use aptos_logger::{AptosData, Writer};
 use std::sync::Arc;
 use tracing::Level;
 
@@ -35,7 +35,7 @@ fn verify_tracing_kvs() {
     // set up the diem logger
     let writer = VecWriter::default();
     let logs = writer.logs.clone();
-    DiemLogger::builder()
+    AptosData::builder()
         .is_async(false)
         .printer(Box::new(writer.write_to_stderr(false)))
         .build();

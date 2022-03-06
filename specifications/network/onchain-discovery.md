@@ -2,7 +2,7 @@
 
 ## Overview
 
-The [DiemNet](README.md) On-chain Discovery Protocol is an authenticated discovery protocol for nodes to learn validator and VFN network addresses and network identity public keys. On-chain discovery leverages the Move language and Diem blockchain to serve as a central authenticated data-store for distributing advertised validator and VFN discovery information in the form of [`NetworkAddress`](network-address.md)es for validators and [`NetworkAddress`](network-address.md)es for VFNs.
+The [AptosNet](README.md) On-chain Discovery Protocol is an authenticated discovery protocol for nodes to learn validator and VFN network addresses and network identity public keys. On-chain discovery leverages the Move language and Diem blockchain to serve as a central authenticated data-store for distributing advertised validator and VFN discovery information in the form of [`NetworkAddress`](network-address.md)es for validators and [`NetworkAddress`](network-address.md)es for VFNs.
 
 ## Design Principles
 

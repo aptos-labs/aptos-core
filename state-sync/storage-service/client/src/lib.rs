@@ -26,7 +26,7 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("DiemNet Rpc error: {0}")]
+    #[error("AptosNet Rpc error: {0}")]
     RpcError(#[from] RpcError),
 
     #[error("Error from remote storage service: {0}")]

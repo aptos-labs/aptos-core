@@ -11,7 +11,7 @@ use crate::{
         PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
     },
     protocols::{network::AppConfig, wire::handshake::v1::ProtocolIdSet},
-    transport::{self, Connection, DiemNetTransport, DIEM_TCP_TRANSPORT},
+    transport::{self, Connection, AptosNetTransport, DIEM_TCP_TRANSPORT},
     ProtocolId,
 };
 use aptos_config::{
@@ -144,8 +144,8 @@ impl PeerManagerContext {
 
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 type MemoryPeerManager =
-    PeerManager<DiemNetTransport<MemoryTransport>, NoiseStream<memsocket::MemorySocket>>;
-type TcpPeerManager = PeerManager<DiemNetTransport<TcpTransport>, NoiseStream<TcpSocket>>;
+    PeerManager<AptosNetTransport<MemoryTransport>, NoiseStream<memsocket::MemorySocket>>;
+type TcpPeerManager = PeerManager<AptosNetTransport<TcpTransport>, NoiseStream<TcpSocket>>;
 
 enum TransportPeerManager {
     #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
@@ -276,7 +276,7 @@ impl PeerManagerBuilder {
         self.peer_manager = match self.listen_address.as_slice() {
             [Ip4(_), Tcp(_)] | [Ip6(_), Tcp(_)] => {
                 Some(TransportPeerManager::Tcp(self.build_with_transport(
-                    DiemNetTransport::new(
+                    AptosNetTransport::new(
                         DIEM_TCP_TRANSPORT.clone(),
                         self.network_context,
                         self.time_service.clone(),
@@ -292,7 +292,7 @@ impl PeerManagerBuilder {
             }
             #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
             [Memory(_)] => Some(TransportPeerManager::Memory(self.build_with_transport(
-                DiemNetTransport::new(
+                AptosNetTransport::new(
                     MemoryTransport,
                     self.network_context,
                     self.time_service.clone(),

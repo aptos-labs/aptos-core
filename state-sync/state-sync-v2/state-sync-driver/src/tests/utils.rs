@@ -7,7 +7,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
     HashValue, PrivateKey, Uniform,
 };
-use aptos_data_client::diemnet::DiemNetDataClient;
+use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_infallible::RwLock;
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -132,7 +132,7 @@ fn create_driver_for_tests(
         MultiNetworkSender::new(HashMap::new()),
         PeerMetadataStorage::new(&[]),
     );
-    let (aptos_data_client, _) = DiemNetDataClient::new(
+    let (aptos_data_client, _) = AptosNetDataClient::new(
         node_config.state_sync.aptos_data_client,
         node_config.state_sync.storage_service,
         TimeService::mock(),

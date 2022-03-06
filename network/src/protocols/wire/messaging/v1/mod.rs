@@ -1,11 +1,11 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! This module defines the DiemNet v1 message types, how they are
+//! This module defines the AptosNet v1 message types, how they are
 //! serialized/deserialized, and provides a `Sink` and `Stream` implementation
 //! for sending `NetworkMessage`s over an abstract IO object (presumably a socket).
 //!
-//! The [DiemNet specification](https://github.com/aptos-labs/aptos-core/blob/main/specifications/network/messaging-v1.md)
+//! The [AptosNet specification](https://github.com/aptos-labs/aptos-core/blob/main/specifications/network/messaging-v1.md)
 //! describes in greater detail how these messages are sent and received
 //! over-the-wire.
 
