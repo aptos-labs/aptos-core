@@ -14,7 +14,7 @@ use aptos_types::{
     transaction::{ChangeSet, Transaction, TransactionOutput, Version, WriteSetPayload},
     write_set::WriteOp,
 };
-use aptos_validator_interface::{DBDebuggerInterface, DebuggerStateView, DiemValidatorInterface};
+use aptos_validator_interface::{AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView};
 use aptos_vm::{
     convert_changeset_and_events, data_cache::RemoteStorage, logging::AdapterLogSchema, DiemVM,
     VMExecutor,
@@ -31,14 +31,14 @@ use std::path::{Path, PathBuf};
 #[cfg(test)]
 mod unit_tests;
 
-pub struct DiemDebugger {
-    debugger: Box<dyn DiemValidatorInterface>,
+pub struct AptosDebugger {
+    debugger: Box<dyn AptosValidatorInterface>,
     build_dir: PathBuf,
     storage_dir: PathBuf,
 }
 
-impl DiemDebugger {
-    pub fn new(debugger: Box<dyn DiemValidatorInterface>) -> Self {
+impl AptosDebugger {
+    pub fn new(debugger: Box<dyn AptosValidatorInterface>) -> Self {
         Self {
             debugger,
             build_dir: PathBuf::from(move_cli::DEFAULT_BUILD_DIR),
