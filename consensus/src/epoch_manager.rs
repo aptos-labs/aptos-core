@@ -11,7 +11,7 @@ use crate::{
         ordering_state_computer::OrderingStateComputer,
     },
     liveness::{
-        leader_reputation::{ActiveInactiveHeuristic, DiemDBBackend, LeaderReputation},
+        leader_reputation::{ActiveInactiveHeuristic, AptosDBBackend, LeaderReputation},
         proposal_generator::ProposalGenerator,
         proposer_election::ProposerElection,
         rotating_proposer_election::{choose_leader, RotatingProposer},
@@ -184,7 +184,8 @@ impl EpochManager {
                 ))
             }
             ConsensusProposerType::LeaderReputation(heuristic_config) => {
-                let backend = Box::new(DiemDBBackend::new(proposers.len(), self.storage.diem_db()));
+                let backend =
+                    Box::new(AptosDBBackend::new(proposers.len(), self.storage.diem_db()));
                 let heuristic = Box::new(ActiveInactiveHeuristic::new(
                     self.author,
                     heuristic_config.active_weights,

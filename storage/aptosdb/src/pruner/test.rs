@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use crate::{change_set::ChangeSet, state_store::StateStore, DiemDB};
+use crate::{change_set::ChangeSet, state_store::StateStore, AptosDB};
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
 use aptos_types::{account_address::AccountAddress, account_state_blob::AccountStateBlob};
@@ -48,7 +48,7 @@ fn test_pruner() {
     let value2 = AccountStateBlob::from(vec![0x03]);
 
     let tmp_dir = TempPath::new();
-    let db = DiemDB::new_for_test(&tmp_dir).db;
+    let db = AptosDB::new_for_test(&tmp_dir).db;
     let state_store = &StateStore::new(Arc::clone(&db), true /* account_count_migration */);
     let pruner = Pruner::new(Arc::clone(&db), 0 /* historical_versions_to_keep */);
 
@@ -109,7 +109,7 @@ fn test_worker_quit_eagerly() {
     let value2 = AccountStateBlob::from(vec![0x03]);
 
     let tmp_dir = TempPath::new();
-    let db = DiemDB::new_for_test(&tmp_dir).db;
+    let db = AptosDB::new_for_test(&tmp_dir).db;
     let state_store = &StateStore::new(Arc::clone(&db), true /* account_count_migration */);
 
     let _root0 = put_account_state_set(

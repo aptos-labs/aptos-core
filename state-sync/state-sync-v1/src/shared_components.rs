@@ -94,7 +94,7 @@ pub(crate) mod test_utils {
         waypoint::Waypoint,
     };
     use aptos_vm::DiemVM;
-    use aptosdb::DiemDB;
+    use aptosdb::AptosDB;
     use channel::{aptos_channel, message_queues::QueueStyle};
     use event_notifications::{EventNotificationSender, EventSubscriptionService};
     use executor::chunk_executor::ChunkExecutor;
@@ -157,7 +157,7 @@ pub(crate) mod test_utils {
         // Create test diem database
         let db_path = aptos_temppath::TempPath::new();
         db_path.create_as_dir().unwrap();
-        let (db, db_rw) = DbReaderWriter::wrap(DiemDB::new_for_test(db_path.path()));
+        let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));
 
         // Bootstrap the genesis transaction
         let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));

@@ -5,7 +5,7 @@ use aptos_config::utils::get_available_port;
 use aptos_proptest_helpers::ValueGenerator;
 use aptos_temppath::TempPath;
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::TransactionToCommit};
-use aptosdb::{test_helper::arb_blocks_to_commit, DiemDB};
+use aptosdb::{test_helper::arb_blocks_to_commit, AptosDB};
 use backup_service::start_backup_service;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -14,16 +14,16 @@ use std::{
 use storage_interface::DbWriter;
 use tokio::runtime::Runtime;
 
-pub fn tmp_db_empty() -> (TempPath, Arc<DiemDB>) {
+pub fn tmp_db_empty() -> (TempPath, Arc<AptosDB>) {
     let tmpdir = TempPath::new();
-    let db = Arc::new(DiemDB::new_for_test(&tmpdir));
+    let db = Arc::new(AptosDB::new_for_test(&tmpdir));
 
     (tmpdir, db)
 }
 
 pub fn tmp_db_with_random_content() -> (
     TempPath,
-    Arc<DiemDB>,
+    Arc<AptosDB>,
     Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
 ) {
     let (tmpdir, db) = tmp_db_empty();
@@ -42,7 +42,7 @@ pub fn tmp_db_with_random_content() -> (
     (tmpdir, db, blocks)
 }
 
-pub fn start_local_backup_service(db: Arc<DiemDB>) -> (Runtime, u16) {
+pub fn start_local_backup_service(db: Arc<AptosDB>) -> (Runtime, u16) {
     let port = get_available_port();
     let rt = start_backup_service(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port), db);
     (rt, port)

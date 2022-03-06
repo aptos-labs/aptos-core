@@ -6,7 +6,7 @@ use aptos_config::config::RocksdbConfig;
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
 use aptos_vm::DiemVM;
-use aptosdb::DiemDB;
+use aptosdb::AptosDB;
 use executor::db_bootstrapper::calculate_genesis;
 use std::{
     fs::File,
@@ -51,7 +51,7 @@ fn main() -> Result<()> {
     let tmpdir;
 
     let db = if opt.commit {
-        DiemDB::open(
+        AptosDB::open(
             &opt.db_dir,
             false,
             None, /* pruner */
@@ -62,7 +62,7 @@ fn main() -> Result<()> {
         // When not committing, we open the DB as secondary so the tool is usable along side a
         // running node on the same DB. Using a TempPath since it won't run for long.
         tmpdir = TempPath::new();
-        DiemDB::open_as_secondary(
+        AptosDB::open_as_secondary(
             opt.db_dir.as_path(),
             tmpdir.path(),
             RocksdbConfig::default(),

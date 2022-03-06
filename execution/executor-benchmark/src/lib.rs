@@ -14,7 +14,7 @@ use aptos_config::config::{NodeConfig, RocksdbConfig};
 use aptos_logger::prelude::*;
 
 use aptos_vm::DiemVM;
-use aptosdb::DiemDB;
+use aptosdb::AptosDB;
 use executor::block_executor::BlockExecutor;
 use executor_types::BlockExecutorTrait;
 use std::{
@@ -26,7 +26,7 @@ use storage_interface::{DbReader, DbReaderWriter};
 
 pub fn init_db_and_executor(config: &NodeConfig) -> (Arc<dyn DbReader>, BlockExecutor<DiemVM>) {
     let (db, dbrw) = DbReaderWriter::wrap(
-        DiemDB::open(
+        AptosDB::open(
             &config.storage.dir(),
             false, /* readonly */
             None,  /* pruner */
@@ -55,7 +55,7 @@ pub fn run_benchmark(
     }
     std::fs::create_dir_all(checkpoint_dir.as_ref()).unwrap();
 
-    DiemDB::open(
+    AptosDB::open(
         &source_dir,
         true, /* readonly */
         None, /* pruner */

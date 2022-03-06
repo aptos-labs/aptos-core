@@ -5,7 +5,7 @@
 
 use crate::{
     change_set::ChangeSet,
-    errors::DiemDbError,
+    errors::AptosDbError,
     schema::{
         transaction::TransactionSchema, transaction_by_account::TransactionByAccountSchema,
         transaction_by_hash::TransactionByHashSchema, write_set::WriteSetSchema,
@@ -96,7 +96,7 @@ impl TransactionStore {
     pub fn get_transaction(&self, version: Version) -> Result<Transaction> {
         self.db
             .get::<TransactionSchema>(&version)?
-            .ok_or_else(|| DiemDbError::NotFound(format!("Txn {}", version)).into())
+            .ok_or_else(|| AptosDbError::NotFound(format!("Txn {}", version)).into())
     }
 
     /// Gets an iterator that yields `num_transactions` transactions starting from `start_version`.
@@ -145,7 +145,7 @@ impl TransactionStore {
             }
         }
 
-        Err(DiemDbError::NotFound(format!("BlockMetadata preceding version {}", version)).into())
+        Err(AptosDbError::NotFound(format!("BlockMetadata preceding version {}", version)).into())
     }
 
     /// Save signed transaction at `version`
@@ -170,9 +170,9 @@ impl TransactionStore {
 
     /// Get executed transaction vm output given `version`
     pub fn get_write_set(&self, version: Version) -> Result<WriteSet> {
-        self.db
-            .get::<WriteSetSchema>(&version)?
-            .ok_or_else(|| DiemDbError::NotFound(format!("WriteSet at version {}", version)).into())
+        self.db.get::<WriteSetSchema>(&version)?.ok_or_else(|| {
+            AptosDbError::NotFound(format!("WriteSet at version {}", version)).into()
+        })
     }
 
     /// Get the first version that write set starts existent.

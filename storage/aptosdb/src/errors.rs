@@ -1,13 +1,13 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! This module defines error types used by [`DiemDB`](crate::DiemDB).
+//! This module defines error types used by [`AptosDB`](crate::AptosDB).
 
 use thiserror::Error;
 
-/// This enum defines errors commonly used among [`DiemDB`](crate::DiemDB) APIs.
+/// This enum defines errors commonly used among [`AptosDB`](crate::AptosDB) APIs.
 #[derive(Debug, Error)]
-pub enum DiemDbError {
+pub enum AptosDbError {
     /// A requested item is not found.
     #[error("{0} not found.")]
     NotFound(String),

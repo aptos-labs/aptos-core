@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-//! This crate provides [`DiemDB`] which represents physical storage of the core Diem data
+//! This crate provides [`AptosDB`] which represents physical storage of the core Diem data
 //! structures.
 //!
 //! It relays read/write operations on the physical storage via [`schemadb`] to the underlying
@@ -39,7 +39,7 @@ pub use aptosdb_test::test_save_blocks_impl;
 use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler},
     change_set::{ChangeSet, SealedChangeSet},
-    errors::DiemDbError,
+    errors::AptosDbError,
     event_store::EventStore,
     ledger_counters::LedgerCounters,
     ledger_store::LedgerStore,
@@ -138,7 +138,7 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
 
 fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<()> {
     if num_requested > max_allowed {
-        Err(DiemDbError::TooManyRequested(num_requested, max_allowed).into())
+        Err(AptosDbError::TooManyRequested(num_requested, max_allowed).into())
     } else {
         Ok(())
     }
@@ -155,7 +155,7 @@ fn update_rocksdb_properties(db: &DB) -> Result<()> {
     let _timer = DIEM_STORAGE_OTHER_TIMERS_SECONDS
         .with_label_values(&["update_rocksdb_properties"])
         .start_timer();
-    for cf_name in DiemDB::column_families() {
+    for cf_name in AptosDB::column_families() {
         for (property_name, rocksdb_property_argument) in &*ROCKSDB_PROPERTY_MAP {
             DIEM_STORAGE_ROCKSDB_PROPERTIES
                 .with_label_values(&[cf_name, property_name])
@@ -210,7 +210,7 @@ impl Drop for RocksdbPropertyReporter {
 /// This holds a handle to the underlying DB responsible for physical storage and provides APIs for
 /// access to the core Diem data structures.
 #[derive(Debug)]
-pub struct DiemDB {
+pub struct AptosDB {
     db: Arc<DB>,
     ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
@@ -222,7 +222,7 @@ pub struct DiemDB {
     prune_window: Option<u64>,
 }
 
-impl DiemDB {
+impl AptosDB {
     fn column_families() -> Vec<ColumnFamilyName> {
         vec![
             /* LedgerInfo CF = */ DEFAULT_CF_NAME,
@@ -246,7 +246,7 @@ impl DiemDB {
     fn new_with_db(db: DB, prune_window: Option<u64>, account_count_migration: bool) -> Self {
         let db = Arc::new(db);
 
-        DiemDB {
+        AptosDB {
             db: Arc::clone(&db),
             event_store: Arc::new(EventStore::new(Arc::clone(&db))),
             ledger_store: Arc::new(LedgerStore::new(Arc::clone(&db))),
@@ -304,7 +304,7 @@ impl DiemDB {
         info!(
             path = path,
             time_ms = %instant.elapsed().as_millis(),
-            "Opened DiemDB.",
+            "Opened AptosDB.",
         );
         Ok(ret)
     }
@@ -343,7 +343,7 @@ impl DiemDB {
             RocksdbConfig::default(),
             true, /* account_count_migration */
         )
-        .expect("Unable to open DiemDB")
+        .expect("Unable to open AptosDB")
     }
 
     /// This force the db to update rocksdb properties immediately.
@@ -458,7 +458,7 @@ impl DiemDB {
             info!(
                 path = path.as_ref(),
                 time_ms = %start.elapsed().as_millis(),
-                "Made DiemDB checkpoint."
+                "Made AptosDB checkpoint."
             );
         })
     }
@@ -649,7 +649,7 @@ impl DiemDB {
     }
 }
 
-impl DbReader for DiemDB {
+impl DbReader for AptosDB {
     fn get_epoch_ending_ledger_infos(
         &self,
         start_epoch: u64,
@@ -741,7 +741,7 @@ impl DbReader for DiemDB {
             .transpose()
     }
 
-    /// Get transaction by version, delegates to `DiemDB::get_transaction_by_hash`
+    /// Get transaction by version, delegates to `AptosDB::get_transaction_by_hash`
     fn get_transaction_by_version(
         &self,
         version: Version,
@@ -1180,7 +1180,7 @@ impl DbReader for DiemDB {
                 .get_account_count(version)
                 .and_then(|count| {
                     count.ok_or_else(|| {
-                        DiemDbError::NotFound(format!("Account count at version {}", version))
+                        AptosDbError::NotFound(format!("Account count at version {}", version))
                             .into()
                     })
                 })
@@ -1204,7 +1204,7 @@ impl DbReader for DiemDB {
     }
 }
 
-impl ModuleResolver for DiemDB {
+impl ModuleResolver for AptosDB {
     type Error = anyhow::Error;
 
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>> {
@@ -1221,7 +1221,7 @@ impl ModuleResolver for DiemDB {
     }
 }
 
-impl ResourceResolver for DiemDB {
+impl ResourceResolver for AptosDB {
     type Error = anyhow::Error;
 
     fn get_resource(&self, address: &AccountAddress, tag: &StructTag) -> Result<Option<Vec<u8>>> {
@@ -1236,9 +1236,9 @@ impl ResourceResolver for DiemDB {
     }
 }
 
-impl MoveDbReader for DiemDB {}
+impl MoveDbReader for AptosDB {}
 
-impl DbWriter for DiemDB {
+impl DbWriter for AptosDB {
     /// `first_version` is the version of the first transaction in `txns_to_commit`.
     /// When `ledger_info_with_sigs` is provided, verify that the transaction accumulator root hash
     /// it carries is generated after the `txns_to_commit` are applied.
@@ -1360,7 +1360,7 @@ pub trait GetRestoreHandler {
     fn get_restore_handler(&self) -> RestoreHandler;
 }
 
-impl GetRestoreHandler for Arc<DiemDB> {
+impl GetRestoreHandler for Arc<AptosDB> {
     fn get_restore_handler(&self) -> RestoreHandler {
         RestoreHandler::new(
             Arc::clone(&self.db),
@@ -1387,7 +1387,7 @@ where
             warn!(
                 api_name = api_name,
                 error = ?e,
-                "DiemDB API returned error."
+                "AptosDB API returned error."
             );
             "Err"
         }

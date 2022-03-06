@@ -24,7 +24,7 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use aptos_vm::DiemVM;
-use aptosdb::DiemDB;
+use aptosdb::AptosDB;
 use consensus_notifications::ConsensusNotifier;
 use data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
 use event_notifications::{
@@ -94,7 +94,7 @@ fn create_driver_for_tests(
     // Create test diem database
     let db_path = aptos_temppath::TempPath::new();
     db_path.create_as_dir().unwrap();
-    let (db, db_rw) = DbReaderWriter::wrap(DiemDB::new_for_test(db_path.path()));
+    let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));
 
     // Bootstrap the genesis transaction
     let (genesis, _) = vm_genesis::test_genesis_change_set_and_validators(Some(1));

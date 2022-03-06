@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use crate::DiemDB;
+use crate::AptosDB;
 use aptos_crypto::hash::ACCUMULATOR_PLACEHOLDER_HASH;
 use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;
@@ -37,7 +37,7 @@ fn save(store: &EventStore, version: Version, events: &[ContractEvent]) -> HashV
 #[test]
 fn test_put_empty() {
     let tmp_dir = TempPath::new();
-    let db = DiemDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.event_store;
     let mut cs = ChangeSet::new();
     assert_eq!(
@@ -49,7 +49,7 @@ fn test_put_empty() {
 #[test]
 fn test_error_on_get_from_empty() {
     let tmp_dir = TempPath::new();
-    let db = DiemDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.event_store;
 
     assert!(store
@@ -63,7 +63,7 @@ proptest! {
     #[test]
     fn test_put_get_verify(events in vec(any::<ContractEvent>().no_shrink(), 1..100)) {
         let tmp_dir = TempPath::new();
-        let db = DiemDB::new_for_test(&tmp_dir);
+        let db = AptosDB::new_for_test(&tmp_dir);
         let store = &db.event_store;
 
         let root_hash = save(store, 100, &events);
@@ -95,7 +95,7 @@ proptest! {
     ) {
 
         let tmp_dir = TempPath::new();
-        let db = DiemDB::new_for_test(&tmp_dir);
+        let db = AptosDB::new_for_test(&tmp_dir);
         let store = &db.event_store;
         // Save 3 chunks at different versions
         save(store, 99 /*version*/, &events1);
@@ -187,7 +187,7 @@ proptest! {
 fn test_index_get_impl(event_batches: Vec<Vec<ContractEvent>>) {
     // Put into db.
     let tmp_dir = TempPath::new();
-    let db = DiemDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.event_store;
 
     let mut cs = ChangeSet::new();
@@ -302,7 +302,7 @@ prop_compose! {
 
 fn test_get_last_version_before_timestamp_impl(new_block_events: Vec<(Version, ContractEvent)>) {
     let tmp_dir = TempPath::new();
-    let db = DiemDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.event_store;
     // error on no blocks
     assert!(store.get_last_version_before_timestamp(1000, 2000).is_err());

@@ -17,7 +17,7 @@ use aptos_types::{
     validator_config::ValidatorConfig, waypoint::Waypoint,
 };
 use aptos_vm::DiemVM;
-use aptosdb::DiemDB;
+use aptosdb::AptosDB;
 use executor::db_bootstrapper;
 use std::{
     convert::TryFrom,
@@ -209,7 +209,7 @@ fn compute_genesis(
     genesis_path: &Path,
     db_path: &Path,
 ) -> Result<(DbReaderWriter, Waypoint), Error> {
-    let aptosdb = DiemDB::open(
+    let aptosdb = AptosDB::open(
         db_path,
         false,
         None,

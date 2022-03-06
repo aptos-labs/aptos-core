@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use crate::DiemDB;
+use crate::AptosDB;
 use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -25,7 +25,7 @@ proptest! {
         ),
     ) {
         let tmp_dir = TempPath::new();
-        let db = DiemDB::new_for_test(&tmp_dir);
+        let db = AptosDB::new_for_test(&tmp_dir);
         let store = &db.transaction_store;
         let (gens, write_sets):(Vec<_>, Vec<_>) = gens_and_write_sets.into_iter().unzip();
         let txns = init_store(universe, gens, store);
@@ -73,7 +73,7 @@ proptest! {
         ),
     ) {
         let tmp_dir = TempPath::new();
-        let db = DiemDB::new_for_test(&tmp_dir);
+        let db = AptosDB::new_for_test(&tmp_dir);
         let store = &db.transaction_store;
         let txns = init_store(universe, gens, store);
 
@@ -129,7 +129,7 @@ proptest! {
         )
     ) {
         let tmp_dir = TempPath::new();
-        let db = DiemDB::new_for_test(&tmp_dir);
+        let db = AptosDB::new_for_test(&tmp_dir);
         let store = &db.transaction_store;
 
         let mut cs = ChangeSet::new();
@@ -178,7 +178,7 @@ proptest! {
         num_versions in 0_u64..=50,
     ) {
         let tmp_dir = TempPath::new();
-        let db = DiemDB::new_for_test(&tmp_dir);
+        let db = AptosDB::new_for_test(&tmp_dir);
         let store = &db.transaction_store;
         let txns = init_store(universe, gens, store);
 

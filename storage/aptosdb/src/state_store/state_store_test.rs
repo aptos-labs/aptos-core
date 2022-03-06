@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use crate::{pruner, DiemDB};
+use crate::{pruner, AptosDB};
 use aptos_config::config::RocksdbConfig;
 use aptos_jellyfish_merkle::restore::JellyfishMerkleRestore;
 use aptos_temppath::TempPath;
@@ -86,7 +86,7 @@ fn verify_state_in_store(
 #[test]
 fn test_empty_store() {
     let tmp_dir = TempPath::new();
-    let db = DiemDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
     let address = AccountAddress::new([1u8; AccountAddress::LENGTH]);
     assert!(store
@@ -97,7 +97,7 @@ fn test_empty_store() {
 #[test]
 fn test_state_store_reader_writer() {
     let tmp_dir = TempPath::new();
-    let db = DiemDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
     let address1 = AccountAddress::new([1u8; AccountAddress::LENGTH]);
     let address2 = AccountAddress::new([2u8; AccountAddress::LENGTH]);
@@ -151,7 +151,7 @@ fn test_retired_records() {
     let value3_update = AccountStateBlob::from(vec![0x13]);
 
     let tmp_dir = TempPath::new();
-    let db = DiemDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
 
     // Update.
@@ -244,7 +244,7 @@ proptest! {
         let kvs: Vec<_> = input.into_iter().collect();
 
         let tmp_dir = TempPath::new();
-        let db = DiemDB::new_for_test(&tmp_dir);
+        let db = AptosDB::new_for_test(&tmp_dir);
         let store = &db.state_store;
         init_store(store, kvs.clone().into_iter());
 
@@ -274,7 +274,7 @@ proptest! {
             })
     ) {
         let tmp_dir1 = TempPath::new();
-        let db1 = DiemDB::new_for_test(&tmp_dir1);
+        let db1 = AptosDB::new_for_test(&tmp_dir1);
         let store1 = &db1.state_store;
         init_store(store1, input.clone().into_iter());
 
@@ -282,7 +282,7 @@ proptest! {
         let expected_root_hash = store1.get_root_hash(version).unwrap();
 
         let tmp_dir2 = TempPath::new();
-        let db2 = DiemDB::new_for_test(&tmp_dir2);
+        let db2 = AptosDB::new_for_test(&tmp_dir2);
         let store2 = &db2.state_store;
 
         let mut restore =
@@ -332,7 +332,7 @@ proptest! {
             })
     ) {
         let tmp_dir1 = TempPath::new();
-        let db1 = DiemDB::new_for_test(&tmp_dir1);
+        let db1 = AptosDB::new_for_test(&tmp_dir1);
         let store1 = &db1.state_store;
         init_store(store1, input.clone().into_iter());
 
@@ -344,7 +344,7 @@ proptest! {
         );
 
         let tmp_dir2 = TempPath::new();
-        let db2 = DiemDB::new_for_test(&tmp_dir2);
+        let db2 = AptosDB::new_for_test(&tmp_dir2);
         let store2 = &db2.state_store;
 
         let mut restore = store2.get_snapshot_receiver(version, expected_root_hash).unwrap();
@@ -372,7 +372,7 @@ proptest! {
         input in hash_map(any::<AccountAddress>(), any::<AccountStateBlob>(), 17..1000)
     ) {
         let src_tmp_dir = TempPath::new();
-        let src_db = DiemDB::new_for_test(&src_tmp_dir);
+        let src_db = AptosDB::new_for_test(&src_tmp_dir);
         let src_store = &src_db.state_store;
         init_store(src_store, input.clone().into_iter());
 
@@ -392,7 +392,7 @@ proptest! {
 
         // restore in non-migration mode
         {
-            let db1 = DiemDB::new_for_test(&tgt_tmp_dir);
+            let db1 = AptosDB::new_for_test(&tgt_tmp_dir);
             let store1 = &db1.state_store;
             let mut restore1 =
                 JellyfishMerkleRestore::new(Arc::clone(store1), version, expected_root_hash, false /* leaf_count_migration */).unwrap();
@@ -402,7 +402,7 @@ proptest! {
 
         // reopen db in migration mode
         {
-            let db2 = DiemDB::open(
+            let db2 = AptosDB::open(
                 &tgt_tmp_dir,
                 false, /* readonly */
                 None,  /* pruner */
@@ -430,7 +430,7 @@ proptest! {
             })
     ) {
         let tmp_dir1 = TempPath::new();
-        let db1 = DiemDB::new_for_test(&tmp_dir1);
+        let db1 = AptosDB::new_for_test(&tmp_dir1);
         let store1 = &db1.state_store;
         init_store(store1, input.clone().into_iter());
 
@@ -438,7 +438,7 @@ proptest! {
         let expected_root_hash = store1.get_root_hash(version).unwrap();
 
         let tmp_dir2 = TempPath::new();
-        let db2 = DiemDB::new_for_test(&tmp_dir2);
+        let db2 = AptosDB::new_for_test(&tmp_dir2);
         let store2 = &db2.state_store;
 
         let mut restore =
@@ -474,7 +474,7 @@ proptest! {
         let account_count = input.iter().map(|(k, _)| k).collect::<HashSet<_>>().len();
 
         let tmp_dir = TempPath::new();
-        let db = DiemDB::new_for_test(&tmp_dir);
+        let db = AptosDB::new_for_test(&tmp_dir);
         let store = &db.state_store;
         init_store(store, input.into_iter());
         assert_eq!(store.get_account_count(version).unwrap().unwrap(), account_count);
@@ -492,7 +492,7 @@ proptest! {
 
         // build state in legacy mode
         {
-            let db = DiemDB::open(
+            let db = AptosDB::open(
                 &tmp_dir,
                 false, /* read_only */
                 None,
@@ -506,7 +506,7 @@ proptest! {
 
         // migrate by touching all accounts
         {
-            let db = DiemDB::new_for_test(&tmp_dir);
+            let db = AptosDB::new_for_test(&tmp_dir);
             let store = &db.state_store;
             update_store(store, after.into_iter(), num_updates as Version);
             assert_eq!(

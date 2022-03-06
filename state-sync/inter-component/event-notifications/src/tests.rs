@@ -17,7 +17,7 @@ use aptos_types::{
     transaction::{Transaction, Version, WriteSetPayload},
 };
 use aptos_vm::DiemVM;
-use aptosdb::DiemDB;
+use aptosdb::AptosDB;
 use claim::{assert_lt, assert_matches, assert_ok};
 use executor_test_helpers::bootstrap_genesis;
 use futures::{FutureExt, StreamExt};
@@ -548,7 +548,7 @@ fn create_database() -> Arc<RwLock<DbReaderWriter>> {
     // Create test diem database
     let db_path = aptos_temppath::TempPath::new();
     assert_ok!(db_path.create_as_dir());
-    let (_, db_rw) = DbReaderWriter::wrap(DiemDB::new_for_test(db_path.path()));
+    let (_, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));
 
     // Bootstrap the genesis transaction
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));

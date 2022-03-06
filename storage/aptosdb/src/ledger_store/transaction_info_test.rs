@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use crate::DiemDB;
+use crate::AptosDB;
 use aptos_temppath::TempPath;
 use proptest::{collection::vec, prelude::*};
 
@@ -53,7 +53,7 @@ proptest! {
         batch2 in vec(any::<TransactionInfo>(), 1..100),
     ) {
         let tmp_dir = TempPath::new();
-        let db = DiemDB::new_for_test(&tmp_dir);
+        let db = AptosDB::new_for_test(&tmp_dir);
         let store = &db.ledger_store;
 
         // insert two batches of transaction infos
@@ -84,7 +84,7 @@ proptest! {
                 })
     ) {
         let tmp_dir = TempPath::new();
-        let db = DiemDB::new_for_test(&tmp_dir);
+        let db = AptosDB::new_for_test(&tmp_dir);
         let store = &db.ledger_store;
         save(store, 0, &infos);
 

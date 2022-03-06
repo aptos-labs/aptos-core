@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{DiemDB, Order, MAX_LIMIT};
+use crate::{AptosDB, Order, MAX_LIMIT};
 use anyhow::{ensure, format_err, Result};
 use aptos_config::config::RocksdbConfig;
 use aptos_types::{
@@ -15,12 +15,12 @@ use std::{convert::AsRef, path::Path};
 use storage_interface::{DbReader, StartupInfo};
 
 pub struct Diemsum {
-    db: DiemDB,
+    db: AptosDB,
 }
 
 impl Diemsum {
     pub fn new<P: AsRef<Path> + Clone>(db_root_path: P) -> Result<Self> {
-        let db = DiemDB::open(
+        let db = AptosDB::open(
             db_root_path,
             true, /* read only */
             None, /* no prune_window */

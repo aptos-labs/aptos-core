@@ -24,7 +24,7 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use aptos_vm::DiemVM;
-use aptosdb::DiemDB;
+use aptosdb::AptosDB;
 use backup_service::start_backup_service;
 use consensus::consensus_provider::start_consensus;
 use consensus_notifications::ConsensusNotificationListener;
@@ -441,7 +441,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
     let mut instant = Instant::now();
     let (diem_db, db_rw) = DbReaderWriter::wrap(
-        DiemDB::open(
+        AptosDB::open(
             &node_config.storage.dir(),
             false, /* readonly */
             node_config.storage.prune_window,

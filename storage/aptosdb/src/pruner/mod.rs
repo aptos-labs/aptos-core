@@ -30,7 +30,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-/// The `Pruner` is meant to be part of a `DiemDB` instance and runs in the background to prune old
+/// The `Pruner` is meant to be part of a `AptosDB` instance and runs in the background to prune old
 /// data.
 ///
 /// It creates a worker thread on construction and joins it on destruction. When destructed, it

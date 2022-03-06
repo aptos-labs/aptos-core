@@ -12,7 +12,7 @@ use crate::{
     schema::{
         jellyfish_merkle_node::JellyfishMerkleNodeSchema, stale_node_index::StaleNodeIndexSchema,
     },
-    DiemDbError,
+    AptosDbError,
 };
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
@@ -175,7 +175,7 @@ impl StateStore {
             process_results(result_iter, |iter| iter.collect())?;
         ensure!(
             !account_blobs.is_empty(),
-            DiemDbError::NotFound(format!("State chunk starting at {}", first_index)),
+            AptosDbError::NotFound(format!("State chunk starting at {}", first_index)),
         );
         let last_index = (account_blobs.len() - 1 + first_index) as u64;
         let first_key = account_blobs.first().expect("checked to exist").0;

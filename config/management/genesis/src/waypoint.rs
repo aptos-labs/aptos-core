@@ -6,7 +6,7 @@ use aptos_management::{config::ConfigPath, error::Error, secure_backend::SharedB
 use aptos_temppath::TempPath;
 use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
 use aptos_vm::DiemVM;
-use aptosdb::DiemDB;
+use aptosdb::AptosDB;
 use executor::db_bootstrapper;
 use storage_interface::DbReaderWriter;
 use structopt::StructOpt;
@@ -40,7 +40,7 @@ impl CreateWaypoint {
 
 pub fn create_genesis_waypoint(genesis: &Transaction) -> Result<Waypoint, Error> {
     let path = TempPath::new();
-    let aptosdb = DiemDB::open(
+    let aptosdb = AptosDB::open(
         &path,
         false,
         None,

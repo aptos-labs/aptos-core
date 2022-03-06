@@ -176,7 +176,7 @@ mod tests {
         waypoint::Waypoint,
     };
     use aptos_vm::DiemVM;
-    use aptosdb::DiemDB;
+    use aptosdb::AptosDB;
     use consensus_notifications::new_consensus_notifier_listener_pair;
     use data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
     use event_notifications::EventSubscriptionService;
@@ -193,7 +193,7 @@ mod tests {
     fn test_new_initialized_configs() {
         // Create a test database
         let tmp_dir = TempPath::new();
-        let db = DiemDB::open(&tmp_dir, false, None, RocksdbConfig::default(), true).unwrap();
+        let db = AptosDB::open(&tmp_dir, false, None, RocksdbConfig::default(), true).unwrap();
         let (_, db_rw) = DbReaderWriter::wrap(db);
 
         // Bootstrap the database

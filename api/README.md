@@ -18,7 +18,7 @@ Each handler defines:
 
 `index.rs` is the root of all routes, it handles `GET /`API and connects all resources' routes with error handling.
 
-The service is launched with a `Context` instance, which holds all external components (e.g. DiemDB, mempool sender).
+The service is launched with a `Context` instance, which holds all external components (e.g. AptosDB, mempool sender).
 The `Context` object also serves as a facade of external components, and sharing some general functionalities across
 all handlers.
 
@@ -83,7 +83,7 @@ Handler tests should cover all aspects of features and functions.
 A `TestContext` is implemented to create components' stubs that API handlers are connected to.
 These stubs are more close to real production components, instead of mocks, so that tests can ensure the API
 handlers are working well with other components in the systems.
-For example, we use real DiemDB implementation in tests for API layers to interact with the database.
+For example, we use real AptosDB implementation in tests for API layers to interact with the database.
 
 Most of the utility functions are provided by the `TestContext`.
 

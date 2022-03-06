@@ -185,10 +185,10 @@ pub enum Order {
 /// expected of a Diem DB
 #[allow(unused_variables)]
 pub trait DbReader: Send + Sync {
-    /// See [`DiemDB::get_epoch_ending_ledger_infos`].
+    /// See [`AptosDB::get_epoch_ending_ledger_infos`].
     ///
-    /// [`DiemDB::get_epoch_ending_ledger_infos`]:
-    /// ../aptosdb/struct.DiemDB.html#method.get_epoch_ending_ledger_infos
+    /// [`AptosDB::get_epoch_ending_ledger_infos`]:
+    /// ../aptosdb/struct.AptosDB.html#method.get_epoch_ending_ledger_infos
     fn get_epoch_ending_ledger_infos(
         &self,
         start_epoch: u64,
@@ -197,9 +197,9 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// See [`DiemDB::get_transactions`].
+    /// See [`AptosDB::get_transactions`].
     ///
-    /// [`DiemDB::get_transactions`]: ../aptosdb/struct.DiemDB.html#method.get_transactions
+    /// [`AptosDB::get_transactions`]: ../aptosdb/struct.AptosDB.html#method.get_transactions
     fn get_transactions(
         &self,
         start_version: Version,
@@ -210,9 +210,9 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// See [`DiemDB::get_transaction_by_hash`].
+    /// See [`AptosDB::get_transaction_by_hash`].
     ///
-    /// [`DiemDB::get_transaction_by_hash`]: ../aptosdb/struct.DiemDB.html#method.get_transaction_by_hash
+    /// [`AptosDB::get_transaction_by_hash`]: ../aptosdb/struct.AptosDB.html#method.get_transaction_by_hash
     fn get_transaction_by_hash(
         &self,
         hash: HashValue,
@@ -222,9 +222,9 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// See [`DiemDB::get_transaction_by_version`].
+    /// See [`AptosDB::get_transaction_by_version`].
     ///
-    /// [`DiemDB::get_transaction_by_version`]: ../aptosdb/struct.DiemDB.html#method.get_transaction_by_version
+    /// [`AptosDB::get_transaction_by_version`]: ../aptosdb/struct.AptosDB.html#method.get_transaction_by_version
     fn get_transaction_by_version(
         &self,
         version: Version,
@@ -234,23 +234,23 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// See [`DiemDB::get_txn_set_version`].
+    /// See [`AptosDB::get_txn_set_version`].
     ///
-    /// [`DiemDB::get_first_txn_version`]: ../aptosdb/struct.DiemDB.html#method.get_first_txn_version
+    /// [`AptosDB::get_first_txn_version`]: ../aptosdb/struct.AptosDB.html#method.get_first_txn_version
     fn get_first_txn_version(&self) -> Result<Option<Version>> {
         unimplemented!()
     }
 
-    /// See [`DiemDB::get_first_write_set_version`].
+    /// See [`AptosDB::get_first_write_set_version`].
     ///
-    /// [`DiemDB::get_first_write_set_version`]: ../aptosdb/struct.DiemDB.html#method.get_first_write_set_version
+    /// [`AptosDB::get_first_write_set_version`]: ../aptosdb/struct.AptosDB.html#method.get_first_write_set_version
     fn get_first_write_set_version(&self) -> Result<Option<Version>> {
         unimplemented!()
     }
 
-    /// See [`DiemDB::get_transaction_outputs`].
+    /// See [`AptosDB::get_transaction_outputs`].
     ///
-    /// [`DiemDB::get_transaction_outputs`]: ../aptosdb/struct.DiemDB.html#method.get_transaction_outputs
+    /// [`AptosDB::get_transaction_outputs`]: ../aptosdb/struct.AptosDB.html#method.get_transaction_outputs
     fn get_transaction_outputs(
         &self,
         start_version: Version,
@@ -283,10 +283,10 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// See [`DiemDB::get_block_timestamp`].
+    /// See [`AptosDB::get_block_timestamp`].
     ///
-    /// [`DiemDB::get_block_timestamp`]:
-    /// ../aptosdb/struct.DiemDB.html#method.get_block_timestamp
+    /// [`AptosDB::get_block_timestamp`]:
+    /// ../aptosdb/struct.AptosDB.html#method.get_block_timestamp
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {
         unimplemented!()
     }
@@ -313,10 +313,10 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// See [`DiemDB::get_latest_account_state`].
+    /// See [`AptosDB::get_latest_account_state`].
     ///
-    /// [`DiemDB::get_latest_account_state`]:
-    /// ../aptosdb/struct.DiemDB.html#method.get_latest_account_state
+    /// [`AptosDB::get_latest_account_state`]:
+    /// ../aptosdb/struct.AptosDB.html#method.get_latest_account_state
     fn get_latest_account_state(
         &self,
         address: AccountAddress,
@@ -342,10 +342,10 @@ pub trait DbReader: Send + Sync {
     }
 
     /// Gets information needed from storage during the main node startup.
-    /// See [`DiemDB::get_startup_info`].
+    /// See [`AptosDB::get_startup_info`].
     ///
-    /// [`DiemDB::get_startup_info`]:
-    /// ../aptosdb/struct.DiemDB.html#method.get_startup_info
+    /// [`AptosDB::get_startup_info`]:
+    /// ../aptosdb/struct.AptosDB.html#method.get_startup_info
     fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
         unimplemented!()
     }
@@ -405,10 +405,10 @@ pub trait DbReader: Send + Sync {
 
     // Gets an account state by account address, out of the ledger state indicated by the state
     // Merkle tree root with a sparse merkle proof proving state tree root.
-    // See [`DiemDB::get_account_state_with_proof_by_version`].
+    // See [`AptosDB::get_account_state_with_proof_by_version`].
     //
-    // [`DiemDB::get_account_state_with_proof_by_version`]:
-    // ../aptosdb/struct.DiemDB.html#method.get_account_state_with_proof_by_version
+    // [`AptosDB::get_account_state_with_proof_by_version`]:
+    // ../aptosdb/struct.AptosDB.html#method.get_account_state_with_proof_by_version
     //
     // This is used by diem core (executor) internally.
     fn get_account_state_with_proof_by_version(
@@ -574,9 +574,9 @@ impl MoveStorage for &dyn DbReader {
 pub trait DbWriter: Send + Sync {
     /// Persist transactions. Called by the executor module when either syncing nodes or committing
     /// blocks during normal operation.
-    /// See [`DiemDB::save_transactions`].
+    /// See [`AptosDB::save_transactions`].
     ///
-    /// [`DiemDB::save_transactions`]: ../aptosdb/struct.DiemDB.html#method.save_transactions
+    /// [`AptosDB::save_transactions`]: ../aptosdb/struct.AptosDB.html#method.save_transactions
     fn save_transactions(
         &self,
         txns_to_commit: &[TransactionToCommit],

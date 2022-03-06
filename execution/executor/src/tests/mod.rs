@@ -20,7 +20,7 @@ use aptos_types::{
     proof::definition::LeafCount,
     transaction::{Transaction, TransactionListWithProof, TransactionStatus, Version},
 };
-use aptosdb::DiemDB;
+use aptosdb::AptosDB;
 use executor_types::{BlockExecutorTrait, ChunkExecutorTrait, ExecutedTrees, TransactionReplayer};
 use proptest::prelude::*;
 use std::collections::BTreeMap;
@@ -56,7 +56,7 @@ impl TestExecutor {
     fn new() -> TestExecutor {
         let path = aptos_temppath::TempPath::new();
         path.create_as_dir().unwrap();
-        let db = DbReaderWriter::new(DiemDB::new_for_test(path.path()));
+        let db = DbReaderWriter::new(AptosDB::new_for_test(path.path()));
         let genesis = vm_genesis::test_genesis_transaction();
         let waypoint = generate_waypoint::<MockVM>(&db, &genesis).unwrap();
         maybe_bootstrap::<MockVM>(&db, &genesis, waypoint).unwrap();

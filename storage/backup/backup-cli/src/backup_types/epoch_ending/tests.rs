@@ -21,7 +21,7 @@ use aptos_types::{
     proptest_types::{AccountInfoUniverse, LedgerInfoWithSignaturesGen},
     waypoint::Waypoint,
 };
-use aptosdb::DiemDB;
+use aptosdb::AptosDB;
 use backup_service::start_backup_service;
 use proptest::{collection::vec, prelude::*, std_facade::BTreeMap};
 use std::{
@@ -103,7 +103,7 @@ fn end_to_end() {
         .map(|li| li.ledger_info().next_block_epoch())
         .unwrap_or(0);
 
-    let tgt_db = DiemDB::new_for_test(&tgt_db_dir);
+    let tgt_db = AptosDB::new_for_test(&tgt_db_dir);
     assert_eq!(
         tgt_db
             .get_epoch_ending_ledger_infos(0, target_version_next_block_epoch)
