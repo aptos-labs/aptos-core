@@ -1,7 +1,7 @@
 [package]
 name = "debug-interface"
 version = "0.1.0"
-authors = ["Diem Association <opensource@aptos-labs.com>"]
+authors = ["Aptos Foundation <opensource@aptos-labs.com>"]
 description = "Diem debug interface"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptos-labs.com"

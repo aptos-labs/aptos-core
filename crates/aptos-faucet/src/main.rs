@@ -13,7 +13,7 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "Diem Faucet",
-    author = "The Diem Association",
+    author = "The Aptos Foundation",
     about = "Diem Testnet utitlty service for creating test account and minting test coins"
 )]
 struct Args {

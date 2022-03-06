@@ -1,7 +1,7 @@
 [package]
 name = "bounded-executor"
 version = "0.1.0"
-authors = ["Diem Association <opensource@aptos-labs.com>"]
+authors = ["Aptos Foundation <opensource@aptos-labs.com>"]
 description = "Diem bounded executor"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptos-labs.com"
