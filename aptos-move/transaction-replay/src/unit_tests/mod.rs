@@ -3,7 +3,7 @@
 
 mod bisection_tests;
 
-use crate::DiemValidatorInterface;
+use crate::AptosValidatorInterface;
 use anyhow::{bail, Result};
 use aptos_types::{
     account_address::AccountAddress,
@@ -70,7 +70,7 @@ impl TestInterface {
     }
 }
 
-impl DiemValidatorInterface for TestInterface {
+impl AptosValidatorInterface for TestInterface {
     fn get_account_state_by_version(
         &self,
         account: AccountAddress,

@@ -19,7 +19,7 @@ use aptos_types::{
 };
 use move_binary_format::file_format::CompiledModule;
 
-pub trait DiemValidatorInterface: Sync {
+pub trait AptosValidatorInterface: Sync {
     fn get_account_state_by_version(
         &self,
         account: AccountAddress,
@@ -99,12 +99,12 @@ pub trait DiemValidatorInterface: Sync {
 }
 
 pub struct DebuggerStateView<'a> {
-    db: &'a dyn DiemValidatorInterface,
+    db: &'a dyn AptosValidatorInterface,
     version: Option<Version>,
 }
 
 impl<'a> DebuggerStateView<'a> {
-    pub fn new(db: &'a dyn DiemValidatorInterface, version: Option<Version>) -> Self {
+    pub fn new(db: &'a dyn AptosValidatorInterface, version: Option<Version>) -> Self {
         Self { db, version }
     }
 }

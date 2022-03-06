@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{unit_tests::TestInterface, DiemDebugger};
+use crate::{unit_tests::TestInterface, AptosDebugger};
 use anyhow::bail;
 use aptos_types::{
     account_address::AccountAddress,
@@ -13,7 +13,7 @@ use std::path::PathBuf;
 
 #[test]
 fn test_bisection() {
-    let debugger = DiemDebugger::new(Box::new(TestInterface::empty(100)));
+    let debugger = AptosDebugger::new(Box::new(TestInterface::empty(100)));
     let check = |v: Vec<bool>, result| {
         assert_eq!(
             debugger
@@ -40,7 +40,7 @@ fn test_bisection() {
 
 #[test]
 fn test_changeset_override() {
-    let debugger = DiemDebugger::new(Box::new(TestInterface::genesis()));
+    let debugger = AptosDebugger::new(Box::new(TestInterface::genesis()));
     let address = AccountAddress::random();
     let mut override_changeset = ChangeSet::new();
     override_changeset

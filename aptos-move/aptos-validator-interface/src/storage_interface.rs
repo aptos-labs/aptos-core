@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::DiemValidatorInterface;
+use crate::AptosValidatorInterface;
 use anyhow::{anyhow, Result};
 use aptos_config::config::RocksdbConfig;
 use aptos_types::{
@@ -29,7 +29,7 @@ impl DBDebuggerInterface {
     }
 }
 
-impl DiemValidatorInterface for DBDebuggerInterface {
+impl AptosValidatorInterface for DBDebuggerInterface {
     fn get_account_state_by_version(
         &self,
         account: AccountAddress,

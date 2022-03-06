@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Result};
-use aptos_transaction_replay::DiemDebugger;
+use aptos_transaction_replay::AptosDebugger;
 use aptos_types::{
     account_address::AccountAddress,
     event::EventKey,
@@ -91,7 +91,7 @@ enum Command {
 fn main() -> Result<()> {
     let opt = Opt::from_args();
     let debugger = if let Some(p) = opt.db {
-        DiemDebugger::db(p)?
+        AptosDebugger::db(p)?
     } else {
         panic!("No debugger attached")
     };
