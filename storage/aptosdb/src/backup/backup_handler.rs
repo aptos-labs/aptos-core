@@ -25,7 +25,7 @@ use itertools::zip_eq;
 use serde::{Deserialize, Serialize};
 use std::{fmt, sync::Arc};
 
-/// `BackupHandler` provides functionalities for DiemDB data backup.
+/// `BackupHandler` provides functionalities for AptosDB data backup.
 #[derive(Clone)]
 pub struct BackupHandler {
     ledger_store: Arc<LedgerStore>,

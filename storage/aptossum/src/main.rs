@@ -14,7 +14,7 @@ use structopt::StructOpt;
 #[derive(StructOpt)]
 #[structopt(
     name = "Diemsum",
-    about = "A command line tool that offers multiple data access commands for DiemDB"
+    about = "A command line tool that offers multiple data access commands for AptosDB"
 )]
 struct Opt {
     /// The parent dir of aptosdb

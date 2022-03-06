@@ -4,7 +4,7 @@
 use crate::{
     change_set::ChangeSet, event_store::EventStore, ledger_store::LedgerStore,
     schema::transaction_accumulator::TransactionAccumulatorSchema, state_store::StateStore,
-    transaction_store::TransactionStore, DiemDB,
+    transaction_store::TransactionStore, AptosDB,
 };
 use anyhow::{ensure, Result};
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
@@ -20,11 +20,11 @@ use schemadb::DB;
 use std::sync::Arc;
 use storage_interface::{DbReader, TreeState};
 
-/// Provides functionalities for DiemDB data restore.
+/// Provides functionalities for AptosDB data restore.
 #[derive(Clone)]
 pub struct RestoreHandler {
     db: Arc<DB>,
-    pub aptosdb: Arc<DiemDB>,
+    pub aptosdb: Arc<AptosDB>,
     ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
     state_store: Arc<StateStore>,
@@ -34,7 +34,7 @@ pub struct RestoreHandler {
 impl RestoreHandler {
     pub(crate) fn new(
         db: Arc<DB>,
-        aptosdb: Arc<DiemDB>,
+        aptosdb: Arc<AptosDB>,
         ledger_store: Arc<LedgerStore>,
         transaction_store: Arc<TransactionStore>,
         state_store: Arc<StateStore>,

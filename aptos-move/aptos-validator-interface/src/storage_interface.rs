@@ -11,7 +11,7 @@ use aptos_types::{
     event::EventKey,
     transaction::{Transaction, Version},
 };
-use aptosdb::DiemDB;
+use aptosdb::AptosDB;
 use std::{convert::TryFrom, path::Path, sync::Arc};
 use storage_interface::{DbReader, Order};
 
@@ -19,7 +19,7 @@ pub struct DBDebuggerInterface(Arc<dyn DbReader>);
 
 impl DBDebuggerInterface {
     pub fn open<P: AsRef<Path> + Clone>(db_root_path: P) -> Result<Self> {
-        Ok(Self(Arc::new(DiemDB::open(
+        Ok(Self(Arc::new(AptosDB::open(
             db_root_path,
             true,
             None,

@@ -13,7 +13,7 @@ use aptos_types::{
     vm_status::StatusCode,
 };
 use aptos_vm::DiemVM;
-use aptosdb::DiemDB;
+use aptosdb::AptosDB;
 use move_core_types::gas_schedule::{GasAlgebra, GasConstants, MAX_TRANSACTION_SIZE_IN_BYTES};
 use rand::SeedableRng;
 use std::u64;
@@ -28,7 +28,7 @@ impl TestValidator {
     fn new() -> Self {
         let _db_path = aptos_temppath::TempPath::new();
         _db_path.create_as_dir().unwrap();
-        let (db, db_rw) = DbReaderWriter::wrap(DiemDB::new_for_test(_db_path.path()));
+        let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(_db_path.path()));
         executor_test_helpers::bootstrap_genesis::<DiemVM>(
             &db_rw,
             &vm_genesis::test_genesis_transaction(),

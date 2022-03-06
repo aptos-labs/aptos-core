@@ -5,10 +5,10 @@
 //! themselves.
 #![allow(unused)]
 
-use super::DiemDB;
+use super::AptosDB;
 use crate::{
     change_set::ChangeSet,
-    errors::DiemDbError,
+    errors::AptosDbError,
     ledger_counters::{LedgerCounter, LedgerCounterBumps},
     schema::{
         event::EventSchema, event_accumulator::EventAccumulatorSchema,
@@ -91,7 +91,7 @@ impl EventStore {
         self.db
             .get::<EventSchema>(&(version, index))?
             .ok_or_else(|| {
-                DiemDbError::NotFound(format!("Event {} of Txn {}", index, version)).into()
+                AptosDbError::NotFound(format!("Event {} of Txn {}", index, version)).into()
             })
     }
 
@@ -215,7 +215,7 @@ impl EventStore {
     ) -> Result<(Version, u64)> {
         let indices = self.lookup_events_by_key(event_key, seq_num, 1, ledger_version)?;
         if indices.is_empty() {
-            return Err(DiemDbError::NotFound(format!(
+            return Err(AptosDbError::NotFound(format!(
                 "Event {} of seq num {}.",
                 event_key, seq_num
             ))

@@ -23,7 +23,7 @@ use aptos_types::{
 use proptest::prelude::*;
 use std::collections::HashMap;
 
-fn verify_epochs(db: &DiemDB, ledger_infos_with_sigs: &[LedgerInfoWithSignatures]) {
+fn verify_epochs(db: &AptosDB, ledger_infos_with_sigs: &[LedgerInfoWithSignatures]) {
     const LIMIT: usize = 2;
     let mut actual_epoch_change_lis = Vec::new();
     let latest_epoch = ledger_infos_with_sigs
@@ -78,7 +78,7 @@ fn verify_epochs(db: &DiemDB, ledger_infos_with_sigs: &[LedgerInfoWithSignatures
 
 pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>) {
     let tmp_dir = TempPath::new();
-    let db = DiemDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test(&tmp_dir);
 
     let num_batches = input.len();
     let mut cur_ver = 0;
@@ -140,7 +140,7 @@ pub fn test_save_blocks_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWit
 
 fn test_sync_transactions_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>) {
     let tmp_dir = TempPath::new();
-    let db = DiemDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test(&tmp_dir);
 
     let num_batches = input.len();
     let mut cur_ver = 0;
@@ -175,7 +175,7 @@ fn test_sync_transactions_impl(input: Vec<(Vec<TransactionToCommit>, LedgerInfoW
 }
 
 fn get_events_by_event_key(
-    db: &DiemDB,
+    db: &AptosDB,
     ledger_info: &LedgerInfo,
     event_key: &EventKey,
     first_seq_num: u64,
@@ -270,7 +270,7 @@ fn get_events_by_event_key(
 }
 
 fn verify_events_by_event_key(
-    db: &DiemDB,
+    db: &AptosDB,
     events: Vec<(EventKey, Vec<(Version, ContractEvent)>)>,
     ledger_info: &LedgerInfo,
     is_latest: bool,
@@ -335,7 +335,7 @@ fn group_events_by_event_key(
 }
 
 fn verify_get_event_by_version(
-    db: &DiemDB,
+    db: &AptosDB,
     committed_txns: &[TransactionToCommit],
     ledger_info: &LedgerInfo,
 ) {
@@ -387,7 +387,7 @@ fn verify_get_event_by_version(
 }
 
 fn verify_account_txns(
-    db: &DiemDB,
+    db: &AptosDB,
     expected_txns_by_account: HashMap<AccountAddress, Vec<(Transaction, Vec<ContractEvent>)>>,
     ledger_info: &LedgerInfo,
 ) {
@@ -455,7 +455,7 @@ fn group_txns_by_account(
 }
 
 fn verify_committed_transactions(
-    db: &DiemDB,
+    db: &AptosDB,
     txns_to_commit: &[TransactionToCommit],
     first_version: Version,
     ledger_info_with_sigs: &LedgerInfoWithSignatures,
@@ -613,7 +613,7 @@ fn test_get_first_seq_num_and_limit() {
 #[test]
 fn test_too_many_requested() {
     let tmp_dir = TempPath::new();
-    let db = DiemDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test(&tmp_dir);
 
     assert!(db.get_transactions(0, 1001 /* limit */, 0, true).is_err());
     assert!(db.get_transaction_outputs(0, 1001 /* limit */, 0).is_err());
@@ -622,7 +622,7 @@ fn test_too_many_requested() {
 #[test]
 fn test_get_latest_tree_state() {
     let tmp_dir = TempPath::new();
-    let db = DiemDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test(&tmp_dir);
 
     // entirely emtpy db
     let empty = db.get_latest_tree_state().unwrap();
@@ -660,7 +660,7 @@ fn test_get_latest_tree_state() {
     );
 }
 
-fn put_transaction_info(db: &DiemDB, version: Version, txn_info: &TransactionInfo) {
+fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &TransactionInfo) {
     let mut cs = ChangeSet::new();
     db.ledger_store
         .put_transaction_infos(version, &[txn_info.clone()], &mut cs)

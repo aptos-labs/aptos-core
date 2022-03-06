@@ -237,7 +237,7 @@ mod tests {
         transaction::{Transaction, TransactionPayload, WriteSetPayload},
     };
     use aptos_vm::DiemVM;
-    use aptosdb::DiemDB;
+    use aptosdb::AptosDB;
     use claim::{assert_err, assert_ok};
     use event_notifications::{EventSubscriptionService, ReconfigNotificationListener};
     use executor::{block_executor::BlockExecutor, chunk_executor::ChunkExecutor};
@@ -366,7 +366,7 @@ mod tests {
         // Create test diem database
         let db_path = aptos_temppath::TempPath::new();
         assert_ok!(db_path.create_as_dir());
-        let (db, db_rw) = DbReaderWriter::wrap(DiemDB::new_for_test(db_path.path()));
+        let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));
 
         // Boostrap the genesis transaction
         let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
@@ -559,7 +559,7 @@ mod tests {
         // Create a test diem database
         let db_path = aptos_temppath::TempPath::new();
         db_path.create_as_dir().unwrap();
-        let (db, db_rw) = DbReaderWriter::wrap(DiemDB::new_for_test(db_path.path()));
+        let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));
 
         // Bootstrap the database with regular genesis
         let (genesis, validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
@@ -637,7 +637,7 @@ mod tests {
         // Create test diem database
         let db_path = aptos_temppath::TempPath::new();
         assert_ok!(db_path.create_as_dir());
-        let (db, db_rw) = DbReaderWriter::wrap(DiemDB::new_for_test(db_path.path()));
+        let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));
 
         // Boostrap the genesis transaction
         let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));

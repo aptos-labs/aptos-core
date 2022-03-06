@@ -21,7 +21,7 @@ use crate::{
 };
 use aptos_temppath::TempPath;
 use aptos_types::transaction::Version;
-use aptosdb::DiemDB;
+use aptosdb::AptosDB;
 use executor_test_helpers::integration_test_impl::test_execution_with_storage_impl;
 use proptest::prelude::*;
 use std::{convert::TryInto, sync::Arc};
@@ -30,7 +30,7 @@ use tokio::time::Duration;
 
 #[derive(Debug)]
 struct TestData {
-    db: Arc<DiemDB>,
+    db: Arc<AptosDB>,
     txn_start_ver: Version,
     state_snapshot_ver: Option<Version>,
     target_ver: Version,
@@ -149,7 +149,7 @@ fn test_end_to_end_impl(d: TestData) {
     .unwrap();
 
     // Check
-    let tgt_db = DiemDB::new_for_test(&tgt_db_dir);
+    let tgt_db = AptosDB::new_for_test(&tgt_db_dir);
     assert_eq!(
         d.db.get_transactions(
             d.txn_start_ver,

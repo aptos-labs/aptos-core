@@ -12,7 +12,7 @@ use aptos_jellyfish_merkle::metrics::{
 };
 use aptos_vm::DiemVM;
 use aptosdb::{
-    metrics::DIEM_STORAGE_ROCKSDB_PROPERTIES, schema::JELLYFISH_MERKLE_NODE_CF_NAME, DiemDB,
+    metrics::DIEM_STORAGE_ROCKSDB_PROPERTIES, schema::JELLYFISH_MERKLE_NODE_CF_NAME, AptosDB,
 };
 use executor::{
     block_executor::BlockExecutor,
@@ -44,7 +44,7 @@ pub fn run(
     let (config, genesis_key) = aptos_genesis_tool::test_config();
     // Create executor.
     let (db, db_rw) = DbReaderWriter::wrap(
-        DiemDB::open(
+        AptosDB::open(
             &db_dir,
             false,        /* readonly */
             prune_window, /* pruner */
@@ -125,7 +125,7 @@ pub fn run(
     let internal_bytes = DIEM_JELLYFISH_INTERNAL_ENCODED_BYTES.get();
     println!("=============FINISHED DB CREATION =============");
     println!(
-        "created a DiemDB til version {} with {} accounts.",
+        "created a AptosDB til version {} with {} accounts.",
         final_version, num_accounts,
     );
     println!("DB dir: {}", db_dir.as_ref().display());

@@ -15,7 +15,7 @@ use crate::{
 };
 use aptos_temppath::TempPath;
 use aptos_types::transaction::PRE_GENESIS_VERSION;
-use aptosdb::DiemDB;
+use aptosdb::AptosDB;
 use std::{convert::TryInto, sync::Arc};
 use storage_interface::DbReader;
 use tokio::time::Duration;
@@ -77,7 +77,7 @@ fn end_to_end() {
     )
     .unwrap();
 
-    let tgt_db = DiemDB::new_for_test(&tgt_db_dir);
+    let tgt_db = AptosDB::new_for_test(&tgt_db_dir);
     assert_eq!(
         tgt_db
             .get_latest_tree_state()

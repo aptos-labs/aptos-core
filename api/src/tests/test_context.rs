@@ -32,7 +32,7 @@ use aptos_types::{
     transaction::{Transaction, TransactionStatus},
 };
 use aptos_vm::DiemVM;
-use aptosdb::DiemDB;
+use aptosdb::AptosDB;
 use bytes::Bytes;
 use executor::db_bootstrapper;
 use executor_types::BlockExecutorTrait;
@@ -61,7 +61,7 @@ pub fn new_test_context() -> TestContext {
     let (root_keys, genesis, genesis_waypoint, validators) = builder.build(&mut rng).unwrap();
     let validator_owner = validators[0].storage().get(OWNER_ACCOUNT).unwrap().value;
 
-    let (db, db_rw) = DbReaderWriter::wrap(DiemDB::new_for_test(&tmp_dir));
+    let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(&tmp_dir));
     let ret =
         db_bootstrapper::maybe_bootstrap::<DiemVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
     assert!(ret);
@@ -90,7 +90,7 @@ pub struct TestContext {
     pub context: Context,
     pub validator_owner: AccountAddress,
     pub mempool: Arc<MockSharedMempool>,
-    pub db: Arc<DiemDB>,
+    pub db: Arc<AptosDB>,
     rng: rand::rngs::StdRng,
     root_keys: Arc<RootKeys>,
     executor: Arc<dyn BlockExecutorTrait>,
@@ -105,7 +105,7 @@ impl TestContext {
         validator_owner: AccountAddress,
         executor: Box<dyn BlockExecutorTrait>,
         mempool: MockSharedMempool,
-        db: Arc<DiemDB>,
+        db: Arc<AptosDB>,
     ) -> Self {
         Self {
             context,

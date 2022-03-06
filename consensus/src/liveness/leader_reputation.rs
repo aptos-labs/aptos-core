@@ -27,13 +27,13 @@ pub trait MetadataBackend: Send + Sync {
     fn get_block_metadata(&self, target_round: Round) -> Vec<NewBlockEvent>;
 }
 
-pub struct DiemDBBackend {
+pub struct AptosDBBackend {
     window_size: usize,
     diem_db: Arc<dyn DbReader>,
     window: Mutex<Vec<(u64, NewBlockEvent)>>,
 }
 
-impl DiemDBBackend {
+impl AptosDBBackend {
     pub fn new(window_size: usize, diem_db: Arc<dyn DbReader>) -> Self {
         Self {
             window_size,
@@ -63,7 +63,7 @@ impl DiemDBBackend {
     }
 }
 
-impl MetadataBackend for DiemDBBackend {
+impl MetadataBackend for AptosDBBackend {
     // assume the target_round only increases
     fn get_block_metadata(&self, target_round: Round) -> Vec<NewBlockEvent> {
         let (known_version, known_round) = self

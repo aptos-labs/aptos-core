@@ -25,14 +25,14 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use aptos_vm::DiemVM;
-use aptosdb::DiemDB;
+use aptosdb::AptosDB;
 use executor::block_executor::BlockExecutor;
 use executor_types::BlockExecutorTrait;
 use rand::SeedableRng;
 use std::{convert::TryFrom, sync::Arc};
 use storage_interface::{DbReaderWriter, Order};
 
-pub fn test_execution_with_storage_impl() -> Arc<DiemDB> {
+pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let (genesis, validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
     let genesis_key = &vm_genesis::GENESIS_KEYPAIR.0;
@@ -512,8 +512,13 @@ pub fn test_execution_with_storage_impl() -> Arc<DiemDB> {
 pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
     path: P,
     genesis: &Transaction,
-) -> (Arc<DiemDB>, DbReaderWriter, BlockExecutor<DiemVM>, Waypoint) {
-    let (db, dbrw) = DbReaderWriter::wrap(DiemDB::new_for_test(&path));
+) -> (
+    Arc<AptosDB>,
+    DbReaderWriter,
+    BlockExecutor<DiemVM>,
+    Waypoint,
+) {
+    let (db, dbrw) = DbReaderWriter::wrap(AptosDB::new_for_test(&path));
     let waypoint = bootstrap_genesis::<DiemVM>(&dbrw, genesis).unwrap();
     let executor = BlockExecutor::new(dbrw.clone());
 

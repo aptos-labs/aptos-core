@@ -15,7 +15,7 @@ use crate::{
 };
 use aptos_temppath::TempPath;
 use aptos_types::transaction::Version;
-use aptosdb::DiemDB;
+use aptosdb::AptosDB;
 use std::{convert::TryInto, mem::size_of, sync::Arc};
 use storage_interface::DbReader;
 use tokio::time::Duration;
@@ -98,7 +98,7 @@ fn end_to_end() {
     // We don't write down any ledger infos when recovering transactions. State-sync needs to take
     // care of it before running consensus. The latest transactions are deemed "synced" instead of
     // "committed" most likely.
-    let tgt_db = DiemDB::new_for_test(&tgt_db_dir);
+    let tgt_db = AptosDB::new_for_test(&tgt_db_dir);
     assert_eq!(
         tgt_db
             .get_latest_transaction_info_option()
