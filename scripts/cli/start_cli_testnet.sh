@@ -13,7 +13,7 @@ source "$HOME/.cargo/env"
 
 SCRIPT_PATH="$(dirname $0)"
 
-RUN_PARAMS="--url https://testnet.diem.com/v1 --waypoint_url https://testnet.diem.com/waypoint.txt --chain-id TESTNET"
+RUN_PARAMS="--url https://testnet.aptos-labs.com/v1 --waypoint_url https://testnet.aptos-labs.com/waypoint.txt --chain-id TESTNET"
 RELEASE=""
 
 while [[ ! -z "$1" ]]; do

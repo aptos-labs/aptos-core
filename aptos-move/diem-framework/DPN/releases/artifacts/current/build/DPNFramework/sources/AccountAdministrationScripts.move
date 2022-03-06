@@ -139,7 +139,7 @@ module DiemFramework::AccountAdministrationScripts {
     ///
     /// # Technical Description
     /// Rotates the authentication key of the sending account to the
-    /// [authentication key derived from `public_key`](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys)
+    /// [authentication key derived from `public_key`](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys)
     /// and publishes a `SharedEd25519PublicKey::SharedEd25519PublicKey` resource
     /// containing the 32-byte ed25519 `public_key` and the `DiemAccount::KeyRotationCapability` for
     /// `account` under `account`.
@@ -183,7 +183,7 @@ module DiemFramework::AccountAdministrationScripts {
     /// # Technical Description
     /// Rotate the `account`'s `DiemAccount::DiemAccount` `authentication_key`
     /// field to `new_key`. `new_key` must be a valid authentication key that
-    /// corresponds to an ed25519 public key as described [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
+    /// corresponds to an ed25519 public key as described [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
     /// and `account` must not have previously delegated its `DiemAccount::KeyRotationCapability`.
     ///
     /// # Parameters
@@ -239,7 +239,7 @@ module DiemFramework::AccountAdministrationScripts {
     /// # Technical Description
     /// Rotates the `account`'s `DiemAccount::DiemAccount` `authentication_key`
     /// field to `new_key`. `new_key` must be a valid authentication key that
-    /// corresponds to an ed25519 public key as described [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
+    /// corresponds to an ed25519 public key as described [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
     /// and `account` must not have previously delegated its `DiemAccount::KeyRotationCapability`.
     ///
     /// # Parameters
@@ -302,7 +302,7 @@ module DiemFramework::AccountAdministrationScripts {
     /// # Technical Description
     /// Rotate the `account`'s `DiemAccount::DiemAccount` `authentication_key` field to `new_key`.
     /// `new_key` must be a valid authentication key that corresponds to an ed25519
-    /// public key as described [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
+    /// public key as described [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
     /// and `account` must not have previously delegated its `DiemAccount::KeyRotationCapability`.
     ///
     /// # Parameters
@@ -371,7 +371,7 @@ module DiemFramework::AccountAdministrationScripts {
     /// Rotates the authentication key of the `to_recover` account to `new_key` using the
     /// `DiemAccount::KeyRotationCapability` stored in the `RecoveryAddress::RecoveryAddress` resource
     /// published under `recovery_address`. `new_key` must be a valide authentication key as described
-    /// [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+    /// [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
     /// This transaction can be sent either by the `to_recover` account, or by the account where the
     /// `RecoveryAddress::RecoveryAddress` resource is published that contains `to_recover`'s `DiemAccount::KeyRotationCapability`.
     ///
@@ -500,7 +500,7 @@ module DiemFramework::AccountAdministrationScripts {
     /// `public_key` must be a valid ed25519 public key.  This transaction first rotates the public key stored in `account`'s
     /// `SharedEd25519PublicKey::SharedEd25519PublicKey` resource to `public_key`, after which it
     /// rotates the `account`'s authentication key to the new authentication key derived from `public_key` as defined
-    /// [here](https://developers.diem.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys)
+    /// [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys)
     /// using the `DiemAccount::KeyRotationCapability` stored in `account`'s `SharedEd25519PublicKey::SharedEd25519PublicKey`.
     ///
     /// # Parameters

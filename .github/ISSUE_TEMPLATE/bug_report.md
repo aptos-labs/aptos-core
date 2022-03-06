@@ -1,6 +1,6 @@
 ---
 name: "\U0001F41B Bug report"
-about: Create a bug report to help improve Diem Core
+about: Create a bug report to help improve Aptos Core
 title: "[Bug]"
 labels: bug
 assignees: ''
@@ -10,7 +10,7 @@ assignees: ''
 # 🐛 Bug
 
 <!-- A clear and concise description of what the bug is.
-To report a security issue, please email security@diem.com. -->
+To report a security issue, please email security@aptos-labs.com. -->
 
 ## To reproduce
 

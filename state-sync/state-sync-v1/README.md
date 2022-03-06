@@ -1,12 +1,12 @@
 ---
 id: state_sync_v1
 title: State Sync v1
-custom_edit_url: https://github.com/diem/diem/edit/main/state-sync/state-sync-v1/README.md
+custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/state-sync/state-sync-v1/README.md
 ---
 
 *** **Note: there are plans to build and deploy a new version of state sync. As
 such, this version (v1) will be deprecated in the near future. See this
-[issue](https://github.com/diem/diem/issues/8906) for more information.** ***
+[issue](https://github.com/aptos-labs/aptos-core/issues/8906) for more information.** ***
 
 # State synchronizer (State sync)
 

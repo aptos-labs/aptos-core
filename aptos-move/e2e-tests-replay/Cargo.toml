@@ -1,7 +1,7 @@
 [package]
 name = "aptos-e2e-tests-replay"
 version = "0.1.0"
-authors = ["Diem Association <opensource@diem.com>"]
+authors = ["Diem Association <opensource@aptos-labs.com>"]
 description = "A tool that reconstructs and replays test cases from the trace dump of E2E tests"
 license = "Apache-2.0"
 edition = "2018"

@@ -631,7 +631,7 @@ cat <<EOF
 Welcome to Diem!
 
 This script will download and install the necessary dependencies needed to
-build, test and inspect Diem Core.
+build, test and inspect Aptos Core.
 
 Based on your selection, these tools will be included:
 EOF

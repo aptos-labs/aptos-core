@@ -3,11 +3,11 @@ id: coding-guidelines
 title: Coding Guidelines
 ---
 
-This document describes the coding guidelines for the Diem Core Rust codebase.
+This document describes the coding guidelines for the Aptos Core Rust codebase.
 
 ## Code formatting
 
-All code formatting is enforced with [rustfmt](https://github.com/rust-lang/rustfmt) with a project-specific configuration.  Below is an example command to adhere to the Diem Core project conventions.
+All code formatting is enforced with [rustfmt](https://github.com/rust-lang/rustfmt) with a project-specific configuration.  Below is an example command to adhere to the Aptos Core project conventions.
 
 ```
 diem$ cargo xfmt
@@ -76,7 +76,7 @@ Document the following for each function:
 
 ### README.md for top-level directories and other major components
 
-Each major component of Diem Core needs to have a `README.md` file. Major components are:
+Each major component of Aptos Core needs to have a `README.md` file. Major components are:
 * top-level directories (e.g. `diem/network`, `diem/language`)
 * the most important crates in the system (e.g. `vm-runtime`)
 

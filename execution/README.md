@@ -1,7 +1,7 @@
 ---
 id: executor
 title: Executor
-custom_edit_url: https://github.com/diem/diem/edit/main/executor/README.md
+custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/executor/README.md
 ---
 
 

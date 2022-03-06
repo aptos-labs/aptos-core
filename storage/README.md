@@ -1,13 +1,13 @@
 ---
 id: storage
 title: Storage
-custom_edit_url: https://github.com/diem/diem/edit/main/storage/README.md
+custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/storage/README.md
 ---
 
 
 The storage module provides reliable and efficient persistent storage for the
 entire set of data on the Diem Blockchain, as well as the necessary data used
-internally by Diem Core.
+internally by Aptos Core.
 
 ## Overview
 

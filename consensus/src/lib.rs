@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-//! Consensus for the Diem Core blockchain
+//! Consensus for the Aptos Core blockchain
 //!
 //! The consensus protocol implemented is DiemBFT (based on
 //! [HotStuff](https://arxiv.org/pdf/1803.05069.pdf)).

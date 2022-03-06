@@ -19,7 +19,7 @@ const DIEM_BECH32_VERSION_LENGTH: usize = 1;
 const DIEM_BECH32_VERSION: u8 = 1;
 
 /// Intent is a struct holdind data decoded from Diem Intent Identifier string
-/// https://dip.diem.com/dip-5/#format
+/// https://dip.aptos-labs.com/dip-5/#format
 #[derive(Ord, PartialOrd, Eq, PartialEq, Hash, Clone)]
 pub struct Intent {
     account_address: AccountAddress,
@@ -30,7 +30,7 @@ pub struct Intent {
 }
 
 impl Intent {
-    /// Encode Intent as a Diem intent identifier (https://dip.diem.com/dip-5/).
+    /// Encode Intent as a Diem intent identifier (https://dip.aptos-labs.com/dip-5/).
     ///
     /// ## Example
     /// ```
@@ -73,7 +73,7 @@ impl Intent {
 impl FromStr for Intent {
     type Err = IntentIdentifierError;
 
-    /// Decode Diem intent identifier (https://dip.diem.com/dip-5/) int 3 parts:
+    /// Decode Diem intent identifier (https://dip.aptos-labs.com/dip-5/) int 3 parts:
     /// 1. account identifier: account address & sub-address
     /// 2. currency
     /// 3. amount
@@ -132,7 +132,7 @@ pub enum IntentIdentifierError {
 }
 
 /// Defines the available HRPs (human readable prefix) as defined in
-/// https://dip.diem.com/dip-5/#format
+/// https://dip.aptos-labs.com/dip-5/#format
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub enum HumanReadablePrefix {
     DM,
@@ -213,7 +213,7 @@ fn decode_account(
 }
 
 /// Encode account identifier string(encoded), currency and amount into
-/// Diem intent identifier (https://dip.diem.com/dip-5/)
+/// Diem intent identifier (https://dip.aptos-labs.com/dip-5/)
 fn encode_intent(
     encoded_account_identifier: &str,
     currency: Option<Currency>,

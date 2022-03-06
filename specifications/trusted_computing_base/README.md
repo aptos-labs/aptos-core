@@ -2,7 +2,7 @@
 
 The [trusted computing base](https://en.wikipedia.org/wiki/Trusted_computing_base) (TCB) of each Diem validator
 is responsible for performing security critical operations and managing cryptographic keys. It is an optional
-component of Diem Core, designed to improve the security of Diem validators.
+component of Aptos Core, designed to improve the security of Diem validators.
 
 If the TCB of a Diem validator remains secure (i.e., uncompromised), it is able to ensure that the validator
 will not violate any safety properties in the network (e.g., forks). In practice, the TCB should be deployed

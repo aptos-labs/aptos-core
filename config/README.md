@@ -17,7 +17,7 @@ blockchain or performing transactions.
 
 For a more detailed summary of the differences between a Validator and a
 Fullnode, see this [blog
-post](https://developers.diem.com/blog/2020/01/23/full-node-basics).
+post](https://developers.aptos-labs.com/blog/2020/01/23/full-node-basics).
 
 ## Organization
 

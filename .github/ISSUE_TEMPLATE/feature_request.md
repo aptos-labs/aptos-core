@@ -1,6 +1,6 @@
 ---
 name: "\U0001F680 Feature request"
-about: Suggest a new feature in Diem Core
+about: Suggest a new feature in Aptos Core
 title: "[Feature Request]"
 labels: enhancement
 assignees: ''

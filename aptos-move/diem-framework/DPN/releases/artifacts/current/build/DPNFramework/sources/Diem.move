@@ -867,7 +867,7 @@ module DiemFramework::Diem {
         aborts_if forall i in 0..len(preburn_queue): preburn_queue[i].preburn.to_burn.value != amount with Errors::INVALID_STATE;
     }
     /// > TODO: See this cannot currently be expressed in the MSL.
-    /// > See https://github.com/diem/diem/issues/7615 for more information.
+    /// > See https://github.com/aptos-labs/aptos-core/issues/7615 for more information.
     spec schema RemovePreburnFromQueueEnsures<CoinType> {
         preburn_address: address;
         amount: u64;

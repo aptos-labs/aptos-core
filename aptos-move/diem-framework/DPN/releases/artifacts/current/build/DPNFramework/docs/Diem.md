@@ -2108,7 +2108,7 @@ Calls to this function will fail if:
 
 
 > TODO: See this cannot currently be expressed in the MSL.
-> See https://github.com/diem/diem/issues/7615 for more information.
+> See https://github.com/aptos-labs/aptos-core/issues/7615 for more information.
 
 
 <a name="0x1_Diem_RemovePreburnFromQueueEnsures"></a>

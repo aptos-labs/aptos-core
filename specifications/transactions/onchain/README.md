@@ -1,10 +1,10 @@
 # On-Chain Data and Transactions
 
-Diem transactions mutate and create state (or resources) within the set of [on-chain modules](https://github.com/diem/diem/tree/main/aptos-move/diem-framework/core/sources), primarily the [Diem Account](https://github.com/diem/diem/blob/main/aptos-move/diem-framework/doc/DiemAccount.md). The transaction format is defined in the [Move Adapter Specification](https://github.com/diem/diem/blob/main/specifications/move_adapter/README.md). Most participants of the Diem Payment Network (DPN) will submit SignedTransactions containing a [script function](https://github.com/diem/diem/blob/main/aptos-move/diem-framework/script_documentation/script_documentation.md). Before release 1.2, clients used scripts. These can be accessed in [compiled form](https://github.com/diem/diem/tree/release-1.1/language/stdlib/compiled/transaction_scripts) and in their [original form](https://github.com/diem/diem/tree/release-1.1/language/stdlib/transaction_scripts). The DPN MainNet only allows script functions and this set of pre-registerd scripts to be submitted. Due to the evolving nature of Move and the Move compiler, compiling existing scripts may not result in the form stored in the directory stored above. Hence, it is recommended to use script functions where available or otherwise the compiled scripts.
+Diem transactions mutate and create state (or resources) within the set of [on-chain modules](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/diem-framework/core/sources), primarily the [Diem Account](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/diem-framework/doc/DiemAccount.md). The transaction format is defined in the [Move Adapter Specification](https://github.com/aptos-labs/aptos-core/blob/main/specifications/move_adapter/README.md). Most participants of the Diem Payment Network (DPN) will submit SignedTransactions containing a [script function](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/diem-framework/script_documentation/script_documentation.md). Before release 1.2, clients used scripts. These can be accessed in [compiled form](https://github.com/aptos-labs/aptos-core/tree/release-1.1/language/stdlib/compiled/transaction_scripts) and in their [original form](https://github.com/aptos-labs/aptos-core/tree/release-1.1/language/stdlib/transaction_scripts). The DPN MainNet only allows script functions and this set of pre-registerd scripts to be submitted. Due to the evolving nature of Move and the Move compiler, compiling existing scripts may not result in the form stored in the directory stored above. Hence, it is recommended to use script functions where available or otherwise the compiled scripts.
 
 ## Peer to Peer Payments and Transaction Metadata
 
-Most transactions will use the [peer_to_peer_with_metadata script function](https://github.com/diem/diem/blob/main/aptos-move/diem-framework/script_documentation/script_documentation.md#0x1_PaymentScripts_peer_to_peer_with_metadata). This single transaction represents all current transfers between two participants and distinguishes the types of transfers via the embedded metadata.
+Most transactions will use the [peer_to_peer_with_metadata script function](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/diem-framework/script_documentation/script_documentation.md#0x1_PaymentScripts_peer_to_peer_with_metadata). This single transaction represents all current transfers between two participants and distinguishes the types of transfers via the embedded metadata.
 
 The metadata is represented by the following `Rust` enum encoded in [Binary Canonical Serialization (BCS)](https://github.com/diem/bcs):
 
@@ -73,7 +73,7 @@ enum CoinTradeMetadata {
 type TradeIds = Vec<String>;
 ```
 
-As defined in [DIP-12](https://dip.diem.com/dip-12/), a coin trade transaction involves a VASP selling or purchasing coins to or from a DD. Each coin trade is represented by a trade id, which is an identifier agreed to by the VASP and DD off-chain. One or more of these off-chain interactions can be settled on-chain via a CoinTradeMetadata transaction.
+As defined in [DIP-12](https://dip.aptos-labs.com/dip-12/), a coin trade transaction involves a VASP selling or purchasing coins to or from a DD. Each coin trade is represented by a trade id, which is an identifier agreed to by the VASP and DD off-chain. One or more of these off-chain interactions can be settled on-chain via a CoinTradeMetadata transaction.
 
 ## Refunds Using RefundMetadata
 
@@ -97,7 +97,7 @@ enum RefundReason {
 }
 ```
 
-Diem supports refund transactions, as defined in [DIP-4](https://dip.diem.com/dip-4/). The refund includes the `transaction_version`, a globally unique value, for the transaction that is being refunded as well as the reason for the refund. For example, an errant transaction to a non-existent destination as well as user-driven refunds. However, use of the refund type is optional.
+Diem supports refund transactions, as defined in [DIP-4](https://dip.aptos-labs.com/dip-4/). The refund includes the `transaction_version`, a globally unique value, for the transaction that is being refunded as well as the reason for the refund. For example, an errant transaction to a non-existent destination as well as user-driven refunds. However, use of the refund type is optional.
 
 Participants can be configured to automatically refund invalid transactions but in order to prevent ping-pong or recursive refunds, only a single transaction should be sent per peer per transaction stream. That is if a payment is followed by a invalid refund no follow up refund should be issued. Instead this should be surfaced to directly to the other party as this is an implementation bug.
 
@@ -105,4 +105,4 @@ For transactions that exceed the travel rule limit must use the off-chain travel
 
 ## Dual Attestation Credentials
 
-Diem defines a [DualAttestation::Credential](https://github.com/diem/diem/blob/main/aptos-move/diem-framework/core/sources/DualAttestation.move) resource to support off-chain protocols. This resource contains the `human_name`, `base_url`, and `compliance_public_key` for a VASP. The `base_url` specifies where the VASP hosts its off-chain API and the `compliance_public_key` is used to verify signed transaction metadata and establish authentication in off-chain communication. The values can be set and updated via the [rotate_dual_attestation_info](https://github.com/diem/diem/blob/main/aptos-move/diem-framework/transaction_scripts/rotate_dual_attestation_info.move) script.
+Diem defines a [DualAttestation::Credential](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/diem-framework/core/sources/DualAttestation.move) resource to support off-chain protocols. This resource contains the `human_name`, `base_url`, and `compliance_public_key` for a VASP. The `base_url` specifies where the VASP hosts its off-chain API and the `compliance_public_key` is used to verify signed transaction metadata and establish authentication in off-chain communication. The values can be set and updated via the [rotate_dual_attestation_info](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/diem-framework/transaction_scripts/rotate_dual_attestation_info.move) script.
