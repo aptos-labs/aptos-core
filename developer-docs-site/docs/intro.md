@@ -10,6 +10,6 @@ sidebar_position: 1
 TODO: Let's put things here *that highlight some stuff*
 
 ```bash
-git clone diem or something
+git clone aptos or something
 ```
 You can type this command into Command Prompt, Powershell, Terminal, or any other integrated terminal of your code editor.

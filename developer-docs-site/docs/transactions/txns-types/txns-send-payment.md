@@ -7,14 +7,14 @@ An account can send a payment to another account by sending a transaction.
 
 ## Introduction
 
-If an account **A** wishes to send a payment to another account **B,** it can do so by sending a [peer_to_peer_with_metadata](https://github.com/diem/diem/blob/main/aptos-move/diem-framework/script_documentation/script_documentation.md#script-peer_to_peer_with_metadata) script transaction.
+If an account **A** wishes to send a payment to another account **B,** it can do so by sending a [peer_to_peer_with_metadata](https://github.com/aptos/aptos/blob/main/aptos-move/aptos-framework/script_documentation/script_documentation.md#script-peer_to_peer_with_metadata) script transaction.
 
 When a payment is made, the sender must specify:
 * The currency the payment is being made in
 * The amount to send
 * The account the payment is being made to, which in this example is account **B**.
 
-When constructing a transaction, account **A** can also specify the metadata parameter. This parameter can be of any form as long as **A** and **B** agree on it, subject to certain rules specified in the agreement between a [Regulated VASP](/reference/glossary# and Diem Networks, and a  `metadata_signature` used for dual attestation.
+When constructing a transaction, account **A** can also specify the metadata parameter. This parameter can be of any form as long as **A** and **B** agree on it, subject to certain rules specified in the agreement between a [Regulated VASP](/reference/glossary# and Aptos Networks, and a  `metadata_signature` used for dual attestation.
 
 ## Dual attestation
 
@@ -28,6 +28,6 @@ Every transaction sending payments between two distinct Regulated VASP accounts 
 
 ### Update dual attestation information
 
-If a Regulated VASP wishes to update their `base_url` or `compliance_public_key`, it can do so by sending a [rotate_dual_attestation_info](https://github.com/diem/diem/blob/main/aptos-move/diem-framework/script_documentation/script_documentation.md#script-rotate_dual_attestation_info) transaction. The Regulated VASP has to send this transaction from their ParentVASP account (this is the account that holds dual attestation data). For example, if a Regulated VASP wishes to change the private key they use to sign metadata for dual attestation, they can send this transaction to do so.
+If a Regulated VASP wishes to update their `base_url` or `compliance_public_key`, it can do so by sending a [rotate_dual_attestation_info](https://github.com/aptos/aptos/blob/main/aptos-move/aptos-framework/script_documentation/script_documentation.md#script-rotate_dual_attestation_info) transaction. The Regulated VASP has to send this transaction from their ParentVASP account (this is the account that holds dual attestation data). For example, if a Regulated VASP wishes to change the private key they use to sign metadata for dual attestation, they can send this transaction to do so.
 
 Once this transaction is executed, all transactions subject to dual attestation will be checked using the new `compliance_public_key`. Because of this, Regulated VASPs should be careful to communicate this change and ensure that there are no outstanding payment transactions that they have previously signed but that have not yet been committed on-chain, since these will be rejected if the `compliance_public_key` has changed.
