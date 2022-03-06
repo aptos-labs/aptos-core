@@ -1,7 +1,7 @@
 [package]
 name = "event-notifications"
 version = "0.1.0"
-authors = ["Diem Association <opensource@aptos-labs.com>"]
+authors = ["Aptos Foundation <opensource@aptos-labs.com>"]
 repository = "https://github.com/aptos-labs/aptos-core"
 description = "The notification service offered by state sync for on-chain events"
 homepage = "https://aptos-labs.com"

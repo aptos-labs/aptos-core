@@ -1,7 +1,7 @@
 [package]
 name = "transaction-emitter"
 version = "0.0.0"
-authors = ["Diem Association <opensource@aptos-labs.com>"]
+authors = ["Aptos Foundation <opensource@aptos-labs.com>"]
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptos-labs.com"
 license = "Apache-2.0"

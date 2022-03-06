@@ -8,7 +8,7 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "Diem-Fuzzer Investigator",
-    author = "The Diem Association",
+    author = "The Aptos Foundation",
     about = "Utility tool to investigate fuzzing artifacts"
 )]
 struct Args {
