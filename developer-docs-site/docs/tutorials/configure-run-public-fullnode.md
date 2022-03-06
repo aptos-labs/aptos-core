@@ -3,9 +3,9 @@ title: "Configure and run a public FullNode"
 slug: "configure-run-public-fullnode"
 hidden: false
 ---
-You can run [FullNodes](/basics/basics-fullnodes) to verify the state and synchronize to the Diem Blockchain. FullNodes can be run by anyone. FullNodes replicate the full state of the blockchain by querying each other, or by querying the validators directly.
+You can run [FullNodes](/basics/basics-fullnodes) to verify the state and synchronize to the Aptos Blockchain. FullNodes can be run by anyone. FullNodes replicate the full state of the blockchain by querying each other, or by querying the validators directly.
 
-This tutorial details how to configure a public FullNode to connect to *testnet*, the Diem Payment Network’s public test network..
+This tutorial details how to configure a public FullNode to connect to *testnet*, the Aptos Payment Network’s public test network..
 
 >
 > **Note:** Your public FullNode will be connected to testnet with a JSON-RPC endpoint accessible on your computer at localhost:8080.
@@ -15,18 +15,18 @@ This tutorial details how to configure a public FullNode to connect to *testnet*
 Before you get started with this tutorial, we recommend you familiarize yourself with the following:
 * [Validator node concepts](/basics/basics-validator-nodes) 
 * [FullNode concepts](/basics/basics-fullnodes) 
-* [JSON-RPC specifications](https://github.com/diem/diem/blob/main/json-rpc/json-rpc-spec.md)
+* [JSON-RPC specifications](https://github.com/aptos/aptos/blob/main/json-rpc/json-rpc-spec.md)
 * [CLI reference](/tools/cli-reference)
 
 
 ## Getting started
-You can configure a public FullNode in two ways: using the Diem Core source code or Docker.
+You can configure a public FullNode in two ways: using the Aptos Core source code or Docker.
 
-### Using Diem Core source code
-1. Download and clone the Diem Core repository from GitHub and prepare your developer environment by running the following commands:
+### Using Aptos Core source code
+1. Download and clone the Aptos Core repository from GitHub and prepare your developer environment by running the following commands:
      ```
-     git clone https://github.com/diem/diem.git
-     cd diem
+     git clone https://github.com/aptos/aptos.git
+     cd aptos
      ./scripts/dev_setup.sh
      source ~/.cargo/env
      ```
@@ -37,7 +37,7 @@ You can configure a public FullNode in two ways: using the Diem Core source code
 
      * Copy `config/src/config/test_data/public_full_node.yaml` to your current working directory.
 
-     * Download [genesis](https://testnet.diem.com/genesis.blob) and [waypoint](https://testnet.diem.com/waypoint.txt) files for testnet.
+     * Download [genesis](https://testnet.aptos.com/genesis.blob) and [waypoint](https://testnet.aptos.com/waypoint.txt) files for testnet.
 
      * Update the public_full_node.yaml file in your current working directory by:
 
@@ -51,7 +51,7 @@ You can configure a public FullNode in two ways: using the Diem Core source code
           ```
           	seed_addrs:
                 D4C4FB4956D899E55289083F45AC5D84:
-                    - "/dns4/fn.testnet.diem.com/tcp/6182/ln-noise-ik/d29d01bed8ab6c30921b327823f7e92c63f8371456fb110256e8c0e8911f4938/ln-handshake/0"
+                    - "/dns4/fn.testnet.aptos.com/tcp/6182/ln-noise-ik/d29d01bed8ab6c30921b327823f7e92c63f8371456fb110256e8c0e8911f4938/ln-handshake/0"
           ```
         * Disable on-chain discovery for the `discovery_method: "none"` (this is not required but it will limit log spew)
        * 
@@ -69,8 +69,8 @@ You can also use Docker to configure and run your PublicFullNode.
 
 1. Install Docker and Docker-Compose.
 2. Create a directory for your public FullNode composition.
-3. Download the public FullNode [docker compose](https://github.com/diem/diem/tree/main/docker/compose/public_full_node/docker-compose.yaml) and [diem](https://github.com/diem/diem/tree/main/docker/compose/public_full_node/public_full_node.yaml) configuration files into this directory.
-4. Download [genesis](https://testnet.diem.com/genesis.blob) and [waypoint](https://testnet.diem.com/waypoint.txt) files for testnet into that directory.
+3. Download the public FullNode [docker compose](https://github.com/aptos/aptos/tree/main/docker/compose/public_full_node/docker-compose.yaml) and [aptos](https://github.com/aptos/aptos/tree/main/docker/compose/public_full_node/public_full_node.yaml) configuration files into this directory.
+4. Download [genesis](https://testnet.aptos.com/genesis.blob) and [waypoint](https://testnet.aptos.com/waypoint.txt) files for testnet into that directory.
 5. Run docker-compose: `docker-compose up`.
 
 ### Understand and verify the correctness of your FullNode
@@ -78,11 +78,11 @@ You can also use Docker to configure and run your PublicFullNode.
 #### Initial synchronization
 During the initial synchronization of your FullNode, there may be a lot of data to transfer.
 
-* Progress can be monitored by querying the metrics port `curl 127.0.0.1:9101/metrics 2> /dev/null | grep diem_state_sync_version | grep type`, which will print out several counters:
-  * `diem_state_sync_version{type="committed"}` -- the latest (blockchain) version that is backed by a signed commitment (ledger info) from the validators
-  * `diem_state_sync_version{type="highest"}` -- the highest or latest known version, typically the same as target
-  * `diem_state_sync_version{type="synced"}` -- the latest blockchain version available in storage, it might not be backed by a ledger info
-  * `diem_state_sync_version{type="target"}` -- the state sync's current target ledger info version
+* Progress can be monitored by querying the metrics port `curl 127.0.0.1:9101/metrics 2> /dev/null | grep aptos_state_sync_version | grep type`, which will print out several counters:
+  * `aptos_state_sync_version{type="committed"}` -- the latest (blockchain) version that is backed by a signed commitment (ledger info) from the validators
+  * `aptos_state_sync_version{type="highest"}` -- the highest or latest known version, typically the same as target
+  * `aptos_state_sync_version{type="synced"}` -- the latest blockchain version available in storage, it might not be backed by a ledger info
+  * `aptos_state_sync_version{type="target"}` -- the state sync's current target ledger info version
 * The Executor component will update the output log by showing that 1000 blocks are committed at a time:
 
   ```
@@ -100,5 +100,5 @@ During the initial synchronization of your FullNode, there may be a lot of data 
   # Enter the container:
   docker exec -it $id /bin/bash
   # Observe the volume (ledger) size:
-  du -cs -BM /opt/diem/data
+  du -cs -BM /opt/aptos/data
   ```

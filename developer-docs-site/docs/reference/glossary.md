@@ -13,17 +13,17 @@ hidden: false
 ### Access path
 
 - An **access path** specifies the location of a resource or Move module within a specific account.
-- In a state of the Diem Blockchain, an account is represented as a map of access paths to values. The Move VM deserializes this representation into modules and resources.
+- In a state of the Aptos Blockchain, an account is represented as a map of access paths to values. The Move VM deserializes this representation into modules and resources.
 - Clients can use access paths to request a resource or a specific piece of data stored inside a resource.
 
 ### Account
 
-- An **account** in the Diem Blockchain is a container for an arbitrary number of [Move modules](#move-module) and [Move resources](#move-resources). This essentially means that the state of each account is comprised of both code and data.
+- An **account** in the Aptos Blockchain is a container for an arbitrary number of [Move modules](#move-module) and [Move resources](#move-resources). This essentially means that the state of each account is comprised of both code and data.
 - The account is identified by an [account address](#account-address).
 
 ### Account Address
 
-- The address of a Diem payment system account is a 16-byte value. Users can claim addresses using digital signatures. The account address is derived from a cryptographic hash of a user’s public verification key concatenated with a signature scheme identifier byte. The Diem payment system supports two signature schemes: Ed25519 (for single-signature transactions) and MultiEd25519 (for multi-signature transactions). To sign a transaction sent from an account address, the user, or the custodial client representing the user, must use the private key that corresponds to that account.
+- The address of a Aptos payment system account is a 16-byte value. Users can claim addresses using digital signatures. The account address is derived from a cryptographic hash of a user’s public verification key concatenated with a signature scheme identifier byte. The Aptos payment system supports two signature schemes: Ed25519 (for single-signature transactions) and MultiEd25519 (for multi-signature transactions). To sign a transaction sent from an account address, the user, or the custodial client representing the user, must use the private key that corresponds to that account.
 
 
 ### Authentication Key
@@ -36,13 +36,13 @@ hidden: false
 
 ### Block
 
-- A **proposed block** on the Diem Blockchain is an ordered list of zero or more transactions proposed by the consensus leader for validators to reach agreement on execution through consensus.
-- A **committed block** is an ordered list of zero or more transactions from a proposed block for which agreement on execution has been reached through consensus and which is recorded to the Diem Blockchain.
+- A **proposed block** on the Aptos Blockchain is an ordered list of zero or more transactions proposed by the consensus leader for validators to reach agreement on execution through consensus.
+- A **committed block** is an ordered list of zero or more transactions from a proposed block for which agreement on execution has been reached through consensus and which is recorded to the Aptos Blockchain.
 
 ### Blockchain
 
 - A **blockchain** is a distributed public ledger.
-- The Diem Blockchain is a single data structure that records the history of transactions and states over time.
+- The Aptos Blockchain is a single data structure that records the history of transactions and states over time.
 
 ### Byzantine (Validator)
 
@@ -52,8 +52,8 @@ hidden: false
 ### Byzantine Fault Tolerance (BFT)
 
 - **Byzantine Fault Tolerance** (BFT) is the ability of a distributed system to provide safety and liveness guarantees in the presence of faulty, or “[Byzantine](#byzantine-validator),” validators below a certain threshold.
-- The Diem Blockchain uses DiemBFT, a consensus protocol based on [HotStuff.](#hotstuff)
-- BFT algorithms typically operate with a number of entities, collectively holding N votes (which are called “validators” in the Diem network’s application of the system).
+- The Aptos Blockchain uses AptosBFT, a consensus protocol based on [HotStuff.](#hotstuff)
+- BFT algorithms typically operate with a number of entities, collectively holding N votes (which are called “validators” in the Aptos network’s application of the system).
 - N is chosen to withstand some number of validators holding f votes, which might be malicious.
 - In this configuration, N is typically set to 3f+1. Validators holding up to f votes will be allowed to be faulty &mdash; offline, malicious, slow, etc. As long as 2f+1 votes are held by [honest](#honest-validator) validators, they will be able to reach consensus on consistent decisions.
 - This implies that BFT consensus protocols can function correctly, even if up to one-third of the voting power is held by validators that are compromised or fail.
@@ -66,17 +66,17 @@ The ChildVASP account is the child of your ParentVASP account. A ChildVASP accou
 
 ### Client
 
-A **client** is a piece of software that has the capability to interact with the Diem Blockchain.
+A **client** is a piece of software that has the capability to interact with the Aptos Blockchain.
 
-- It can allow the user to construct, sign, and submit new transactions to the JSON-RPC service component of a Diem node.
-- It can issue queries to the Diem Blockchain and request the status of a transaction or account.
+- It can allow the user to construct, sign, and submit new transactions to the JSON-RPC service component of a Aptos node.
+- It can issue queries to the Aptos Blockchain and request the status of a transaction or account.
 - Currently, a client can be run on behalf of the end user (for example, for a custodial wallet).
 
 ### Consensus
 
 - **Consensus** is a component of a validator.
 - The consensus component is responsible for coordination and agreement amongst all validators on the block of transactions to be executed, their order, and the execution results.
-- The Diem Blockchain is formed with these agreed-upon transactions and their corresponding execution results.
+- The Aptos Blockchain is formed with these agreed-upon transactions and their corresponding execution results.
 
 ### Consensus Protocol
 
@@ -92,48 +92,48 @@ A **client** is a piece of software that has the capability to interact with the
 
 ### Designated Dealer
 
-A Designated Dealer is a regulated, well-capitalized financial institution that has the right, pursuant to a contract with Diem Networks, to purchase Diem Coins from, and to sell them to, Diem Networks in minting and burning transactions. Designated Dealers facilitate liquidity in Diem Coins for other DPN participants, such that Diem Coins are readily available to [Regulated VASP](#regulated-vasp) participants and through Regulated VASP participants to end users.
+A Designated Dealer is a regulated, well-capitalized financial institution that has the right, pursuant to a contract with Aptos Networks, to purchase Aptos Coins from, and to sell them to, Aptos Networks in minting and burning transactions. Designated Dealers facilitate liquidity in Aptos Coins for other DPN participants, such that Aptos Coins are readily available to [Regulated VASP](#regulated-vasp) participants and through Regulated VASP participants to end users.
 
 
-### DiemBFT
+### AptosBFT
 
-- DiemBFT is the Diem protocol's BFT consensus algorithm.
-- DiemBFT is based on HotStuff.
+- AptosBFT is the Aptos protocol's BFT consensus algorithm.
+- AptosBFT is based on HotStuff.
 
-### Diem Blockchain
+### Aptos Blockchain
 
-- The **Diem Blockchain** is a ledger of immutable transactions agreed upon by the validators on the Diem network (the network of validators).
+- The **Aptos Blockchain** is a ledger of immutable transactions agreed upon by the validators on the Aptos network (the network of validators).
 
-### Diem Core
+### Aptos Core
 
-Diem Core is the open source technology on which the Diem Payment Network runs. Diem Core contains software for
+Aptos Core is the open source technology on which the Aptos Payment Network runs. Aptos Core contains software for
 
-* the Diem Blockchain itself, which generates and stores the immutable ledger of confirmed transactions and
-* the validation process, which implements the consensus algorithm to validate transactions and add them to the Diem Blockchain immutable ledger.
-
-
-### Diem Framework
-The Diem Framework defines the public API for blockchain updates and the structure of on-chain data. It defines the business logic and access control for the three key pillars of Diem functionality: payments, treasury, and on-chain governance. It is implemented as a set of modules written in the Move programming language and stored on-chain as Move bytecode.
+* the Aptos Blockchain itself, which generates and stores the immutable ledger of confirmed transactions and
+* the validation process, which implements the consensus algorithm to validate transactions and add them to the Aptos Blockchain immutable ledger.
 
 
-### Diem node
-A Diem node is a peer entity of the Diem network that tracks the state of the Diem Blockchain. There are two types of Diem nodes, [validators](#validator) and [FullNodes](#fullnode)).
+### Aptos Framework
+The Aptos Framework defines the public API for blockchain updates and the structure of on-chain data. It defines the business logic and access control for the three key pillars of Aptos functionality: payments, treasury, and on-chain governance. It is implemented as a set of modules written in the Move programming language and stored on-chain as Move bytecode.
 
-### Diem Protocol
 
-- **Diem protocol** is the specification of how transactions are submitted, ordered, executed, and recorded within the Diem network.
+### Aptos node
+A Aptos node is a peer entity of the Aptos network that tracks the state of the Aptos Blockchain. There are two types of Aptos nodes, [validators](#validator) and [FullNodes](#fullnode)).
 
-### DiemAccount.T
+### Aptos Protocol
 
-- A **`DiemAccount.T`** is a Move resource that holds all the administrative data associated with an account, such as sequence number, balance, and authentication key.
-- A **`DiemAccount.T`** is the only resource that every account is guaranteed to contain.
+- **Aptos protocol** is the specification of how transactions are submitted, ordered, executed, and recorded within the Aptos network.
 
-### DiemAccount module
+### AptosAccount.T
 
-- **The DiemAccount module** is a Move module that contains the code for manipulating the administrative data held in a particular `DiemAccount.T` resource.
-- Code for checking or incrementing sequence numbers, withdrawing or depositing currency, and extracting gas deposits is included in the DiemAccount module.
+- A **`AptosAccount.T`** is a Move resource that holds all the administrative data associated with an account, such as sequence number, balance, and authentication key.
+- A **`AptosAccount.T`** is the only resource that every account is guaranteed to contain.
 
-### Diem testnet
+### AptosAccount module
+
+- **The AptosAccount module** is a Move module that contains the code for manipulating the administrative data held in a particular `AptosAccount.T` resource.
+- Code for checking or incrementing sequence numbers, withdrawing or depositing currency, and extracting gas deposits is included in the AptosAccount module.
+
+### Aptos testnet
 
 - See [testnet](#testnet).
 
@@ -143,7 +143,7 @@ A Diem node is a peer entity of the Diem network that tracks the state of the Di
 ### Ed25519
 
 - **Ed25519** is our supported digital signature scheme.
-- More specifically, the Diem network uses the PureEdDSA scheme over the Ed25519 curve, as defined in RFC 8032.
+- More specifically, the Aptos network uses the PureEdDSA scheme over the Ed25519 curve, as defined in RFC 8032.
 
 ### Epoch
 
@@ -154,7 +154,7 @@ A Diem node is a peer entity of the Diem network that tracks the state of the Di
 
 - An **event** is the user-facing representation of the effects of executing a transaction.
 - A transaction may be designed to emit any number of events as a list. For example, a peer-to-peer payment transaction emits a `SentPaymentEvent` for the sender account and a `ReceivedPaymentEvent` for the recipient account.
-- In the Diem protocol, events provide evidence that the successful execution of a transaction resulted in a specific effect. The `ReceivedPaymentEvent` (in the above example) allows the recipient to confirm that a payment was received into their account.
+- In the Aptos protocol, events provide evidence that the successful execution of a transaction resulted in a specific effect. The `ReceivedPaymentEvent` (in the above example) allows the recipient to confirm that a payment was received into their account.
 - Events are persisted on the blockchain and are used to answer queries by [clients](#client).
 
 ### Execution Result
@@ -179,7 +179,7 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 ### Faucet
 
-- **Faucet** is the way to create Diem currency with no real-world value, only on our testnet.
+- **Faucet** is the way to create Aptos currency with no real-world value, only on our testnet.
 - The Faucet is a service running along with the testnet. This service only exists to facilitate minting coins for the testnet.
 - You can use the Faucet by sending a request to create coins and transfer them into a given account on your behalf.
 
@@ -199,7 +199,7 @@ These are FullNodes used by DPN Participants to forward transactions to the vali
 
 ### Gas
 
-- **Gas** is a way to pay for computation and storage on a blockchain network. All transactions on the Diem network cost a certain amount of gas.
+- **Gas** is a way to pay for computation and storage on a blockchain network. All transactions on the Aptos network cost a certain amount of gas.
 - The gas required for a transaction depends on the size of the transaction, the computational cost of executing the transaction, and the amount of additional global state created by the transaction (e.g., if new accounts are created).
 - The purpose of gas is regulating demand for the limited computational and storage resources of the validators, including preventing denial of service (DoS) attacks.
 
@@ -218,14 +218,14 @@ These are FullNodes used by DPN Participants to forward transactions to the vali
 ### HotStuff
 
 - **HotStuff** is a recent proposal for a [BFT](#byzantine-fault-tolerance-bft) consensus protocol.
-- DiemBFT, the Diem network's consensus algorithm, is based on HotStuff.
+- AptosBFT, the Aptos network's consensus algorithm, is based on HotStuff.
 - It simplifies the reasoning about safety, and it addresses some performance limitations of previous consensus protocols.
 
 ## J
 
 ### JSON-RPC Service
 
-- The JSON-RPC Service component is the external interface of a Diem node. Any incoming client request, such as submitted transactions or queries, must first go through the JSON-RPC Service. A client needs to go through the JSON-RPC Service component to access storage or any other component in the system. This filters requests and protects the system.
+- The JSON-RPC Service component is the external interface of a Aptos node. Any incoming client request, such as submitted transactions or queries, must first go through the JSON-RPC Service. A client needs to go through the JSON-RPC Service component to access storage or any other component in the system. This filters requests and protects the system.
 - Whenever a client submits a new transaction, the JSON-RPC Service passes it to [mempool](#mempool).
 
 
@@ -242,7 +242,7 @@ These are FullNodes used by DPN Participants to forward transactions to the vali
 ## M
 
 ### Mainnet
-The production network for the Diem Payment Network.
+The production network for the Aptos Payment Network.
 
 
 ### Maximum Gas Amount
@@ -254,26 +254,26 @@ The production network for the Diem Payment Network.
 ### Mempool
 
 - **Mempool** is one of the components of the validator. It holds an in-memory buffer of transactions that have been submitted but not yet agreed upon and executed. Mempool receives transactions from [JSON-RPC Service](#json-rpc-service).
-- Transactions in the mempool of a validator are added from the JSON-RPC Service of the current node and from the mempool of other Diem nodes.
+- Transactions in the mempool of a validator are added from the JSON-RPC Service of the current node and from the mempool of other Aptos nodes.
 - When the current validator is the leader, its consensus component pulls the transactions from its mempool and proposes the order of the transactions that form a block. The validator quorum then votes on the proposal.
 
 ### Merkle Trees
 
 - **Merkle tree** is a type of authenticated data structure that allows for efficient verification of data integrity and updates.
-- The Diem network treats the entire blockchain as a single data structure that records the history of transactions and states over time.
+- The Aptos network treats the entire blockchain as a single data structure that records the history of transactions and states over time.
 - The Merkle tree implementation simplifies the work of apps accessing the blockchain. It allows apps to:
   - Read any data from any point in time.
   - Verify the integrity of the data using a unified framework.
 
 ### Merkle Accumulator
 
-- The [Merkle Accumulator](https://www.usenix.org/legacy/event/sec09/tech/full_papers/crosby.pdf) is an _append-only_ Merkle tree that the Diem Blockchain uses to store the ledger.
+- The [Merkle Accumulator](https://www.usenix.org/legacy/event/sec09/tech/full_papers/crosby.pdf) is an _append-only_ Merkle tree that the Aptos Blockchain uses to store the ledger.
 - Merkle accumulators can provide proofs that a transaction was included in the chain (“proof of inclusion”).
 - They are also called ["history trees"](http://people.cs.vt.edu/danfeng/courses/cs6204/sp10-papers/crosby.pdf) in literature.
 
 ### Move
 
-- **Move** is a new programming language that implements all the transactions on the Diem Blockchain.
+- **Move** is a new programming language that implements all the transactions on the Aptos Blockchain.
 - It has two different kinds of code &mdash; [transaction scripts](#transaction-script) and [Move modules](#move-module).
 - For further information on Move, refer to the [Move technical paper](/technical-papers/move-paper)
 
@@ -284,8 +284,8 @@ The production network for the Diem Payment Network.
 
 ### Move Module
 
-- A **Move module** defines the rules for updating the global state of the Diem Blockchain.
-- In the Diem protocol, a Move module is a **smart contract**.
+- A **Move module** defines the rules for updating the global state of the Aptos Blockchain.
+- In the Aptos protocol, a Move module is a **smart contract**.
 - Each user-submitted transaction includes a transaction script. The transaction script invokes procedures of one or more Move modules to update the global state of the blockchain according to the rules.
 
 ### Move Resources
@@ -302,40 +302,40 @@ The production network for the Diem Payment Network.
 
 ### Node
 
-- A **node** is a peer entity of the Diem network that tracks the state of the Diem Blockchain.
-- A Diem node consists of logical components. [Mempool](#mempool), [consensus](#consensus), and the [virtual machine](#virtual-machine) are examples of node components.
+- A **node** is a peer entity of the Aptos network that tracks the state of the Aptos Blockchain.
+- A Aptos node consists of logical components. [Mempool](#mempool), [consensus](#consensus), and the [virtual machine](#virtual-machine) are examples of node components.
 
 ## O
 
 ### Open-Source Community
 
-- **Open-source community** is a term used for a group of developers who work on open-source software. If you're reading this glossary, then you are part of the Diem project's developer community.
+- **Open-source community** is a term used for a group of developers who work on open-source software. If you're reading this glossary, then you are part of the Aptos project's developer community.
 
 ## P
 
 ### ParentVASP account
 
-The ParentVASP account is your unique root account. You can have only one parent account per Regulated VASP. Diem Networks will create a ParentVASP account on your behalf with your authentication key.
+The ParentVASP account is your unique root account. You can have only one parent account per Regulated VASP. Aptos Networks will create a ParentVASP account on your behalf with your authentication key.
 
 
 ### Proof
 
 - A **proof** is a way to verify the accuracy of data in the blockchain.
-- Every operation in the Diem Blockchain can be verified cryptographically that it is indeed correct and that data has not been omitted.
+- Every operation in the Aptos Blockchain can be verified cryptographically that it is indeed correct and that data has not been omitted.
 - For example, if a user queries the information within a particular executed transaction, they will be provided with a cryptographic proof that the data returned to them is correct.
 
 ## R
 
 ### Regulated VASP
 
-A Regulated VASP is a VASP that is registered or licensed in a Financial Action Task Force ("FATF") member jurisdiction and permitted to perform VASP activities under such license or registration. A Regulated VASP must be authorized by Diem Networks to operate as a VASP participant on the Diem Payment Network.
+A Regulated VASP is a VASP that is registered or licensed in a Financial Action Task Force ("FATF") member jurisdiction and permitted to perform VASP activities under such license or registration. A Regulated VASP must be authorized by Aptos Networks to operate as a VASP participant on the Aptos Payment Network.
 
 Under the DPN Rules, a VASP is defined as a natural or legal person that as a business conducts one or more of the following activities or operations for or on behalf of another natural or legal person:
-- Exchanges between Diem Coins and fiat currencies;
-- Exchanges between Diem Coins and other virtual assets;
-- Transfers of Diem Coins;
-- Engages in safekeeping or administration of Diem Coins; and
-- Otherwise provides financial services related to Diem Coins.
+- Exchanges between Aptos Coins and fiat currencies;
+- Exchanges between Aptos Coins and other virtual assets;
+- Transfers of Aptos Coins;
+- Engages in safekeeping or administration of Aptos Coins; and
+- Otherwise provides financial services related to Aptos Coins.
 
 
 ### Round
@@ -367,19 +367,19 @@ Under the DPN Rules, a VASP is defined as a natural or legal person that as a bu
 
 ### State
 
-- A **state** in the Diem protocol is a snapshot of the distributed database.
+- A **state** in the Aptos protocol is a snapshot of the distributed database.
 - A transaction modifies the database and produces a new and updated state.
 
 ### State Root Hash
 
-- **State root hash** is a [Merkle hash](https://en.wikipedia.org/wiki/Merkle_tree) over all keys and values the state of the Diem Blockchain at a given version.
+- **State root hash** is a [Merkle hash](https://en.wikipedia.org/wiki/Merkle_tree) over all keys and values the state of the Aptos Blockchain at a given version.
 
 ## T
 
 ### testnet
 
-- The **testnet** is a publicly deployed instance of the Diem network that runs using a set of validator test nodes.
-- The testnet is a demonstration of the Diem network that is built for experimenting with new ideas
+- The **testnet** is a publicly deployed instance of the Aptos network that runs using a set of validator test nodes.
+- The testnet is a demonstration of the Aptos network that is built for experimenting with new ideas
 - The testnet simulates a digital payment system and the coins on the testnet have _no real world value_.
 
 ### Transaction
@@ -392,14 +392,14 @@ Under the DPN Rules, a VASP is defined as a natural or legal person that as a bu
   - [Sequence number](#sequence-number)
   - [Expiration time](#expiration-time)
 - A signed transaction is a raw transaction with the digital signature.
-- An executed transaction changes the state of the Diem Blockchain.
+- An executed transaction changes the state of the Aptos Blockchain.
 
 ### Transaction Script
 
 - Each transaction submitted by a user includes a **transaction script**.
 - It represents the operation a client submits to a validator.
 - The operation could be a request to move coins from user A to user B, or it could involve interactions with published [Move modules](#move-modules)/smart contracts.
-- The transaction script is an arbitrary program that interacts with resources published in the global storage of the Diem Blockchain by calling the procedures of a module. It encodes the logic for a transaction.
+- The transaction script is an arbitrary program that interacts with resources published in the global storage of the Aptos Blockchain by calling the procedures of a module. It encodes the logic for a transaction.
 - A single transaction script can send funds to multiple recipients and invoke procedures from several different modules.
 - A transaction script **is not** stored in the global state and cannot be invoked by other transaction scripts. It is a single-use program.
 
@@ -408,21 +408,21 @@ Under the DPN Rules, a VASP is defined as a natural or legal person that as a bu
 ### Validator
 
 - _Alternate name_: Validators.
-- A **validator** is an entity of the Diem ecosystem that validates on the Diem Blockchain. It receives requests from clients and runs consensus, execution, and storage.
+- A **validator** is an entity of the Aptos ecosystem that validates on the Aptos Blockchain. It receives requests from clients and runs consensus, execution, and storage.
 - A validator maintains the history of all the transactions on the blockchain.
 - Internally, a validator needs to keep the current state, to execute transactions, and to calculate the next state.
 
 ### Version
 
 - A **version** is also called “height” in blockchain literature.
-- The Diem Blockchain doesn't have an explicit notion of a block &mdash; it only uses blocks for batching and executing transactions.
+- The Aptos Blockchain doesn't have an explicit notion of a block &mdash; it only uses blocks for batching and executing transactions.
 - A transaction at height 0 is the first transaction (genesis transaction), and a transaction at height 100 is the 101st transaction in the transaction store.
 
 ## W
 
 ### Well-Formed Transaction
 
-A Diem transaction is **well formed** if each of the following conditions are true for the transaction:
+A Aptos transaction is **well formed** if each of the following conditions are true for the transaction:
 
 - The transaction has a valid signature.
 - An account exists at the sender address.

@@ -5,13 +5,13 @@ hidden: false
 ---
 import BlockQuote from "@site/src/components/BlockQuote";
 
-When a transaction is executed in the Diem Payment Network (DPN), the network resources used are tracked and measured using gas.
+When a transaction is executed in the Aptos Payment Network (DPN), the network resources used are tracked and measured using gas.
 
 ## Introduction
 
-Gas ensures that all Move programs running on the Diem Blockchain terminate. This bounds the computational resources used. Gas also provides the ability to charge a transaction fee, partly based on consumed resources during execution.
+Gas ensures that all Move programs running on the Aptos Blockchain terminate. This bounds the computational resources used. Gas also provides the ability to charge a transaction fee, partly based on consumed resources during execution.
 
-When a client submits a transaction for execution to the Diem Blockchain, it contains a specified:
+When a client submits a transaction for execution to the Aptos Blockchain, it contains a specified:
 
 * `max_gas_amount`: The maximum amount of gas units that can be used to execute a transaction. This bounds the computational resources that can be consumed by a transaction.
 * `gas_price`: The number of gas units used in the specified gas currency. Gas price is a way to move from gas units, the abstract units of resource consumption the virtual machine (VM) uses, into a transaction fee in the specified gas currency.
@@ -28,7 +28,7 @@ For the VM to execute a transaction, the gas system needs to track the primary r
 
 1. The computational cost of executing the transaction.
 2. The network cost of sending the transaction over the DPN.
-3. The storage cost of data created and read during the transaction on the Diem Blockchain.
+3. The storage cost of data created and read during the transaction on the Aptos Blockchain.
 
 The first two of these resources (computational and network) are ephemeral. On the other hand, storage is long lived. Once data is allocated, that data persists until it is deleted. In the case of accounts, the data lives indefinitely.
 
@@ -55,20 +55,20 @@ After the prologue has run, and we've checked in part that the account can cover
 * The transaction execution is complete, after which the cost of storing the transaction data is charged, and the epilogue is run and the execution fee deducted, or
 * The "gas tank" becomes empty, in which case an `OutOfGas` error is raised.
 
-In the former, the fee is collected and the result of the transaction is persisted on the Diem Blockchain. The latter causes the execution of the transaction to stop when the error is raised, following which the total gas liability of the transaction is collected. No other remnants of the execution are committed other than the deduction in this case.
+In the former, the fee is collected and the result of the transaction is persisted on the Aptos Blockchain. The latter causes the execution of the transaction to stop when the error is raised, following which the total gas liability of the transaction is collected. No other remnants of the execution are committed other than the deduction in this case.
 
 ## Using gas to prioritize a transaction
 
 When you send a transaction, it is prioritized based on different criteria. One of these is the normalized gas price for the transaction.
 
-For transactions that are subject to ordering by gas price (i.e., non-governance transactions) these prices are first normalized to Diem Coins. This is done by using the current gas currency to Diem Coin conversion rate that is stored on-chain. Transactions are then ranked (in part) based upon this normalized gas price.
+For transactions that are subject to ordering by gas price (i.e., non-governance transactions) these prices are first normalized to Aptos Coins. This is done by using the current gas currency to Aptos Coin conversion rate that is stored on-chain. Transactions are then ranked (in part) based upon this normalized gas price.
 
 For example:
 
 * Bob sends a transaction with `gas_price` 10 and `gas_currency` of “BobCoins”.
 * Alice sends a transaction at the same time with `gas_price` 20 and `gas_currency` of “AliceCoins”.
 
-If the on-chain “BobCoins” to Diem Coins exchange rate is 2.1 and the on-chain “AliceCoins” to Diem Coins exchange rate is 1,
+If the on-chain “BobCoins” to Aptos Coins exchange rate is 2.1 and the on-chain “AliceCoins” to Aptos Coins exchange rate is 1,
 * Bob’s transaction has a normalized gas price of `10 * 2.1 = 21`.
 * Alice’s transaction has a normalized gas price of `20 * 1 = 20`.
 

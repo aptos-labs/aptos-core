@@ -5,26 +5,26 @@ hidden: false
 ---
 import BlockQuote from "@site/src/components/BlockQuote";
 
-You can run a local test validator network to test and develop against a Diem Blockchain, including Move changes. This network is not part of the Diem Ecosystem and is only for testing and development purposes.
+You can run a local test validator network to test and develop against a Aptos Blockchain, including Move changes. This network is not part of the Aptos Ecosystem and is only for testing and development purposes.
 
-You can also use the Diem CLI command dev to compile, publish, and execute Move programs on your local test validator network.
+You can also use the Aptos CLI command dev to compile, publish, and execute Move programs on your local test validator network.
 
 <BlockQuote type="info">
-Your local test network will not be connected to testnet or mainnet of the Diem Blockchain. 
+Your local test network will not be connected to testnet or mainnet of the Aptos Blockchain. 
 </BlockQuote>
 
 ## Getting Started
 
-You can run a local test validator network in two ways: using the Diem Core source code or Docker. The Diem Core source code is useful when testing modifications to the Diem Core code base. Docker is particularly useful when building services on top of the Diem Blockchain as there is no build overhead and the ledger state persists across restarts of the network by default.
+You can run a local test validator network in two ways: using the Aptos Core source code or Docker. The Aptos Core source code is useful when testing modifications to the Aptos Core code base. Docker is particularly useful when building services on top of the Aptos Blockchain as there is no build overhead and the ledger state persists across restarts of the network by default.
 
 
-### Using Diem Core source code
+### Using Aptos Core source code
 
-1. Download and clone the Diem Core repository from GitHub and prepare your developer environment by running the following commands:
+1. Download and clone the Aptos Core repository from GitHub and prepare your developer environment by running the following commands:
 
     ```
-    git clone https://github.com/diem/diem.git
-    cd diem
+    git clone https://github.com/aptos/aptos.git
+    cd aptos
     ./scripts/dev_setup.sh
     source ~/.cargo/env
     ```
@@ -57,17 +57,17 @@ After starting your local test validator network, you should see the following:
 
 validator_1  | Entering test mode, this should never be used in production!
 validator_1  | Completed generating configuration:
-validator_1  | 	Log file: "/opt/diem/var/validator.log"
-validator_1  | 	Config path: "/opt/diem/var/0/node.yaml"
-validator_1  | 	Diem root key path: "/opt/diem/var/mint.key"
+validator_1  | 	Log file: "/opt/aptos/var/validator.log"
+validator_1  | 	Config path: "/opt/aptos/var/0/node.yaml"
+validator_1  | 	Aptos root key path: "/opt/aptos/var/mint.key"
 validator_1  | 	Waypoint: 0:7ff525d33f685a5cf26a71b393fa5159874c8f0c2861c382905f49dcb6991cb6
 validator_1  | 	JSON-RPC endpoint: 0.0.0.0:8080
 validator_1  | 	FullNode network: /ip4/0.0.0.0/tcp/7180
 validator_1  | 	ChainId: TESTING
 
 ```
-This output contains information required for starting the Diem CLI tool:
-* Diem root key path - The root (also known as a mint or faucet) key controls the account that can mint. Available in the docker compose folder under `aptos_root_key`.
+This output contains information required for starting the Aptos CLI tool:
+* Aptos root key path - The root (also known as a mint or faucet) key controls the account that can mint. Available in the docker compose folder under `aptos_root_key`.
 * Waypoint - a verifiable checkpoint into the blockchain (available in the docker compose folder under waypoint.txt)
 * JSON-RPC endpoint - `http://127.0.0.1:8080`.
 * ChainId - uniquely distinguishes this chain from other chains.
@@ -76,6 +76,6 @@ This output contains information required for starting the Diem CLI tool:
 Use the output from above to start a `aptos-client` in another terminal:
 
 ```
-$ cd ~/diem
+$ cd ~/aptos
 $ cargo run -p cli -- -c $CHAIN_ID -m $ROOT_KEY -u http://127.0.0.1:8080 --waypoint $WAYPOINT
 ```

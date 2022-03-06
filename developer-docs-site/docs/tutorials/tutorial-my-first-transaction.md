@@ -5,13 +5,13 @@ hidden: false
 ---
 import BlockQuote from "@site/src/components/BlockQuote";
 
-This document will guide you through executing your first transaction on the Diem Blockchain's [testnet](/reference/glossary#testnet). Before you proceed, we recommend that you read the following to familiarize yourself with the key concepts:
+This document will guide you through executing your first transaction on the Aptos Blockchain's [testnet](/reference/glossary#testnet). Before you proceed, we recommend that you read the following to familiarize yourself with the key concepts:
 
 
 * [Basics](/basics/basics-txns-states)
 * [Life of a transaction](/transactions/basics-life-of-txn)
 
-We provide a command line interface (CLI) client to interact with the Diem Blockchain.
+We provide a command line interface (CLI) client to interact with the Aptos Blockchain.
 
 #### Assumptions
 
@@ -26,23 +26,23 @@ All commands in this document assume that:
 
 ## Steps to submit a transaction
 
-In this example, we will download the necessary Diem components and execute a transaction between two users: Alice and Bob.
+In this example, we will download the necessary Aptos components and execute a transaction between two users: Alice and Bob.
 
-To submit a transaction to a validator node on the Diem testnet:
+To submit a transaction to a validator node on the Aptos testnet:
 
-1. [Clone and build Diem Core](#clone-and-build-diem-core).
-2. [Build the Diem CLI client and connect to the testnet](#build-diem-cli-client-and-connect-to-the-testnet).
+1. [Clone and build Aptos Core](#clone-and-build-aptos-core).
+2. [Build the Aptos CLI client and connect to the testnet](#build-aptos-cli-client-and-connect-to-the-testnet).
 3. [Create accounts for Alice and Bob](#create-accounts-for-alice-and-bob).
-4. [Add Fake Diem Coins to Alice’s and Bob’s accounts](#add-fake-diem-coins-to-alices-and-bobs-accounts).
+4. [Add Fake Aptos Coins to Alice’s and Bob’s accounts](#add-fake-aptos-coins-to-alices-and-bobs-accounts).
 5. [Submit a transaction](#submit-a-transaction).
 
 
-### Clone and build Diem Core
+### Clone and build Aptos Core
 
-1. Clone the Diem Core repository
+1. Clone the Aptos Core repository
 
     ```bash
-    git clone https://github.com/diem/diem.git && cd diem
+    git clone https://github.com/aptos/aptos.git && cd aptos
     ```
 
 2. Checkout the `testnet` branch
@@ -52,7 +52,7 @@ To submit a transaction to a validator node on the Diem testnet:
     ```
 
 3. Install dependencies
-    To setup Diem Core, change to the `diem` directory and run the setup script to install the dependencies, as shown below:
+    To setup Aptos Core, change to the `aptos` directory and run the setup script to install the dependencies, as shown below:
 
     ```
     ./scripts/dev_setup.sh
@@ -60,7 +60,7 @@ To submit a transaction to a validator node on the Diem testnet:
 
     The setup script performs these actions:
 
-    * Installs rustup, an installer for the Rust programming language, in which Diem Core is implemented.
+    * Installs rustup, an installer for the Rust programming language, in which Aptos Core is implemented.
     * Installs the required versions of the rust-toolchain.
     * Installs CMake to manage the build process.
 
@@ -68,9 +68,9 @@ To submit a transaction to a validator node on the Diem testnet:
 If your setup fails, see [Troubleshooting](#setup)
 
 
-### Build Diem CLI client and connect to the testnet
+### Build Aptos CLI client and connect to the testnet
 
-To connect to a validator node running on the Diem testnet, run the client as shown below.
+To connect to a validator node running on the Aptos testnet, run the client as shown below.
 
 
 ```bash
@@ -92,7 +92,7 @@ account | a
 query | q
 	Query operations
 transfer | transferb | t | tb
-	<sender_account_address>|<sender_account_ref_id> <receiver_account_address>|<receiver_account_ref_id> <number_of_coins> <currency_code> [gas_unit_price_in_micro_diems (default=0)] [max_gas_amount_in_micro_diems (default 400_000)] Suffix 'b' is for blocking.
+	<sender_account_address>|<sender_account_ref_id> <receiver_account_address>|<receiver_account_ref_id> <number_of_coins> <currency_code> [gas_unit_price_in_micro_aptoss (default=0)] [max_gas_amount_in_micro_aptoss (default 400_000)] Suffix 'b' is for blocking.
 	Transfer coins from one account to another.
 info | i
 	Print cli config and client internal information
@@ -104,7 +104,7 @@ quit | q!
 
 Please, input commands:
 
-diem%
+aptos%
 
 ```
 
@@ -120,10 +120,10 @@ Once your client is connected to the testnet, you can run CLI commands to create
 
 #### Step 1: Check if the CLI client Is running on your system
 
-A `diem%` command line prompt indicates that your Diem CLI client is running. To see the help information for the `account` command enter “account” as shown below:
+A `aptos%` command line prompt indicates that your Aptos CLI client is running. To see the help information for the `account` command enter “account” as shown below:
 
 ```
-diem% account
+aptos% account
 usage: account <arg>
 
 Use the following args for this command:
@@ -135,9 +135,9 @@ create | c
 list | la
 	Print all accounts that were created or loaded
 recover | r <file_path>
-	Recover Diem wallet from the file path
+	Recover Aptos wallet from the file path
 write | w <file_path>
-	Save Diem wallet mnemonic recovery seed to disk
+	Save Aptos wallet mnemonic recovery seed to disk
 mint | mintb | m | mb <receiver_account_ref_id>|<receiver_account_address> <number_of_coins> <currency_code> [use_base_units (default=false)]
 	Send currency of the given type from the faucet address to the given recipient address. Creates an account at the recipient address if one does not already exist.
 addc | addcb | ac | acb <account_address> <currency_code>
@@ -148,12 +148,12 @@ addc | addcb | ac | acb <account_address> <currency_code>
 #### Step 2: Create Alice’s account
 
 >
->**Note**: Creating an account using the CLI does not update the Diem Blockchain, it just creates a local key-pair.
+>**Note**: Creating an account using the CLI does not update the Aptos Blockchain, it just creates a local key-pair.
 >
 
 To create Alice’s account, enter this command:
 
-`diem% account create`
+`aptos% account create`
 
 Sample output on success:
 
@@ -165,14 +165,14 @@ Created/retrieved local account #0 address 9d02da2312d2687ca665ccf77f2435fc
 * 0 is the index of Alice’s account.
 * The hex string is the address of Alice’s account.
 
-The index is just a way to refer to Alice’s account. Users can use the account index, a local CLI index, in other CLI commands to refer to the accounts they have created. The index is meaningless to the blockchain. Alice’s account will be created on the blockchain only when fake Diem Coins are added to Alice’s account or transferred to Alice’s account via a transfer from another user. Note that you may also use the hex address in CLI commands. The account index is just a convenience wrapper around the account address.
+The index is just a way to refer to Alice’s account. Users can use the account index, a local CLI index, in other CLI commands to refer to the accounts they have created. The index is meaningless to the blockchain. Alice’s account will be created on the blockchain only when fake Aptos Coins are added to Alice’s account or transferred to Alice’s account via a transfer from another user. Note that you may also use the hex address in CLI commands. The account index is just a convenience wrapper around the account address.
 
 
 #### Step 3: Create Bob’s account
 
 To create Bob’s account, repeat the account creation command:
 
-`diem% account create`
+`aptos% account create`
 
 Sample output on success:
 
@@ -189,7 +189,7 @@ Created/retrieved local account #1 address 3099d7230aa336f5dcfe13c1231454ce
 
 To list the accounts you have created, enter this command:
 
-`diem% account list`
+`aptos% account list`
 
 Sample output on success:
 ```
@@ -198,25 +198,25 @@ User account index: 1, address: 3099d7230aa336f5dcfe13c1231454ce, private_key: "
 
 ```
 
-The sequence number for an account indicates the number of transactions that have been sent from that account. It is incremented by one every time a transaction sent from that account is executed and stored in the Diem Blockchain. To learn more, refer to [sequence number](/reference/glossary#sequence-number).
+The sequence number for an account indicates the number of transactions that have been sent from that account. It is incremented by one every time a transaction sent from that account is executed and stored in the Aptos Blockchain. To learn more, refer to [sequence number](/reference/glossary#sequence-number).
 
-### Add Fake Diem Coins to Alice’s and Bob’s accounts
+### Add Fake Aptos Coins to Alice’s and Bob’s accounts
 
-Adding fake Diem Coins with no real-world value to accounts on testnet is done via Faucet. Faucet is a service that runs along with the testnet. This service only edocs/transactions/basics-life-of-txnxists to facilitate minting coins for testnet and will not exist for mainnet. Faucet creates Diem Coins with no real-world value. Assuming you’ve [created Alice’s and Bob’s account](#create-accounts-for-alice-and-bob), with index 0 and index 1 respectively, you can follow the steps below to add fake Diem Coins to both accounts.
-
-
-#### Step 1: Add 110 Diem Coins to Alice’s account
-
-To mint fake Diem Coins and add them to Alice’s account, enter this command:
+Adding fake Aptos Coins with no real-world value to accounts on testnet is done via Faucet. Faucet is a service that runs along with the testnet. This service only edocs/transactions/basics-life-of-txnxists to facilitate minting coins for testnet and will not exist for mainnet. Faucet creates Aptos Coins with no real-world value. Assuming you’ve [created Alice’s and Bob’s account](#create-accounts-for-alice-and-bob), with index 0 and index 1 respectively, you can follow the steps below to add fake Aptos Coins to both accounts.
 
 
-`diem% account mint 0 110 XUS`
+#### Step 1: Add 110 Aptos Coins to Alice’s account
+
+To mint fake Aptos Coins and add them to Alice’s account, enter this command:
+
+
+`aptos% account mint 0 110 XUS`
 
 * 0 is the index of Alice’s account.
-* 110 is the amount of fake Diem Coins to be added to Alice’s account.
-* XUS is the currency code for the fake Diem Coins
+* 110 is the amount of fake Aptos Coins to be added to Alice’s account.
+* XUS is the currency code for the fake Aptos Coins
 
-A successful account “mint” command will also create Alice’s account on the blockchain.  Note that “minting” on Testnet means adding new fake Diem Coins to an account.
+A successful account “mint” command will also create Alice’s account on the blockchain.  Note that “minting” on Testnet means adding new fake Aptos Coins to an account.
 
 Sample output on success:
 
@@ -232,16 +232,16 @@ When the request is submitted, it means that it has been added to the mempool (o
 
 If your account “mint” command did not submit your request successfully, refer to [Troubleshooting](#minting-and-adding-money-to-account)
 
-#### Step 2: Add 52 Diem Coins to Bob’s account
+#### Step 2: Add 52 Aptos Coins to Bob’s account
 
-To mint fake Diem Coins and add them to Bob’s account, enter this command:
+To mint fake Aptos Coins and add them to Bob’s account, enter this command:
 
 
-`diem% account mint 1 52 XUS`
+`aptos% account mint 1 52 XUS`
 
 * 1 is the index of Bob’s account.
-* 52 is the amount of Diem to be added to Bob’s account.
-* XUS is the currency code for the fake Diem Coins
+* 52 is the amount of Aptos to be added to Bob’s account.
+* XUS is the currency code for the fake Aptos Coins
 
 A successful account “mint” command can also create Bob’s account on the blockchain. Another way to create Bob’s account on the blockchain is to transfer money from Alice’s account to Bob’s account.
 
@@ -261,7 +261,7 @@ If your account mint command did not submit your request successfully, refer to 
 
 To check the balance in Alice’s account, enter this command:
 
-`diem% query balance 0`
+`aptos% query balance 0`
 
 Sample output on success:
 
@@ -269,7 +269,7 @@ Sample output on success:
 
 To check the balance in Bob’s account, enter this command:
 
-`diem% query balance 1`
+`aptos% query balance 1`
 
 Sample output on success:
 
@@ -277,15 +277,15 @@ Sample output on success:
 
 ### Submit a transaction
 
-Before we submit a transaction to transfer Diem Coins from Alice’s account to Bob’s account, we will query the sequence number of each account. This will help us understand how executing a transaction changes the sequence number of each account.
+Before we submit a transaction to transfer Aptos Coins from Alice’s account to Bob’s account, we will query the sequence number of each account. This will help us understand how executing a transaction changes the sequence number of each account.
 
 #### Query the accounts’ sequence numbers
 
 ```plaintext
-diem% query sequence 0
+aptos% query sequence 0
 >> Getting current sequence number
 Sequence number is: 0
-diem% query sequence 1
+aptos% query sequence 1
 >> Getting current sequence number
 Sequence number is: 0
 ```
@@ -294,14 +294,14 @@ In `query sequence 0`, 0 is the index of Alice’s account. A sequence number of
 
 #### Transfer money
 
-To submit a transaction to transfer 10 Diem Coins from Alice’s account to Bob’s account, enter this command:
+To submit a transaction to transfer 10 Aptos Coins from Alice’s account to Bob’s account, enter this command:
 
-`diem% transfer 0 1 10 XUS`
+`aptos% transfer 0 1 10 XUS`
 
 * 0 is the index of Alice’s account.
 * 1 is the index of Bob’s account.
-* 10 is the number of fake Diem Coins to transfer from Alice’s account to Bob’s account.
-* XUS is the currency code for the fake Diem Coins
+* 10 is the number of fake Aptos Coins to transfer from Alice’s account to Bob’s account.
+* XUS is the currency code for the fake Aptos Coins
 
 
 Sample output on success:
@@ -320,17 +320,17 @@ To troubleshoot the transfer command, refer to [Troubleshooting](#the-transfer-c
 
 **The Blocking Transfer Command**: You can use the `transferb` command (as shown below), instead of the `transfer` command. `transferb` will submit the transaction and return to the client prompt only after the transaction has been committed to the blockchain. An example is shown below:
 
-`diem% transferb 0 1 10 XUS`
+`aptos% transferb 0 1 10 XUS`
 
 Refer to [Life of a transaction](/transactions/basics-life-of-txn) for an understanding of the lifecycle of a transaction from submission to execution and storage.
 
 #### Query sequence number after transfer
 
 ```
-diem% query sequence 0
+aptos% query sequence 0
 >> Getting current sequence number
 Sequence number is: 1
-diem% query sequence 1
+aptos% query sequence 1
 >> Getting current sequence number
 Sequence number is: 0
 ```
@@ -339,18 +339,18 @@ The sequence number of 1 for Alice’s account (index 0) indicates that one tran
 
 #### Check the balance in both accounts after transfer
 
-To check the final balance in both accounts, query the balance again for each account as you did in [this step](#step-3-check-the-balance). If your transaction (transfer) executed successfully, you should see 100 fake Diem Coins in Alice’s account and 62 fake Diem Coins in Bob’s account.
+To check the final balance in both accounts, query the balance again for each account as you did in [this step](#step-3-check-the-balance). If your transaction (transfer) executed successfully, you should see 100 fake Aptos Coins in Alice’s account and 62 fake Aptos Coins in Bob’s account.
 
 ```
-diem% query balance 0
+aptos% query balance 0
 Balance is: 100.000000XUS
-diem% query balance 1
+aptos% query balance 1
 Balance is: 62.000000XUS
 ```
 
 ### Congratulations!
 
-You have successfully executed your transaction on the Diem testnet and transferred 10 Diem Coins from Alice’s account to Bob’s account!
+You have successfully executed your transaction on the Aptos testnet and transferred 10 Aptos Coins from Alice’s account to Bob’s account!
 
 
 ## Troubleshooting
@@ -358,23 +358,23 @@ You have successfully executed your transaction on the Diem testnet and transfer
 ### Setup
 
 * Update Rust:
-    * Run `rustup update` from your diem directory.
+    * Run `rustup update` from your aptos directory.
 * Update protoc:
     * Update `protoc` to version 3.6.0 or above.
-* Re-run setup script from your diem directory:
+* Re-run setup script from your aptos directory:
     * `./scripts/dev_setup.sh`
 
 
 ### Client build and run
 
-If you are experiencing build failures, try to remove the cargo lock file from the diem directory:
+If you are experiencing build failures, try to remove the cargo lock file from the aptos directory:
 
 * `rm Cargo.lock`
 
 If your client did not connect to the testnet:
 
 * Check your internet connection.
-* Ensure that you are using the latest version of the client. Pull the latest Diem Core and rerun the client: `./scripts/cli/start_cli_testnet.sh`
+* Ensure that you are using the latest version of the client. Pull the latest Aptos Core and rerun the client: `./scripts/cli/start_cli_testnet.sh`
 
 
 ### Minting and adding money to account
@@ -382,7 +382,7 @@ If your client did not connect to the testnet:
 * If the validator node you connected to on testnet is unavailable, you will get a “Server unavailable” message as shown below:
 
 ```
-diem% account mint 0 110 XUS
+aptos% account mint 0 110 XUS
 >> Minting coins
 [ERROR] Error minting coins: Server unavailable, please retry and/or check **if** host passed to the client is running
 ```
@@ -391,14 +391,14 @@ diem% account mint 0 110 XUS
 
 * To check if an account exists, query the account state. For an account with index 0 enter this:
 
-  `diem% query account_state 0`
+  `aptos% query account_state 0`
 
 ### The transfer command
 
 If the testnet validator node (your client was connected to) is unavailable or your connection to the testnet has timed-out, you will see this error:
 
 ```
-diem% transfer 0 1 10 XUS
+aptos% transfer 0 1 10 XUS
 >> Transferring
 [ERROR] Failed to perform transaction: Server unavailable, please retry and/or check if host passed to the client is running
 ```
@@ -406,7 +406,7 @@ To troubleshoot transfer errors:
 
 * Check the connection to testnet.
 * Query the sender account to make sure it exists. Use the following command for an account with index 0:`query account_state 0`
-* You can try quitting the client using `quit` or `q!`, and rerun the following command to connect to the testnet: `./scripts/cli/start_cli_testnet.sh` from the diem directory
+* You can try quitting the client using `quit` or `q!`, and rerun the following command to connect to the testnet: `./scripts/cli/start_cli_testnet.sh` from the aptos directory
 
 ## Sample outputs of additional query commands
 
@@ -415,7 +415,7 @@ To troubleshoot transfer errors:
 This example will query for a single transaction's details using the account and sequence number.
 
 ```
-diem% query txn_acc_seq 0 0 true
+aptos% query txn_acc_seq 0 0 true
 >>> Getting committed transaction by account and sequence number
 Committed transaction: Transaction {
     version: 51985530,
@@ -549,7 +549,7 @@ Committed transaction: Transaction {
 In the following example, we will query for “sent” events from the account at reference index 0.  You will notice there is a single event since we sent one transaction from this account.  The proof of the current state is also returned so that verification can be performed that no events are missing - this is done when the query does not return “limit” events.
 
 ```
-diem% query event 0 sent 0 10
+aptos% query event 0 sent 0 10
 >> Getting events by account and event type.
 Event { key: "03000000000000009d02da2312d2687ca665ccf77f2435fc", sequence_number: 0, transaction_version: 51985530, data: Some(EventData { r#type: "sentpayment", amount: Some(Amount { amount: 10000000, currency: "XUS" }), preburn_address: "", currency_code: "", new_to_xdx_exchange_rate: 0.0, sender: "9d02da2312d2687ca665ccf77f2435fc", receiver: "3099d7230aa336f5dcfe13c1231454ce", metadata: "", epoch: 0, round: 0, proposer: "", proposed_time: 0, destination_address: "", new_compliance_public_key: "", new_base_url: "", time_rotated_seconds: 0, created_address: "", role_id: 0, committed_timestamp_secs: 0 }) }
 Last event state: Account {
@@ -591,7 +591,7 @@ Last event state: Account {
 In this example, we will query for the state of a single account.
 
 ```plaintext
-diem% query account_state 0
+aptos% query account_state 0
 >> Getting latest account state
 Latest account state is:
  Account: (
@@ -678,4 +678,4 @@ Latest account state is:
 Once you have executed your first transaction, you may refer to the document [Life of a transaction](/transactions/basics-life-of-txn) for:
 
 * A look "under the hood" at the lifecycle of a transaction from submission to execution.
-* An understanding of the interactions between each logical component of a Diem validator as transactions get submitted and executed in the Diem ecosystem.
+* An understanding of the interactions between each logical component of a Aptos validator as transactions get submitted and executed in the Aptos ecosystem.
