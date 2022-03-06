@@ -140,7 +140,7 @@ impl Default for OnDiskStorageConfig {
         Self {
             namespace: None,
             path: PathBuf::from("secure_storage.json"),
-            data_dir: PathBuf::from("/opt/diem/data"),
+            data_dir: PathBuf::from("/opt/aptos/data"),
         }
     }
 }

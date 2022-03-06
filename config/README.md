@@ -58,11 +58,11 @@ The configuration for validator `I`, can be produced by:
     config-builder validator \
         -a $PUBLIC_MULTIADDR_FOR_VALIDATOR_I \
         -b $PUBLIC_MULTIADDR_FOR_VALIDATOR_0 \
-        -d /opt/diem/data \
+        -d /opt/aptos/data \
         -i $I \
         -l $ANY_MULTIADDR_FOR_VALIDATOR_I \
         -n $TOTAL_NUMBER_OF_VALIDATORS \
-        -o /opt/diem/etc \
+        -o /opt/aptos/etc \
         -s $SHARED_SECRET
 
 As an example, this is the 2nd Validator (offset 1) in a 4 Validator TestNet:
@@ -70,17 +70,17 @@ As an example, this is the 2nd Validator (offset 1) in a 4 Validator TestNet:
     config-builder validator \
         -a "/ip4/1.1.1.2/tcp/7000" \
         -b "/ip4/1.1.1.1/tcp/7000" \
-        -d /opt/diem/data \
+        -d /opt/aptos/data \
         -i 1 \
         -l "/ip4/0.0.0.0/tcp/7000" \
         -n 4 \
-        -o /opt/diem/etc \
+        -o /opt/aptos/etc \
         -s 0123456789abcdef101112131415161718191a1b1c1d1e1f2021222324252627
 
 To create a mint service's key:
 
     config-builder faucet \
-        -o /opt/diem/etc \
+        -o /opt/aptos/etc \
         -s 0123456789abcdef101112131415161718191a1b1c1d1e1f2021222324252627
 
 Instantiating a FullNode config is similar to instantiating a Validator config.
@@ -97,10 +97,10 @@ networks.
     config-builder full-node (create | extend) \
         -a $PUBLIC_MULTIADDR_FOR_FULL_NODE_I \
         -b $PUBLIC_MULTIADDR_FOR_FULL_NODE_0 \
-        -d /opt/diem/data \
+        -d /opt/aptos/data \
         -l $ANY_MULTIADDR_FOR_FULL_NODE_I \
         -n $TOTAL_NUMBER_OF_VALIDATORS \
-        -o /opt/diem/etc \
+        -o /opt/aptos/etc \
         -s $VALIDATOR_SHARED_SECRET \
         [ -i $I -f $TOTAL_NUMBER_OF_FULL_NODES -c $FULL_NODE_SHARED_SECRET | -p ]
 
@@ -110,10 +110,10 @@ configuration.
     config-builder full-node extend \
         -a "/ip4/1.1.1.2/tcp/7100" \
         -b "/ip4/1.1.1.2/tcp/7100" \
-        -d /opt/diem/data \
+        -d /opt/aptos/data \
         -l "/ip4/0.0.0.0/tcp/7100" \
         -n 4 \
-        -o /opt/diem/etc \
+        -o /opt/aptos/etc \
         -s 0123456789abcdef101112131415161718191a1b1c1d1e1f2021222324252627 \
         -i 0 \
         -f 4 \
@@ -125,10 +125,10 @@ Validator/FullNode hybrid configured above.
     config-builder full-node create \
         -a "/ip4/1.1.1.3/tcp/7100" \
         -b "/ip4/1.1.1.2/tcp/7100" \
-        -d /opt/diem/fn/data \
+        -d /opt/aptos/fn/data \
         -l "/ip4/0.0.0.0/tcp/7100" \
         -n 4 \
-        -o /opt/diem/fn/etc \
+        -o /opt/aptos/fn/etc \
         -s 0123456789abcdef101112131415161718191a1b1c1d1e1f2021222324252627 \
         -i 1 \
         -f 4 \
@@ -139,10 +139,10 @@ Similarly a public network could be added via:
     config-builder full-node create \
         -a "/ip4/1.1.1.2/tcp/7100" \
         -b "/ip4/1.1.1.2/tcp/7100" \
-        -d /opt/diem/fn/data \
+        -d /opt/aptos/fn/data \
         -l "/ip4/0.0.0.0/tcp/7100" \
         -n 4 \
-        -o /opt/diem/etc \
+        -o /opt/aptos/etc \
         -s 0123456789abcdef101112131415161718191a1b1c1d1e1f2021222324252627 \
         -p
 
