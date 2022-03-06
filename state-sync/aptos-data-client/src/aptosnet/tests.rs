@@ -1,9 +1,9 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{DataSummaryPoller, DiemDataClient, AptosNetDataClient, Error};
+use super::{AptosDataClient, AptosNetDataClient, DataSummaryPoller, Error};
 use aptos_config::{
-    config::{DiemDataClientConfig, StorageServiceConfig},
+    config::{AptosDataClientConfig, StorageServiceConfig},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_crypto::HashValue;
@@ -84,7 +84,7 @@ impl MockNetwork {
 
         let mock_time = TimeService::mock();
         let (client, poller) = AptosNetDataClient::new(
-            DiemDataClientConfig::default(),
+            AptosDataClientConfig::default(),
             StorageServiceConfig::default(),
             mock_time.clone(),
             network_client,

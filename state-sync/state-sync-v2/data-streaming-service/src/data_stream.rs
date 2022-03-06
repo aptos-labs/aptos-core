@@ -17,7 +17,7 @@ use crate::{
 };
 use aptos_config::config::DataStreamingServiceConfig;
 use aptos_data_client::{
-    AdvertisedData, DiemDataClient, GlobalDataSummary, Response, ResponseContext, ResponseError,
+    AdvertisedData, AptosDataClient, GlobalDataSummary, Response, ResponseContext, ResponseError,
     ResponsePayload,
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
@@ -88,7 +88,7 @@ pub struct DataStream<T> {
     request_failure_count: u64,
 }
 
-impl<T: DiemDataClient + Send + Clone + 'static> DataStream<T> {
+impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
     pub fn new(
         config: DataStreamingServiceConfig,
         data_stream_id: DataStreamId,
@@ -648,7 +648,7 @@ fn extract_response_error(notification_feedback: &NotificationFeedback) -> Respo
     }
 }
 
-fn spawn_request_task<T: DiemDataClient + Send + Clone + 'static>(
+fn spawn_request_task<T: AptosDataClient + Send + Clone + 'static>(
     data_client_request: DataClientRequest,
     aptos_data_client: T,
     pending_response: PendingClientResponse,
@@ -704,7 +704,7 @@ fn spawn_request_task<T: DiemDataClient + Send + Clone + 'static>(
     })
 }
 
-async fn get_account_states_with_proof<T: DiemDataClient + Send + Clone + 'static>(
+async fn get_account_states_with_proof<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: AccountsWithProofRequest,
 ) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
@@ -718,7 +718,7 @@ async fn get_account_states_with_proof<T: DiemDataClient + Send + Clone + 'stati
         .map(|response| response.map(ResponsePayload::from))
 }
 
-async fn get_epoch_ending_ledger_infos<T: DiemDataClient + Send + Clone + 'static>(
+async fn get_epoch_ending_ledger_infos<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: EpochEndingLedgerInfosRequest,
 ) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
@@ -729,7 +729,7 @@ async fn get_epoch_ending_ledger_infos<T: DiemDataClient + Send + Clone + 'stati
         .map(|response| response.map(ResponsePayload::from))
 }
 
-async fn get_number_of_account_states<T: DiemDataClient + Send + Clone + 'static>(
+async fn get_number_of_account_states<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: NumberOfAccountsRequest,
 ) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
@@ -739,7 +739,7 @@ async fn get_number_of_account_states<T: DiemDataClient + Send + Clone + 'static
         .map(|response| response.map(ResponsePayload::from))
 }
 
-async fn get_transaction_outputs_with_proof<T: DiemDataClient + Send + Clone + 'static>(
+async fn get_transaction_outputs_with_proof<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: TransactionOutputsWithProofRequest,
 ) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
@@ -753,7 +753,7 @@ async fn get_transaction_outputs_with_proof<T: DiemDataClient + Send + Clone + '
         .map(|response| response.map(ResponsePayload::from))
 }
 
-async fn get_transactions_with_proof<T: DiemDataClient + Send + Clone + 'static>(
+async fn get_transactions_with_proof<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: TransactionsWithProofRequest,
 ) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {

@@ -12,7 +12,7 @@ use crate::{
     },
 };
 use aptos_config::config::DataStreamingServiceConfig;
-use aptos_data_client::{DiemDataClient, GlobalDataSummary, OptimalChunkSizes};
+use aptos_data_client::{AptosDataClient, GlobalDataSummary, OptimalChunkSizes};
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_logger::prelude::*;
 use futures::StreamExt;
@@ -45,7 +45,7 @@ pub struct DataStreamingService<T> {
     notification_id_generator: Arc<U64IdGenerator>,
 }
 
-impl<T: DiemDataClient + Send + Clone + 'static> DataStreamingService<T> {
+impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
     pub fn new(
         config: DataStreamingServiceConfig,
         aptos_data_client: T,
@@ -310,7 +310,7 @@ fn verify_optimal_chunk_sizes(optimal_chunk_sizes: &OptimalChunkSizes) -> Result
         || optimal_chunk_sizes.transaction_chunk_size == 0
         || optimal_chunk_sizes.transaction_output_chunk_size == 0
     {
-        Err(Error::DiemDataClientResponseIsInvalid(format!(
+        Err(Error::AptosDataClientResponseIsInvalid(format!(
             "Found at least one optimal chunk size of zero: {:?}",
             optimal_chunk_sizes
         )))

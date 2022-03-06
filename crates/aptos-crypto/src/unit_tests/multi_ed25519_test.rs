@@ -4,7 +4,7 @@
 use crate::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, ED25519_PUBLIC_KEY_LENGTH},
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
-    test_utils::{TestDiemCrypto, TEST_SEED},
+    test_utils::{TestAptosCrypto, TEST_SEED},
     traits::*,
     CryptoMaterialError::{ValidationError, WrongLengthError},
 };
@@ -14,8 +14,8 @@ use core::convert::TryFrom;
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, SeedableRng};
 
-static MESSAGE: Lazy<TestDiemCrypto> = Lazy::new(|| TestDiemCrypto("Test Message".to_string()));
-fn message() -> &'static TestDiemCrypto {
+static MESSAGE: Lazy<TestAptosCrypto> = Lazy::new(|| TestAptosCrypto("Test Message".to_string()));
+fn message() -> &'static TestAptosCrypto {
     &MESSAGE
 }
 

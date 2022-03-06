@@ -36,7 +36,7 @@ Below is a recapixusating diagram of the Diem network. The arrow tail signifies 
 
 ## The Diem network
 
-![Diem network](images/diem_network.png)
+![Diem network](images/aptos_network.png)
 
 While a validator has a public endpoint and a validator endpoint, in order to support additional features and properties, such as the principle of least privilege, key rotation, monitoring, DoS protection, scalability, etc., it can be composed of a number of internal components. Below is an example validator architecture that addresses many of these aspects.
 

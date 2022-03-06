@@ -30,7 +30,7 @@ pub fn start_consensus(
     network_events: ConsensusNetworkEvents,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     consensus_to_mempool_sender: mpsc::Sender<ConsensusRequest>,
-    diem_db: DbReaderWriter,
+    aptos_db: DbReaderWriter,
     reconfig_events: ReconfigNotificationListener,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
 ) -> Runtime {
@@ -39,14 +39,14 @@ pub fn start_consensus(
         .enable_all()
         .build()
         .expect("Failed to create Tokio runtime!");
-    let storage = Arc::new(StorageWriteProxy::new(node_config, diem_db.reader.clone()));
+    let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
     let txn_manager = Arc::new(MempoolProxy::new(
         consensus_to_mempool_sender,
         node_config.consensus.mempool_poll_count,
         node_config.consensus.mempool_txn_pull_timeout_ms,
         node_config.consensus.mempool_executed_txn_timeout_ms,
     ));
-    let execution_correctness_manager = ExecutionCorrectnessManager::new(node_config, diem_db);
+    let execution_correctness_manager = ExecutionCorrectnessManager::new(node_config, aptos_db);
 
     let state_computer = Arc::new(ExecutionProxy::new(
         execution_correctness_manager.client(),

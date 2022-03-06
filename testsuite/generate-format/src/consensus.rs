@@ -20,11 +20,11 @@ pub fn output_file() -> Option<&'static str> {
 
 /// This aims at signing canonically serializable BCS data
 #[derive(CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
-struct TestDiemCrypto(String);
+struct TestAptosCrypto(String);
 
 /// Record sample values for crypto types used by consensus.
 fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()> {
-    let message = TestDiemCrypto("Hello, World".to_string());
+    let message = TestAptosCrypto("Hello, World".to_string());
 
     let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
     let private_key = Ed25519PrivateKey::generate(&mut rng);

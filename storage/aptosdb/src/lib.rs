@@ -107,27 +107,27 @@ const MAX_NUM_EPOCH_ENDING_LEDGER_INFO: usize = 100;
 static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
     [
         (
-            "diem_rocksdb_live_sst_files_size_bytes",
+            "aptos_rocksdb_live_sst_files_size_bytes",
             "rocksdb.live-sst-files-size",
         ),
         (
-            "diem_rocksdb_all_memtables_size_bytes",
+            "aptos_rocksdb_all_memtables_size_bytes",
             "rocksdb.size-all-mem-tables",
         ),
         (
-            "diem_rocksdb_num_running_compactions",
+            "aptos_rocksdb_num_running_compactions",
             "rocksdb.num-running-compactions",
         ),
         (
-            "diem_rocksdb_num_running_flushes",
+            "aptos_rocksdb_num_running_flushes",
             "rocksdb.num-running-flushes",
         ),
         (
-            "diem_rocksdb_block_cache_usage_bytes",
+            "aptos_rocksdb_block_cache_usage_bytes",
             "rocksdb.block-cache-usage",
         ),
         (
-            "diem_rocksdb_cf_size_bytes",
+            "aptos_rocksdb_cf_size_bytes",
             "rocksdb.estimate-live-data-size",
         ),
     ]

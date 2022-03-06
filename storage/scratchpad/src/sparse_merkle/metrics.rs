@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 
 pub static OLDEST_GENERATION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "diem_scratchpad_smt_oldest_generation",
+        "aptos_scratchpad_smt_oldest_generation",
         "Generation value on the oldest ancestor, after fetched."
     )
     .unwrap()
@@ -16,7 +16,7 @@ pub static OLDEST_GENERATION: Lazy<IntGauge> = Lazy::new(|| {
 
 pub static LATEST_GENERATION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "diem_scratchpad_smt_latest_generation",
+        "aptos_scratchpad_smt_latest_generation",
         "Generation value on newly spawned SMT."
     )
     .unwrap()
@@ -24,7 +24,7 @@ pub static LATEST_GENERATION: Lazy<IntGauge> = Lazy::new(|| {
 
 pub static TIMER: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "diem_scratchpad_smt_timer_seconds",
+        "aptos_scratchpad_smt_timer_seconds",
         "Various timers for performance analysis.",
         &["name"]
     )

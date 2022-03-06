@@ -14,7 +14,7 @@ use crate::{
     utils,
 };
 use aptos_config::config::{RoleType, StateSyncDriverConfig};
-use aptos_data_client::DiemDataClient;
+use aptos_data_client::AptosDataClient;
 use aptos_infallible::Mutex;
 use aptos_logger::*;
 use aptos_types::waypoint::Waypoint;
@@ -97,7 +97,7 @@ pub struct StateSyncDriver<DataClient, MempoolNotifier, StorageSyncer> {
 }
 
 impl<
-        DataClient: DiemDataClient + Send + Clone + 'static,
+        DataClient: AptosDataClient + Send + Clone + 'static,
         MempoolNotifier: MempoolNotificationSender,
         StorageSyncer: StorageSynchronizerInterface + Clone,
     > StateSyncDriver<DataClient, MempoolNotifier, StorageSyncer>

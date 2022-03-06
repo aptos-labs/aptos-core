@@ -30,7 +30,7 @@ pub struct StateSyncConfig {
 
     // Everything above belongs to state sync v1 and will be removed in the future.
     pub data_streaming_service: DataStreamingServiceConfig,
-    pub aptos_data_client: DiemDataClientConfig,
+    pub aptos_data_client: AptosDataClientConfig,
     pub state_sync_driver: StateSyncDriverConfig,
     pub storage_service: StorageServiceConfig,
 }
@@ -48,7 +48,7 @@ impl Default for StateSyncConfig {
             sync_request_timeout_ms: 60_000,
             tick_interval_ms: 100,
             data_streaming_service: DataStreamingServiceConfig::default(),
-            aptos_data_client: DiemDataClientConfig::default(),
+            aptos_data_client: AptosDataClientConfig::default(),
             state_sync_driver: StateSyncDriverConfig::default(),
             storage_service: StorageServiceConfig::default(),
         }
@@ -158,12 +158,12 @@ impl Default for DataStreamingServiceConfig {
 
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default)]
-pub struct DiemDataClientConfig {
+pub struct AptosDataClientConfig {
     pub response_timeout_ms: u64, // Timeout (in milliseconds) when waiting for a response
     pub summary_poll_interval_ms: u64, // Interval (in milliseconds) between data summary polls
 }
 
-impl Default for DiemDataClientConfig {
+impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
             response_timeout_ms: 3_000,

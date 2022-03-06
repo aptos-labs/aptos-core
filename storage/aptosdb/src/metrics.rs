@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 pub static DIEM_STORAGE_LEDGER: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         // metric name
-        "diem_storage_ledger",
+        "aptos_storage_ledger",
         // metric description
         "Diem storage ledger counters",
         // metric labels (dimensions)
@@ -21,7 +21,7 @@ pub static DIEM_STORAGE_LEDGER: Lazy<IntGaugeVec> = Lazy::new(|| {
 
 pub static DIEM_STORAGE_COMMITTED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "diem_storage_committed_txns",
+        "aptos_storage_committed_txns",
         "Diem storage committed transactions"
     )
     .unwrap()
@@ -29,7 +29,7 @@ pub static DIEM_STORAGE_COMMITTED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
 
 pub static DIEM_STORAGE_LATEST_TXN_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "diem_storage_latest_transaction_version",
+        "aptos_storage_latest_transaction_version",
         "Diem storage latest transaction version"
     )
     .unwrap()
@@ -37,7 +37,7 @@ pub static DIEM_STORAGE_LATEST_TXN_VERSION: Lazy<IntGauge> = Lazy::new(|| {
 
 pub static DIEM_STORAGE_LEDGER_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "diem_storage_ledger_version",
+        "aptos_storage_ledger_version",
         "Version in the latest saved ledger info."
     )
     .unwrap()
@@ -45,7 +45,7 @@ pub static DIEM_STORAGE_LEDGER_VERSION: Lazy<IntGauge> = Lazy::new(|| {
 
 pub static DIEM_STORAGE_NEXT_BLOCK_EPOCH: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "diem_storage_next_block_epoch",
+        "aptos_storage_next_block_epoch",
         "ledger_info.next_block_epoch() for the latest saved ledger info."
     )
     .unwrap()
@@ -53,19 +53,19 @@ pub static DIEM_STORAGE_NEXT_BLOCK_EPOCH: Lazy<IntGauge> = Lazy::new(|| {
 
 pub static DIEM_STORAGE_LATEST_ACCOUNT_COUNT: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "diem_storage_latest_account_count",
+        "aptos_storage_latest_account_count",
         "Total number of account in the StateDB at the latest version."
     )
     .unwrap()
 });
 
 pub static DIEM_STORAGE_PRUNE_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!("diem_storage_prune_window", "Diem storage prune window").unwrap()
+    register_int_gauge!("aptos_storage_prune_window", "Diem storage prune window").unwrap()
 });
 
 pub static DIEM_STORAGE_PRUNER_LEAST_READABLE_STATE_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "diem_storage_pruner_least_readable_state_version",
+        "aptos_storage_pruner_least_readable_state_version",
         "Diem storage pruner least readable state version"
     )
     .unwrap()
@@ -74,7 +74,7 @@ pub static DIEM_STORAGE_PRUNER_LEAST_READABLE_STATE_VERSION: Lazy<IntGauge> = La
 pub static DIEM_STORAGE_API_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
-        "diem_storage_api_latency_seconds",
+        "aptos_storage_api_latency_seconds",
         // metric description
         "Diem storage api latency in seconds",
         // metric labels (dimensions)
@@ -86,7 +86,7 @@ pub static DIEM_STORAGE_API_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
 pub static DIEM_STORAGE_OTHER_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
-        "diem_storage_other_timers_seconds",
+        "aptos_storage_other_timers_seconds",
         // metric description
         "Various timers below public API level.",
         // metric labels (dimensions)
@@ -99,7 +99,7 @@ pub static DIEM_STORAGE_OTHER_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| 
 pub static DIEM_STORAGE_ROCKSDB_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         // metric name
-        "diem_rocksdb_properties",
+        "aptos_rocksdb_properties",
         // metric description
         "rocksdb integer properties",
         // metric labels (dimensions)

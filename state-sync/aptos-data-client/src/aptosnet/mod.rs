@@ -7,11 +7,11 @@ use crate::{
         metrics::{increment_counter, start_timer},
         state::{ErrorType, PeerStates},
     },
-    DiemDataClient, Error, GlobalDataSummary, Response, ResponseCallback, ResponseContext,
+    AptosDataClient, Error, GlobalDataSummary, Response, ResponseCallback, ResponseContext,
     ResponseError, ResponseId, Result,
 };
 use aptos_config::{
-    config::{DiemDataClientConfig, StorageServiceConfig},
+    config::{AptosDataClientConfig, StorageServiceConfig},
     network_id::PeerNetworkId,
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
@@ -49,7 +49,7 @@ mod tests;
 const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 5;
 const POLLER_ERROR_LOG_FREQ_SECS: u64 = 1;
 
-/// A [`DiemDataClient`] that fulfills requests from remote peers' Storage Service
+/// A [`AptosDataClient`] that fulfills requests from remote peers' Storage Service
 /// over AptosNet.
 ///
 /// The `AptosNetDataClient`:
@@ -70,7 +70,7 @@ const POLLER_ERROR_LOG_FREQ_SECS: u64 = 1;
 #[derive(Clone, Debug)]
 pub struct AptosNetDataClient {
     /// Config for AptosNet data client.
-    data_client_config: DiemDataClientConfig,
+    data_client_config: AptosDataClientConfig,
     /// The underlying AptosNet storage service client.
     network_client: StorageServiceClient,
     /// All of the data-client specific data we have on each network peer.
@@ -83,7 +83,7 @@ pub struct AptosNetDataClient {
 
 impl AptosNetDataClient {
     pub fn new(
-        data_client_config: DiemDataClientConfig,
+        data_client_config: AptosDataClientConfig,
         storage_service_config: StorageServiceConfig,
         time_service: TimeService,
         network_client: StorageServiceClient,
@@ -313,7 +313,7 @@ impl AptosNetDataClient {
 }
 
 #[async_trait]
-impl DiemDataClient for AptosNetDataClient {
+impl AptosDataClient for AptosNetDataClient {
     fn get_global_data_summary(&self) -> GlobalDataSummary {
         self.global_summary_cache.read().clone()
     }

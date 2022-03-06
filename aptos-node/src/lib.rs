@@ -4,7 +4,7 @@
 use aptos_api::runtime::bootstrap as bootstrap_api;
 use aptos_config::{
     config::{
-        DataStreamingServiceConfig, DiemDataClientConfig, NetworkConfig, NodeConfig,
+        AptosDataClientConfig, DataStreamingServiceConfig, NetworkConfig, NodeConfig,
         PersistableConfig, StorageServiceConfig,
     },
     network_id::NetworkId,
@@ -95,7 +95,7 @@ pub fn start(config: &NodeConfig, log_file: Option<PathBuf>) {
     let logger = Some(logger.build());
 
     // Let's now log some important information, since the logger is set up
-    info!(config = config, "Loaded DiemNode config");
+    info!(config = config, "Loaded AptosNode config");
 
     if fail::has_failpoints() {
         warn!("Failpoints is enabled");
@@ -327,7 +327,7 @@ fn setup_data_streaming_service(
 
 fn setup_aptos_data_client(
     storage_service_config: StorageServiceConfig,
-    aptos_data_client_config: DiemDataClientConfig,
+    aptos_data_client_config: AptosDataClientConfig,
     network_handles: HashMap<NetworkId, storage_service_client::StorageServiceNetworkSender>,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
 ) -> (AptosNetDataClient, Runtime) {
@@ -440,7 +440,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     });
 
     let mut instant = Instant::now();
-    let (diem_db, db_rw) = DbReaderWriter::wrap(
+    let (aptos_db, db_rw) = DbReaderWriter::wrap(
         AptosDB::open(
             &node_config.storage.dir(),
             false, /* readonly */
@@ -450,10 +450,10 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         )
         .expect("DB should open."),
     );
-    let _simple_storage_service = start_storage_service_with_db(node_config, Arc::clone(&diem_db));
+    let _simple_storage_service = start_storage_service_with_db(node_config, Arc::clone(&aptos_db));
     let backup_service = start_backup_service(
         node_config.storage.backup_service_address,
-        Arc::clone(&diem_db),
+        Arc::clone(&aptos_db),
     );
 
     let genesis_waypoint = node_config.base.waypoint.genesis_waypoint();
@@ -615,7 +615,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
     let (mp_client_sender, mp_client_events) = channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
-    let api_runtime = bootstrap_api(node_config, chain_id, diem_db, mp_client_sender).unwrap();
+    let api_runtime = bootstrap_api(node_config, chain_id, aptos_db, mp_client_sender).unwrap();
 
     let mut consensus_runtime = None;
     let (consensus_to_mempool_sender, consensus_requests) = channel(INTRA_NODE_CHANNEL_BUFFER_SIZE);

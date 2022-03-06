@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 /// Counter for pending network events to the storage service (server-side)
 pub static PENDING_STORAGE_SERVER_NETWORK_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "diem_storage_service_server_pending_network_events",
+        "aptos_storage_service_server_pending_network_events",
         "Counters for pending network events for the storage server",
         &["state"]
     )
@@ -20,7 +20,7 @@ pub static PENDING_STORAGE_SERVER_NETWORK_EVENTS: Lazy<IntCounterVec> = Lazy::ne
 /// Counter for storage service errors encountered
 pub static STORAGE_ERRORS_ENCOUNTERED: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "diem_storage_service_server_errors",
+        "aptos_storage_service_server_errors",
         "Counters related to the storage server errors encountered",
         &["protocol", "error_type"]
     )
@@ -30,7 +30,7 @@ pub static STORAGE_ERRORS_ENCOUNTERED: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Counter for received storage service requests
 pub static STORAGE_REQUESTS_RECEIVED: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "diem_storage_service_server_requests_received",
+        "aptos_storage_service_server_requests_received",
         "Counters related to the storage server requests received",
         &["protocol", "request_type"]
     )
@@ -40,7 +40,7 @@ pub static STORAGE_REQUESTS_RECEIVED: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Counter for storage service responses sent
 pub static STORAGE_RESPONSES_SENT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "diem_storage_service_server_responses_sent",
+        "aptos_storage_service_server_responses_sent",
         "Counters related to the storage server responses sent",
         &["protocol", "response_type"]
     )
@@ -50,7 +50,7 @@ pub static STORAGE_RESPONSES_SENT: Lazy<IntCounterVec> = Lazy::new(|| {
 /// Time it takes to process a storage request
 pub static STORAGE_REQUEST_PROCESSING_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
-        "diem_storage_service_server_request_latency",
+        "aptos_storage_service_server_request_latency",
         "Time it takes to process a storage service request",
         &["protocol", "request_type"]
     )

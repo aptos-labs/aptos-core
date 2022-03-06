@@ -214,7 +214,7 @@ impl DataStreamEngine for AccountsStreamEngine {
             Ok(client_requests)
         } else {
             info!(
-                (LogSchema::new(LogEntry::DiemDataClient)
+                (LogSchema::new(LogEntry::AptosDataClient)
                     .event(LogEvent::Pending)
                     .message(&format!(
                         "Requested the number of accounts at version: {:?}",
@@ -545,7 +545,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
             if target_ledger_info.ledger_info().epoch() > next_request_epoch {
                 // There was an epoch change. Request an epoch ending ledger info.
                 info!(
-                    (LogSchema::new(LogEntry::DiemDataClient)
+                    (LogSchema::new(LogEntry::AptosDataClient)
                         .event(LogEvent::Pending)
                         .message(&format!(
                             "Requested an epoch ending ledger info for epoch: {:?}",

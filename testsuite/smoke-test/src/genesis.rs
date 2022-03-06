@@ -112,7 +112,7 @@ async fn test_genesis_transaction_flow() {
     for i in 0..5 {
         for validator in swarm.validators() {
             let round = validator
-                .get_metric("diem_consensus_current_round{}")
+                .get_metric("aptos_consensus_current_round{}")
                 .await
                 .unwrap()
                 .unwrap();

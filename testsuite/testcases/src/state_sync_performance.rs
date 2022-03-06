@@ -11,7 +11,7 @@ use rand::{
 use std::{thread, time::Instant};
 use tokio::{runtime::Runtime, time::Duration};
 
-const STATE_SYNC_COMMITTED_COUNTER_NAME: &str = "diem_state_sync_version.synced";
+const STATE_SYNC_COMMITTED_COUNTER_NAME: &str = "aptos_state_sync_version.synced";
 
 pub struct StateSyncPerformance;
 

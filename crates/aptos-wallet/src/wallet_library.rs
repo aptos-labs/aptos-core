@@ -4,7 +4,7 @@
 //! The following document is a minimalist version of Diem Wallet. Note that this Wallet does
 //! not promote security as the mnemonic is stored in unencrypted form. In future iterations,
 //! we will be releasing more robust Wallet implementations. It is our intention to present a
-//! foundation that is simple to understand and incrementally improve the DiemWallet
+//! foundation that is simple to understand and incrementally improve the AptosWallet
 //! implementation and it's security guarantees throughout testnet. For a more robust wallet
 //! reference, the authors suggest to audit the file of the same name in the rust-wallet crate.
 //! That file can be found here:
@@ -87,7 +87,7 @@ impl WalletLibrary {
     pub fn generate_addresses(&mut self, depth: u64) -> Result<()> {
         let current = self.key_leaf.0;
         if current > depth {
-            return Err(WalletError::DiemWalletGeneric(
+            return Err(WalletError::AptosWalletGeneric(
                 "Addresses already generated up to the supplied depth".to_string(),
             )
             .into());
@@ -121,7 +121,7 @@ impl WalletLibrary {
         {
             Ok((authentication_key, old_key_leaf))
         } else {
-            Err(WalletError::DiemWalletGeneric(
+            Err(WalletError::AptosWalletGeneric(
                 "This address is already in your wallet".to_string(),
             )
             .into())
@@ -143,7 +143,7 @@ impl WalletLibrary {
                     ret.push(*account_address);
                 }
                 None => {
-                    return Err(WalletError::DiemWalletGeneric(format!(
+                    return Err(WalletError::AptosWalletGeneric(format!(
                         "Child num {} not exist while depth is {}",
                         i,
                         self.addr_map.len()
@@ -168,7 +168,7 @@ impl WalletLibrary {
                 signature,
             ))
         } else {
-            Err(WalletError::DiemWalletGeneric(
+            Err(WalletError::AptosWalletGeneric(
                 "Well, that address is nowhere to be found... This is awkward".to_string(),
             )
             .into())
@@ -180,7 +180,7 @@ impl WalletLibrary {
         if let Some(child) = self.addr_map.get(address) {
             Ok(self.key_factory.private_child(*child)?.get_private_key())
         } else {
-            Err(WalletError::DiemWalletGeneric("missing address".to_string()).into())
+            Err(WalletError::AptosWalletGeneric("missing address".to_string()).into())
         }
     }
 
@@ -192,7 +192,7 @@ impl WalletLibrary {
                 .private_child(*child)?
                 .get_authentication_key())
         } else {
-            Err(WalletError::DiemWalletGeneric("missing address".to_string()).into())
+            Err(WalletError::AptosWalletGeneric("missing address".to_string()).into())
         }
     }
 }

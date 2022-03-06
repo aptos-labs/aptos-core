@@ -114,11 +114,11 @@ pub fn run(
     let db_size = DIEM_STORAGE_ROCKSDB_PROPERTIES
         .with_label_values(&[
             JELLYFISH_MERKLE_NODE_CF_NAME,
-            "diem_rocksdb_live_sst_files_size_bytes",
+            "aptos_rocksdb_live_sst_files_size_bytes",
         ])
         .get();
     let data_size = DIEM_STORAGE_ROCKSDB_PROPERTIES
-        .with_label_values(&[JELLYFISH_MERKLE_NODE_CF_NAME, "diem_rocksdb_cf_size_bytes"])
+        .with_label_values(&[JELLYFISH_MERKLE_NODE_CF_NAME, "aptos_rocksdb_cf_size_bytes"])
         .get();
     let reads = DIEM_JELLYFISH_STORAGE_READS.get();
     let leaf_bytes = DIEM_JELLYFISH_LEAF_ENCODED_BYTES.get();

@@ -4,7 +4,7 @@
 use crate::{CryptoStorage, Error, KVStorage, Storage};
 
 use aptos_crypto::{
-    ed25519::Ed25519PrivateKey, test_utils::TestDiemCrypto, HashValue, PrivateKey, Signature,
+    ed25519::Ed25519PrivateKey, test_utils::TestAptosCrypto, HashValue, PrivateKey, Signature,
     Uniform,
 };
 
@@ -164,7 +164,7 @@ fn test_import_key(storage: &mut Storage) {
 
     // Verify valid keys
 
-    let message = TestDiemCrypto("Hello, World".to_string());
+    let message = TestAptosCrypto("Hello, World".to_string());
     let message_signature = storage.sign(imported_key_name, &message).unwrap();
     message_signature
         .verify(&message, &imported_public_key)
@@ -280,7 +280,7 @@ fn test_create_sign_rotate_sign(storage: &mut Storage) {
     let public_key = storage.create_key(CRYPTO_NAME).unwrap();
 
     // Create then sign message and verify correct signature
-    let message = TestDiemCrypto("Hello, World".to_string());
+    let message = TestAptosCrypto("Hello, World".to_string());
     let message_signature = storage.sign(CRYPTO_NAME, &message).unwrap();
     assert!(message_signature.verify(&message, &public_key).is_ok());
 

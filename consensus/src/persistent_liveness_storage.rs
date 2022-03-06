@@ -58,7 +58,7 @@ pub trait PersistentLivenessStorage: Send + Sync {
     fn retrieve_epoch_change_proof(&self, version: u64) -> Result<EpochChangeProof>;
 
     /// Returns a handle of the aptosdb.
-    fn diem_db(&self) -> Arc<dyn DbReader>;
+    fn aptos_db(&self) -> Arc<dyn DbReader>;
 }
 
 #[derive(Clone)]
@@ -307,13 +307,13 @@ impl RecoveryData {
 /// The proxy we use to persist data in diem db storage service via grpc.
 pub struct StorageWriteProxy {
     db: Arc<ConsensusDB>,
-    diem_db: Arc<dyn DbReader>,
+    aptos_db: Arc<dyn DbReader>,
 }
 
 impl StorageWriteProxy {
-    pub fn new(config: &NodeConfig, diem_db: Arc<dyn DbReader>) -> Self {
+    pub fn new(config: &NodeConfig, aptos_db: Arc<dyn DbReader>) -> Self {
         let db = Arc::new(ConsensusDB::new(config.storage.dir()));
-        StorageWriteProxy { db, diem_db }
+        StorageWriteProxy { db, aptos_db }
     }
 }
 
@@ -338,7 +338,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
 
     fn recover_from_ledger(&self) -> LedgerRecoveryData {
         let startup_info = self
-            .diem_db
+            .aptos_db
             .get_startup_info()
             .expect("unable to read ledger info from storage")
             .expect("startup info is None");
@@ -407,7 +407,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
 
         // find the block corresponding to storage latest ledger info
         let startup_info = self
-            .diem_db
+            .aptos_db
             .get_startup_info()
             .expect("unable to read ledger info from storage")
             .expect("startup info is None");
@@ -418,7 +418,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
             .clone();
         let root_executed_trees = startup_info
             .committed_tree_state
-            .into_ledger_view(&self.diem_db)
+            .into_ledger_view(&self.aptos_db)
             .expect("Failed to construct committed ledger view.");
         match RecoveryData::new(
             last_vote,
@@ -484,14 +484,14 @@ impl PersistentLivenessStorage for StorageWriteProxy {
 
     fn retrieve_epoch_change_proof(&self, version: u64) -> Result<EpochChangeProof> {
         let (_, proofs, _) = self
-            .diem_db
+            .aptos_db
             .get_state_proof(version)
             .map_err(DbError::from)?
             .into_inner();
         Ok(proofs)
     }
 
-    fn diem_db(&self) -> Arc<dyn DbReader> {
-        self.diem_db.clone()
+    fn aptos_db(&self) -> Arc<dyn DbReader> {
+        self.aptos_db.clone()
     }
 }
