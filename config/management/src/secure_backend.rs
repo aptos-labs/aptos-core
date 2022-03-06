@@ -221,19 +221,19 @@ mod tests {
         let path_str = path.path().to_str().unwrap();
 
         let github = format!(
-            "backend=github;repository_owner=diem;repository=diem;token={}",
+            "backend=github;repository_owner=aptos;repository=aptos;token={}",
             path_str
         );
         storage(&github).unwrap();
 
         let github = format!(
-            "backend=github;repository_owner=diem;repository=diem;token={};namespace=test",
+            "backend=github;repository_owner=aptos;repository=aptos;token={};namespace=test",
             path_str
         );
         storage(&github).unwrap();
 
         let github = format!(
-            "backend=github;repository_owner=diem;repository=diem;branch=genesis;token={};namespace=test",
+            "backend=github;repository_owner=aptos;repository=aptos;branch=genesis;token={};namespace=test",
             path_str
         );
         storage(&github).unwrap();

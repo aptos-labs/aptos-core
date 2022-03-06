@@ -52,7 +52,7 @@ use structopt::StructOpt;
 /// //     cmd [OPTIONS] --test <test>
 ///```
 
-/// Config for diem management tools
+/// Config for aptos management tools
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Config {
     #[serde(deserialize_with = "chain_id::deserialize_config_chain_id")]

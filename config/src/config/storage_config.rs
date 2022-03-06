@@ -71,7 +71,7 @@ impl Default for StorageConfig {
             // conservatively safe minimal prune window. It'll take a few Gigabytes of disk space
             // depending on the size of an average account blob.
             prune_window: Some(1_000_000),
-            data_dir: PathBuf::from("/opt/diem/data"),
+            data_dir: PathBuf::from("/opt/aptos/data"),
             // Default read/write/connection timeout, in milliseconds
             timeout_ms: 30_000,
             rocksdb_config: RocksdbConfig::default(),
