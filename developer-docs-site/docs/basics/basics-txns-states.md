@@ -1,7 +1,6 @@
 ---
 title: "Transactions and states"
 slug: "basics-txns-states"
-hidden: false
 ---
 The two fundamental concepts at the heart of the Aptos Blockchain are
 
@@ -10,10 +9,9 @@ The two fundamental concepts at the heart of the Aptos Blockchain are
 
 When a submitted transaction is executed, the state of the Aptos Blockchain changes.
 
+# Transactions
 
-## Transactions
-
-When a Aptos Blockchain participant submits a transaction, they are requesting the ledger state to be updated with their transaction information.
+When an Aptos Blockchain participant submits a transaction, they are requesting the ledger state to be updated with their transaction information.
 
 A [signed transaction](/reference/glossary#transaction) on the blockchain contains the following information:
 
@@ -21,7 +19,7 @@ A [signed transaction](/reference/glossary#transaction) on the blockchain contai
 - **Sender address**: The sender's [account address](/reference/glossary#account-address).
 - **Sender public key**: The public authentication key that corresponds to the private authentication key used to sign the transaction.
 - **Program**: The program comprises:
-  - A Move bytecode transaction script: The Move transaction script is an arbitrary program that encodes transaction logic and interacts with resources published in the blockchain's distributed database. Move is a next generation language for secure, sandboxed, and formally verified programming.
+  - A Move module and function name or a move bytecode transaction script.
   - An optional list of inputs to the script. For a peer-to-peer transaction, these inputs contain the recipient's information and the amount transferred to them.
   - An optional list of Move bytecode modules to publish.
 - **Gas price** (in specified currency/gas units): This is the amount the sender is willing to pay per unit of [gas](/reference/glossary#gas) to execute the transaction. [Gas](basics-gas-txn-fee.md) is a way to pay for computation and storage. A gas unit is an abstract measurement of computation with no inherent real-world value.
@@ -30,13 +28,11 @@ A [signed transaction](/reference/glossary#transaction) on the blockchain contai
 - **Sequence number**: This is an unsigned integer that must be equal to the sender's account [sequence number](/reference/glossary#sequence-number) at the time of execution.
 - **Expiration time**: The transaction ceases to be valid after this time.
 
-
-
-## Ledger state
+# Ledger state
 
 The Aptos Blockchain's ledger state or global [state](/reference/glossary#state) comprises the state of all accounts in the blockchain. Each validator node in the blockchain must know the global state of the latest version of the blockchain's distributed database (versioned database) to execute any transaction.
 
-### Versioned database
+## Versioned database
 
 All of the data in the Aptos Blockchain is persisted in a single-versioned distributed database. A version number is an unsigned 64-bit integer that corresponds to the number of transactions the system has executed.
 
@@ -45,9 +41,7 @@ This versioned database allows validator nodes to:
 - Execute a transaction against the ledger state at the latest version.
 - Respond to client queries about ledger history at both current and previous versions.
 
-
 ## Transactions change state
-
 
 ![FIGURE 1.0 TRANSACTIONS CHANGE STATE](/img/docs/transactions.svg)
 <small className="figure">FIGURE 1.0 TRANSACTIONS CHANGE STATE</small>

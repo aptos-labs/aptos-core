@@ -1,7 +1,6 @@
 ---
 title: "Proof"
 slug: "basics-merkle-proof"
-hidden: false
 ---
 
 A proof is a way to verify the truth of data in the Aptos Blockchain.
