@@ -2,11 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
-use crate::{
-    account::Account,
-    compile,
-    executor::FakeExecutor,
-};
+use crate::{account::Account, compile, executor::FakeExecutor};
 use diem_transaction_builder::stdlib as transaction_builder;
 use move_binary_format::file_format::CompiledModule;
 use transaction_builder::*;

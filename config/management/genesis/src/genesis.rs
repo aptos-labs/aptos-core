@@ -4,10 +4,9 @@
 use crate::builder::GenesisBuilder;
 use diem_management::{config::ConfigPath, error::Error, secure_backend::SharedBackend};
 use diem_secure_storage::Storage;
-use diem_types::on_chain_config::VMPublishingOption;
 use diem_types::{
     chain_id::ChainId,
-    on_chain_config::{ConsensusConfigV2, OnChainConsensusConfig},
+    on_chain_config::{ConsensusConfigV2, OnChainConsensusConfig, VMPublishingOption},
     transaction::Transaction,
 };
 use std::{fs::File, io::Write, path::PathBuf};
