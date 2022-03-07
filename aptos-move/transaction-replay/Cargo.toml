@@ -26,11 +26,11 @@ move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a922
 move-vm-runtime = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 move-vm-test-utils = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 aptos-resource-viewer = { path = "../aptos-resource-viewer" }
-diem-framework = { path = "../../aptos-move/diem-framework" }
+framework =  { path = "../framework" }
 move-compiler = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 bcs = "0.1.2"
 difference = "2.0.0"
 
 [dev-dependencies]
 vm-genesis = { path = "../vm-genesis" }
-diem-framework-releases = { path = "../../aptos-move/diem-framework/DPN/releases" }
+diem-framework-releases = { path = "../framework/DPN/releases" }

@@ -115,7 +115,7 @@ where
 
 // This file was generated. Do not modify!
 //
-// To update this code, run: `cargo run --release -p diem-framework`.
+// To update this code, run: `cargo run --release -p framework`.
 "#
             )?;
         }

@@ -34,7 +34,7 @@ aptos-api = { path = "../api" }
 aptos-config = { path = "../config" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-data-client = { path = "../state-sync/aptos-data-client" }
-diem-framework-releases = { path = "../aptos-move/diem-framework/DPN/releases" }
+diem-framework-releases = { path = "../aptos-move/framework/DPN/releases" }
 aptos-genesis-tool = {path = "../config/management/genesis", features = ["testing"] }
 aptos-logger = { path = "../crates/aptos-logger" }
 aptos-mempool = { path = "../mempool" }

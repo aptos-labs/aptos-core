@@ -356,10 +356,10 @@ fn panic_missing_private_key(cmd_name: &str) -> ! {
 
 static PRECOMPILED_DIEM_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
     let program_res = move_compiler::construct_pre_compiled_lib(
-        &diem_framework::dpn_files(),
+        &framework::dpn_files(),
         None,
         move_compiler::Flags::empty().set_sources_shadow_deps(false),
-        diem_framework::diem_framework_named_addresses(),
+        framework::diem_framework_named_addresses(),
     )
     .unwrap();
     match program_res {
@@ -373,10 +373,10 @@ static PRECOMPILED_DIEM_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
 
 static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
     let program_res = move_compiler::construct_pre_compiled_lib(
-        &diem_framework::aptos_files(),
+        &framework::aptos_files(),
         None,
         move_compiler::Flags::empty().set_sources_shadow_deps(false),
-        diem_framework::aptos_framework_named_addresses(),
+        framework::aptos_framework_named_addresses(),
     )
     .unwrap();
     match program_res {
@@ -798,7 +798,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
             None => BTreeMap::new(),
         };
 
-        let mut named_address_mapping = diem_framework::diem_framework_named_addresses();
+        let mut named_address_mapping = framework::diem_framework_named_addresses();
 
         for (name, addr) in test_only_named_addresses() {
             assert!(!named_address_mapping.contains_key(&name));

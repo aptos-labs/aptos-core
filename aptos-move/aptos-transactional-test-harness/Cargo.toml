@@ -30,7 +30,7 @@ move-command-line-common = { git = "https://github.com/diem/move", rev = "98ed29
 language-e2e-tests = { path = "../e2e-tests" }
 aptos-vm =  { path = "../aptos-vm" }
 vm-genesis= { path = "../vm-genesis" }
-diem-framework = { path = "../diem-framework" }
+framework =  { path = "../framework" }
 aptos-keygen = { path = "../aptos-keygen" }
 
 # Other Diem dependencies

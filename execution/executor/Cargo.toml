@@ -40,7 +40,7 @@ proptest = { version = "1.0.0", optional = true }
 proptest = "1.0.0"
 rand = "0.8.3"
 
-diem-framework-releases = { path = "../../aptos-move/diem-framework/DPN/releases" }
+diem-framework-releases = { path = "../../aptos-move/framework/DPN/releases" }
 executor-test-helpers = { path = "../executor-test-helpers" }
 aptos-config = { path = "../../config" }
 aptos-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }

@@ -26,8 +26,8 @@ aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 aptos-crypto-derive = { path = "../../crates/aptos-crypto-derive" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-types = { path = "../../types" }
-diem-framework-releases = { path = "../../aptos-move/diem-framework/DPN/releases" }
-diem-framework = { path = "../../aptos-move/diem-framework" }
+diem-framework-releases = { path = "../framework/DPN/releases" }
+framework =  { path = "../framework" }
 move-compiler = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 bcs = "0.1.2"
 aptos-state-view = { path = "../../storage/state-view" }

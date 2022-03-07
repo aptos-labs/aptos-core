@@ -204,9 +204,7 @@ impl AptosDebugger {
         version: Version,
         save_write_sets: bool,
     ) -> Result<Vec<CompiledModule>> {
-        let modules = self
-            .debugger
-            .get_diem_framework_modules_by_version(version)?;
+        let modules = self.debugger.get_framework_modules_by_version(version)?;
         if save_write_sets {
             let state_view = OnDiskStateView::create(&self.build_dir, &self.storage_dir)?;
             for m in &modules {
@@ -403,9 +401,9 @@ fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {
 fn compile_move_script(file_path: &str) -> Result<Vec<u8>> {
     let cur_path = file_path.to_owned();
     let targets = &vec![cur_path];
-    let (files, units_or_diags) = Compiler::new(targets, &diem_framework::dpn_files())
+    let (files, units_or_diags) = Compiler::new(targets, &framework::dpn_files())
         .set_flags(Flags::empty().set_sources_shadow_deps(false))
-        .set_named_address_values(diem_framework::diem_framework_named_addresses())
+        .set_named_address_values(framework::diem_framework_named_addresses())
         .build()?;
     let unit = match units_or_diags {
         Err(diags) => {

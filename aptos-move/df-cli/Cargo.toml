@@ -18,7 +18,7 @@ aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 move-cli = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
 aptos-vm = { path = "../aptos-vm" }
-diem-framework-releases = { path = "../../aptos-move/diem-framework/DPN/releases" }
+diem-framework-releases = { path = "../framework/DPN/releases" }
 
 [dev-dependencies]
 datatest-stable = "0.1.1"

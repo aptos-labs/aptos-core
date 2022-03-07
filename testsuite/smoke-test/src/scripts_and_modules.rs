@@ -61,7 +61,7 @@ impl MalformedScript {
             .join("testsuite/smoke-test/src/dev_modules/test_script.move")
             .canonicalize()?;
         let move_stdlib_dir = move_stdlib::move_stdlib_modules_full_path();
-        let diem_payment_framework_dir = diem_framework::diem_payment_modules_full_path();
+        let diem_payment_framework_dir = framework::diem_payment_modules_full_path();
         let dependencies = &[
             move_stdlib_dir.as_str(),
             diem_payment_framework_dir.as_str(),
@@ -140,7 +140,7 @@ impl ExecuteCustomModuleAndScript {
 
         // Get the path to the Move stdlib sources
         let move_stdlib_dir = move_stdlib::move_stdlib_modules_full_path();
-        let diem_payment_framework_dir = diem_framework::diem_payment_modules_full_path();
+        let diem_payment_framework_dir = framework::diem_payment_modules_full_path();
 
         // Make a copy of module.move with "{{sender}}" substituted.
         let module_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -277,7 +277,7 @@ pub fn compile_program(file_path: &str, dependency_paths: &[&str]) -> Result<Vec
     for dep in dependency_paths {
         command.args(&["-d", dep]);
     }
-    for (name, addr) in diem_framework::diem_framework_named_addresses() {
+    for (name, addr) in framework::diem_framework_named_addresses() {
         command.args(&["-a", &format!("{}={:#X}", name, addr)]);
     }
 

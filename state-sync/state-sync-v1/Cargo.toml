@@ -55,7 +55,7 @@ claim = "0.5.0"
 proptest = "1.0.0"
 
 channel = { path = "../../crates/channel" }
-diem-framework-releases= { path = "../../aptos-move/diem-framework/DPN/releases" }
+diem-framework-releases= { path = "../../aptos-move/framework/DPN/releases" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
 aptos-mempool = { path = "../../mempool", features = ["fuzzing"] }
