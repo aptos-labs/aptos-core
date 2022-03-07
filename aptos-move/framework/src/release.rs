@@ -113,7 +113,7 @@ impl ReleaseOptions {
             println!("Generating script builders");
             generate_script_builder(
                 &output_path.join("transaction_script_builder.rs"),
-                &[&output_path, Path::new("DPN/releases/legacy/script_abis")],
+                &[&output_path],
             )
         }
     }
