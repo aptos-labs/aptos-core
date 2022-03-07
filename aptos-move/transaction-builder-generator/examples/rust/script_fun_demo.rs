@@ -1,8 +1,8 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use diem_framework::{encode_peer_to_peer_with_metadata_script_function, ScriptFunctionCall};
 use aptos_types::{AccountAddress, Identifier, StructTag, TypeTag};
+use framework::{encode_peer_to_peer_with_metadata_script_function, ScriptFunctionCall};
 use serde_bytes::ByteBuf as Bytes;
 
 fn demo_p2p_script_function() {

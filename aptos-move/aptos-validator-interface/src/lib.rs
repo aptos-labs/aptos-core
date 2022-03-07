@@ -35,10 +35,7 @@ pub trait AptosValidatorInterface: Sync {
         seq: u64,
     ) -> Result<Option<Version>>;
 
-    fn get_diem_framework_modules_by_version(
-        &self,
-        version: Version,
-    ) -> Result<Vec<CompiledModule>> {
+    fn get_framework_modules_by_version(&self, version: Version) -> Result<Vec<CompiledModule>> {
         let mut acc = vec![];
         for module_bytes in self
             .get_account_state_by_version(account_config::CORE_CODE_ADDRESS, version)?

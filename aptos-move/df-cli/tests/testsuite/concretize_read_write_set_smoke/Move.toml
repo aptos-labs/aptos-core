@@ -3,4 +3,4 @@ name = "concretize_read_write_set_smoke"
 version = "0.0.0"
 
 [dependencies]
-DPNFramework = { local = "../../../../diem-framework/DPN" }
+DPNFramework = { local = "../../../../framework/DPN" }

@@ -23,7 +23,7 @@ generate-key = { path = "../../generate-key" }
 bcs = "0.1.2"
 aptos-config = { path = "../.."}
 aptos-crypto = { path = "../../../crates/aptos-crypto" }
-diem-framework-releases = { path = "../../../aptos-move/diem-framework/DPN/releases"}
+diem-framework-releases = { path = "../../../aptos-move/framework/DPN/releases" }
 aptos-global-constants = { path = "../../global-constants" }
 aptos-management = { path = ".." }
 aptos-secure-storage = { path = "../../../secure/storage" }

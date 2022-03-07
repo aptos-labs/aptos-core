@@ -59,9 +59,9 @@ build/
 
 # Do not ignore the Move build output under the releases for DPN, core, and
 # experimental -- these are the release code.
-!aptos-move/diem-framework/DPN/releases/artifacts/**
-!aptos-move/diem-framework/experimental/releases/artifacts/**
-!aptos-move/diem-framework/aptos-framework/releases/artifacts/**
+!aptos-move/framework/DPN/releases/artifacts/**
+!aptos-move/framework/experimental/releases/artifacts/**
+!aptos-move/framework/aptos-framework/releases/artifacts/**
 
 # Docker incremental build temporary files and directories
 target-out-docker

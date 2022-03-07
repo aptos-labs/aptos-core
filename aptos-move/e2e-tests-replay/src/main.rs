@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use structopt::StructOpt;
 
 use aptos_types::on_chain_config::{DiemVersion, DIEM_MAX_KNOWN_VERSION};
-use diem_framework::dpn_files;
+use framework::dpn_files;
 use move_model::run_model_builder;
 use move_stackless_bytecode_interpreter::{
     concrete::settings::InterpreterSettings, StacklessBytecodeInterpreter,

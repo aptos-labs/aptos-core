@@ -143,7 +143,7 @@ To install dependency-free Rust crates `aptos-types` and `diem-framework` into a
 ```bash
 target/debug/generate-transaction-builders \
     --language rust \
-    --module-name diem-framework \
+    --module-name framework \
     --with-aptos-types "testsuite/generate-format/tests/staged/diem.yaml" \
     --target-source-dir "$DEST" \
     "aptos-move/diem-framework/DPN/releases/legacy" \

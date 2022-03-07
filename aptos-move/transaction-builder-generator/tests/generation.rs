@@ -18,12 +18,12 @@ fn get_aptos_registry() -> Registry {
 
 fn get_tx_script_abis() -> Vec<ScriptABI> {
     // This is also a custom rule in diem/x.toml.
-    let legacy_path = Path::new("../diem-framework/DPN/releases/legacy/script_abis");
+    let legacy_path = Path::new("../framework/DPN/releases/legacy/script_abis");
     buildgen::read_abis(&[legacy_path]).expect("reading legacy ABI files should not fail")
 }
 
 fn get_script_fun_abis() -> Vec<ScriptABI> {
-    let new_abis = Path::new("../diem-framework/DPN/releases/artifacts/current");
+    let new_abis = Path::new("../framework/DPN/releases/artifacts/current");
     buildgen::read_abis(&[new_abis]).expect("reading new ABI files should not fail")
 }
 
@@ -186,14 +186,14 @@ fn test_rust(abis: &[ScriptABI], demo_file: &str, expected_output: &str) {
     let config = serdegen::CodeGeneratorConfig::new("aptos-types".to_string());
     installer.install_module(&config, &registry).unwrap();
 
-    let stdlib_dir_path = dir.path().join("diem-framework");
+    let stdlib_dir_path = dir.path().join("framework");
     std::fs::create_dir_all(stdlib_dir_path.clone()).unwrap();
 
     let mut cargo = std::fs::File::create(&stdlib_dir_path.join("Cargo.toml")).unwrap();
     write!(
         cargo,
         r#"[package]
-name = "diem-framework"
+name = "framework"
 version = "0.1.0"
 edition = "2018"
 
@@ -221,7 +221,7 @@ test = false
     // Use a stable `target` dir to avoid downloading and recompiling crates everytime.
     let target_dir = std::env::current_dir().unwrap().join("../../target");
     let status = Command::new("cargo")
-        .current_dir(dir.path().join("diem-framework"))
+        .current_dir(dir.path().join("framework"))
         .arg("build")
         .arg("--target-dir")
         .arg(target_dir.clone())

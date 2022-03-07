@@ -1,0 +1,12 @@
+[package]
+name = "CoreFramework"
+version = "1.5.0"
+
+[addresses]
+Std = "0x1"
+VMReserved = "0x0"
+CoreFramework = "0x1"
+CoreResources = "0xA550C18"
+
+[dependencies]
+MoveStdlib = { local = "../move-stdlib" }

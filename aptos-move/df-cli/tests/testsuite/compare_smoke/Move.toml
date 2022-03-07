@@ -3,5 +3,5 @@ name = "compare_smoke"
 version = "0.0.0"
 
 [dependencies]
-DPNFramework = { local = "../../../../diem-framework/DPN" }
-MoveNursery = { local = "../../../../diem-framework/move-stdlib/nursery" }
+DPNFramework = { local = "../../../../framework/DPN" }
+MoveNursery = { local = "../../../../framework/move-stdlib/nursery" }
