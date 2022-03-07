@@ -21,8 +21,9 @@ use crate::{
     metrics::{
         DIEM_SCHEMADB_BATCH_COMMIT_BYTES, DIEM_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS,
         DIEM_SCHEMADB_BATCH_PUT_LATENCY_SECONDS, DIEM_SCHEMADB_DELETES, DIEM_SCHEMADB_GET_BYTES,
-        DIEM_SCHEMADB_GET_LATENCY_SECONDS, DIEM_SCHEMADB_ITER_BYTES,
-        DIEM_SCHEMADB_ITER_LATENCY_SECONDS, DIEM_SCHEMADB_PUT_BYTES,
+        DIEM_SCHEMADB_GET_LATENCY_SECONDS, DIEM_SCHEMADB_INCLUSIVE_RANGE_DELETES,
+        DIEM_SCHEMADB_ITER_BYTES, DIEM_SCHEMADB_ITER_LATENCY_SECONDS, DIEM_SCHEMADB_PUT_BYTES,
+        DIEM_SCHEMADB_RANGE_DELETES,
     },
     schema::{KeyCodec, Schema, SeekKeyCodec, ValueCodec},
 };
@@ -52,6 +53,8 @@ pub const DEFAULT_CF_NAME: ColumnFamilyName = "default";
 enum WriteOp {
     Value { key: Vec<u8>, value: Vec<u8> },
     Deletion { key: Vec<u8> },
+    DeletionRange { begin: Vec<u8>, end: Vec<u8> },
+    DeletionRangeInclusive { begin: Vec<u8>, end: Vec<u8> },
 }
 
 /// `SchemaBatch` holds a collection of updates that can be applied to a DB atomically. The updates
@@ -90,6 +93,32 @@ impl SchemaBatch {
             .or_insert_with(Vec::new)
             .push(WriteOp::Deletion { key });
 
+        Ok(())
+    }
+
+    /// Adds a delete range operation that delete a range [start, end)
+    pub fn delete_range<S: Schema>(&mut self, begin: &S::Key, end: &S::Key) -> Result<()> {
+        let begin = <S::Key as KeyCodec<S>>::encode_key(begin)?;
+        let end = <S::Key as KeyCodec<S>>::encode_key(end)?;
+        self.rows
+            .entry(S::COLUMN_FAMILY_NAME)
+            .or_insert_with(Vec::new)
+            .push(WriteOp::DeletionRange { begin, end });
+        Ok(())
+    }
+
+    /// Adds a delete range operation that delete a range [start, end] including end
+    pub fn delete_range_inclusive<S: Schema>(
+        &mut self,
+        begin: &S::Key,
+        end: &S::Key,
+    ) -> Result<()> {
+        let begin = <S::Key as KeyCodec<S>>::encode_key(begin)?;
+        let end = <S::Key as KeyCodec<S>>::encode_key(end)?;
+        self.rows
+            .entry(S::COLUMN_FAMILY_NAME)
+            .or_insert_with(Vec::new)
+            .push(WriteOp::DeletionRangeInclusive { begin, end });
         Ok(())
     }
 }
@@ -398,6 +427,13 @@ impl DB {
                 match write_op {
                     WriteOp::Value { key, value } => db_batch.put_cf(cf_handle, key, value),
                     WriteOp::Deletion { key } => db_batch.delete_cf(cf_handle, key),
+                    WriteOp::DeletionRange { begin, end } => {
+                        db_batch.delete_range_cf(cf_handle, begin, end);
+                    }
+                    WriteOp::DeletionRangeInclusive { begin, end } => {
+                        db_batch.delete_range_cf(cf_handle, begin, end);
+                        db_batch.delete_cf(cf_handle, end);
+                    }
                 }
             }
         }
@@ -416,6 +452,16 @@ impl DB {
                     }
                     WriteOp::Deletion { key: _ } => {
                         DIEM_SCHEMADB_DELETES.with_label_values(&[cf_name]).inc();
+                    }
+                    WriteOp::DeletionRange { begin: _, end: _ } => {
+                        DIEM_SCHEMADB_RANGE_DELETES
+                            .with_label_values(&[cf_name])
+                            .inc();
+                    }
+                    WriteOp::DeletionRangeInclusive { begin: _, end: _ } => {
+                        DIEM_SCHEMADB_INCLUSIVE_RANGE_DELETES
+                            .with_label_values(&[cf_name])
+                            .inc();
                     }
                 }
             }

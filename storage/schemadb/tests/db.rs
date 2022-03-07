@@ -172,8 +172,61 @@ fn test_schema_put_get() {
     );
 }
 
+fn test_schemabatch_delete_range_util(begin: u32, end: u32, is_inclusive: bool) {
+    let db = TestDB::new();
+    let mut db_batch = SchemaBatch::new();
+    for i in 0..100u32 {
+        db_batch
+            .put::<TestSchema1>(&TestField(i), &TestField(i))
+            .unwrap();
+    }
+    let mut should_exist_vec = [true; 100];
+
+    db_batch
+        .delete_range::<TestSchema1>(&TestField(begin), &TestField(end))
+        .unwrap();
+    if !is_inclusive {
+        for i in begin..end {
+            should_exist_vec[i as usize] = false;
+        }
+    } else {
+        for i in begin..=end {
+            should_exist_vec[i as usize] = false;
+        }
+    }
+    db.write_schemas(db_batch).unwrap();
+    for (i, should_exist) in should_exist_vec.iter().enumerate() {
+        assert_eq!(
+            db.get::<TestSchema1>(&TestField(i as u32))
+                .unwrap()
+                .is_some(),
+            *should_exist,
+        )
+    }
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
+
+    #[test]
+    fn test_schemabatch_delete_range(
+        ranges_to_delete in vec(
+            (0..100u32).prop_flat_map(|begin| (Just(begin), (begin..100u32))), 0..10)
+    ) {
+        for (begin, end) in ranges_to_delete {
+            test_schemabatch_delete_range_util(begin, end, false);
+        }
+    }
+
+    #[test]
+    fn test_schemabatch_delete_range_inclusive(
+        ranges_to_delete in vec(
+            (0..100u32).prop_flat_map(|begin| (Just(begin), (begin..100u32))), 0..10)
+    ) {
+         for (begin, end) in ranges_to_delete {
+            test_schemabatch_delete_range_util(begin, end, false);
+        }
+    }
 
     #[test]
     fn test_schema_range_delete(
@@ -242,6 +295,7 @@ fn test_single_schema_batch() {
     db_batch
         .put::<TestSchema2>(&TestField(5), &TestField(5))
         .unwrap();
+
     db.write_schemas(db_batch).unwrap();
 
     assert_eq!(

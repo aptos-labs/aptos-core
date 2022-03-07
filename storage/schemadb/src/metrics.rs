@@ -99,6 +99,24 @@ pub static DIEM_SCHEMADB_DELETES: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static DIEM_SCHEMADB_RANGE_DELETES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "diem_storage_range_deletes",
+        "Diem storage range delete calls",
+        &["cf_name"]
+    )
+    .unwrap()
+});
+
+pub static DIEM_SCHEMADB_INCLUSIVE_RANGE_DELETES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "diem_storage_range_inclusive_deletes",
+        "Diem storage range inclusive delete calls",
+        &["cf_name"]
+    )
+    .unwrap()
+});
+
 pub static DIEM_SCHEMADB_BATCH_PUT_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
