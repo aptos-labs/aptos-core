@@ -465,9 +465,10 @@ impl TransactionFactory {
         sliding_nonce: u64,
         config: Vec<u8>,
     ) -> TransactionBuilder {
-        self.payload(
-            stdlib::encode_update_diem_consensus_config_script_function(sliding_nonce, config),
-        )
+        self.payload(stdlib::encode_update_diem_consensus_config_script_function(
+            sliding_nonce,
+            config,
+        ))
     }
 
     pub fn update_diem_version(&self, sliding_nonce: u64, major: u64) -> TransactionBuilder {
