@@ -137,12 +137,17 @@ where
             .iter()
             .cloned()
             .partition(|abi| abi.is_transaction_script_abi());
-        let mut script_registry: BTreeMap<_, _> = vec![(
-            "ScriptCall".to_string(),
-            common::make_abi_enum_container(transaction_script_abis.as_slice()),
-        )]
-        .into_iter()
-        .collect();
+        let has_script = !transaction_script_abis.is_empty();
+        let mut script_registry: BTreeMap<_, _> = if has_script {
+            vec![(
+                "ScriptCall".to_string(),
+                common::make_abi_enum_container(transaction_script_abis.as_slice()),
+            )]
+            .into_iter()
+            .collect()
+        } else {
+            BTreeMap::new()
+        };
         let mut script_function_registry: BTreeMap<_, _> = vec![(
             "ScriptFunctionCall".to_string(),
             common::make_abi_enum_container(script_fun_abis.as_slice()),
@@ -168,9 +173,10 @@ where
                 )
             })
             .collect();
-        comments.insert(
-            vec!["crate".to_string(), "ScriptCall".to_string()],
-            r#"Structured representation of a call into a known Move script.
+        if has_script {
+            comments.insert(
+                vec!["crate".to_string(), "ScriptCall".to_string()],
+                r#"Structured representation of a call into a known Move script.
 ```ignore
 impl ScriptCall {
     pub fn encode(self) -> Script { .. }
@@ -178,8 +184,9 @@ impl ScriptCall {
 }
 ```
 "#
-            .into(),
-        );
+                .into(),
+            );
+        }
         comments.insert(
             vec!["crate".to_string(), "ScriptFunctionCall".to_string()],
             r#"Structured representation of a call into a known Move script function.
