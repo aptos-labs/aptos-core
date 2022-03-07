@@ -1,8 +1,9 @@
 ---
 title: "Events"
 slug: "basics-events"
-hidden: false
 ---
+TODO(@davidiw): This needs to be resurrected once we have some events in TestCoin.
+
 Events are Move data that are emitted during the execution of a transaction on the Aptos Blockchain.
 
 For example, whenever a payment transaction is sent or received on-chain, the transaction will emit the relevant data using the `SentPaymentEvent` and `ReceivedPaymentEvent`. This data is stored in the EventStore, which is part of the Aptos Blockchain’s ledger state. You can query the EventStore to get proof of executed transactions on-chain.

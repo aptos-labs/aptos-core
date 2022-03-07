@@ -221,14 +221,6 @@ These are FullNodes used by DPN Participants to forward transactions to the vali
 - AptosBFT, the Aptos network's consensus algorithm, is based on HotStuff.
 - It simplifies the reasoning about safety, and it addresses some performance limitations of previous consensus protocols.
 
-## J
-
-### JSON-RPC Service
-
-- The JSON-RPC Service component is the external interface of a Aptos node. Any incoming client request, such as submitted transactions or queries, must first go through the JSON-RPC Service. A client needs to go through the JSON-RPC Service component to access storage or any other component in the system. This filters requests and protects the system.
-- Whenever a client submits a new transaction, the JSON-RPC Service passes it to [mempool](#mempool).
-
-
 ## L
 
 ### Leader
@@ -336,6 +328,11 @@ Under the DPN Rules, a VASP is defined as a natural or legal person that as a bu
 - Transfers of Aptos Coins;
 - Engages in safekeeping or administration of Aptos Coins; and
 - Otherwise provides financial services related to Aptos Coins.
+
+### REST Service
+
+- The JSON-RPC Service component is the external interface of a Aptos node. Any incoming client request, such as submitted transactions or queries, must first go through the JSON-RPC Service. A client needs to go through the JSON-RPC Service component to access storage or any other component in the system. This filters requests and protects the system.
+- Whenever a client submits a new transaction, the JSON-RPC Service passes it to [mempool](#mempool).
 
 
 ### Round

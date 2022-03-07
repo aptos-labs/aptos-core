@@ -1,13 +1,12 @@
 ---
 title: "Gas and transaction fees"
 slug: "basics-gas-txn-fee"
-hidden: false
 ---
 import BlockQuote from "@site/src/components/BlockQuote";
 
-When a transaction is executed in the Aptos Payment Network (DPN), the network resources used are tracked and measured using gas.
+When a transaction is executed on the Aptos Blockchain, the network resources used are tracked and measured using gas.
 
-## Introduction
+# Introduction
 
 Gas ensures that all Move programs running on the Aptos Blockchain terminate. This bounds the computational resources used. Gas also provides the ability to charge a transaction fee, partly based on consumed resources during execution.
 
@@ -18,9 +17,8 @@ When a client submits a transaction for execution to the Aptos Blockchain, it co
 * `gas_currency`: This is the currency of the transaction fee.
 
 The transaction fee charged to the client will be at most `gas_price * max_gas_amount`.
-<BlockQuote type="info">
-The gas price, and hence the transaction fee, should rise-and-fall with contention in the DPN. At launch, we expect gas prices to be at or near zero. But in periods of high contention, you can prioritize transactions using the gas price, which will encourage sending only needed transactions during such times.
-</BlockQuote>
+
+The gas price, and hence the transaction fee, should parallel the demand and load of the Aptos Blockchain as demand exceeds supply the gas price will as well.
 
 ## Types of resource usage consumed
 
@@ -41,9 +39,6 @@ When you send a transaction, the transaction fee (in the specifed gas currency) 
 At different times in the transaction flow, different aspects of resource usage are charged. The basics of the transaction flow and the gas-related logic are detailed in the following diagram:
 ![FIGURE 1.0 Gas and Transaction Flow](/img/docs/using-gas.svg)
 <small className="figure">FIGURE 1.0 Gas and Transaction Flow</small>
-
-
-
 
 In the diagram, both the prologue and epilogue sections are marked in the same color. This is because these sections of the transaction flow need to be **unmetered**:
 * In the prologue, it's not known if the submitting account has sufficient funds to cover its gas liability, or if the user submitting the transaction even has authority over the submitting account. Due to this lack of knowledge, when the prologue is executed, it needs to be unmetered. Deducting gas for transactions that fail the prologue could allow unauthorized deductions from accounts.
