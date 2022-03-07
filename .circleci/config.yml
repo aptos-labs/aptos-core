@@ -56,18 +56,10 @@ jobs:
     machine:
       image: ubuntu-2004:current
     resource_class: xlarge
-    parameters:
-      image-name:
-        type: string
-      target-image-name:
-        type: string
     steps:
       - checkout
-      - run:
-          command: ./docker/<< parameters.image-name >>/build.sh
-          no_output_timeout: 30m
       - aws-setup
-      - run: SOURCE=aptos/<< parameters.target-image-name >>:latest TARGET_REPO="${AWS_ECR_ACCOUNT_URL}/aptos/<< parameters.target-image-name >>" TARGET_TAGS="${TAGS}:main_$(git rev-parse --short=8  HEAD),latest" docker/tag-and-push.sh
+      - run: ./docker/build-aws.sh --build-all --version $(git rev-parse --short HEAD) --addl_tags latest
   # a dummy job so that we can require auto or canary branches
   require-bors:
     machine:
@@ -82,8 +74,7 @@ workflows:
       - e2e-test
       - lint
       - unit-test
-  docker-build-push:
-    jobs:
+      ### bors-controlled workflows ###
       - require-bors:
           filters:
             branches:
@@ -91,44 +82,6 @@ workflows:
                 - auto
                 - canary
       - docker-build-push:
-          name: docker-validator
-          image-name: validator
-          target-image-name: validator
-          context: aws-dev
-          requires:
-            - require-bors
-      - docker-build-push:
-          name: docker-forge
-          image-name: forge
-          target-image-name: forge
-          context: aws-dev
-          requires:
-            - require-bors
-      - docker-build-push:
-          name: docker-tools
-          image-name: tools
-          target-image-name: tools
-          context: aws-dev
-          requires:
-            - require-bors
-      - docker-build-push:
-          name: docker-init
-          image-name: init
-          target-image-name: init
-          context: aws-dev
-          requires:
-            - require-bors
-      - docker-build-push:
-          name: docker-faucet
-          image-name: faucet
-          target-image-name: faucet
-          context: aws-dev
-          requires:
-            - require-bors
-      - docker-build-push:
-          name: docker-safety-rules
-          image-name: safety-rules
-          target-image-name: validator_tcb
           context: aws-dev
           requires:
             - require-bors
