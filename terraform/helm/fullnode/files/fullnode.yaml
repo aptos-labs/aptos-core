@@ -30,5 +30,4 @@ storage:
   backup_service_address: "0.0.0.0:6186"
 
 api:
-  enabled: {{ .Values.enableApi | default false}}
   address: "0.0.0.0:8080"
