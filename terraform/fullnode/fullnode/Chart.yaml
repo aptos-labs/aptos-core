@@ -1,0 +1,4 @@
+apiVersion: v2
+name: pfn
+version: 0.1
+description: Additional components for a public fullnode fleet deployment

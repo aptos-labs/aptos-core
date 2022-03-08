@@ -1,0 +1,92 @@
+imageTag: latest
+
+imagePullSecret:
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name:
+  annotations: {}
+
+service:
+  monitoring:
+    loadBalancerSourceRanges:
+  fullnode:
+    numFullnodes:
+    exposeApi: true
+    loadBalancerSourceRanges:
+  domain:
+  aws_tags:
+
+ingress:
+  acm_certificate:
+  loadBalancerSourceRanges:
+
+monitoring:
+  prometheus:
+    useHttps: true
+    image:
+      repo: prom/prometheus
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources:
+      limits:
+        cpu: 1
+        memory: 3Gi
+      requests:
+        cpu: 1
+        memory: 3Gi
+    storage:
+      class:
+      size: 50Gi
+    retention: 15d
+  alertmanager:
+    alertRouteTrees:
+      - match:
+          severity: critical
+        receiver: 'critical'
+      - match:
+          severity: error
+        receiver: 'error'
+    alertReceivers:
+      - name: 'critical'
+      - name: 'error'
+      - name: 'default'
+    image:
+      repo: prom/alertmanager
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources:
+      limits:
+        cpu: 0.25
+        memory: 128Mi
+      requests:
+        cpu: 0.25
+        memory: 128Mi
+    logLevel: info
+  grafana:
+    image:
+      repo: grafana/grafana
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources:
+      limits:
+        cpu: 0.25
+        memory: 128Mi
+      requests:
+        cpu: 0.25
+        memory: 128Mi
+    googleAuth:
+    config:
+
+
+
+aws:
+  region:
+  cluster_name:
+  vpc_id:
+  role_arn:
+  zone_name:
+

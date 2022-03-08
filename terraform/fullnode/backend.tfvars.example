@@ -1,0 +1,3 @@
+bucket = "terraform.global"
+key    = "state/k8s-pfn"
+region = "us-west-2"

@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pfn.fullname" . }}-dashboards
+  labels:
+    {{- include "pfn.labels" . | nindent 4 }}
+binaryData:
+{{ (.Files.Glob "files/dashboards/*.json.gz").AsSecrets | indent 2 }}

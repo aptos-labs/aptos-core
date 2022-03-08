@@ -91,7 +91,7 @@ spec:
           aptos-genesis-tool treasury-compliance-key --validator-backend "$VAULT_BACKEND;namespace=aptos" --shared-backend "$FILE_BACKEND;namespace=aptos"
           {{- if .Values.service.fullnode.enableOnchainDiscovery }}
           # wait for DNS getting created
-          sleep 300
+          sleep 60
           {{- end }}
           for N in $(seq 0 $(({{ .Values.genesis.numValidators}}-1))); do
             {{- if .Values.localVaultBackend }}

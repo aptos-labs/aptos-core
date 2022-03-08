@@ -1,0 +1,19 @@
+{{- if .Values.service.fullnode.exposeApi }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "pfn.fullname" . }}-fullnode
+  labels:
+    {{- include "pfn.labels" . | nindent 4 }}
+  annotations:
+    alb.ingress.kubernetes.io/healthcheck-path: /-/healthy
+spec:
+  selector:
+    app.kubernetes.io/part-of: aptos-fullnode
+    app.kubernetes.io/name: fullnode
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: NodePort
+  externalTrafficPolicy: Local
+{{- end }}

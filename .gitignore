@@ -43,6 +43,7 @@ aptos-move/vm-genesis/genesis/vm_config.toml
 .terraform/
 terraform/terraform.tfstate*
 terraform/.terraform.tfstate*
+terraform/fullnode/*-kubernetes.json
 terraform/validator/*/*-kubernetes.json
 terraform/validator/*/*-vault.ca
 terraform/validator/*/*-kube.config

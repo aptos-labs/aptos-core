@@ -1,0 +1,21 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "pfn.fullname" . }}
+roleRef:
+  kind: ClusterRole
+  name: eks:podsecuritypolicy:privileged
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: {{ include "pfn.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+{{- range $i, $e := until (int .Values.service.fullnode.numFullnodes) }}
+- kind: ServiceAccount
+  name: pfn{{ $e }}-aptos-fullnode
+  namespace: {{ $.Release.Namespace }}
+{{- end }}
+- kind: ServiceAccount
+  name: pfn-pfn-aptos-logger
+  namespace: {{ $.Release.Namespace }}
+
