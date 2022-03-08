@@ -54,7 +54,7 @@ You may browse command line options with `target/debug/generate-transaction-buil
 
 NOTE: until the Diem version flag is set to greater than `2` the path
 used for generating transaction builders should be
-`aptos-move/diem-framework/legacy/transaction_scripts/abi`. You can query
+`aptos-move/framework/legacy/transaction_scripts/abi`. You can query
 this version number by submitting a `get_metadata` request to the JSON-RPC
 endpoint.
 
@@ -68,8 +68,8 @@ target/debug/generate-transaction-builders \
     --with-aptos-types "testsuite/generate-format/tests/staged/diem.yaml" \
     --target-source-dir "$DEST" \
     --with-custom-aptos-code aptos-move/transaction-builder-generator/examples/python3/custom_aptos_code/*.py -- \
-    "aptos-move/diem-framework/DPN/releases/legacy" \
-    "aptos-move/diem-framework/DPN/releases/artifacts/current"
+    "aptos-move/framework/DPN/releases/legacy" \
+    "aptos-move/framework/DPN/releases/artifacts/current"
 ```
 Next, you may copy and execute the [Python demo file](examples/python3/stdlib_demo.py) with:
 ```bash
@@ -86,8 +86,8 @@ target/debug/generate-transaction-builders \
     --module-name diem_framework \
     --with-aptos-types "testsuite/generate-format/tests/staged/diem.yaml" \
     --target-source-dir "$DEST" \
-    "aptos-move/diem-framework/DPN/releases/legacy" \
-    "aptos-move/diem-framework/DPN/releases/artifacts/current"
+    "aptos-move/framework/DPN/releases/legacy" \
+    "aptos-move/framework/DPN/releases/artifacts/current"
 ```
 Next, you may copy and execute the [C++ demo file](examples/cpp/stdlib_demo.cpp) with:
 ```bash
@@ -106,8 +106,8 @@ target/debug/generate-transaction-builders \
     --with-aptos-types "testsuite/generate-format/tests/staged/diem.yaml" \
     --target-source-dir "$DEST" \
     --with-custom-aptos-code aptos-move/transaction-builder-generator/examples/java/custom_aptos_code/*.java -- \
-    "aptos-move/diem-framework/DPN/releases/legacy" \
-    "aptos-move/diem-framework/DPN/releases/artifacts/current"
+    "aptos-move/framework/DPN/releases/legacy" \
+    "aptos-move/framework/DPN/releases/artifacts/current"
 ```
 Next, you may copy and execute the [Java demo file](examples/java/StdlibDemo.java) with:
 ```bash
@@ -127,8 +127,8 @@ target/debug/generate-transaction-builders \
     --aptos-package-name testing \
     --with-aptos-types "testsuite/generate-format/tests/staged/diem.yaml" \
     --target-source-dir "$DEST" \
-    "aptos-move/diem-framework/DPN/releases/legacy" \
-    "aptos-move/diem-framework/DPN/releases/artifacts/current"
+    "aptos-move/framework/DPN/releases/legacy" \
+    "aptos-move/framework/DPN/releases/artifacts/current"
 ```
 Next, you may copy and execute the [Go demo file](examples/golang/stdlib_demo.go) as follows:
 (Note that `$DEST` must be an absolute path)
@@ -146,8 +146,8 @@ target/debug/generate-transaction-builders \
     --module-name framework \
     --with-aptos-types "testsuite/generate-format/tests/staged/diem.yaml" \
     --target-source-dir "$DEST" \
-    "aptos-move/diem-framework/DPN/releases/legacy" \
-    "aptos-move/diem-framework/DPN/releases/artifacts/current"
+    "aptos-move/framework/DPN/releases/legacy" \
+    "aptos-move/framework/DPN/releases/artifacts/current"
 ```
 Next, you may copy and execute the [Rust demo file](examples/rust/stdlib_demo.rs). (See [unit test](tests/generation.rs) for details.)
 
@@ -161,8 +161,8 @@ target/debug/generate-transaction-builders \
     --module-name diemStdlib \
     --with-aptos-types "testsuite/generate-format/tests/staged/diem.yaml" \
     --target-source-dir "$DEST" \
-    "aptos-move/diem-framework/DPN/releases/legacy" \
-    "aptos-move/diem-framework/DPN/releases/artifacts/current"
+    "aptos-move/framework/DPN/releases/legacy" \
+    "aptos-move/framework/DPN/releases/artifacts/current"
 ```
 
 ### C#
@@ -175,8 +175,8 @@ target/debug/generate-transaction-builders \
     --with-aptos-types "testsuite/generate-format/tests/staged/diem.yaml" \
     --target-source-dir "$DEST" \
     --with-custom-aptos-code aptos-move/transaction-builder-generator/examples/csharp/custom_aptos_code/*.cs -- \
-    "aptos-move/diem-framework/DPN/releases/legacy" \
-    "aptos-move/diem-framework/DPN/releases/artifacts/current"
+    "aptos-move/framework/DPN/releases/legacy" \
+    "aptos-move/framework/DPN/releases/artifacts/current"
 ```
 Next, you may copy and execute the [C# demo file](examples/csharp/StdlibDemo.cs) with:
 ```bash

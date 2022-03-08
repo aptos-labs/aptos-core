@@ -278,7 +278,7 @@ mark-changed = []
 
 [[determinator.path-rule]]
 # Required by get_stdlib_script_abis in transaction-builder-generator.
-globs = ["aptos-move/diem-framework/DPN/releases/artifacts/current/**/*"]
+globs = ["aptos-move/framework/DPN/releases/artifacts/current/**/*"]
 mark-changed = ["transaction-builder-generator"]
 post-rule = "skip-rules"
 

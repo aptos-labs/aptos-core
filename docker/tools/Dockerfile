@@ -49,21 +49,21 @@ COPY --from=builder /aptos/target/release/aptos-transaction-replay /usr/local/bi
 ### Get DPN Move modules bytecodes for genesis ceremony
 RUN mkdir -p /aptos/move/build
 RUN mkdir -p /aptos/move/modules
-COPY --from=builder /aptos/aptos-move/diem-framework/DPN/releases/artifacts/current/build /aptos/move/build
+COPY --from=builder /aptos/aptos-move/framework/DPN/releases/artifacts/current/build /aptos/move/build
 RUN mv /aptos/move/build/**/bytecode_modules/*.mv /aptos/move/modules
 RUN rm -rf /aptos/move/build
 
 ### Get experimental Move modules bytecodes for genesis ceremony
 RUN mkdir -p /experimental/move/build
 RUN mkdir -p /experimental/move/modules
-COPY --from=builder /aptos/aptos-move/diem-framework/experimental/releases/artifacts/current/build /experimental/move/build
+COPY --from=builder /aptos/aptos-move/framework/experimental/releases/artifacts/current/build /experimental/move/build
 RUN mv /experimental/move/build/**/bytecode_modules/*.mv /experimental/move/modules
 RUN rm -rf /experimental/move/build
 
 ### Get Aptos Move modules bytecodes for genesis ceremony
 RUN mkdir -p /aptos-framework/move/build
 RUN mkdir -p /aptos-framework/move/modules
-COPY --from=builder /aptos/aptos-move/diem-framework/aptos-framework/releases/artifacts/current/build /aptos-framework/move/build
+COPY --from=builder /aptos/aptos-move/framework/aptos-framework/releases/artifacts/current/build /aptos-framework/move/build
 RUN mv /aptos-framework/move/build/**/bytecode_modules/*.mv /aptos-framework/move/modules
 RUN rm -rf /aptos-framework/move/build
 
