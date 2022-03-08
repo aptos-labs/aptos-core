@@ -310,22 +310,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-documentation-tool"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-workspace-hack",
- "once_cell",
- "regex",
- "serde 1.0.136",
- "serde-generate",
- "serde-reflection",
- "serde_yaml",
- "structopt",
- "tempfile",
-]
-
-[[package]]
 name = "aptos-e2e-tests-replay"
 version = "0.1.0"
 dependencies = [
@@ -7474,23 +7458,6 @@ checksum = "4872ced36b91d47bae8a214a683fe54e7078875b399dfa251df346c9b547d1f9"
 dependencies = [
  "atty",
  "is_ci",
-]
-
-[[package]]
-name = "swiss-knife"
-version = "0.1.0"
-dependencies = [
- "aptos-crypto",
- "aptos-transaction-builder",
- "aptos-types",
- "aptos-workspace-hack",
- "bcs",
- "hex",
- "move-core-types",
- "rand 0.8.4",
- "serde 1.0.136",
- "serde_json",
- "structopt",
 ]
 
 [[package]]

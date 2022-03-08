@@ -165,7 +165,6 @@ members = [
     # Please keep this list in alphabetical order!
 
     "testcases",
-    "aptos-documentation-tool",
     "aptos-e2e-tests-replay",
     "aptos-framework-releases",
     "aptos-fuzz",
