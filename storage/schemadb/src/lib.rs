@@ -29,7 +29,7 @@ use crate::{
 use anyhow::{ensure, format_err, Result};
 use aptos_logger::prelude::*;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     iter::Iterator,
     marker::PhantomData,
     path::Path,
@@ -50,15 +50,15 @@ pub const DEFAULT_CF_NAME: ColumnFamilyName = "default";
 
 #[derive(Debug)]
 enum WriteOp {
-    Value(Vec<u8>),
-    Deletion,
+    Value { key: Vec<u8>, value: Vec<u8> },
+    Deletion { key: Vec<u8> },
 }
 
 /// `SchemaBatch` holds a collection of updates that can be applied to a DB atomically. The updates
 /// will be applied in the order in which they are added to the `SchemaBatch`.
 #[derive(Debug, Default)]
 pub struct SchemaBatch {
-    rows: HashMap<ColumnFamilyName, BTreeMap<Vec<u8>, WriteOp>>,
+    rows: HashMap<ColumnFamilyName, Vec<WriteOp>>,
 }
 
 impl SchemaBatch {
@@ -76,8 +76,8 @@ impl SchemaBatch {
         let value = <S::Value as ValueCodec<S>>::encode_value(value)?;
         self.rows
             .entry(S::COLUMN_FAMILY_NAME)
-            .or_insert_with(BTreeMap::new)
-            .insert(key, WriteOp::Value(value));
+            .or_insert_with(Vec::new)
+            .push(WriteOp::Value { key, value });
 
         Ok(())
     }
@@ -87,8 +87,8 @@ impl SchemaBatch {
         let key = <S::Key as KeyCodec<S>>::encode_key(key)?;
         self.rows
             .entry(S::COLUMN_FAMILY_NAME)
-            .or_insert_with(BTreeMap::new)
-            .insert(key, WriteOp::Deletion);
+            .or_insert_with(Vec::new)
+            .push(WriteOp::Deletion { key });
 
         Ok(())
     }
@@ -394,10 +394,10 @@ impl DB {
         let mut db_batch = rocksdb::WriteBatch::default();
         for (cf_name, rows) in &batch.rows {
             let cf_handle = self.get_cf_handle(cf_name)?;
-            for (key, write_op) in rows {
+            for write_op in rows {
                 match write_op {
-                    WriteOp::Value(value) => db_batch.put_cf(cf_handle, key, value),
-                    WriteOp::Deletion => db_batch.delete_cf(cf_handle, key),
+                    WriteOp::Value { key, value } => db_batch.put_cf(cf_handle, key, value),
+                    WriteOp::Deletion { key } => db_batch.delete_cf(cf_handle, key),
                 }
             }
         }
@@ -407,14 +407,14 @@ impl DB {
 
         // Bump counters only after DB write succeeds.
         for (cf_name, rows) in &batch.rows {
-            for (key, write_op) in rows {
+            for write_op in rows {
                 match write_op {
-                    WriteOp::Value(value) => {
+                    WriteOp::Value { key, value } => {
                         DIEM_SCHEMADB_PUT_BYTES
                             .with_label_values(&[cf_name])
                             .observe((key.len() + value.len()) as f64);
                     }
-                    WriteOp::Deletion => {
+                    WriteOp::Deletion { key: _ } => {
                         DIEM_SCHEMADB_DELETES.with_label_values(&[cf_name]).inc();
                     }
                 }
