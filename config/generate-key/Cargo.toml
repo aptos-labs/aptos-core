@@ -1,10 +1,10 @@
 [package]
 name = "generate-key"
 version = "0.1.0"
-authors = ["Aptos Foundation <opensource@aptos-labs.com>"]
+authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
 description = "Aptos generate key"
 repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptos-labs.com"
+homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 edition = "2018"

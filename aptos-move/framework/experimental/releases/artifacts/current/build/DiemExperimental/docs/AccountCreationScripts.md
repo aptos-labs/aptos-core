@@ -49,7 +49,7 @@ Creates an account with a Validator Operator role at <code>new_account_address</
 <code><a href="../../../../../../../experimental/releases/artifacts/current/build/CoreFramework/docs/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource with the specified <code>human_name</code>.
 This script does not assign the validator operator to any validator accounts but only creates the account.
 Authentication key prefixes, and how to construct them from an ed25519 public key are described
-[here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+[here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
 
 
 <a name="@Events_2"></a>
@@ -156,7 +156,7 @@ Creates an account with a Validator role at <code>new_account_address</code>, wi
 This script does not add the validator to the validator set or the system,
 but only creates the account.
 Authentication keys, prefixes, and how to construct them from an ed25519 public key are described
-[here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+[here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
 
 
 <a name="@Events_8"></a>

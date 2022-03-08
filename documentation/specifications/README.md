@@ -2,11 +2,11 @@
 
 This document describes the protocol specifications for the Diem Payment Network (LPN). The intended audience for this document are as follows:
 
-* Virtual Asset Service Providers (VASPs), designated dealers (DDs), and other [ecosystem developers](https://aptos-labs.com/en-US/white-paper/) who build software that can interface with the LPN.
+* Virtual Asset Service Providers (VASPs), designated dealers (DDs), and other [ecosystem developers](https://aptoslabs.com/en-US/white-paper/) who build software that can interface with the LPN.
 * Developers who work on supporting transaction validation and interface with the validation protocols.
 * Those interested in improving the protocol specifications and/or understanding the LPN in more detail.
 
-The reference implementations for all LPN specifications is [Aptos Core](https://github.com/diem/diem). Aptos Core is maintained by the open-source developer community on behalf of the [Aptos Foundation](https://aptos-labs.com/en-US/association/). After the initial launch of the LPN, all specification changes will be proposed via the Diem Improvement Proposals (DIP) process - which is not yet finalized and public. For expedience prior to the launch of the LPN, changes to the specification will be made directly in the documentation and code.
+The reference implementations for all LPN specifications is [Aptos Core](https://github.com/diem/diem). Aptos Core is maintained by the open-source developer community on behalf of the [Aptos Foundation](https://aptoslabs.com/en-US/association/). After the initial launch of the LPN, all specification changes will be proposed via the Diem Improvement Proposals (DIP) process - which is not yet finalized and public. For expedience prior to the launch of the LPN, changes to the specification will be made directly in the documentation and code.
 
 ## Overview
 
@@ -19,7 +19,7 @@ latency, and an efficient, high-capacity storage system.
 * Highly secure to ensure the safety of funds and financial data.
 * Flexible, so that it can power future innovation in financial services.
 
-The Diem Blockchain is designed from the ground up to holistically address these requirements and builds on the learnings from existing projects and research — a combination of innovative approaches and well-understood techniques. The [Diem whitepaper](https://developers.aptos-labs.com/docs/assets/papers/the-diem-blockchain/2019-09-26.pdf) provides much of the rationale behind the overall design.  More details on the Aptos Foundation and its mission are available on [aptos-labs.com](https://aptos-labs.com)
+The Diem Blockchain is designed from the ground up to holistically address these requirements and builds on the learnings from existing projects and research — a combination of innovative approaches and well-understood techniques. The [Diem whitepaper](https://developers.aptoslabs.com/docs/assets/papers/the-diem-blockchain/2019-09-26.pdf) provides much of the rationale behind the overall design.  More details on the Aptos Foundation and its mission are available on [aptoslabs.com](https://aptoslabs.com)
 
 ## Architecture
 
@@ -68,7 +68,7 @@ The process for upgrading the LPN specifications is as follows:
 
 1. **Seed an idea**. A Contributor should socialize their idea with the Diem developer community and Maintainers. They might create a [GitHub issue](https://github.com/aptos-labs/aptos-core/issues) or use another means of gathering feedback.
 
-2. **[Standard DIP](https://dip.aptos-labs.com/overview)**. A Contributor proposes a new standard DIP that modifies an existing specification(s) or proposes a new specification. If the standard DIP reaches the "Accepted" status, the proposed changes will be set in the new specification version as well as implemented in the Aptos Core master branch. Other implementations of the protocol must follow these changes as well.
+2. **[Standard DIP](https://dip.aptoslabs.com/overview)**. A Contributor proposes a new standard DIP that modifies an existing specification(s) or proposes a new specification. If the standard DIP reaches the "Accepted" status, the proposed changes will be set in the new specification version as well as implemented in the Aptos Core master branch. Other implementations of the protocol must follow these changes as well.
 
 3. **LPN upgrade**. There are two types of specification upgrades: backwards-incompatible (e.g. hard forks) or backwards-compatible (e.g. soft forks). Unlike conventional software systems, backwards-incompatible upgrades are likely to be much more common than backwards-compatible upgrades in LPN. Because the purpose of LPN is to agree on the bit-precise result of executing a computation and most specifications contribute to that result, almost every upgrade will break compatibility with previous versions. Thus, we will assume that proposed upgrades are backwards-incompatible by default and require rigorous justification to handle an upgrade as backwards-compatible. In addition, changes to the following specifications are backwards-incompatible by definition:
 

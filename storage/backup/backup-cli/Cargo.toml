@@ -1,9 +1,9 @@
 [package]
 name = "backup-cli"
 version = "0.1.0"
-authors = ["Aptos Foundation <opensource@aptos-labs.com>"]
+authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
 repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptos-labs.com"
+homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 edition = "2018"

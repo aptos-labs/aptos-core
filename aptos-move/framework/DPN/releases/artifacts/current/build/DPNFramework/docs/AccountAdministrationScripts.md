@@ -326,7 +326,7 @@ Any account can send this transaction.
 ### Technical Description
 
 Rotates the authentication key of the sending account to the
-[authentication key derived from <code>public_key</code>](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys)
+[authentication key derived from <code>public_key</code>](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys)
 and publishes a <code><a href="SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_SharedEd25519PublicKey">SharedEd25519PublicKey::SharedEd25519PublicKey</a></code> resource
 containing the 32-byte ed25519 <code>public_key</code> and the <code><a href="DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> for
 <code>account</code> under <code>account</code>.
@@ -414,7 +414,7 @@ Rotates the <code>account</code>'s authentication key to the supplied new authen
 
 Rotate the <code>account</code>'s <code><a href="DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>authentication_key</code>
 field to <code>new_key</code>. <code>new_key</code> must be a valid authentication key that
-corresponds to an ed25519 public key as described [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
+corresponds to an ed25519 public key as described [here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
 and <code>account</code> must not have previously delegated its <code><a href="DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.
 
 
@@ -522,7 +522,7 @@ Compliance or Diem Root accounts).
 
 Rotates the <code>account</code>'s <code><a href="DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>authentication_key</code>
 field to <code>new_key</code>. <code>new_key</code> must be a valid authentication key that
-corresponds to an ed25519 public key as described [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
+corresponds to an ed25519 public key as described [here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
 and <code>account</code> must not have previously delegated its <code><a href="DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.
 
 
@@ -637,7 +637,7 @@ only be sent by the Diem Root account as a write set transaction.
 
 Rotate the <code>account</code>'s <code><a href="DiemAccount.md#0x1_DiemAccount_DiemAccount">DiemAccount::DiemAccount</a></code> <code>authentication_key</code> field to <code>new_key</code>.
 <code>new_key</code> must be a valid authentication key that corresponds to an ed25519
-public key as described [here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
+public key as described [here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys),
 and <code>account</code> must not have previously delegated its <code><a href="DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.
 
 
@@ -763,7 +763,7 @@ new authentication key. Only used for accounts that are part of a recovery addre
 Rotates the authentication key of the <code>to_recover</code> account to <code>new_key</code> using the
 <code><a href="DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> stored in the <code><a href="RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> resource
 published under <code>recovery_address</code>. <code>new_key</code> must be a valide authentication key as described
-[here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+[here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
 This transaction can be sent either by the <code>to_recover</code> account, or by the account where the
 <code><a href="RecoveryAddress.md#0x1_RecoveryAddress_RecoveryAddress">RecoveryAddress::RecoveryAddress</a></code> resource is published that contains <code>to_recover</code>'s <code><a href="DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code>.
 
@@ -989,7 +989,7 @@ any account that has previously published a shared ed25519 public key using
 <code>public_key</code> must be a valid ed25519 public key.  This transaction first rotates the public key stored in <code>account</code>'s
 <code><a href="SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_SharedEd25519PublicKey">SharedEd25519PublicKey::SharedEd25519PublicKey</a></code> resource to <code>public_key</code>, after which it
 rotates the <code>account</code>'s authentication key to the new authentication key derived from <code>public_key</code> as defined
-[here](https://developers.aptos-labs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys)
+[here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys)
 using the <code><a href="DiemAccount.md#0x1_DiemAccount_KeyRotationCapability">DiemAccount::KeyRotationCapability</a></code> stored in <code>account</code>'s <code><a href="SharedEd25519PublicKey.md#0x1_SharedEd25519PublicKey_SharedEd25519PublicKey">SharedEd25519PublicKey::SharedEd25519PublicKey</a></code>.
 
 

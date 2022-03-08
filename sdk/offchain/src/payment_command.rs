@@ -234,7 +234,7 @@ impl PaymentState {
 
                 PaymentState::RecieverSend
             }
-            // https://dip.aptos-labs.com/dip-1/#sinit---rabort-step-9 states that the abort code needs
+            // https://dip.aptoslabs.com/dip-1/#sinit---rabort-step-9 states that the abort code needs
             // to be one of "no-kyc-needed" or "rejected" but "no-kyc-needed" isn't a valid abort
             // code
             (Status::NeedsKycData, _, Status::Abort, _) => PaymentState::RecieverAbort,

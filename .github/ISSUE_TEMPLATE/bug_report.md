@@ -10,7 +10,7 @@ assignees: ''
 # 🐛 Bug
 
 <!-- A clear and concise description of what the bug is.
-To report a security issue, please email security@aptos-labs.com. -->
+To report a security issue, please email security@aptoslabs.com. -->
 
 ## To reproduce
 

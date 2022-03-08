@@ -6,7 +6,7 @@ smoke-test = { path = "smoke-test" }
 testcases = { path = "testsuite/testcases" }
 
 [cargo.sccache]
-bucket = "ci-artifacts.aptos-labs.com"
+bucket = "ci-artifacts.aptoslabs.com"
 prefix = "sccache/diem/"
 public = true
 region = "us-west-2"
@@ -118,7 +118,7 @@ allowed-paths = "^([a-zA-Z0-9._\\-/@:]|-)+$"
 whitespace-exceptions = [
     ".github/actions/*/dist/*",
     # TODO: reevaluate skipping whitespace checks in .md files for the website
-    "developers.aptos-labs.com/**/*.md",
+    "developers.aptoslabs.com/**/*.md",
     "developer-docs-site/**/*",
     "**/*.exp",
     "**/*.errmap",
@@ -131,7 +131,7 @@ license-exceptions = [
 ]
 
 [workspace.enforced-attributes]
-authors = ["Aptos Foundation <opensource@aptos-labs.com>"]
+authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
 license = "Apache-2.0"
 
 [workspace.banned-deps.direct]
@@ -263,7 +263,7 @@ mark-changed = "all"
 
 [[determinator.path-rule]]
 # Ignore website and other ancillary files, and scripts not listed above.
-globs = ["developers.aptos-labs.com/**/*", "developer-docs-site/**/*", "documentation/**/*", "docker/**/*", "language/documentation/**/*", "specifications/**/*", "scripts/**/*", "terraform/**/*"]
+globs = ["developers.aptoslabs.com/**/*", "developer-docs-site/**/*", "documentation/**/*", "docker/**/*", "language/documentation/**/*", "specifications/**/*", "scripts/**/*", "terraform/**/*"]
 mark-changed = []
 
 [[determinator.path-rule]]
