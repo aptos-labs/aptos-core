@@ -2,7 +2,6 @@ version: 2.1
 
 orbs:
   aws-cli: circleci/aws-cli@2.1.0
-  aws-ecr: circleci/aws-ecr@7.3.0
 
 jobs:
   build-benchmarks:
@@ -60,6 +59,38 @@ jobs:
       - checkout
       - aws-setup
       - run: ./docker/build-aws.sh --build-all --version $(git rev-parse --short HEAD) --addl_tags latest
+  forge-k8s:
+    machine:
+      image: ubuntu-2004:current
+    resource_class: xlarge
+    steps:
+      - checkout
+      - aws-setup
+      - run: echo "export IMAGE_TAG=dev_$(git rev-parse --short HEAD)" >> $BASH_ENV
+      # since we're running with `--build-all`, assume that if it passes, we have all images required for Forge
+      - run: aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG
+      - run: ./scripts/fgi/run --tag $IMAGE_TAG --suite land_blocking
+      - run:
+          name: Post Forge Results to GitHub PR
+          command: |
+            sudo apt-get install jq
+
+            pr_response=$(curl --location --request GET "https://api.github.com/repos/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pulls?head=$CIRCLE_PROJECT_USERNAME:$CIRCLE_BRANCH&state=open" \
+            -u $FORGE_GH_USER:$FORGE_GH_TOKEN)
+
+            if [ $(echo $pr_response | jq length) -eq 0 ]; then
+              echo "No PR found to update"
+            else
+              pr_comment_url=$(echo $pr_response | jq -r ".[]._links.comments.href")
+            fi
+
+            curl --location --request POST "$pr_comment_url" \
+            -u $FORGE_GH_USER:$FORGE_GH_TOKEN \
+            --header 'Content-Type: application/json' \
+            --data-raw '{
+            "body": "This would be the data to add"
+            }'
+
   # a dummy job so that we can require auto or canary branches
   require-bors:
     machine:
@@ -85,6 +116,10 @@ workflows:
           context: aws-dev
           requires:
             - require-bors
+      - forge-k8s:
+          context: aws-dev
+          requires:
+            - docker-build-push
 commands:
   dev-setup:
     steps:
@@ -95,11 +130,6 @@ commands:
       - run: cat $HOME/.cargo/env >> $BASH_ENV
   aws-setup:
     steps:
-      - run:
-          name: Compose AWS Env Variables
-          command: |
-            echo 'export AWS_ECR_ACCOUNT_URL="${AWS_ECR_ACCOUNT_NUM}.dkr.ecr.${AWS_REGION}.amazonaws.com"' >> $BASH_ENV
       - aws-cli/install
       # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
       - aws-cli/setup
-      - aws-ecr/ecr-login
