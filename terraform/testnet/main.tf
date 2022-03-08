@@ -118,10 +118,6 @@ resource "helm_release" "testnet" {
           }
         }
       }
-      cluster_test = {
-        nodeSelector = jsondecode(module.validator.helm_values)["validator"]["nodeSelector"]
-        tolerations  = jsondecode(module.validator.helm_values)["validator"]["tolerations"]
-      }
       aws = {
         region       = var.region
         cluster_name = data.aws_eks_cluster.aptos.name

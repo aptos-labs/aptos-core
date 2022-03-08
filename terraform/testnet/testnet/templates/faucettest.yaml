@@ -20,7 +20,7 @@ metadata:
     app.kubernetes.io/name: faucet-test
 spec:
   concurrencyPolicy: Replace
-  schedule: {{ printf "%d-59/%d * * * *" (int .Values.faucet_test.offsetMins) (int .Values.cluster_test.intervalMins) | quote }}
+  schedule: {{ printf "%d * * * *" (int .Values.faucet_test.offsetMins) | quote }}
   jobTemplate:
     spec:
       template:
@@ -33,26 +33,6 @@ spec:
         spec:
           restartPolicy: Never
           priorityClassName: {{ include "testnet.fullname" . }}-high
-          initContainers:
-          # prevent concurrent jobs with cluster-test
-          - name: wait-cluster-test
-            image: {{ .Values.genesis.image.repo }}:{{ .Values.genesis.image.tag | default .Values.imageTag }}
-            imagePullPolicy: {{ .Values.genesis.image.pullPolicy }}
-            command:
-            - sh
-            - -c
-            - |-
-              set +e
-              delay=5
-              for attempt in $(seq 60) ; do
-                kubectl get pods --selector=app.kubernetes.io/name=cluster-test --field-selector=status.phase=Running | tee /tmp/kube.list
-                if [ ! -s /tmp/kube.list ]; then
-                  sleep 10
-                  exit
-                fi
-                echo Attempt $attempt, CT still running. Sleeping "$delay"s
-                sleep $delay
-              done
           containers:
           - name: faucet-test
             image: {{ .Values.faucet.image.repo }}:{{ .Values.faucet.image.tag | default .Values.imageTag }}

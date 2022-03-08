@@ -142,28 +142,6 @@ monitoring:
     googleAuth:
     config:
 
-cluster_test:
-  enabled: true
-  image:
-    repo: aptos/cluster_test
-    tag:
-    pullPolicy: IfNotPresent
-  resources:
-    limits:
-      cpu: 1
-      memory: 512Mi
-    requests:
-      cpu: 1
-      memory: 512Mi
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
-  intervalMins: 15
-  config:
-    duration: 300
-    accounts_per_client: 12
-    workers_per_ac: 64
-
 # if enabled, faucet_test is synchronized with cluster_test traffic
 # to prevent race on mint account
 faucet_test:
