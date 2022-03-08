@@ -107,7 +107,7 @@ resource "aws_dynamodb_table" "vault" {
   }
 
   lifecycle {
-    # prevent_destroy = true
+    prevent_destroy = true
   }
 }
 
