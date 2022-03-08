@@ -2,7 +2,7 @@
 name = "testcases"
 version = "0.0.0"
 authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
-description = "compat tests"
+description = "Aptos compatibility tests"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"

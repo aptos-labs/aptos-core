@@ -2,9 +2,13 @@
 name = "num-variants"
 version = "0.1.0"
 authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
-edition = "2018"
-publish = false
+description = "Utility to add a constant value to enum variants"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
+publish = false
+edition = "2018"
+
 
 [lib]
 proc-macro = true

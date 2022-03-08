@@ -2,7 +2,7 @@
 name = "swiss-knife"
 version = "0.1.0"
 authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
-description = "Tool for generating, serializing (LCS), hashing and signing Diem transactions. Additionally, contains tools for testing"
+description = "Tool for generating, serializing (BCS), hashing and signing Aptos transactions. Additionally, contains tools for testing"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"

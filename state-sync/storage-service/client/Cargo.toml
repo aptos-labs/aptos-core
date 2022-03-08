@@ -2,7 +2,7 @@
 name = "storage-service-client"
 version = "0.1.0"
 authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
-description = "The Diem storage service (client-side)"
+description = "The Aptos storage service (client-side)"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"

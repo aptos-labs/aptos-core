@@ -2,6 +2,7 @@
 name = "transaction-emitter"
 version = "0.0.0"
 authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
+description = "Aptos transaction emitter for testing"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"

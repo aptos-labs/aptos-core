@@ -2,7 +2,7 @@
 name = "aptos-time-service"
 version = "0.1.0"
 authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
-description = "Aptos Time Service"
+description = "Time Service for mocking time with tokio"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"

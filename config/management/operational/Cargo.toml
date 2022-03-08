@@ -2,7 +2,7 @@
 name = "aptos-operational-tool"
 version = "0.1.0"
 authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
-description = "Aptos Management is a tool for operators to manage nodes"
+description = "Tool for operators to manage nodes"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
