@@ -2,7 +2,7 @@
 name = "aptos-id-generator"
 version = "0.1.0"
 authors = ["Aptos Foundation <opensource@aptos-labs.com>"]
-description = "Diem aptos-id-generator. A common id generator for Diem"
+description = "Aptos aptos-id-generator. A common id generator for Diem"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptos-labs.com"
 license = "Apache-2.0"

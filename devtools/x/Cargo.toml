@@ -2,7 +2,7 @@
 name = "x"
 version = "0.1.0"
 authors = ["Aptos Foundation <opensource@aptos-labs.com>"]
-description = "Diem extended cargo tasks"
+description = "Aptos extended cargo tasks"
 edition = "2018"
 publish = false
 license = "Apache-2.0"

@@ -2,7 +2,7 @@
 name = "executor-test-helpers"
 version = "0.1.0"
 authors = ["Aptos Foundation <opensource@aptos-labs.com>"]
-description = "Diem executor test helpers"
+description = "Aptos executor test helpers"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptos-labs.com"
 license = "Apache-2.0"

@@ -2,7 +2,7 @@
 name = "aptos-crypto-derive"
 version = "0.0.3"
 authors = ["Aptos Foundation <opensource@aptos-labs.com>"]
-description = "Diem custom derives for `aptos-crypto`"
+description = "Aptos custom derives for `aptos-crypto`"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptos-labs.com"
 license = "Apache-2.0"

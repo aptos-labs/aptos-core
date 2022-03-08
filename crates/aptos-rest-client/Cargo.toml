@@ -2,7 +2,7 @@
 name = "aptos-rest-client"
 version = "0.0.0"
 authors = ["Aptos Foundation <opensource@aptos-labs.com>"]
-description = "Diem Rest client"
+description = "Aptos Rest client"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptos-labs.com"
 license = "Apache-2.0"

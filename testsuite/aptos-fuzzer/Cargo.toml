@@ -2,7 +2,7 @@
 name = "aptos-fuzzer"
 version = "0.1.0"
 authors = ["Aptos Foundation <opensource@aptos-labs.com>"]
-description = "Diem fuzzer"
+description = "Aptos fuzzer"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptos-labs.com"
 license = "Apache-2.0"
