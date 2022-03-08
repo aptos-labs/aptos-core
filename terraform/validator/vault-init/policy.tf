@@ -52,11 +52,6 @@ data "vault_policy_document" "validator" {
     capabilities = ["read"]
     description  = "Allow reading the genesis waypoint"
   }
-  rule {
-    path         = "${var.kv_v2_mount}/data/${var.namespace}/validator_network_address_keys"
-    capabilities = ["read"]
-    description  = "Allow reading the shared validator network address keys"
-  }
 }
 
 resource "vault_policy" "validator" {

@@ -78,7 +78,6 @@ impl ValidatorConfig {
 /// * CONSENSUS_KEY
 /// * FULLNODE_NETWORK_KEY
 /// * VALIDATOR_NETWORK_KEY
-/// * VALIDATOR_NETWORK_ADDRESS_KEYS - For encrypting network addresses
 /// * OPERATOR_ACCOUNT
 /// * OPERATOR_KEY
 pub fn build_validator_config_transaction<S: KVStorage + CryptoStorage>(

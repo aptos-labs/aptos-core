@@ -19,7 +19,7 @@ use aptos_crypto::{
 };
 use aptos_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, GENESIS_WAYPOINT, OPERATOR_ACCOUNT, OPERATOR_KEY,
-    OWNER_ACCOUNT, OWNER_KEY, VALIDATOR_NETWORK_ADDRESS_KEYS, VALIDATOR_NETWORK_KEY, WAYPOINT,
+    OWNER_ACCOUNT, OWNER_KEY, VALIDATOR_NETWORK_KEY, WAYPOINT,
 };
 use aptos_management::storage::to_x25519;
 use aptos_operational_tool::{
@@ -1031,53 +1031,9 @@ async fn test_validator_config() {
 }
 
 #[tokio::test]
-async fn test_validator_decryption() {
-    let (_swarm, op_tool, backend, mut storage) = launch_swarm_with_op_tool_and_backend(1).await;
-
-    // Fetch the validator config and validator info for this operator's owner
-    let owner_account = storage.get::<AccountAddress>(OWNER_ACCOUNT).unwrap().value;
-    let validator_config = op_tool
-        .validator_config(owner_account, Some(&backend))
-        .await
-        .unwrap();
-    let validator_set_infos = op_tool
-        .validator_set(Some(owner_account), Some(&backend))
-        .await
-        .unwrap();
-    assert_eq!(1, validator_set_infos.len());
-
-    let config_network_address = validator_config.validator_network_address;
-    let info_network_address = validator_set_infos[0].validator_network_address.clone();
-    assert_eq!(config_network_address, info_network_address,);
-
-    // Corrupt the network address encryption key in storage
-    storage
-        .set(VALIDATOR_NETWORK_ADDRESS_KEYS, "INVALID KEY")
-        .unwrap();
-
-    // Verify that any failure to decrypt the address will still produce a result
-    for backend in &[Some(&backend), None] {
-        // Fetch the validator config and validator info for this operator's owner
-        let validator_config = op_tool
-            .validator_config(owner_account, *backend)
-            .await
-            .unwrap();
-        let validator_set_infos = op_tool
-            .validator_set(Some(owner_account), *backend)
-            .await
-            .unwrap();
-
-        // Ensure the validator network addresses failed to decrypt, but everything else was fetched
-        let config_network_address = validator_config.validator_network_address;
-        let info_network_address = validator_set_infos[0].validator_network_address.clone();
-        assert_eq!(config_network_address, info_network_address);
-    }
-}
-
-#[tokio::test]
 async fn test_validator_set() {
     let num_nodes = 4;
-    let (_env, op_tool, backend, mut storage) =
+    let (_env, op_tool, backend, storage) =
         launch_swarm_with_op_tool_and_backend(num_nodes).await;
 
     // Fetch the validator config and validator info for this operator's owner
@@ -1112,32 +1068,6 @@ async fn test_validator_set() {
     // Fetch the entire validator set and check this account is included
     let validator_set_infos = op_tool.validator_set(None, Some(&backend)).await.unwrap();
     assert_eq!(num_nodes, validator_set_infos.len());
-    let _ = validator_set_infos
-        .iter()
-        .find(|info| info.account_address == owner_account)
-        .unwrap();
-
-    // Overwrite the shared network encryption key in storage and verify that the
-    // validator set can still be retrieved (but unable to decrypt the validator
-    // network address)
-    let _ = storage
-        .set(VALIDATOR_NETWORK_ADDRESS_KEYS, "random string")
-        .unwrap();
-    let validator_set_infos = op_tool.validator_set(None, Some(&backend)).await.unwrap();
-    assert_eq!(num_nodes, validator_set_infos.len());
-
-    let validator_info = validator_set_infos
-        .iter()
-        .find(|info| info.account_address == owner_account)
-        .unwrap();
-    assert_eq!(
-        validator_info.fullnode_network_address,
-        validator_config.fullnode_network_address
-    );
-    assert_eq!(
-        validator_info.validator_network_address,
-        validator_config.validator_network_address
-    );
 }
 
 async fn test_verify_validator_state(
