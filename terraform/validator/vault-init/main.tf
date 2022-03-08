@@ -70,19 +70,6 @@ resource "vault_generic_secret" "operator_account" {
   disable_read = true
 }
 
-resource "vault_generic_secret" "validator_network_address_keys" {
-  path = "${var.kv_v2_mount}/${var.namespace}/validator_network_address_keys"
-  data_json = jsonencode({
-    validator_network_address_keys = {
-      current = 0
-      keys = {
-        "0" = var.validator_network_address_key
-      }
-    }
-  })
-  depends_on = [null_resource.mounts_created]
-}
-
 resource "vault_transit_secret_backend_key" "owner" {
   backend    = var.transit_mount
   name       = "${var.namespace}__owner"
