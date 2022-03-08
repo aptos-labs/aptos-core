@@ -66,30 +66,19 @@ jobs:
     steps:
       - checkout
       - aws-setup
-      - run: echo "export IMAGE_TAG=dev_$(git rev-parse --short HEAD)" >> $BASH_ENV
+      - run: echo "export IMAGE_TAG=dev_1521a7ee" >> $BASH_ENV
       # since we're running with `--build-all`, assume that if it passes, we have all images required for Forge
       - run: aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG
-      - run: ./scripts/fgi/run --tag $IMAGE_TAG --suite land_blocking
+      # - run: ./scripts/fgi/run --tag $IMAGE_TAG --suite land_blocking
       - run:
           name: Post Forge Results to GitHub PR
           command: |
-            sudo apt-get install jq
+            commit_message=$(git log -1 --pretty=%B)
+            PR_NUMBER=$(echo "${commit_message}" | grep 'Closes: #' | tail -1 | sed 's/Closes: #//')
 
-            pr_response=$(curl --location --request GET "https://api.github.com/repos/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pulls?head=$CIRCLE_PROJECT_USERNAME:$CIRCLE_BRANCH&state=open" \
-            -u $FORGE_GH_USER:$FORGE_GH_TOKEN)
-
-            if [ $(echo $pr_response | jq length) -eq 0 ]; then
-              echo "No PR found to update"
-            else
-              pr_comment_url=$(echo $pr_response | jq -r ".[]._links.comments.href")
-            fi
-
-            curl --location --request POST "$pr_comment_url" \
-            -u $FORGE_GH_USER:$FORGE_GH_TOKEN \
-            --header 'Content-Type: application/json' \
-            --data-raw '{
-            "body": "This would be the data to add"
-            }'
+            curl -s -H "Authorization: token ${FORGE_GH_TOKEN}" \
+            -X POST -d "{\"body\": \"HELLOOOOOO from ${CIRCLE_BUILD_URL}\"}" \
+            "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/issues/${PR_NUMBER}/comments"
 
   # a dummy job so that we can require auto or canary branches
   require-bors:
@@ -101,10 +90,10 @@ workflows:
   build-test-deploy:
     jobs:
 #      - build-benchmarks
-      - crypto
-      - e2e-test
-      - lint
-      - unit-test
+      # - crypto
+      # - e2e-test
+      # - lint
+      # - unit-test
       ### bors-controlled workflows ###
       - require-bors:
           filters:
@@ -112,14 +101,14 @@ workflows:
               only:
                 - auto
                 - canary
-      - docker-build-push:
-          context: aws-dev
-          requires:
-            - require-bors
+      # - docker-build-push:
+      #     context: aws-dev
+      #     requires:
+      #       - require-bors
       - forge-k8s:
           context: aws-dev
-          requires:
-            - docker-build-push
+          # requires:
+          #   - docker-build-push
 commands:
   dev-setup:
     steps:
