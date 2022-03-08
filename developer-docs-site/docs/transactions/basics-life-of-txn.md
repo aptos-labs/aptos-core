@@ -82,7 +82,7 @@ We've described what happens in each stage below, along with links to the corres
 | Description                                                  | Aptos Node Component Interactions         |
 | ------------------------------------------------------------ | ---------------------------------------- |
 | 6. **Consensus → Mempool**: &mdash; As validator V<sub>1</sub> is a proposer/leader for this transaction, it will pull a block of transactions from its mempool and replicate this block as a proposal to other validator nodes via its consensus component. | [1. Consensus](#1-consensus-→-mempool), [3. Mempool](#3-consensus-→-mempool) |
-| 7. **Consensus → Other Validators**: The consensus component of V<sub>1</sub> is responsible for coordinating agreement among all validators on the order of transactions in the proposed block. Refer to our technical paper [State Machine Replication in the Aptos Blockchain](/technical-papers/state-machine-replication-paper) for details of our proposed consensus protocol AptosBFT. | [2. Consensus](#2-consensus-→-other-validators)                     |
+| 7. **Consensus → Other Validators**: The consensus component of V<sub>1</sub> is responsible for coordinating agreement among all validators on the order of transactions in the proposed block. | [2. Consensus](#2-consensus-→-other-validators)                     |
 
 ## Executing the block and reaching consensus
 
