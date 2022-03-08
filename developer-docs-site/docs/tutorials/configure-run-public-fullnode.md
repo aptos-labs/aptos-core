@@ -1,13 +1,11 @@
 ---
 title: "Configure and run a public FullNode"
 slug: "configure-run-public-fullnode"
-hidden: false
 ---
 You can run [FullNodes](/basics/basics-fullnodes) to verify the state and synchronize to the Aptos Blockchain. FullNodes can be run by anyone. FullNodes replicate the full state of the blockchain by querying each other, or by querying the validators directly.
 
 This tutorial details how to configure a public FullNode to connect to *testnet*, the Aptos Payment Network’s public test network..
 
->
 > **Note:** Your public FullNode will be connected to testnet with a JSON-RPC endpoint accessible on your computer at localhost:8080.
 >
 
@@ -15,8 +13,7 @@ This tutorial details how to configure a public FullNode to connect to *testnet*
 Before you get started with this tutorial, we recommend you familiarize yourself with the following:
 * [Validator node concepts](/basics/basics-validator-nodes) 
 * [FullNode concepts](/basics/basics-fullnodes) 
-* [JSON-RPC specifications](https://github.com/aptos/aptos/blob/main/json-rpc/json-rpc-spec.md)
-* [CLI reference](/tools/cli-reference)
+* [REST specifications][rest_spec]
 
 
 ## Getting started
@@ -25,7 +22,7 @@ You can configure a public FullNode in two ways: using the Aptos Core source cod
 ### Using Aptos Core source code
 1. Download and clone the Aptos Core repository from GitHub and prepare your developer environment by running the following commands:
      ```
-     git clone https://github.com/aptos/aptos.git
+     git clone https://github.com/aptos-labs/aptos-core.git
      cd aptos
      ./scripts/dev_setup.sh
      source ~/.cargo/env
@@ -37,24 +34,13 @@ You can configure a public FullNode in two ways: using the Aptos Core source cod
 
      * Copy `config/src/config/test_data/public_full_node.yaml` to your current working directory.
 
-     * Download [genesis](https://testnet.aptos.com/genesis.blob) and [waypoint](https://testnet.aptos.com/waypoint.txt) files for testnet.
+     * Download [genesis][testnet_genesis] and [waypoint][testnet_waypoint] files for testnet.
 
      * Update the public_full_node.yaml file in your current working directory by:
 
        * Specifying the directory where you want testnet to store its database next to `base:data_dir`; for example, `./data`.
 
        * Copying and pasting the contents of the waypoint file to the `waypoint` field.
-
-       * Adding the path where your Genesis file is located to `genesis_file_location`.
-        * Adding the following under `full_node_networks`.
-
-          ```
-          	seed_addrs:
-                D4C4FB4956D899E55289083F45AC5D84:
-                    - "/dns4/fn.testnet.aptos.com/tcp/6182/ln-noise-ik/d29d01bed8ab6c30921b327823f7e92c63f8371456fb110256e8c0e8911f4938/ln-handshake/0"
-          ```
-        * Disable on-chain discovery for the `discovery_method: "none"` (this is not required but it will limit log spew)
-       * 
 
        * Reading through the config and making any other desired changes. You can see what configurations the `public_full_node.yaml` file should have by checking the following file as an example: `docker/compose/public_full_node/public_full_node.yaml`
 4. Run the aptos-node using `cargo run -p aptos-node --release -- -f ./public_full_node.yaml`
@@ -69,8 +55,8 @@ You can also use Docker to configure and run your PublicFullNode.
 
 1. Install Docker and Docker-Compose.
 2. Create a directory for your public FullNode composition.
-3. Download the public FullNode [docker compose](https://github.com/aptos/aptos/tree/main/docker/compose/public_full_node/docker-compose.yaml) and [aptos](https://github.com/aptos/aptos/tree/main/docker/compose/public_full_node/public_full_node.yaml) configuration files into this directory.
-4. Download [genesis](https://testnet.aptos.com/genesis.blob) and [waypoint](https://testnet.aptos.com/waypoint.txt) files for testnet into that directory.
+3. Download the public FullNode [docker compose][pfn_docker_compose] and [aptos-core][pfn_config_file] configuration files into this directory.
+4. Download [genesis][testnet_genesis] and [waypoint][testnet_waypoint] files for testnet into that directory.
 5. Run docker-compose: `docker-compose up`.
 
 ### Understand and verify the correctness of your FullNode
@@ -102,3 +88,9 @@ During the initial synchronization of your FullNode, there may be a lot of data 
   # Observe the volume (ledger) size:
   du -cs -BM /opt/aptos/data
   ```
+
+[pfn_config_file]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/public_full_node.yaml
+[pfn_docker_compose]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/docker-compose.yaml
+[rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api
+[testnet_genesis]: https://dev.fullnode.aptoslabs.com/genesis.blob
+[testnet_waypoint]: https://dev.fullnode.aptoslabs.com/waypoint.txt
