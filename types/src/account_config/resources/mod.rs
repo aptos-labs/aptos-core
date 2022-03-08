@@ -17,7 +17,6 @@ pub mod preburn_queue;
 pub mod preburn_with_metadata;
 pub mod role;
 pub mod vasp;
-pub mod vasp_domain;
 pub mod withdraw_capability;
 
 pub use account::*;
@@ -36,5 +35,4 @@ pub use preburn_queue::*;
 pub use preburn_with_metadata::*;
 pub use role::*;
 pub use vasp::*;
-pub use vasp_domain::*;
 pub use withdraw_capability::*;

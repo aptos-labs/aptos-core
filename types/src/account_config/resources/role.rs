@@ -3,7 +3,6 @@
 
 use crate::account_config::resources::{
     ChildVASP, Credential, DesignatedDealer, DesignatedDealerPreburns, ParentVASP,
-    VASPDomainManager, VASPDomains,
 };
 use serde::{Deserialize, Serialize};
 
@@ -13,7 +12,6 @@ pub enum AccountRole {
     ParentVASP {
         vasp: ParentVASP,
         credential: Credential,
-        vasp_domains: Option<VASPDomains>,
     },
     ChildVASP(ChildVASP),
     DesignatedDealer {
@@ -21,9 +19,7 @@ pub enum AccountRole {
         preburn_balances: DesignatedDealerPreburns,
         designated_dealer: DesignatedDealer,
     },
-    TreasuryCompliance {
-        vasp_domain_manager: VASPDomainManager,
-    },
+    TreasuryCompliance,
     Unknown,
     // TODO: add other roles
 }

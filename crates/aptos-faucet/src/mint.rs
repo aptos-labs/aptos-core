@@ -62,7 +62,7 @@ impl std::fmt::Display for Response {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct MintParams {
     pub amount: Option<u64>,
     pub pub_key: Ed25519PublicKey,
@@ -73,6 +73,7 @@ impl std::fmt::Display for MintParams {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "<Mint {:?} to {:?}>", self.amount, self.receiver())
     }
+
 }
 
 impl MintParams {

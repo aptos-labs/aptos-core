@@ -8,7 +8,7 @@ use crate::{
         currency_code_from_type_tag, AccountResource, AccountRole, BalanceResource, CRSNResource,
         ChainIdResource, ChildVASP, Credential, CurrencyInfoResource, DesignatedDealer,
         DesignatedDealerPreburns, DiemAccountResource, FreezingBit, ParentVASP,
-        PreburnQueueResource, PreburnResource, VASPDomainManager, VASPDomains,
+        PreburnQueueResource, PreburnResource,
     },
     block_metadata::DiemBlockResource,
     diem_timestamp::DiemTimestampResource,
@@ -127,14 +127,9 @@ impl AccountState {
             match (
                 self.get_resource::<ParentVASP>(),
                 self.get_resource::<Credential>(),
-                self.get_resource::<VASPDomains>(),
             ) {
-                (Ok(Some(vasp)), Ok(Some(credential)), Ok(vasp_domains)) => {
-                    Ok(Some(AccountRole::ParentVASP {
-                        vasp,
-                        credential,
-                        vasp_domains,
-                    }))
+                (Ok(Some(vasp)), Ok(Some(credential))) => {
+                    Ok(Some(AccountRole::ParentVASP { vasp, credential }))
                 }
                 _ => Ok(None),
             }
@@ -168,13 +163,6 @@ impl AccountState {
                         designated_dealer,
                     }))
                 }
-                _ => Ok(None),
-            }
-        } else if self.0.contains_key(&VASPDomainManager::resource_path()) {
-            match self.get_resource::<VASPDomainManager>() {
-                Ok(Some(vasp_domain_manager)) => Ok(Some(AccountRole::TreasuryCompliance {
-                    vasp_domain_manager,
-                })),
                 _ => Ok(None),
             }
         } else {

@@ -10,12 +10,11 @@ use aptos_types::{
         CancelBurnEvent, ComplianceKeyRotationEvent, CreateAccountEvent, CurrencyInfoResource,
         DesignatedDealerPreburns, DiemAccountResource, FreezingBit, Limit, MintEvent,
         NewBlockEvent, NewEpochEvent, PreburnEvent, ReceivedMintEvent, ReceivedPaymentEvent,
-        SentPaymentEvent, ToXDXExchangeRateUpdateEvent, VASPDomainEvent,
+        SentPaymentEvent, ToXDXExchangeRateUpdateEvent,
     },
     account_state::AccountState,
     account_state_blob::{AccountStateBlob, AccountStateWithProof},
     contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
-    diem_id_identifier::DiemIdVaspDomainIdentifier,
     event::EventKey,
     proof::{
         AccountStateProof, AccumulatorConsistencyProof, SparseMerkleProof,
@@ -71,8 +70,6 @@ pub enum AccountRoleView {
         num_children: u64,
         compliance_key_rotation_events_key: EventKey,
         base_url_rotation_events_key: EventKey,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        vasp_domains: Option<Vec<DiemIdVaspDomainIdentifier>>,
     },
     #[serde(rename = "designated_dealer")]
     DesignatedDealer {
@@ -88,10 +85,7 @@ pub enum AccountRoleView {
         preburn_queues: Option<Vec<PreburnQueueView>>,
     },
     #[serde(rename = "treasury_compliance")]
-    TreasuryCompliance {
-        #[serde(skip_serializing_if = "Option::is_none")]
-        vasp_domain_events_key: Option<EventKey>,
-    },
+    TreasuryCompliance,
     /// The Unknown variant is deserialized by the client if it sees
     /// a variant that it doesn't know about
     #[serde(rename = "unknown")]
@@ -412,15 +406,6 @@ pub enum EventDataView {
         created_address: AccountAddress,
         role_id: u64,
     },
-    #[serde(rename = "vaspdomain")]
-    VASPDomain {
-        // Whether a domain was added or removed
-        removed: bool,
-        // VASP Domain string of the account
-        domain: DiemIdVaspDomainIdentifier,
-        // On-chain account address
-        address: AccountAddress,
-    },
     #[serde(rename = "unknown")]
     Unknown {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -547,13 +532,6 @@ impl TryFrom<ContractEvent> for EventDataView {
             let admin_transaction_event = AdminTransactionEvent::try_from(&event)?;
             EventDataView::AdminTransaction {
                 committed_timestamp_secs: admin_transaction_event.committed_timestamp_secs(),
-            }
-        } else if event.type_tag() == &TypeTag::Struct(VASPDomainEvent::struct_tag()) {
-            let vasp_domain_event = VASPDomainEvent::try_from(&event)?;
-            EventDataView::VASPDomain {
-                removed: vasp_domain_event.removed(),
-                domain: vasp_domain_event.domain().domain().clone(),
-                address: vasp_domain_event.address(),
             }
         } else {
             EventDataView::Unknown {
@@ -1325,25 +1303,17 @@ impl From<AccountRole> for AccountRoleView {
             AccountRole::ChildVASP(child_vasp) => AccountRoleView::ChildVASP {
                 parent_vasp_address: child_vasp.parent_vasp_addr(),
             },
-            AccountRole::ParentVASP {
-                vasp,
-                credential,
-                vasp_domains,
-            } => {
-                let domains = vasp_domains.map(|vasp_domains| vasp_domains.get_domains_list());
-                AccountRoleView::ParentVASP {
-                    human_name: credential.human_name().to_string(),
-                    base_url: credential.base_url().to_string(),
-                    expiration_time: credential.expiration_date(),
-                    compliance_key: BytesView::from(credential.compliance_public_key()),
-                    num_children: vasp.num_children(),
-                    compliance_key_rotation_events_key: *credential
-                        .compliance_key_rotation_events()
-                        .key(),
-                    base_url_rotation_events_key: *credential.base_url_rotation_events().key(),
-                    vasp_domains: domains,
-                }
-            }
+            AccountRole::ParentVASP { vasp, credential } => AccountRoleView::ParentVASP {
+                human_name: credential.human_name().to_string(),
+                base_url: credential.base_url().to_string(),
+                expiration_time: credential.expiration_date(),
+                compliance_key: BytesView::from(credential.compliance_public_key()),
+                num_children: vasp.num_children(),
+                compliance_key_rotation_events_key: *credential
+                    .compliance_key_rotation_events()
+                    .key(),
+                base_url_rotation_events_key: *credential.base_url_rotation_events().key(),
+            },
             AccountRole::DesignatedDealer {
                 dd_credential,
                 preburn_balances,
@@ -1365,11 +1335,7 @@ impl From<AccountRole> for AccountRoleView {
                     preburn_queues,
                 }
             }
-            AccountRole::TreasuryCompliance {
-                vasp_domain_manager,
-            } => AccountRoleView::TreasuryCompliance {
-                vasp_domain_events_key: Some(*vasp_domain_manager.vasp_domain_events().key()),
-            },
+            AccountRole::TreasuryCompliance => AccountRoleView::TreasuryCompliance,
         }
     }
 }

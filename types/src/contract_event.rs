@@ -6,7 +6,7 @@ use crate::{
         AdminTransactionEvent, BaseUrlRotationEvent, BurnEvent, CancelBurnEvent,
         ComplianceKeyRotationEvent, CreateAccountEvent, MintEvent, NewBlockEvent, NewEpochEvent,
         PreburnEvent, ReceivedMintEvent, ReceivedPaymentEvent, SentPaymentEvent,
-        ToXDXExchangeRateUpdateEvent, VASPDomainEvent,
+        ToXDXExchangeRateUpdateEvent,
     },
     event::EventKey,
     ledger_info::LedgerInfo,
@@ -249,16 +249,6 @@ impl TryFrom<&ContractEvent> for CreateAccountEvent {
     fn try_from(event: &ContractEvent) -> Result<Self> {
         if event.type_tag != TypeTag::Struct(Self::struct_tag()) {
             anyhow::bail!("Expected CreateAccountEvent")
-        }
-        Self::try_from_bytes(&event.event_data)
-    }
-}
-
-impl TryFrom<&ContractEvent> for VASPDomainEvent {
-    type Error = Error;
-    fn try_from(event: &ContractEvent) -> Result<Self> {
-        if event.type_tag != TypeTag::Struct(Self::struct_tag()) {
-            anyhow::bail!("Expected VASPDomainEvent")
         }
         Self::try_from_bytes(&event.event_data)
     }
