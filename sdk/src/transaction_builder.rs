@@ -12,7 +12,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-pub use aptos_transaction_builder::{experimental_stdlib, stdlib};
+pub use aptos_transaction_builder::{aptos_stdlib, experimental_stdlib, stdlib};
 use aptos_types::transaction::{ChangeSet, ModuleBundle, Script, ScriptFunction, WriteSetPayload};
 
 pub struct TransactionBuilder {

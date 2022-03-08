@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error::Error, Client, Result};
+use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{authenticator::AuthenticationKey, SignedTransaction},
@@ -21,25 +22,18 @@ impl FaucetClient {
         }
     }
 
-    pub fn create_account(
-        &self,
-        authentication_key: AuthenticationKey,
-        currency_code: &str,
-    ) -> Result<()> {
+    pub fn create_account(&self, public_key: Ed25519PublicKey) -> Result<()> {
         let client = reqwest::blocking::Client::new();
         let mut url = Url::parse(&self.faucet_url).map_err(Error::request)?;
         url.set_path("accounts");
-        let query = format!(
-            "authentication-key={}&currency={}",
-            authentication_key, currency_code
-        );
+        let query = format!("pub_key={}", public_key);
         url.set_query(Some(&query));
 
         let response = client.post(url).send().map_err(Error::request)?;
         let status_code = response.status();
         let body = response.text().map_err(Error::decode)?;
         if !status_code.is_success() {
-            return Err(Error::status(status_code.as_u16()).into());
+            return Err(anyhow::anyhow!("body: {}", body));
         }
 
         let bytes = hex::decode(body).map_err(Error::decode)?;
@@ -53,11 +47,11 @@ impl FaucetClient {
         Ok(())
     }
 
-    pub fn fund(&self, address: AccountAddress, currency_code: &str, amount: u64) -> Result<()> {
+    pub fn fund(&self, address: AccountAddress, amount: u64) -> Result<()> {
         let client = reqwest::blocking::Client::new();
         let mut url = Url::parse(&self.faucet_url).map_err(Error::request)?;
         url.set_path(&format!("accounts/{}/fund", address));
-        let query = format!("currency={}&amount={}", currency_code, amount);
+        let query = format!("amount={}", amount);
         url.set_query(Some(&query));
 
         // Faucet returns the transaction that creates the account and needs to be waited on before
@@ -80,14 +74,10 @@ impl FaucetClient {
         Ok(())
     }
 
-    pub fn mint(
-        &self,
-        currency_code: &str,
-        auth_key: AuthenticationKey,
-        amount: u64,
-    ) -> Result<()> {
-        self.create_account(auth_key, currency_code)?;
-        self.fund(auth_key.derived_address(), currency_code, amount)?;
+    pub fn mint(&self, public_key: Ed25519PublicKey, amount: u64) -> Result<()> {
+        let address = AuthenticationKey::ed25519(&public_key).derived_address();
+        self.create_account(public_key)?;
+        self.fund(address, amount)?;
 
         Ok(())
     }

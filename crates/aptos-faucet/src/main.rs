@@ -3,8 +3,7 @@
 
 use aptos_logger::info;
 use aptos_sdk::types::{
-    account_config::{testnet_dd_account_address, treasury_compliance_account_address},
-    chain_id::ChainId,
+    account_address::AccountAddress, account_config::aptos_root_address, chain_id::ChainId,
     LocalAccount,
 };
 use std::sync::Arc;
@@ -12,9 +11,9 @@ use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
-    name = "Diem Faucet",
+    name = "Aptos Faucet",
     author = "The Aptos Foundation",
-    about = "Diem Testnet utitlty service for creating test account and minting test coins"
+    about = "Aptos Testnet utility service for creating test accounts and minting test coins"
 )]
 struct Args {
     /// Faucet service listen address
@@ -23,22 +22,31 @@ struct Args {
     /// Faucet service listen port
     #[structopt(short = "p", long, default_value = "80")]
     pub port: u16,
-    /// Diem fullnode/validator server URL
+    /// Aptos fullnode/validator server URL
     #[structopt(short = "s", long, default_value = "https://testnet.aptoslabs.com/")]
     pub server_url: String,
     /// Path to the private key for creating test account and minting coins.
-    /// To keep Testnet simple, we used one private key for both treasury compliance account and testnet
-    /// designated dealer account, hence here we only accept one private key.
+    /// To keep Testnet simple, we used one private key for aptos root account
     /// To manually generate a keypair, use generate-key:
     /// `cargo run -p generate-keypair -- -o <output_file_path>`
-    #[structopt(short = "m", long, default_value = "/opt/diem/etc/mint.key")]
+    #[structopt(short = "m", long, default_value = "/opt/aptos/etc/mint.key")]
     pub mint_key_file_path: String,
+    /// Address of the account to send transactions from.
+    /// On Testnet, for example, this is 0xa550c18.
+    /// If not present, the mint key's address is used
+    #[structopt(short = "t", long)]
+    pub mint_account_address: Option<AccountAddress>,
     /// Chain ID of the network this client is connecting to.
-    /// For mainnet: \"MAINNET\" or 1, testnet: \"TESTNET\" or 2, devnet: \"DEVNET\" or 3, \
-    /// local swarm: \"TESTING\" or 4
+    /// For mainnet: "MAINNET" or 1, testnet: "TESTNET" or 2, devnet: "DEVNET" or 3,
+    /// local swarm: "TESTING" or 4
     /// Note: Chain ID of 0 is not allowed; Use number if chain id is not predefined.
     #[structopt(short = "c", long, default_value = "2")]
     pub chain_id: ChainId,
+    /// Fixed amount of coins to mint.
+    /// If this is unset, users can specify the amount to mint.
+    /// For Aptos public testnets, this is always set.
+    #[structopt(short = "f", long)]
+    pub fixed_amount: Option<u64>,
 }
 
 #[tokio::main]
@@ -51,28 +59,28 @@ async fn main() {
         .expect("invalid address or port number");
 
     info!(
-        "[faucet]: chain id: {}, server url: {}",
+        "[faucet]: chain id: {}, server url: {} . Limit: {:?}",
         args.chain_id,
         args.server_url.as_str(),
+        args.fixed_amount,
     );
-    let treasury_account = LocalAccount::new(
-        treasury_compliance_account_address(),
-        generate_key::load_key(&args.mint_key_file_path),
-        0,
-    );
-    let dd_account = LocalAccount::new(
-        testnet_dd_account_address(),
-        generate_key::load_key(&args.mint_key_file_path),
-        0,
-    );
+
+    let key = generate_key::load_key(&args.mint_key_file_path);
+
+    let faucet_address: AccountAddress =
+        args.mint_account_address.unwrap_or_else(aptos_root_address);
+    let faucet_account = LocalAccount::new(faucet_address, key, 0);
     let service = Arc::new(aptos_faucet::Service::new(
         args.server_url,
         args.chain_id,
-        treasury_account,
-        dd_account,
+        faucet_account,
+        args.fixed_amount,
     ));
 
-    info!("[faucet]: running on: {}", address);
+    info!(
+        "[faucet]: running on: {}. Minting from {}",
+        address, faucet_address
+    );
     warp::serve(aptos_faucet::routes(service))
         .run(address)
         .await;
@@ -80,7 +88,7 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
-    use aptos_crypto::hash::HashValue;
+    use aptos_crypto::{ed25519::Ed25519PublicKey, hash::HashValue, PrivateKey};
     use aptos_faucet::{routes, Service};
     use aptos_infallible::RwLock;
     use aptos_rest_client::{
@@ -91,16 +99,13 @@ mod tests {
         FaucetClient,
     };
     use aptos_sdk::{
-        transaction_builder::stdlib::{ScriptCall, ScriptFunctionCall},
+        transaction_builder::aptos_stdlib::ScriptFunctionCall,
         types::{
             account_address::AccountAddress,
-            account_config::{testnet_dd_account_address, treasury_compliance_account_address},
             chain_id::ChainId,
             transaction::{
-                authenticator::AuthenticationKey,
-                metadata::{CoinTradeMetadata, Metadata},
-                SignedTransaction, Transaction, TransactionPayload,
-                TransactionPayload::{Script, ScriptFunction},
+                authenticator::AuthenticationKey, SignedTransaction, Transaction,
+                TransactionPayload::Script,
             },
             LocalAccount,
         },
@@ -108,10 +113,10 @@ mod tests {
     use serde::Serialize;
     use std::{
         collections::HashMap,
-        convert::TryFrom,
-        str::FromStr,
+        convert::{TryFrom, TryInto},
         sync::{Arc, Mutex},
     };
+    use tokio::task::yield_now;
     use warp::{Filter, Rejection, Reply};
 
     type AccountStates = Arc<RwLock<HashMap<AccountAddress, AccountState>>>;
@@ -132,30 +137,23 @@ mod tests {
         }
     }
 
-    fn setup() -> (AccountStates, Arc<Service>) {
+    fn setup(fixed_amount: Option<u64>) -> (AccountStates, Arc<Service>) {
         let f = tempfile::NamedTempFile::new()
             .unwrap()
             .into_temp_path()
             .to_path_buf();
         generate_key::generate_and_save_key(&f);
-        let treasury_account = LocalAccount::new(
-            treasury_compliance_account_address(),
-            generate_key::load_key(&f),
-            0,
-        );
-        let dd_account =
-            LocalAccount::new(testnet_dd_account_address(), generate_key::load_key(&f), 0);
+        let key = generate_key::load_key(&f);
+        let account_address = AuthenticationKey::ed25519(&key.public_key()).derived_address();
+
+        let faucet_account = LocalAccount::new(account_address, key, 0);
 
         let chain_id = ChainId::test();
 
         let accounts = AccountStates::new(aptos_infallible::RwLock::new(HashMap::new()));
         accounts
             .write()
-            .insert(testnet_dd_account_address(), AccountState::new(100000));
-        accounts.write().insert(
-            treasury_compliance_account_address(),
-            AccountState::new(100000),
-        );
+            .insert(account_address, AccountState::new(0));
 
         let last_txn = Arc::new(Mutex::new(None));
         let last_txn_0 = last_txn.clone();
@@ -180,8 +178,8 @@ mod tests {
         let service = Service::new(
             format!("http://localhost:{}/", address.port()),
             chain_id,
-            treasury_account,
-            dd_account,
+            faucet_account,
+            fixed_amount,
         );
         (accounts, Arc::new(service))
     }
@@ -244,34 +242,13 @@ mod tests {
     ) -> Result<impl Reply, Rejection> {
         let txn: SignedTransaction = bcs::from_bytes(&txn).unwrap();
         assert_eq!(txn.chain_id(), ChainId::test());
+
         if let Script(script) = txn.payload() {
-            match ScriptCall::decode(script) {
-                Some(ScriptCall::CreateParentVaspAccount {
-                    new_account_address: address,
-                    ..
-                }) => {
-                    let mut writer = accounts.write();
-                    let previous = writer.insert(address, AccountState::new(0));
-                    assert!(previous.is_none(), "should not create account twice");
-                }
-                Some(ScriptCall::CreateDesignatedDealer { addr: address, .. }) => {
-                    let mut writer = accounts.write();
-                    let previous = writer.insert(address, AccountState::new(0));
-                    assert!(previous.is_none(), "should not create account twice");
-                }
-                Some(ScriptCall::PeerToPeerWithMetadata { payee, amount, .. }) => {
-                    let mut writer = accounts.write();
-                    let account = writer.get_mut(&payee).expect("account should be created");
-                    account.balance = amount;
-                }
-                _ => panic!("unexpected type of script"),
-            }
+            panic!("unexpected type of script: {:?}", script.args())
         }
         if let Some(script_function) = ScriptFunctionCall::decode(txn.payload()) {
             match script_function {
-                ScriptFunctionCall::AddVaspDomain { .. } => {}
-                ScriptFunctionCall::RemoveVaspDomain { .. } => {}
-                ScriptFunctionCall::CreateParentVaspAccount {
+                ScriptFunctionCall::CreateAccount {
                     new_account_address: address,
                     ..
                 } => {
@@ -279,17 +256,17 @@ mod tests {
                     let previous = writer.insert(address, AccountState::new(0));
                     assert!(previous.is_none(), "should not create account twice");
                 }
-                ScriptFunctionCall::CreateDesignatedDealer { addr: address, .. } => {
+                ScriptFunctionCall::Mint { addr, amount, .. } => {
+                    // Sometimes we call CreateAccount and Mint at the same time (from our tests: this is a test method)
+                    // If the account doesn't exist yet, we sleep for 100ms to let the other request finish
+                    if accounts.write().get_mut(&addr).is_none() {
+                        yield_now().await;
+                    }
                     let mut writer = accounts.write();
-                    let previous = writer.insert(address, AccountState::new(0));
-                    assert!(previous.is_none(), "should not create account twice");
+                    let account = writer.get_mut(&addr).expect("account should be created");
+                    account.balance += amount;
                 }
-                ScriptFunctionCall::PeerToPeerWithMetadata { payee, amount, .. } => {
-                    let mut writer = accounts.write();
-                    let account = writer.get_mut(&payee).expect("account should be created");
-                    account.balance = amount;
-                }
-                script => panic!("unexpected type of script: {:?}", script),
+                script => panic!("unexpected type of script function: {:?}", script),
             }
         }
 
@@ -322,7 +299,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_healthy() {
-        let (_accounts, service) = setup();
+        let (_accounts, service) = setup(None);
         let filter = routes(service);
         let resp = warp::test::request()
             .method("GET")
@@ -335,115 +312,77 @@ mod tests {
 
     #[tokio::test]
     async fn test_mint() {
-        let (accounts, service) = setup();
+        let (accounts, service) = setup(None);
         let filter = routes(service);
 
-        // auth_key is outside of the loop for minting same account multiple
-        // times, it should success and should not create same account multiple
-        // times.
-        let auth_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
+        // pub_key is outside of the loop for minting same account multiple times,
+        // it should succeed and should not create same account multiple times.
+        let pub_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
         let amount = 13345;
-        for (i, path) in ["/", "/mint"].iter().enumerate() {
-            let resp = warp::test::request()
-                .method("POST")
-                .path(
-                    format!(
-                        "{}?auth_key={}&amount={}&currency_code=XDX",
-                        path, auth_key, amount
-                    )
-                    .as_str(),
-                )
-                .reply(&filter)
-                .await;
-            assert_eq!(resp.body(), (i + 1).to_string().as_str());
-            let reader = accounts.read();
-            let addr =
-                AccountAddress::try_from("a74fd7c46952c497e75afb0a7932586d".to_owned()).unwrap();
-            let account = reader.get(&addr).expect("account should be created");
-            assert_eq!(account.balance, amount);
-        }
+        let resp = warp::test::request()
+            .method("POST")
+            .path(format!("/mint?pub_key={}&amount={}", pub_key, amount).as_str())
+            .reply(&filter)
+            .await;
+        assert_eq!(resp.body(), 2.to_string().as_str());
+        let reader = accounts.read();
+        let addr = AccountAddress::try_from("25C62C0E0820F422000814CDBA407835".to_owned()).unwrap();
+        let account = reader.get(&addr).expect("account should be created");
+        assert_eq!(account.balance, amount);
     }
 
     #[tokio::test]
     async fn test_mint_with_txns_response() {
-        let (accounts, service) = setup();
+        let (accounts, service) = setup(None);
         let filter = routes(service);
 
-        let auth_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
+        let pub_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
         let amount = 13345;
-        let trade_id = "11111111-1111-1111-1111-111111111111";
         let resp = warp::test::request()
             .method("POST")
             .path(
                 format!(
-                    "/mint?auth_key={}&amount={}&trade_id={}&currency_code=XDX&return_txns=true",
-                    auth_key, amount, trade_id
+                    "/mint?pub_key={}&amount={}&return_txns=true",
+                    pub_key, amount
                 )
                 .as_str(),
             )
             .reply(&filter)
             .await;
         let body = resp.body();
-        let txns: Vec<SignedTransaction> =
-            bcs::from_bytes(&hex::decode(body).expect("hex encoded response body"))
-                .expect("valid bcs vec");
+        let bytes = hex::decode(body).expect("hex encoded response body");
+        let txns: Vec<SignedTransaction> = bcs::from_bytes(&bytes).expect("valid bcs vec");
         assert_eq!(txns.len(), 2);
 
-        let trade_ids = get_trade_ids_from_payload(txns[1].payload());
-        assert_eq!(trade_ids.len(), 1);
-        assert_eq!(trade_ids[0], trade_id);
-
         let reader = accounts.read();
-        let addr = AccountAddress::try_from("a74fd7c46952c497e75afb0a7932586d".to_owned()).unwrap();
+        let addr = AccountAddress::try_from("25C62C0E0820F422000814CDBA407835".to_owned()).unwrap();
         let account = reader.get(&addr).expect("account should be created");
         assert_eq!(account.balance, amount);
     }
 
     #[tokio::test]
-    async fn test_mint_dd_account_with_txns_response() {
-        let (accounts, service) = setup();
+    async fn test_mint_send_amount_when_not_allowed() {
+        let (_accounts, service) = setup(Some(7));
         let filter = routes(service);
 
-        let auth_key = "44b8f03f203ec45dbd7484e433752efe54aa533116e934f8a50c28bece06d3ac";
-        let amount = 13345;
+        let pub_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
         let resp = warp::test::request()
             .method("POST")
-            .path(
-                format!(
-                    "/mint?auth_key={}&amount={}&currency_code=XDX&return_txns=true&is_designated_dealer=true",
-                    auth_key, amount
-                )
-                    .as_str(),
-            )
+            .path(format!("/mint?pub_key={}&amount=1000000", pub_key).as_str())
             .reply(&filter)
             .await;
-        let body = resp.body();
-        let txns: Vec<SignedTransaction> =
-            bcs::from_bytes(&hex::decode(body).expect("hex encoded response body"))
-                .expect("valid bcs vec");
-        assert_eq!(txns.len(), 2);
-
-        let reader = accounts.read();
-        let addr = AccountAddress::try_from("54aa533116e934f8a50c28bece06d3ac".to_owned()).unwrap();
-        let account = reader.get(&addr).expect("account should be created");
-        assert_eq!(account.balance, amount);
+        assert_eq!(resp.body(), "Mint amount is fixed to 7 on this faucet");
     }
 
     #[tokio::test]
-    async fn test_mint_invalid_auth_key() {
-        let (_accounts, service) = setup();
+    async fn test_mint_invalid_pub_key() {
+        let (_accounts, service) = setup(None);
         let filter = routes(service);
 
-        let auth_key = "invalid-auth-key";
+        let pub_key = "invalid-auth-key";
         let resp = warp::test::request()
             .method("POST")
-            .path(
-                format!(
-                    "/mint?auth_key={}&amount=1000000&currency_code=XDX",
-                    auth_key
-                )
-                .as_str(),
-            )
+            .path(format!("/mint?pub_key={}&amount=1000000", pub_key).as_str())
             .reply(&filter)
             .await;
         assert_eq!(resp.body(), "Invalid query string");
@@ -451,94 +390,80 @@ mod tests {
 
     #[tokio::test]
     async fn test_mint_fullnode_error() {
-        let (accounts, service) = setup();
-        accounts
-            .write()
-            .remove(&treasury_compliance_account_address());
+        let (accounts, service) = setup(None);
+        let address = service.faucet_account.lock().unwrap().address();
+        accounts.write().remove(&address);
         let filter = routes(service);
 
-        let auth_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
+        let pub_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
         let resp = warp::test::request()
             .method("POST")
-            .path(
-                format!(
-                    "/mint?auth_key={}&amount=1000000&currency_code=XDX",
-                    auth_key
-                )
-                .as_str(),
-            )
+            .path(format!("/mint?pub_key={}&amount=1000000", pub_key).as_str())
             .reply(&filter)
             .await;
-        assert_eq!(resp.body(), "treasury compliance account not found");
+
+        assert_eq!(
+            resp.body(),
+            &format!("faucet account {:?} not found", address)
+        );
     }
 
     #[tokio::test]
     async fn create_account_with_client() {
-        let (_accounts, service) = setup();
+        let (_accounts, service) = setup(None);
         let endpoint = service.endpoint().to_owned();
         let (address, future) = warp::serve(routes(service)).bind_ephemeral(([127, 0, 0, 1], 0));
         tokio::task::spawn(async move { future.await });
 
         let faucet_client = FaucetClient::new(format!("http://{}", address), endpoint);
 
-        let auth_key = AuthenticationKey::from_str(
-            "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d",
-        )
-        .unwrap();
-        tokio::task::spawn_blocking(move || faucet_client.create_account(auth_key, "XUS").unwrap())
+        let pub_key: Ed25519PublicKey =
+            hex::decode(&"459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d")
+                .unwrap()
+                .as_slice()
+                .try_into()
+                .unwrap();
+
+        assert_eq!(
+            AuthenticationKey::ed25519(&pub_key)
+                .derived_address()
+                .to_string(),
+            "25C62C0E0820F422000814CDBA407835"
+        );
+
+        let res = tokio::task::spawn_blocking(move || faucet_client.create_account(pub_key))
             .await
             .unwrap();
+        res.unwrap();
     }
 
     #[tokio::test]
     async fn fund_account_with_client() {
-        let (_accounts, service) = setup();
+        let (_accounts, service) = setup(None);
         let endpoint = service.endpoint().to_owned();
         let (address, future) = warp::serve(routes(service)).bind_ephemeral(([127, 0, 0, 1], 0));
         tokio::task::spawn(async move { future.await });
 
         let faucet_client = FaucetClient::new(format!("http://{}", address), endpoint);
 
-        let auth_key = AuthenticationKey::from_str(
-            "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d",
-        )
-        .unwrap();
-        tokio::task::spawn_blocking(move || {
-            faucet_client.create_account(auth_key, "XUS").unwrap();
-            faucet_client
-                .fund(auth_key.derived_address(), "XUS", 10)
+        let pub_key: Ed25519PublicKey =
+            hex::decode(&"459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d")
                 .unwrap()
+                .as_slice()
+                .try_into()
+                .unwrap();
+
+        let (res1, res2) = tokio::task::spawn_blocking(move || {
+            let address = AuthenticationKey::ed25519(&pub_key).derived_address();
+            (
+                faucet_client.create_account(pub_key),
+                faucet_client.fund(address, 10),
+            )
         })
         .await
         .unwrap();
-    }
 
-    fn get_trade_ids_from_payload(payload: &TransactionPayload) -> Vec<String> {
-        match payload {
-            Script(script) => match ScriptCall::decode(script) {
-                Some(ScriptCall::PeerToPeerWithMetadata { metadata, .. }) => {
-                    match bcs::from_bytes(&metadata).expect("should decode metadata") {
-                        Metadata::CoinTradeMetadata(CoinTradeMetadata::CoinTradeMetadataV0(
-                            coin_trade_metadata,
-                        )) => coin_trade_metadata.trade_ids,
-                        _ => panic!("unexpected type of transaction metadata"),
-                    }
-                }
-                _ => panic!("unexpected type of script"),
-            },
-            ScriptFunction(_) => match ScriptFunctionCall::decode(payload) {
-                Some(ScriptFunctionCall::PeerToPeerWithMetadata { metadata, .. }) => {
-                    match bcs::from_bytes(&metadata).expect("should decode metadata") {
-                        Metadata::CoinTradeMetadata(CoinTradeMetadata::CoinTradeMetadataV0(
-                            coin_trade_metadata,
-                        )) => coin_trade_metadata.trade_ids,
-                        _ => panic!("unexpected type of transaction metadata"),
-                    }
-                }
-                _ => panic!("unexpected type of script"),
-            },
-
-            _ => panic!("unexpected payload type"),
-        }
+        res1.unwrap();
+        res2.unwrap();
     }
 }
