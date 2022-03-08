@@ -152,9 +152,6 @@ resource "helm_release" "validator" {
       localVaultBackend = var.enable_dev_vault # Toggle dev vault mode
       validator = {
         name = "val${count.index}"
-        config = {
-          validator_network_address_key = var.validator_network_address_key
-        }
       }
       chain = {
         name     = "aptos-${terraform.workspace}"

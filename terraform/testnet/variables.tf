@@ -159,8 +159,3 @@ variable "enable_dev_vault" {
   description = "TEST ONLY: Enables Vault in Dev Mode for all validators"
   default     = false
 }
-
-variable "validator_network_address_key" {
-  description = "Decryption key for validator network address"
-  type        = string
-}

@@ -46,8 +46,6 @@ module "vault" {
   reset_safety_data = false
   namespace         = "val${count.index}"
 
-  validator_network_address_key = var.validator_network_address_key
-
   kubernetes_host        = module.validator.kubernetes.kubernetes_host
   kubernetes_ca_cert     = module.validator.kubernetes.kubernetes_ca_cert
   issuer                 = module.validator.kubernetes.issuer

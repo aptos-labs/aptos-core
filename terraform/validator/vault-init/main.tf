@@ -23,11 +23,6 @@ variable "reset_safety_data" {
   default     = true
 }
 
-variable "validator_network_address_key" {
-  description = "Decryption key for validator network address"
-  type        = string
-}
-
 resource "vault_mount" "secret" {
   count = var.mount_engines ? 1 : 0
   path  = var.kv_v2_mount
