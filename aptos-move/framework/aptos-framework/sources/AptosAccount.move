@@ -7,6 +7,7 @@ module AptosFramework::AptosAccount {
     use Std::Hash;
     use Std::Vector;
     use Std::BCS;
+    use Std::Signer;
     use CoreFramework::Account;
     use CoreFramework::DiemTimestamp;
     use CoreFramework::SystemAddresses;
@@ -24,6 +25,10 @@ module AptosFramework::AptosAccount {
     const EGAS: u64 = 1;
     const ECANNOT_CREATE_AT_CORE_CODE: u64 = 2;
     const EADDR_NOT_MATCH_PREIMAGE: u64 = 3;
+    const ETRANSACTION_EXPIRED: u64 = 4;
+    const ECANT_PAY_GAS_DEPOSIT: u64 = 5;
+    const EWRITESET_NOT_ALLOWED: u64 = 6;
+    const EMULTI_AGENT_NOT_SUPPORTED: u64 = 7;
 
     public(friend) fun create_account_internal(account_address: address, auth_key_prefix: vector<u8>): (signer, vector<u8>) {
         assert!(
@@ -57,7 +62,7 @@ module AptosFramework::AptosAccount {
     }
 
     ///////////////////////////////////////////////////////////////////////////
-    /// Basic account creation method: no roles attached, no conditions checked.
+    /// Basic account creation method.
     ///////////////////////////////////////////////////////////////////////////
 
     public fun create_account(
@@ -118,50 +123,49 @@ module AptosFramework::AptosAccount {
         sender: signer,
         txn_sequence_number: u64,
         txn_public_key: vector<u8>,
-        _txn_gas_price: u64,
-        _txn_max_gas_units: u64,
-        _txn_expiration_time: u64,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
         chain_id: u8,
     ) {
-        Account::prologue(&sender, txn_sequence_number, txn_public_key, chain_id)
+        prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
     fun script_prologue(
         sender: signer,
         txn_sequence_number: u64,
         txn_public_key: vector<u8>,
-        _txn_gas_price: u64,
-        _txn_max_gas_units: u64,
-        _txn_expiration_time: u64,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
         chain_id: u8,
         _script_hash: vector<u8>,
     ) {
-        Account::prologue(&sender, txn_sequence_number, txn_public_key, chain_id)
+        prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
     fun writeset_prologue(
-        sender: signer,
-        txn_sequence_number: u64,
-        txn_public_key: vector<u8>,
+        _sender: signer,
+        _txn_sequence_number: u64,
+        _txn_public_key: vector<u8>,
         _txn_expiration_time: u64,
-        chain_id: u8,
+        _chain_id: u8,
     ) {
-        Account::prologue(&sender, txn_sequence_number, txn_public_key, chain_id)
+        assert!(false, Errors::invalid_argument(EWRITESET_NOT_ALLOWED));
     }
 
-    // Might be able to combine this
     fun multi_agent_script_prologue(
-        sender: signer,
-        txn_sequence_number: u64,
-        txn_sender_public_key: vector<u8>,
+        _sender: signer,
+        _txn_sequence_number: u64,
+        _txn_sender_public_key: vector<u8>,
         _secondary_signer_addresses: vector<address>,
         _secondary_signer_public_key_hashes: vector<vector<u8>>,
         _txn_gas_price: u64,
         _txn_max_gas_units: u64,
         _txn_expiration_time: u64,
-        chain_id: u8,
+        _chain_id: u8,
     ) {
-         Account::prologue(&sender, txn_sequence_number, txn_sender_public_key, chain_id)
+        assert!(false, Errors::invalid_argument(EMULTI_AGENT_NOT_SUPPORTED));
     }
 
     fun epilogue(
@@ -171,13 +175,9 @@ module AptosFramework::AptosAccount {
         txn_max_gas_units: u64,
         gas_units_remaining: u64
     ) {
-        // [EA1; Invariant]: Make sure that the transaction's `max_gas_units` is greater
-        // than the number of gas units remaining after execution.
         assert!(txn_max_gas_units >= gas_units_remaining, Errors::invalid_argument(EGAS));
         let gas_used = txn_max_gas_units - gas_units_remaining;
 
-        // [EA2; Invariant]: Make sure that the transaction fee would not overflow maximum
-        // number representable in a u64. Already checked in [PCA5].
         assert!(
             (txn_gas_price as u128) * (gas_used as u128) <= MAX_U64,
             Errors::limit_exceeded(EGAS)
@@ -190,10 +190,29 @@ module AptosFramework::AptosAccount {
     }
 
     fun writeset_epilogue(
-        core_resource: signer,
+        _core_resource: signer,
         _txn_sequence_number: u64,
-        should_trigger_reconfiguration: bool,
+        _should_trigger_reconfiguration: bool,
     ) {
-        Account::writeset_epilogue(&core_resource, should_trigger_reconfiguration, &Marker::get());
+        assert!(false, Errors::invalid_argument(EWRITESET_NOT_ALLOWED));
+    }
+
+    fun prologue_common(
+        sender: signer,
+        txn_sequence_number: u64,
+        txn_public_key: vector<u8>,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+    ) {
+        assert!(
+            DiemTimestamp::now_seconds() < txn_expiration_time,
+            Errors::invalid_argument(ETRANSACTION_EXPIRED),
+        );
+        Account::prologue(&sender, txn_sequence_number, txn_public_key, chain_id);
+        let max_transaction_fee = txn_gas_price * txn_max_gas_units;
+        let balance = TestCoin::balance_of(Signer::address_of(&sender));
+        assert!(balance >= max_transaction_fee, Errors::invalid_state(ECANT_PAY_GAS_DEPOSIT));
     }
 }
