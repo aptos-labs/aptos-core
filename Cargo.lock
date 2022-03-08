@@ -133,6 +133,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-secure-storage",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-workspace-hack",
+ "base64",
+ "bcs",
+ "futures",
+ "hex",
+ "itertools",
+ "rand 0.8.4",
+ "serde 1.0.136",
+ "serde_json",
+ "serde_yaml",
+ "short-hex-str",
+ "structopt",
+ "thiserror",
+ "tokio",
+ "tokio-util 0.6.9",
+ "toml",
+ "url",
+]
+
+[[package]]
 name = "aptos-api"
 version = "0.1.0"
 dependencies = [

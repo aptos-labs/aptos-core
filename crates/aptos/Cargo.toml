@@ -1,0 +1,36 @@
+[package]
+name = "aptos"
+version = "0.1.0"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "Aptos tool for management of nodes and interacting with blockchain"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.52"
+base64 = "0.13.0"
+futures = "0.3.12"
+hex = "0.4.3"
+itertools = "0.10.0"
+rand = "0.8.3"
+serde = "1.0.124"
+serde_json = "1.0.64"
+serde_yaml = "0.8.17"
+structopt = "0.3.21"
+thiserror = "1.0.24"
+tokio = { version = "1.8.1", features = ["full"] }
+tokio-util = { version = "0.6.4", features = ["compat"] }
+toml = { version = "0.5.8", default-features = false }
+url = "2.2.2"
+
+aptos-config = { path = "../../config" }
+aptos-crypto = { path = "../aptos-crypto" }
+aptos-secure-storage = { path = "../../secure/storage" }
+aptos-temppath = { path = "../aptos-temppath" }
+aptos-types = { path = "../../types" }
+aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
+bcs = "0.1.2"
+short-hex-str = { path = "../short-hex-str" }
