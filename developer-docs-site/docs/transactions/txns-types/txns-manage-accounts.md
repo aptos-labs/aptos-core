@@ -21,7 +21,7 @@ After the recovery address **R** has been created, other accounts that belong to
 
 If an account **A** wishes to update the authentication key needed to access it, it can do so by sending one of two transactions, depending on whether A has been registered with, or is, an account recovery address.
 
-* If **A** has not registered itself with a recovery address, it can change its authentication key by sending a [rotate_authentication_key](https://github.com/aptos/aptos/blob/main/aptos-move/aptos-framework/script_documentation/script_documentation.md#function-rotate_authentication_key) transaction with its new auth key.
+* If **A** has not registered itself with a recovery address, it can change its authentication key by sending a [rotate_authentication_key](https://github.com/aptos/aptos/blob/main/aptos-move/aptos-framework/script_documentation/script_documentation.md#function-rotate_authentication_key) transaction with its new authentication key.
 * If **A** is part of a recovery address, then it can rotate its key by sending a [rotate_authentication_key_with_recovery_address](https://github.com/aptos/aptos/blob/main/aptos-move/aptos-framework/script_documentation/script_documentation.md#function-rotate_authentication_key_with_recovery_address) transaction with its new authentication key, and itself as the `to_recover` address.
 
 
