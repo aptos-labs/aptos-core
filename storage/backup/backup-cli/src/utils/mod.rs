@@ -11,7 +11,7 @@ pub(crate) mod stream;
 pub mod test_utils;
 
 use anyhow::{anyhow, Result};
-use aptos_config::config::RocksdbConfig;
+use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_crypto::HashValue;
 use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{restore::JellyfishMerkleRestore, NodeBatch, TreeWriter};
@@ -169,8 +169,8 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
         let run_mode = if let Some(db_dir) = &opt.db_dir {
             let restore_handler = Arc::new(AptosDB::open(
                 db_dir,
-                false, /* read_only */
-                None,  /* pruner */
+                false,                       /* read_only */
+                NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
                 opt.rocksdb_opt.into(),
                 opt.account_count_migration,
             )?)

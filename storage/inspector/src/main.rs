@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use anyhow::Result;
-use aptos_config::config::RocksdbConfig;
+use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_logger::info;
 use aptosdb::AptosDB;
 use diem_framework_releases::name_for_script;
@@ -169,8 +169,8 @@ fn main() {
 
     let db = AptosDB::open(
         p,
-        true, /* readonly */
-        None, /* pruner */
+        true,                        /* readonly */
+        NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
         RocksdbConfig::default(),
         true, /* account_count_migration, ignored anyway */
     )

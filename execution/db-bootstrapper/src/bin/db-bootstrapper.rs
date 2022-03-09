@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{ensure, format_err, Context, Result};
-use aptos_config::config::RocksdbConfig;
+use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
 use aptos_vm::AptosVM;
@@ -54,7 +54,7 @@ fn main() -> Result<()> {
         AptosDB::open(
             &opt.db_dir,
             false,
-            None, /* pruner */
+            NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
             RocksdbConfig::default(),
             opt.account_count_migration,
         )

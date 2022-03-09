@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::*;
+use crate::pruner::*;
 use crate::{change_set::ChangeSet, state_store::StateStore, AptosDB};
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
@@ -41,7 +41,7 @@ fn verify_state_in_store(
 }
 
 #[test]
-fn test_pruner() {
+fn test_state_store_pruner() {
     let address = AccountAddress::new([1u8; AccountAddress::LENGTH]);
     let value0 = AccountStateBlob::from(vec![0x01]);
     let value1 = AccountStateBlob::from(vec![0x02]);
@@ -50,7 +50,13 @@ fn test_pruner() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir).db;
     let state_store = &StateStore::new(Arc::clone(&db), true /* account_count_migration */);
-    let pruner = Pruner::new(Arc::clone(&db), 0 /* historical_versions_to_keep */);
+    let pruner = Pruner::new(
+        Arc::clone(&db),
+        StoragePrunerConfig {
+            state_store_prune_window: Some(0),
+            default_prune_window: Some(0),
+        }, /* historical_versions_to_keep */
+    );
 
     let _root0 = put_account_state_set(
         &db,
@@ -136,16 +142,16 @@ fn test_worker_quit_eagerly() {
         let worker = Worker::new(
             Arc::clone(&db),
             command_receiver,
-            Arc::new(AtomicU64::new(0)), /* progress */
+            Arc::new(Mutex::new(vec![0, 0])), /* progress */
         );
         command_sender
             .send(Command::Prune {
-                least_readable_version: 1,
+                target_db_versions: vec![1, 0],
             })
             .unwrap();
         command_sender
             .send(Command::Prune {
-                least_readable_version: 2,
+                target_db_versions: vec![2, 0],
             })
             .unwrap();
         command_sender.send(Command::Quit).unwrap();

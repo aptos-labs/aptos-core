@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::RocksdbConfig;
+use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, OPERATOR_ACCOUNT, OPERATOR_KEY, OWNER_ACCOUNT, OWNER_KEY,
     SAFETY_DATA, VALIDATOR_NETWORK_KEY, WAYPOINT,
@@ -212,7 +212,7 @@ fn compute_genesis(
     let aptosdb = AptosDB::open(
         db_path,
         false,
-        None,
+        NO_OP_STORAGE_PRUNER_CONFIG,
         RocksdbConfig::default(),
         true, /* account_count_migration */
     )

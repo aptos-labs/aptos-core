@@ -63,10 +63,18 @@ pub static DIEM_STORAGE_PRUNE_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!("aptos_storage_prune_window", "Aptos storage prune window").unwrap()
 });
 
-pub static DIEM_STORAGE_PRUNER_LEAST_READABLE_STATE_VERSION: Lazy<IntGauge> = Lazy::new(|| {
+pub static DIEM_STATE_STORAGE_PRUNER_LEAST_READABLE_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "aptos_storage_pruner_least_readable_state_version",
-        "Aptos storage pruner least readable state version"
+        "aptos_state_storage_pruner_least_readable_version",
+        "Aptos state storage pruner least readable state version"
+    )
+    .unwrap()
+});
+
+pub static DIEM_TRANSACTION_PRUNER_LEAST_READABLE_VERSION: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_transaction_pruner_least_readable_version",
+        "Aptos transaction pruner least readable state version"
     )
     .unwrap()
 });

@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::RocksdbConfig;
+use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_management::{config::ConfigPath, error::Error, secure_backend::SharedBackend};
 use aptos_temppath::TempPath;
 use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
@@ -43,7 +43,7 @@ pub fn create_genesis_waypoint(genesis: &Transaction) -> Result<Waypoint, Error>
     let aptosdb = AptosDB::open(
         &path,
         false,
-        None,
+        NO_OP_STORAGE_PRUNER_CONFIG,
         RocksdbConfig::default(),
         true, /* account_count_migration */
     )

@@ -39,9 +39,7 @@ pub struct StorageConfig {
     pub backup_service_address: SocketAddr,
     pub dir: PathBuf,
     pub grpc_max_receive_len: Option<i32>,
-    /// None disables pruning. The windows is in number of versions, consider system tps
-    /// (transaction per second) when calculating proper window.
-    pub prune_window: Option<u64>,
+    pub storage_pruner_config: StoragePrunerConfig,
     #[serde(skip)]
     data_dir: PathBuf,
     /// Read, Write, Connect timeout for network operations in milliseconds
@@ -57,6 +55,33 @@ pub struct StorageConfig {
     pub account_count_migration: bool,
 }
 
+pub const NO_OP_STORAGE_PRUNER_CONFIG: StoragePrunerConfig = StoragePrunerConfig {
+    state_store_prune_window: None,
+    default_prune_window: None,
+};
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct StoragePrunerConfig {
+    /// None disables pruning. The windows is in number of versions, consider system tps
+    /// (transaction per second) when calculating proper window.
+    pub state_store_prune_window: Option<u64>,
+    /// This is the default pruning window for any other store except for state store. State store being
+    /// big in size, we might want to configure a smaller window for state store vs other store.
+    pub default_prune_window: Option<u64>,
+}
+
+impl StoragePrunerConfig {
+    pub fn new(
+        state_store_prune_window: Option<u64>,
+        default_store_prune_window: Option<u64>,
+    ) -> Self {
+        StoragePrunerConfig {
+            state_store_prune_window,
+            default_prune_window: default_store_prune_window,
+        }
+    }
+}
+
 impl Default for StorageConfig {
     fn default() -> StorageConfig {
         StorageConfig {
@@ -70,7 +95,10 @@ impl Default for StorageConfig {
             // of the DB might require, 10k (TPS)  * 100 (seconds)  =  1 Million might be a
             // conservatively safe minimal prune window. It'll take a few Gigabytes of disk space
             // depending on the size of an average account blob.
-            prune_window: Some(1_000_000),
+            storage_pruner_config: StoragePrunerConfig {
+                state_store_prune_window: Some(1_000_000),
+                default_prune_window: Some(10_000_000),
+            },
             data_dir: PathBuf::from("/opt/aptos/data"),
             // Default read/write/connection timeout, in milliseconds
             timeout_ms: 30_000,

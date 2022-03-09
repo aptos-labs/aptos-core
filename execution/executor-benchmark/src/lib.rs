@@ -10,7 +10,7 @@ use crate::{
     transaction_committer::TransactionCommitter, transaction_executor::TransactionExecutor,
     transaction_generator::TransactionGenerator,
 };
-use aptos_config::config::{NodeConfig, RocksdbConfig};
+use aptos_config::config::{NodeConfig, RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_logger::prelude::*;
 
 use aptos_vm::AptosVM;
@@ -28,8 +28,8 @@ pub fn init_db_and_executor(config: &NodeConfig) -> (Arc<dyn DbReader>, BlockExe
     let (db, dbrw) = DbReaderWriter::wrap(
         AptosDB::open(
             &config.storage.dir(),
-            false, /* readonly */
-            None,  /* pruner */
+            false,                       /* readonly */
+            NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
             RocksdbConfig::default(),
             true, /* account_count_migration */
         )
@@ -57,8 +57,8 @@ pub fn run_benchmark(
 
     AptosDB::open(
         &source_dir,
-        true, /* readonly */
-        None, /* pruner */
+        true,                        /* readonly */
+        NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
         RocksdbConfig::default(),
         true, /* account_count_migration */
     )
@@ -128,6 +128,7 @@ pub fn run_benchmark(
 
 #[cfg(test)]
 mod tests {
+    use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_temppath::TempPath;
 
     #[test]
@@ -142,7 +143,7 @@ mod tests {
             10, /* init_account_balance */
             5,  /* block_size */
             storage_dir.as_ref(),
-            None, /* prune_window */
+            NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
         );
 
         super::run_benchmark(

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
+use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
 use aptos_logger::{prelude::*, Level, Logger};
 use aptos_types::transaction::Version;
 use aptosdb::{AptosDB, GetRestoreHandler};
@@ -55,8 +56,8 @@ async fn main_impl() -> Result<()> {
     let opt = Opt::from_args();
     let restore_handler = Arc::new(AptosDB::open(
         opt.db_dir,
-        false, /* read_only */
-        None,  /* pruner */
+        false,                       /* read_only */
+        NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
         opt.rocksdb_opt.into(),
         true, /* account_count_migration */
     )?)
