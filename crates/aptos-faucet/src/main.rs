@@ -34,7 +34,7 @@ struct Args {
     /// Address of the account to send transactions from.
     /// On Testnet, for example, this is 0xa550c18.
     /// If not present, the mint key's address is used
-    #[structopt(short = "t", long)]
+    #[structopt(short = "t", long, parse(try_from_str = AccountAddress::from_hex_literal))]
     pub mint_account_address: Option<AccountAddress>,
     /// Chain ID of the network this client is connecting to.
     /// For mainnet: "MAINNET" or 1, testnet: "TESTNET" or 2, devnet: "DEVNET" or 3,
