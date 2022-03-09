@@ -29,7 +29,7 @@ pub fn metadata() -> Result<Metadata> {
     serde_json::from_slice(&output.stdout).map_err(Into::into)
 }
 
-/// Get the diem node binary from the current working directory
+/// Get the aptos node binary from the current working directory
 pub fn get_aptos_node_binary_from_worktree() -> Result<(String, PathBuf)> {
     let metadata = metadata()?;
     let mut revision = git_rev_parse(&metadata, "HEAD")?;
@@ -106,11 +106,11 @@ fn git_is_worktree_dirty() -> Result<bool> {
 }
 
 /// Attempt to query the local git repository's remotes for the one that points to the upstream
-/// diem/diem repository, falling back to "origin" if unable to locate the remote
+/// aptos-labs/aptos-core repository, falling back to "origin" if unable to locate the remote
 pub fn git_get_upstream_remote() -> Result<String> {
     let output = Command::new("sh")
         .arg("-c")
-        .arg("git remote -v | grep \"https://github.com/diem/diem.* (fetch)\" | cut -f1")
+        .arg("git remote -v | grep \"https://github.com/aptos-labs/aptos-core.* (fetch)\" | cut -f1")
         .output()
         .context("Failed to get upstream remote")?;
 

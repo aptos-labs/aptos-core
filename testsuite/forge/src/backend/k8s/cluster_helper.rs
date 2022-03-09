@@ -38,7 +38,7 @@ const HEALTH_CHECK_URL: &str = "http://127.0.0.1:8001";
 const VALIDATOR_SCALING_FACTOR: i64 = 3;
 const UTILITIES_SCALING_FACTOR: i64 = 3;
 const TRUSTED_SCALING_FACTOR: i64 = 1;
-const GENESIS_MODULES_DIR: &str = "/diem/move/modules";
+const GENESIS_MODULES_DIR: &str = "/aptos-framework/move/modules";
 
 async fn wait_genesis_job(kube_client: &K8sClient, era: &str) -> Result<()> {
     aptos_retrier::retry_async(k8s_retry_strategy(), || {
@@ -187,7 +187,7 @@ fn upgrade_validator(validator_name: &str, helm_repo: &str, options: &[&str]) ->
 }
 
 fn upgrade_testnet(helm_repo: &str, options: &[&str]) -> Result<()> {
-    upgrade_helm_release("diem", &format!("{}/testnet", helm_repo), options)
+    upgrade_helm_release("aptos", &format!("{}/testnet", helm_repo), options)
 }
 
 fn get_helm_status(helm_release_name: &str) -> Result<Value> {
@@ -205,7 +205,7 @@ fn get_helm_status(helm_release_name: &str) -> Result<Value> {
 
 fn get_helm_values(helm_release_name: &str) -> Result<Value> {
     let mut v: Value = get_helm_status(helm_release_name)
-        .map_err(|e| format_err!("failed to helm get values diem: {}", e))?;
+        .map_err(|e| format_err!("failed to helm get values aptos: {}", e))?;
     Ok(v["config"].take())
 }
 
@@ -217,7 +217,7 @@ pub fn uninstall_from_k8s_cluster() -> Result<()> {
     println!("All validators removed");
 
     // NOTE: for now, do not remove testnet helm chart since it is more expensive
-    // remove_helm_release("diem").unwrap();
+    // remove_helm_release("aptos").unwrap();
     // println!("Testnet release removed");
     Ok(())
 }
@@ -284,26 +284,26 @@ pub async fn clean_k8s_cluster(
     println!("All validators upgraded");
 
     // get testnet values
-    let v: Value = get_helm_status("diem").unwrap();
+    let v: Value = get_helm_status("aptos").unwrap();
     let version = v["version"].as_i64().expect("not a i64") as usize;
     let config = &v["config"];
 
     // prep testnet chart for release
-    helm_release_patch("diem", version).unwrap();
+    helm_release_patch("aptos", version).unwrap();
 
     // store the helm values for later use
-    let file_path = tmp_dir.path().join("diem_status.json");
+    let file_path = tmp_dir.path().join("aptos_status.json");
     println!("Wrote helm values to: {:?}", &file_path);
     let mut file = File::create(file_path).expect("Could not create file in temp dir");
     file.write_all(&config.to_string().into_bytes())
         .expect("Could not write to file");
     let file_path_str = tmp_dir
         .path()
-        .join("diem_status.json")
+        .join("aptos_status.json")
         .display()
         .to_string();
 
-    // run genesis from the directory in diem/init image
+    // run genesis from the directory in aptos/init image
     let move_modules_dir = if let Some(genesis_modules_path) = genesis_modules_path {
         genesis_modules_path
     } else {
@@ -351,7 +351,7 @@ pub async fn clean_k8s_cluster(
 }
 
 fn get_new_era() -> Result<String> {
-    let v: Value = get_helm_values("diem")?;
+    let v: Value = get_helm_values("aptos")?;
     println!("{}", v["genesis"]["era"]);
     let chain_era: &str = &era_to_string(&v["genesis"]["era"]).unwrap();
 

@@ -61,11 +61,11 @@ impl K8sFactory {
         );
         vault.available()?;
         let root_key = vault
-            .export_private_key("diem__aptos_root")
+            .export_private_key("aptos__aptos_root")
             .unwrap()
             .to_bytes();
         let treasury_compliance_key = vault
-            .export_private_key("diem__treasury_compliance")
+            .export_private_key("aptos__treasury_compliance")
             .unwrap()
             .to_bytes();
 
