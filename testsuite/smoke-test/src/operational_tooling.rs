@@ -1033,8 +1033,7 @@ async fn test_validator_config() {
 #[tokio::test]
 async fn test_validator_set() {
     let num_nodes = 4;
-    let (_env, op_tool, backend, storage) =
-        launch_swarm_with_op_tool_and_backend(num_nodes).await;
+    let (_env, op_tool, backend, storage) = launch_swarm_with_op_tool_and_backend(num_nodes).await;
 
     // Fetch the validator config and validator info for this operator's owner
     let owner_account = storage.get::<AccountAddress>(OWNER_ACCOUNT).unwrap().value;
