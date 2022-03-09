@@ -12,6 +12,7 @@ mod page;
 pub(crate) mod param;
 pub mod runtime;
 mod transactions;
+pub(crate) mod version;
 
 mod failpoint;
 #[cfg(any(test))]

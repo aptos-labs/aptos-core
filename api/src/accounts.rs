@@ -6,6 +6,7 @@ use crate::{
     failpoint::fail_point,
     metrics::metrics,
     param::{AddressParam, LedgerVersionParam, MoveIdentifierParam, MoveStructTagParam},
+    version::Version,
 };
 
 use aptos_api_types::{
@@ -50,22 +51,11 @@ pub fn get_account_resources(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("accounts" / AddressParam / "resources")
         .and(warp::get())
         .and(context.filter())
-        .map(|address, ctx| (None, address, ctx))
+        .and(warp::query::<Version>())
+        .map(|address, ctx, version: Version| (version.version, address, ctx))
         .untuple_one()
         .and_then(handle_get_account_resources)
         .with(metrics("get_account_resources"))
-        .boxed()
-}
-
-// GET /ledger/<version>/accounts/<address>/resources
-pub fn get_account_resources_by_ledger_version(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("ledger" / LedgerVersionParam / "accounts" / AddressParam / "resources")
-        .and(warp::get())
-        .and(context.filter())
-        .map(|version, address, ctx| (Some(version), address, ctx))
-        .untuple_one()
-        .and_then(handle_get_account_resources)
-        .with(metrics("get_account_resources_by_ledger_version"))
         .boxed()
 }
 
@@ -74,22 +64,11 @@ pub fn get_account_modules(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("accounts" / AddressParam / "modules")
         .and(warp::get())
         .and(context.filter())
-        .map(|address, ctx| (None, address, ctx))
+        .and(warp::query::<Version>())
+        .map(|address, ctx, version: Version| (version.version, address, ctx))
         .untuple_one()
         .and_then(handle_get_account_modules)
         .with(metrics("get_account_modules"))
-        .boxed()
-}
-
-// GET /ledger/<version>/accounts/<address>/modules
-pub fn get_account_modules_by_ledger_version(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("ledger" / LedgerVersionParam / "accounts" / AddressParam / "modules")
-        .and(warp::get())
-        .and(context.filter())
-        .map(|version, address, ctx| (Some(version), address, ctx))
-        .untuple_one()
-        .and_then(handle_get_account_modules)
-        .with(metrics("get_account_modules_by_ledger_version"))
         .boxed()
 }
 

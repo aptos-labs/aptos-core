@@ -1,15 +1,15 @@
 openapi: 3.0.3
 info:
-  title: Diem Dev API Specification
+  title: Aptos Dev API Specification
   description: >
-    Diem Dev API is REST API for client applications to interact the Diem blockchain.
+    The Aptos Dev API is a RESTful API for client applications to interact the Aptos blockchain.
   license:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
   version: 0.1.0
   contact:
     name: The Aptos Foundation
-    url: https://github.com/diem/diem
+    url: https://github.com/aptos-labs/aptos-core
 tags:
   - name: general
     description: General information
@@ -88,9 +88,16 @@ paths:
         - accounts
       parameters:
         - $ref: '#/components/parameters/AccountAddress'
+        - $ref: '#/components/parameters/LedgerVersion'
       responses:
         "200":
-          description: Returns the latest account resources.
+          description: |
+            This API returns account resources for a specific ledger version (AKA transaction version).
+            If not present, the latest version is used.
+
+            The Aptos nodes prune account state history, via a configurable time window (link).
+
+            If the requested data has been pruned, the server responds with a 404
           content:
             application/json:
               schema:
@@ -111,71 +118,16 @@ paths:
         - accounts
       parameters:
         - $ref: '#/components/parameters/AccountAddress'
-      responses:
-        "200":
-          description: Returns the latest account modules.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/MoveModule'
-        "400":
-          $ref: '#/components/responses/400'
-        "404":
-          $ref: '#/components/responses/404'
-        "500":
-          $ref: '#/components/responses/500'
-  /ledger/{ledger_version}/accounts/{address}/resources:
-    get:
-      summary: Get account resources by ledger version
-      operationId: get_account_resources_by_ledger_version
-      description: |
-        This API returns account resources for a specific ledger version (AKA transaction version).
-
-        Diem node prunes account state history data by a time window configured (link).
-
-        When the data is pruned, server responds 404.
-      tags:
-        - accounts
-      parameters:
         - $ref: '#/components/parameters/LedgerVersion'
-        - $ref: '#/components/parameters/AccountAddress'
       responses:
         "200":
           description: |
-            Returns the given ledger version account resources.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AccountResource'
-        "400":
-          $ref: '#/components/responses/400'
-        "404":
-          $ref: '#/components/responses/404'
-        "500":
-          $ref: '#/components/responses/500'
-  /ledger/{ledger_version}/accounts/{address}/modules:
-    get:
-      summary: Get account modules by ledger version
-      description: |
-        This API returns account modules for a specific ledger version (AKA transaction version).
+            This API returns account modules for a specific ledger version (AKA transaction version).
+            If not present, the latest version is used.
 
-        Diem node prunes account state history data by a time window configured (link).
+            The Aptos nodes prune account state history, via a configurable time window (link).
 
-        When the data is pruned, server responds 404.
-      operationId: get_account_modules_by_ledger_version
-      tags:
-        - accounts
-      parameters:
-        - $ref: '#/components/parameters/LedgerVersion'
-        - $ref: '#/components/parameters/AccountAddress'
-      responses:
-        "200":
-          description: |
-            Returns the given ledger version account modules.
+            If the requested data has been pruned, the server responds with a 404
           content:
             application/json:
               schema:
@@ -224,16 +176,16 @@ paths:
 
         **Submit transaction using signed transaction BCS bytes**
 
-          * Generate Diem core types and transaction script functions for the client application langauge
+          * Generate Aptos core types and transaction script functions for the client application langauge
             by [Tranaction Builder](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/transaction-builder-generator)
-          * Create [RawTransaction](https://diem.github.io/diem/aptos_types/transaction/struct.RawTransaction.html).
+          * Create [RawTransaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/struct.RawTransaction.html).
           * Create transaction signing message: bytes("DIEM::RawTransaction") + BCS bytes of the RawTransaction.
             See [Crypto Spec](https://github.com/aptos-labs/aptos-core/blob/main/specifications/crypto/README.md) for more details.
           * Sign the transaction signing message and create transaction signature.
-          * Create [SignedTransaction](https://diem.github.io/diem/aptos_types/transaction/struct.SignedTransaction.html).
-          * Serialize [SignedTransaction](https://diem.github.io/diem/aptos_types/transaction/struct.SignedTransaction.html)
+          * Create [SignedTransaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/struct.SignedTransaction.html).
+          * Serialize [SignedTransaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/struct.SignedTransaction.html)
             into BCS bytes.
-          * Submit the [SignedTransaction](https://diem.github.io/diem/aptos_types/transaction/struct.SignedTransaction.html)
+          * Submit the [SignedTransaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/struct.SignedTransaction.html)
             BCS bytes (do not hex-encoded it). The request header "Content-Type" must set to "application/x.diem.signed_transaction+bcs".
       tags:
         - transactions
@@ -250,7 +202,7 @@ paths:
               type: string
               format: binary
               description: |
-                BCS bytes of the [SignedTransaction](https://diem.github.io/diem/aptos_types/transaction/struct.SignedTransaction.html).
+                BCS bytes of the [SignedTransaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/struct.SignedTransaction.html).
       responses:
         "202":
           description: Transaction is accepted and submitted to mempool.
@@ -293,8 +245,7 @@ paths:
     get:
       summary: Get transaction
       description: |
-        There are two type transaction identifiers:
-
+        There are two types of transaction identifiers:
           1. Tranasction hash: included in any transaction JSON respond from server.
           2. Transaction version: included in on-chain transaction JSON respond from server.
 
@@ -302,10 +253,10 @@ paths:
         if no on-chain transaction found, then look up transaction by hash in the mempool
         (pending) transactions.
 
-        When given transaction version, server looks up the transaction on-chain by version.
+        When given a transaction version, server looks up the transaction on-chain by version.
 
-        To create transaction hash:
-          1. Create hash message bytes: "DIEM::Transaction" bytes + BCS bytes of [Transaction](https://diem.github.io/diem/aptos_types/transaction/enum.Transaction.html).
+        To create a transaction hash:
+          1. Create hash message bytes: "DIEM::Transaction" bytes + BCS bytes of [Transaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/enum.Transaction.html).
           2. Apply hash algorithm `SHA3-256` to the hash message bytes.
           3. Hex-encode the hash bytes with `0x` prefix.
       operationId: get_transaction
@@ -462,9 +413,9 @@ components:
       schema:
         $ref: '#/components/schemas/Address'
     LedgerVersion:
-      name: ledger_version
-      in: path
-      required: true
+      name: version
+      in: query
+      required: false
       schema:
         $ref: '#/components/schemas/LedgerVersion'
     StartVersion:
@@ -567,7 +518,7 @@ components:
       type: string
       format: address
       description: |
-        Hex-encoded 16 bytes Diem account address.
+        Hex-encoded 16 bytes Aptos account address.
 
         Prefixed with `0x` and leading zeros are trimmed.
 
@@ -677,7 +628,7 @@ components:
 
             Move struct field name and value are serialized as object property name and value.
       example:
-        type: "0x1::DiemAccount::Balance<0x1::XDX::XDX>"
+        type: "0x1::AptosAccount::Balance<0x1::XDX::XDX>"
         data:
           coin:
             value: "8000000000"
@@ -701,12 +652,12 @@ components:
         Vector type value examples:
           * `vector<u8>`
           * `vector<vector<u64>>`
-          * `vector<0x1::DiemAccount::Balance<0x1::XDX::XDX>>`
+          * `vector<0x1::AptosAccount::Balance<0x1::XDX::XDX>>`
 
         Struct type value examples:
-          * `0x1::Diem::Diem<0x1::XDX::XDX>`
+          * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
           * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
-          * `0x1::DiemAccount::AccountOperationsCapability`
+          * `0x1::AptosAccount::AccountOperationsCapability`
 
         Note:
           1. Empty chars should be ignored when comparing 2 struct tag ids.
@@ -736,12 +687,12 @@ components:
         Vector type value examples:
           * `vector<u8>`
           * `vector<vector<u64>>`
-          * `vector<0x1::DiemAccount::Balance<0x1::XDX::XDX>>`
+          * `vector<0x1::AptosAccount::Balance<0x1::XDX::XDX>>`
 
         Struct type value examples:
-          * `0x1::Diem::Diem<0x1::XDX::XDX>`
+          * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
           * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
-          * `0x1::DiemAccount::AccountOperationsCapability`
+          * `0x1::AptosAccount::AccountOperationsCapability`
 
         Reference type value examples:
           * `&signer`
@@ -758,16 +709,16 @@ components:
                     {"constraints": [], "is_phantom": true}
                 ],
                 "fields": [
-                    { "name": "balance", "type": "0x1::Diem::Diem<T0>" },
-                    { "name": "preburn", "type": "0x1::Diem::Preburn<T0>" }
+                    { "name": "balance", "type": "0x1::Aptos::Aptos<T0>" },
+                    { "name": "preburn", "type": "0x1::Aptos::Preburn<T0>" }
                 ]
             }
 
         It's Move source code:
 
-            module DiemFramework::TransactionFee {
+            module AptosFramework::TransactionFee {
                 struct TransactionFee<phantom CoinType> has key {
-                    balance: Diem<CoinType>,
+                    balance: Aptos<CoinType>,
                     preburn: Preburn<CoinType>,
                 }
             }
@@ -778,7 +729,7 @@ components:
         Note:
           1. Empty chars should be ignored when comparing 2 struct tag ids.
           2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
-      example: "0x1::DiemAccount::Balance<0x1::XUS::XUS>"
+      example: "0x1::AptosAccount::Balance<0x1::XUS::XUS>"
     MoveStructTagId:
       title: Move Struct Tag ID
       type: string
@@ -792,16 +743,16 @@ components:
           2. `struct generic type parameters` joined by `, `.
 
         Examples:
-          * `0x1::Diem::Diem<0x1::XDX::XDX>`
+          * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
           * `0x1::Abc::Abc<vector<u8>, vector<u64>>`
-          * `0x1::DiemAccount::AccountOperationsCapability`
+          * `0x1::AptosAccount::AccountOperationsCapability`
 
         Note:
           1. Empty chars should be ignored when comparing 2 struct tag ids.
           2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
 
         See [doc](https://diem.github.io/move/structs-and-resources.html) for more details.
-      example: "0x1::DiemAccount::Balance<0x1::XUS::XUS>"
+      example: "0x1::AptosAccount::Balance<0x1::XUS::XUS>"
     MoveModule:
       title: Move Module
       type: object
@@ -883,11 +834,11 @@ components:
         abilities:
           - "key"
         generic_type_params:
-          - constraints: []
+          - constraints: [ ]
             is_phantom: true
         fields:
           - name: "coin"
-            type: "0x1::Diem::Diem<T0>"
+            type: "0x1::Aptos::Aptos<T0>"
     MoveStructField:
       title: Move Struct Field
       type: object
@@ -944,14 +895,14 @@ components:
         name: "peer_to_peer_with_metadata"
         visibility: "script"
         generic_type_params:
-          - constraints: []
+          - constraints: [ ]
         params:
           - "signer"
           - "address"
           - "u64"
           - "vector<u8>"
           - "vector<u8>"
-        return: []
+        return: [ ]
     MoveAbility:
       title: Move Ability
       type: string
@@ -979,7 +930,7 @@ components:
         Module name is case sensitive.
 
         See [doc](https://diem.github.io/move/modules-and-scripts.html#modules) for more details.
-      example: "0x1::Diem"
+      example: "0x1::Aptos"
     UserTransactionRequest:
       title: User Transaction Request
       type: object
@@ -1077,11 +1028,11 @@ components:
           type: boolean
           description: |
             Transaction execution result (success: true, failure: false).
-            See `vm_status` for human readable error message from Diem VM.
+            See `vm_status` for human readable error message from Aptos VM.
         vm_status:
           type: string
           description: |
-            Human readable transaction execution result message from Diem VM.
+            Human readable transaction execution result message from Aptos VM.
         accumulator_root_hash:
           $ref: '#/components/schemas/HexEncodedBytes'
     UserTransaction:
@@ -1395,7 +1346,7 @@ components:
 
         Move `u64` and `u128` type value is serialized into `string`.
 
-        Move `address` type value(16 bytes Diem account address) is serialized into
+        Move `address` type value(16 bytes Aptos account address) is serialized into
         hex-encoded string, which is prefixed with `0x` and leading zeros are trimmed.
 
         For example:
@@ -1454,7 +1405,7 @@ components:
       example:
         key: "0x00000000000000000000000000000000000000000a550c18"
         sequence_number: "23"
-        type: "0x1::DiemAccount::CreateAccountEvent"
+        type: "0x1::AptosAccount::CreateAccountEvent"
         data:
           created: "0xa550c18"
           role_id: "0"

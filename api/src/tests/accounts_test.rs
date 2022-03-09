@@ -599,7 +599,7 @@ fn account_resources(address: &str) -> String {
 }
 
 fn account_resources_with_ledger_version(address: &str, ledger_version: i128) -> String {
-    format!("/ledger/{}{}", ledger_version, account_resources(address))
+    format!("{}?version={}", account_resources(address), ledger_version)
 }
 
 fn account_modules(address: &str) -> String {
@@ -607,5 +607,5 @@ fn account_modules(address: &str) -> String {
 }
 
 fn account_modules_with_ledger_version(address: &str, ledger_version: i128) -> String {
-    format!("/ledger/{}{}", ledger_version, account_modules(address))
+    format!("{}?version={}", account_modules(address), ledger_version)
 }
