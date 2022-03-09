@@ -54,7 +54,7 @@ impl<'a, S: 'a + StateView> ExecutorTask for DiemVMWrapper<'a, S> {
         view: &MVHashMapView<AccessPath, WriteOp>,
         txn: &PreprocessedTransaction,
     ) -> ExecutionStatus<DiemTransactionOutput, VMStatus> {
-        let log_context = AdapterLogSchema::new(self.base_view.id(), view.version());
+        let log_context = AdapterLogSchema::new(self.base_view.id(), view.txn_idx());
         let versioned_view = VersionedView::new_view(self.base_view, view);
 
         match self

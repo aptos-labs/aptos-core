@@ -3,7 +3,6 @@
 
 use crate::tests::peer_to_peer::{check_and_apply_transfer_output, create_cyclic_transfers};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
-use aptos_parallel_executor::errors::Error;
 use aptos_types::{
     block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ParallelExecutionConfig, ValidatorSet},
@@ -13,12 +12,9 @@ use aptos_types::{
     },
     vm_status::{KeptVMStatus, StatusCode},
 };
-use aptos_vm::{parallel_executor::ParallelDiemVM, read_write_set_analysis::add_on_functions_list};
-use aptos_writeset_generator::encode_initialize_parallel_execution;
-use diem_framework_releases::current_modules;
+use aptos_vm::parallel_executor::ParallelDiemVM;
 use language_e2e_tests::{account, common_transactions::rotate_key_txn, executor::FakeExecutor};
 use move_ir_compiler::Compiler;
-use read_write_set::analyze;
 
 #[test]
 fn peer_to_peer_with_prologue_parallel() {
@@ -33,11 +29,6 @@ fn peer_to_peer_with_prologue_parallel() {
 
     // insert a block prologue transaction
     let (txns_info, transfer_txns) = create_cyclic_transfers(&executor, &accounts, transfer_amount);
-
-    let analyze_result = analyze(current_modules().iter())
-        .unwrap()
-        .normalize_all_scripts(add_on_functions_list())
-        .trim();
 
     let mut txns = transfer_txns
         .into_iter()
@@ -56,7 +47,7 @@ fn peer_to_peer_with_prologue_parallel() {
     txns.insert(0, Transaction::BlockMetadata(new_block));
 
     let (mut results, parallel_status) =
-        ParallelDiemVM::execute_block(&analyze_result, txns, executor.get_state_view()).unwrap();
+        ParallelDiemVM::execute_block(txns, executor.get_state_view()).unwrap();
 
     assert!(parallel_status.is_none());
 
@@ -79,13 +70,8 @@ fn rotate_ed25519_key() {
     let new_key_hash = AuthenticationKey::ed25519(&pubkey).to_vec();
     let txn = rotate_key_txn(sender.account(), new_key_hash.clone(), 10);
 
-    let analyze_result = analyze(current_modules().iter())
-        .unwrap()
-        .normalize_all_scripts(add_on_functions_list());
-
     // execute transaction
     let (mut results, parallel_status) = ParallelDiemVM::execute_block(
-        &analyze_result,
         vec![Transaction::UserTransaction(txn)],
         executor.get_state_view(),
     )
@@ -192,50 +178,6 @@ fn parallel_execution_genesis() {
         })
     );
 }
-#[test]
-fn parallel_config_sequential_check() {
-    let mut executor = FakeExecutor::from_fresh_genesis();
-
-    let aptos_root = account::Account::new_aptos_root();
-    let seq_num = executor
-        .read_account_resource_at_address(aptos_root.address())
-        .unwrap()
-        .sequence_number();
-
-    let txn = aptos_root
-        .transaction()
-        .write_set(encode_initialize_parallel_execution())
-        .sequence_number(seq_num)
-        .sign();
-
-    let txns = vec![Transaction::UserTransaction(txn)];
-
-    let analyze_result = analyze(current_modules().iter())
-        .unwrap()
-        .normalize_all_scripts(add_on_functions_list());
-    let (mut results, parallel_status) =
-        ParallelDiemVM::execute_block(&analyze_result, txns, executor.get_state_view()).unwrap();
-
-    let output = results.pop().unwrap();
-
-    // Making sure that an infer error is triggered and the transaction is executed in sequential mode.
-    match parallel_status {
-        Some(Error::InferencerError) => (),
-        _ => panic!(
-            "Unexpected parallel execution status, expected sequential mode due to inference error"
-        ),
-    }
-
-    assert!(results.is_empty());
-
-    executor.apply_write_set(output.write_set());
-    assert_eq!(
-        ParallelExecutionConfig::fetch_config(executor.get_state_view()),
-        Some(ParallelExecutionConfig {
-            read_write_analysis_result: None,
-        })
-    );
-}
 
 #[test]
 fn parallel_execution_with_bad_config() {
@@ -262,7 +204,6 @@ fn parallel_execution_with_bad_config() {
     let script_body = {
         let code = r#"
 import 0x1.ParallelExecutionConfig;
-
 main(dr_account: signer, account: signer, payload: vector<u8>) {
 label b0:
   ParallelExecutionConfig.enable_parallel_execution_with_config(&dr_account, move(payload));

@@ -40,7 +40,7 @@ use aptos_types::{
 };
 use aptos_vm::{
     convert_changeset_and_events, data_cache::RemoteStorage, parallel_executor::ParallelDiemVM,
-    read_write_set_analysis::add_on_functions_list, DiemVM, VMExecutor, VMValidator,
+    DiemVM, VMExecutor, VMValidator,
 };
 use aptos_writeset_generator::{
     encode_disable_parallel_execution, encode_enable_parallel_execution_with_config,
@@ -56,7 +56,6 @@ use move_core_types::{
 };
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_types::gas_schedule::GasStatus;
-use read_write_set::analyze;
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
 
@@ -160,7 +159,7 @@ impl FakeExecutor {
         //  - the e2e test outputs a golden file, and
         //  - the environment variable is properly set
         if let Some(env_trace_dir) = env::var_os(ENV_TRACE_DIR) {
-            let diem_version = DiemVersion::fetch_config(&self.data_store).map_or(0, |v| v.major);
+            let aptos_version = DiemVersion::fetch_config(&self.data_store).map_or(0, |v| v.major);
 
             let trace_dir = Path::new(&env_trace_dir).join(file_name);
             if trace_dir.exists() {
@@ -172,7 +171,7 @@ impl FakeExecutor {
                 .create_new(true)
                 .open(trace_dir.join(TRACE_FILE_NAME))
                 .unwrap();
-            write!(name_file, "{}::{}", test_name, diem_version).unwrap();
+            write!(name_file, "{}::{}", test_name, aptos_version).unwrap();
             for sub_dir in &[
                 TRACE_DIR_META,
                 TRACE_DIR_DATA,
@@ -375,12 +374,7 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let analyze_result = analyze(current_modules().iter())
-            .unwrap()
-            .normalize_all_scripts(add_on_functions_list());
-
-        let (result, _) =
-            ParallelDiemVM::execute_block(&analyze_result, txn_block, &self.data_store)?;
+        let (result, _) = ParallelDiemVM::execute_block(txn_block, &self.data_store)?;
 
         Ok(result)
     }

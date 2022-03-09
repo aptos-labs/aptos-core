@@ -8,10 +8,7 @@ mod vm_wrapper;
 use crate::{
     adapter_common::{preprocess_transaction, PreprocessedTransaction},
     aptos_vm::DiemVM,
-    data_cache::RemoteStorage,
-    parallel_executor::{
-        read_write_set_analyzer::ReadWriteSetAnalysisWrapper, vm_wrapper::DiemVMWrapper,
-    },
+    parallel_executor::vm_wrapper::DiemVMWrapper,
 };
 use aptos_parallel_executor::{
     errors::Error,
@@ -26,7 +23,6 @@ use aptos_types::{
 };
 use move_core_types::vm_status::{StatusCode, VMStatus};
 use rayon::prelude::*;
-use read_write_set_dynamic::NormalizedReadWriteSetAnalysis;
 
 impl PTransaction for PreprocessedTransaction {
     type Key = AccessPath;
@@ -67,28 +63,19 @@ pub struct ParallelDiemVM();
 
 impl ParallelDiemVM {
     pub fn execute_block<S: StateView>(
-        analysis_result: &NormalizedReadWriteSetAnalysis,
         transactions: Vec<Transaction>,
         state_view: &S,
     ) -> Result<(Vec<TransactionOutput>, Option<Error<VMStatus>>), VMStatus> {
-        let blockchain_view = RemoteStorage::new(state_view);
-        let analyzer = ReadWriteSetAnalysisWrapper::new(analysis_result, &blockchain_view);
-
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
         // sequentially while executing the transactions.
-
         let signature_verified_block: Vec<PreprocessedTransaction> = transactions
             .par_iter()
             .map(|txn| preprocess_transaction::<DiemVM>(txn.clone()))
             .collect();
 
-        match ParallelTransactionExecutor::<
-            PreprocessedTransaction,
-            DiemVMWrapper<S>,
-            ReadWriteSetAnalysisWrapper<RemoteStorage<S>>,
-        >::new(analyzer)
-        .execute_transactions_parallel(state_view, signature_verified_block)
+        match ParallelTransactionExecutor::<PreprocessedTransaction, DiemVMWrapper<S>>::new()
+            .execute_transactions_parallel(state_view, signature_verified_block)
         {
             Ok(results) => Ok((
                 results

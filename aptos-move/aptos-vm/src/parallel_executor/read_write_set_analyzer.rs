@@ -13,7 +13,7 @@ use read_write_set_dynamic::NormalizedReadWriteSetAnalysis;
 pub(crate) struct ReadWriteSetAnalysisWrapper<'a, S: MoveResolver> {
     analyzer: ReadWriteSetAnalysis<'a, S>,
 }
-
+#[allow(dead_code)]
 impl<'a, S: MoveResolver> ReadWriteSetAnalysisWrapper<'a, S> {
     pub fn new(analysis_result: &'a NormalizedReadWriteSetAnalysis, view: &'a S) -> Self {
         Self {

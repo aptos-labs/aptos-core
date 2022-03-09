@@ -1,223 +1,134 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use once_cell::sync::OnceCell;
+use crossbeam::utils::CachePadded;
+use dashmap::DashMap;
 use std::{
-    cmp::{max, PartialOrd},
-    collections::{btree_map::BTreeMap, HashMap},
-    fmt::Debug,
+    collections::btree_map::BTreeMap,
     hash::Hash,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
 
 #[cfg(test)]
 mod unit_tests;
 
-/// A structure that holds placeholders for each write to the database
-//
-//  The structure is created by one thread creating the scheduling, and
-//  at that point it is used as a &mut by that single thread.
-//
-//  Then it is passed to all threads executing as a shared reference. At
-//  this point only a single thread must write to any entry, and others
-//  can read from it. Only entries are mutated using interior mutability,
-//  but no entries can be added or deleted.
-//
+// TODO: re-use definitions with the scheduler.
+pub type TxnIndex = usize;
+pub type Incarnation = usize;
+pub type Version = (TxnIndex, Incarnation);
 
-pub type Version = usize;
+const FLAG_DONE: usize = 0;
+const FLAG_ESTIMATE: usize = 1;
 
-pub struct MVHashMap<K, V> {
-    data: HashMap<K, BTreeMap<Version, WriteCell<V>>>,
+/// Type of entry, recorded in the shared multi-version data-structure for each write.
+struct WriteCell<V> {
+    /// Used to mark the entry as a "write estimate".
+    flag: AtomicUsize,
+    /// Incarnation number of the transaction that wrote the entry. Note that
+    /// TxnIndex is part of the key and not recorded here.
+    incarnation: Incarnation,
+    /// Actual data stored in a shared pointer (to ensure ownership and avoid clones).
+    data: Arc<V>,
 }
-
-#[derive(Debug)]
-pub enum Error {
-    // A write has been performed on an entry that is not in the possible_writes list.
-    UnexpectedWrite,
-    // A query doesn't match any entry in the map.
-    NotInMap,
-}
-
-#[cfg_attr(any(target_arch = "x86_64"), repr(align(128)))]
-pub(crate) struct WriteCell<V>(OnceCell<Option<V>>);
 
 impl<V> WriteCell<V> {
-    pub fn new() -> WriteCell<V> {
-        WriteCell(OnceCell::new())
+    pub fn new_from(flag: usize, incarnation: Incarnation, data: V) -> WriteCell<V> {
+        WriteCell {
+            flag: AtomicUsize::new(flag),
+            incarnation,
+            data: Arc::new(data),
+        }
     }
 
-    pub fn is_assigned(&self) -> bool {
-        self.0.get().is_some()
+    pub fn flag(&self) -> usize {
+        self.flag.load(Ordering::SeqCst)
     }
 
-    pub fn write(&self, v: V) {
-        // Each cell should only be written exactly once.
-        assert!(self.0.set(Some(v)).is_ok())
+    pub fn mark_estimate(&self) {
+        self.flag.store(FLAG_ESTIMATE, Ordering::SeqCst);
     }
+}
 
-    pub fn skip(&self) {
-        assert!(self.0.set(None).is_ok());
-    }
-
-    pub fn get(&self) -> Option<&Option<V>> {
-        self.0.get()
-    }
+/// Main multi-version data-structure used by threads to read/write during parallel
+/// execution. Maps each access path to an interal BTreeMap that contains the indices
+/// of transactions that write at the given access path alongside the corresponding
+/// entries of WriteCell type.
+///
+/// Concurrency is managed by DashMap, i.e. when a method accesses a BTreeMap at a
+/// given key, it holds exclusive access and doesn't need to explicitly synchronize
+/// with other reader/writers.
+pub struct MVHashMap<K, V> {
+    data: DashMap<K, BTreeMap<TxnIndex, CachePadded<WriteCell<V>>>>,
 }
 
 impl<K: Hash + Clone + Eq, V> MVHashMap<K, V> {
-    /// Create the MVHashMap structure from a list of possible writes. Each element in the list
-    /// indicates a key that could potentially be modified at its given version.
-    ///
-    /// Returns the MVHashMap, and the maximum number of writes that can write to one single key.
-    pub fn new_from(possible_writes: Vec<(K, Version)>) -> (Self, usize) {
-        let mut outer_map: HashMap<K, BTreeMap<Version, WriteCell<V>>> = HashMap::new();
-        for (key, version) in possible_writes.into_iter() {
-            outer_map
-                .entry(key)
-                .or_default()
-                .insert(version, WriteCell::new());
+    pub fn new() -> MVHashMap<K, V> {
+        MVHashMap {
+            data: DashMap::new(),
         }
-        let max_dependency_size = outer_map
-            .values()
-            .fold(0, |max_depth, btree_map| max(max_depth, btree_map.len()));
-
-        (MVHashMap { data: outer_map }, max_dependency_size)
     }
 
-    /// Get the number of keys in the MVHashMap.
-    pub fn len(&self) -> usize {
-        self.data.len()
+    /// Write a versioned data at a specified key. If the WriteCell entry is overwritten,
+    /// asserts that the new incarnation is strictly higher.
+    pub fn write(&self, key: &K, version: Version, data: V) {
+        let (txn_idx, incarnation) = version;
+
+        let mut map = self.data.entry(key.clone()).or_insert(BTreeMap::new());
+        let prev_cell = map.insert(
+            txn_idx,
+            CachePadded::new(WriteCell::new_from(FLAG_DONE, incarnation, data)),
+        );
+
+        // Assert that the previous entry for txn_idx, if present, had lower incarnation.
+        assert!(prev_cell
+            .map(|cell| cell.incarnation < incarnation)
+            .unwrap_or(true));
     }
 
-    fn get_entry(&self, key: &K, version: Version) -> Result<&WriteCell<V>, Error> {
-        self.data
-            .get(key)
-            .ok_or(Error::UnexpectedWrite)?
-            .get(&version)
-            .ok_or(Error::UnexpectedWrite)
+    /// Mark an entry from transaction 'txn_idx' at access path 'key' as an estimated write
+    /// (for future incarnation). Will panic if the entry is not in the data-structure.
+    pub fn mark_estimate(&self, key: &K, txn_idx: TxnIndex) {
+        let map = self.data.get(key).expect("Path must exist");
+        map.get(&txn_idx)
+            .expect("Entry by txn must exist")
+            .mark_estimate();
     }
 
-    /// Write to `key` at `version`.
-    /// Function will return an error if the write is not in the initial `possible_writes` list.
-    pub fn write(&self, key: &K, version: Version, data: V) -> Result<(), Error> {
-        // By construction there will only be a single writer, before the
-        // write there will be no readers on the variable.
-        // So it is safe to go ahead and write without any further check.
-
-        let entry = self.get_entry(key, version)?;
-
-        #[cfg(test)]
-        {
-            // Test the invariant holds
-            if entry.is_assigned() {
-                panic!("Cannot write twice to same entry.");
-            }
-        }
-
-        entry.write(data);
-
-        Ok(())
+    /// Delete an entry from transaction 'txn_idx' at access path 'key'. Will panic
+    /// if the access path has never been written before.
+    pub fn delete(&self, key: &K, txn_idx: TxnIndex) {
+        // TODO: investigate logical deletion.
+        let mut map = self.data.get_mut(key).expect("Path must exist");
+        map.remove(&txn_idx);
     }
 
-    /// Skips writing to `key` at `version` if that entry hasn't been assigned.
-    /// Function will return an error if the write is not in the initial `possible_writes` list.
-    pub fn skip_if_not_set(&self, key: &K, version: Version) -> Result<(), Error> {
-        // We only write or skip once per entry
-        // So it is safe to go ahead and just do it.
-        let entry = self.get_entry(key, version)?;
+    /// read may return Ok((Arc<V>, txn_idx, incarnation)), Err(dep_txn_idx) for
+    /// a dependency of transaction dep_txn_idx or Err(None) when no prior entry is found.
+    pub fn read(&self, key: &K, txn_idx: TxnIndex) -> Result<(Version, Arc<V>), Option<TxnIndex>> {
+        match self.data.get(key) {
+            Some(tree) => {
+                // Find the dependency
+                let mut iter = tree.range(0..txn_idx);
+                if let Some((idx, write_cell)) = iter.next_back() {
+                    let flag = write_cell.flag();
 
-        // Test the invariant holds
-        if !entry.is_assigned() {
-            entry.skip();
-        }
-
-        Ok(())
-    }
-
-    /// Skips writing to `key` at `version`.
-    /// Function will return an error if the write is not in the initial `possible_writes` list.
-    /// `skip` should only be invoked when `key` at `version` hasn't been assigned.
-    pub fn skip(&self, key: &K, version: Version) -> Result<(), Error> {
-        // We only write or skip once per entry
-        // So it is safe to go ahead and just do it.
-        let entry = self.get_entry(key, version)?;
-
-        #[cfg(test)]
-        {
-            // Test the invariant holds
-            if entry.is_assigned() {
-                panic!("Cannot write twice to same entry.");
-            }
-        }
-
-        entry.skip();
-        Ok(())
-    }
-
-    /// Get the value of `key` at `version`.
-    /// Returns Ok(val) if such key is already assigned by previous transactions.
-    /// Returns Err(None) if `version` is smaller than the write of all previous versions.
-    /// Returns Err(Some(version)) if such key is dependent on the `version`-th transaction.
-    pub fn read(&self, key: &K, version: Version) -> Result<&V, Option<Version>> {
-        let tree = self.data.get(key).ok_or(None)?;
-
-        let mut iter = tree.range(0..version);
-
-        while let Some((entry_key, entry_val)) = iter.next_back() {
-            if *entry_key < version {
-                match entry_val.get() {
-                    // Entry not yet computed, return the version that blocked this query.
-                    None => return Err(Some(*entry_key)),
-                    // Entry is skipped, go to previous version.
-                    Some(None) => continue,
-                    Some(Some(v)) => return Ok(v),
+                    if flag == FLAG_ESTIMATE {
+                        // Found a dependency.
+                        Err(Some(*idx))
+                    } else {
+                        debug_assert!(flag == FLAG_DONE);
+                        // The entry is populated, return its contents.
+                        let write_version = (*idx, write_cell.incarnation);
+                        Ok((write_version, write_cell.data.clone()))
+                    }
+                } else {
+                    Err(None)
                 }
             }
+            None => Err(None),
         }
-
-        Err(None)
-    }
-}
-
-const PARALLEL_THRESHOLD: usize = 1000;
-
-impl<K, V> MVHashMap<K, V>
-where
-    K: PartialOrd + Send + Clone + Hash + Eq,
-    V: Send,
-{
-    fn split_merge(
-        num_cpus: usize,
-        recursion_depth: usize,
-        split: Vec<(K, Version)>,
-    ) -> (usize, HashMap<K, BTreeMap<Version, WriteCell<V>>>) {
-        if (1 << recursion_depth) > num_cpus || split.len() < PARALLEL_THRESHOLD {
-            let mut data = HashMap::new();
-            let mut max_len = 0;
-            for (path, version) in split.into_iter() {
-                let place = data.entry(path).or_insert_with(BTreeMap::new);
-                place.insert(version, WriteCell::new());
-                max_len = max(max_len, place.len());
-            }
-            (max_len, data)
-        } else {
-            // Partition the possible writes by keys and work on each partition in parallel.
-            let pivot_address = split[split.len() / 2].0.clone();
-            let (left, right): (Vec<_>, Vec<_>) =
-                split.into_iter().partition(|(p, _)| *p < pivot_address);
-            let ((m0, mut left_map), (m1, right_map)) = rayon::join(
-                || Self::split_merge(num_cpus, recursion_depth + 1, left),
-                || Self::split_merge(num_cpus, recursion_depth + 1, right),
-            );
-            left_map.extend(right_map);
-            (max(m0, m1), left_map)
-        }
-    }
-
-    /// Create the MVHashMap structure from a list of possible writes in parallel.
-    pub fn new_from_parallel(possible_writes: Vec<(K, Version)>) -> (Self, usize) {
-        let num_cpus = num_cpus::get();
-
-        let (max_dependency_len, data) = Self::split_merge(num_cpus, 0, possible_writes);
-        (MVHashMap { data }, max_dependency_len)
     }
 }

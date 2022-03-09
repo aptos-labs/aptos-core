@@ -3,10 +3,11 @@
 
 use crate::{
     executor::ParallelTransactionExecutor,
-    proptest_types::types::{ExpectedOutput, Inferencer, Task, Transaction},
+    proptest_types::types::{ExpectedOutput, Task, Transaction},
+    scheduler::{Scheduler, SchedulerTask, TaskGuard},
 };
 use rand::random;
-use std::{fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash, sync::atomic::AtomicUsize};
 
 fn run_and_assert<K, V>(transactions: Vec<Transaction<K, V>>)
 where
@@ -15,10 +16,7 @@ where
 {
     let baseline = ExpectedOutput::generate_baseline(&transactions);
 
-    let output =
-        ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>, Inferencer<K, V>>::new(
-            Inferencer::new(),
-        )
+    let output = ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new()
         .execute_transactions_parallel((), transactions);
 
     assert!(baseline.check_output(&output))
@@ -131,4 +129,241 @@ fn early_skips() {
         transactions.push(Transaction::SkipRest)
     }
     run_and_assert(transactions)
+}
+
+#[test]
+fn scheduler_tasks() {
+    let s = Scheduler::new(6);
+    let fake_counter = AtomicUsize::new(0);
+
+    for i in 0..5 {
+        // not calling finish execution, so validation tasks not dispatched.
+        assert!(matches!(
+            s.next_task(),
+            SchedulerTask::ExecutionTask((j, 0), _) if i == j
+        ));
+    }
+
+    // Finish execution for txns 0, 2, 4. txn 0 without validate_suffix and because
+    // validation index is higher will return validation task to the caller.
+    assert!(matches!(
+        s.finish_execution(0, 0, false, TaskGuard::new(&fake_counter)),
+        SchedulerTask::ValidationTask((0, 0), _)
+    ));
+    // Requires revalidation suffix, so validation index will be decreased to 2,
+    // and txn 4 will not need to return a validation task.
+    assert!(matches!(
+        s.finish_execution(2, 0, true, TaskGuard::new(&fake_counter)),
+        SchedulerTask::NoTask
+    ));
+    // txn 2's finish validation pulled back validation index, so 4 will get validated
+    // and no need to return a validation task.
+    assert!(matches!(
+        s.finish_execution(4, 0, false, TaskGuard::new(&fake_counter)),
+        SchedulerTask::NoTask
+    ));
+
+    assert!(matches!(
+        s.next_task(),
+        SchedulerTask::ValidationTask((2, 0), _)
+    ));
+    // txn 3 hasn't finished execution, so no validation task for it.
+    assert!(matches!(
+        s.next_task(),
+        SchedulerTask::ValidationTask((4, 0), _)
+    ));
+
+    // Validation index is decreased and no task returned to caller.
+    assert!(matches!(
+        s.finish_execution(3, 0, true, TaskGuard::new(&fake_counter)),
+        SchedulerTask::NoTask
+    ));
+
+    assert!(matches!(
+        s.next_task(),
+        SchedulerTask::ValidationTask((3, 0), _)
+    ));
+    // txn 4 dispatched for validation again because it the previous validation
+    // hasn't finished.
+    assert!(matches!(
+        s.next_task(),
+        SchedulerTask::ValidationTask((4, 0), _)
+    ));
+
+    // successful abort.
+    assert!(s.try_abort(3, 0));
+    assert!(matches!(
+        s.finish_execution(1, 0, false, TaskGuard::new(&fake_counter)),
+        SchedulerTask::ValidationTask((1, 0), _)
+    ));
+
+    // unsuccessful abort.
+    assert!(!s.try_abort(3, 0));
+    assert!(matches!(
+        s.finish_abort(3, 0, TaskGuard::new(&fake_counter)),
+        SchedulerTask::ExecutionTask((3, 1), _)
+    ));
+
+    // can abort even after succesful validation
+    assert!(s.try_abort(4, 0));
+    assert!(matches!(
+        s.finish_abort(4, 0, TaskGuard::new(&fake_counter)),
+        SchedulerTask::ExecutionTask((4, 1), _)
+    ));
+
+    // txn 4 is aborted, so there won't be a validation task.
+    assert!(matches!(
+        s.next_task(),
+        SchedulerTask::ExecutionTask((5, 0), _)
+    ));
+    // Wrap up all outstanding tasks.
+    assert!(matches!(
+        s.finish_execution(4, 1, false, TaskGuard::new(&fake_counter)),
+        SchedulerTask::ValidationTask((4, 1), _)
+    ));
+    assert!(matches!(
+        s.finish_execution(3, 1, false, TaskGuard::new(&fake_counter)),
+        SchedulerTask::ValidationTask((3, 1), _)
+    ));
+
+    assert!(matches!(
+        s.finish_execution(5, 0, false, TaskGuard::new(&fake_counter)),
+        SchedulerTask::NoTask
+    ));
+
+    assert!(matches!(
+        s.next_task(),
+        SchedulerTask::ValidationTask((5, 0), _)
+    ));
+
+    assert!(matches!(s.next_task(), SchedulerTask::Done));
+}
+
+#[test]
+fn scheduler_dependency() {
+    let s = Scheduler::new(10);
+    let fake_counter = AtomicUsize::new(0);
+
+    for i in 0..5 {
+        // not calling finish execution, so validation tasks not dispatched.
+        assert!(matches!(
+            s.next_task(),
+            SchedulerTask::ExecutionTask((j, 0), _) if j == i
+        ));
+    }
+
+    assert!(matches!(
+        s.finish_execution(0, 0, false, TaskGuard::new(&fake_counter)),
+        SchedulerTask::ValidationTask((0, 0), _)
+    ));
+    assert!(matches!(
+        s.next_task(),
+        SchedulerTask::ExecutionTask((5, 0), _)
+    ));
+
+    assert!(!s.try_add_dependency(3, 0));
+    assert!(s.try_add_dependency(4, 2));
+
+    assert!(matches!(
+        s.finish_execution(2, 0, false, TaskGuard::new(&fake_counter)),
+        SchedulerTask::ValidationTask((2, 0), _)
+    ));
+    assert!(matches!(
+        s.next_task(),
+        SchedulerTask::ExecutionTask((4, 1), _)
+    ));
+}
+
+#[test]
+fn scheduler_incarnation() {
+    let s = Scheduler::new(5);
+    let fake_counter = AtomicUsize::new(0);
+
+    for i in 0..5 {
+        // not calling finish execution, so validation tasks not dispatched.
+        assert!(matches!(
+            s.next_task(),
+            SchedulerTask::ExecutionTask((j, 0), _) if j == i
+        ));
+    }
+    // execution index = 5
+    assert!(s.try_add_dependency(1, 0));
+    assert!(s.try_add_dependency(3, 0));
+
+    assert!(matches!(
+        s.finish_execution(2, 0, true, TaskGuard::new(&fake_counter)),
+        SchedulerTask::NoTask
+    ));
+    assert!(matches!(
+        s.finish_execution(4, 0, true, TaskGuard::new(&fake_counter)),
+        SchedulerTask::NoTask
+    ));
+
+    assert!(matches!(
+        s.next_task(),
+        SchedulerTask::ValidationTask((2, 0), _)
+    ));
+    assert!(matches!(
+        s.next_task(),
+        SchedulerTask::ValidationTask((4, 0), _)
+    ));
+
+    assert!(s.try_abort(2, 0));
+    assert!(s.try_abort(4, 0));
+    assert!(!s.try_abort(2, 0));
+
+    assert!(matches!(
+        s.finish_abort(2, 0, TaskGuard::new(&fake_counter)),
+        SchedulerTask::ExecutionTask((2, 1), _)
+    ));
+
+    assert!(matches!(
+        s.finish_execution(0, 0, false, TaskGuard::new(&fake_counter)),
+        SchedulerTask::ValidationTask((0, 0), _)
+    ));
+    // execution index =  1
+
+    assert!(matches!(
+        s.finish_abort(4, 0, TaskGuard::new(&fake_counter)),
+        SchedulerTask::NoTask
+    ));
+
+    assert!(matches!(
+        s.next_task(),
+        SchedulerTask::ExecutionTask((1, 1), _)
+    ));
+    assert!(matches!(
+        s.next_task(),
+        SchedulerTask::ExecutionTask((3, 1), _)
+    ));
+    assert!(matches!(
+        s.next_task(),
+        SchedulerTask::ExecutionTask((4, 1), _)
+    ));
+    // execution index = 5
+
+    assert!(matches!(
+        s.finish_execution(1, 1, false, TaskGuard::new(&fake_counter)),
+        SchedulerTask::ValidationTask((1, 1), _)
+    ));
+    assert!(matches!(
+        s.finish_execution(2, 1, false, TaskGuard::new(&fake_counter)),
+        SchedulerTask::ValidationTask((2, 1), _)
+    ));
+    assert!(matches!(
+        s.finish_execution(3, 1, false, TaskGuard::new(&fake_counter)),
+        SchedulerTask::ValidationTask((3, 1), _)
+    ));
+
+    // validation index is 4, so finish execution doesn't return validation task, next task does.
+    assert!(matches!(
+        s.finish_execution(4, 1, false, TaskGuard::new(&fake_counter)),
+        SchedulerTask::NoTask
+    ));
+    assert!(matches!(
+        s.next_task(),
+        SchedulerTask::ValidationTask((4, 1), _)
+    ));
+
+    assert!(matches!(s.next_task(), SchedulerTask::Done));
 }

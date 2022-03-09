@@ -16,7 +16,6 @@ const DEFAULT_TIMEOUT: u64 = 30;
 enum Operator<V: Debug + Clone> {
     Insert(V),
     Remove,
-    Skip,
     Read,
 }
 
@@ -40,7 +39,7 @@ where
             let value_to_update = match op {
                 Operator::Insert(v) => Some(v.clone()),
                 Operator::Remove => None,
-                Operator::Skip | Operator::Read => continue,
+                Operator::Read => continue,
             };
 
             baseline
@@ -68,7 +67,6 @@ fn operator_strategy<V: Arbitrary + Clone>() -> impl Strategy<Value = Operator<V
     prop_oneof![
         2 => any::<V>().prop_map(Operator::Insert),
         1 => Just(Operator::Remove),
-        1 => Just(Operator::Skip),
         4 => Just(Operator::Read),
     ]
 }
@@ -86,17 +84,24 @@ where
         .map(|(idx, op)| (idx.get(&universe).clone(), op))
         .collect::<Vec<_>>();
 
+    let baseline = Baseline::new(transactions.as_slice());
+    let map = MVHashMap::<K, Option<V>>::new();
+
+    // make ESTIMATE placeholders for all versions to be written.
+    // allows to test that correct values appear at the end of concurrent execution.
     let versions_to_write = transactions
         .iter()
         .enumerate()
         .filter_map(|(idx, (key, op))| match op {
             Operator::Read => None,
-            Operator::Insert(_) | Operator::Skip | Operator::Remove => Some((key.clone(), idx)),
+            Operator::Insert(_) | Operator::Remove => Some((key.clone(), idx)),
         })
         .collect::<Vec<_>>();
+    for (key, idx) in versions_to_write {
+        map.write(&key, (idx, 0), None);
+        map.mark_estimate(&key, idx);
+    }
 
-    let baseline = Baseline::new(transactions.as_slice());
-    let (map, _) = MVHashMap::<K, Option<V>>::new_from_parallel(versions_to_write);
     let curent_idx = AtomicUsize::new(0);
 
     // Spawn a few threads in parallel to commit each operator.
@@ -116,17 +121,25 @@ where
                         let mut retry_attempts = 0;
                         loop {
                             match map.read(key, idx) {
-                                Ok(Some(v)) => {
-                                    assert_eq!(
-                                        baseline,
-                                        ExpectedOutput::Value(v.clone()),
-                                        "{:?}",
-                                        idx
-                                    );
-                                    break;
-                                }
-                                Ok(None) => {
-                                    assert_eq!(baseline, ExpectedOutput::Deleted, "{:?}", idx);
+                                Ok((_, v)) => {
+                                    match &*v {
+                                        Some(w) => {
+                                            assert_eq!(
+                                                baseline,
+                                                ExpectedOutput::Value(w.clone()),
+                                                "{:?}",
+                                                idx
+                                            );
+                                        }
+                                        None => {
+                                            assert_eq!(
+                                                baseline,
+                                                ExpectedOutput::Deleted,
+                                                "{:?}",
+                                                idx
+                                            );
+                                        }
+                                    }
                                     break;
                                 }
                                 Err(None) => {
@@ -142,14 +155,11 @@ where
                             std::thread::sleep(std::time::Duration::from_millis(100));
                         }
                     }
-                    Operator::Skip => {
-                        map.skip(key, idx).unwrap();
-                    }
                     Operator::Remove => {
-                        map.write(key, idx, None).unwrap();
+                        map.write(key, (idx, 1), None);
                     }
                     Operator::Insert(v) => {
-                        map.write(key, idx, Some(v.clone())).unwrap();
+                        map.write(key, (idx, 1), Some(v.clone()));
                     }
                 }
             })
@@ -174,7 +184,6 @@ proptest! {
     ) {
         run_and_assert(universe, transactions)?;
     }
-
 
     #[test]
     fn multi_key_proptest(

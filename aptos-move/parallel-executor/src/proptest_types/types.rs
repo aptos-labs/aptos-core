@@ -243,7 +243,7 @@ where
                 let mut reads_result = vec![];
                 for k in reads.iter() {
                     reads_result.push(match view.read(k) {
-                        Ok(Some(v)) => Some(v.clone()),
+                        Ok(Some(v)) => Some((*v).clone()),
                         Ok(None) => None,
                         Err(_) => return ExecutionStatus::Abort(0),
                     })
@@ -251,7 +251,7 @@ where
                 ExecutionStatus::Success(Output(actual_writes.clone(), reads_result))
             }
             Transaction::SkipRest => ExecutionStatus::SkipRest(Output(vec![], vec![])),
-            Transaction::Abort => ExecutionStatus::Abort(view.version()),
+            Transaction::Abort => ExecutionStatus::Abort(view.txn_idx()),
         }
     }
 }

@@ -738,8 +738,11 @@ name = "aptos-parallel-executor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-infallible",
  "aptos-workspace-hack",
+ "arc-swap",
  "criterion",
+ "crossbeam",
  "crossbeam-queue",
  "mvhashmap",
  "num_cpus",
@@ -2283,6 +2286,16 @@ dependencies = [
 
 [[package]]
 name = "dashmap"
+version = "4.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e77a43b28d0668df09411cb0bc9a8c2adc40f9a048afe863e05fd43251e8e39c"
+dependencies = [
+ "cfg-if",
+ "num_cpus",
+]
+
+[[package]]
+name = "dashmap"
 version = "5.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0834a35a3fce649144119e18da2a4d8ed12ef3862f47183fd46f625d072d96c"
@@ -3802,7 +3815,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ab388864246d58a276e60e7569a833d9cc4cd75c66e5ca77c177dad38e59996"
 dependencies = [
  "ahash",
- "dashmap",
+ "dashmap 5.1.0",
  "hashbrown 0.12.0",
  "once_cell",
  "parking_lot 0.12.0",
@@ -4953,6 +4966,9 @@ name = "mvhashmap"
 version = "0.1.0"
 dependencies = [
  "aptos-workspace-hack",
+ "arc-swap",
+ "crossbeam",
+ "dashmap 4.0.2",
  "num_cpus",
  "once_cell",
  "proptest",

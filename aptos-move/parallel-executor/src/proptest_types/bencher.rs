@@ -4,7 +4,7 @@
 use crate::{
     executor::ParallelTransactionExecutor,
     proptest_types::types::{
-        ExpectedOutput, Inferencer, Task, Transaction, TransactionGen, TransactionGenParams,
+        ExpectedOutput, Task, Transaction, TransactionGen, TransactionGenParams,
     },
 };
 use criterion::{BatchSize, Bencher as CBencher};
@@ -53,7 +53,7 @@ where
                     vec(key_strategy, self.universe_size),
                     self.transaction_size,
                     self.transaction_gen_param,
-                    false,
+                    true,
                 )
             },
             |state| state.run(),
@@ -108,10 +108,7 @@ where
     }
 
     pub(crate) fn run(self) {
-        let output =
-            ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>, Inferencer<K, V>>::new(
-                Inferencer::new(),
-            )
+        let output = ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new()
             .execute_transactions_parallel((), self.transactions);
 
         if let Some(expected_output) = self.expected_output {

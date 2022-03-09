@@ -51,7 +51,6 @@ use move_core_types::{
 };
 use move_vm_runtime::session::Session;
 use move_vm_types::gas_schedule::GasStatus;
-use read_write_set_dynamic::NormalizedReadWriteSetAnalysis;
 use std::{
     collections::HashSet,
     convert::{AsMut, AsRef},
@@ -213,15 +212,15 @@ impl DiemVM {
 
             match payload {
                 TransactionPayload::Script(script) => {
-                    let diem_version = self.0.get_diem_version()?;
+                    let aptos_version = self.0.get_diem_version()?;
                     let remapped_script =
-                        if diem_version < aptos_types::on_chain_config::DIEM_VERSION_2 {
+                        if aptos_version < aptos_types::on_chain_config::DIEM_VERSION_2 {
                             None
                         } else {
                             script_to_script_function::remapping(script.code())
                         };
                     let mut senders = vec![txn_data.sender()];
-                    if diem_version >= DIEM_VERSION_3 {
+                    if aptos_version >= DIEM_VERSION_3 {
                         senders.extend(txn_data.secondary_signers());
                     }
                     match remapped_script {
@@ -245,9 +244,9 @@ impl DiemVM {
                     }
                 }
                 TransactionPayload::ScriptFunction(script_fn) => {
-                    let diem_version = self.0.get_diem_version()?;
+                    let aptos_version = self.0.get_diem_version()?;
                     let mut senders = vec![txn_data.sender()];
-                    if diem_version >= DIEM_VERSION_3 {
+                    if aptos_version >= DIEM_VERSION_3 {
                         senders.extend(txn_data.secondary_signers());
                     }
                     session.execute_script_function(
@@ -382,7 +381,7 @@ impl DiemVM {
                 log_context,
             ),
             TransactionPayload::WriteSet(_) => {
-                return discard_error_vm_status(VMStatus::Error(StatusCode::UNREACHABLE))
+                return discard_error_vm_status(VMStatus::Error(StatusCode::UNREACHABLE));
             }
         };
 
@@ -424,17 +423,17 @@ impl DiemVM {
             WriteSetPayload::Direct(change_set) => change_set.clone(),
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(storage);
-                let diem_version = self.0.get_diem_version().map_err(Err)?;
+                let aptos_version = self.0.get_diem_version().map_err(Err)?;
                 let senders = match txn_sender {
                     None => vec![*execute_as],
                     Some(sender) => vec![sender, *execute_as],
                 };
-                let remapped_script = if diem_version < aptos_types::on_chain_config::DIEM_VERSION_2
-                {
-                    None
-                } else {
-                    script_to_script_function::remapping(script.code())
-                };
+                let remapped_script =
+                    if aptos_version < aptos_types::on_chain_config::DIEM_VERSION_2 {
+                        None
+                    } else {
+                        script_to_script_function::remapping(script.code())
+                    };
                 let execution_result = match remapped_script {
                     // We are in this case before VERSION_2
                     // or if there is no remapping for the script
@@ -463,7 +462,7 @@ impl DiemVM {
                         ChangeSet::new(cs, events)
                     }
                     Err(e) => {
-                        return Err(Ok((e, discard_error_output(StatusCode::INVALID_WRITE_SET))))
+                        return Err(Ok((e, discard_error_output(StatusCode::INVALID_WRITE_SET))));
                     }
                 }
             }
@@ -733,20 +732,15 @@ impl VMExecutor for DiemVM {
         });
 
         // Execute transactions in parallel if on chain config is set and loaded.
-        if let Some(read_write_set_analysis) =
+        if let Some(_read_write_set_analysis) =
             ParallelExecutionConfig::fetch_config(&RemoteStorage::new(state_view))
                 .and_then(|config| config.read_write_analysis_result)
                 .map(|config| config.into_inner())
         {
-            let analysis_reuslt = NormalizedReadWriteSetAnalysis::new(read_write_set_analysis);
-
             // Note that writeset transactions will be executed sequentially as it won't be inferred
             // by the read write set analysis and thus fall into the sequential path.
-            let (result, _) = crate::parallel_executor::ParallelDiemVM::execute_block(
-                &analysis_reuslt,
-                transactions,
-                state_view,
-            )?;
+            let (result, _) =
+                crate::parallel_executor::ParallelDiemVM::execute_block(transactions, state_view)?;
             Ok(result)
         } else {
             let output = Self::execute_block_and_keep_vm_status(transactions, state_view)?;

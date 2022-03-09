@@ -54,10 +54,10 @@ pub trait ExecutorTask: Sync {
     type T: Transaction;
 
     /// The output of a transaction. This should contain the side effect of this transaction.
-    type Output: TransactionOutput<T = Self::T>;
+    type Output: TransactionOutput<T = Self::T> + 'static;
 
     /// Type of error when the executor failed to process a transaction and needs to abort.
-    type Error: Clone + Send + Sync;
+    type Error: Clone + Send + Sync + 'static;
 
     /// Type to intialize the single thread transaction executor. Copy and Sync are required because
     /// we will create an instance of executor on each individual thread.
