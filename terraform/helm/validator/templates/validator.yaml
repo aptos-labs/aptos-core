@@ -224,7 +224,7 @@ spec:
     ports:
     - protocol: TCP
       port: 6180
-  {{- if .Values.exposeValidatorJsonRpc }}
+  {{- if .Values.exposeValidatorRestApi }}
   # REST API from HAproxy
   - from:
     - podSelector:
