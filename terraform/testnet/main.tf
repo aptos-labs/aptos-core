@@ -145,7 +145,8 @@ resource "helm_release" "validator" {
   values = [
     module.validator.helm_values,
     jsonencode({
-      localVaultBackend = var.enable_dev_vault # Toggle dev vault mode
+      exposeValidatorRestApi = var.enable_forge
+      localVaultBackend      = var.enable_dev_vault # Toggle dev vault mode
       validator = {
         name = "val${count.index}"
       }
@@ -159,17 +160,6 @@ resource "helm_release" "validator" {
         external = {
           type = "NodePort"
         }
-      }
-      fullnode = {
-        groups = [
-          {
-            name          = "fullnode"
-            replicas      = 1
-            enableJsonRpc = true
-            # Forge requires REST API
-            enableApi = var.enable_forge || var.enable_api
-          }
-        ]
       }
       monitoring = {
         fullKubernetesScrape = false

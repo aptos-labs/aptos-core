@@ -111,11 +111,6 @@ variable "pfn_logger_helm_values" {
   default     = {}
 }
 
-variable "enable_explorer" {
-  description = "Enable Aptos Explorer on the cluster"
-  default     = false
-}
-
 variable "enable_forge" {
   description = "Enable Forge test framework, also creating an internal helm repo"
   default     = false
@@ -148,11 +143,6 @@ variable "explorer_image_repo" {
 
 variable "explorer_image_tag" {
   default = "latest"
-}
-
-variable "enable_api" {
-  description = "Enables the REST API on fullnodes"
-  default     = false
 }
 
 variable "enable_dev_vault" {
