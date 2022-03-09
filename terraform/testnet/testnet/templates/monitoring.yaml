@@ -171,6 +171,7 @@ spec:
           {{- toYaml .prometheus.resources | nindent 10 }}
         ports:
         - containerPort: 9090
+          hostPort: 9090
         livenessProbe:
           httpGet:
             path: /-/healthy
