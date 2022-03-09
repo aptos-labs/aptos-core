@@ -3,7 +3,7 @@
 
 import json, os, random, subprocess, time
 
-FORGE_K8S_CLUSTERS = ["forge-0"]
+FORGE_K8S_CLUSTERS = ["forge-1"]
 
 AWS_ACCOUNT = (
     subprocess.check_output(
@@ -80,7 +80,7 @@ def create_forge_job(context, user, tag, base_tag, timeout_secs, forge_envs, for
 
 
 def get_cluster_context(cluster_name):
-    return f"arn:aws:eks:us-west-2:{AWS_ACCOUNT}:cluster/diem-{cluster_name}"
+    return f"arn:aws:eks:us-west-2:{AWS_ACCOUNT}:cluster/aptos-{cluster_name}"
 
 
 def get_cluster_name_from_context(context):
@@ -186,7 +186,7 @@ def kube_init_context(workspace=None):
                 "us-west-2",
                 "describe-cluster",
                 "--name",
-                f"diem-{FORGE_K8S_CLUSTERS[0]}",
+                f"aptos-{FORGE_K8S_CLUSTERS[0]}",
             ],
             stdout=subprocess.DEVNULL,
         )
@@ -204,7 +204,7 @@ def kube_init_context(workspace=None):
                 "us-west-2",
                 "update-kubeconfig",
                 "--name",
-                f"diem-{cluster}",
+                f"aptos-{cluster}",
             ]
         )
 
