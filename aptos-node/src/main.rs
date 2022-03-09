@@ -75,7 +75,7 @@ fn main() {
         let genesis_modules = if let Some(module_paths) = args.genesis_modules {
             diem_framework_releases::load_modules_from_paths(&module_paths)
         } else {
-            diem_framework_releases::current_module_blobs().to_vec()
+            aptos_framework_releases::current_module_blobs().to_vec()
         };
         aptos_node::load_test_environment(
             args.config,

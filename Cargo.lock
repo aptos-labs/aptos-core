@@ -653,6 +653,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-data-client",
+ "aptos-framework-releases",
  "aptos-genesis-tool",
  "aptos-infallible",
  "aptos-logger",
