@@ -9,6 +9,7 @@ modified from https://github.com/diem/move/tree/main/language/documentation/tuto
 
 -  [Struct `Coin`](#0x1_TestCoin_Coin)
 -  [Resource `Balance`](#0x1_TestCoin_Balance)
+-  [Resource `CoinInfo`](#0x1_TestCoin_CoinInfo)
 -  [Resource `MintCapability`](#0x1_TestCoin_MintCapability)
 -  [Resource `BurnCapability`](#0x1_TestCoin_BurnCapability)
 -  [Constants](#@Constants_0)
@@ -22,6 +23,8 @@ modified from https://github.com/diem/move/tree/main/language/documentation/tuto
 -  [Function `burn`](#0x1_TestCoin_burn)
 -  [Function `burn_with_capability`](#0x1_TestCoin_burn_with_capability)
 -  [Function `burn_gas`](#0x1_TestCoin_burn_gas)
+-  [Function `total_supply`](#0x1_TestCoin_total_supply)
+-  [Function `scaling_factor`](#0x1_TestCoin_scaling_factor)
 
 
 <pre><code><b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
@@ -77,6 +80,40 @@ Struct representing the balance of each address.
 <dl>
 <dt>
 <code>coin: <a href="TestCoin.md#0x1_TestCoin_Coin">TestCoin::Coin</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_TestCoin_CoinInfo"></a>
+
+## Resource `CoinInfo`
+
+Represnets the metadata of the coin, store @CoreResources.
+
+
+<pre><code><b>struct</b> <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>total_value: u128</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>scaling_factor: u64</code>
 </dt>
 <dd>
 
@@ -179,7 +216,7 @@ Error codes
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_initialize">initialize</a>(core_resource: &signer)
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_initialize">initialize</a>(core_resource: &signer, scaling_factor: u64)
 </code></pre>
 
 
@@ -188,10 +225,11 @@ Error codes
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_initialize">initialize</a>(core_resource: &signer) {
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_initialize">initialize</a>(core_resource: &signer, scaling_factor: u64) {
     <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(core_resource);
     <b>move_to</b>(core_resource, <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a> {});
     <b>move_to</b>(core_resource, <a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a> {});
+    <b>move_to</b>(core_resource, <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> { total_value: 0, scaling_factor });
     <a href="TestCoin.md#0x1_TestCoin_register">register</a>(core_resource);
 }
 </code></pre>
@@ -244,10 +282,14 @@ Mint coins with capability.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_mint">mint</a>(account: &signer, mint_addr: <b>address</b>, amount: u64) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>, <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a> {
-    <b>let</b> _cap = <b>borrow_global</b>&lt;<a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a>&gt;(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account));
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_mint">mint</a>(account: &signer, mint_addr: <b>address</b>, amount: u64) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>, <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a>, <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> {
+    <b>let</b> sender_addr = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
+    <b>let</b> _cap = <b>borrow_global</b>&lt;<a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a>&gt;(sender_addr);
     // Deposit `amount` of tokens <b>to</b> `mint_addr`'s balance
     <a href="TestCoin.md#0x1_TestCoin_deposit">deposit</a>(mint_addr, <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a> { value: amount });
+    // Update the total supply
+    <b>let</b> coin_info = <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a>&gt;(sender_addr);
+    coin_info.total_value = coin_info.total_value + (amount <b>as</b> u128);
 }
 </code></pre>
 
@@ -382,7 +424,7 @@ Burn coins with capability.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_burn">burn</a>(account: &signer, coins: <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a>) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_burn">burn</a>(account: &signer, coins: <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a>) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a>, <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> {
     <b>let</b> cap = <b>borrow_global</b>&lt;<a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a>&gt;(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account));
     <a href="TestCoin.md#0x1_TestCoin_burn_with_capability">burn_with_capability</a>(coins, cap);
 }
@@ -407,8 +449,11 @@ Burn coins with capability.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="TestCoin.md#0x1_TestCoin_burn_with_capability">burn_with_capability</a>(coins: <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a>, _cap: &<a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a>) {
-    <b>let</b> <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a> { value: _value } = coins;
+<pre><code><b>fun</b> <a href="TestCoin.md#0x1_TestCoin_burn_with_capability">burn_with_capability</a>(coins: <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a>, _cap: &<a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a>) <b>acquires</b>  <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> {
+    <b>let</b> <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a> { value } = coins;
+    // Update the total supply
+    <b>let</b> coin_info = <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a>&gt;(@CoreResources);
+    coin_info.total_value = coin_info.total_value - (value <b>as</b> u128);
 }
 </code></pre>
 
@@ -432,9 +477,58 @@ Burn transaction gas.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_burn_gas">burn_gas</a>(fee: <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a>) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_burn_gas">burn_gas</a>(fee: <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a>) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a>, <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> {
     <b>let</b> cap = <b>borrow_global</b>&lt;<a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a>&gt;(@CoreResources);
     <a href="TestCoin.md#0x1_TestCoin_burn_with_capability">burn_with_capability</a>(fee, cap);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_TestCoin_total_supply"></a>
+
+## Function `total_supply`
+
+Get the current total supply of the coin.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_total_supply">total_supply</a>(): u128
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_total_supply">total_supply</a>(): u128 <b>acquires</b>  <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> {
+    <b>borrow_global</b>&lt;<a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a>&gt;(@CoreResources).total_value
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_TestCoin_scaling_factor"></a>
+
+## Function `scaling_factor`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_scaling_factor">scaling_factor</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_scaling_factor">scaling_factor</a>(): u64 <b>acquires</b>  <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> {
+    <b>borrow_global</b>&lt;<a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a>&gt;(@CoreResources).scaling_factor
 }
 </code></pre>
 

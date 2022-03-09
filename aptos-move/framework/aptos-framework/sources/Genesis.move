@@ -75,7 +75,7 @@ module AptosFramework::Genesis {
         AptosValidatorConfig::initialize(core_resource_account);
         AptosValidatorOperatorConfig::initialize(core_resource_account);
 
-        TestCoin::initialize(core_resource_account);
+        TestCoin::initialize(core_resource_account, 1000000);
 
         // Pad the event counter for the Diem Root account to match DPN. This
         // _MUST_ match the new epoch event counter otherwise all manner of
