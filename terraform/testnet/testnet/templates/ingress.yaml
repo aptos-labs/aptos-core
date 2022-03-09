@@ -1,3 +1,4 @@
+{{- if .Values.service.fullnode.exposeApi }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -28,16 +29,6 @@ spec:
         backend:
           service:
             name: {{ include "testnet.fullname" . }}-faucet
-            port:
-              number: 80
-  - host: mon.{{ .Values.service.domain }}
-    http:
-      paths:
-      - path: /*
-        pathType: Prefix
-        backend:
-          service:
-            name: {{ include "testnet.fullname" . }}-monitoring
             port:
               number: 80
   {{- if .Values.service.pfn.exposeApi }}
@@ -98,3 +89,4 @@ spec:
             name: {{ include "testnet.fullname" . }}-api
             port:
               number: 80
+{{- end }}

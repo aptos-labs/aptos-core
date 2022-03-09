@@ -72,6 +72,7 @@ faucet:
 service:
   fullnode:
     enableOnchainDiscovery: false
+    exposeApi: false
     loadBalancerSourceRanges:
   monitoring:
     loadBalancerSourceRanges:
