@@ -15,13 +15,13 @@ An account may contain an arbitrary number of Move resources and Move modules.
 
 ## Initial Account Setup
 
-An Aptos account is referenced by an account address, which is a 16-byte value. The account address is derived from the initial public verification key(s) for that account. Specifically, the account address is the last 16-bytes within the SHA-3 256 cryptographic hash of the initial public verification key(s) concatenated with a signature scheme identifier byte. The Aptos Blockchain supports two signature schemes:[Ed25519](/reference/glossary#ed25519) and MultiEd25519 (for multi-signature transactions). The account's private key is necessary for signing transactions.
+An Aptos account is referenced by an account address, which is a 16-byte value. The account address is derived from the initial public verification key(s) for that account. Specifically, the account address is the last 16-bytes of the SHA-3 256 cryptographic hash of the initial public verification key(s) concatenated with a signature scheme identifier byte. The Aptos Blockchain supports two signature schemes: [Ed25519](/reference/glossary#ed25519) and MultiEd25519 (for multi-signature transactions). The account's private key is necessary for signing transactions.
 
-Each account also stores a `sequence_number`, which repreesents the next transaaction sequence number to prevent replay attacks of transactions. This is initialized to `0` at account creation time.
+Each account also stores a `sequence_number`, which represents the next transaaction sequence number to prevent replay attacks of transactions. This is initialized to `0` at account creation time.
 
 ## Authentication Keys
 
-Each account stores an authentication key. This authentication key enables account owners to rotate their private key(s) associated with the account without changing the address that hosts their account. During rotation, the authentication key is updated based upon the newly generate private, public key-pair(s).
+Each account stores an authentication key. This authentication key enables account owners to rotate their private key(s) associated with the account without changing the address that hosts their account. During rotation, the authentication key is updated based upon the newly-generated private, public key-pair(s).
 
 ### Single signer authentication
 
@@ -40,4 +40,4 @@ Creating a K-of-N multisig authentication key is similar to creating a single si
 
 ## Account resources
 
-Every account on Aptos can store data, which it does so in resources. The initial resource is the account data itself (authentication key and sequence number). Additional resources like currency or NFTs can be added after account creation. In order to create accounts, the Aptos testnet requires the accounts public key and an amount of TestCoin to add to that account, resulting in the creation of a new account with those two resources.
+Every account on Aptos can store data, which it does so in resources. The initial resource is the account data itself (authentication key and sequence number). Additional resources like currency or NFTs can be added after account creation. In order to create accounts, the Aptos testnet requires the account's public key and an amount of TestCoin to add to that account, resulting in the creation of a new account with those two resources.
