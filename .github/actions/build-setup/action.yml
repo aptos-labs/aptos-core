@@ -37,9 +37,9 @@ runs:
           sudo mkdir -p /opt/git || true
           sudo chmod -R g+rw /opt/
           sudo chgrp -R wheel /opt/
-          mv /Users/runner/work/diem/diem /opt/git/diem
-          ln -s /opt/git/diem /Users/runner/work/diem/diem
-          cd /opt/git/diem
+          mv /Users/runner/work/aptos/aptos /opt/git/aptos-core
+          ln -s /opt/git/aptos-core /Users/runner/work/aptos/aptos
+          cd /opt/git/aptos-core
         fi
 
         # prepare move lang prover tooling.
@@ -61,5 +61,5 @@ runs:
       shell: bash
       run: |
         echo 'RUST_BACKTRACE=1' | tee -a $GITHUB_ENV
-        echo 'DIEM_DUMP_LOGS=1' | tee -a $GITHUB_ENV
+        echo 'APTOS_DUMP_LOGS=1' | tee -a $GITHUB_ENV
         echo 'CARGO_INCREMENTAL=0' | tee -a $GITHUB_ENV

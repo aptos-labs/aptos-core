@@ -12,7 +12,7 @@ public = true
 region = "us-west-2"
 endpoint = "https://s3-us-west-2.amazonaws.com"
 required-cargo-home = "/opt/cargo/"
-required-git-home = "/opt/git/diem"
+required-git-home = "/opt/git/aptos-core"
 envs = [
    #To debug sccache uncomment the two lines below.
    #["SCCACHE_ERROR_LOG","/tmp/sccache_log"],
@@ -21,7 +21,7 @@ envs = [
 
 [cargo.sccache.installer]
 version = "0.2.16-alpha.0"
-git = "https://github.com/diem/sccache.git"
+git = "https://github.com/mozilla/sccache.git"
 git-rev = "ef50d87a58260c30767520045e242ccdbdb965af"
 features = [ "s3" ]
 
