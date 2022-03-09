@@ -47,11 +47,11 @@ COPY --from=builder /aptos/target/release/db-restore /usr/local/bin
 COPY --from=builder /aptos/target/release/aptos-transaction-replay /usr/local/bin
 
 ### Get DPN Move modules bytecodes for genesis ceremony
-RUN mkdir -p /aptos/move/build
-RUN mkdir -p /aptos/move/modules
-COPY --from=builder /aptos/aptos-move/framework/DPN/releases/artifacts/current/build /aptos/move/build
-RUN mv /aptos/move/build/**/bytecode_modules/*.mv /aptos/move/modules
-RUN rm -rf /aptos/move/build
+RUN mkdir -p /diem-framework/move/build
+RUN mkdir -p /diem-framework/move/modules
+COPY --from=builder /aptos/aptos-move/framework/DPN/releases/artifacts/current/build /diem-framework/move/build
+RUN mv /diem-framework/move/build/**/bytecode_modules/*.mv /diem-framework/move/modules
+RUN rm -rf /diem-framework/move/build
 
 ### Get experimental Move modules bytecodes for genesis ceremony
 RUN mkdir -p /experimental/move/build
