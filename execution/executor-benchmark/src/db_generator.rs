@@ -5,7 +5,10 @@ use crate::{
     transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
     TransactionCommitter,
 };
-use aptos_config::{config::RocksdbConfig, utils::get_genesis_txn};
+use aptos_config::{
+    config::{RocksdbConfig, StoragePrunerConfig},
+    utils::get_genesis_txn,
+};
 use aptos_jellyfish_merkle::metrics::{
     DIEM_JELLYFISH_INTERNAL_ENCODED_BYTES, DIEM_JELLYFISH_LEAF_ENCODED_BYTES,
     DIEM_JELLYFISH_STORAGE_READS,
@@ -31,7 +34,7 @@ pub fn run(
     init_account_balance: u64,
     block_size: usize,
     db_dir: impl AsRef<Path>,
-    prune_window: Option<u64>,
+    storage_pruner_config: StoragePrunerConfig,
 ) {
     println!("Initializing...");
 
@@ -46,8 +49,8 @@ pub fn run(
     let (db, db_rw) = DbReaderWriter::wrap(
         AptosDB::open(
             &db_dir,
-            false,        /* readonly */
-            prune_window, /* pruner */
+            false,                 /* readonly */
+            storage_pruner_config, /* pruner */
             RocksdbConfig::default(),
             true, /* account_count_migration */
         )

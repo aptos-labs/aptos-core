@@ -3,7 +3,7 @@
 
 use crate::{AptosDB, Order, MAX_LIMIT};
 use anyhow::{ensure, format_err, Result};
-use aptos_config::config::RocksdbConfig;
+use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_types::{
     account_address::AccountAddress,
     account_state_blob::AccountStateBlob,
@@ -22,8 +22,8 @@ impl Aptossum {
     pub fn new<P: AsRef<Path> + Clone>(db_root_path: P) -> Result<Self> {
         let db = AptosDB::open(
             db_root_path,
-            true, /* read only */
-            None, /* no prune_window */
+            true,                        /* read only */
+            NO_OP_STORAGE_PRUNER_CONFIG, /* no prune_window */
             RocksdbConfig::default(),
             true, /* account_count_migration, ignored anyway */
         )?;

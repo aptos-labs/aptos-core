@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::{pruner, AptosDB};
-use aptos_config::config::RocksdbConfig;
+use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_jellyfish_merkle::restore::JellyfishMerkleRestore;
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -60,7 +60,7 @@ fn prune_stale_indices(
     target_least_readable_version: Version,
     limit: usize,
 ) {
-    pruner::prune_state(
+    pruner::state_store::prune_state_store(
         Arc::clone(&store.db),
         least_readable_version,
         target_least_readable_version,
@@ -405,7 +405,7 @@ proptest! {
             let db2 = AptosDB::open(
                 &tgt_tmp_dir,
                 false, /* readonly */
-                None,  /* pruner */
+                NO_OP_STORAGE_PRUNER_CONFIG,  /* pruner config */
                 RocksdbConfig::default(),
                 true, /* account_count_migration */
             ).unwrap();
@@ -495,7 +495,7 @@ proptest! {
             let db = AptosDB::open(
                 &tmp_dir,
                 false, /* read_only */
-                None,
+                NO_OP_STORAGE_PRUNER_CONFIG,
                 RocksdbConfig::default(),
                 false, /* account_count_migration */
             ).unwrap();

@@ -3,7 +3,7 @@
 
 use crate::AptosValidatorInterface;
 use anyhow::{anyhow, Result};
-use aptos_config::config::RocksdbConfig;
+use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_types::{
     account_address::AccountAddress,
     account_state::AccountState,
@@ -22,7 +22,7 @@ impl DBDebuggerInterface {
         Ok(Self(Arc::new(AptosDB::open(
             db_root_path,
             true,
-            None,
+            NO_OP_STORAGE_PRUNER_CONFIG,
             RocksdbConfig::default(),
             true, /* account_count_migration, ignored anyway */
         )?)))

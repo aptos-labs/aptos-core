@@ -30,7 +30,6 @@ proptest! {
         let (gens, write_sets):(Vec<_>, Vec<_>) = gens_and_write_sets.into_iter().unzip();
         let txns = init_store(universe, gens, store);
 
-
         // write sets
         let mut cs = ChangeSet::new();
         for (ver, ws) in write_sets.iter().enumerate() {

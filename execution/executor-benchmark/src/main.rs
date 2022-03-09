@@ -1,6 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_config::config::StoragePrunerConfig;
 use aptos_secure_push_metrics::MetricsPusher;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -30,7 +31,10 @@ enum Command {
         init_account_balance: u64,
 
         #[structopt(long)]
-        prune_window: Option<u64>,
+        state_store_prune_window: Option<u64>,
+
+        #[structopt(long)]
+        default_store_prune_window: Option<u64>,
     },
     RunExecutor {
         #[structopt(
@@ -68,14 +72,15 @@ fn main() {
             data_dir,
             num_accounts,
             init_account_balance,
-            prune_window,
+            state_store_prune_window,
+            default_store_prune_window,
         } => {
             executor_benchmark::db_generator::run(
                 num_accounts,
                 init_account_balance,
                 opt.block_size,
                 data_dir,
-                prune_window,
+                StoragePrunerConfig::new(state_store_prune_window, default_store_prune_window),
             );
         }
         Command::RunExecutor {

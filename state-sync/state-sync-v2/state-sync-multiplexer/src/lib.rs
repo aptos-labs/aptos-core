@@ -164,7 +164,10 @@ pub fn state_sync_v1_network_config() -> AppConfig {
 #[cfg(any(test, feature = "fuzzing"))]
 mod tests {
     use crate::StateSyncMultiplexer;
-    use aptos_config::{config::RocksdbConfig, utils::get_genesis_txn};
+    use aptos_config::{
+        config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG},
+        utils::get_genesis_txn,
+    };
     use aptos_crypto::HashValue;
     use aptos_data_client::aptosnet::AptosNetDataClient;
     use aptos_genesis_tool::test_config;
@@ -193,7 +196,14 @@ mod tests {
     fn test_new_initialized_configs() {
         // Create a test database
         let tmp_dir = TempPath::new();
-        let db = AptosDB::open(&tmp_dir, false, None, RocksdbConfig::default(), true).unwrap();
+        let db = AptosDB::open(
+            &tmp_dir,
+            false,
+            NO_OP_STORAGE_PRUNER_CONFIG,
+            RocksdbConfig::default(),
+            true,
+        )
+        .unwrap();
         let (_, db_rw) = DbReaderWriter::wrap(db);
 
         // Bootstrap the database

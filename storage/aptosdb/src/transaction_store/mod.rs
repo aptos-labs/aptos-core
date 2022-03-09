@@ -10,16 +10,19 @@ use crate::{
         transaction::TransactionSchema, transaction_by_account::TransactionByAccountSchema,
         transaction_by_hash::TransactionByHashSchema, write_set::WriteSetSchema,
     },
+    transaction_accumulator::TransactionAccumulatorSchema,
+    transaction_info::TransactionInfoSchema,
 };
 use anyhow::{ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
+    proof::position::Position,
     transaction::{Transaction, Version},
     write_set::WriteSet,
 };
-use schemadb::{ReadOptions, SchemaIterator, DB};
+use schemadb::{ReadOptions, SchemaBatch, SchemaIterator, DB};
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -190,6 +193,78 @@ impl TransactionStore {
         cs: &mut ChangeSet,
     ) -> Result<()> {
         cs.batch.put::<WriteSetSchema>(&version, write_set)
+    }
+
+    /// Prune the transaction by hash store given a list of transaction
+    pub fn prune_transaction_by_hash(
+        &self,
+        transactions: &[Transaction],
+        db_batch: &mut SchemaBatch,
+    ) -> anyhow::Result<()> {
+        for transaction in transactions {
+            db_batch.delete::<TransactionByHashSchema>(&transaction.hash())?;
+        }
+        Ok(())
+    }
+
+    /// Prune the transaction by account store given a list of transaction
+    pub fn prune_transaction_by_account(
+        &self,
+        transactions: &[Transaction],
+        db_batch: &mut SchemaBatch,
+    ) -> anyhow::Result<()> {
+        for transaction in transactions {
+            if let Transaction::UserTransaction(txn) = transaction {
+                db_batch
+                    .delete::<TransactionByAccountSchema>(&(txn.sender(), txn.sequence_number()))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Prune the transaction schema store between a range of version in [begin, end)
+    pub fn prune_transaction_schema(
+        &self,
+        begin: Version,
+        end: Version,
+        db_batch: &mut SchemaBatch,
+    ) -> anyhow::Result<()> {
+        db_batch.delete_range::<TransactionSchema>(&begin, &end)?;
+        Ok(())
+    }
+
+    /// Prune the transaction schema store between a range of version in [begin, end)
+    pub fn prune_transaction_info_schema(
+        &self,
+        begin: Version,
+        end: Version,
+        db_batch: &mut SchemaBatch,
+    ) -> anyhow::Result<()> {
+        db_batch.delete_range::<TransactionInfoSchema>(&begin, &end)?;
+        Ok(())
+    }
+
+    /// Prune the transaction schema store between a range of version in [begin, end).
+    pub fn prune_transaction_accumulator(
+        &self,
+        begin: Version,
+        end: Version,
+        db_batch: &mut SchemaBatch,
+    ) -> anyhow::Result<()> {
+        let begin_position = self.get_min_proof_node(begin);
+        let end_position = self.get_min_proof_node(end);
+        db_batch.delete_range::<TransactionAccumulatorSchema>(&begin_position, &end_position)?;
+        Ok(())
+    }
+    /// Returns the minimum position node needed to be included in the proof of the leaf index. This
+    /// will be the left child of the root if the leaf index is non zero and zero otherwise.
+    pub fn get_min_proof_node(&self, leaf_index: u64) -> Position {
+        if leaf_index > 0 {
+            Position::root_from_leaf_index(leaf_index).left_child()
+        } else {
+            // Handle this as a special case when least_readable_version is 0
+            Position::root_from_leaf_index(0)
+        }
     }
 }
 

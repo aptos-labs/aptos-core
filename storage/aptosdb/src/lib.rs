@@ -56,7 +56,7 @@ use crate::{
     transaction_store::TransactionStore,
 };
 use anyhow::{ensure, format_err, Result};
-use aptos_config::config::RocksdbConfig;
+use aptos_config::config::{RocksdbConfig, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_crypto::hash::{HashValue, SPARSE_MERKLE_PLACEHOLDER_HASH};
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -226,7 +226,6 @@ pub struct AptosDB {
     system_store: SystemStore,
     rocksdb_property_reporter: RocksdbPropertyReporter,
     pruner: Option<Pruner>,
-    prune_window: Option<u64>,
 }
 
 impl AptosDB {
@@ -250,31 +249,42 @@ impl AptosDB {
         ]
     }
 
-    fn new_with_db(db: DB, prune_window: Option<u64>, account_count_migration: bool) -> Self {
+    fn new_with_db(
+        db: DB,
+        storage_pruner_config: StoragePrunerConfig,
+        account_count_migration: bool,
+    ) -> Self {
         let db = Arc::new(db);
+        let transaction_store = Arc::new(TransactionStore::new(Arc::clone(&db)));
 
         AptosDB {
             db: Arc::clone(&db),
             event_store: Arc::new(EventStore::new(Arc::clone(&db))),
             ledger_store: Arc::new(LedgerStore::new(Arc::clone(&db))),
             state_store: Arc::new(StateStore::new(Arc::clone(&db), account_count_migration)),
-            transaction_store: Arc::new(TransactionStore::new(Arc::clone(&db))),
+            transaction_store: Arc::clone(&transaction_store),
             system_store: SystemStore::new(Arc::clone(&db)),
             rocksdb_property_reporter: RocksdbPropertyReporter::new(Arc::clone(&db)),
-            pruner: prune_window.map(|n| Pruner::new(Arc::clone(&db), n)),
-            prune_window,
+            pruner: match storage_pruner_config {
+                NO_OP_STORAGE_PRUNER_CONFIG => None,
+                _ => Some(Pruner::new(
+                    Arc::clone(&db),
+                    storage_pruner_config,
+                    Arc::clone(&transaction_store),
+                )),
+            },
         }
     }
 
     pub fn open<P: AsRef<Path> + Clone>(
         db_root_path: P,
         readonly: bool,
-        prune_window: Option<u64>,
+        storage_pruner_config: StoragePrunerConfig,
         rocksdb_config: RocksdbConfig,
         account_count_migration: bool, // ignored when opening readonly
     ) -> Result<Self> {
         ensure!(
-            prune_window.is_none() || !readonly,
+            storage_pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
             "Do not set prune_window when opening readonly.",
         );
 
@@ -307,7 +317,7 @@ impl AptosDB {
             )
         };
 
-        let ret = Self::new_with_db(db, prune_window, account_count_migration);
+        let ret = Self::new_with_db(db, storage_pruner_config, account_count_migration);
         info!(
             path = path,
             time_ms = %instant.elapsed().as_millis(),
@@ -335,7 +345,7 @@ impl AptosDB {
                 Self::column_families(),
                 &rocksdb_opts,
             )?,
-            None, // prune_window
+            NO_OP_STORAGE_PRUNER_CONFIG,
             true, // account_count_migration
         ))
     }
@@ -345,8 +355,8 @@ impl AptosDB {
     pub fn new_for_test<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
         Self::open(
             db_root_path,
-            false, /* readonly */
-            None,  /* pruner */
+            false,                       /* readonly */
+            NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
             RocksdbConfig::default(),
             true, /* account_count_migration */
         )
@@ -1207,7 +1217,9 @@ impl DbReader for AptosDB {
     }
 
     fn get_state_prune_window(&self) -> Option<usize> {
-        self.prune_window.map(|u| u as usize)
+        self.pruner
+            .as_ref()
+            .map(|x| x.get_state_store_pruner_window() as usize)
     }
 }
 

@@ -1,8 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::*;
-use crate::{change_set::ChangeSet, state_store::StateStore, AptosDB};
+use crate::{change_set::ChangeSet, pruner::*, state_store::StateStore, AptosDB};
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
 use aptos_types::{account_address::AccountAddress, account_state_blob::AccountStateBlob};
@@ -41,16 +40,25 @@ fn verify_state_in_store(
 }
 
 #[test]
-fn test_pruner() {
+fn test_state_store_pruner() {
     let address = AccountAddress::new([1u8; AccountAddress::LENGTH]);
     let value0 = AccountStateBlob::from(vec![0x01]);
     let value1 = AccountStateBlob::from(vec![0x02]);
     let value2 = AccountStateBlob::from(vec![0x03]);
 
     let tmp_dir = TempPath::new();
-    let db = AptosDB::new_for_test(&tmp_dir).db;
+    let aptos_db = AptosDB::new_for_test(&tmp_dir);
+    let db = aptos_db.db;
     let state_store = &StateStore::new(Arc::clone(&db), true /* account_count_migration */);
-    let pruner = Pruner::new(Arc::clone(&db), 0 /* historical_versions_to_keep */);
+    let transaction_store = &aptos_db.transaction_store;
+    let pruner = Pruner::new(
+        Arc::clone(&db),
+        StoragePrunerConfig {
+            state_store_prune_window: Some(0),
+            default_prune_window: Some(0),
+        },
+        Arc::clone(transaction_store),
+    );
 
     let _root0 = put_account_state_set(
         &db,
@@ -73,14 +81,24 @@ fn test_pruner() {
 
     // Prune till version=0.
     {
-        pruner.wake_and_wait(0 /* latest_version */).unwrap();
+        pruner
+            .wake_and_wait(
+                0, /* latest_version */
+                PrunerIndex::StateStorePrunerIndex as usize,
+            )
+            .unwrap();
         verify_state_in_store(state_store, address, Some(&value0), 0);
         verify_state_in_store(state_store, address, Some(&value1), 1);
         verify_state_in_store(state_store, address, Some(&value2), 2);
     }
     // Prune till version=1.
     {
-        pruner.wake_and_wait(1 /* latest_version */).unwrap();
+        pruner
+            .wake_and_wait(
+                1, /* latest_version */
+                PrunerIndex::StateStorePrunerIndex as usize,
+            )
+            .unwrap();
         // root0 is gone.
         assert!(state_store
             .get_account_state_with_proof_by_version(address, 0)
@@ -91,7 +109,12 @@ fn test_pruner() {
     }
     // Prune till version=2.
     {
-        pruner.wake_and_wait(2 /* latest_version */).unwrap();
+        pruner
+            .wake_and_wait(
+                2, /* latest_version */
+                PrunerIndex::StateStorePrunerIndex as usize,
+            )
+            .unwrap();
         // root1 is gone.
         assert!(state_store
             .get_account_state_with_proof_by_version(address, 1)
@@ -109,7 +132,8 @@ fn test_worker_quit_eagerly() {
     let value2 = AccountStateBlob::from(vec![0x03]);
 
     let tmp_dir = TempPath::new();
-    let db = AptosDB::new_for_test(&tmp_dir).db;
+    let aptos_db = AptosDB::new_for_test(&tmp_dir);
+    let db = aptos_db.db;
     let state_store = &StateStore::new(Arc::clone(&db), true /* account_count_migration */);
 
     let _root0 = put_account_state_set(
@@ -135,17 +159,18 @@ fn test_worker_quit_eagerly() {
         let (command_sender, command_receiver) = channel();
         let worker = Worker::new(
             Arc::clone(&db),
+            Arc::clone(&aptos_db.transaction_store),
             command_receiver,
-            Arc::new(AtomicU64::new(0)), /* progress */
+            Arc::new(Mutex::new(vec![0, 0])), /* progress */
         );
         command_sender
             .send(Command::Prune {
-                least_readable_version: 1,
+                target_db_versions: vec![1, 0],
             })
             .unwrap();
         command_sender
             .send(Command::Prune {
-                least_readable_version: 2,
+                target_db_versions: vec![2, 0],
             })
             .unwrap();
         command_sender.send(Command::Quit).unwrap();
