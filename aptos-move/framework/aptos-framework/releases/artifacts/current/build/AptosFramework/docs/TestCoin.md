@@ -12,9 +12,14 @@ modified from https://github.com/diem/move/tree/main/language/documentation/tuto
 -  [Resource `CoinInfo`](#0x1_TestCoin_CoinInfo)
 -  [Resource `MintCapability`](#0x1_TestCoin_MintCapability)
 -  [Resource `BurnCapability`](#0x1_TestCoin_BurnCapability)
+-  [Struct `DelegatedMintCapability`](#0x1_TestCoin_DelegatedMintCapability)
+-  [Resource `Delegations`](#0x1_TestCoin_Delegations)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_TestCoin_initialize)
 -  [Function `register`](#0x1_TestCoin_register)
+-  [Function `delegte_mint_capability`](#0x1_TestCoin_delegte_mint_capability)
+-  [Function `claim_mint_capability`](#0x1_TestCoin_claim_mint_capability)
+-  [Function `find_delegation`](#0x1_TestCoin_find_delegation)
 -  [Function `mint`](#0x1_TestCoin_mint)
 -  [Function `balance_of`](#0x1_TestCoin_balance_of)
 -  [Function `transfer`](#0x1_TestCoin_transfer)
@@ -28,8 +33,10 @@ modified from https://github.com/diem/move/tree/main/language/documentation/tuto
 
 
 <pre><code><b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
+<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option">0x1::Option</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer">0x1::Signer</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses">0x1::SystemAddresses</a>;
+<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector">0x1::Vector</a>;
 </code></pre>
 
 
@@ -177,9 +184,73 @@ Represnets the metadata of the coin, store @CoreResources.
 
 </details>
 
+<a name="0x1_TestCoin_DelegatedMintCapability"></a>
+
+## Struct `DelegatedMintCapability`
+
+Delegation token created by delegator and can be claimed by the delegatee as MintCapability.
+
+
+<pre><code><b>struct</b> <a href="TestCoin.md#0x1_TestCoin_DelegatedMintCapability">DelegatedMintCapability</a> <b>has</b> store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><b>to</b>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_TestCoin_Delegations"></a>
+
+## Resource `Delegations`
+
+
+
+<pre><code><b>struct</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>inner: vector&lt;<a href="TestCoin.md#0x1_TestCoin_DelegatedMintCapability">TestCoin::DelegatedMintCapability</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a name="@Constants_0"></a>
 
 ## Constants
+
+
+<a name="0x1_TestCoin_EALREADY_DELEGATED"></a>
+
+
+
+<pre><code><b>const</b> <a href="TestCoin.md#0x1_TestCoin_EALREADY_DELEGATED">EALREADY_DELEGATED</a>: u64 = 3;
+</code></pre>
+
 
 
 <a name="0x1_TestCoin_EALREADY_HAS_BALANCE"></a>
@@ -196,6 +267,15 @@ Represnets the metadata of the coin, store @CoreResources.
 
 
 <pre><code><b>const</b> <a href="TestCoin.md#0x1_TestCoin_EBALANCE_NOT_PUBLISHED">EBALANCE_NOT_PUBLISHED</a>: u64 = 2;
+</code></pre>
+
+
+
+<a name="0x1_TestCoin_EDELEGATION_NOT_FOUND"></a>
+
+
+
+<pre><code><b>const</b> <a href="TestCoin.md#0x1_TestCoin_EDELEGATION_NOT_FOUND">EDELEGATION_NOT_FOUND</a>: u64 = 4;
 </code></pre>
 
 
@@ -230,6 +310,7 @@ Error codes
     <b>move_to</b>(core_resource, <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a> {});
     <b>move_to</b>(core_resource, <a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a> {});
     <b>move_to</b>(core_resource, <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> { total_value: 0, scaling_factor });
+    <b>move_to</b>(core_resource, <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> { inner: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_empty">Vector::empty</a>() });
     <a href="TestCoin.md#0x1_TestCoin_register">register</a>(core_resource);
 }
 </code></pre>
@@ -259,6 +340,102 @@ minting or transferring to the account.
     <b>let</b> empty_coin = <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a> { value: 0 };
     <b>assert</b>!(!<b>exists</b>&lt;<a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>&gt;(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)), <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="TestCoin.md#0x1_TestCoin_EALREADY_HAS_BALANCE">EALREADY_HAS_BALANCE</a>));
     <b>move_to</b>(account, <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a> { coin:  empty_coin });
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_TestCoin_delegte_mint_capability"></a>
+
+## Function `delegte_mint_capability`
+
+Create delegated token for the address so the account could claim MintCapability later.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_delegte_mint_capability">delegte_mint_capability</a>(account: &signer, <b>to</b>: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_delegte_mint_capability">delegte_mint_capability</a>(account: &signer, <b>to</b>: <b>address</b>) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> {
+    <b>let</b> delegations = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a>&gt;(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)).inner;
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(delegations)) {
+        <b>let</b> element = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(delegations, i);
+        <b>assert</b>!(element.<b>to</b> != <b>to</b>, <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="TestCoin.md#0x1_TestCoin_EALREADY_DELEGATED">EALREADY_DELEGATED</a>));
+    };
+    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_push_back">Vector::push_back</a>(delegations, <a href="TestCoin.md#0x1_TestCoin_DelegatedMintCapability">DelegatedMintCapability</a> { <b>to</b> });
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_TestCoin_claim_mint_capability"></a>
+
+## Function `claim_mint_capability`
+
+Claim the delegated mint capability and destroy the delegated token.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_claim_mint_capability">claim_mint_capability</a>(account: &signer)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_claim_mint_capability">claim_mint_capability</a>(account: &signer) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> {
+    <b>let</b> maybe_index = <a href="TestCoin.md#0x1_TestCoin_find_delegation">find_delegation</a>(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account));
+    <b>assert</b>!(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_is_some">Option::is_some</a>(&maybe_index), <a href="TestCoin.md#0x1_TestCoin_EDELEGATION_NOT_FOUND">EDELEGATION_NOT_FOUND</a>);
+    <b>let</b> idx = *<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_borrow">Option::borrow</a>(&maybe_index);
+    <b>let</b> delegations = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a>&gt;(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)).inner;
+    <b>let</b> <a href="TestCoin.md#0x1_TestCoin_DelegatedMintCapability">DelegatedMintCapability</a> { <b>to</b>: _} = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_swap_remove">Vector::swap_remove</a>(delegations, idx);
+
+    <b>move_to</b>(account, <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a> {});
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_TestCoin_find_delegation"></a>
+
+## Function `find_delegation`
+
+
+
+<pre><code><b>fun</b> <a href="TestCoin.md#0x1_TestCoin_find_delegation">find_delegation</a>(addr: <b>address</b>): <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_Option">Option::Option</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="TestCoin.md#0x1_TestCoin_find_delegation">find_delegation</a>(addr: <b>address</b>): <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option">Option</a>&lt;u64&gt; <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> {
+    <b>let</b> delegations = &<b>borrow_global</b>&lt;<a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a>&gt;(@CoreResources).inner;
+    <b>let</b> i = 0;
+    <b>let</b> index = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_none">Option::none</a>();
+    <b>while</b> (i &lt; <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(delegations)) {
+        <b>let</b> element = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(delegations, i);
+        <b>if</b> (element.<b>to</b> == addr) {
+            index = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_some">Option::some</a>(i);
+            <b>break</b>
+        }
+    };
+    index
 }
 </code></pre>
 
