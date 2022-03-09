@@ -3,6 +3,8 @@
 module AptosFramework::TestCoin {
     use Std::Errors;
     use Std::Signer;
+    use Std::Vector;
+    use Std::Option::{Self, Option};
 
     use CoreFramework::SystemAddresses;
 
@@ -12,6 +14,8 @@ module AptosFramework::TestCoin {
     const EINSUFFICIENT_BALANCE: u64 = 0;
     const EALREADY_HAS_BALANCE: u64 = 1;
     const EBALANCE_NOT_PUBLISHED: u64 = 2;
+    const EALREADY_DELEGATED: u64 = 3;
+    const EDELEGATION_NOT_FOUND: u64 = 4;
 
     struct Coin has store {
         value: u64
@@ -31,11 +35,21 @@ module AptosFramework::TestCoin {
     struct MintCapability has key, store { }
     struct BurnCapability has key, store { }
 
+    /// Delegation token created by delegator and can be claimed by the delegatee as MintCapability.
+    struct DelegatedMintCapability has store {
+        to: address
+    }
+
+    struct Delegations has key {
+        inner: vector<DelegatedMintCapability>,
+    }
+
     public fun initialize(core_resource: &signer, scaling_factor: u64) {
         SystemAddresses::assert_core_resource(core_resource);
         move_to(core_resource, MintCapability {});
         move_to(core_resource, BurnCapability {});
         move_to(core_resource, CoinInfo { total_value: 0, scaling_factor });
+        move_to(core_resource, Delegations { inner: Vector::empty() });
         register(core_resource);
     }
 
@@ -45,6 +59,42 @@ module AptosFramework::TestCoin {
         let empty_coin = Coin { value: 0 };
         assert!(!exists<Balance>(Signer::address_of(account)), Errors::already_published(EALREADY_HAS_BALANCE));
         move_to(account, Balance { coin:  empty_coin });
+    }
+
+    /// Create delegated token for the address so the account could claim MintCapability later.
+    public fun delegte_mint_capability(account: &signer, to: address) acquires Delegations {
+        let delegations = &mut borrow_global_mut<Delegations>(Signer::address_of(account)).inner;
+        let i = 0;
+        while (i < Vector::length(delegations)) {
+            let element = Vector::borrow(delegations, i);
+            assert!(element.to != to, Errors::invalid_argument(EALREADY_DELEGATED));
+        };
+        Vector::push_back(delegations, DelegatedMintCapability { to });
+    }
+
+    /// Claim the delegated mint capability and destroy the delegated token.
+    public fun claim_mint_capability(account: &signer) acquires Delegations {
+        let maybe_index = find_delegation(Signer::address_of(account));
+        assert!(Option::is_some(&maybe_index), EDELEGATION_NOT_FOUND);
+        let idx = *Option::borrow(&maybe_index);
+        let delegations = &mut borrow_global_mut<Delegations>(Signer::address_of(account)).inner;
+        let DelegatedMintCapability { to: _} = Vector::swap_remove(delegations, idx);
+
+        move_to(account, MintCapability {});
+    }
+
+    fun find_delegation(addr: address): Option<u64> acquires Delegations {
+        let delegations = &borrow_global<Delegations>(@CoreResources).inner;
+        let i = 0;
+        let index = Option::none();
+        while (i < Vector::length(delegations)) {
+            let element = Vector::borrow(delegations, i);
+            if (element.to == addr) {
+                index = Option::some(i);
+                break
+            }
+        };
+        index
     }
 
     /// Mint coins with capability.
@@ -215,5 +265,27 @@ module AptosFramework::TestCoin {
         assert!(balance_of(addr) == 600, 0);
         assert!(balance_of(addr1) == 400, 0);
         assert!(total_supply() == 1000, 0);
+    }
+
+    #[test(account = @CoreResources, delegatee = @0x1)]
+    fun mint_delegation_success(account: signer, delegatee: signer) acquires Balance, CoinInfo, Delegations, MintCapability  {
+        initialize(&account, 1000000);
+        let addr = Signer::address_of(&delegatee);
+        delegte_mint_capability(&account, addr);
+        claim_mint_capability(&delegatee);
+
+        mint(&delegatee, addr, 1000);
+        assert!(balance_of(addr) == 1000, 0);
+    }
+
+    #[test(account = @CoreResources, random = @0x1)]
+    #[expected_failure]
+    fun mint_delegation_fail(account: signer, random: signer) acquires Balance, CoinInfo, Delegations, MintCapability  {
+        initialize(&account, 1000000);
+        let delegatee = @0x1234;
+        delegte_mint_capability(&account, delegatee);
+        claim_mint_capability(&random);
+
+        mint(&random, @0x1, 1000);
     }
 }
