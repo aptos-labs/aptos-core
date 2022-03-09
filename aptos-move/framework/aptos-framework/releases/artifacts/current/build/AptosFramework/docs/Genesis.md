@@ -121,7 +121,7 @@
     <a href="AptosValidatorConfig.md#0x1_AptosValidatorConfig_initialize">AptosValidatorConfig::initialize</a>(core_resource_account);
     <a href="AptosValidatorOperatorConfig.md#0x1_AptosValidatorOperatorConfig_initialize">AptosValidatorOperatorConfig::initialize</a>(core_resource_account);
 
-    <a href="TestCoin.md#0x1_TestCoin_initialize">TestCoin::initialize</a>(core_resource_account);
+    <a href="TestCoin.md#0x1_TestCoin_initialize">TestCoin::initialize</a>(core_resource_account, 1000000);
 
     // Pad the event counter for the Diem Root account <b>to</b> match DPN. This
     // _MUST_ match the new epoch event counter otherwise all manner of
