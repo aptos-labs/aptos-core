@@ -103,36 +103,43 @@ const MAX_LIMIT: u64 = 5000;
 // TODO: Either implement an iteration API to allow a very old client to loop through a long history
 // or guarantee that there is always a recent enough waypoint and client knows to boot from there.
 const MAX_NUM_EPOCH_ENDING_LEDGER_INFO: usize = 100;
-
-static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
+static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
     [
-        (
-            "aptos_rocksdb_live_sst_files_size_bytes",
-            "rocksdb.live-sst-files-size",
-        ),
-        (
-            "aptos_rocksdb_all_memtables_size_bytes",
-            "rocksdb.size-all-mem-tables",
-        ),
-        (
-            "aptos_rocksdb_num_running_compactions",
-            "rocksdb.num-running-compactions",
-        ),
-        (
-            "aptos_rocksdb_num_running_flushes",
-            "rocksdb.num-running-flushes",
-        ),
-        (
-            "aptos_rocksdb_block_cache_usage_bytes",
-            "rocksdb.block-cache-usage",
-        ),
-        (
-            "aptos_rocksdb_cf_size_bytes",
-            "rocksdb.estimate-live-data-size",
-        ),
+        "rocksdb.num-immutable-mem-table",
+        "rocksdb.mem-table-flush-pending",
+        "rocksdb.compaction-pending",
+        "rocksdb.background-errors",
+        "rocksdb.cur-size-active-mem-table",
+        "rocksdb.cur-size-all-mem-tables",
+        "rocksdb.size-all-mem-tables",
+        "rocksdb.num-entries-active-mem-table",
+        "rocksdb.num-entries-imm-mem-tables",
+        "rocksdb.num-deletes-active-mem-table",
+        "rocksdb.num-deletes-imm-mem-tables",
+        "rocksdb.estimate-num-keys",
+        "rocksdb.estimate-table-readers-mem",
+        "rocksdb.is-file-deletions-enabled",
+        "rocksdb.num-snapshots",
+        "rocksdb.oldest-snapshot-time",
+        "rocksdb.num-live-versions",
+        "rocksdb.current-super-version-number",
+        "rocksdb.estimate-live-data-size",
+        "rocksdb.min-log-number-to-keep",
+        "rocksdb.min-obsolete-sst-number-to-keep",
+        "rocksdb.total-sst-files-size",
+        "rocksdb.live-sst-files-size",
+        "rocksdb.base-level",
+        "rocksdb.estimate-pending-compaction-bytes",
+        "rocksdb.num-running-compactions",
+        "rocksdb.num-running-flushes",
+        "rocksdb.actual-delayed-write-rate",
+        "rocksdb.is-write-stopped",
+        "rocksdb.block-cache-capacity",
+        "rocksdb.block-cache-usage",
+        "rocksdb.block-cache-pinned-usage",
     ]
     .iter()
-    .cloned()
+    .map(|x| (*x, format!("aptos_{}", x.replace(".", "_"))))
     .collect()
 });
 
@@ -156,10 +163,10 @@ fn update_rocksdb_properties(db: &DB) -> Result<()> {
         .with_label_values(&["update_rocksdb_properties"])
         .start_timer();
     for cf_name in AptosDB::column_families() {
-        for (property_name, rocksdb_property_argument) in &*ROCKSDB_PROPERTY_MAP {
+        for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
             DIEM_STORAGE_ROCKSDB_PROPERTIES
-                .with_label_values(&[cf_name, property_name])
-                .set(db.get_property(cf_name, rocksdb_property_argument)? as i64);
+                .with_label_values(&[cf_name, aptos_rocksdb_property_name])
+                .set(db.get_property(cf_name, rockdb_property_name)? as i64);
         }
     }
     Ok(())
