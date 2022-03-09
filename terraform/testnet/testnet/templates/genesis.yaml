@@ -86,7 +86,7 @@ spec:
           kubectl get secret -o name | grep "{{ include "testnet.fullname" . }}-faucet-e" | xargs -r kubectl delete
 
           aptos-genesis-tool set-layout --shared-backend "$FILE_BACKEND;namespace=common" --path /genesis/layout.yaml
-          aptos-genesis-tool set-move-modules --shared-backend "$FILE_BACKEND;namespace=common" --dir {{ .Values.genesis.moveModuleDir | default "/aptos/move/modules"}}
+          aptos-genesis-tool set-move-modules --shared-backend "$FILE_BACKEND;namespace=common" --dir {{ .Values.genesis.moveModuleDir | default "/aptos-framework/move/modules"}}
           aptos-genesis-tool aptos-root-key --validator-backend "$VAULT_BACKEND;namespace=aptos" --shared-backend "$FILE_BACKEND;namespace=aptos"
           aptos-genesis-tool treasury-compliance-key --validator-backend "$VAULT_BACKEND;namespace=aptos" --shared-backend "$FILE_BACKEND;namespace=aptos"
           {{- if .Values.service.fullnode.enableOnchainDiscovery }}
