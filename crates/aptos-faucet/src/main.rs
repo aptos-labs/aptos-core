@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_logger::info;
-use aptos_sdk::types::{
-    account_address::AccountAddress, account_config::aptos_root_address, chain_id::ChainId,
-    LocalAccount,
+use aptos_sdk::{
+    transaction_builder::aptos_stdlib,
+    types::{
+        account_address::AccountAddress, account_config::aptos_root_address, chain_id::ChainId,
+        transaction::authenticator::AuthenticationKeyPreimage, LocalAccount,
+    },
 };
 use std::sync::Arc;
 use structopt::StructOpt;
@@ -45,6 +48,11 @@ struct Args {
     /// Maximum amount of coins to mint.
     #[structopt(long)]
     pub maximum_amount: Option<u64>,
+    /// If this is set, the faucet will use the root key to create a new account,
+    /// give it permissions to mint, and use that new account from then on.   
+    /// For Aptos public testnets, this is always set.
+    #[structopt(short = "d", long)]
+    pub delegate_on_start: bool,
 }
 
 #[tokio::main]
@@ -68,20 +76,134 @@ async fn main() {
     let faucet_address: AccountAddress =
         args.mint_account_address.unwrap_or_else(aptos_root_address);
     let faucet_account = LocalAccount::new(faucet_address, key, 0);
-    let service = Arc::new(aptos_faucet::Service::new(
-        args.server_url,
+
+    let mut service = Arc::new(aptos_faucet::Service::new(
+        args.server_url.clone(),
         args.chain_id,
         faucet_account,
         args.maximum_amount,
     ));
 
-    info!(
-        "[faucet]: running on: {}. Minting from {}",
-        address, faucet_address
-    );
+    if args.delegate_on_start {
+        service =
+            delegate_account(service, args.server_url, args.chain_id, args.maximum_amount).await;
+        let faucet_address = service.faucet_account.lock().unwrap().address();
+        info!(
+            "[faucet]: running on: {}. Minting from {} via delegation",
+            address, faucet_address
+        );
+    } else {
+        info!(
+            "[faucet]: running on: {}. Minting from {}",
+            address, faucet_address
+        );
+    }
+
     warp::serve(aptos_faucet::routes(service))
         .run(address)
         .await;
+}
+
+async fn delegate_account(
+    service: Arc<aptos_faucet::Service>,
+    server_url: String,
+    chain_id: ChainId,
+    maximum_amount: Option<u64>,
+) -> Arc<aptos_faucet::Service> {
+    // Create a new random account, then delegate to it
+    let delegated_account = LocalAccount::generate(&mut rand::rngs::OsRng);
+
+    {
+        let mut faucet_account = service.faucet_account.lock().unwrap();
+        let faucet_sequence_number = service
+            .client
+            .get_account(faucet_account.address())
+            .await
+            .unwrap()
+            .into_inner()
+            .sequence_number;
+        if faucet_sequence_number > faucet_account.sequence_number() {
+            *faucet_account.sequence_number_mut() = faucet_sequence_number;
+        }
+
+        // Create the account
+        service
+            .client
+            .submit_and_wait(
+                &faucet_account.sign_with_transaction_builder(
+                    service.transaction_factory.payload(
+                        aptos_stdlib::encode_create_account_script_function(
+                            delegated_account.address(),
+                            AuthenticationKeyPreimage::ed25519(delegated_account.public_key())
+                                .into_vec(),
+                        ),
+                    ),
+                ),
+            )
+            .await
+            .unwrap();
+
+        // Delegate minting to the account
+        service
+            .client
+            .submit_and_wait(&faucet_account.sign_with_transaction_builder(
+                service.transaction_factory.payload(
+                    aptos_stdlib::encode_delegate_mint_capability_script_function(
+                        delegated_account.address(),
+                    ),
+                ),
+            ))
+            .await
+            .unwrap();
+
+        // Give the new account some moolah
+        service
+            .client
+            .submit_and_wait(
+                &faucet_account.sign_with_transaction_builder(service.transaction_factory.payload(
+                    aptos_stdlib::encode_mint_script_function(
+                        delegated_account.address(),
+                        // we hold the world ransom for  one...? hundred...? billion dollars
+                        100_000_000,
+                    ),
+                )),
+            )
+            .await
+            .unwrap();
+    }
+
+    let service = Arc::new(aptos_faucet::Service::new(
+        server_url,
+        chain_id,
+        delegated_account,
+        maximum_amount,
+    ));
+    {
+        let mut faucet_account = service.faucet_account.lock().unwrap();
+        let faucet_sequence_number = service
+            .client
+            .get_account(faucet_account.address())
+            .await
+            .unwrap()
+            .into_inner()
+            .sequence_number;
+        if faucet_sequence_number > faucet_account.sequence_number() {
+            *faucet_account.sequence_number_mut() = faucet_sequence_number;
+        }
+        // claim the capability!
+        service
+            .client
+            .submit_and_wait(
+                &faucet_account.sign_with_transaction_builder(
+                    service
+                        .transaction_factory
+                        .payload(aptos_stdlib::encode_claim_mint_capability_script_function()),
+                ),
+            )
+            .await
+            .unwrap();
+    }
+    service
 }
 
 #[cfg(test)]

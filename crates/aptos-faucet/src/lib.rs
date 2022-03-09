@@ -49,8 +49,8 @@ pub mod mint;
 
 pub struct Service {
     pub faucet_account: Mutex<LocalAccount>,
-    transaction_factory: TransactionFactory,
-    client: Client,
+    pub transaction_factory: TransactionFactory,
+    pub client: Client,
     endpoint: String,
     maximum_amount: Option<u64>,
 }
