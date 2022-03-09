@@ -298,19 +298,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_healthy() {
-        let (_accounts, service) = setup(None);
-        let filter = routes(service);
-        let resp = warp::test::request()
-            .method("GET")
-            .path("/-/healthy")
-            .reply(&filter)
-            .await;
-        assert_eq!(resp.status(), 200);
-        assert_eq!(resp.body(), "aptos-faucet:ok");
-    }
-
-    #[tokio::test]
     async fn test_mint() {
         let (accounts, service) = setup(None);
         let filter = routes(service);
@@ -358,6 +345,20 @@ mod tests {
         let addr = AccountAddress::try_from("25C62C0E0820F422000814CDBA407835".to_owned()).unwrap();
         let account = reader.get(&addr).expect("account should be created");
         assert_eq!(account.balance, amount);
+    }
+
+    #[tokio::test]
+    async fn test_health() {
+        let (_accounts, service) = setup(None);
+
+        let resp = warp::test::request()
+            .method("GET")
+            .path(&"/health".to_string())
+            .reply(&routes(service))
+            .await;
+
+        assert_eq!(resp.status(), 200);
+        assert_eq!(resp.body(), 0.to_string().as_str());
     }
 
     #[tokio::test]

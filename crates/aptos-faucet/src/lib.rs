@@ -82,8 +82,8 @@ pub fn routes(
     service: Arc<Service>,
 ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     let mint = mint::mint_routes(service.clone());
-    let accounts = accounts_routes(service);
-    let health = warp::path!("-" / "healthy").map(|| "aptos-faucet:ok");
+    let accounts = accounts_routes(service.clone());
+    let health = health_route(service);
 
     health
         .or(mint)
@@ -102,6 +102,28 @@ pub fn routes(
             )
         }))
         .with(warp::cors().allow_any_origin().allow_methods(vec!["POST"]))
+}
+
+fn health_route(
+    service: Arc<Service>,
+) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    warp::path!("health")
+        .and(warp::get())
+        .and(warp::any().map(move || service.clone()))
+        .and_then(handle_health)
+}
+
+async fn handle_health(service: Arc<Service>) -> Result<Box<dyn warp::Reply>, Infallible> {
+    let faucet_address = service.faucet_account.lock().unwrap().address();
+    let faucet_account = service.client.get_account(faucet_address).await;
+
+    match faucet_account {
+        Ok(account) => Ok(Box::new(account.inner().sequence_number.to_string())),
+        Err(err) => Ok(Box::new(warp::reply::with_status(
+            err.to_string(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        ))),
+    }
 }
 
 fn accounts_routes(
