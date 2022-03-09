@@ -14,6 +14,9 @@ modified from https://github.com/diem/move/tree/main/language/documentation/tuto
 -  [Resource `BurnCapability`](#0x1_TestCoin_BurnCapability)
 -  [Struct `DelegatedMintCapability`](#0x1_TestCoin_DelegatedMintCapability)
 -  [Resource `Delegations`](#0x1_TestCoin_Delegations)
+-  [Resource `TransferEvents`](#0x1_TestCoin_TransferEvents)
+-  [Struct `SentEvent`](#0x1_TestCoin_SentEvent)
+-  [Struct `ReceivedEvent`](#0x1_TestCoin_ReceivedEvent)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_TestCoin_initialize)
 -  [Function `register`](#0x1_TestCoin_register)
@@ -33,6 +36,7 @@ modified from https://github.com/diem/move/tree/main/language/documentation/tuto
 
 
 <pre><code><b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
+<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event">0x1::Event</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option">0x1::Option</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer">0x1::Signer</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses">0x1::SystemAddresses</a>;
@@ -134,6 +138,7 @@ Represnets the metadata of the coin, store @CoreResources.
 
 ## Resource `MintCapability`
 
+Capability required to mint coins.
 
 
 <pre><code><b>struct</b> <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a> <b>has</b> store, key
@@ -161,6 +166,7 @@ Represnets the metadata of the coin, store @CoreResources.
 
 ## Resource `BurnCapability`
 
+Capability required to burn coins.
 
 
 <pre><code><b>struct</b> <a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a> <b>has</b> store, key
@@ -216,6 +222,7 @@ Delegation token created by delegator and can be claimed by the delegatee as Min
 
 ## Resource `Delegations`
 
+The container stores the current pending delegations.
 
 
 <pre><code><b>struct</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> <b>has</b> key
@@ -230,6 +237,106 @@ Delegation token created by delegator and can be claimed by the delegatee as Min
 <dl>
 <dt>
 <code>inner: vector&lt;<a href="TestCoin.md#0x1_TestCoin_DelegatedMintCapability">TestCoin::DelegatedMintCapability</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_TestCoin_TransferEvents"></a>
+
+## Resource `TransferEvents`
+
+Events handles.
+
+
+<pre><code><b>struct</b> <a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>sent_events: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_EventHandle">Event::EventHandle</a>&lt;<a href="TestCoin.md#0x1_TestCoin_SentEvent">TestCoin::SentEvent</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>received_events: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_EventHandle">Event::EventHandle</a>&lt;<a href="TestCoin.md#0x1_TestCoin_ReceivedEvent">TestCoin::ReceivedEvent</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_TestCoin_SentEvent"></a>
+
+## Struct `SentEvent`
+
+
+
+<pre><code><b>struct</b> <a href="TestCoin.md#0x1_TestCoin_SentEvent">SentEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>amount: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code><b>to</b>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_TestCoin_ReceivedEvent"></a>
+
+## Struct `ReceivedEvent`
+
+
+
+<pre><code><b>struct</b> <a href="TestCoin.md#0x1_TestCoin_ReceivedEvent">ReceivedEvent</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>amount: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>from: <b>address</b></code>
 </dt>
 <dd>
 
@@ -340,6 +447,13 @@ minting or transferring to the account.
     <b>let</b> empty_coin = <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a> { value: 0 };
     <b>assert</b>!(!<b>exists</b>&lt;<a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>&gt;(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)), <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="TestCoin.md#0x1_TestCoin_EALREADY_HAS_BALANCE">EALREADY_HAS_BALANCE</a>));
     <b>move_to</b>(account, <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a> { coin:  empty_coin });
+    <b>move_to</b>(
+        account,
+        <a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a> {
+            sent_events: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_new_event_handle">Event::new_event_handle</a>&lt;<a href="TestCoin.md#0x1_TestCoin_SentEvent">SentEvent</a>&gt;(account),
+            received_events: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_new_event_handle">Event::new_event_handle</a>&lt;<a href="TestCoin.md#0x1_TestCoin_ReceivedEvent">ReceivedEvent</a>&gt;(account),
+        }
+    );
 }
 </code></pre>
 
@@ -364,7 +478,8 @@ Create delegated token for the address so the account could claim MintCapability
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_delegte_mint_capability">delegte_mint_capability</a>(account: &signer, <b>to</b>: <b>address</b>) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> {
-    <b>let</b> delegations = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a>&gt;(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)).inner;
+    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(account);
+    <b>let</b> delegations = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a>&gt;(@CoreResources).inner;
     <b>let</b> i = 0;
     <b>while</b> (i &lt; <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(delegations)) {
         <b>let</b> element = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(delegations, i);
@@ -398,7 +513,7 @@ Claim the delegated mint capability and destroy the delegated token.
     <b>let</b> maybe_index = <a href="TestCoin.md#0x1_TestCoin_find_delegation">find_delegation</a>(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account));
     <b>assert</b>!(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_is_some">Option::is_some</a>(&maybe_index), <a href="TestCoin.md#0x1_TestCoin_EDELEGATION_NOT_FOUND">EDELEGATION_NOT_FOUND</a>);
     <b>let</b> idx = *<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_borrow">Option::borrow</a>(&maybe_index);
-    <b>let</b> delegations = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a>&gt;(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)).inner;
+    <b>let</b> delegations = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a>&gt;(@CoreResources).inner;
     <b>let</b> <a href="TestCoin.md#0x1_TestCoin_DelegatedMintCapability">DelegatedMintCapability</a> { <b>to</b>: _} = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_swap_remove">Vector::swap_remove</a>(delegations, idx);
 
     <b>move_to</b>(account, <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a> {});
@@ -427,13 +542,15 @@ Claim the delegated mint capability and destroy the delegated token.
 <pre><code><b>fun</b> <a href="TestCoin.md#0x1_TestCoin_find_delegation">find_delegation</a>(addr: <b>address</b>): <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option">Option</a>&lt;u64&gt; <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> {
     <b>let</b> delegations = &<b>borrow_global</b>&lt;<a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a>&gt;(@CoreResources).inner;
     <b>let</b> i = 0;
+    <b>let</b> len = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(delegations);
     <b>let</b> index = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_none">Option::none</a>();
-    <b>while</b> (i &lt; <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(delegations)) {
+    <b>while</b> (i &lt; len) {
         <b>let</b> element = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(delegations, i);
         <b>if</b> (element.<b>to</b> == addr) {
             index = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_some">Option::some</a>(i);
             <b>break</b>
-        }
+        };
+        i = i + 1;
     };
     index
 }
@@ -465,7 +582,7 @@ Mint coins with capability.
     // Deposit `amount` of tokens <b>to</b> `mint_addr`'s balance
     <a href="TestCoin.md#0x1_TestCoin_deposit">deposit</a>(mint_addr, <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a> { value: amount });
     // Update the total supply
-    <b>let</b> coin_info = <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a>&gt;(sender_addr);
+    <b>let</b> coin_info = <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a>&gt;(@CoreResources);
     coin_info.total_value = coin_info.total_value + (amount <b>as</b> u128);
 }
 </code></pre>
@@ -516,9 +633,20 @@ Transfers <code>amount</code> of tokens from <code>from</code> to <code><b>to</b
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_transfer">transfer</a>(from: &signer, <b>to</b>: <b>address</b>, amount: u64) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_transfer">transfer</a>(from: &signer, <b>to</b>: <b>address</b>, amount: u64) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>, <a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a> {
     <b>let</b> check = <a href="TestCoin.md#0x1_TestCoin_withdraw">withdraw</a>(from, amount);
     <a href="TestCoin.md#0x1_TestCoin_deposit">deposit</a>(<b>to</b>, check);
+    // emit events
+    <b>let</b> sender_handle = <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a>&gt;(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(from));
+    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>&lt;<a href="TestCoin.md#0x1_TestCoin_SentEvent">SentEvent</a>&gt;(
+        &<b>mut</b> sender_handle.sent_events,
+        <a href="TestCoin.md#0x1_TestCoin_SentEvent">SentEvent</a> { amount, <b>to</b> },
+    );
+    <b>let</b> receiver_handle = <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a>&gt;(<b>to</b>);
+    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>&lt;<a href="TestCoin.md#0x1_TestCoin_ReceivedEvent">ReceivedEvent</a>&gt;(
+        &<b>mut</b> receiver_handle.received_events,
+        <a href="TestCoin.md#0x1_TestCoin_ReceivedEvent">ReceivedEvent</a> { amount, from: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(from) },
+    );
 }
 </code></pre>
 
