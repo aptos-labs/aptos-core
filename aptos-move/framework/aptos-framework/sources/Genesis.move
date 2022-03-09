@@ -82,8 +82,6 @@ module AptosFramework::Genesis {
         // things start to break.
         Event::destroy_handle(Event::new_event_handle<u64>(core_resource_account));
         Event::destroy_handle(Event::new_event_handle<u64>(core_resource_account));
-        Event::destroy_handle(Event::new_event_handle<u64>(core_resource_account));
-        Event::destroy_handle(Event::new_event_handle<u64>(core_resource_account));
 
         // this needs to be called at the very end
         CoreGenesis::init(core_resource_account, chain_id);
