@@ -92,7 +92,7 @@ spec:
           {{- if .Values.service.fullnode.enableOnchainDiscovery }}
           # wait for DNS getting created
           sleep 300
-          {{- else }}
+          {{- end }}
           for N in $(seq 0 $(({{ .Values.genesis.numValidators}}-1))); do
             {{- if .Values.localVaultBackend }}
             export VAULT_ADDR="http://val${N}-aptos-validator-vault:8200"
