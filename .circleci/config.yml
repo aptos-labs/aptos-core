@@ -83,16 +83,33 @@ jobs:
       # since we're running with `--build-all`, assume that if it passes, we have all images required for Forge
       - run: aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG
       # XXX: make forge non-blocking for now
-      - run: ./scripts/fgi/run --tag $IMAGE_TAG --suite land_blocking || true
       - run:
-          name: Post Forge Results to GitHub PR
+          name: Run Forge
+          shell: /bin/bash
+          command: |
+            FGI_REPRO_CMD="./scripts/fgi/run --tag $IMAGE_TAG --suite land_blocking --report forge_report.json"
+            eval $FGI_REPRO_CMD
+            FGI_EXIT_CODE=$?
+            echo "export FGI_REPRO_CMD=$FGI_REPRO_CMD" >> $BASH_ENV
+            echo "export FGI_EXIT_CODE=$FGI_EXIT_CODE" >> $BASH_ENV
+      - run:
+          name: Post Forge test results
           shell: /bin/bash
           command: |
             commit_message=$(git log -1 --pretty=%B)
             PR_NUMBER=$(echo "${commit_message}" | grep 'Closes: #' | tail -1 | sed 's/Closes: #//')
 
+            echo "Repro: $FGI_REPRO_CMD"
+
+            cat \<<EOF > forge_comment.txt
+            Forge run: ${CIRCLE_BUILD_URL}
+            Forge Test Result: \`$(cat forge_report.json | jq -r .text)\`
+            EOF
+            # replace all newlines
+            FORGE_COMMENT=$(awk '{printf "%s\\n", $0}' forge_comment.txt)
+
             curl -s -H "Authorization: token ${FORGE_GH_TOKEN}" \
-            -X POST -d "{\"body\": \"Forge run: ${CIRCLE_BUILD_URL}\"}" \
+            -X POST -d "{\"body\": \"${FORGE_COMMENT}\"}" \
             "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/issues/${PR_NUMBER}/comments"
             exit 0
 
