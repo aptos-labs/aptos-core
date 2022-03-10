@@ -1,0 +1,19 @@
+[package]
+name = "move-examples"
+version = "0.1.0"
+authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
+repository = "https://github.com/aptos-core/aptos-labs"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+aptos-vm = { path = "../aptos-vm" }
+aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+framework = { path = "../framework" }
+structopt = "0.3.21"
+move-compiler = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-package = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-stdlib = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-unit-test = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }

@@ -20,6 +20,7 @@ members = [
     "aptos-move/framework/experimental/releases",
     "aptos-move/framework/releases",
     "aptos-move/genesis-viewer",
+    "aptos-move/move-examples",
     "aptos-move/mvhashmap",
     "aptos-move/parallel-executor",
     "aptos-move/transaction-builder-generator",
