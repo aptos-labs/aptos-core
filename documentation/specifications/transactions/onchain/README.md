@@ -12,7 +12,6 @@ The metadata is represented by the following `Rust` enum encoded in [Binary Cano
 enum Metadata {
   Undefined,
   GeneralMetadata(GeneralMetadata),
-  TravelRuleMetadata(TravelRuleMetadata),
   UnstructuredByteMetadata(Option<Vec<u8>>),
   RefundMetadata(RefundMetadata),
 }
@@ -50,18 +49,6 @@ Lifetime of subaddresses:
 
 Subaddresses should be used with great care to not accidentally leak personally identifiable information (PII). However, implementors must be mindful of the permissive nature of subaddresses as outlined in this specification.
 
-## Payments Using TravelRuleMetadata
-
-```
-enum TravelRuleMetadata {
-   TravelRuleMetadataVersionV0(OffChainReferenceId),
-}
-
-type OffChainReferenceId = Option<String>;
-```
-
-The TravelRuleMetadata completes a transaction that began with a pre-flight, or off-chain exchange. During this exchange, the two parties should have agreed on an `OffChainReferenceId`, likley a `reference_id` or a [UUID-128](https://tools.ietf.org/html/rfc4122).
-
 ## Refunds Using RefundMetadata
 
 ```
@@ -88,7 +75,7 @@ Diem supports refund transactions, as defined in [DIP-4](https://dip.aptoslabs.c
 
 Participants can be configured to automatically refund invalid transactions but in order to prevent ping-pong or recursive refunds, only a single transaction should be sent per peer per transaction stream. That is if a payment is followed by a invalid refund no follow up refund should be issued. Instead this should be surfaced to directly to the other party as this is an implementation bug.
 
-For transactions that exceed the travel rule limit must use the off-chain travel rule protocol and will likely be refunded by a TravelRuleMetadata. All other transactions, may use the refund transaction but are not strictly required to do so. Usage of the refund transaction, however, makes it clear what is a refund and the intent or reason for it.
+All other transactions, may use the refund transaction but are not strictly required to do so. Usage of the refund transaction, however, makes it clear what is a refund and the intent or reason for it.
 
 ## Dual Attestation Credentials
 

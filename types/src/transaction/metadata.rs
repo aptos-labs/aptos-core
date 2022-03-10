@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 pub enum Metadata {
     Undefined,
     GeneralMetadata(GeneralMetadata),
-    TravelRuleMetadata(TravelRuleMetadata),
     UnstructuredBytesMetadata(UnstructuredBytesMetadata),
     RefundMetadata(RefundMetadata),
     PaymentMetadata(PaymentMetadata),
@@ -68,21 +67,6 @@ impl GeneralMetadataV0 {
     pub fn referenced_event(&self) -> &Option<u64> {
         &self.referenced_event
     }
-}
-
-/// List of supported transaction metadata format versions for transactions
-/// subject to travel rule
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum TravelRuleMetadata {
-    TravelRuleMetadataVersion0(TravelRuleMetadataV0),
-}
-
-/// Transaction metadata format for transactions subject to travel rule
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct TravelRuleMetadataV0 {
-    /// Off-chain reference_id.  Used when off-chain APIs are used.
-    /// Specifies the off-chain reference ID that was agreed upon in off-chain APIs.
-    pub off_chain_reference_id: Option<String>,
 }
 
 /// Opaque binary transaction metadata

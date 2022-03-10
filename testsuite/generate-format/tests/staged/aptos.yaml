@@ -92,18 +92,14 @@ Metadata:
         NEWTYPE:
           TYPENAME: GeneralMetadata
     2:
-      TravelRuleMetadata:
-        NEWTYPE:
-          TYPENAME: TravelRuleMetadata
-    3:
       UnstructuredBytesMetadata:
         NEWTYPE:
           TYPENAME: UnstructuredBytesMetadata
-    4:
+    3:
       RefundMetadata:
         NEWTYPE:
           TYPENAME: RefundMetadata
-    6:
+    4:
       PaymentMetadata:
         NEWTYPE:
           TYPENAME: PaymentMetadata
@@ -292,16 +288,6 @@ TransactionPayload:
       ScriptFunction:
         NEWTYPE:
           TYPENAME: ScriptFunction
-TravelRuleMetadata:
-  ENUM:
-    0:
-      TravelRuleMetadataVersion0:
-        NEWTYPE:
-          TYPENAME: TravelRuleMetadataV0
-TravelRuleMetadataV0:
-  STRUCT:
-    - off_chain_reference_id:
-        OPTION: STR
 TypeTag:
   ENUM:
     0:
