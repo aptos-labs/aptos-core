@@ -39,23 +39,22 @@ jobs:
   e2e-test:
     machine:
       image: ubuntu-2004:current
-    resource_class: xlarge
+    resource_class: 2xlarge
     steps:
       - dev-setup
-      - run: RUST_BACKTRACE=full cargo nextest --nextest-profile ci --partition hash:1/1 --jobs 8 --test-threads 2 --package smoke-test
+      - run: RUST_BACKTRACE=full cargo nextest --nextest-profile ci --partition hash:1/1 --test-threads 5 --package smoke-test
   unit-test:
     machine:
       image: ubuntu-2004:current
-    resource_class: xlarge
+    resource_class: 2xlarge
     steps:
       - dev-setup
-      - run: cargo xtest --package jsonrpc-integration-tests --changed-since "origin/main"
-      - run: cargo xtest --doc --jobs 8 --unit --changed-since "origin/main"
-      - run: cargo nextest --nextest-profile ci --partition hash:1/1 --jobs 6 --test-threads 8 --unit --exclude backup-cli --changed-since "origin/main"
+      - run: cargo xtest --doc --unit --changed-since "origin/main"
+      - run: cargo nextest --nextest-profile ci --partition hash:1/1 --unit --exclude backup-cli --changed-since "origin/main"
   docker-build-push:
-    machine:
-      image: ubuntu-2004:current
-    resource_class: xlarge
+    docker:
+      - image: cimg/base:stable
+    resource_class: medium
     steps:
       - checkout
       - aws-setup
