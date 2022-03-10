@@ -69,3 +69,7 @@ target-out-docker
 
 # Doc generation output
 *.md.old
+
+# Vim swap files
+*.swp
+*.swo
