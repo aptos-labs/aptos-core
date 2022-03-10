@@ -2,7 +2,7 @@ version: 2.1
 
 orbs:
   aws-cli: circleci/aws-cli@2.1.0
-  aws-ecr: circleci/aws-ecr@7.3.0
+  kubernetes: circleci/kubernetes@1.3.0
 
 jobs:
   build-benchmarks:
@@ -58,7 +58,44 @@ jobs:
     steps:
       - checkout
       - aws-setup
-      - run: ./docker/build-aws.sh --build-all --version $(git rev-parse --short HEAD) --addl_tags latest
+      - run: echo "export IMAGE_TAG=dev_$(git rev-parse --short=8 HEAD)" >> $BASH_ENV
+      - run:
+          name: Build or skip
+          shell: /bin/bash
+          command: |
+            aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG
+            ret=$?
+            if [ $ret -ne 0 ]; then
+              echo "Image tag $IMAGE_TAG not present. Starting build..."
+              ./docker/build-aws.sh --build-all --version $(git rev-parse --short=8 HEAD) --addl_tags latest
+            else
+              echo "Image tag $IMAGE_TAG already present. Skipping build..."
+            fi
+  forge-k8s:
+    docker:
+      - image: cimg/base:stable
+    resource_class: medium
+    steps:
+      - checkout
+      - aws-setup
+      - kubernetes/install-kubectl
+      - run: echo "export IMAGE_TAG=dev_$(git rev-parse --short=8 HEAD)" >> $BASH_ENV
+      # since we're running with `--build-all`, assume that if it passes, we have all images required for Forge
+      - run: aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG
+      # XXX: make forge non-blocking for now
+      - run: ./scripts/fgi/run --tag $IMAGE_TAG --suite land_blocking || true
+      - run:
+          name: Post Forge Results to GitHub PR
+          shell: /bin/bash
+          command: |
+            commit_message=$(git log -1 --pretty=%B)
+            PR_NUMBER=$(echo "${commit_message}" | grep 'Closes: #' | tail -1 | sed 's/Closes: #//')
+
+            curl -s -H "Authorization: token ${FORGE_GH_TOKEN}" \
+            -X POST -d "{\"body\": \"Forge run: ${CIRCLE_BUILD_URL}\"}" \
+            "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/issues/${PR_NUMBER}/comments"
+            exit 0
+
   # a dummy job so that we can require auto or canary branches
   require-bors:
     machine:
@@ -84,6 +121,10 @@ workflows:
           context: aws-dev
           requires:
             - require-bors
+      - forge-k8s:
+          context: aws-dev
+          requires:
+            - docker-build-push
 commands:
   dev-setup:
     steps:
@@ -94,10 +135,6 @@ commands:
       - run: cat $HOME/.cargo/env >> $BASH_ENV
   aws-setup:
     steps:
-      - run:
-          name: Compose AWS Env Variables
-          command: |
-            echo 'export AWS_ECR_ACCOUNT_URL="${AWS_ECR_ACCOUNT_NUM}.dkr.ecr.${AWS_REGION}.amazonaws.com"' >> $BASH_ENV
       - aws-cli/install
       # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
       - aws-cli/setup
