@@ -27,6 +27,23 @@ impl AptosTest for MintTransfer {
             ));
         ctx.client().submit_and_wait(&transfer_txn).await?;
 
+        // test delegation
+        let txn_factory = ctx.transaction_factory();
+        let delegate_txn = ctx
+            .root_account()
+            .sign_with_transaction_builder(txn_factory.payload(
+                aptos_stdlib::encode_delegate_mint_capability_script_function(account1.address()),
+            ));
+        ctx.client().submit_and_wait(&delegate_txn).await?;
+        let claim_txn = account1.sign_with_transaction_builder(
+            txn_factory.payload(aptos_stdlib::encode_claim_mint_capability_script_function()),
+        );
+        ctx.client().submit_and_wait(&claim_txn).await?;
+        let mint_txn = account1.sign_with_transaction_builder(txn_factory.payload(
+            aptos_stdlib::encode_mint_script_function(account1.address(), 100),
+        ));
+        ctx.client().submit_and_wait(&mint_txn).await?;
+
         Ok(())
     }
 }

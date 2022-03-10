@@ -10,10 +10,6 @@ module AptosFramework::BasicScripts {
         TestCoin::register(&signer);
     }
 
-    public(script) fun mint(core_resource_account: signer, addr: address, amount: u64) {
-        TestCoin::mint(&core_resource_account, addr, amount);
-    }
-
     public(script) fun transfer(from: signer, to: address, amount: u64){
         TestCoin::transfer(&from, to, amount)
     }

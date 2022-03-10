@@ -90,11 +90,8 @@ impl TransactionValidation for VMValidator {
 
     fn restart(&mut self, config: OnChainConfigPayload) -> Result<()> {
         self.notify_commit();
-        let vm_config = config.get::<VMConfig>()?;
-        let version = config.get::<DiemVersion>()?;
-        let publishing_option = config.get::<VMPublishingOption>()?;
 
-        self.vm = DiemVM::init_with_config(version, vm_config, publishing_option);
+        self.vm = DiemVM::new_for_validation(&self.cached_state_view);
         Ok(())
     }
 

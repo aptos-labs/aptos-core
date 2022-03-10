@@ -98,6 +98,10 @@ impl<'t> AptosContext<'t> {
             .await?;
         Ok(())
     }
+
+    pub fn root_account(&mut self) -> &mut LocalAccount {
+        &mut self.public_info.root_account
+    }
 }
 
 pub struct AptosPublicInfo<'t> {

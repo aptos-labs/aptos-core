@@ -8,6 +8,7 @@ use serde::Serialize;
 use warp::http::header::{HeaderValue, CONTENT_TYPE};
 
 pub const X_APTOS_CHAIN_ID: &str = "X-Aptos-Chain-Id";
+pub const X_APTOS_EPOCH: &str = "X-Aptos-Epoch";
 pub const X_APTOS_LEDGER_VERSION: &str = "X-Aptos-Ledger-Version";
 pub const X_APTOS_LEDGER_TIMESTAMP: &str = "X-Aptos-Ledger-TimestampUsec";
 
@@ -40,6 +41,7 @@ impl warp::Reply for Response {
             X_APTOS_LEDGER_TIMESTAMP,
             self.ledger_info.ledger_timestamp.into(),
         );
+        headers.insert(X_APTOS_EPOCH, self.ledger_info.epoch.into());
 
         res
     }

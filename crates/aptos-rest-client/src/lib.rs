@@ -110,6 +110,7 @@ impl Client {
         #[derive(Deserialize)]
         struct Response {
             chain_id: u8,
+            epoch: u64,
             #[serde(deserialize_with = "types::deserialize_from_string")]
             ledger_version: u64,
             #[serde(deserialize_with = "types::deserialize_from_string")]
@@ -120,6 +121,7 @@ impl Client {
 
         let response = self.json::<Response>(response).await?.map(|r| State {
             chain_id: r.chain_id,
+            epoch: r.epoch,
             version: r.ledger_version,
             timestamp_usecs: r.ledger_timestamp,
         });

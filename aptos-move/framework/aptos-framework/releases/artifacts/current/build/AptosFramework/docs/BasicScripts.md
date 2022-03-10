@@ -6,7 +6,6 @@
 
 
 -  [Function `create_account`](#0x1_BasicScripts_create_account)
--  [Function `mint`](#0x1_BasicScripts_mint)
 -  [Function `transfer`](#0x1_BasicScripts_transfer)
 
 
@@ -37,30 +36,6 @@
 ) {
     <b>let</b> signer = <a href="AptosAccount.md#0x1_AptosAccount_create_account">AptosAccount::create_account</a>(new_account_address, auth_key_prefix);
     <a href="TestCoin.md#0x1_TestCoin_register">TestCoin::register</a>(&signer);
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_BasicScripts_mint"></a>
-
-## Function `mint`
-
-
-
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="BasicScripts.md#0x1_BasicScripts_mint">mint</a>(core_resource_account: signer, addr: <b>address</b>, amount: u64)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="BasicScripts.md#0x1_BasicScripts_mint">mint</a>(core_resource_account: signer, addr: <b>address</b>, amount: u64) {
-    <a href="TestCoin.md#0x1_TestCoin_mint">TestCoin::mint</a>(&core_resource_account, addr, amount);
 }
 </code></pre>
 
