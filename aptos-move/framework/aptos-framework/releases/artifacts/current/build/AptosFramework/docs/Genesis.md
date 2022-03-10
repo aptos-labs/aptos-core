@@ -12,6 +12,7 @@
 
 <pre><code><b>use</b> <a href="AptosAccount.md#0x1_AptosAccount">0x1::AptosAccount</a>;
 <b>use</b> <a href="AptosConsensusConfig.md#0x1_AptosConsensusConfig">0x1::AptosConsensusConfig</a>;
+<b>use</b> <a href="AptosTransactionPublishingOption.md#0x1_AptosTransactionPublishingOption">0x1::AptosTransactionPublishingOption</a>;
 <b>use</b> <a href="AptosVMConfig.md#0x1_AptosVMConfig">0x1::AptosVMConfig</a>;
 <b>use</b> <a href="AptosValidatorConfig.md#0x1_AptosValidatorConfig">0x1::AptosValidatorConfig</a>;
 <b>use</b> <a href="AptosValidatorOperatorConfig.md#0x1_AptosValidatorOperatorConfig">0x1::AptosValidatorOperatorConfig</a>;
@@ -35,7 +36,7 @@
 
 
 
-<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize">initialize</a>(core_resource_account: signer, _tc_account: signer, core_resource_account_auth_key: vector&lt;u8&gt;, _tc_auth_key: vector&lt;u8&gt;, _initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, _is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_diem_version: u64, consensus_config: vector&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize">initialize</a>(core_resource_account: signer, _tc_account: signer, core_resource_account_auth_key: vector&lt;u8&gt;, _tc_auth_key: vector&lt;u8&gt;, initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_diem_version: u64, consensus_config: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -49,8 +50,8 @@
     _tc_account: signer,
     core_resource_account_auth_key: vector&lt;u8&gt;,
     _tc_auth_key: vector&lt;u8&gt;,
-    _initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;,
-    _is_open_module: bool,
+    initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;,
+    is_open_module: bool,
     instruction_schedule: vector&lt;u8&gt;,
     native_schedule: vector&lt;u8&gt;,
     chain_id: u8,
@@ -60,6 +61,8 @@
     <a href="Genesis.md#0x1_Genesis_initialize_internal">initialize_internal</a>(
         &core_resource_account,
         core_resource_account_auth_key,
+        initial_script_allow_list,
+        is_open_module,
         instruction_schedule,
         native_schedule,
         chain_id,
@@ -79,7 +82,7 @@
 
 
 
-<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize_internal">initialize_internal</a>(core_resource_account: &signer, core_resource_account_auth_key: vector&lt;u8&gt;, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_diem_version: u64, consensus_config: vector&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize_internal">initialize_internal</a>(core_resource_account: &signer, core_resource_account_auth_key: vector&lt;u8&gt;, initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_diem_version: u64, consensus_config: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -91,6 +94,8 @@
 <pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize_internal">initialize_internal</a>(
     core_resource_account: &signer,
     core_resource_account_auth_key: vector&lt;u8&gt;,
+    initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;,
+    is_open_module: bool,
     instruction_schedule: vector&lt;u8&gt;,
     native_schedule: vector&lt;u8&gt;,
     chain_id: u8,
@@ -120,6 +125,7 @@
 
     <a href="AptosValidatorConfig.md#0x1_AptosValidatorConfig_initialize">AptosValidatorConfig::initialize</a>(core_resource_account);
     <a href="AptosValidatorOperatorConfig.md#0x1_AptosValidatorOperatorConfig_initialize">AptosValidatorOperatorConfig::initialize</a>(core_resource_account);
+    <a href="AptosTransactionPublishingOption.md#0x1_AptosTransactionPublishingOption_initialize">AptosTransactionPublishingOption::initialize</a>(core_resource_account, initial_script_allow_list, is_open_module);
 
     <a href="TestCoin.md#0x1_TestCoin_initialize">TestCoin::initialize</a>(core_resource_account, 1000000);
 

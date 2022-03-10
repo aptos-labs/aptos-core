@@ -14,6 +14,7 @@ module CoreFramework::DiemConfig {
     friend CoreFramework::DiemVersion;
     friend CoreFramework::DiemVMConfig;
     friend CoreFramework::ParallelExecutionConfig;
+    friend CoreFramework::DiemTransactionPublishingOption;
 
     /// Event that signals DiemBFT algorithm to start a new epoch,
     /// with new configuration information. This is also called a

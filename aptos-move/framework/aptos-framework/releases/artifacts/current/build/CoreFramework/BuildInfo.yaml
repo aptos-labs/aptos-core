@@ -44,6 +44,9 @@ compiled_package_info:
       name: DiemTimestamp
     : CoreFramework
     ? address: "00000000000000000000000000000001"
+      name: DiemTransactionPublishingOption
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
       name: DiemVMConfig
     : CoreFramework
     ? address: "00000000000000000000000000000001"
@@ -88,7 +91,7 @@ compiled_package_info:
     ? address: "00000000000000000000000000000001"
       name: Vector
     : Std
-  source_digest: C1C17355E0E39239912E53B03C168597E91ED7623DD0317218EE8C79CB2DD442
+  source_digest: FB8886BBA9CCC906E15186C33992217BE360FF711DC5E0878234ADF20954EF71
   build_flags:
     dev_mode: false
     test_mode: false

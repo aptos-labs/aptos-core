@@ -24,6 +24,9 @@ compiled_package_info:
       name: AptosConsensusConfig
     : AptosFramework
     ? address: "00000000000000000000000000000001"
+      name: AptosTransactionPublishingOption
+    : AptosFramework
+    ? address: "00000000000000000000000000000001"
       name: AptosVMConfig
     : AptosFramework
     ? address: "00000000000000000000000000000001"
@@ -70,6 +73,9 @@ compiled_package_info:
     : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: DiemTimestamp
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: DiemTransactionPublishingOption
     : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: DiemVMConfig
@@ -128,7 +134,7 @@ compiled_package_info:
     ? address: "00000000000000000000000000000001"
       name: Vector
     : Std
-  source_digest: 9F4226D30A15C73B60E96142306F135748D0316095B6E59FEECDD7F22672B78A
+  source_digest: DA08D1587A621A2176DC31EA2F668DDCC181E956AEEEC308F6ED822900CE042D
   build_flags:
     dev_mode: false
     test_mode: false

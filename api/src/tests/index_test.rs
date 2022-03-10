@@ -12,6 +12,7 @@ async fn test_get_ledger_info() {
 
     let expected = json!({
         "chain_id": 4,
+        "epoch": 0,
         "ledger_version": ledger_info.version().to_string(),
         "ledger_timestamp": ledger_info.timestamp().to_string(),
     });

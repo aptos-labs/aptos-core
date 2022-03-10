@@ -34,12 +34,16 @@ where
     path
 }
 
-pub fn diem_core_modules_full_path() -> String {
+pub fn core_modules_full_path() -> String {
     format!("{}/{}", env!("CARGO_MANIFEST_DIR"), CORE_MODULES_DIR)
 }
 
 pub fn diem_payment_modules_full_path() -> String {
     format!("{}/{}", env!("CARGO_MANIFEST_DIR"), DPN_MODULES_DIR)
+}
+
+pub fn aptos_modules_full_path() -> String {
+    format!("{}/{}", env!("CARGO_MANIFEST_DIR"), APTOS_MODULES_DIR)
 }
 
 pub fn dpn_files_no_dependencies() -> Vec<String> {

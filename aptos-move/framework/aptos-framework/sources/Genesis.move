@@ -9,6 +9,7 @@ module AptosFramework::Genesis {
     use CoreFramework::ValidatorConfig;
     use CoreFramework::ValidatorOperatorConfig;
     use AptosFramework::AptosConsensusConfig;
+    use AptosFramework::AptosTransactionPublishingOption;
     use AptosFramework::AptosValidatorConfig;
     use AptosFramework::AptosValidatorOperatorConfig;
     use AptosFramework::AptosValidatorSet;
@@ -23,8 +24,8 @@ module AptosFramework::Genesis {
         _tc_account: signer,
         core_resource_account_auth_key: vector<u8>,
         _tc_auth_key: vector<u8>,
-        _initial_script_allow_list: vector<vector<u8>>,
-        _is_open_module: bool,
+        initial_script_allow_list: vector<vector<u8>>,
+        is_open_module: bool,
         instruction_schedule: vector<u8>,
         native_schedule: vector<u8>,
         chain_id: u8,
@@ -34,6 +35,8 @@ module AptosFramework::Genesis {
         initialize_internal(
             &core_resource_account,
             core_resource_account_auth_key,
+            initial_script_allow_list,
+            is_open_module,
             instruction_schedule,
             native_schedule,
             chain_id,
@@ -45,6 +48,8 @@ module AptosFramework::Genesis {
     fun initialize_internal(
         core_resource_account: &signer,
         core_resource_account_auth_key: vector<u8>,
+        initial_script_allow_list: vector<vector<u8>>,
+        is_open_module: bool,
         instruction_schedule: vector<u8>,
         native_schedule: vector<u8>,
         chain_id: u8,
@@ -74,6 +79,7 @@ module AptosFramework::Genesis {
 
         AptosValidatorConfig::initialize(core_resource_account);
         AptosValidatorOperatorConfig::initialize(core_resource_account);
+        AptosTransactionPublishingOption::initialize(core_resource_account, initial_script_allow_list, is_open_module);
 
         TestCoin::initialize(core_resource_account, 1000000);
 
@@ -178,6 +184,8 @@ module AptosFramework::Genesis {
         initialize_internal(
             core_resource_account,
             x"0000000000000000000000000000000000000000000000000000000000000000",
+            Vector::empty(),
+            true,
             x"", // instruction_schedule not needed for unit tests
             x"", // native schedule not needed for unit tests
             4u8, // TESTING chain ID

@@ -11,6 +11,7 @@ module AptosFramework::AptosAccount {
     use CoreFramework::Account;
     use CoreFramework::DiemTimestamp;
     use CoreFramework::SystemAddresses;
+    use CoreFramework::DiemTransactionPublishingOption;
     use AptosFramework::Marker;
     use AptosFramework::AptosValidatorConfig;
     use AptosFramework::AptosValidatorOperatorConfig;
@@ -29,6 +30,8 @@ module AptosFramework::AptosAccount {
     const ECANT_PAY_GAS_DEPOSIT: u64 = 5;
     const EWRITESET_NOT_ALLOWED: u64 = 6;
     const EMULTI_AGENT_NOT_SUPPORTED: u64 = 7;
+    const EMODULE_NOT_ALLOWED: u64 = 8;
+    const ESCRIPT_NOT_ALLOWED: u64 = 9;
 
     public(friend) fun create_account_internal(account_address: address, auth_key_prefix: vector<u8>): (signer, vector<u8>) {
         assert!(
@@ -128,6 +131,7 @@ module AptosFramework::AptosAccount {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
+        assert!(DiemTransactionPublishingOption::is_module_allowed(), Errors::invalid_state(EMODULE_NOT_ALLOWED));
         prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
@@ -139,8 +143,9 @@ module AptosFramework::AptosAccount {
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
         chain_id: u8,
-        _script_hash: vector<u8>,
+        script_hash: vector<u8>,
     ) {
+        assert!(DiemTransactionPublishingOption::is_script_allowed(&script_hash), Errors::invalid_state(ESCRIPT_NOT_ALLOWED));
         prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 

@@ -5,6 +5,7 @@ module AptosFramework::Marker {
 
     friend AptosFramework::AptosAccount;
     friend AptosFramework::AptosConsensusConfig;
+    friend AptosFramework::AptosTransactionPublishingOption;
     friend AptosFramework::AptosValidatorConfig;
     friend AptosFramework::AptosValidatorOperatorConfig;
     friend AptosFramework::AptosValidatorSet;

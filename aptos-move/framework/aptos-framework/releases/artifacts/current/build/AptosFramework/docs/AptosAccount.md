@@ -30,6 +30,7 @@ transaction in addition to the core prologue and epilogue.
 <b>use</b> <a href="AptosValidatorOperatorConfig.md#0x1_AptosValidatorOperatorConfig">0x1::AptosValidatorOperatorConfig</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/BCS.md#0x1_BCS">0x1::BCS</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
+<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption">0x1::DiemTransactionPublishingOption</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Hash.md#0x1_Hash">0x1::Hash</a>;
 <b>use</b> <a href="Marker.md#0x1_Marker">0x1::Marker</a>;
@@ -101,11 +102,29 @@ transaction in addition to the core prologue and epilogue.
 
 
 
+<a name="0x1_AptosAccount_EMODULE_NOT_ALLOWED"></a>
+
+
+
+<pre><code><b>const</b> <a href="AptosAccount.md#0x1_AptosAccount_EMODULE_NOT_ALLOWED">EMODULE_NOT_ALLOWED</a>: u64 = 8;
+</code></pre>
+
+
+
 <a name="0x1_AptosAccount_EMULTI_AGENT_NOT_SUPPORTED"></a>
 
 
 
 <pre><code><b>const</b> <a href="AptosAccount.md#0x1_AptosAccount_EMULTI_AGENT_NOT_SUPPORTED">EMULTI_AGENT_NOT_SUPPORTED</a>: u64 = 7;
+</code></pre>
+
+
+
+<a name="0x1_AptosAccount_ESCRIPT_NOT_ALLOWED"></a>
+
+
+
+<pre><code><b>const</b> <a href="AptosAccount.md#0x1_AptosAccount_ESCRIPT_NOT_ALLOWED">ESCRIPT_NOT_ALLOWED</a>: u64 = 9;
 </code></pre>
 
 
@@ -375,6 +394,7 @@ Rotate the authentication key for the account under cap.account_address
     txn_expiration_time: u64,
     chain_id: u8,
 ) {
+    <b>assert</b>!(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_is_module_allowed">DiemTransactionPublishingOption::is_module_allowed</a>(), <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="AptosAccount.md#0x1_AptosAccount_EMODULE_NOT_ALLOWED">EMODULE_NOT_ALLOWED</a>));
     <a href="AptosAccount.md#0x1_AptosAccount_prologue_common">prologue_common</a>(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
 }
 </code></pre>
@@ -389,7 +409,7 @@ Rotate the authentication key for the account under cap.account_address
 
 
 
-<pre><code><b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_script_prologue">script_prologue</a>(sender: signer, txn_sequence_number: u64, txn_public_key: vector&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, chain_id: u8, _script_hash: vector&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_script_prologue">script_prologue</a>(sender: signer, txn_sequence_number: u64, txn_public_key: vector&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, chain_id: u8, script_hash: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -406,8 +426,9 @@ Rotate the authentication key for the account under cap.account_address
     txn_max_gas_units: u64,
     txn_expiration_time: u64,
     chain_id: u8,
-    _script_hash: vector&lt;u8&gt;,
+    script_hash: vector&lt;u8&gt;,
 ) {
+    <b>assert</b>!(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_is_script_allowed">DiemTransactionPublishingOption::is_script_allowed</a>(&script_hash), <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="AptosAccount.md#0x1_AptosAccount_ESCRIPT_NOT_ALLOWED">ESCRIPT_NOT_ALLOWED</a>));
     <a href="AptosAccount.md#0x1_AptosAccount_prologue_common">prologue_common</a>(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
 }
 </code></pre>

@@ -58,7 +58,7 @@ The Move modules in the Diem Framework can be bucketed in to a couple categories
 * <code><a href="DiemBlock.md#0x1_DiemBlock">DiemBlock</a></code>
 * <code><a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a></code>
 * <code><a href="DiemTimestamp.md#0x1_DiemTimestamp">DiemTimestamp</a></code>
-* <code>DiemTransactionPublishingOption</code>
+* <code><a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption">DiemTransactionPublishingOption</a></code>
 * <code><a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a></code>
 * <code><a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a></code>
 * <code>TransactionFee</code>
@@ -99,6 +99,7 @@ The Move modules in the Diem Framework can be bucketed in to a couple categories
 -  [`0x1::DiemConsensusConfig`](DiemConsensusConfig.md#0x1_DiemConsensusConfig)
 -  [`0x1::DiemSystem`](DiemSystem.md#0x1_DiemSystem)
 -  [`0x1::DiemTimestamp`](DiemTimestamp.md#0x1_DiemTimestamp)
+-  [`0x1::DiemTransactionPublishingOption`](DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption)
 -  [`0x1::DiemVMConfig`](DiemVMConfig.md#0x1_DiemVMConfig)
 -  [`0x1::DiemVersion`](DiemVersion.md#0x1_DiemVersion)
 -  [`0x1::Errors`](../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors)

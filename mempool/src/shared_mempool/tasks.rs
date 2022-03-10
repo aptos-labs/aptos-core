@@ -289,12 +289,6 @@ where
         .map(|t| smp.validator.read().validate_transaction(t.0.clone()))
         .collect::<Vec<_>>();
     vm_validation_timer.stop_and_record();
-    println!(
-        "txn {}:{}, status: {:?}",
-        transactions[0].0.sender(),
-        transactions[0].0.sequence_number(),
-        validation_results[0],
-    );
     {
         let mut mempool = smp.mempool.lock();
         for (idx, (transaction, crsn_or_seqno)) in transactions.into_iter().enumerate() {

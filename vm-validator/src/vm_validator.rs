@@ -88,7 +88,7 @@ impl TransactionValidation for VMValidator {
         Ok(self.vm.validate_transaction(txn, &self.cached_state_view))
     }
 
-    fn restart(&mut self, config: OnChainConfigPayload) -> Result<()> {
+    fn restart(&mut self, _config: OnChainConfigPayload) -> Result<()> {
         self.notify_commit();
 
         self.vm = DiemVM::new_for_validation(&self.cached_state_view);

@@ -166,7 +166,7 @@ impl ValidatorBuilder {
             move_modules,
             num_validators: NonZeroUsize::new(1).unwrap(),
             randomize_first_validator_ports: true,
-            publishing_option: None,
+            publishing_option: Some(VMPublishingOption::open()),
             template: NodeConfig::default_for_validator(),
         }
     }

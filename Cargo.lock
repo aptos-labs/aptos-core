@@ -7086,6 +7086,7 @@ dependencies = [
  "hex",
  "move-command-line-common",
  "move-ir-compiler",
+ "move-package",
  "move-stdlib",
  "once_cell",
  "proptest",
