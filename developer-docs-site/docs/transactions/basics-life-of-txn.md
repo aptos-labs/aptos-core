@@ -106,7 +106,7 @@ Alice's account will now have 100 Aptos Coins, and its sequence number will be 6
 In the [previous section](#lifecycle-of-the-transaction), we described the typical lifecycle of a sample transaction from being submitted to being committed to the Aptos Blockchain's distributed database. Now let's look in more depth at the inter-component interactions of Aptos nodes as the blockchain processes transactions and responds to queries. This information will be most useful to those who:
 
 * Would like to get an overall idea of how the system works under the covers.
-* Are interested in eventually contributing to the Aptos Core software.
+* Are interested in eventually contributing to the Aptos-core software.
 
 You can learn more about the different types of Aptos nodes here:
 * [Validator nodes](/basics/basics-validator-nodes)

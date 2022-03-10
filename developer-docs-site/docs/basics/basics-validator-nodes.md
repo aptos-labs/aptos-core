@@ -17,7 +17,7 @@ Each Aptos node comprises several logical components:
 * [Storage](#storage)
 * [State synchronizer](#state-synchronizer)
 
-The [Aptos Core](/reference/glossary#aptos-core) software can be configured to run as a validator node or as a FullNode.
+The [Aptos-core](/reference/glossary#aptos-core) software can be configured to run as a validator node or as a FullNode.
 
 # Overview
 

@@ -27,9 +27,9 @@ slug: "glossary"
 
 - The **Aptos Blockchain** is a ledger of immutable transactions agreed upon by the validators on the Aptos network (the network of validators).
 
-## Aptos Core
+## Aptos-core
 
-Aptos Core is the open source technology on which the Aptos Payment Network runs. Aptos Core contains software for
+Aptos-core is the open source technology on which the Aptos Payment Network runs. Aptos-core contains software for
 
 * the Aptos Blockchain itself, which generates and stores the immutable ledger of confirmed transactions and
 * the validation process, which implements the consensus algorithm to validate transactions and add them to the Aptos Blockchain immutable ledger.

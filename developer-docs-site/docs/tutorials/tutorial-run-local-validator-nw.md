@@ -12,11 +12,11 @@ Your local test network will not be connected to testnet or mainnet of the Aptos
 
 ## Getting Started
 
-You can run a local test validator network in two ways: using the Aptos Core source code or Docker. The Aptos Core source code is useful when testing modifications to the Aptos Core code base. Docker is particularly useful when building services on top of the Aptos Blockchain as there is no build overhead and the ledger state persists across restarts of the network by default.
+You can run a local test validator network in two ways: using the Aptos-core source code or Docker. The Aptos-core source code is useful when testing modifications to the Aptos-core code base. Docker is particularly useful when building services on top of the Aptos Blockchain as there is no build overhead and the ledger state persists across restarts of the network by default.
 
-### Using Aptos Core source code
+### Using Aptos-core source code
 
-1. Download and clone the Aptos Core repository from GitHub and prepare your developer environment by running the following commands:
+1. Download and clone the Aptos-core repository from GitHub and prepare your developer environment by running the following commands:
 
     ```
     git clone https://github.com/aptos-labs/aptos-core.git

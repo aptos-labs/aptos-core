@@ -17,10 +17,10 @@ Before you get started with this tutorial, we recommend you familiarize yourself
 
 
 ## Getting started
-You can configure a public FullNode in two ways: using the Aptos Core source code or Docker.
+You can configure a public FullNode in two ways: using the Aptos-core source code or Docker.
 
-### Using Aptos Core source code
-1. Download and clone the Aptos Core repository from GitHub and prepare your developer environment by running the following commands:
+### Using Aptos-core source code
+1. Download and clone the Aptos-core repository from GitHub and prepare your developer environment by running the following commands:
      ```
      git clone https://github.com/aptos-labs/aptos-core.git
      cd aptos
