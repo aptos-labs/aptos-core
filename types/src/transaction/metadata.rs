@@ -15,7 +15,6 @@ pub enum Metadata {
     GeneralMetadata(GeneralMetadata),
     UnstructuredBytesMetadata(UnstructuredBytesMetadata),
     RefundMetadata(RefundMetadata),
-    PaymentMetadata(PaymentMetadata),
 }
 
 /// List of supported transaction metadata format versions for regular
@@ -99,17 +98,4 @@ pub enum RefundReason {
     UserInitiatedPartialRefund,
     UserInitiatedFullRefund,
     InvalidReferenceId,
-}
-
-/// List of supported transaction metadata format versions for transactions for payments
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum PaymentMetadata {
-    PaymentMetadataVersion0(PaymentMetadataV0),
-}
-
-/// Transaction metadata format for transactions for payments
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct PaymentMetadataV0 {
-    /// Reference ID needed for off-chain reference ID exchange.
-    pub reference_id: [u8; 16],
 }

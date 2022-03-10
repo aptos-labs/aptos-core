@@ -99,10 +99,6 @@ Metadata:
       RefundMetadata:
         NEWTYPE:
           TYPENAME: RefundMetadata
-    4:
-      PaymentMetadata:
-        NEWTYPE:
-          TYPENAME: PaymentMetadata
 Module:
   STRUCT:
     - code: BYTES
@@ -121,18 +117,6 @@ MultiEd25519PublicKey:
   NEWTYPESTRUCT: BYTES
 MultiEd25519Signature:
   NEWTYPESTRUCT: BYTES
-PaymentMetadata:
-  ENUM:
-    0:
-      PaymentMetadataVersion0:
-        NEWTYPE:
-          TYPENAME: PaymentMetadataV0
-PaymentMetadataV0:
-  STRUCT:
-    - reference_id:
-        TUPLEARRAY:
-          CONTENT: U8
-          SIZE: 16
 RawTransaction:
   STRUCT:
     - sender:
