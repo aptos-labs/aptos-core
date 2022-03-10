@@ -1,7 +1,7 @@
 #!/bin/bash
 # Copyright (c) The Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
-# This script sets up the environment for the Diem build by installing necessary dependencies.
+# This script sets up the environment for the build by installing necessary dependencies.
 #
 # Usage ./dev_setup.sh <options>
 #   v - verbose, print all statements
@@ -38,7 +38,7 @@ cd "$SCRIPT_PATH/.." || exit
 
 function usage {
   echo "Usage:"
-  echo "Installs or updates necessary dev tools for diem/diem."
+  echo "Installs or updates necessary dev tools for aptoslabs/aptos-core."
   echo "-b batch mode, no user interactions and miminal output"
   echo "-p update ${HOME}/.profile"
   echo "-t install build tools"
@@ -50,7 +50,7 @@ function usage {
   echo "-i installs an individual tool by name"
   echo "-n will target the /opt/ dir rather than the $HOME dir.  /opt/bin/, /opt/rustup/, and /opt/dotnet/ rather than $HOME/bin/, $HOME/.rustup/, and $HOME/.dotnet/"
   echo "If no toolchain component is selected with -t, -o, -y, or -p, the behavior is as if -t had been provided."
-  echo "This command must be called from the root folder of the Diem project."
+  echo "This command must be called from the root folder of the Aptos-core project."
 }
 
 function add_to_profile {
@@ -628,7 +628,7 @@ function install_python3 {
 
 function welcome_message {
 cat <<EOF
-Welcome to Diem!
+Welcome to Aptos!
 
 This script will download and install the necessary dependencies needed to
 build, test and inspect Aptos Core.
@@ -778,7 +778,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "false" ]] && \
 fi
 
 if [ ! -f rust-toolchain ]; then
-	echo "Unknown location. Please run this from the diem repository. Abort."
+	echo "Unknown location. Please run this from the aptos-core repository. Abort."
 	exit 1
 fi
 
