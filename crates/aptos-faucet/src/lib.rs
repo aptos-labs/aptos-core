@@ -117,12 +117,17 @@ async fn handle_health(service: Arc<Service>) -> Result<Box<dyn warp::Reply>, In
     let faucet_address = service.faucet_account.lock().unwrap().address();
     let faucet_account = service.client.get_account(faucet_address).await;
 
+    info!("[HEALTH] faucet address: {}", &faucet_address);
+
     match faucet_account {
         Ok(account) => Ok(Box::new(account.inner().sequence_number.to_string())),
-        Err(err) => Ok(Box::new(warp::reply::with_status(
-            err.to_string(),
-            StatusCode::INTERNAL_SERVER_ERROR,
-        ))),
+        Err(err) => {
+            info!("[HEALTH] ERR: {}", &err);
+            Ok(Box::new(warp::reply::with_status(
+                err.to_string(),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            )))
+        }
     }
 }
 
