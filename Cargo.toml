@@ -122,7 +122,7 @@ members = [
     "vm-validator",
 ]
 
-# NOTE: default-members is the complete list of binaries that form the "production Diem codebase". These members should
+# NOTE: default-members is the complete list of binaries that form the "production Aptos codebase". These members should
 # never include crates that require fuzzing features or test features. These are the crates we want built with no extra
 # test-only code included.
 #
