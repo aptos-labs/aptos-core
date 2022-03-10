@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
-#[structopt(about = "Diem Node")]
+#[structopt(about = "Aptos Node")]
 struct Args {
     #[structopt(
         short = "f",
