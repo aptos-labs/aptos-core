@@ -4,8 +4,8 @@ As Aptos Core is currently in the prototype stage and does not power a blockchai
 
 ## Reporting a Bug
 
-The Aptos Core team and community take all security bugs in the Diem project seriously to ensure the security of the Diem Blockchain.
+The Aptos Core team and community take all security bugs in the Aptos project seriously to ensure the security of the Aptos Blockchain.
 
 You can also report security bugs by emailing us directly at security@aptoslabs.com.
 
-Thank you for improving the security of the Diem Blockchain! Your efforts and responsible disclosure are appreciated, and every effort will be made to acknowledge your contributions in a timely manner.
+Thank you for improving the security of the Aptos Blockchain! Your efforts and responsible disclosure are appreciated, and every effort will be made to acknowledge your contributions in a timely manner.
