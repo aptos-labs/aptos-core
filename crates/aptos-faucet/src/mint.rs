@@ -3,7 +3,7 @@
 
 use crate::Service;
 use anyhow::Result;
-use aptos_crypto::ed25519::Ed25519PublicKey;
+use aptos_crypto::{ed25519::Ed25519PublicKey, hash::HashValue};
 use aptos_sdk::{
     transaction_builder::aptos_stdlib,
     types::{
@@ -47,16 +47,18 @@ async fn handle(
 
 #[derive(Debug)]
 pub enum Response {
-    DDAccountNextSeqNum(u64),
     SubmittedTxns(Vec<SignedTransaction>),
+    SubmittedTxnsHashes(Vec<HashValue>),
 }
 
 impl std::fmt::Display for Response {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Response::DDAccountNextSeqNum(v1) => write!(f, "{}", v1),
-            Response::SubmittedTxns(v2) => {
-                write!(f, "{}", hex::encode(bcs::to_bytes(&v2).unwrap()))
+            Response::SubmittedTxns(value) => {
+                write!(f, "{}", hex::encode(bcs::to_bytes(&value).unwrap()))
+            }
+            Response::SubmittedTxnsHashes(value) => {
+                write!(f, "{}", serde_json::to_string(&value).unwrap())
             }
         }
     }
@@ -73,7 +75,6 @@ impl std::fmt::Display for MintParams {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "<Mint {:?} to {:?}>", self.amount, self.receiver())
     }
-
 }
 
 impl MintParams {
@@ -155,9 +156,11 @@ async fn process(service: &Service, params: MintParams) -> Result<Response> {
     if params.return_txns.unwrap_or(false) {
         Ok(Response::SubmittedTxns(txns))
     } else {
-        Ok(Response::DDAccountNextSeqNum(
-            service.faucet_account.lock().unwrap().sequence_number(),
-        ))
+        let hashes = txns
+            .iter()
+            .map(|txn| txn.clone().committed_hash())
+            .collect();
+        Ok(Response::SubmittedTxnsHashes(hashes))
     }
 }
 

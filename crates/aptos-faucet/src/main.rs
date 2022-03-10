@@ -311,7 +311,8 @@ mod tests {
             .path(format!("/mint?pub_key={}&amount={}", pub_key, amount).as_str())
             .reply(&filter)
             .await;
-        assert_eq!(resp.body(), 2.to_string().as_str());
+        let values: Vec<HashValue> = serde_json::from_slice(resp.body()).unwrap();
+        assert_eq!(values.len(), 2);
         let reader = accounts.read();
         let addr = AccountAddress::try_from("25C62C0E0820F422000814CDBA407835".to_owned()).unwrap();
         let account = reader.get(&addr).expect("account should be created");

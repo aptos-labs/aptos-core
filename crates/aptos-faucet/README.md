@@ -29,10 +29,7 @@ Notes:
 
 ### Response
 
-If the query param `return_txns` is not provided, or it is not "true", the server returns an unsigned int64 in the HTTP response body,
-which is the account sequence number of the account `0xa550c18` after executing your request.
-Nominally, this number can be used for looking up the submitted transaction.
-However, under load, this number may be shared by multiple transactions.
+If the query param `return_txns` is not provided, or it is not "true", the server returns a json-encoded list of transaction has values. These can be used to monitor the status of submitted transactions.
 
 If the query param `return_txns` is set, the server will respond with the transactions for creating and funding your account.
 The response HTTP body is hex encoded bytes of BCS encoded `Vec<aptos_types::transaction::SignedTransaction>`.
