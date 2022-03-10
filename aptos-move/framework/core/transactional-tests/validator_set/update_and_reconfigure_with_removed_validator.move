@@ -19,9 +19,9 @@ script {
 
 //# run --admin-script --signers DiemRoot DiemRoot
 script{
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     fun main(_dr: signer, account: signer) {
-        DiemSystem::remove_validator(&account, @Bob);
+        ValidatorSystem::remove_validator(&account, @Bob);
     }
 }
 
@@ -29,8 +29,8 @@ script{
 
 //# run --admin-script --signers DiemRoot Alice
 script {
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     fun main(_dr: signer, account: signer) {
-        DiemSystem::update_config_and_reconfigure(&account, @Bob);
+        ValidatorSystem::update_config_and_reconfigure(&account, @Bob);
     }
 }

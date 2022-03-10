@@ -23,9 +23,9 @@ Once the component makeup of the XDX has been chosen the
 <pre><code><b>use</b> <a href="AccountLimits.md#0x1_AccountLimits">0x1::AccountLimits</a>;
 <b>use</b> <a href="CoreAddresses.md#0x1_CoreAddresses">0x1::CoreAddresses</a>;
 <b>use</b> <a href="Diem.md#0x1_Diem">0x1::Diem</a>;
-<b>use</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
 <b>use</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
 <b>use</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/FixedPoint32.md#0x1_FixedPoint32">0x1::FixedPoint32</a>;
+<b>use</b> <a href="Timestamp.md#0x1_Timestamp">0x1::Timestamp</a>;
 </code></pre>
 
 
@@ -147,7 +147,7 @@ restrictions are enforced in the <code><a href="Diem.md#0x1_Diem_register_curren
     dr_account: &signer,
     tc_account: &signer,
 ) {
-    <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
+    <a href="Timestamp.md#0x1_Timestamp_assert_genesis">Timestamp::assert_genesis</a>();
     // Operational constraint
     <a href="CoreAddresses.md#0x1_CoreAddresses_assert_currency_info">CoreAddresses::assert_currency_info</a>(dr_account);
     // <a href="XDX.md#0x1_XDX_Reserve">Reserve</a> must not exist.
@@ -194,7 +194,7 @@ restrictions are enforced in the <code><a href="Diem.md#0x1_Diem_register_curren
 Registering XDX can only be done in genesis.
 
 
-<pre><code><b>include</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotGenesis">DiemTimestamp::AbortsIfNotGenesis</a>;
+<pre><code><b>include</b> <a href="Timestamp.md#0x1_Timestamp_AbortsIfNotGenesis">Timestamp::AbortsIfNotGenesis</a>;
 </code></pre>
 
 
@@ -307,21 +307,21 @@ Return the account address where the globally unique XDX::Reserve resource is st
 After genesis, the Reserve resource exists.
 
 
-<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>() ==&gt; <a href="XDX.md#0x1_XDX_reserve_exists">reserve_exists</a>();
+<pre><code><b>invariant</b> [suspendable] <a href="Timestamp.md#0x1_Timestamp_is_operating">Timestamp::is_operating</a>() ==&gt; <a href="XDX.md#0x1_XDX_reserve_exists">reserve_exists</a>();
 </code></pre>
 
 
 After genesis, XDX is registered.
 
 
-<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>() ==&gt; <a href="Diem.md#0x1_Diem_is_currency">Diem::is_currency</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;();
+<pre><code><b>invariant</b> [suspendable] <a href="Timestamp.md#0x1_Timestamp_is_operating">Timestamp::is_operating</a>() ==&gt; <a href="Diem.md#0x1_Diem_is_currency">Diem::is_currency</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;();
 </code></pre>
 
 
 After genesis, the exchange rate to XDX is always equal to 1.0.
 
 
-<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+<pre><code><b>invariant</b> [suspendable] <a href="Timestamp.md#0x1_Timestamp_is_operating">Timestamp::is_operating</a>()
      ==&gt; <a href="Diem.md#0x1_Diem_spec_xdx_exchange_rate">Diem::spec_xdx_exchange_rate</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;() == FixedPoint32::spec_create_from_rational(1, 1);
 </code></pre>
 
@@ -329,7 +329,7 @@ After genesis, the exchange rate to XDX is always equal to 1.0.
 After genesis, XDX is always a synthetic currency.
 
 
-<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+<pre><code><b>invariant</b> [suspendable] <a href="Timestamp.md#0x1_Timestamp_is_operating">Timestamp::is_operating</a>()
     ==&gt; <a href="Diem.md#0x1_Diem_is_synthetic_currency">Diem::is_synthetic_currency</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;();
 </code></pre>
 
@@ -337,7 +337,7 @@ After genesis, XDX is always a synthetic currency.
 After genesis, the scaling factor for XDX is always equal to 1,000,000.
 
 
-<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+<pre><code><b>invariant</b> [suspendable] <a href="Timestamp.md#0x1_Timestamp_is_operating">Timestamp::is_operating</a>()
     ==&gt; <a href="Diem.md#0x1_Diem_spec_currency_info">Diem::spec_currency_info</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;().scaling_factor == 1000000;
 </code></pre>
 
@@ -345,7 +345,7 @@ After genesis, the scaling factor for XDX is always equal to 1,000,000.
 After genesis, the fractional part for XDX is always equal to 1,000.
 
 
-<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+<pre><code><b>invariant</b> [suspendable] <a href="Timestamp.md#0x1_Timestamp_is_operating">Timestamp::is_operating</a>()
     ==&gt; <a href="Diem.md#0x1_Diem_spec_currency_info">Diem::spec_currency_info</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;().fractional_part == 1000;
 </code></pre>
 
@@ -353,7 +353,7 @@ After genesis, the fractional part for XDX is always equal to 1,000.
 After genesis, the currency code for XDX is always "XDX".
 
 
-<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+<pre><code><b>invariant</b> [suspendable] <a href="Timestamp.md#0x1_Timestamp_is_operating">Timestamp::is_operating</a>()
     ==&gt; <a href="Diem.md#0x1_Diem_spec_currency_code">Diem::spec_currency_code</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;() == b"<a href="XDX.md#0x1_XDX">XDX</a>";
 </code></pre>
 
@@ -381,7 +381,7 @@ AccountLimits::publish_unrestricted_limits, but we can't prove the condition the
 it does not hold for all types (but does hold for XDX).
 
 
-<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+<pre><code><b>invariant</b> [suspendable] <a href="Timestamp.md#0x1_Timestamp_is_operating">Timestamp::is_operating</a>()
     ==&gt; <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">AccountLimits::LimitsDefinition</a>&lt;<a href="XDX.md#0x1_XDX">XDX</a>&gt;&gt;(@DiemRoot);
 </code></pre>
 

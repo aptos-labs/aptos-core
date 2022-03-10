@@ -11,8 +11,8 @@
 
 
 <pre><code><b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability">0x1::Capability</a>;
-<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses">0x1::SystemAddresses</a>;
+<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Timestamp.md#0x1_Timestamp">0x1::Timestamp</a>;
 </code></pre>
 
 
@@ -85,7 +85,7 @@ Initialize the capability of the marker so friend modules can acquire it for pri
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="Marker.md#0x1_Marker_initialize">initialize</a>(core_resource: &signer) {
-    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
+    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Timestamp.md#0x1_Timestamp_assert_genesis">Timestamp::assert_genesis</a>();
     <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(core_resource);
     <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_create">Capability::create</a>(core_resource, &<a href="Marker.md#0x1_Marker_get">get</a>());
 }

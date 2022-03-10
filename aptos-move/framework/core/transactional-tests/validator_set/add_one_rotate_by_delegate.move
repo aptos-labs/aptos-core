@@ -30,21 +30,21 @@ script {
 
 //# run --admin-script --signers DiemRoot Alice --show-events
 script {
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     use DiemFramework::ValidatorConfig;
 
     fun main(_dr: signer, account: signer) {
     let account = &account;
         ValidatorConfig::set_config(account, @Bob, x"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a", x"", x"");
         // the local validator's key is now different from the one in the validator set
-        assert!(ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@Bob)) !=
+        assert!(ValidatorConfig::get_consensus_pubkey(&ValidatorSystem::get_validator_config(@Bob)) !=
                ValidatorConfig::get_consensus_pubkey(&ValidatorConfig::get_config(@Bob)), 99);
-        DiemSystem::update_config_and_reconfigure(account, @Bob);
+        ValidatorSystem::update_config_and_reconfigure(account, @Bob);
         // the local validator's key is now the same as the key in the validator set
-        assert!(ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@Bob)) ==
+        assert!(ValidatorConfig::get_consensus_pubkey(&ValidatorSystem::get_validator_config(@Bob)) ==
                ValidatorConfig::get_consensus_pubkey(&ValidatorConfig::get_config(@Bob)), 99);
         // check bob's public key is updated
-        let validator_config = DiemSystem::get_validator_config(@Bob);
+        let validator_config = ValidatorSystem::get_validator_config(@Bob);
         assert!(*ValidatorConfig::get_consensus_pubkey(&validator_config) == x"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a", 99);
     }
 }

@@ -7,7 +7,7 @@
 /// For a conceptual discussion of roles, see the [DIP-2 document][ACCESS_CONTROL].
 module DiemFramework::Roles {
     use DiemFramework::CoreAddresses;
-    use DiemFramework::DiemTimestamp;
+    use DiemFramework::Timestamp;
     use Std::Errors;
     use Std::Signer;
     friend DiemFramework::DiemAccount;
@@ -67,7 +67,7 @@ module DiemFramework::Roles {
     public(friend) fun grant_diem_root_role(
         dr_account: &signer,
     ) {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         // Checks actual Diem root because Diem root role is not set
         // until next line of code.
         CoreAddresses::assert_diem_root(dr_account);
@@ -75,7 +75,7 @@ module DiemFramework::Roles {
         grant_role(dr_account, DIEM_ROOT_ROLE_ID);
     }
     spec grant_diem_root_role {
-        include DiemTimestamp::AbortsIfNotGenesis;
+        include Timestamp::AbortsIfNotGenesis;
         include CoreAddresses::AbortsIfNotDiemRoot{account: dr_account};
         include GrantRole{addr: Signer::address_of(dr_account), role_id: DIEM_ROOT_ROLE_ID};
     }
@@ -85,14 +85,14 @@ module DiemFramework::Roles {
         treasury_compliance_account: &signer,
         dr_account: &signer,
     ) acquires RoleId {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         CoreAddresses::assert_treasury_compliance(treasury_compliance_account);
         assert_diem_root(dr_account);
         // Grant the TC role to the treasury_compliance_account
         grant_role(treasury_compliance_account, TREASURY_COMPLIANCE_ROLE_ID);
     }
     spec grant_treasury_compliance_role {
-        include DiemTimestamp::AbortsIfNotGenesis;
+        include Timestamp::AbortsIfNotGenesis;
         include CoreAddresses::AbortsIfNotTreasuryCompliance{account: treasury_compliance_account};
         include AbortsIfNotDiemRoot{account: dr_account};
         include GrantRole{addr: Signer::address_of(treasury_compliance_account), role_id: TREASURY_COMPLIANCE_ROLE_ID};
@@ -397,13 +397,13 @@ module DiemFramework::Roles {
         /// The DiemRoot role is only granted in genesis [[A1]][ROLE]. A new `RoleId` with `DIEM_ROOT_ROLE_ID` is only
         /// published through `grant_diem_root_role` which aborts if it is not invoked in genesis.
         apply ThisRoleIsNotNewlyPublished{this: DIEM_ROOT_ROLE_ID} to * except grant_diem_root_role, grant_role;
-        apply DiemTimestamp::AbortsIfNotGenesis to grant_diem_root_role;
+        apply Timestamp::AbortsIfNotGenesis to grant_diem_root_role;
 
         /// TreasuryCompliance role is only granted in genesis [[A2]][ROLE]. A new `RoleId` with `TREASURY_COMPLIANCE_ROLE_ID` is only
         /// published through `grant_treasury_compliance_role` which aborts if it is not invoked in genesis.
         apply ThisRoleIsNotNewlyPublished{this: TREASURY_COMPLIANCE_ROLE_ID} to *
             except grant_treasury_compliance_role, grant_role;
-        apply DiemTimestamp::AbortsIfNotGenesis to grant_treasury_compliance_role;
+        apply Timestamp::AbortsIfNotGenesis to grant_treasury_compliance_role;
 
         /// Validator roles are only granted by DiemRoot [[A3]][ROLE]. A new `RoleId` with `VALIDATOR_ROLE_ID` is only
         /// published through `new_validator_role` which aborts if `creating_account` does not have the DiemRoot role.
@@ -437,14 +437,14 @@ module DiemFramework::Roles {
         /// In other words, a `RoleId` with `DIEM_ROOT_ROLE_ID` uniquely exists at `DIEM_ROOT_ADDRESS`.
         invariant forall addr: address where spec_has_diem_root_role_addr(addr): addr == @DiemRoot;
         invariant [suspendable]
-            DiemTimestamp::is_operating() ==> spec_has_diem_root_role_addr(@DiemRoot);
+            Timestamp::is_operating() ==> spec_has_diem_root_role_addr(@DiemRoot);
 
         /// The TreasuryCompliance role is globally unique [[B2]][ROLE], and is published at TREASURY_COMPLIANCE_ADDRESS [[C2]][ROLE].
         /// In other words, a `RoleId` with `TREASURY_COMPLIANCE_ROLE_ID` uniquely exists at `TREASURY_COMPLIANCE_ADDRESS`.
         invariant forall addr: address where spec_has_treasury_compliance_role_addr(addr):
           addr == @TreasuryCompliance;
         invariant [suspendable]
-            DiemTimestamp::is_operating() ==> spec_has_treasury_compliance_role_addr(@TreasuryCompliance);
+            Timestamp::is_operating() ==> spec_has_treasury_compliance_role_addr(@TreasuryCompliance);
 
         // TODO: These specs really just repeat what's in spec_can_hold_balance_addr. It's nice to
         // be able to link to DIP-2, but can we do that with less verbose specs?

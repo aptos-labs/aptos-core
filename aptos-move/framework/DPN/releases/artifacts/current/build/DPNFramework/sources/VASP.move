@@ -2,7 +2,7 @@
 /// hierarchy.  The main account, called a "parent VASP" and a collection of "child VASP"s.
 /// This module provides functions to manage VASP accounts.
 module DiemFramework::VASP {
-    use DiemFramework::DiemTimestamp;
+    use DiemFramework::Timestamp;
     use DiemFramework::Roles;
     use DiemFramework::AccountLimits;
     use Std::Errors;
@@ -41,7 +41,7 @@ module DiemFramework::VASP {
     /// Aborts if `dr_account` is not the diem root account,
     /// or if there is already a VASP (child or parent) at this account.
     public(friend) fun publish_parent_vasp_credential(vasp: &signer, tc_account: &signer) {
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         Roles::assert_treasury_compliance(tc_account);
         Roles::assert_parent_vasp_role(vasp);
         let vasp_addr = Signer::address_of(vasp);
@@ -50,7 +50,7 @@ module DiemFramework::VASP {
     }
 
     spec publish_parent_vasp_credential {
-        include DiemTimestamp::AbortsIfNotOperating;
+        include Timestamp::AbortsIfNotOperating;
         include Roles::AbortsIfNotTreasuryCompliance{account: tc_account};
         include Roles::AbortsIfNotParentVasp{account: vasp};
         let vasp_addr = Signer::address_of(vasp);

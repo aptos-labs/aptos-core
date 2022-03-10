@@ -19,7 +19,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
     on_chain_config::{
-        ConfigStorage, DiemVersion, OnChainConfig, VMConfig, VMPublishingOption, DIEM_VERSION_3,
+        ConfigStorage, OnChainConfig, VMConfig, VMPublishingOption, Version, DIEM_VERSION_3,
     },
     transaction::{SignedTransaction, TransactionOutput, TransactionStatus},
     vm_status::{KeptVMStatus, StatusCode, VMStatus},
@@ -43,15 +43,15 @@ use std::{convert::TryFrom, sync::Arc};
 
 #[derive(Clone)]
 /// A wrapper to make VMRuntime standalone and thread safe.
-pub struct DiemVMImpl {
+pub struct AptosVMImpl {
     move_vm: Arc<MoveVM>,
     on_chain_config: Option<VMConfig>,
-    version: Option<DiemVersion>,
+    version: Option<Version>,
     publishing_option: Option<VMPublishingOption>,
     chain_account_info: Option<ChainSpecificAccountInfo>,
 }
 
-impl DiemVMImpl {
+impl AptosVMImpl {
     #[allow(clippy::new_without_default)]
     pub fn new<S: StateView>(state: &S) -> Self {
         let inner = MoveVM::new(aptos_natives())
@@ -69,7 +69,7 @@ impl DiemVMImpl {
     }
 
     pub fn init_with_config(
-        version: DiemVersion,
+        version: Version,
         on_chain_config: VMConfig,
         publishing_option: VMPublishingOption,
     ) -> Self {
@@ -84,9 +84,9 @@ impl DiemVMImpl {
         }
     }
 
-    /// Provides access to some internal APIs of the Diem VM.
-    pub fn internals(&self) -> DiemVMInternals {
-        DiemVMInternals(self)
+    /// Provides access to some internal APIs of the VM.
+    pub fn internals(&self) -> AptosVMInternals {
+        AptosVMInternals(self)
     }
 
     pub(crate) fn chain_info(&self) -> &ChainSpecificAccountInfo {
@@ -111,7 +111,7 @@ impl DiemVMImpl {
 
     fn load_configs_impl<S: ConfigStorage>(&mut self, data_cache: &S) {
         self.on_chain_config = VMConfig::fetch_config(data_cache);
-        self.version = DiemVersion::fetch_config(data_cache);
+        self.version = Version::fetch_config(data_cache);
         self.publishing_option = VMPublishingOption::fetch_config(data_cache);
     }
 
@@ -142,10 +142,10 @@ impl DiemVMImpl {
             })
     }
 
-    pub fn get_diem_version(&self) -> Result<DiemVersion, VMStatus> {
+    pub fn get_version(&self) -> Result<Version, VMStatus> {
         self.version.clone().ok_or_else(|| {
             CRITICAL_ERRORS.inc();
-            error!("VM Startup Failed. Diem Version Not Found");
+            error!("VM Startup Failed. Version Not Found");
             VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
         })
     }
@@ -268,7 +268,7 @@ impl DiemVMImpl {
                 MoveValue::vector_u8(HashValue::sha3_256_of(&preimage.to_vec()).to_vec())
             })
             .collect();
-        let args = if self.get_diem_version()? >= DIEM_VERSION_3 && txn_data.is_multi_agent() {
+        let args = if self.get_version()? >= DIEM_VERSION_3 && txn_data.is_multi_agent() {
             vec![
                 MoveValue::Signer(txn_data.sender),
                 MoveValue::U64(txn_sequence_number),
@@ -293,7 +293,7 @@ impl DiemVMImpl {
             ]
         };
         let prologue_function_name =
-            if self.get_diem_version()? >= DIEM_VERSION_3 && txn_data.is_multi_agent() {
+            if self.get_version()? >= DIEM_VERSION_3 && txn_data.is_multi_agent() {
                 &chain_specific_info.multi_agent_prologue_name
             } else {
                 &chain_specific_info.script_prologue_name
@@ -513,12 +513,12 @@ impl DiemVMImpl {
     }
 }
 
-/// Internal APIs for the Diem VM, primarily used for testing.
+/// Internal APIs for the VM, primarily used for testing.
 #[derive(Clone, Copy)]
-pub struct DiemVMInternals<'a>(&'a DiemVMImpl);
+pub struct AptosVMInternals<'a>(&'a AptosVMImpl);
 
-impl<'a> DiemVMInternals<'a> {
-    pub fn new(internal: &'a DiemVMImpl) -> Self {
+impl<'a> AptosVMInternals<'a> {
+    pub fn new(internal: &'a AptosVMImpl) -> Self {
         Self(internal)
     }
 
@@ -533,8 +533,8 @@ impl<'a> DiemVMInternals<'a> {
     }
 
     /// Returns the version of Move Runtime.
-    pub fn diem_version(self) -> Result<DiemVersion, VMStatus> {
-        self.0.get_diem_version()
+    pub fn version(self) -> Result<Version, VMStatus> {
+        self.0.get_version()
     }
 
     /// Executes the given code within the context of a transaction.
@@ -672,10 +672,10 @@ fn vm_thread_safe() {
     fn assert_send<T: Send>() {}
     fn assert_sync<T: Sync>() {}
 
-    use crate::DiemVM;
+    use crate::AptosVM;
 
-    assert_send::<DiemVM>();
-    assert_sync::<DiemVM>();
+    assert_send::<AptosVM>();
+    assert_sync::<AptosVM>();
     assert_send::<MoveVM>();
     assert_sync::<MoveVM>();
 }

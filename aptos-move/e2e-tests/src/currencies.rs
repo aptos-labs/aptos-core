@@ -15,10 +15,10 @@ pub fn add_currency_to_system(
     {
         let compiled_script = {
             let script = "
-            import 0x1.DiemTransactionPublishingOption;
+            import 0x1.TransactionPublishingOption;
             main(config: signer) {
             label b0:
-                DiemTransactionPublishingOption.set_open_module(&config, false);
+                TransactionPublishingOption.set_open_module(&config, false);
                 return;
             }
             ";

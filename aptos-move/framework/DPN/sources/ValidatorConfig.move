@@ -1,10 +1,10 @@
 /// The ValidatorConfig resource holds information about a validator. Information
 /// is published and updated by Diem root in a `Self::ValidatorConfig` in preparation for
-/// later inclusion (by functions in DiemConfig) in a `DiemConfig::DiemConfig<DiemSystem>`
-/// struct (the `Self::ValidatorConfig` in a `DiemConfig::ValidatorInfo` which is a member
-/// of the `DiemSystem::DiemSystem.validators` vector).
+/// later inclusion (by functions in Reconfiguration) in a `Reconfiguration::Reconfiguration<ValidatorSystem>`
+/// struct (the `Self::ValidatorConfig` in a `Reconfiguration::ValidatorInfo` which is a member
+/// of the `ValidatorSystem::ValidatorSystem.validators` vector).
 module DiemFramework::ValidatorConfig {
-    use DiemFramework::DiemTimestamp;
+    use DiemFramework::Timestamp;
     use Std::Errors;
     use DiemFramework::Signature;
     use DiemFramework::Roles;
@@ -53,7 +53,7 @@ module DiemFramework::ValidatorConfig {
         dr_account: &signer,
         human_name: vector<u8>,
     ) {
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         Roles::assert_diem_root(dr_account);
         Roles::assert_validator(validator_account);
         assert!(
@@ -76,7 +76,7 @@ module DiemFramework::ValidatorConfig {
         validator_account: signer;
         dr_account: signer;
         let validator_addr = Signer::address_of(validator_account);
-        include DiemTimestamp::AbortsIfNotOperating;
+        include Timestamp::AbortsIfNotOperating;
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
         include Roles::AbortsIfNotValidator{account: validator_account};
         aborts_if exists_config(validator_addr)
@@ -170,7 +170,7 @@ module DiemFramework::ValidatorConfig {
 
     /// Rotate the config in the validator_account.
     /// Once the config is set, it can not go back to `Option::none` - this is crucial for validity
-    /// of the DiemSystem's code.
+    /// of the ValidatorSystem's code.
     public fun set_config(
         validator_operator_account: &signer,
         validator_addr: address,
@@ -325,7 +325,7 @@ module DiemFramework::ValidatorConfig {
 
     /// # Validity of Validators
 
-    /// See comment on `ValidatorConfig::set_config` -- DiemSystem depends on this.
+    /// See comment on `ValidatorConfig::set_config` -- ValidatorSystem depends on this.
     spec module {
         /// A validator stays valid once it becomes valid.
         invariant update
@@ -341,7 +341,7 @@ module DiemFramework::ValidatorConfig {
             Roles::spec_has_validator_role_addr(addr);
 
         /// DIP-6 Property: If address has a ValidatorConfig, it has a validator role.  This invariant is useful
-        /// in DiemSystem so we don't have to check whether every validator address has a validator role.
+        /// in ValidatorSystem so we don't have to check whether every validator address has a validator role.
         invariant forall addr: address where exists_config(addr):
             Roles::spec_has_validator_role_addr(addr);
 

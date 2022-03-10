@@ -29,12 +29,12 @@ transaction in addition to the core prologue and epilogue.
 
 
 <pre><code><b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/CoreFramework/docs/Account.md#0x1_Account">0x1::Account</a>;
-<b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/CoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event">0x1::Event</a>;
 <b>use</b> <a href="ExperimentalValidatorConfig.md#0x1_ExperimentalValidatorConfig">0x1::ExperimentalValidatorConfig</a>;
 <b>use</b> <a href="ExperimentalValidatorOperatorConfig.md#0x1_ExperimentalValidatorOperatorConfig">0x1::ExperimentalValidatorOperatorConfig</a>;
 <b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/CoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses">0x1::SystemAddresses</a>;
+<b>use</b> <a href="../../../../../../../experimental/releases/artifacts/current/build/CoreFramework/docs/Timestamp.md#0x1_Timestamp">0x1::Timestamp</a>;
 </code></pre>
 
 
@@ -379,7 +379,7 @@ Initialize this module. This is only callable from genesis.
     dr_account: &signer,
     dummy_auth_key_prefix: vector&lt;u8&gt;,
 ) {
-    <a href="../../../../../../../experimental/releases/artifacts/current/build/CoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/CoreFramework/docs/Timestamp.md#0x1_Timestamp_assert_genesis">Timestamp::assert_genesis</a>();
     // Operational constraint, not a privilege constraint.
     <a href="../../../../../../../experimental/releases/artifacts/current/build/CoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(dr_account);
     <a href="../../../../../../../experimental/releases/artifacts/current/build/CoreFramework/docs/Account.md#0x1_Account_initialize">Account::initialize</a>&lt;<a href="ExperimentalAccount.md#0x1_ExperimentalAccount_ExperimentalAccountMarker">ExperimentalAccountMarker</a>&gt;(
@@ -480,7 +480,7 @@ AccountOperationsCapability, WriteSetManager, and finally makes the account.
 <pre><code><b>fun</b> <a href="ExperimentalAccount.md#0x1_ExperimentalAccount_create_diem_root_account">create_diem_root_account</a>(
     auth_key_prefix: vector&lt;u8&gt;,
 ) {
-    <a href="../../../../../../../experimental/releases/artifacts/current/build/CoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/CoreFramework/docs/Timestamp.md#0x1_Timestamp_assert_genesis">Timestamp::assert_genesis</a>();
     <b>let</b> (dr_account, _) = <a href="ExperimentalAccount.md#0x1_ExperimentalAccount_create_core_account">create_core_account</a>(@CoreResources, auth_key_prefix);
     <a href="../../../../../../../experimental/releases/artifacts/current/build/CoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(&dr_account);
     <b>assert</b>!(

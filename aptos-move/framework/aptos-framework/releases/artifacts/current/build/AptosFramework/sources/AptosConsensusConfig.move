@@ -1,14 +1,14 @@
 module AptosFramework::AptosConsensusConfig {
     use Std::Capability;
-    use CoreFramework::DiemConsensusConfig;
+    use CoreFramework::ConsensusConfig;
     use AptosFramework::Marker;
 
     public fun initialize(account: &signer) {
-        DiemConsensusConfig::initialize<Marker::ChainMarker>(account);
+        ConsensusConfig::initialize<Marker::ChainMarker>(account);
     }
 
     public fun set(account: &signer, config: vector<u8>) {
-        DiemConsensusConfig::set(
+        ConsensusConfig::set(
             config, &Capability::acquire(account, &Marker::get())
         );
     }

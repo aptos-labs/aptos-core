@@ -10,8 +10,8 @@
 
 
 <pre><code><b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability">0x1::Capability</a>;
-<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/DiemVMConfig.md#0x1_DiemVMConfig">0x1::DiemVMConfig</a>;
 <b>use</b> <a href="Marker.md#0x1_Marker">0x1::Marker</a>;
+<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/VMConfig.md#0x1_VMConfig">0x1::VMConfig</a>;
 </code></pre>
 
 
@@ -37,7 +37,7 @@ Publishes the VM config.
     instruction_schedule: vector&lt;u8&gt;,
     native_schedule: vector&lt;u8&gt;,
 ) {
-    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/DiemVMConfig.md#0x1_DiemVMConfig_initialize">DiemVMConfig::initialize</a>&lt;<a href="Marker.md#0x1_Marker_ChainMarker">Marker::ChainMarker</a>&gt;(account, instruction_schedule, native_schedule);
+    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/VMConfig.md#0x1_VMConfig_initialize">VMConfig::initialize</a>&lt;<a href="Marker.md#0x1_Marker_ChainMarker">Marker::ChainMarker</a>&gt;(account, instruction_schedule, native_schedule);
 }
 </code></pre>
 
@@ -74,7 +74,7 @@ Publishes the VM config.
     gas_unit_scaling_factor: u64,
     default_account_size: u64,
 ) {
-    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/DiemVMConfig.md#0x1_DiemVMConfig_set_gas_constants">DiemVMConfig::set_gas_constants</a>&lt;<a href="Marker.md#0x1_Marker_ChainMarker">Marker::ChainMarker</a>&gt;(
+    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/VMConfig.md#0x1_VMConfig_set_gas_constants">VMConfig::set_gas_constants</a>&lt;<a href="Marker.md#0x1_Marker_ChainMarker">Marker::ChainMarker</a>&gt;(
         global_memory_per_byte_cost,
         global_memory_per_byte_write_cost,
         min_transaction_gas_units,

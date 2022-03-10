@@ -4,11 +4,11 @@
 use aptos_transaction_builder::stdlib::encode_update_dual_attestation_limit_script;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
-    on_chain_config::DiemVersion,
+    on_chain_config::Version,
     transaction::{Script, ScriptFunction, TransactionArgument, TransactionStatus},
     vm_status::{KeptVMStatus, StatusCode},
 };
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use diem_framework_releases::legacy::transaction_scripts::LegacyStdlibScript;
 use language_e2e_tests::{
     account::{self, Account},
@@ -28,18 +28,18 @@ fn initial_diem_version() {
     test_with_different_versions! {CURRENT_RELEASE_VERSIONS, |test_env| {
         let mut executor = test_env.executor;
 
-        let vm = DiemVM::new(executor.get_state_view());
+        let vm = AptosVM::new(executor.get_state_view());
 
         assert_eq!(
-            vm.internals().diem_version().unwrap(),
-            DiemVersion { major: test_env.version_number }
+            vm.internals().version().unwrap(),
+            Version { major: test_env.version_number }
         );
 
         let account = test_env.dr_account;
         let txn = account
             .transaction()
             .script(Script::new(
-                LegacyStdlibScript::UpdateDiemVersion
+                LegacyStdlibScript::UpdateVersion
                     .compiled_bytes()
                     .into_vec(),
                 vec![],
@@ -50,10 +50,10 @@ fn initial_diem_version() {
         executor.new_block();
         executor.execute_and_apply(txn);
 
-        let new_vm = DiemVM::new(executor.get_state_view());
+        let new_vm = AptosVM::new(executor.get_state_view());
         assert_eq!(
-            new_vm.internals().diem_version().unwrap(),
-            DiemVersion { major: test_env.version_number + 1 }
+            new_vm.internals().version().unwrap(),
+            Version { major: test_env.version_number + 1 }
         );
     }
     }
@@ -63,18 +63,18 @@ fn initial_diem_version() {
 fn drop_txn_after_reconfiguration() {
     test_with_different_versions! {CURRENT_RELEASE_VERSIONS, |test_env| {
         let mut executor = test_env.executor;
-        let vm = DiemVM::new(executor.get_state_view());
+        let vm = AptosVM::new(executor.get_state_view());
 
         assert_eq!(
-            vm.internals().diem_version().unwrap(),
-            DiemVersion { major: test_env.version_number }
+            vm.internals().version().unwrap(),
+            Version { major: test_env.version_number }
         );
 
         let account = test_env.dr_account;
         let txn = account
             .transaction()
             .script(Script::new(
-                LegacyStdlibScript::UpdateDiemVersion
+                LegacyStdlibScript::UpdateVersion
                     .compiled_bytes()
                     .into_vec(),
                 vec![],

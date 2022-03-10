@@ -8,6 +8,8 @@
 //! This is not in a top-level tests directory because each file there gets compiled into a
 //! separate binary. The linker ends up repeating a lot of work for each binary to not much
 //! benefit.
+//!
+//! Set env REGENERATE_GOLDENFILES to update the golden files when running tests..
 
 mod account_limits;
 mod account_universe;

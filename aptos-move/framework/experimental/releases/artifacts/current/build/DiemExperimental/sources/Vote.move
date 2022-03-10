@@ -14,7 +14,7 @@ module ExperimentalFramework::Vote {
     use Std::Event;
     use Std::Signer;
     use Std::Vector;
-    use CoreFramework::DiemTimestamp;
+    use CoreFramework::Timestamp;
     #[test_only]
     friend ExperimentalFramework::VoteTests;
 
@@ -167,7 +167,7 @@ module ExperimentalFramework::Vote {
     ): BallotID acquires Ballots, BallotCounter {
         let ballot_address = Signer::address_of(ballot_account);
 
-        assert!(DiemTimestamp::now_seconds() < expiration_timestamp_secs, Errors::invalid_argument(EINVALID_TIMESTAMP));
+        assert!(Timestamp::now_seconds() < expiration_timestamp_secs, Errors::invalid_argument(EINVALID_TIMESTAMP));
         assert!(num_votes_required > 0, Errors::invalid_argument(EINVALID_NUM_VOTES));
 
         if (!exists<BallotCounter>(ballot_address)) {
@@ -267,7 +267,7 @@ module ExperimentalFramework::Vote {
         let allowed_voters = &ballot.allowed_voters;
 
         assert!(check_voter_present(allowed_voters, &voter_address_bcs), Errors::invalid_state(EINVALID_VOTER));
-        assert!(DiemTimestamp::now_seconds() <= ballot.expiration_timestamp_secs, Errors::invalid_state(EBALLOT_EXPIRED));
+        assert!(Timestamp::now_seconds() <= ballot.expiration_timestamp_secs, Errors::invalid_state(EBALLOT_EXPIRED));
 
         assert!(!check_voter_present(&ballot.votes_received, &voter_address_bcs), Errors::invalid_state(EALREADY_VOTED));
 
@@ -329,7 +329,7 @@ module ExperimentalFramework::Vote {
         let removed_ballots = Vector::empty();
         while ({
             spec {
-                invariant no_expired_ballots(ballots, DiemTimestamp::spec_now_seconds(), i);
+                invariant no_expired_ballots(ballots, Timestamp::spec_now_seconds(), i);
                 invariant vector_subset(ballots, old(ballot_data).ballots);
                 invariant i <= len(ballots);
                 invariant 0 <= i;
@@ -337,7 +337,7 @@ module ExperimentalFramework::Vote {
             i < Vector::length(ballots)
         }) {
             let ballot = Vector::borrow(ballots, i);
-            if (ballot.expiration_timestamp_secs < DiemTimestamp::now_seconds()) {
+            if (ballot.expiration_timestamp_secs < Timestamp::now_seconds()) {
                 let ballot_id = *(&ballot.ballot_id);
                 Vector::swap_remove(ballots, i);
                 Vector::push_back(&mut removed_ballots, *&ballot_id);
@@ -473,7 +473,7 @@ module ExperimentalFramework::Vote {
     /// NOTE: Maybe this should be "<=" not "<"
     spec fun is_expired_if_exists<Proposal>(ballot_address: address, ballot_id: BallotID): bool {
         get_ballot<Proposal>(ballot_address, ballot_id).expiration_timestamp_secs
-            <= DiemTimestamp::spec_now_seconds()
+            <= Timestamp::spec_now_seconds()
     }
 
     // FUNCTIONS REPRESENTING STATES
@@ -543,7 +543,7 @@ module ExperimentalFramework::Vote {
         /// Ballots afterwards is a subset of ballots before.
         ensures vector_subset(post_ballots, pre_ballots);
         /// All expired ballots are removed
-        ensures no_expired_ballots<Proposal>(post_ballots, DiemTimestamp::spec_now_seconds(), len(post_ballots));
+        ensures no_expired_ballots<Proposal>(post_ballots, Timestamp::spec_now_seconds(), len(post_ballots));
     }
 
     spec gc_internal {

@@ -9,7 +9,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::warn;
 use aptos_secure_net::{NetworkClient, NetworkServer};
 
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use executor::block_executor::BlockExecutor;
 use executor_types::Error;
 use std::net::SocketAddr;
@@ -34,7 +34,7 @@ pub fn execute(
     prikey: Option<Ed25519PrivateKey>,
     network_timeout: u64,
 ) {
-    let block_executor = Box::new(BlockExecutor::<DiemVM>::new(DbReaderWriter::new(
+    let block_executor = Box::new(BlockExecutor::<AptosVM>::new(DbReaderWriter::new(
         StorageClient::new(&storage_addr, network_timeout),
     )));
     let serializer_service = SerializerService::new(block_executor, prikey);

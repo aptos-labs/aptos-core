@@ -4,7 +4,7 @@ module DiemFramework::TransactionFee {
     use DiemFramework::XDX;
     use DiemFramework::Diem::{Self, Diem, Preburn};
     use DiemFramework::Roles;
-    use DiemFramework::DiemTimestamp;
+    use DiemFramework::Timestamp;
     use Std::Errors;
     use Std::Signer;
 
@@ -23,13 +23,13 @@ module DiemFramework::TransactionFee {
     public fun initialize(
         tc_account: &signer,
     ) {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         Roles::assert_treasury_compliance(tc_account);
         // accept fees in all the currencies
         add_txn_fee_currency<XUS>(tc_account);
     }
     spec initialize {
-        include DiemTimestamp::AbortsIfNotGenesis;
+        include Timestamp::AbortsIfNotGenesis;
         include Roles::AbortsIfNotTreasuryCompliance{account: tc_account};
         include AddTxnFeeCurrencyAbortsIf<XUS>;
         ensures is_initialized();
@@ -70,7 +70,7 @@ module DiemFramework::TransactionFee {
 
     /// Deposit `coin` into the transaction fees bucket
     public fun pay_fee<CoinType>(coin: Diem<CoinType>) acquires TransactionFee {
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         assert!(is_coin_initialized<CoinType>(), Errors::not_published(ETRANSACTION_FEE));
         let fees = borrow_global_mut<TransactionFee<CoinType>>(@TreasuryCompliance);
         Diem::deposit(&mut fees.balance, coin)
@@ -83,7 +83,7 @@ module DiemFramework::TransactionFee {
     spec schema PayFeeAbortsIf<CoinType> {
         coin: Diem<CoinType>;
         let fees = spec_transaction_fee<CoinType>().balance;
-        include DiemTimestamp::AbortsIfNotOperating;
+        include Timestamp::AbortsIfNotOperating;
         aborts_if !is_coin_initialized<CoinType>() with Errors::NOT_PUBLISHED;
         include Diem::DepositAbortsIf<CoinType>{coin: fees, check: coin};
     }
@@ -100,7 +100,7 @@ module DiemFramework::TransactionFee {
     public fun burn_fees<CoinType>(
         tc_account: &signer,
     ) acquires TransactionFee {
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         Roles::assert_treasury_compliance(tc_account);
         assert!(is_coin_initialized<CoinType>(), Errors::not_published(ETRANSACTION_FEE));
         if (XDX::is_xdx<CoinType>()) {
@@ -127,7 +127,7 @@ module DiemFramework::TransactionFee {
         /// Must abort if the account does not have the TreasuryCompliance role [[H3]][PERMISSION].
         include Roles::AbortsIfNotTreasuryCompliance{account: tc_account};
 
-        include DiemTimestamp::AbortsIfNotOperating;
+        include Timestamp::AbortsIfNotOperating;
         aborts_if !is_coin_initialized<CoinType>() with Errors::NOT_PUBLISHED;
         include if (XDX::spec_is_xdx<CoinType>()) BurnFeesXDX else BurnFeesNotXDX<CoinType>;
 
@@ -164,7 +164,7 @@ module DiemFramework::TransactionFee {
 
     spec module {
         /// If time has started ticking, then `TransactionFee` resources have been initialized.
-        invariant [suspendable] DiemTimestamp::is_operating() ==> is_initialized();
+        invariant [suspendable] Timestamp::is_operating() ==> is_initialized();
     }
 
     /// # Helper Function

@@ -291,11 +291,11 @@ fn test_change_publishing_option_to_custom() {
 
     let script_body = {
         let code = "
-    import 0x1.DiemTransactionPublishingOption;
+    import 0x1.TransactionPublishingOption;
 
     main(account: signer) {
     label b0:
-      DiemTransactionPublishingOption.set_open_script(&account);
+      TransactionPublishingOption.set_open_script(&account);
 
       return;
     }

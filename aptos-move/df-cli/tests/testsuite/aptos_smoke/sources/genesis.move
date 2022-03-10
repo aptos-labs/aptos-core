@@ -6,14 +6,14 @@ script {
     use DiemFramework::XDX;
     use DiemFramework::Diem;
     use DiemFramework::DiemAccount;
-    use DiemFramework::DiemBlock;
-    use DiemFramework::DiemConfig;
-    use DiemFramework::DiemSystem;
-    use DiemFramework::DiemTimestamp;
-    use DiemFramework::DiemTransactionPublishingOption;
-    use DiemFramework::DiemVersion;
+    use DiemFramework::Block;
+    use DiemFramework::Reconfiguration;
+    use DiemFramework::ValidatorSystem;
+    use DiemFramework::Timestamp;
+    use DiemFramework::TransactionPublishingOption;
+    use DiemFramework::Version;
     use DiemFramework::TransactionFee;
-    use DiemFramework::DiemVMConfig;
+    use DiemFramework::VMConfig;
     use Std::Vector;
 
     fun genesis(
@@ -39,7 +39,7 @@ script {
         ChainId::initialize(dr_account, chain_id);
 
         // On-chain config setup
-        DiemConfig::initialize(dr_account);
+        Reconfiguration::initialize(dr_account);
 
         // Currency setup
         Diem::initialize(dr_account);
@@ -56,22 +56,22 @@ script {
 
         TransactionFee::initialize(tc_account);
 
-        DiemSystem::initialize_validator_set(dr_account);
-        DiemVersion::initialize(dr_account, initial_diem_version);
+        ValidatorSystem::initialize_validator_set(dr_account);
+        Version::initialize(dr_account, initial_diem_version);
         DualAttestation::initialize(dr_account);
-        DiemBlock::initialize_block_metadata(dr_account);
+        Block::initialize_block_metadata(dr_account);
 
         let dr_rotate_key_cap = DiemAccount::extract_key_rotation_capability(dr_account);
         DiemAccount::rotate_authentication_key(&dr_rotate_key_cap, dr_auth_key);
         DiemAccount::restore_key_rotation_capability(dr_rotate_key_cap);
 
-        DiemTransactionPublishingOption::initialize(
+        TransactionPublishingOption::initialize(
             dr_account,
             initial_script_allow_list,
             is_open_module,
         );
 
-        DiemVMConfig::initialize(
+        VMConfig::initialize(
             dr_account,
             instruction_schedule,
             native_schedule,
@@ -80,7 +80,7 @@ script {
         let tc_rotate_key_cap = DiemAccount::extract_key_rotation_capability(tc_account);
         DiemAccount::rotate_authentication_key(&tc_rotate_key_cap, tc_auth_key);
         DiemAccount::restore_key_rotation_capability(tc_rotate_key_cap);
-        DiemTimestamp::set_time_has_started_for_testing(dr_account);
+        Timestamp::set_time_has_started_for_testing(dr_account);
     }
 
 }

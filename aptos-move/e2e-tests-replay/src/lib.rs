@@ -17,7 +17,7 @@ use aptos_types::{
         DIEM_ACCOUNT_MODULE,
     },
     block_metadata::BlockMetadata,
-    on_chain_config::DiemVersion,
+    on_chain_config::Version,
     transaction::{
         Script, ScriptFunction, Transaction, TransactionArgument, TransactionOutput,
         TransactionPayload, TransactionStatus, WriteSetPayload,
@@ -28,7 +28,7 @@ use aptos_vm::{
     natives::aptos_natives,
     script_to_script_function::remapping,
     system_module_names::{
-        BLOCK_PROLOGUE, DIEM_BLOCK_MODULE, SCRIPT_PROLOGUE_NAME, USER_EPILOGUE_NAME,
+        BLOCK_MODULE, BLOCK_PROLOGUE, SCRIPT_PROLOGUE_NAME, USER_EPILOGUE_NAME,
         WRITESET_EPILOGUE_NAME, WRITESET_PROLOGUE_NAME,
     },
     transaction_metadata::TransactionMetadata,
@@ -70,7 +70,7 @@ const MOVE_VM_TRACING_LOG_FILENAME: &str = "move_vm_trace.log";
 
 pub struct ReplayFlags {
     /// Filter based on which diem version the trace was executed under
-    pub diem_version: DiemVersion,
+    pub diem_version: Version,
     /// Filters on which trace (and steps) to run
     pub filters: BTreeMap<String, BTreeSet<usize>>,
     /// Maximum number of steps per trace to replay
@@ -515,7 +515,7 @@ impl<'env> TraceReplayer<'env> {
         let result = execute_function_via_session_and_xrunner(
             &mut session,
             xrunner.as_mut(),
-            &*DIEM_BLOCK_MODULE,
+            &*BLOCK_MODULE,
             &*BLOCK_PROLOGUE,
             vec![],
             args,

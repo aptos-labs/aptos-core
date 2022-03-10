@@ -5,7 +5,7 @@ use aptos_config::config::RocksdbConfig;
 use aptos_management::{config::ConfigPath, error::Error, secure_backend::SharedBackend};
 use aptos_temppath::TempPath;
 use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use executor::db_bootstrapper;
 use storage_interface::DbReaderWriter;
@@ -50,6 +50,6 @@ pub fn create_genesis_waypoint(genesis: &Transaction) -> Result<Waypoint, Error>
     .map_err(|e| Error::UnexpectedError(e.to_string()))?;
     let db_rw = DbReaderWriter::new(aptosdb);
 
-    db_bootstrapper::generate_waypoint::<DiemVM>(&db_rw, genesis)
+    db_bootstrapper::generate_waypoint::<AptosVM>(&db_rw, genesis)
         .map_err(|e| Error::UnexpectedError(e.to_string()))
 }

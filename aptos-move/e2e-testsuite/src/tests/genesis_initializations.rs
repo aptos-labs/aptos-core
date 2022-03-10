@@ -134,9 +134,9 @@ fn test_diem_timestamp_time_has_started() {
     let mut executor = FakeExecutor::stdlib_only_genesis();
     let account_address = AccountAddress::random();
 
-    // Invalid address used to call `DiemTimestamp::set_time_has_started`
+    // Invalid address used to call `Timestamp::set_time_has_started`
     let output = executor.try_exec(
-        "DiemTimestamp",
+        "Timestamp",
         "set_time_has_started",
         vec![],
         serialize_values(&vec![MoveValue::Signer(account_address)]),
@@ -144,7 +144,7 @@ fn test_diem_timestamp_time_has_started() {
     assert_eq!(output.unwrap_err().move_abort_code(), Some(2));
 
     executor.exec(
-        "DiemTimestamp",
+        "Timestamp",
         "set_time_has_started",
         vec![],
         serialize_values(&vec![MoveValue::Signer(
@@ -153,7 +153,7 @@ fn test_diem_timestamp_time_has_started() {
     );
 
     let output = executor.try_exec(
-        "DiemTimestamp",
+        "Timestamp",
         "set_time_has_started",
         vec![],
         serialize_values(&vec![MoveValue::Signer(
@@ -169,7 +169,7 @@ fn test_diem_block_double_init() {
     let mut executor = FakeExecutor::stdlib_only_genesis();
 
     executor.exec(
-        "DiemBlock",
+        "Block",
         "initialize_block_metadata",
         vec![],
         serialize_values(&vec![MoveValue::Signer(
@@ -178,7 +178,7 @@ fn test_diem_block_double_init() {
     );
 
     let output = executor.try_exec(
-        "DiemBlock",
+        "Block",
         "initialize_block_metadata",
         vec![],
         serialize_values(&vec![MoveValue::Signer(

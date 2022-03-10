@@ -43,10 +43,10 @@
     -  [Related Scripts](#@Related_Scripts_29)
 
 
-<pre><code><b>use</b> <a href="DiemSystem.md#0x1_DiemSystem">0x1::DiemSystem</a>;
-<b>use</b> <a href="SlidingNonce.md#0x1_SlidingNonce">0x1::SlidingNonce</a>;
+<pre><code><b>use</b> <a href="SlidingNonce.md#0x1_SlidingNonce">0x1::SlidingNonce</a>;
 <b>use</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">0x1::ValidatorConfig</a>;
 <b>use</b> <a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig">0x1::ValidatorOperatorConfig</a>;
+<b>use</b> <a href="ValidatorSystem.md#0x1_ValidatorSystem">0x1::ValidatorSystem</a>;
 </code></pre>
 
 
@@ -70,7 +70,7 @@ transaction can only be successfully called by the Diem Root account.
 ### Technical Description
 
 This script adds the account at <code>validator_address</code> to the validator set.
-This transaction emits a <code><a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> event and triggers a
+This transaction emits a <code><a href="Reconfiguration.md#0x1_Reconfiguration_NewEpochEvent">Reconfiguration::NewEpochEvent</a></code> event and triggers a
 reconfiguration. Once the reconfiguration triggered by this script's
 execution has been performed, the account at the <code>validator_address</code> is
 considered to be a validator in the network.
@@ -104,10 +104,10 @@ or does not have a <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_Validat
 | <code>Errors::REQUIRES_ADDRESS</code> | <code><a href="CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>                  | The sending account is not the Diem Root account.                                                                                         |
 | <code>Errors::REQUIRES_ROLE</code>    | <code><a href="Roles.md#0x1_Roles_EDIEM_ROOT">Roles::EDIEM_ROOT</a></code>                          | The sending account is not the Diem Root account.                                                                                         |
 | 0                          | 0                                            | The provided <code>validator_name</code> does not match the already-recorded human name for the validator.                                           |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="DiemSystem.md#0x1_DiemSystem_EINVALID_PROSPECTIVE_VALIDATOR">DiemSystem::EINVALID_PROSPECTIVE_VALIDATOR</a></code> | The validator to be added does not have a <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource published under it, or its <code>config</code> field is empty. |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="DiemSystem.md#0x1_DiemSystem_EALREADY_A_VALIDATOR">DiemSystem::EALREADY_A_VALIDATOR</a></code>           | The <code>validator_address</code> account is already a registered validator.                                                                        |
-| <code>Errors::INVALID_STATE</code>    | <code><a href="DiemConfig.md#0x1_DiemConfig_EINVALID_BLOCK_TIME">DiemConfig::EINVALID_BLOCK_TIME</a></code>            | An invalid time value was encountered in reconfiguration. Unlikely to occur.                                                              |
-| <code>Errors::LIMIT_EXCEEDED</code>   | <code><a href="DiemSystem.md#0x1_DiemSystem_EMAX_VALIDATORS">DiemSystem::EMAX_VALIDATORS</a></code>                | The validator set is already at its maximum size. The validator could not be added.                                                       |
+| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="ValidatorSystem.md#0x1_ValidatorSystem_EINVALID_PROSPECTIVE_VALIDATOR">ValidatorSystem::EINVALID_PROSPECTIVE_VALIDATOR</a></code> | The validator to be added does not have a <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource published under it, or its <code>config</code> field is empty. |
+| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="ValidatorSystem.md#0x1_ValidatorSystem_EALREADY_A_VALIDATOR">ValidatorSystem::EALREADY_A_VALIDATOR</a></code>           | The <code>validator_address</code> account is already a registered validator.                                                                        |
+| <code>Errors::INVALID_STATE</code>    | <code><a href="Reconfiguration.md#0x1_Reconfiguration_EINVALID_BLOCK_TIME">Reconfiguration::EINVALID_BLOCK_TIME</a></code>            | An invalid time value was encountered in reconfiguration. Unlikely to occur.                                                              |
+| <code>Errors::LIMIT_EXCEEDED</code>   | <code><a href="ValidatorSystem.md#0x1_ValidatorSystem_EMAX_VALIDATORS">ValidatorSystem::EMAX_VALIDATORS</a></code>                | The validator set is already at its maximum size. The validator could not be added.                                                       |
 
 
 <a name="@Related_Scripts_4"></a>
@@ -140,7 +140,7 @@ or does not have a <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_Validat
 ) {
     <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
     <b>assert</b>!(<a href="ValidatorConfig.md#0x1_ValidatorConfig_get_human_name">ValidatorConfig::get_human_name</a>(validator_address) == validator_name, 0);
-    <a href="DiemSystem.md#0x1_DiemSystem_add_validator">DiemSystem::add_validator</a>(&dr_account, validator_address);
+    <a href="ValidatorSystem.md#0x1_ValidatorSystem_add_validator">ValidatorSystem::add_validator</a>(&dr_account, validator_address);
 }
 </code></pre>
 
@@ -157,12 +157,12 @@ or does not have a <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_Validat
 <b>include</b> <a href="SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{seq_nonce: sliding_nonce, account: dr_account};
 <b>include</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_AbortsIfNoValidatorConfig">ValidatorConfig::AbortsIfNoValidatorConfig</a>{addr: validator_address};
 <b>aborts_if</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_get_human_name">ValidatorConfig::get_human_name</a>(validator_address) != validator_name <b>with</b> 0;
-<b>include</b> <a href="DiemSystem.md#0x1_DiemSystem_AddValidatorAbortsIf">DiemSystem::AddValidatorAbortsIf</a>{validator_addr: validator_address};
-<b>include</b> <a href="DiemSystem.md#0x1_DiemSystem_AddValidatorEnsures">DiemSystem::AddValidatorEnsures</a>{validator_addr: validator_address};
+<b>include</b> <a href="ValidatorSystem.md#0x1_ValidatorSystem_AddValidatorAbortsIf">ValidatorSystem::AddValidatorAbortsIf</a>{validator_addr: validator_address};
+<b>include</b> <a href="ValidatorSystem.md#0x1_ValidatorSystem_AddValidatorEnsures">ValidatorSystem::AddValidatorEnsures</a>{validator_addr: validator_address};
 </code></pre>
 
 
-Reports INVALID_STATE because of is_operating() and !exists<DiemSystem::CapabilityHolder>.
+Reports INVALID_STATE because of is_operating() and !exists<ValidatorSystem::CapabilityHolder>.
 is_operating() is always true during transactions, and CapabilityHolder is published
 during initialization (Genesis).
 Reports REQUIRES_ROLE if dr_account is not Diem root, but that can't happen
@@ -177,7 +177,7 @@ in practice because it aborts with NOT_PUBLISHED or REQUIRES_ADDRESS, first.
     Errors::INVALID_STATE,
     Errors::LIMIT_EXCEEDED,
     Errors::REQUIRES_ROLE;
-<b>include</b> <a href="DiemConfig.md#0x1_DiemConfig_ReconfigureEmits">DiemConfig::ReconfigureEmits</a>;
+<b>include</b> <a href="Reconfiguration.md#0x1_Reconfiguration_ReconfigureEmits">Reconfiguration::ReconfigureEmits</a>;
 </code></pre>
 
 
@@ -212,7 +212,7 @@ validator.
 ### Technical Description
 
 This updates the fields with corresponding names held in the <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>
-config resource held under <code>validator_account</code>. It does not emit a <code><a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code>
+config resource held under <code>validator_account</code>. It does not emit a <code><a href="Reconfiguration.md#0x1_Reconfiguration_NewEpochEvent">Reconfiguration::NewEpochEvent</a></code>
 so the copy of this config held in the validator set will not be updated, and the changes are
 only "locally" under the <code>validator_account</code> account address.
 
@@ -334,7 +334,7 @@ successfully called by the Diem Root account.
 ### Technical Description
 
 This script removes the account at <code>validator_address</code> from the validator set. This transaction
-emits a <code><a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> event. Once the reconfiguration triggered by this event
+emits a <code><a href="Reconfiguration.md#0x1_Reconfiguration_NewEpochEvent">Reconfiguration::NewEpochEvent</a></code> event. Once the reconfiguration triggered by this event
 has been performed, the account at <code>validator_address</code> is no longer considered to be a
 validator in the network. This transaction will fail if the validator at <code>validator_address</code>
 is not in the validator set.
@@ -364,10 +364,10 @@ is not in the validator set.
 | <code>Errors::INVALID_ARGUMENT</code> | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code> | The <code>sliding_nonce</code> has been previously recorded.                                               |
 | <code>Errors::NOT_PUBLISHED</code>    | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>          | The sending account is not the Diem Root account or Treasury Compliance account                |
 | 0                          | 0                                       | The provided <code>validator_name</code> does not match the already-recorded human name for the validator. |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="DiemSystem.md#0x1_DiemSystem_ENOT_AN_ACTIVE_VALIDATOR">DiemSystem::ENOT_AN_ACTIVE_VALIDATOR</a></code> | The validator to be removed is not in the validator set.                                        |
+| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="ValidatorSystem.md#0x1_ValidatorSystem_ENOT_AN_ACTIVE_VALIDATOR">ValidatorSystem::ENOT_AN_ACTIVE_VALIDATOR</a></code> | The validator to be removed is not in the validator set.                                        |
 | <code>Errors::REQUIRES_ADDRESS</code> | <code><a href="CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>            | The sending account is not the Diem Root account.                                              |
 | <code>Errors::REQUIRES_ROLE</code>    | <code><a href="Roles.md#0x1_Roles_EDIEM_ROOT">Roles::EDIEM_ROOT</a></code>                    | The sending account is not the Diem Root account.                                              |
-| <code>Errors::INVALID_STATE</code>    | <code><a href="DiemConfig.md#0x1_DiemConfig_EINVALID_BLOCK_TIME">DiemConfig::EINVALID_BLOCK_TIME</a></code>      | An invalid time value was encountered in reconfiguration. Unlikely to occur.                    |
+| <code>Errors::INVALID_STATE</code>    | <code><a href="Reconfiguration.md#0x1_Reconfiguration_EINVALID_BLOCK_TIME">Reconfiguration::EINVALID_BLOCK_TIME</a></code>      | An invalid time value was encountered in reconfiguration. Unlikely to occur.                    |
 
 
 <a name="@Related_Scripts_14"></a>
@@ -401,7 +401,7 @@ is not in the validator set.
     <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
     // TODO: Use an error code from <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">Errors</a>.<b>move</b>
     <b>assert</b>!(<a href="ValidatorConfig.md#0x1_ValidatorConfig_get_human_name">ValidatorConfig::get_human_name</a>(validator_address) == validator_name, 0);
-    <a href="DiemSystem.md#0x1_DiemSystem_remove_validator">DiemSystem::remove_validator</a>(&dr_account, validator_address);
+    <a href="ValidatorSystem.md#0x1_ValidatorSystem_remove_validator">ValidatorSystem::remove_validator</a>(&dr_account, validator_address);
 }
 </code></pre>
 
@@ -418,12 +418,12 @@ is not in the validator set.
 <b>include</b> <a href="SlidingNonce.md#0x1_SlidingNonce_RecordNonceAbortsIf">SlidingNonce::RecordNonceAbortsIf</a>{seq_nonce: sliding_nonce, account: dr_account};
 <b>include</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_AbortsIfNoValidatorConfig">ValidatorConfig::AbortsIfNoValidatorConfig</a>{addr: validator_address};
 <b>aborts_if</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_get_human_name">ValidatorConfig::get_human_name</a>(validator_address) != validator_name <b>with</b> 0;
-<b>include</b> <a href="DiemSystem.md#0x1_DiemSystem_RemoveValidatorAbortsIf">DiemSystem::RemoveValidatorAbortsIf</a>{validator_addr: validator_address};
-<b>include</b> <a href="DiemSystem.md#0x1_DiemSystem_RemoveValidatorEnsures">DiemSystem::RemoveValidatorEnsures</a>{validator_addr: validator_address};
+<b>include</b> <a href="ValidatorSystem.md#0x1_ValidatorSystem_RemoveValidatorAbortsIf">ValidatorSystem::RemoveValidatorAbortsIf</a>{validator_addr: validator_address};
+<b>include</b> <a href="ValidatorSystem.md#0x1_ValidatorSystem_RemoveValidatorEnsures">ValidatorSystem::RemoveValidatorEnsures</a>{validator_addr: validator_address};
 </code></pre>
 
 
-Reports INVALID_STATE because of is_operating() and !exists<DiemSystem::CapabilityHolder>.
+Reports INVALID_STATE because of is_operating() and !exists<ValidatorSystem::CapabilityHolder>.
 is_operating() is always true during transactions, and CapabilityHolder is published
 during initialization (Genesis).
 Reports REQUIRES_ROLE if dr_account is not Diem root, but that can't happen
@@ -437,7 +437,7 @@ in practice because it aborts with NOT_PUBLISHED or REQUIRES_ADDRESS, first.
     Errors::REQUIRES_ADDRESS,
     Errors::INVALID_STATE,
     Errors::REQUIRES_ROLE;
-<b>include</b> <a href="DiemConfig.md#0x1_DiemConfig_ReconfigureEmits">DiemConfig::ReconfigureEmits</a>;
+<b>include</b> <a href="Reconfiguration.md#0x1_Reconfiguration_ReconfigureEmits">Reconfiguration::ReconfigureEmits</a>;
 </code></pre>
 
 
@@ -471,7 +471,7 @@ Validator Operator account that is already registered with a validator.
 ### Technical Description
 
 This updates the fields with corresponding names held in the <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>
-config resource held under <code>validator_account</code>. It then emits a <code><a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to
+config resource held under <code>validator_account</code>. It then emits a <code><a href="Reconfiguration.md#0x1_Reconfiguration_NewEpochEvent">Reconfiguration::NewEpochEvent</a></code> to
 trigger a reconfiguration of the system.  This reconfiguration will update the validator set
 on-chain with the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code>.
 
@@ -499,7 +499,7 @@ on-chain with the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_
 | <code>Errors::REQUIRES_ROLE</code>    | <code><a href="Roles.md#0x1_Roles_EVALIDATOR_OPERATOR">Roles::EVALIDATOR_OPERATOR</a></code>                   | <code>validator_operator_account</code> does not have a Validator Operator role.                                 |
 | <code>Errors::INVALID_ARGUMENT</code> | <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_EINVALID_TRANSACTION_SENDER">ValidatorConfig::EINVALID_TRANSACTION_SENDER</a></code> | <code>validator_operator_account</code> is not the registered operator for the validator at <code>validator_address</code>. |
 | <code>Errors::INVALID_ARGUMENT</code> | <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_EINVALID_CONSENSUS_KEY">ValidatorConfig::EINVALID_CONSENSUS_KEY</a></code>      | <code>consensus_pubkey</code> is not a valid ed25519 public key.                                                 |
-| <code>Errors::INVALID_STATE</code>    | <code><a href="DiemConfig.md#0x1_DiemConfig_EINVALID_BLOCK_TIME">DiemConfig::EINVALID_BLOCK_TIME</a></code>             | An invalid time value was encountered in reconfiguration. Unlikely to occur.                          |
+| <code>Errors::INVALID_STATE</code>    | <code><a href="Reconfiguration.md#0x1_Reconfiguration_EINVALID_BLOCK_TIME">Reconfiguration::EINVALID_BLOCK_TIME</a></code>             | An invalid time value was encountered in reconfiguration. Unlikely to occur.                          |
 
 
 <a name="@Related_Scripts_19"></a>
@@ -538,7 +538,7 @@ on-chain with the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_
         validator_network_addresses,
         fullnode_network_addresses
     );
-    <a href="DiemSystem.md#0x1_DiemSystem_update_config_and_reconfigure">DiemSystem::update_config_and_reconfigure</a>(&validator_operator_account, validator_account);
+    <a href="ValidatorSystem.md#0x1_ValidatorSystem_update_config_and_reconfigure">ValidatorSystem::update_config_and_reconfigure</a>(&validator_operator_account, validator_account);
  }
 </code></pre>
 
@@ -552,7 +552,7 @@ on-chain with the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_
 
 
 <pre><code><b>include</b> <a href="DiemAccount.md#0x1_DiemAccount_TransactionChecks">DiemAccount::TransactionChecks</a>{sender: validator_operator_account};
-<b>include</b> <a href="DiemSystem.md#0x1_DiemSystem_UpdateConfigAndReconfigureEnsures">DiemSystem::UpdateConfigAndReconfigureEnsures</a>{validator_addr: validator_account};
+<b>include</b> <a href="ValidatorSystem.md#0x1_ValidatorSystem_UpdateConfigAndReconfigureEnsures">ValidatorSystem::UpdateConfigAndReconfigureEnsures</a>{validator_addr: validator_account};
 <b>ensures</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_is_valid">ValidatorConfig::is_valid</a>(validator_account);
 <b>ensures</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_spec_get_config">ValidatorConfig::spec_get_config</a>(validator_account)
     == <a href="ValidatorConfig.md#0x1_ValidatorConfig_Config">ValidatorConfig::Config</a> {
@@ -561,26 +561,26 @@ on-chain with the updated <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_
                 fullnode_network_addresses,
 };
 <b>include</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_SetConfigAbortsIf">ValidatorConfig::SetConfigAbortsIf</a>{validator_addr: validator_account};
-<b>include</b> <a href="DiemSystem.md#0x1_DiemSystem_UpdateConfigAndReconfigureAbortsIf">DiemSystem::UpdateConfigAndReconfigureAbortsIf</a>{validator_addr: validator_account};
+<b>include</b> <a href="ValidatorSystem.md#0x1_ValidatorSystem_UpdateConfigAndReconfigureAbortsIf">ValidatorSystem::UpdateConfigAndReconfigureAbortsIf</a>{validator_addr: validator_account};
 <b>let</b> is_validator_info_updated =
-    (<b>exists</b> v_info in <a href="DiemSystem.md#0x1_DiemSystem_spec_get_validators">DiemSystem::spec_get_validators</a>():
+    (<b>exists</b> v_info in <a href="ValidatorSystem.md#0x1_ValidatorSystem_spec_get_validators">ValidatorSystem::spec_get_validators</a>():
         v_info.addr == validator_account
         && v_info.config != <a href="ValidatorConfig.md#0x1_ValidatorConfig_Config">ValidatorConfig::Config</a> {
                 consensus_pubkey,
                 validator_network_addresses,
                 fullnode_network_addresses,
            });
-<b>include</b> is_validator_info_updated ==&gt; <a href="DiemConfig.md#0x1_DiemConfig_ReconfigureAbortsIf">DiemConfig::ReconfigureAbortsIf</a>;
-<b>let</b> validator_index = <a href="DiemSystem.md#0x1_DiemSystem_spec_index_of_validator">DiemSystem::spec_index_of_validator</a>(<a href="DiemSystem.md#0x1_DiemSystem_spec_get_validators">DiemSystem::spec_get_validators</a>(), validator_account);
-<b>let</b> last_config_time = <a href="DiemSystem.md#0x1_DiemSystem_spec_get_validators">DiemSystem::spec_get_validators</a>()[validator_index].last_config_update_time;
-<b>aborts_if</b> is_validator_info_updated && last_config_time &gt; <a href="DiemSystem.md#0x1_DiemSystem_MAX_U64">DiemSystem::MAX_U64</a> - <a href="DiemSystem.md#0x1_DiemSystem_FIVE_MINUTES">DiemSystem::FIVE_MINUTES</a>
+<b>include</b> is_validator_info_updated ==&gt; <a href="Reconfiguration.md#0x1_Reconfiguration_ReconfigureAbortsIf">Reconfiguration::ReconfigureAbortsIf</a>;
+<b>let</b> validator_index = <a href="ValidatorSystem.md#0x1_ValidatorSystem_spec_index_of_validator">ValidatorSystem::spec_index_of_validator</a>(<a href="ValidatorSystem.md#0x1_ValidatorSystem_spec_get_validators">ValidatorSystem::spec_get_validators</a>(), validator_account);
+<b>let</b> last_config_time = <a href="ValidatorSystem.md#0x1_ValidatorSystem_spec_get_validators">ValidatorSystem::spec_get_validators</a>()[validator_index].last_config_update_time;
+<b>aborts_if</b> is_validator_info_updated && last_config_time &gt; <a href="ValidatorSystem.md#0x1_ValidatorSystem_MAX_U64">ValidatorSystem::MAX_U64</a> - <a href="ValidatorSystem.md#0x1_ValidatorSystem_FIVE_MINUTES">ValidatorSystem::FIVE_MINUTES</a>
     <b>with</b> Errors::LIMIT_EXCEEDED;
-<b>aborts_if</b> is_validator_info_updated && <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_microseconds">DiemTimestamp::spec_now_microseconds</a>() &lt;= last_config_time + <a href="DiemSystem.md#0x1_DiemSystem_FIVE_MINUTES">DiemSystem::FIVE_MINUTES</a>
+<b>aborts_if</b> is_validator_info_updated && <a href="Timestamp.md#0x1_Timestamp_spec_now_microseconds">Timestamp::spec_now_microseconds</a>() &lt;= last_config_time + <a href="ValidatorSystem.md#0x1_ValidatorSystem_FIVE_MINUTES">ValidatorSystem::FIVE_MINUTES</a>
     <b>with</b> Errors::LIMIT_EXCEEDED;
 </code></pre>
 
 
-This reports a possible INVALID_STATE abort, which comes from an assert in DiemConfig::reconfigure_
+This reports a possible INVALID_STATE abort, which comes from an assert in Reconfiguration::reconfigure_
 that config.last_reconfiguration_time is not in the future. This is a system error that a user
 for which there is no useful recovery except to resubmit the transaction.
 
@@ -590,7 +590,7 @@ for which there is no useful recovery except to resubmit the transaction.
     Errors::REQUIRES_ROLE,
     Errors::INVALID_ARGUMENT,
     Errors::INVALID_STATE;
-<b>include</b> is_validator_info_updated ==&gt; <a href="DiemConfig.md#0x1_DiemConfig_ReconfigureEmits">DiemConfig::ReconfigureEmits</a>;
+<b>include</b> is_validator_info_updated ==&gt; <a href="Reconfiguration.md#0x1_Reconfiguration_ReconfigureEmits">Reconfiguration::ReconfigureEmits</a>;
 </code></pre>
 
 
@@ -632,7 +632,7 @@ operator for the sending validator account. The account at <code>operator_accoun
 a Validator Operator role and have a <code><a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code>
 resource published under it. The sending <code>account</code> must be a Validator and have a
 <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">ValidatorConfig::ValidatorConfig</a></code> resource published under it. This script does not emit a
-<code><a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> and no reconfiguration of the system is initiated by this script.
+<code><a href="Reconfiguration.md#0x1_Reconfiguration_NewEpochEvent">Reconfiguration::NewEpochEvent</a></code> and no reconfiguration of the system is initiated by this script.
 
 
 <a name="@Parameters_22"></a>
@@ -709,7 +709,7 @@ resource published under it. The sending <code>account</code> must be a Validato
 </code></pre>
 
 
-Reports INVALID_STATE because of !exists<DiemSystem::CapabilityHolder>, but that can't happen
+Reports INVALID_STATE because of !exists<ValidatorSystem::CapabilityHolder>, but that can't happen
 because CapabilityHolder is published during initialization (Genesis).
 
 

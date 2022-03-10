@@ -35,14 +35,14 @@ The Move modules in the Diem Framework can be bucketed in to a couple categories
 
 ### System Management
 * `ChainId`
-* `DiemBlock`
-* `DiemConfig`
-* `DiemTimestamp`
-* `DiemTransactionPublishingOption`
-* `DiemVersion`
-* `DiemVMConfig`
+* `Block`
+* `Reconfiguration`
+* `Timestamp`
+* `TransactionPublishingOption`
+* `Version`
+* `VMConfig`
 * `TransactionFee`
-* `DiemSystem`
+* `ValidatorSystem`
 * `ValidatorConfig`
 * `ValidatorOperatorConfig`
 * `Genesis` (Note: not published on-chain)

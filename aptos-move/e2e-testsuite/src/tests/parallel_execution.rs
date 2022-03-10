@@ -12,7 +12,7 @@ use aptos_types::{
     },
     vm_status::{KeptVMStatus, StatusCode},
 };
-use aptos_vm::parallel_executor::ParallelDiemVM;
+use aptos_vm::parallel_executor::ParallelAptosVM;
 use language_e2e_tests::{account, common_transactions::rotate_key_txn, executor::FakeExecutor};
 use move_ir_compiler::Compiler;
 
@@ -47,7 +47,7 @@ fn peer_to_peer_with_prologue_parallel() {
     txns.insert(0, Transaction::BlockMetadata(new_block));
 
     let (mut results, parallel_status) =
-        ParallelDiemVM::execute_block(txns, executor.get_state_view()).unwrap();
+        ParallelAptosVM::execute_block(txns, executor.get_state_view()).unwrap();
 
     assert!(parallel_status.is_none());
 
@@ -71,7 +71,7 @@ fn rotate_ed25519_key() {
     let txn = rotate_key_txn(sender.account(), new_key_hash.clone(), 10);
 
     // execute transaction
-    let (mut results, parallel_status) = ParallelDiemVM::execute_block(
+    let (mut results, parallel_status) = ParallelAptosVM::execute_block(
         vec![Transaction::UserTransaction(txn)],
         executor.get_state_view(),
     )

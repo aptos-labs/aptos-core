@@ -7,7 +7,7 @@ mod vm_wrapper;
 
 use crate::{
     adapter_common::{preprocess_transaction, PreprocessedTransaction},
-    aptos_vm::DiemVM,
+    aptos_vm::AptosVM,
     parallel_executor::vm_wrapper::DiemVMWrapper,
 };
 use aptos_parallel_executor::{
@@ -59,9 +59,9 @@ impl PTransactionOutput for DiemTransactionOutput {
     }
 }
 
-pub struct ParallelDiemVM();
+pub struct ParallelAptosVM();
 
-impl ParallelDiemVM {
+impl ParallelAptosVM {
     pub fn execute_block<S: StateView>(
         transactions: Vec<Transaction>,
         state_view: &S,
@@ -71,7 +71,7 @@ impl ParallelDiemVM {
         // sequentially while executing the transactions.
         let signature_verified_block: Vec<PreprocessedTransaction> = transactions
             .par_iter()
-            .map(|txn| preprocess_transaction::<DiemVM>(txn.clone()))
+            .map(|txn| preprocess_transaction::<AptosVM>(txn.clone()))
             .collect();
 
         match ParallelTransactionExecutor::<PreprocessedTransaction, DiemVMWrapper<S>>::new()
@@ -85,7 +85,7 @@ impl ParallelDiemVM {
                 None,
             )),
             Err(err @ Error::InferencerError) | Err(err @ Error::UnestimatedWrite) => {
-                let output = DiemVM::execute_block_and_keep_vm_status(transactions, state_view)?;
+                let output = AptosVM::execute_block_and_keep_vm_status(transactions, state_view)?;
                 Ok((
                     output
                         .into_iter()

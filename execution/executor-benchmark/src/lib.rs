@@ -13,7 +13,7 @@ use crate::{
 use aptos_config::config::{NodeConfig, RocksdbConfig};
 use aptos_logger::prelude::*;
 
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use executor::block_executor::BlockExecutor;
 use executor_types::BlockExecutorTrait;
@@ -24,7 +24,7 @@ use std::{
 };
 use storage_interface::{DbReader, DbReaderWriter};
 
-pub fn init_db_and_executor(config: &NodeConfig) -> (Arc<dyn DbReader>, BlockExecutor<DiemVM>) {
+pub fn init_db_and_executor(config: &NodeConfig) -> (Arc<dyn DbReader>, BlockExecutor<AptosVM>) {
     let (db, dbrw) = DbReaderWriter::wrap(
         AptosDB::open(
             &config.storage.dir(),

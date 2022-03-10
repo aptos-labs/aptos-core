@@ -3,18 +3,18 @@
 
 use crate::{account::Account, executor::FakeExecutor};
 use aptos_types::{
-    on_chain_config::DiemVersion,
+    on_chain_config::Version,
     transaction::{Script, TransactionArgument},
 };
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use diem_framework_releases::legacy::transaction_scripts::LegacyStdlibScript;
 
-pub fn set_diem_version(executor: &mut FakeExecutor, version: DiemVersion) {
+pub fn set_diem_version(executor: &mut FakeExecutor, version: Version) {
     let account = Account::new_genesis_account(aptos_types::on_chain_config::config_address());
     let txn = account
         .transaction()
         .script(Script::new(
-            LegacyStdlibScript::UpdateDiemVersion
+            LegacyStdlibScript::UpdateVersion
                 .compiled_bytes()
                 .into_vec(),
             vec![],
@@ -28,6 +28,6 @@ pub fn set_diem_version(executor: &mut FakeExecutor, version: DiemVersion) {
     executor.new_block();
     executor.execute_and_apply(txn);
 
-    let new_vm = DiemVM::new(executor.get_state_view());
-    assert_eq!(new_vm.internals().diem_version().unwrap(), version);
+    let new_vm = AptosVM::new(executor.get_state_view());
+    assert_eq!(new_vm.internals().version().unwrap(), version);
 }

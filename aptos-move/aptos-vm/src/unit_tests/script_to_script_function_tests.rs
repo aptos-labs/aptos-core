@@ -66,7 +66,7 @@ fn test_byte_patterns() {
             S::TieredMint => TIERED_MINT_BYTES!().to_vec(),
             S::UnfreezeAccount => UNFREEZE_ACCOUNT_BYTES!().to_vec(),
             S::UpdateExchangeRate => UPDATE_EXCHANGE_RATE_BYTES!().to_vec(),
-            S::UpdateDiemVersion => UPDATE_DIEM_VERSION_BYTES!().to_vec(),
+            S::UpdateVersion => UPDATE_DIEM_VERSION_BYTES!().to_vec(),
             S::UpdateMintingAbility => UPDATE_MINTING_ABILITY_BYTES!().to_vec(),
             S::UpdateDualAttestationLimit => UPDATE_DUAL_ATTESTATION_LIMIT_BYTES!().to_vec(),
         };

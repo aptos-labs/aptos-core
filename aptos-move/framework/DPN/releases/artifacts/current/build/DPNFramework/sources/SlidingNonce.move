@@ -276,13 +276,13 @@ module DiemFramework::SlidingNonce {
     spec module {} // Switch to module documentation context
 
     spec module {
-        use DiemFramework::DiemTimestamp;
+        use DiemFramework::Timestamp;
 
         /// Sliding nonces are initialized at Diem root and treasury compliance addresses
-        invariant [suspendable] DiemTimestamp::is_operating()
+        invariant [suspendable] Timestamp::is_operating()
             ==> exists<SlidingNonce>(@DiemRoot);
 
-        invariant [suspendable] DiemTimestamp::is_operating()
+        invariant [suspendable] Timestamp::is_operating()
             ==> exists<SlidingNonce>(@TreasuryCompliance);
 
         // In the current code, only Diem root and Treasury compliance have sliding nonces.

@@ -31,10 +31,10 @@ a given time period.
     -  [Access Control](#@Access_Control_2)
 
 
-<pre><code><b>use</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
-<b>use</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
+<pre><code><b>use</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
 <b>use</b> <a href="Roles.md#0x1_Roles">0x1::Roles</a>;
 <b>use</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer">0x1::Signer</a>;
+<b>use</b> <a href="Timestamp.md#0x1_Timestamp">0x1::Timestamp</a>;
 </code></pre>
 
 
@@ -248,7 +248,7 @@ need to be a unique capability.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_grant_mutation_capability">grant_mutation_capability</a>(dr_account: &signer): <a href="AccountLimits.md#0x1_AccountLimits_AccountLimitMutationCapability">AccountLimitMutationCapability</a> {
-    <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
+    <a href="Timestamp.md#0x1_Timestamp_assert_genesis">Timestamp::assert_genesis</a>();
     <a href="Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a>(dr_account);
     <a href="AccountLimits.md#0x1_AccountLimits_AccountLimitMutationCapability">AccountLimitMutationCapability</a>{}
 }
@@ -263,7 +263,7 @@ need to be a unique capability.
 
 
 
-<pre><code><b>include</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotGenesis">DiemTimestamp::AbortsIfNotGenesis</a>;
+<pre><code><b>include</b> <a href="Timestamp.md#0x1_Timestamp_AbortsIfNotGenesis">Timestamp::AbortsIfNotGenesis</a>;
 <b>include</b> <a href="Roles.md#0x1_Roles_AbortsIfNotDiemRoot">Roles::AbortsIfNotDiemRoot</a>{account: dr_account};
 </code></pre>
 
@@ -791,7 +791,7 @@ the inflow and outflow records.
 
 
 <pre><code><b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_reset_window">reset_window</a>&lt;CoinType&gt;(window: &<b>mut</b> <a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;, limits_definition: &<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;) {
-    <b>let</b> current_time = <a href="DiemTimestamp.md#0x1_DiemTimestamp_now_microseconds">DiemTimestamp::now_microseconds</a>();
+    <b>let</b> current_time = <a href="Timestamp.md#0x1_Timestamp_now_microseconds">Timestamp::now_microseconds</a>();
     <b>assert</b>!(window.window_start &lt;= <a href="AccountLimits.md#0x1_AccountLimits_MAX_U64">MAX_U64</a> - limits_definition.time_period, <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_limit_exceeded">Errors::limit_exceeded</a>(<a href="AccountLimits.md#0x1_AccountLimits_EWINDOW">EWINDOW</a>));
     <b>if</b> (current_time &gt; window.window_start + limits_definition.time_period) {
         window.window_start = current_time;
@@ -824,7 +824,7 @@ the inflow and outflow records.
 <pre><code><b>schema</b> <a href="AccountLimits.md#0x1_AccountLimits_ResetWindowAbortsIf">ResetWindowAbortsIf</a>&lt;CoinType&gt; {
     window: <a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;;
     limits_definition: <a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;;
-    <b>include</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotOperating">DiemTimestamp::AbortsIfNotOperating</a>;
+    <b>include</b> <a href="Timestamp.md#0x1_Timestamp_AbortsIfNotOperating">Timestamp::AbortsIfNotOperating</a>;
     <b>aborts_if</b> window.window_start + limits_definition.time_period &gt; max_u64() <b>with</b> Errors::LIMIT_EXCEEDED;
 }
 </code></pre>
@@ -852,7 +852,7 @@ the inflow and outflow records.
     window: <a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;,
     limits_definition: <a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">LimitsDefinition</a>&lt;CoinType&gt;
 ): bool {
-    <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_microseconds">DiemTimestamp::spec_now_microseconds</a>() &gt; window.window_start + limits_definition.time_period
+    <a href="Timestamp.md#0x1_Timestamp_spec_now_microseconds">Timestamp::spec_now_microseconds</a>() &gt; window.window_start + limits_definition.time_period
 }
 <a name="0x1_AccountLimits_spec_window_reset_with_limits"></a>
 <b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_spec_window_reset_with_limits">spec_window_reset_with_limits</a>&lt;CoinType&gt;(
@@ -863,7 +863,7 @@ the inflow and outflow records.
         <a href="AccountLimits.md#0x1_AccountLimits_Window">Window</a>&lt;CoinType&gt;{
             limit_address: window.limit_address,
             tracked_balance: window.tracked_balance,
-            window_start: <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_microseconds">DiemTimestamp::spec_now_microseconds</a>(),
+            window_start: <a href="Timestamp.md#0x1_Timestamp_spec_now_microseconds">Timestamp::spec_now_microseconds</a>(),
             window_inflow: 0,
             window_outflow: 0
         }
@@ -1365,7 +1365,7 @@ Checks whether the limits definition is unrestricted.
 
 
 <pre><code><b>fun</b> <a href="AccountLimits.md#0x1_AccountLimits_current_time">current_time</a>(): u64 {
-    <b>if</b> (<a href="DiemTimestamp.md#0x1_DiemTimestamp_is_genesis">DiemTimestamp::is_genesis</a>()) 0 <b>else</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_now_microseconds">DiemTimestamp::now_microseconds</a>()
+    <b>if</b> (<a href="Timestamp.md#0x1_Timestamp_is_genesis">Timestamp::is_genesis</a>()) 0 <b>else</b> <a href="Timestamp.md#0x1_Timestamp_now_microseconds">Timestamp::now_microseconds</a>()
 }
 </code></pre>
 

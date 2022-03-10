@@ -5,7 +5,7 @@ use anyhow::{ensure, format_err, Context, Result};
 use aptos_config::config::RocksdbConfig;
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Transaction, waypoint::Waypoint};
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use executor::db_bootstrapper::calculate_genesis;
 use std::{
@@ -84,7 +84,7 @@ fn main() -> Result<()> {
         )
     }
 
-    let committer = calculate_genesis::<DiemVM>(&db, tree_state, &genesis_txn)
+    let committer = calculate_genesis::<AptosVM>(&db, tree_state, &genesis_txn)
         .with_context(|| format_err!("Failed to calculate genesis."))?;
     println!(
         "Successfully calculated genesis. Got waypoint: {}",

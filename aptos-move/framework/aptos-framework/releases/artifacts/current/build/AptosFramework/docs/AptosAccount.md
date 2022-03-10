@@ -29,15 +29,15 @@ transaction in addition to the core prologue and epilogue.
 <b>use</b> <a href="AptosValidatorConfig.md#0x1_AptosValidatorConfig">0x1::AptosValidatorConfig</a>;
 <b>use</b> <a href="AptosValidatorOperatorConfig.md#0x1_AptosValidatorOperatorConfig">0x1::AptosValidatorOperatorConfig</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/BCS.md#0x1_BCS">0x1::BCS</a>;
-<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
-<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption">0x1::DiemTransactionPublishingOption</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Hash.md#0x1_Hash">0x1::Hash</a>;
 <b>use</b> <a href="Marker.md#0x1_Marker">0x1::Marker</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer">0x1::Signer</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses">0x1::SystemAddresses</a>;
 <b>use</b> <a href="TestCoin.md#0x1_TestCoin">0x1::TestCoin</a>;
+<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Timestamp.md#0x1_Timestamp">0x1::Timestamp</a>;
 <b>use</b> <a href="TransactionFee.md#0x1_TransactionFee">0x1::TransactionFee</a>;
+<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/TransactionPublishingOption.md#0x1_TransactionPublishingOption">0x1::TransactionPublishingOption</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector">0x1::Vector</a>;
 </code></pre>
 
@@ -196,7 +196,7 @@ Initialize this module. This is only callable from genesis.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_initialize">initialize</a>(core_resource: &signer) {
-    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
+    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Timestamp.md#0x1_Timestamp_assert_genesis">Timestamp::assert_genesis</a>();
     // Operational constraint, not a privilege constraint.
     <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(core_resource);
     <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Account.md#0x1_Account_initialize">Account::initialize</a>&lt;<a href="Marker.md#0x1_Marker_ChainMarker">Marker::ChainMarker</a>&gt;(
@@ -394,7 +394,7 @@ Rotate the authentication key for the account under cap.account_address
     txn_expiration_time: u64,
     chain_id: u8,
 ) {
-    <b>assert</b>!(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_is_module_allowed">DiemTransactionPublishingOption::is_module_allowed</a>(), <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="AptosAccount.md#0x1_AptosAccount_EMODULE_NOT_ALLOWED">EMODULE_NOT_ALLOWED</a>));
+    <b>assert</b>!(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/TransactionPublishingOption.md#0x1_TransactionPublishingOption_is_module_allowed">TransactionPublishingOption::is_module_allowed</a>(), <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="AptosAccount.md#0x1_AptosAccount_EMODULE_NOT_ALLOWED">EMODULE_NOT_ALLOWED</a>));
     <a href="AptosAccount.md#0x1_AptosAccount_prologue_common">prologue_common</a>(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
 }
 </code></pre>
@@ -428,7 +428,7 @@ Rotate the authentication key for the account under cap.account_address
     chain_id: u8,
     script_hash: vector&lt;u8&gt;,
 ) {
-    <b>assert</b>!(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_is_script_allowed">DiemTransactionPublishingOption::is_script_allowed</a>(&script_hash), <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="AptosAccount.md#0x1_AptosAccount_ESCRIPT_NOT_ALLOWED">ESCRIPT_NOT_ALLOWED</a>));
+    <b>assert</b>!(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/TransactionPublishingOption.md#0x1_TransactionPublishingOption_is_script_allowed">TransactionPublishingOption::is_script_allowed</a>(&script_hash), <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="AptosAccount.md#0x1_AptosAccount_ESCRIPT_NOT_ALLOWED">ESCRIPT_NOT_ALLOWED</a>));
     <a href="AptosAccount.md#0x1_AptosAccount_prologue_common">prologue_common</a>(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
 }
 </code></pre>
@@ -595,7 +595,7 @@ Rotate the authentication key for the account under cap.account_address
     chain_id: u8,
 ) {
     <b>assert</b>!(
-        <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>() &lt; txn_expiration_time,
+        <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Timestamp.md#0x1_Timestamp_now_seconds">Timestamp::now_seconds</a>() &lt; txn_expiration_time,
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="AptosAccount.md#0x1_AptosAccount_ETRANSACTION_EXPIRED">ETRANSACTION_EXPIRED</a>),
     );
     <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Account.md#0x1_Account_prologue">Account::prologue</a>(&sender, txn_sequence_number, txn_public_key, chain_id);

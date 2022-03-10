@@ -7,7 +7,7 @@ use aptos_types::{
     on_chain_config::{OnChainConfig, ValidatorSet},
     transaction::Transaction,
 };
-use aptos_vm::{DiemVM, VMExecutor};
+use aptos_vm::{AptosVM, VMExecutor};
 use criterion::{measurement::Measurement, BatchSize, Bencher};
 use language_e2e_tests::{
     account_universe::{log_balance_strategy, AUTransactionGen, AccountUniverseGen},
@@ -164,7 +164,7 @@ impl TransactionBenchState {
     fn execute(self) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
-        DiemVM::execute_block(self.transactions, self.executor.get_state_view())
+        AptosVM::execute_block(self.transactions, self.executor.get_state_view())
             .expect("VM should not fail to start");
     }
 

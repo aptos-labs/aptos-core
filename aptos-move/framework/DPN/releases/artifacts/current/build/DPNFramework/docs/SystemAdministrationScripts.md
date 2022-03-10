@@ -29,10 +29,10 @@ network outside of validators and validator operators.
     -  [Common Abort Conditions](#@Common_Abort_Conditions_15)
 
 
-<pre><code><b>use</b> <a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig">0x1::DiemConsensusConfig</a>;
-<b>use</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig">0x1::DiemVMConfig</a>;
-<b>use</b> <a href="DiemVersion.md#0x1_DiemVersion">0x1::DiemVersion</a>;
+<pre><code><b>use</b> <a href="ConsensusConfig.md#0x1_ConsensusConfig">0x1::ConsensusConfig</a>;
 <b>use</b> <a href="SlidingNonce.md#0x1_SlidingNonce">0x1::SlidingNonce</a>;
+<b>use</b> <a href="VMConfig.md#0x1_VMConfig">0x1::VMConfig</a>;
+<b>use</b> <a href="Version.md#0x1_Version">0x1::Version</a>;
 </code></pre>
 
 
@@ -54,7 +54,7 @@ transaction can only be sent from the Diem Root account.
 
 ### Technical Description
 
-Updates the <code><a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a></code> on-chain config and emits a <code><a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to trigger
+Updates the <code><a href="Version.md#0x1_Version">Version</a></code> on-chain config and emits a <code><a href="Reconfiguration.md#0x1_Reconfiguration_NewEpochEvent">Reconfiguration::NewEpochEvent</a></code> to trigger
 a reconfiguration of the system. The <code>major</code> version that is passed in must be strictly greater
 than the current major version held on-chain. The VM reads this information and can use it to
 preserve backwards compatibility with previous major versions of the VM.
@@ -82,7 +82,7 @@ preserve backwards compatibility with previous major versions of the VM.
 | <code>Errors::INVALID_ARGUMENT</code> | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>                | The <code>sliding_nonce</code> is too far in the future.                                              |
 | <code>Errors::INVALID_ARGUMENT</code> | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ENONCE_ALREADY_RECORDED">SlidingNonce::ENONCE_ALREADY_RECORDED</a></code>       | The <code>sliding_nonce</code> has been previously recorded.                                          |
 | <code>Errors::REQUIRES_ADDRESS</code> | <code><a href="CoreAddresses.md#0x1_CoreAddresses_EDIEM_ROOT">CoreAddresses::EDIEM_ROOT</a></code>                   | <code>account</code> is not the Diem Root account.                                                    |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="DiemVersion.md#0x1_DiemVersion_EINVALID_MAJOR_VERSION_NUMBER">DiemVersion::EINVALID_MAJOR_VERSION_NUMBER</a></code>  | <code>major</code> is less-than or equal to the current major version stored on-chain.                |
+| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="Version.md#0x1_Version_EINVALID_MAJOR_VERSION_NUMBER">Version::EINVALID_MAJOR_VERSION_NUMBER</a></code>  | <code>major</code> is less-than or equal to the current major version stored on-chain.                |
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_update_diem_version">update_diem_version</a>(account: signer, sliding_nonce: u64, major: u64)
@@ -96,7 +96,7 @@ preserve backwards compatibility with previous major versions of the VM.
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_update_diem_version">update_diem_version</a>(account: signer, sliding_nonce: u64, major: u64) {
     <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
-    <a href="DiemVersion.md#0x1_DiemVersion_set">DiemVersion::set</a>(&account, major)
+    <a href="Version.md#0x1_Version_set">Version::set</a>(&account, major)
 }
 </code></pre>
 
@@ -121,8 +121,8 @@ metering. This transaction can only be sent from the Diem Root account.
 
 ### Technical Description
 
-Updates the on-chain config holding the <code><a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a></code> and emits a
-<code><a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to trigger a reconfiguration of the system.
+Updates the on-chain config holding the <code><a href="VMConfig.md#0x1_VMConfig">VMConfig</a></code> and emits a
+<code><a href="Reconfiguration.md#0x1_Reconfiguration_NewEpochEvent">Reconfiguration::NewEpochEvent</a></code> to trigger a reconfiguration of the system.
 
 
 <a name="@Parameters_6"></a>
@@ -152,7 +152,7 @@ Updates the on-chain config holding the <code><a href="DiemVMConfig.md#0x1_DiemV
 
 | Error Category             | Error Reason                                | Description                                                                                |
 | ----------------           | --------------                              | -------------                                                                              |
-| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="DiemVMConfig.md#0x1_DiemVMConfig_EGAS_CONSTANT_INCONSISTENCY">DiemVMConfig::EGAS_CONSTANT_INCONSISTENCY</a></code> | The provided gas constants are inconsistent.                                               |
+| <code>Errors::INVALID_ARGUMENT</code> | <code><a href="VMConfig.md#0x1_VMConfig_EGAS_CONSTANT_INCONSISTENCY">VMConfig::EGAS_CONSTANT_INCONSISTENCY</a></code> | The provided gas constants are inconsistent.                                               |
 | <code>Errors::NOT_PUBLISHED</code>    | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ESLIDING_NONCE">SlidingNonce::ESLIDING_NONCE</a></code>              | A <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> resource is not published under <code>account</code>.                                |
 | <code>Errors::INVALID_ARGUMENT</code> | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_OLD">SlidingNonce::ENONCE_TOO_OLD</a></code>              | The <code>sliding_nonce</code> is too old and it's impossible to determine if it's duplicated or not. |
 | <code>Errors::INVALID_ARGUMENT</code> | <code><a href="SlidingNonce.md#0x1_SlidingNonce_ENONCE_TOO_NEW">SlidingNonce::ENONCE_TOO_NEW</a></code>              | The <code>sliding_nonce</code> is too far in the future.                                              |
@@ -185,7 +185,7 @@ Updates the on-chain config holding the <code><a href="DiemVMConfig.md#0x1_DiemV
     default_account_size: u64,
 ) {
     <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&dr_account, sliding_nonce);
-    <a href="DiemVMConfig.md#0x1_DiemVMConfig_set_gas_constants">DiemVMConfig::set_gas_constants</a>(
+    <a href="VMConfig.md#0x1_VMConfig_set_gas_constants">VMConfig::set_gas_constants</a>(
             &dr_account,
             global_memory_per_byte_cost,
             global_memory_per_byte_write_cost,
@@ -223,8 +223,8 @@ transaction can only be sent from the Diem Root account.
 
 ### Technical Description
 
-Initializes the <code><a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig">DiemConsensusConfig</a></code> on-chain config to empty and allows future updates from DiemRoot via
-<code>update_diem_consensus_config</code>. This doesn't emit a <code><a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code>.
+Initializes the <code>DiemConsensusConfig</code> on-chain config to empty and allows future updates from DiemRoot via
+<code>update_diem_consensus_config</code>. This doesn't emit a <code><a href="Reconfiguration.md#0x1_Reconfiguration_NewEpochEvent">Reconfiguration::NewEpochEvent</a></code>.
 
 
 <a name="@Parameters_10"></a>
@@ -261,7 +261,7 @@ Initializes the <code><a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig">D
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_initialize_diem_consensus_config">initialize_diem_consensus_config</a>(account: signer, sliding_nonce: u64) {
     <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
-    <a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig_initialize">DiemConsensusConfig::initialize</a>(&account);
+    <a href="ConsensusConfig.md#0x1_ConsensusConfig_initialize">ConsensusConfig::initialize</a>(&account);
 }
 </code></pre>
 
@@ -286,7 +286,7 @@ transaction can only be sent from the Diem Root account.
 
 ### Technical Description
 
-Updates the <code><a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig">DiemConsensusConfig</a></code> on-chain config and emits a <code><a href="DiemConfig.md#0x1_DiemConfig_NewEpochEvent">DiemConfig::NewEpochEvent</a></code> to trigger
+Updates the <code>DiemConsensusConfig</code> on-chain config and emits a <code><a href="Reconfiguration.md#0x1_Reconfiguration_NewEpochEvent">Reconfiguration::NewEpochEvent</a></code> to trigger
 a reconfiguration of the system.
 
 
@@ -325,7 +325,7 @@ a reconfiguration of the system.
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SystemAdministrationScripts.md#0x1_SystemAdministrationScripts_update_diem_consensus_config">update_diem_consensus_config</a>(account: signer, sliding_nonce: u64, config: vector&lt;u8&gt;) {
     <a href="SlidingNonce.md#0x1_SlidingNonce_record_nonce_or_abort">SlidingNonce::record_nonce_or_abort</a>(&account, sliding_nonce);
-    <a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig_set">DiemConsensusConfig::set</a>(&account, config)
+    <a href="ConsensusConfig.md#0x1_ConsensusConfig_set">ConsensusConfig::set</a>(&account, config)
 }
 </code></pre>
 

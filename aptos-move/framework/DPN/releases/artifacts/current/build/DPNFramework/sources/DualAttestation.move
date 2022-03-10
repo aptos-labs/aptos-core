@@ -3,7 +3,7 @@ module DiemFramework::DualAttestation {
     use DiemFramework::CoreAddresses;
     use DiemFramework::XDX::XDX;
     use DiemFramework::Diem;
-    use DiemFramework::DiemTimestamp;
+    use DiemFramework::Timestamp;
     use DiemFramework::Roles;
     use DiemFramework::Signature;
     use DiemFramework::VASP;
@@ -130,7 +130,7 @@ module DiemFramework::DualAttestation {
         credential.base_url = copy new_url;
         Event::emit_event(&mut credential.base_url_rotation_events, BaseUrlRotationEvent {
             new_base_url: new_url,
-            time_rotated_seconds: DiemTimestamp::now_seconds(),
+            time_rotated_seconds: Timestamp::now_seconds(),
         });
     }
     spec rotate_base_url {
@@ -145,7 +145,7 @@ module DiemFramework::DualAttestation {
         /// Must abort if the account does not have the resource Credential [[H17]][PERMISSION].
         include AbortsIfNoCredential{addr: sender};
 
-        include DiemTimestamp::AbortsIfNotOperating;
+        include Timestamp::AbortsIfNotOperating;
     }
     spec schema AbortsIfNoCredential {
         addr: address;
@@ -168,7 +168,7 @@ module DiemFramework::DualAttestation {
         let handle = global<Credential>(sender).base_url_rotation_events;
         let msg = BaseUrlRotationEvent {
             new_base_url: new_url,
-            time_rotated_seconds: DiemTimestamp::spec_now_seconds(),
+            time_rotated_seconds: Timestamp::spec_now_seconds(),
         };
         emits msg to handle;
     }
@@ -185,7 +185,7 @@ module DiemFramework::DualAttestation {
         credential.compliance_public_key = copy new_key;
         Event::emit_event(&mut credential.compliance_key_rotation_events, ComplianceKeyRotationEvent {
             new_compliance_public_key: new_key,
-            time_rotated_seconds: DiemTimestamp::now_seconds(),
+            time_rotated_seconds: Timestamp::now_seconds(),
         });
 
     }
@@ -202,7 +202,7 @@ module DiemFramework::DualAttestation {
         /// Must abort if the account does not have the resource Credential [[H17]][PERMISSION].
         include AbortsIfNoCredential{addr: sender};
 
-        include DiemTimestamp::AbortsIfNotOperating;
+        include Timestamp::AbortsIfNotOperating;
         aborts_if !Signature::ed25519_validate_pubkey(new_key) with Errors::INVALID_ARGUMENT;
     }
     spec schema RotateCompliancePublicKeyEnsures {
@@ -222,7 +222,7 @@ module DiemFramework::DualAttestation {
         let handle = global<Credential>(sender).compliance_key_rotation_events;
         let msg = ComplianceKeyRotationEvent {
             new_compliance_public_key: new_key,
-            time_rotated_seconds: DiemTimestamp::spec_now_seconds(),
+            time_rotated_seconds: Timestamp::spec_now_seconds(),
         };
         emits msg to handle;
     }
@@ -481,7 +481,7 @@ module DiemFramework::DualAttestation {
 
     /// Travel rule limit set during genesis
     public fun initialize(dr_account: &signer) {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         CoreAddresses::assert_diem_root(dr_account); // operational constraint.
         assert!(!exists<Limit>(@DiemRoot), Errors::already_published(ELIMIT));
         let initial_limit = (INITIAL_DUAL_ATTESTATION_LIMIT as u128) * (Diem::scaling_factor<XDX>() as u128);
@@ -494,7 +494,7 @@ module DiemFramework::DualAttestation {
         )
     }
     spec initialize {
-        include DiemTimestamp::AbortsIfNotGenesis;
+        include Timestamp::AbortsIfNotGenesis;
         include CoreAddresses::AbortsIfNotDiemRoot{account: dr_account};
         aborts_if exists<Limit>(@DiemRoot) with Errors::ALREADY_PUBLISHED;
         let initial_limit = INITIAL_DUAL_ATTESTATION_LIMIT * Diem::spec_scaling_factor<XDX>();
@@ -537,7 +537,7 @@ module DiemFramework::DualAttestation {
 
     /// The Limit resource should be published after genesis
     spec module {
-        invariant [suspendable] DiemTimestamp::is_operating() ==> spec_is_published();
+        invariant [suspendable] Timestamp::is_operating() ==> spec_is_published();
     }
 
     /// # Helper Functions

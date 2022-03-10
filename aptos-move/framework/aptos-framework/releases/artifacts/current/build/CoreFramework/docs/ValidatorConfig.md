@@ -5,9 +5,9 @@
 
 The ValidatorConfig resource holds information about a validator. Information
 is published and updated by Diem root in a <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">Self::ValidatorConfig</a></code> in preparation for
-later inclusion (by functions in DiemConfig) in a <code>DiemConfig::DiemConfig&lt;<a href="DiemSystem.md#0x1_DiemSystem">DiemSystem</a>&gt;</code>
-struct (the <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">Self::ValidatorConfig</a></code> in a <code>DiemConfig::ValidatorInfo</code> which is a member
-of the <code><a href="DiemSystem.md#0x1_DiemSystem_DiemSystem">DiemSystem::DiemSystem</a>.validators</code> vector).
+later inclusion (by functions in Reconfiguration) in a <code>Reconfiguration::Reconfiguration&lt;<a href="ValidatorSystem.md#0x1_ValidatorSystem">ValidatorSystem</a>&gt;</code>
+struct (the <code><a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfig">Self::ValidatorConfig</a></code> in a <code>Reconfiguration::ValidatorInfo</code> which is a member
+of the <code><a href="ValidatorSystem.md#0x1_ValidatorSystem_ValidatorSystem">ValidatorSystem::ValidatorSystem</a>.validators</code> vector).
 
 
 -  [Resource `ValidatorConfigChainMarker`](#0x1_ValidatorConfig_ValidatorConfigChainMarker)
@@ -29,12 +29,12 @@ of the <code><a href="DiemSystem.md#0x1_DiemSystem_DiemSystem">DiemSystem::DiemS
 
 
 <pre><code><b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability">0x1::Capability</a>;
-<b>use</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option">0x1::Option</a>;
 <b>use</b> <a href="Signature.md#0x1_Signature">0x1::Signature</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer">0x1::Signer</a>;
 <b>use</b> <a href="SystemAddresses.md#0x1_SystemAddresses">0x1::SystemAddresses</a>;
+<b>use</b> <a href="Timestamp.md#0x1_Timestamp">0x1::Timestamp</a>;
 <b>use</b> <a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig">0x1::ValidatorOperatorConfig</a>;
 </code></pre>
 
@@ -217,7 +217,7 @@ The <code><a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a></
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_initialize">initialize</a>&lt;T&gt;(account: &signer) {
-    <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
+    <a href="Timestamp.md#0x1_Timestamp_assert_genesis">Timestamp::assert_genesis</a>();
     <a href="SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(account);
 
     <b>assert</b>!(
@@ -255,7 +255,7 @@ and the address of the validator operator.
     human_name: vector&lt;u8&gt;,
     _cap: Cap&lt;T&gt;
 ) {
-    <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_operating">DiemTimestamp::assert_operating</a>();
+    <a href="Timestamp.md#0x1_Timestamp_assert_operating">Timestamp::assert_operating</a>();
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="ValidatorConfig.md#0x1_ValidatorConfig_ValidatorConfigChainMarker">ValidatorConfigChainMarker</a>&lt;T&gt;&gt;(@CoreResources),
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_not_published">Errors::not_published</a>(<a href="ValidatorConfig.md#0x1_ValidatorConfig_ECHAIN_MARKER">ECHAIN_MARKER</a>)
@@ -369,7 +369,7 @@ The old config is preserved.
 
 Rotate the config in the validator_account.
 Once the config is set, it can not go back to <code><a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_none">Option::none</a></code> - this is crucial for validity
-of the DiemSystem's code.
+of the ValidatorSystem's code.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig_set_config">set_config</a>(validator_operator_account: &signer, validator_addr: <b>address</b>, consensus_pubkey: vector&lt;u8&gt;, validator_network_addresses: vector&lt;u8&gt;, fullnode_network_addresses: vector&lt;u8&gt;)

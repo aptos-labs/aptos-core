@@ -49,6 +49,6 @@ impl NewBlockEvent {
 }
 
 impl MoveStructType for NewBlockEvent {
-    const MODULE_NAME: &'static IdentStr = ident_str!("DiemBlock");
+    const MODULE_NAME: &'static IdentStr = ident_str!("Block");
     const STRUCT_NAME: &'static IdentStr = ident_str!("NewBlockEvent");
 }

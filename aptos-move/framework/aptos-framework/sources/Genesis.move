@@ -29,7 +29,7 @@ module AptosFramework::Genesis {
         instruction_schedule: vector<u8>,
         native_schedule: vector<u8>,
         chain_id: u8,
-        initial_diem_version: u64,
+        initial_version: u64,
         consensus_config: vector<u8>,
     ) {
         initialize_internal(
@@ -40,7 +40,7 @@ module AptosFramework::Genesis {
             instruction_schedule,
             native_schedule,
             chain_id,
-            initial_diem_version,
+            initial_version,
             consensus_config,
         )
     }
@@ -53,7 +53,7 @@ module AptosFramework::Genesis {
         instruction_schedule: vector<u8>,
         native_schedule: vector<u8>,
         chain_id: u8,
-        initial_diem_version: u64,
+        initial_version: u64,
         consensus_config: vector<u8>,
     ) {
         // initialize the chain marker first
@@ -67,7 +67,7 @@ module AptosFramework::Genesis {
         // Consensus config setup
         AptosConsensusConfig::initialize(core_resource_account);
         AptosValidatorSet::initialize_validator_set(core_resource_account);
-        AptosVersion::initialize(core_resource_account, initial_diem_version);
+        AptosVersion::initialize(core_resource_account, initial_version);
 
         AptosVMConfig::initialize(
             core_resource_account,
@@ -84,7 +84,7 @@ module AptosFramework::Genesis {
         TestCoin::initialize(core_resource_account, 1000000);
         TestCoin::mint(core_resource_account, Signer::address_of(core_resource_account), 18446744073709551615);
 
-        // Pad the event counter for the Diem Root account to match DPN. This
+        // Pad the event counter for the Root account to match DPN. This
         // _MUST_ match the new epoch event counter otherwise all manner of
         // things start to break.
         Event::destroy_handle(Event::new_event_handle<u64>(core_resource_account));
@@ -94,7 +94,7 @@ module AptosFramework::Genesis {
         CoreGenesis::init(core_resource_account, chain_id);
     }
 
-    /// Sets up the initial validator set for the Diem network.
+    /// Sets up the initial validator set for the network.
     /// The validator "owner" accounts, their UTF-8 names, and their authentication
     /// keys are encoded in the `owners`, `owner_names`, and `owner_auth_key` vectors.
     /// Each validator signs consensus messages with the private key corresponding to the Ed25519
@@ -103,7 +103,7 @@ module AptosFramework::Genesis {
     /// the owner). The operators, their names, and their authentication keys are encoded
     /// in the `operators`, `operator_names`, and `operator_auth_keys` vectors.
     /// Finally, each validator must specify the network address
-    /// (see diem/types/src/network_address/mod.rs) for itself and its full nodes.
+    /// (see types/src/network_address/mod.rs) for itself and its full nodes.
     fun create_initialize_owners_operators(
         core_resource_account: signer,
         owners: vector<signer>,

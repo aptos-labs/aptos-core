@@ -36,10 +36,10 @@ Command `experimental read-write-set storage/0x00000000000000000000000000000001/
 0xa550c18/0x1::Diem::CurrencyInfo<0x1::XUS::XUS>/2: Read
 0xa550c18/0x1::Diem::CurrencyInfo<0x1::XUS::XUS>/2/0: Read
 0xa550c18/0x1::Diem::CurrencyInfo<0x1::XUS::XUS>/6: Read
-0xa550c18/0x1::DiemTimestamp::CurrentTimeMicroseconds: Read
-0xa550c18/0x1::DiemTimestamp::CurrentTimeMicroseconds/0: Read
 0xa550c18/0x1::DualAttestation::Limit: Read
 0xa550c18/0x1::DualAttestation::Limit/0: Read
+0xa550c18/0x1::Timestamp::CurrentTimeMicroseconds: Read
+0xa550c18/0x1::Timestamp::CurrentTimeMicroseconds/0: Read
 
 
 
@@ -54,8 +54,8 @@ Command `experimental read-write-set storage/0x00000000000000000000000000000001/
 0xb/0x1::DualAttestation::Credential
 0xb/0x1::VASP::ParentVASP
 0xa550c18/0x1::Diem::CurrencyInfo<0x1::XUS::XUS>
-0xa550c18/0x1::DiemTimestamp::CurrentTimeMicroseconds
 0xa550c18/0x1::DualAttestation::Limit
+0xa550c18/0x1::Timestamp::CurrentTimeMicroseconds
 Command `experimental read-write-set storage/0x00000000000000000000000000000001/modules/PaymentScripts.mv peer_to_peer_with_metadata --concretize writes --type-args 0x1::XUS::XUS --signers 0xA --args 0xB 500 x"" x""`:
 0xa/0x1::DiemAccount::Balance<0x1::XUS::XUS>
 0xa/0x1::DiemAccount::DiemAccount

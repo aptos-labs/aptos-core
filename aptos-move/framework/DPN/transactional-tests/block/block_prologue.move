@@ -5,22 +5,22 @@
 //# run --admin-script
 //#     --signers DiemRoot DiemRoot
 script{
-use DiemFramework::DiemTimestamp;
-use DiemFramework::DiemBlock;
+use DiemFramework::Timestamp;
+use DiemFramework::Block;
 
 fun main() {
-    assert!(DiemBlock::get_current_block_height() == 1, 73);
-    assert!(DiemTimestamp::now_microseconds() == 1000000, 76);
+    assert!(Block::get_current_block_height() == 1, 73);
+    assert!(Timestamp::now_microseconds() == 1000000, 76);
 }
 }
 
 //# run --admin-script
 //#     --signers DiemRoot DiemRoot
 script{
-use DiemFramework::DiemTimestamp;
+use DiemFramework::Timestamp;
 
 fun main() {
-    assert!(DiemTimestamp::now_microseconds() != 2000000, 77);
+    assert!(Timestamp::now_microseconds() != 2000000, 77);
 }
 }
 
@@ -29,9 +29,9 @@ fun main() {
 //# run --admin-script
 //#     --signers DiemRoot Vivian
 script{
-use DiemFramework::DiemTimestamp;
+use DiemFramework::Timestamp;
 
 fun main(dr: signer, vv: signer) {
-    DiemTimestamp::update_global_time(&vv, @Vivian, 20);
+    Timestamp::update_global_time(&vv, @Vivian, 20);
 }
 }

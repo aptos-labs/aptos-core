@@ -16,7 +16,7 @@ use aptos_types::{
 };
 use aptos_validator_interface::{AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView};
 use aptos_vm::{
-    convert_changeset_and_events, data_cache::RemoteStorage, logging::AdapterLogSchema, DiemVM,
+    convert_changeset_and_events, data_cache::RemoteStorage, logging::AdapterLogSchema, AptosVM,
     VMExecutor,
 };
 use move_binary_format::{errors::VMResult, file_format::CompiledModule};
@@ -58,7 +58,7 @@ impl AptosDebugger {
         txns: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>> {
         let state_view = DebuggerStateView::new(&*self.debugger, version.checked_sub(1));
-        DiemVM::execute_block(txns, &state_view)
+        AptosVM::execute_block(txns, &state_view)
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
     }
 
@@ -123,7 +123,7 @@ impl AptosDebugger {
             .checked_sub(1)
             .ok_or_else(|| anyhow!("Can't run a write set transaction without genesis."))?;
         let state_view = DebuggerStateView::new(&*self.debugger, Some(base_version));
-        let vm = DiemVM::new(&state_view);
+        let vm = AptosVM::new(&state_view);
         let cache = aptos_vm::data_cache::StateViewCache::new(&state_view);
         let sequence_number = match self
             .debugger

@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 use aptos_types::{
     access_path::AccessPath,
-    on_chain_config::DiemVersion,
+    on_chain_config::Version,
     transaction::{ChangeSet, Script, TransactionStatus, WriteSetPayload},
     vm_status::KeptVMStatus,
     write_set::WriteOp,
 };
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use aptos_writeset_generator::build_changeset;
 use language_e2e_tests::{
     account::Account, compile::compile_module, current_function_name, executor::FakeExecutor,
@@ -64,11 +64,8 @@ fn build_upgrade_writeset() {
 
     executor.apply_write_set(output.write_set());
 
-    let new_vm = DiemVM::new(executor.get_state_view());
-    assert_eq!(
-        new_vm.internals().diem_version().unwrap(),
-        DiemVersion { major: 11 }
-    );
+    let new_vm = AptosVM::new(executor.get_state_view());
+    assert_eq!(new_vm.internals().version().unwrap(), Version { major: 11 });
 
     let script_body = {
         let code = r#"

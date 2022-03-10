@@ -11,22 +11,22 @@ module Alice::Foo {
 // Initially, any script is allowed.
 //# run --admin-script --signers DiemRoot DiemRoot
 script {
-use DiemFramework::DiemTransactionPublishingOption;
+use DiemFramework::TransactionPublishingOption;
 fun main(dr: signer, _dr2: signer) {
-    assert!(DiemTransactionPublishingOption::is_script_allowed(&dr, &x""), 100);
+    assert!(TransactionPublishingOption::is_script_allowed(&dr, &x""), 100);
 }
 }
 
 // Turning off open scripts is a privileged operation.
 //# run --admin-script --signers DiemRoot Vivian
 script {
-use DiemFramework::DiemTransactionPublishingOption;
+use DiemFramework::TransactionPublishingOption;
 fun main(_dr: signer, vv: signer) {
-    DiemTransactionPublishingOption::set_open_script(&vv);
+    TransactionPublishingOption::set_open_script(&vv);
 }
 }
 
-// TODO: double check on `DiemTransactionPublishingOption::set_open_script`.
+// TODO: double check on `TransactionPublishingOption::set_open_script`.
 //     - The name seems confusing.
 //     - Shall we send more transactions to test out its effects?
 
@@ -36,10 +36,10 @@ fun main(_dr: signer, vv: signer) {
 // Step 2: Change option to CustomModule
 //# run --admin-script --signers DiemRoot DiemRoot
 script {
-use DiemFramework::DiemTransactionPublishingOption;
+use DiemFramework::TransactionPublishingOption;
 
 fun main(dr: signer, _dr2: signer) {
-    DiemTransactionPublishingOption::set_open_module(&dr, false)
+    TransactionPublishingOption::set_open_module(&dr, false)
 }
 }
 

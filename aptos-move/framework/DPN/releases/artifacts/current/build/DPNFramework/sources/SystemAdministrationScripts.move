@@ -1,9 +1,9 @@
 /// This module contains Diem Framework script functions to administer the
 /// network outside of validators and validator operators.
 module DiemFramework::SystemAdministrationScripts {
-    use DiemFramework::DiemConsensusConfig;
-    use DiemFramework::DiemVersion;
-    use DiemFramework::DiemVMConfig;
+    use DiemFramework::ConsensusConfig;
+    use DiemFramework::Version;
+    use DiemFramework::VMConfig;
     use DiemFramework::SlidingNonce;
 
     ///  # Summary
@@ -11,7 +11,7 @@ module DiemFramework::SystemAdministrationScripts {
     /// transaction can only be sent from the Diem Root account.
     ///
     /// # Technical Description
-    /// Updates the `DiemVersion` on-chain config and emits a `DiemConfig::NewEpochEvent` to trigger
+    /// Updates the `Version` on-chain config and emits a `Reconfiguration::NewEpochEvent` to trigger
     /// a reconfiguration of the system. The `major` version that is passed in must be strictly greater
     /// than the current major version held on-chain. The VM reads this information and can use it to
     /// preserve backwards compatibility with previous major versions of the VM.
@@ -31,11 +31,11 @@ module DiemFramework::SystemAdministrationScripts {
     /// | `Errors::INVALID_ARGUMENT` | `SlidingNonce::ENONCE_TOO_NEW`                | The `sliding_nonce` is too far in the future.                                              |
     /// | `Errors::INVALID_ARGUMENT` | `SlidingNonce::ENONCE_ALREADY_RECORDED`       | The `sliding_nonce` has been previously recorded.                                          |
     /// | `Errors::REQUIRES_ADDRESS` | `CoreAddresses::EDIEM_ROOT`                   | `account` is not the Diem Root account.                                                    |
-    /// | `Errors::INVALID_ARGUMENT` | `DiemVersion::EINVALID_MAJOR_VERSION_NUMBER`  | `major` is less-than or equal to the current major version stored on-chain.                |
+    /// | `Errors::INVALID_ARGUMENT` | `Version::EINVALID_MAJOR_VERSION_NUMBER`  | `major` is less-than or equal to the current major version stored on-chain.                |
 
     public(script) fun update_diem_version(account: signer, sliding_nonce: u64, major: u64) {
         SlidingNonce::record_nonce_or_abort(&account, sliding_nonce);
-        DiemVersion::set(&account, major)
+        Version::set(&account, major)
     }
 
     /// # Summary
@@ -43,8 +43,8 @@ module DiemFramework::SystemAdministrationScripts {
     /// metering. This transaction can only be sent from the Diem Root account.
     ///
     /// # Technical Description
-    /// Updates the on-chain config holding the `DiemVMConfig` and emits a
-    /// `DiemConfig::NewEpochEvent` to trigger a reconfiguration of the system.
+    /// Updates the on-chain config holding the `VMConfig` and emits a
+    /// `Reconfiguration::NewEpochEvent` to trigger a reconfiguration of the system.
     ///
     /// # Parameters
     /// | Name                                | Type     | Description                                                                                            |
@@ -66,7 +66,7 @@ module DiemFramework::SystemAdministrationScripts {
     /// # Common Abort Conditions
     /// | Error Category             | Error Reason                                | Description                                                                                |
     /// | ----------------           | --------------                              | -------------                                                                              |
-    /// | `Errors::INVALID_ARGUMENT` | `DiemVMConfig::EGAS_CONSTANT_INCONSISTENCY` | The provided gas constants are inconsistent.                                               |
+    /// | `Errors::INVALID_ARGUMENT` | `VMConfig::EGAS_CONSTANT_INCONSISTENCY` | The provided gas constants are inconsistent.                                               |
     /// | `Errors::NOT_PUBLISHED`    | `SlidingNonce::ESLIDING_NONCE`              | A `SlidingNonce` resource is not published under `account`.                                |
     /// | `Errors::INVALID_ARGUMENT` | `SlidingNonce::ENONCE_TOO_OLD`              | The `sliding_nonce` is too old and it's impossible to determine if it's duplicated or not. |
     /// | `Errors::INVALID_ARGUMENT` | `SlidingNonce::ENONCE_TOO_NEW`              | The `sliding_nonce` is too far in the future.                                              |
@@ -88,7 +88,7 @@ module DiemFramework::SystemAdministrationScripts {
         default_account_size: u64,
     ) {
         SlidingNonce::record_nonce_or_abort(&dr_account, sliding_nonce);
-        DiemVMConfig::set_gas_constants(
+        VMConfig::set_gas_constants(
                 &dr_account,
                 global_memory_per_byte_cost,
                 global_memory_per_byte_write_cost,
@@ -110,7 +110,7 @@ module DiemFramework::SystemAdministrationScripts {
     ///
     /// # Technical Description
     /// Initializes the `DiemConsensusConfig` on-chain config to empty and allows future updates from DiemRoot via
-    /// `update_diem_consensus_config`. This doesn't emit a `DiemConfig::NewEpochEvent`.
+    /// `update_diem_consensus_config`. This doesn't emit a `Reconfiguration::NewEpochEvent`.
     ///
     /// # Parameters
     /// | Name            | Type      | Description                                                                |
@@ -129,7 +129,7 @@ module DiemFramework::SystemAdministrationScripts {
 
     public(script) fun initialize_diem_consensus_config(account: signer, sliding_nonce: u64) {
         SlidingNonce::record_nonce_or_abort(&account, sliding_nonce);
-        DiemConsensusConfig::initialize(&account);
+        ConsensusConfig::initialize(&account);
     }
 
     ///  # Summary
@@ -137,7 +137,7 @@ module DiemFramework::SystemAdministrationScripts {
     /// transaction can only be sent from the Diem Root account.
     ///
     /// # Technical Description
-    /// Updates the `DiemConsensusConfig` on-chain config and emits a `DiemConfig::NewEpochEvent` to trigger
+    /// Updates the `DiemConsensusConfig` on-chain config and emits a `Reconfiguration::NewEpochEvent` to trigger
     /// a reconfiguration of the system.
     ///
     /// # Parameters
@@ -158,6 +158,6 @@ module DiemFramework::SystemAdministrationScripts {
 
     public(script) fun update_diem_consensus_config(account: signer, sliding_nonce: u64, config: vector<u8>) {
         SlidingNonce::record_nonce_or_abort(&account, sliding_nonce);
-        DiemConsensusConfig::set(&account, config)
+        ConsensusConfig::set(&account, config)
     }
 }

@@ -10,9 +10,9 @@ module DiemFramework::DiemAccount {
     use DiemFramework::XUS::XUS;
     use DiemFramework::DualAttestation;
     use DiemFramework::XDX::XDX;
-    use DiemFramework::DiemConfig;
-    use DiemFramework::DiemTimestamp;
-    use DiemFramework::DiemTransactionPublishingOption;
+    use DiemFramework::Reconfiguration;
+    use DiemFramework::Timestamp;
+    use DiemFramework::TransactionPublishingOption;
     use DiemFramework::SlidingNonce;
     use DiemFramework::TransactionFee;
     use DiemFramework::ValidatorConfig;
@@ -206,7 +206,7 @@ module DiemFramework::DiemAccount {
         dr_account: &signer,
         dummy_auth_key_prefix: vector<u8>,
     ) acquires AccountOperationsCapability {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         // Operational constraint, not a privilege constraint.
         CoreAddresses::assert_diem_root(dr_account);
 
@@ -293,7 +293,7 @@ module DiemFramework::DiemAccount {
         metadata_signature: vector<u8>,
         dual_attestation: bool,
     ) acquires DiemAccount, Balance, AccountOperationsCapability {
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         AccountFreezing::assert_not_frozen(payee);
 
         // Check that the `to_deposit` coin is non-zero
@@ -373,7 +373,7 @@ module DiemFramework::DiemAccount {
         payee: address;
         amount: u64;
         metadata: vector<u8>;
-        include DiemTimestamp::AbortsIfNotOperating;
+        include Timestamp::AbortsIfNotOperating;
         aborts_if amount == 0 with Errors::INVALID_ARGUMENT;
         include
             spec_should_track_limits_for_account<Token>(payer, payee, false) ==>
@@ -531,7 +531,7 @@ module DiemFramework::DiemAccount {
         balance: &mut Balance<Token>,
         amount: u64
     ): Diem<Token> acquires AccountOperationsCapability {
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         AccountFreezing::assert_not_frozen(payer);
         // Make sure that this withdrawal is compliant with the limits on
         // the account if it's a inter-VASP transfer,
@@ -576,7 +576,7 @@ module DiemFramework::DiemAccount {
           payee: address;
           balance: Balance<Token>;
           amount: u64;
-          include DiemTimestamp::AbortsIfNotOperating;
+          include Timestamp::AbortsIfNotOperating;
           include AccountFreezing::AbortsIfFrozen{account: payer};
           aborts_if balance.coin.value < amount with Errors::LIMIT_EXCEEDED;
     }
@@ -596,7 +596,7 @@ module DiemFramework::DiemAccount {
         amount: u64,
         metadata: vector<u8>,
     ): Diem<Token> acquires Balance, AccountOperationsCapability, DiemAccount {
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         let payer = cap.account_address;
         assert!(exists_at(payer), Errors::not_published(EACCOUNT));
         assert!(exists<Balance<Token>>(payer), Errors::not_published(EPAYER_DOESNT_HOLD_CURRENCY));
@@ -635,7 +635,7 @@ module DiemFramework::DiemAccount {
         payee: address;
         amount: u64;
         let payer = cap.account_address;
-        include DiemTimestamp::AbortsIfNotOperating;
+        include Timestamp::AbortsIfNotOperating;
         include Diem::AbortsIfNoCurrency<Token>;
         include WithdrawFromBalanceAbortsIf<Token>{payer, balance: global<Balance<Token>>(payer)};
         aborts_if !exists_at(payer) with Errors::NOT_PUBLISHED;
@@ -672,7 +672,7 @@ module DiemFramework::DiemAccount {
         amount: u64
     ) acquires Balance, AccountOperationsCapability, DiemAccount {
         Roles::assert_designated_dealer(dd);
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         Diem::preburn_to<Token>(dd, withdraw_from(cap, Signer::address_of(dd), amount, x""))
     }
     spec preburn {
@@ -700,7 +700,7 @@ module DiemFramework::DiemAccount {
         dd: signer;
         cap: WithdrawCapability;
         amount: u64;
-        include DiemTimestamp::AbortsIfNotOperating{};
+        include Timestamp::AbortsIfNotOperating{};
         include WithdrawFromAbortsIf<Token>{payee: Signer::address_of(dd)};
         include Diem::PreburnToAbortsIf<Token>{account: dd};
     }
@@ -1137,7 +1137,7 @@ module DiemFramework::DiemAccount {
         aborts_if exists<AccountFreezing::FreezingBit>(addr) with Errors::ALREADY_PUBLISHED;
         // There is an invariant below that says that there is always an AccountOperationsCapability
         // after Genesis, so this can only abort during Genesis.
-        aborts_if DiemTimestamp::is_genesis()
+        aborts_if Timestamp::is_genesis()
             && !exists<AccountOperationsCapability>(@DiemRoot)
             with Errors::NOT_PUBLISHED;
         include CreateAuthenticationKeyAbortsIf;
@@ -1192,7 +1192,7 @@ module DiemFramework::DiemAccount {
     fun create_diem_root_account(
         auth_key_prefix: vector<u8>,
     ) acquires AccountOperationsCapability {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         let dr_account = create_signer(@DiemRoot);
         CoreAddresses::assert_diem_root(&dr_account);
         Roles::grant_diem_root_role(&dr_account);
@@ -1243,7 +1243,7 @@ module DiemFramework::DiemAccount {
     }
     spec schema CreateDiemRootAccountAbortsIf {
         auth_key_prefix: vector<u8>;
-        include DiemTimestamp::AbortsIfNotGenesis;
+        include Timestamp::AbortsIfNotGenesis;
         include Roles::GrantRole{addr: @DiemRoot, role_id: Roles::DIEM_ROOT_ROLE_ID};
         aborts_if exists<SlidingNonce::SlidingNonce>(@DiemRoot)
             with Errors::ALREADY_PUBLISHED;
@@ -1275,7 +1275,7 @@ module DiemFramework::DiemAccount {
         dr_account: &signer,
         auth_key_prefix: vector<u8>,
     ) acquires AccountOperationsCapability {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         Roles::assert_diem_root(dr_account);
         let new_account_address = @TreasuryCompliance;
         let new_account = create_signer(new_account_address);
@@ -1313,7 +1313,7 @@ module DiemFramework::DiemAccount {
     spec schema CreateTreasuryComplianceAccountAbortsIf {
         dr_account: signer;
         auth_key_prefix: vector<u8>;
-        include DiemTimestamp::AbortsIfNotGenesis;
+        include Timestamp::AbortsIfNotGenesis;
         include Roles::GrantRole{addr: @TreasuryCompliance, role_id: Roles::TREASURY_COMPLIANCE_ROLE_ID};
         aborts_if exists<SlidingNonce::SlidingNonce>(@TreasuryCompliance)
             with Errors::ALREADY_PUBLISHED;
@@ -1344,7 +1344,7 @@ module DiemFramework::DiemAccount {
         human_name: vector<u8>,
         add_all_currencies: bool,
     ) acquires AccountOperationsCapability {
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         Roles::assert_treasury_compliance(creator_account);
         let new_dd_account = create_signer(new_account_address);
         Roles::new_designated_dealer_role(creator_account, &new_dd_account);
@@ -1366,7 +1366,7 @@ module DiemFramework::DiemAccount {
         new_account_address: address;
         auth_key_prefix: vector<u8>;
         add_all_currencies: bool;
-        include DiemTimestamp::AbortsIfNotOperating;
+        include Timestamp::AbortsIfNotOperating;
         include Roles::AbortsIfNotTreasuryCompliance{account: creator_account};
         aborts_if exists<Roles::RoleId>(new_account_address) with Errors::ALREADY_PUBLISHED;
         aborts_if exists<DesignatedDealer::Dealer>(new_account_address) with Errors::ALREADY_PUBLISHED;
@@ -1424,7 +1424,7 @@ module DiemFramework::DiemAccount {
         new_account_address: address;
         auth_key_prefix: vector<u8>;
         add_all_currencies: bool;
-        include DiemTimestamp::AbortsIfNotOperating;
+        include Timestamp::AbortsIfNotOperating;
         include Roles::AbortsIfNotTreasuryCompliance{account: creator_account};
         include VASPDomain::PublishVASPDomainsAbortsIf{vasp_addr: new_account_address};
         aborts_if exists<Roles::RoleId>(new_account_address) with Errors::ALREADY_PUBLISHED;
@@ -1452,7 +1452,7 @@ module DiemFramework::DiemAccount {
         auth_key_prefix: vector<u8>,
         add_all_currencies: bool,
     ) acquires AccountOperationsCapability {
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         Roles::assert_parent_vasp_role(parent);
         let new_account = create_signer(new_account_address);
         Roles::new_child_vasp_role(parent, &new_account);
@@ -1478,7 +1478,7 @@ module DiemFramework::DiemAccount {
         new_account_address: address;
         auth_key_prefix: vector<u8>;
         add_all_currencies: bool;
-        include DiemTimestamp::AbortsIfNotOperating;
+        include Timestamp::AbortsIfNotOperating;
         include Roles::AbortsIfNotParentVasp{account: parent};
         aborts_if exists<Roles::RoleId>(new_account_address) with Errors::ALREADY_PUBLISHED;
         include VASP::PublishChildVASPAbortsIf{child_addr: new_account_address};
@@ -1652,7 +1652,7 @@ module DiemFramework::DiemAccount {
         chain_id: u8,
     ) acquires DiemAccount, Balance {
         assert!(
-            DiemTransactionPublishingOption::is_module_allowed(&sender),
+            TransactionPublishingOption::is_module_allowed(&sender),
             Errors::invalid_state(PROLOGUE_EMODULE_NOT_ALLOWED),
         );
 
@@ -1692,9 +1692,9 @@ module DiemFramework::DiemAccount {
             txn_expiration_time_seconds,
         };
         /// Aborts only in genesis. Does not need to be handled.
-        include DiemTransactionPublishingOption::AbortsIfNoTransactionPublishingOption;
+        include TransactionPublishingOption::AbortsIfNoTransactionPublishingOption;
         /// Covered: L75 (Match 9)
-        aborts_if !DiemTransactionPublishingOption::spec_is_module_allowed(sender) with Errors::INVALID_STATE;
+        aborts_if !TransactionPublishingOption::spec_is_module_allowed(sender) with Errors::INVALID_STATE;
     }
 
     /// The prologue for script transaction
@@ -1709,7 +1709,7 @@ module DiemFramework::DiemAccount {
         script_hash: vector<u8>,
     ) acquires DiemAccount, Balance {
         assert!(
-            DiemTransactionPublishingOption::is_script_allowed(&sender, &script_hash),
+            TransactionPublishingOption::is_script_allowed(&sender, &script_hash),
             Errors::invalid_state(PROLOGUE_ESCRIPT_NOT_ALLOWED),
         );
 
@@ -1743,9 +1743,9 @@ module DiemFramework::DiemAccount {
         let transaction_sender = Signer::address_of(sender);
         include PrologueCommonAbortsIf<Token> {transaction_sender};
         /// Aborts only in Genesis. Does not need to be handled.
-        include DiemTransactionPublishingOption::AbortsIfNoTransactionPublishingOption;
+        include TransactionPublishingOption::AbortsIfNoTransactionPublishingOption;
         /// Covered: L74 (Match 8)
-        aborts_if !DiemTransactionPublishingOption::spec_is_script_allowed(sender, script_hash) with Errors::INVALID_STATE;
+        aborts_if !TransactionPublishingOption::spec_is_script_allowed(sender, script_hash) with Errors::INVALID_STATE;
     }
 
     /// The prologue for WriteSet transaction
@@ -1977,7 +1977,7 @@ module DiemFramework::DiemAccount {
 
         // [PCA9]: Check that the transaction hasn't expired
         assert!(
-            DiemTimestamp::now_seconds() < txn_expiration_time_seconds,
+            Timestamp::now_seconds() < txn_expiration_time_seconds,
             Errors::invalid_argument(PROLOGUE_ETRANSACTION_EXPIRED)
         );
 
@@ -2027,7 +2027,7 @@ module DiemFramework::DiemAccount {
         max_transaction_fee: u128;
         txn_expiration_time_seconds: u64;
         /// Only happens if this is called in Genesis. Doesn't need to be handled.
-        include DiemTimestamp::AbortsIfNotOperating;
+        include Timestamp::AbortsIfNotOperating;
         /// [PCA1] Covered: L73 (Match 7)
         aborts_if chain_id != ChainId::spec_get_chain_id() with Errors::INVALID_ARGUMENT;
         /// [PCA2] Covered: L65 (Match 4)
@@ -2045,7 +2045,7 @@ module DiemFramework::DiemAccount {
         /// [PCA8] Covered: L69 (Match 5)
         aborts_if max_transaction_fee > 0 && balance<Token>(transaction_sender) < max_transaction_fee with Errors::INVALID_ARGUMENT;
         /// [PCA9] Covered: L72 (Match 6)
-        aborts_if DiemTimestamp::spec_now_seconds() >= txn_expiration_time_seconds with Errors::INVALID_ARGUMENT;
+        aborts_if Timestamp::spec_now_seconds() >= txn_expiration_time_seconds with Errors::INVALID_ARGUMENT;
         /// [PCA10] Covered: L81 (match 11)
         aborts_if txn_sequence_number >= MAX_U64 with Errors::LIMIT_EXCEEDED;
         /// [PCA11] Covered: L61 (Match 2)
@@ -2205,7 +2205,7 @@ module DiemFramework::DiemAccount {
         let writeset_events_ref = borrow_global_mut<DiemWriteSetManager>(@DiemRoot);
         Event::emit_event<AdminTransactionEvent>(
             &mut writeset_events_ref.upgrade_events,
-            AdminTransactionEvent { committed_timestamp_secs: DiemTimestamp::now_seconds() },
+            AdminTransactionEvent { committed_timestamp_secs: Timestamp::now_seconds() },
         );
 
         // Double check that the sender is the DiemRoot account at the `@DiemRoot`
@@ -2220,7 +2220,7 @@ module DiemFramework::DiemAccount {
 
         // Currency code don't matter here as it won't be charged anyway.
         epilogue_common<XUS>(dr_account, txn_sequence_number, 0, 0, 0);
-        if (should_trigger_reconfiguration) DiemConfig::reconfigure(dr_account)
+        if (should_trigger_reconfiguration) Reconfiguration::reconfigure(dr_account)
     }
     spec writeset_epilogue {
         include WritesetEpilogueAbortsIf;
@@ -2232,21 +2232,21 @@ module DiemFramework::DiemAccount {
         txn_sequence_number: u64;
         should_trigger_reconfiguration: bool;
         aborts_if !exists<DiemWriteSetManager>(@DiemRoot);
-        include DiemTimestamp::AbortsIfNotOperating;
+        include Timestamp::AbortsIfNotOperating;
         aborts_if Signer::address_of(dr_account) != @DiemRoot with Errors::INVALID_ARGUMENT;
         aborts_if !Roles::has_diem_root_role(dr_account) with Errors::INVALID_ARGUMENT;
         include EpilogueCommonAbortsIf<XUS>{account: dr_account, txn_gas_price: 0, txn_max_gas_units: 0, gas_units_remaining: 0};
         include should_trigger_reconfiguration ==> Roles::AbortsIfNotDiemRoot{account: dr_account};
-        include should_trigger_reconfiguration ==> DiemConfig::ReconfigureAbortsIf;
+        include should_trigger_reconfiguration ==> Reconfiguration::ReconfigureAbortsIf;
     }
     spec schema WritesetEpilogueEmits {
         should_trigger_reconfiguration: bool;
         let handle = global<DiemWriteSetManager>(@DiemRoot).upgrade_events;
         let msg = AdminTransactionEvent {
-            committed_timestamp_secs: DiemTimestamp::spec_now_seconds()
+            committed_timestamp_secs: Timestamp::spec_now_seconds()
         };
         emits msg to handle;
-        include should_trigger_reconfiguration ==> DiemConfig::ReconfigureEmits;
+        include should_trigger_reconfiguration ==> Reconfiguration::ReconfigureEmits;
     }
 
     /// Create a Validator account
@@ -2276,7 +2276,7 @@ module DiemFramework::DiemAccount {
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
         include MakeAccountAbortsIf{addr: new_account_address};
         // from `ValidatorConfig::publish`
-        include DiemTimestamp::AbortsIfNotOperating;
+        include Timestamp::AbortsIfNotOperating;
         aborts_if ValidatorConfig::exists_config(new_account_address) with Errors::ALREADY_PUBLISHED;
     }
     spec schema CreateValidatorAccountEnsures {
@@ -2313,7 +2313,7 @@ module DiemFramework::DiemAccount {
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
         include MakeAccountAbortsIf{addr: new_account_address};
         // from `ValidatorConfig::publish`
-        include DiemTimestamp::AbortsIfNotOperating;
+        include Timestamp::AbortsIfNotOperating;
         aborts_if ValidatorOperatorConfig::has_validator_operator_config(new_account_address) with Errors::ALREADY_PUBLISHED;
     }
     spec schema CreateValidatorOperatorAccountEnsures {
@@ -2421,10 +2421,10 @@ module DiemFramework::DiemAccount {
         invariant update forall addr: address where old(exists_at(addr)): exists_at(addr);
 
         /// After genesis, the `AccountOperationsCapability` exists.
-        invariant [suspendable] DiemTimestamp::is_operating() ==> exists<AccountOperationsCapability>(@DiemRoot);
+        invariant [suspendable] Timestamp::is_operating() ==> exists<AccountOperationsCapability>(@DiemRoot);
 
         /// After genesis, the `DiemWriteSetManager` exists.
-        invariant [suspendable] DiemTimestamp::is_operating() ==> exists<DiemWriteSetManager>(@DiemRoot);
+        invariant [suspendable] Timestamp::is_operating() ==> exists<DiemWriteSetManager>(@DiemRoot);
 
         /// resource struct `Balance<CoinType>` is persistent
         invariant<CoinType> update forall addr: address
@@ -2593,7 +2593,7 @@ module DiemFramework::DiemAccount {
 
     spec fun prologue_guarantees(sender: signer) : bool {
         let addr = Signer::address_of(sender);
-        DiemTimestamp::is_operating() && exists_at(addr) && !AccountFreezing::account_is_frozen(addr)
+        Timestamp::is_operating() && exists_at(addr) && !AccountFreezing::account_is_frozen(addr)
     }
 
     /// Used in transaction script to specify properties checked by the prologue.

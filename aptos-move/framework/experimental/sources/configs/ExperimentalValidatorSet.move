@@ -1,13 +1,13 @@
 module ExperimentalFramework::ExperimentalValidatorSet {
     use Std::Capability;
-    use CoreFramework::DiemSystem;
+    use CoreFramework::ValidatorSystem;
 
     struct ExperimentalValidatorSet has drop {}
 
     public fun initialize_validator_set(
         account: &signer,
     ) {
-        DiemSystem::initialize_validator_set<ExperimentalValidatorSet>(account);
+        ValidatorSystem::initialize_validator_set<ExperimentalValidatorSet>(account);
         Capability::create(account, &ExperimentalValidatorSet {});
     }
 
@@ -15,7 +15,7 @@ module ExperimentalFramework::ExperimentalValidatorSet {
         account: &signer,
         validator_addr: address,
     ) {
-        DiemSystem::add_validator(
+        ValidatorSystem::add_validator(
             validator_addr,
             Capability::acquire(account, &ExperimentalValidatorSet {})
         );
@@ -25,7 +25,7 @@ module ExperimentalFramework::ExperimentalValidatorSet {
         account: &signer,
         validator_addr: address,
     ) {
-        DiemSystem::remove_validator(
+        ValidatorSystem::remove_validator(
             validator_addr,
             Capability::acquire(account, &ExperimentalValidatorSet {})
         );

@@ -10,7 +10,7 @@ module ExperimentalFramework::SystemAdministrationScripts {
     /// transaction can only be sent from the Diem Root account.
     ///
     /// # Technical Description
-    /// Updates the `DiemVersion` on-chain config and emits a `DiemConfig::NewEpochEvent` to trigger
+    /// Updates the `Version` on-chain config and emits a `Reconfiguration::NewEpochEvent` to trigger
     /// a reconfiguration of the system. The `major` version that is passed in must be strictly greater
     /// than the current major version held on-chain. The VM reads this information and can use it to
     /// preserve backwards compatibility with previous major versions of the VM.
@@ -26,7 +26,7 @@ module ExperimentalFramework::SystemAdministrationScripts {
     /// | Error Category             | Error Reason                                  | Description                                                                                |
     /// | ----------------           | --------------                                | -------------                                                                              |
     /// | `Errors::REQUIRES_ADDRESS` | `CoreAddresses::EDIEM_ROOT`                   | `account` is not the Diem Root account.                                                    |
-    /// | `Errors::INVALID_ARGUMENT` | `DiemVersion::EINVALID_MAJOR_VERSION_NUMBER`  | `major` is less-than or equal to the current major version stored on-chain.                |
+    /// | `Errors::INVALID_ARGUMENT` | `Version::EINVALID_MAJOR_VERSION_NUMBER`  | `major` is less-than or equal to the current major version stored on-chain.                |
 
     public(script) fun update_diem_version(account: signer, _sliding_nonce: u64, major: u64) {
         ExperimentalVersion::set(&account, major)
@@ -37,8 +37,8 @@ module ExperimentalFramework::SystemAdministrationScripts {
     /// metering. This transaction can only be sent from the Diem Root account.
     ///
     /// # Technical Description
-    /// Updates the on-chain config holding the `DiemVMConfig` and emits a
-    /// `DiemConfig::NewEpochEvent` to trigger a reconfiguration of the system.
+    /// Updates the on-chain config holding the `VMConfig` and emits a
+    /// `Reconfiguration::NewEpochEvent` to trigger a reconfiguration of the system.
     ///
     /// # Parameters
     /// | Name                                | Type     | Description                                                                                            |
@@ -60,7 +60,7 @@ module ExperimentalFramework::SystemAdministrationScripts {
     /// # Common Abort Conditions
     /// | Error Category             | Error Reason                                | Description                                                                                |
     /// | ----------------           | --------------                              | -------------                                                                              |
-    /// | `Errors::INVALID_ARGUMENT` | `DiemVMConfig::EGAS_CONSTANT_INCONSISTENCY` | The provided gas constants are inconsistent.                                               |
+    /// | `Errors::INVALID_ARGUMENT` | `VMConfig::EGAS_CONSTANT_INCONSISTENCY` | The provided gas constants are inconsistent.                                               |
     /// | `Errors::REQUIRES_ADDRESS` | `CoreAddresses::EDIEM_ROOT`                 | `account` is not the Diem Root account.                                                    |
     public(script) fun set_gas_constants(
         dr_account: signer,
@@ -99,7 +99,7 @@ module ExperimentalFramework::SystemAdministrationScripts {
     ///
     /// # Technical Description
     /// Initializes the `DiemConsensusConfig` on-chain config to empty and allows future updates from DiemRoot via
-    /// `update_diem_consensus_config`. This doesn't emit a `DiemConfig::NewEpochEvent`.
+    /// `update_diem_consensus_config`. This doesn't emit a `Reconfiguration::NewEpochEvent`.
     ///
     /// # Parameters
     /// | Name            | Type      | Description                                                                |
@@ -121,7 +121,7 @@ module ExperimentalFramework::SystemAdministrationScripts {
     /// transaction can only be sent from the Diem Root account.
     ///
     /// # Technical Description
-    /// Updates the `DiemConsensusConfig` on-chain config and emits a `DiemConfig::NewEpochEvent` to trigger
+    /// Updates the `DiemConsensusConfig` on-chain config and emits a `Reconfiguration::NewEpochEvent` to trigger
     /// a reconfiguration of the system.
     ///
     /// # Parameters

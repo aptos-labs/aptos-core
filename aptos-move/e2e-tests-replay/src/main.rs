@@ -5,7 +5,7 @@ use anyhow::{bail, Result};
 use std::collections::{BTreeMap, BTreeSet};
 use structopt::StructOpt;
 
-use aptos_types::on_chain_config::{DiemVersion, DIEM_MAX_KNOWN_VERSION};
+use aptos_types::on_chain_config::{Version, DIEM_MAX_KNOWN_VERSION};
 use framework::dpn_files;
 use move_model::run_model_builder;
 use move_stackless_bytecode_interpreter::{
@@ -72,7 +72,7 @@ pub fn main() -> Result<()> {
     let flags = ReplayFlags {
         diem_version: args
             .diem_version
-            .map_or(DIEM_MAX_KNOWN_VERSION, |v| DiemVersion { major: v }),
+            .map_or(DIEM_MAX_KNOWN_VERSION, |v| Version { major: v }),
         filters,
         step_limit: args.step_limit.unwrap_or(usize::MAX),
         xrun: args.xrun,

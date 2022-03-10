@@ -236,12 +236,12 @@ pub async fn enable_open_publishing(
 ) -> Result<()> {
     let script_body = {
         let code = "
-            import 0x1.DiemTransactionPublishingOption;
+            import 0x1.TransactionPublishingOption;
 
             main(account: signer) {
             label b0:
-                DiemTransactionPublishingOption.set_open_script(&account);
-                DiemTransactionPublishingOption.set_open_module(&account, true);
+                TransactionPublishingOption.set_open_script(&account);
+                TransactionPublishingOption.set_open_module(&account, true);
 
                 return;
             }

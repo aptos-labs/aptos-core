@@ -16,7 +16,7 @@ use aptos_types::{
     on_chain_config::{OnChainConfig, ON_CHAIN_CONFIG_REGISTRY},
     transaction::{Transaction, Version, WriteSetPayload},
 };
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use claim::{assert_lt, assert_matches, assert_ok};
 use executor_test_helpers::bootstrap_genesis;
@@ -552,7 +552,7 @@ fn create_database() -> Arc<RwLock<DbReaderWriter>> {
 
     // Bootstrap the genesis transaction
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
-    assert_ok!(bootstrap_genesis::<DiemVM>(&db_rw, &genesis_txn));
+    assert_ok!(bootstrap_genesis::<AptosVM>(&db_rw, &genesis_txn));
 
     Arc::new(RwLock::new(db_rw))
 }

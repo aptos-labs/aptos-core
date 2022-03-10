@@ -9,30 +9,30 @@
 
 //# run --admin-script --signers DiemRoot Carol
 script {
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
 
     fun main(_dr: signer, account: signer) {
-        DiemSystem::initialize_validator_set(&account);
+        ValidatorSystem::initialize_validator_set(&account);
     }
 }
 
 //# run --admin-script --signers DiemRoot DiemRoot
 script {
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
 
     fun main() {
-        let len = DiemSystem::validator_set_size();
-        DiemSystem::get_ith_validator_address(len);
+        let len = ValidatorSystem::validator_set_size();
+        ValidatorSystem::get_ith_validator_address(len);
     }
 }
 
 //# run --admin-script --signers DiemRoot Carol
 script {
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
 
     fun main(_dr: signer, account: signer) {
         let account = &account;
-        DiemSystem::update_config_and_reconfigure(account, @Bob);
+        ValidatorSystem::update_config_and_reconfigure(account, @Bob);
     }
 }
 

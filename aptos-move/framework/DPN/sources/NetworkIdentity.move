@@ -1,6 +1,6 @@
 /// Module managing Diemnet NetworkIdentity
 module DiemFramework::NetworkIdentity {
-    use DiemFramework::DiemTimestamp;
+    use DiemFramework::Timestamp;
     use DiemFramework::Roles;
     use Std::Errors;
     use Std::Event::{Self, EventHandle};
@@ -110,7 +110,7 @@ module DiemFramework::NetworkIdentity {
                 NetworkIdentityChangeNotification {
                     account: account_addr,
                     identities: *&identity.identities,
-                    time_rotated_seconds: DiemTimestamp::now_seconds(),
+                    time_rotated_seconds: Timestamp::now_seconds(),
                 }
             );
         }
@@ -129,14 +129,14 @@ module DiemFramework::NetworkIdentity {
         let post msg = NetworkIdentityChangeNotification {
             account: account_addr,
             identities: global<NetworkIdentity>(account_addr).identities,
-            time_rotated_seconds: DiemTimestamp::spec_now_seconds(),
+            time_rotated_seconds: Timestamp::spec_now_seconds(),
         };
 
         aborts_if !tc_network_identity_event_handle_exists() with Errors::NOT_PUBLISHED;
         aborts_if len(to_add) == 0 with Errors::INVALID_ARGUMENT;
         aborts_if len(prior_identities) + len(to_add) > MAX_U64;
         aborts_if len(prior_identities) + len(to_add) > MAX_ADDR_IDENTITIES with Errors::LIMIT_EXCEEDED;
-        include has_change ==> DiemTimestamp::AbortsIfNotOperating;
+        include has_change ==> Timestamp::AbortsIfNotOperating;
         include AddMembersInternalEnsures<vector<u8>> {
             old_members: prior_identities,
             new_members: global<NetworkIdentity>(account_addr).identities,
@@ -171,7 +171,7 @@ module DiemFramework::NetworkIdentity {
                 NetworkIdentityChangeNotification {
                     account: account_addr,
                     identities: *&identity.identities,
-                    time_rotated_seconds: DiemTimestamp::now_seconds(),
+                    time_rotated_seconds: Timestamp::now_seconds(),
                 }
             );
         };
@@ -185,14 +185,14 @@ module DiemFramework::NetworkIdentity {
         let post msg = NetworkIdentityChangeNotification {
             account: account_addr,
             identities: global<NetworkIdentity>(account_addr).identities,
-            time_rotated_seconds: DiemTimestamp::spec_now_seconds(),
+            time_rotated_seconds: Timestamp::spec_now_seconds(),
         };
 
         aborts_if !tc_network_identity_event_handle_exists() with Errors::NOT_PUBLISHED;
         aborts_if len(to_remove) == 0 with Errors::INVALID_ARGUMENT;
         aborts_if len(to_remove) > MAX_ADDR_IDENTITIES with Errors::LIMIT_EXCEEDED;
         aborts_if !exists<NetworkIdentity>(account_addr) with Errors::NOT_PUBLISHED;
-        include has_change ==> DiemTimestamp::AbortsIfNotOperating;
+        include has_change ==> Timestamp::AbortsIfNotOperating;
         include RemoveMembersInternalEnsures<vector<u8>> {
             old_members: prior_identities,
             new_members: global<NetworkIdentity>(account_addr).identities,

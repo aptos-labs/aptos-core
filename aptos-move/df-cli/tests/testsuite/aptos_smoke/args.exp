@@ -49,6 +49,22 @@ Changed resource(s) under 2 address(es):
           time_period: 86400000000
           max_holding: 18446744073709551615
       }
+    Added type 0x1::Block::BlockMetadata: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24] (wrote 79 bytes)
+      key 0x1::Block::BlockMetadata {
+          height: 0
+          new_block_events: store 0x1::Event::EventHandle<0x1::Block::NewBlockEvent> {
+              counter: 0
+              guid: drop store 0x1::Event::GUIDWrapper {
+                  len_bytes: 24u8
+                  guid: drop store 0x1::GUID::GUID {
+                      id: copy drop store 0x1::GUID::ID {
+                          creation_num: 17
+                          addr: a550c18
+                      }
+                  }
+              }
+          }
+      }
     Added type 0x1::ChainId::ChainId: [0] (wrote 35 bytes)
       key 0x1::ChainId::ChainId {
           id: 0u8
@@ -275,27 +291,19 @@ Changed resource(s) under 2 address(es):
               }
           }
       }
-    Added type 0x1::DiemBlock::BlockMetadata: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24] (wrote 83 bytes)
-      key 0x1::DiemBlock::BlockMetadata {
-          height: 0
-          new_block_events: store 0x1::Event::EventHandle<0x1::DiemBlock::NewBlockEvent> {
-              counter: 0
-              guid: drop store 0x1::Event::GUIDWrapper {
-                  len_bytes: 24u8
-                  guid: drop store 0x1::GUID::GUID {
-                      id: copy drop store 0x1::GUID::ID {
-                          creation_num: 17
-                          addr: a550c18
-                      }
-                  }
-              }
-          }
+    Added type 0x1::DualAttestation::Limit: [0, 202, 154, 59, 0, 0, 0, 0] (wrote 48 bytes)
+      key 0x1::DualAttestation::Limit {
+          micro_xdx_limit: 1000000000
       }
-    Added type 0x1::DiemConfig::Configuration: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24] (wrote 92 bytes)
-      key 0x1::DiemConfig::Configuration {
+    Added type 0x1::GUID::Generator: [18, 0, 0, 0, 0, 0, 0, 0] (wrote 41 bytes)
+      key 0x1::GUID::Generator {
+          counter: 18
+      }
+    Added type 0x1::Reconfiguration::Configuration: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24] (wrote 97 bytes)
+      key 0x1::Reconfiguration::Configuration {
           epoch: 0
           last_reconfiguration_time: 0
-          events: store 0x1::Event::EventHandle<0x1::DiemConfig::NewEpochEvent> {
+          events: store 0x1::Event::EventHandle<0x1::Reconfiguration::NewEpochEvent> {
               counter: 0
               guid: drop store 0x1::Event::GUIDWrapper {
                   len_bytes: 24u8
@@ -308,29 +316,46 @@ Changed resource(s) under 2 address(es):
               }
           }
       }
-    Added type 0x1::DiemConfig::DiemConfig<0x1::DiemSystem::DiemSystem>: [0, 0] (wrote 82 bytes)
-      store key 0x1::DiemConfig::DiemConfig<0x1::DiemSystem::DiemSystem> {
-          payload: copy drop store 0x1::DiemSystem::DiemSystem {
-              scheme: 0u8
-              validators: [
+    Added type 0x1::Reconfiguration::ModifyConfigCapability<0x1::RegisteredCurrencies::RegisteredCurrencies>: [0] (wrote 118 bytes)
+      store key 0x1::Reconfiguration::ModifyConfigCapability<0x1::RegisteredCurrencies::RegisteredCurrencies> {
+          dummy_field: false
+      }
+    Added type 0x1::Reconfiguration::ModifyConfigCapability<0x1::TransactionPublishingOption::TransactionPublishingOption>: [0] (wrote 132 bytes)
+      store key 0x1::Reconfiguration::ModifyConfigCapability<0x1::TransactionPublishingOption::TransactionPublishingOption> {
+          dummy_field: false
+      }
+    Added type 0x1::Reconfiguration::ModifyConfigCapability<0x1::VMConfig::VMConfig>: [0] (wrote 94 bytes)
+      store key 0x1::Reconfiguration::ModifyConfigCapability<0x1::VMConfig::VMConfig> {
+          dummy_field: false
+      }
+    Added type 0x1::Reconfiguration::ModifyConfigCapability<0x1::Version::Version>: [0] (wrote 92 bytes)
+      store key 0x1::Reconfiguration::ModifyConfigCapability<0x1::Version::Version> {
+          dummy_field: false
+      }
+    Added type 0x1::Reconfiguration::Reconfiguration<0x1::RegisteredCurrencies::RegisteredCurrencies>: [2, 3, 88, 85, 83, 3, 88, 68, 88] (wrote 119 bytes)
+      store key 0x1::Reconfiguration::Reconfiguration<0x1::RegisteredCurrencies::RegisteredCurrencies> {
+          payload: copy drop store 0x1::RegisteredCurrencies::RegisteredCurrencies {
+              currency_codes: [
+                  585553,
+                  584458,
               ]
           }
       }
-    Added type 0x1::DiemConfig::DiemConfig<0x1::DiemTransactionPublishingOption::DiemTransactionPublishingOption>: [0, 1] (wrote 124 bytes)
-      store key 0x1::DiemConfig::DiemConfig<0x1::DiemTransactionPublishingOption::DiemTransactionPublishingOption> {
-          payload: copy drop store 0x1::DiemTransactionPublishingOption::DiemTransactionPublishingOption {
+    Added type 0x1::Reconfiguration::Reconfiguration<0x1::TransactionPublishingOption::TransactionPublishingOption>: [0, 1] (wrote 126 bytes)
+      store key 0x1::Reconfiguration::Reconfiguration<0x1::TransactionPublishingOption::TransactionPublishingOption> {
+          payload: copy drop store 0x1::TransactionPublishingOption::TransactionPublishingOption {
               script_allow_list: [
               ]
               module_publishing_allowed: true
           }
       }
-    Added type 0x1::DiemConfig::DiemConfig<0x1::DiemVMConfig::DiemVMConfig>: [0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 88, 2, 0, 0, 0, 0, 0, 0, 88, 2, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 9, 61, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 39, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 232, 3, 0, 0, 0, 0, 0, 0, 32, 3, 0, 0, 0, 0, 0, 0] (wrote 174 bytes)
-      store key 0x1::DiemConfig::DiemConfig<0x1::DiemVMConfig::DiemVMConfig> {
-          payload: copy drop store 0x1::DiemVMConfig::DiemVMConfig {
-              gas_schedule: copy drop store 0x1::DiemVMConfig::GasSchedule {
+    Added type 0x1::Reconfiguration::Reconfiguration<0x1::VMConfig::VMConfig>: [0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 88, 2, 0, 0, 0, 0, 0, 0, 88, 2, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 9, 61, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 39, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 232, 3, 0, 0, 0, 0, 0, 0, 32, 3, 0, 0, 0, 0, 0, 0] (wrote 176 bytes)
+      store key 0x1::Reconfiguration::Reconfiguration<0x1::VMConfig::VMConfig> {
+          payload: copy drop store 0x1::VMConfig::VMConfig {
+              gas_schedule: copy drop store 0x1::VMConfig::GasSchedule {
                   instruction_schedule: 
                   native_schedule: 
-                  gas_constants: copy drop store 0x1::DiemVMConfig::GasConstants {
+                  gas_constants: copy drop store 0x1::VMConfig::GasConstants {
                       global_memory_per_byte_cost: 4
                       global_memory_per_byte_write_cost: 9
                       min_transaction_gas_units: 600
@@ -346,54 +371,19 @@ Changed resource(s) under 2 address(es):
               }
           }
       }
-    Added type 0x1::DiemConfig::DiemConfig<0x1::DiemVersion::DiemVersion>: [1, 0, 0, 0, 0, 0, 0, 0] (wrote 90 bytes)
-      store key 0x1::DiemConfig::DiemConfig<0x1::DiemVersion::DiemVersion> {
-          payload: copy drop store 0x1::DiemVersion::DiemVersion {
-              major: 1
-          }
-      }
-    Added type 0x1::DiemConfig::DiemConfig<0x1::RegisteredCurrencies::RegisteredCurrencies>: [2, 3, 88, 85, 83, 3, 88, 68, 88] (wrote 109 bytes)
-      store key 0x1::DiemConfig::DiemConfig<0x1::RegisteredCurrencies::RegisteredCurrencies> {
-          payload: copy drop store 0x1::RegisteredCurrencies::RegisteredCurrencies {
-              currency_codes: [
-                  585553,
-                  584458,
+    Added type 0x1::Reconfiguration::Reconfiguration<0x1::ValidatorSystem::ValidatorSystem>: [0, 0] (wrote 102 bytes)
+      store key 0x1::Reconfiguration::Reconfiguration<0x1::ValidatorSystem::ValidatorSystem> {
+          payload: copy drop store 0x1::ValidatorSystem::ValidatorSystem {
+              scheme: 0u8
+              validators: [
               ]
           }
       }
-    Added type 0x1::DiemConfig::ModifyConfigCapability<0x1::DiemTransactionPublishingOption::DiemTransactionPublishingOption>: [0] (wrote 135 bytes)
-      store key 0x1::DiemConfig::ModifyConfigCapability<0x1::DiemTransactionPublishingOption::DiemTransactionPublishingOption> {
-          dummy_field: false
-      }
-    Added type 0x1::DiemConfig::ModifyConfigCapability<0x1::DiemVMConfig::DiemVMConfig>: [0] (wrote 97 bytes)
-      store key 0x1::DiemConfig::ModifyConfigCapability<0x1::DiemVMConfig::DiemVMConfig> {
-          dummy_field: false
-      }
-    Added type 0x1::DiemConfig::ModifyConfigCapability<0x1::DiemVersion::DiemVersion>: [0] (wrote 95 bytes)
-      store key 0x1::DiemConfig::ModifyConfigCapability<0x1::DiemVersion::DiemVersion> {
-          dummy_field: false
-      }
-    Added type 0x1::DiemConfig::ModifyConfigCapability<0x1::RegisteredCurrencies::RegisteredCurrencies>: [0] (wrote 113 bytes)
-      store key 0x1::DiemConfig::ModifyConfigCapability<0x1::RegisteredCurrencies::RegisteredCurrencies> {
-          dummy_field: false
-      }
-    Added type 0x1::DiemSystem::CapabilityHolder: [0] (wrote 47 bytes)
-      key 0x1::DiemSystem::CapabilityHolder {
-          cap: store key 0x1::DiemConfig::ModifyConfigCapability<0x1::DiemSystem::DiemSystem> {
-              dummy_field: false
+    Added type 0x1::Reconfiguration::Reconfiguration<0x1::Version::Version>: [1, 0, 0, 0, 0, 0, 0, 0] (wrote 92 bytes)
+      store key 0x1::Reconfiguration::Reconfiguration<0x1::Version::Version> {
+          payload: copy drop store 0x1::Version::Version {
+              major: 1
           }
-      }
-    Added type 0x1::DiemTimestamp::CurrentTimeMicroseconds: [0, 0, 0, 0, 0, 0, 0, 0] (wrote 64 bytes)
-      key 0x1::DiemTimestamp::CurrentTimeMicroseconds {
-          microseconds: 0
-      }
-    Added type 0x1::DualAttestation::Limit: [0, 202, 154, 59, 0, 0, 0, 0] (wrote 48 bytes)
-      key 0x1::DualAttestation::Limit {
-          micro_xdx_limit: 1000000000
-      }
-    Added type 0x1::GUID::Generator: [18, 0, 0, 0, 0, 0, 0, 0] (wrote 41 bytes)
-      key 0x1::GUID::Generator {
-          counter: 18
       }
     Added type 0x1::Roles::RoleId: [0, 0, 0, 0, 0, 0, 0, 0] (wrote 39 bytes)
       key 0x1::Roles::RoleId {
@@ -403,6 +393,16 @@ Changed resource(s) under 2 address(es):
       key 0x1::SlidingNonce::SlidingNonce {
           min_nonce: 0
           nonce_mask: 0u128
+      }
+    Added type 0x1::Timestamp::CurrentTimeMicroseconds: [0, 0, 0, 0, 0, 0, 0, 0] (wrote 60 bytes)
+      key 0x1::Timestamp::CurrentTimeMicroseconds {
+          microseconds: 0
+      }
+    Added type 0x1::ValidatorSystem::CapabilityHolder: [0] (wrote 52 bytes)
+      key 0x1::ValidatorSystem::CapabilityHolder {
+          cap: store key 0x1::Reconfiguration::ModifyConfigCapability<0x1::ValidatorSystem::ValidatorSystem> {
+              dummy_field: false
+          }
       }
     Added type 0x1::XDX::Reserve: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] (wrote 40 bytes)
       key 0x1::XDX::Reserve {
@@ -513,7 +513,7 @@ Changed resource(s) under 2 address(es):
               }
           }
       }
-Wrote 3554 bytes of resource ID's and data
+Wrote 3588 bytes of resource ID's and data
 Command `sandbox run sources/create_designated_dealer.move  --type-args 0x1::XDX::XDX --signers 0xB1E55ED --args 0 0xDD x"00000000000000000000000000000000" b"DD" true -v`:
 Emitted 1 events:
 Emitted [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 221, 2, 0, 0, 0, 0, 0, 0, 0] as the 2th event to stream [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 85, 12, 24]

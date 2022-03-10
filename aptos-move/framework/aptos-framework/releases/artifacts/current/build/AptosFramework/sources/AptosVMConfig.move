@@ -1,6 +1,6 @@
 module AptosFramework::AptosVMConfig {
     use Std::Capability;
-    use CoreFramework::DiemVMConfig;
+    use CoreFramework::VMConfig;
     use AptosFramework::Marker;
 
     /// Publishes the VM config.
@@ -9,7 +9,7 @@ module AptosFramework::AptosVMConfig {
         instruction_schedule: vector<u8>,
         native_schedule: vector<u8>,
     ) {
-        DiemVMConfig::initialize<Marker::ChainMarker>(account, instruction_schedule, native_schedule);
+        VMConfig::initialize<Marker::ChainMarker>(account, instruction_schedule, native_schedule);
     }
 
     public fun set_gas_constants(
@@ -26,7 +26,7 @@ module AptosFramework::AptosVMConfig {
         gas_unit_scaling_factor: u64,
         default_account_size: u64,
     ) {
-        DiemVMConfig::set_gas_constants<Marker::ChainMarker>(
+        VMConfig::set_gas_constants<Marker::ChainMarker>(
             global_memory_per_byte_cost,
             global_memory_per_byte_write_cost,
             min_transaction_gas_units,

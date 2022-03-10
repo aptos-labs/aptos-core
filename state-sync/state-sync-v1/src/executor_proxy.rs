@@ -231,12 +231,12 @@ mod tests {
         ledger_info::LedgerInfoWithSignatures,
         move_resource::MoveStorage,
         on_chain_config::{
-            ConsensusConfigV1, DiemVersion, OnChainConfig, OnChainConsensusConfig,
+            ConsensusConfigV1, OnChainConfig, OnChainConsensusConfig, Version,
             ON_CHAIN_CONFIG_REGISTRY,
         },
         transaction::{Transaction, TransactionPayload, WriteSetPayload},
     };
-    use aptos_vm::DiemVM;
+    use aptos_vm::AptosVM;
     use aptosdb::AptosDB;
     use claim::{assert_err, assert_ok};
     use event_notifications::{EventSubscriptionService, ReconfigNotificationListener};
@@ -370,7 +370,7 @@ mod tests {
 
         // Boostrap the genesis transaction
         let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
-        assert_ok!(bootstrap_genesis::<DiemVM>(&db_rw, &genesis_txn));
+        assert_ok!(bootstrap_genesis::<AptosVM>(&db_rw, &genesis_txn));
 
         // Create an event subscriber
         let mut event_subscription_service = EventSubscriptionService::new(
@@ -383,7 +383,7 @@ mod tests {
             .unwrap();
 
         // Create an executor proxy
-        let chunk_executor = Arc::new(ChunkExecutor::<DiemVM>::new(db_rw).unwrap());
+        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw).unwrap());
         let mut executor_proxy = ExecutorProxy::new(db, chunk_executor, event_subscription_service);
 
         // Publish a subscribed event
@@ -422,8 +422,8 @@ mod tests {
 
         // Verify the correct reconfig notification is sent
         let notification = reconfig_receiver.select_next_some().now_or_never().unwrap();
-        let received_config = notification.on_chain_configs.get::<DiemVersion>().unwrap();
-        assert_eq!(received_config, DiemVersion { major: 7 });
+        let received_config = notification.on_chain_configs.get::<Version>().unwrap();
+        assert_eq!(received_config, Version { major: 7 });
     }
 
     #[test]
@@ -564,7 +564,7 @@ mod tests {
         // Bootstrap the database with regular genesis
         let (genesis, validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
         let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
-        assert_ok!(bootstrap_genesis::<DiemVM>(&db_rw, &genesis_txn));
+        assert_ok!(bootstrap_genesis::<AptosVM>(&db_rw, &genesis_txn));
 
         // Create a reconfig subscriber with a custom config registry (including
         // a TestOnChainConfig that doesn't exist on-chain).
@@ -585,7 +585,7 @@ mod tests {
             .unwrap();
 
         // Create an executor
-        let chunk_executor = Arc::new(ChunkExecutor::<DiemVM>::new(db_rw.clone()).unwrap());
+        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()).unwrap());
         let mut executor_proxy = ExecutorProxy::new(db, chunk_executor, event_subscription_service);
 
         // Verify that the initial configs returned to the subscriber don't contain the unknown on-chain config
@@ -594,7 +594,7 @@ mod tests {
             .now_or_never()
             .unwrap()
             .on_chain_configs;
-        assert_ok!(payload.get::<DiemVersion>());
+        assert_ok!(payload.get::<Version>());
         assert_err!(payload.get::<TestOnChainConfig>());
 
         // Create a dummy prologue transaction that will bump the timer, and update the Diem version
@@ -603,7 +603,7 @@ mod tests {
         let allowlist_txn = create_new_update_consensus_config_transaction(0);
 
         // Execute and commit the reconfig block
-        let mut block_executor = Box::new(BlockExecutor::<DiemVM>::new(db_rw));
+        let mut block_executor = Box::new(BlockExecutor::<AptosVM>::new(db_rw));
         let block = vec![dummy_txn, allowlist_txn];
         let (reconfig_events, _) = execute_and_commit_block(&mut block_executor, block, 1);
 
@@ -616,7 +616,7 @@ mod tests {
             .now_or_never()
             .unwrap()
             .on_chain_configs;
-        assert_ok!(payload.get::<DiemVersion>());
+        assert_ok!(payload.get::<Version>());
         assert_ok!(payload.get::<OnChainConsensusConfig>());
         assert_err!(payload.get::<TestOnChainConfig>());
     }
@@ -627,8 +627,8 @@ mod tests {
         verify_initial_config: bool,
     ) -> (
         Vec<TestValidator>,
-        Box<BlockExecutor<DiemVM>>,
-        ExecutorProxy<ChunkExecutor<DiemVM>>,
+        Box<BlockExecutor<AptosVM>>,
+        ExecutorProxy<ChunkExecutor<AptosVM>>,
         ReconfigNotificationListener,
     ) {
         // Generate a genesis change set
@@ -641,7 +641,7 @@ mod tests {
 
         // Boostrap the genesis transaction
         let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
-        assert_ok!(bootstrap_genesis::<DiemVM>(&db_rw, &genesis_txn));
+        assert_ok!(bootstrap_genesis::<AptosVM>(&db_rw, &genesis_txn));
 
         // Create event subscription service and initialize configs
         let mut event_subscription_service = EventSubscriptionService::new(
@@ -667,8 +667,8 @@ mod tests {
         }
 
         // Create the executors
-        let block_executor = Box::new(BlockExecutor::<DiemVM>::new(db_rw.clone()));
-        let chunk_executor = Arc::new(ChunkExecutor::<DiemVM>::new(db_rw).unwrap());
+        let block_executor = Box::new(BlockExecutor::<AptosVM>::new(db_rw.clone()));
+        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw).unwrap());
         let executor_proxy = ExecutorProxy::new(db, chunk_executor, event_subscription_service);
 
         (
@@ -774,7 +774,7 @@ mod tests {
 
     /// Executes and commits a given block that will cause a reconfiguration event.
     fn execute_and_commit_block(
-        block_executor: &mut Box<BlockExecutor<DiemVM>>,
+        block_executor: &mut Box<BlockExecutor<AptosVM>>,
         block: Vec<Transaction>,
         block_id: u8,
     ) -> (Vec<ContractEvent>, LedgerInfoWithSignatures) {

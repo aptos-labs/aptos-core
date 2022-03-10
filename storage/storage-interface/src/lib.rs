@@ -15,9 +15,7 @@ use aptos_types::{
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     move_resource::MoveStorage,
-    on_chain_config::{
-        default_access_path_for_config, experimental_access_path_for_config, ConfigID,
-    },
+    on_chain_config::{access_path_for_config, dpn_access_path_for_config, ConfigID},
     proof::{
         definition::LeafCount, AccumulatorConsistencyProof, SparseMerkleProof,
         SparseMerkleRangeProof, TransactionAccumulatorSummary,
@@ -538,10 +536,10 @@ impl MoveStorage for &dyn DbReader {
                 })?,
         )?;
 
-        match aptos_root_state.get(&experimental_access_path_for_config(config_id).path) {
+        match aptos_root_state.get(&access_path_for_config(config_id).path) {
             Some(config) => Ok(config.to_vec()),
             _ => aptos_root_state
-                .get(&default_access_path_for_config(config_id).path)
+                .get(&dpn_access_path_for_config(config_id).path)
                 .map_or_else(
                     || {
                         Err(format_err!(

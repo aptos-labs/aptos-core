@@ -64,7 +64,7 @@ impl<'r, 'l, S: MoveResolver> GenesisSession<'r, 'l, S> {
 
     fn disable_reconfiguration(&mut self) {
         self.exec_func(
-            "DiemConfig",
+            "Reconfiguration",
             "disable_reconfiguration",
             vec![],
             serialize_values(&vec![MoveValue::Signer(aptos_root_address())]),
@@ -73,7 +73,7 @@ impl<'r, 'l, S: MoveResolver> GenesisSession<'r, 'l, S> {
 
     fn enable_reconfiguration(&mut self) {
         self.exec_func(
-            "DiemConfig",
+            "Reconfiguration",
             "enable_reconfiguration",
             vec![],
             serialize_values(&vec![MoveValue::Signer(aptos_root_address())]),
@@ -81,7 +81,7 @@ impl<'r, 'l, S: MoveResolver> GenesisSession<'r, 'l, S> {
     }
     pub fn set_diem_version(&mut self, version: Version) {
         self.exec_func(
-            "DiemVersion",
+            "Version",
             "set",
             vec![],
             serialize_values(&vec![

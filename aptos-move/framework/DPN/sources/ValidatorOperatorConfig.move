@@ -3,7 +3,7 @@ module DiemFramework::ValidatorOperatorConfig {
     use Std::Errors;
     use Std::Signer;
     use DiemFramework::Roles;
-    use DiemFramework::DiemTimestamp;
+    use DiemFramework::Timestamp;
     friend DiemFramework::DiemAccount;
 
     #[test_only]
@@ -25,7 +25,7 @@ module DiemFramework::ValidatorOperatorConfig {
         dr_account: &signer,
         human_name: vector<u8>,
     ) {
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         Roles::assert_diem_root(dr_account);
         Roles::assert_validator_operator(validator_operator_account);
         assert!(
@@ -48,7 +48,7 @@ module DiemFramework::ValidatorOperatorConfig {
         validator_operator_account: signer;
         dr_account: signer;
         let validator_operator_addr = Signer::address_of(validator_operator_account);
-        include DiemTimestamp::AbortsIfNotOperating;
+        include Timestamp::AbortsIfNotOperating;
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
         include Roles::AbortsIfNotValidatorOperator{account: validator_operator_account};
         aborts_if has_validator_operator_config(validator_operator_addr)

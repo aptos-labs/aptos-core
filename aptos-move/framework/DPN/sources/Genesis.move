@@ -11,15 +11,15 @@ module DiemFramework::Genesis {
     use DiemFramework::XDX;
     use DiemFramework::Diem;
     use DiemFramework::DiemAccount;
-    use DiemFramework::DiemBlock;
-    use DiemFramework::DiemConfig;
-    use DiemFramework::DiemConsensusConfig;
-    use DiemFramework::DiemSystem;
-    use DiemFramework::DiemTimestamp;
-    use DiemFramework::DiemTransactionPublishingOption;
-    use DiemFramework::DiemVersion;
+    use DiemFramework::Block;
+    use DiemFramework::Reconfiguration;
+    use DiemFramework::ConsensusConfig;
+    use DiemFramework::ValidatorSystem;
+    use DiemFramework::Timestamp;
+    use DiemFramework::TransactionPublishingOption;
+    use DiemFramework::Version;
     use DiemFramework::TransactionFee;
-    use DiemFramework::DiemVMConfig;
+    use DiemFramework::VMConfig;
     use DiemFramework::ParallelExecutionConfig;
     use DiemFramework::ValidatorConfig;
     use DiemFramework::ValidatorOperatorConfig;
@@ -74,10 +74,10 @@ module DiemFramework::Genesis {
         ChainId::initialize(dr_account, chain_id);
 
         // On-chain config setup
-        DiemConfig::initialize(dr_account);
+        Reconfiguration::initialize(dr_account);
 
         // Consensus config setup
-        DiemConsensusConfig::initialize(dr_account);
+        ConsensusConfig::initialize(dr_account);
 
         // Parallel execution config setup
         ParallelExecutionConfig::initialize_parallel_execution(dr_account);
@@ -93,10 +93,10 @@ module DiemFramework::Genesis {
         AccountFreezing::initialize(dr_account);
         TransactionFee::initialize(tc_account);
 
-        DiemSystem::initialize_validator_set(dr_account);
-        DiemVersion::initialize(dr_account, initial_diem_version);
+        ValidatorSystem::initialize_validator_set(dr_account);
+        Version::initialize(dr_account, initial_diem_version);
         DualAttestation::initialize(dr_account);
-        DiemBlock::initialize_block_metadata(dr_account);
+        Block::initialize_block_metadata(dr_account);
 
         // Rotate auth keys for DiemRoot and TreasuryCompliance accounts to the given
         // values
@@ -108,24 +108,24 @@ module DiemFramework::Genesis {
         DiemAccount::rotate_authentication_key(&tc_rotate_key_cap, tc_auth_key);
         DiemAccount::restore_key_rotation_capability(tc_rotate_key_cap);
 
-        DiemTransactionPublishingOption::initialize(
+        TransactionPublishingOption::initialize(
             dr_account,
             initial_script_allow_list,
             is_open_module,
         );
 
-        DiemVMConfig::initialize(
+        VMConfig::initialize(
             dr_account,
             instruction_schedule,
             native_schedule,
         );
 
-        DiemConsensusConfig::set(dr_account, consensus_config);
+        ConsensusConfig::set(dr_account, consensus_config);
 
         // After we have called this function, all invariants which are guarded by
-        // `DiemTimestamp::is_operating() ==> ...` will become active and a verification condition.
+        // `Timestamp::is_operating() ==> ...` will become active and a verification condition.
         // See also discussion at function specification.
-        DiemTimestamp::set_time_has_started(dr_account);
+        Timestamp::set_time_has_started(dr_account);
     }
 
     /// Sets up the initial validator set for the Diem network.
@@ -212,7 +212,7 @@ module DiemFramework::Genesis {
             );
 
             // finally, add this validator to the validator set
-            DiemSystem::add_validator(&dr_account, owner_address);
+            ValidatorSystem::add_validator(&dr_account, owner_address);
 
             i = i + 1;
         }
@@ -229,7 +229,7 @@ module DiemFramework::Genesis {
     /// > each module.
     spec initialize {
         /// Assume that this is called in genesis state (no timestamp).
-        requires DiemTimestamp::is_genesis();
+        requires Timestamp::is_genesis();
     }
 
     #[test_only]

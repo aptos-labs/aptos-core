@@ -55,14 +55,14 @@ The Move modules in the Diem Framework can be bucketed in to a couple categories
 ### System Management
 
 * <code><a href="ChainId.md#0x1_ChainId">ChainId</a></code>
-* <code><a href="DiemBlock.md#0x1_DiemBlock">DiemBlock</a></code>
-* <code><a href="DiemConfig.md#0x1_DiemConfig">DiemConfig</a></code>
-* <code><a href="DiemTimestamp.md#0x1_DiemTimestamp">DiemTimestamp</a></code>
-* <code><a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption">DiemTransactionPublishingOption</a></code>
-* <code><a href="DiemVersion.md#0x1_DiemVersion">DiemVersion</a></code>
-* <code><a href="DiemVMConfig.md#0x1_DiemVMConfig">DiemVMConfig</a></code>
+* <code><a href="Block.md#0x1_Block">Block</a></code>
+* <code><a href="Reconfiguration.md#0x1_Reconfiguration">Reconfiguration</a></code>
+* <code><a href="Timestamp.md#0x1_Timestamp">Timestamp</a></code>
+* <code><a href="TransactionPublishingOption.md#0x1_TransactionPublishingOption">TransactionPublishingOption</a></code>
+* <code><a href="Version.md#0x1_Version">Version</a></code>
+* <code><a href="VMConfig.md#0x1_VMConfig">VMConfig</a></code>
 * <code>TransactionFee</code>
-* <code><a href="DiemSystem.md#0x1_DiemSystem">DiemSystem</a></code>
+* <code><a href="ValidatorSystem.md#0x1_ValidatorSystem">ValidatorSystem</a></code>
 * <code><a href="ValidatorConfig.md#0x1_ValidatorConfig">ValidatorConfig</a></code>
 * <code><a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig">ValidatorOperatorConfig</a></code>
 * <code>Genesis</code> (Note: not published on-chain)
@@ -91,29 +91,29 @@ The Move modules in the Diem Framework can be bucketed in to a couple categories
 
 -  [`0x1::Account`](Account.md#0x1_Account)
 -  [`0x1::BCS`](../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/BCS.md#0x1_BCS)
+-  [`0x1::Block`](Block.md#0x1_Block)
 -  [`0x1::Capability`](../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability)
 -  [`0x1::ChainId`](ChainId.md#0x1_ChainId)
+-  [`0x1::ConsensusConfig`](ConsensusConfig.md#0x1_ConsensusConfig)
 -  [`0x1::CoreGenesis`](CoreGenesis.md#0x1_CoreGenesis)
--  [`0x1::DiemBlock`](DiemBlock.md#0x1_DiemBlock)
--  [`0x1::DiemConfig`](DiemConfig.md#0x1_DiemConfig)
--  [`0x1::DiemConsensusConfig`](DiemConsensusConfig.md#0x1_DiemConsensusConfig)
--  [`0x1::DiemSystem`](DiemSystem.md#0x1_DiemSystem)
--  [`0x1::DiemTimestamp`](DiemTimestamp.md#0x1_DiemTimestamp)
--  [`0x1::DiemTransactionPublishingOption`](DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption)
--  [`0x1::DiemVMConfig`](DiemVMConfig.md#0x1_DiemVMConfig)
--  [`0x1::DiemVersion`](DiemVersion.md#0x1_DiemVersion)
 -  [`0x1::Errors`](../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors)
 -  [`0x1::Event`](../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event)
 -  [`0x1::GUID`](../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID)
 -  [`0x1::Hash`](../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Hash.md#0x1_Hash)
 -  [`0x1::Option`](../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option)
 -  [`0x1::ParallelExecutionConfig`](ParallelExecutionConfig.md#0x1_ParallelExecutionConfig)
+-  [`0x1::Reconfiguration`](Reconfiguration.md#0x1_Reconfiguration)
 -  [`0x1::Signature`](Signature.md#0x1_Signature)
 -  [`0x1::Signer`](../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer)
 -  [`0x1::SystemAddresses`](SystemAddresses.md#0x1_SystemAddresses)
+-  [`0x1::Timestamp`](Timestamp.md#0x1_Timestamp)
+-  [`0x1::TransactionPublishingOption`](TransactionPublishingOption.md#0x1_TransactionPublishingOption)
+-  [`0x1::VMConfig`](VMConfig.md#0x1_VMConfig)
 -  [`0x1::ValidatorConfig`](ValidatorConfig.md#0x1_ValidatorConfig)
 -  [`0x1::ValidatorOperatorConfig`](ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig)
+-  [`0x1::ValidatorSystem`](ValidatorSystem.md#0x1_ValidatorSystem)
 -  [`0x1::Vector`](../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector)
+-  [`0x1::Version`](Version.md#0x1_Version)
 
 
 [//]: # ("File containing references which can be used from documentation")

@@ -12,10 +12,10 @@
 //
 //# run --admin-script --signers DiemRoot DiemRoot
 script {
-use DiemFramework::DiemTransactionPublishingOption;
+use DiemFramework::TransactionPublishingOption;
 
 fun main(dr: signer, _dr2: signer) {
-    DiemTransactionPublishingOption::set_open_module(&dr, false)
+    TransactionPublishingOption::set_open_module(&dr, false)
 }
 }
 

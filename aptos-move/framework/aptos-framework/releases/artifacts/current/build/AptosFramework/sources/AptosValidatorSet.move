@@ -1,19 +1,19 @@
 module AptosFramework::AptosValidatorSet {
     use Std::Capability;
-    use CoreFramework::DiemSystem;
+    use CoreFramework::ValidatorSystem;
     use AptosFramework::Marker;
 
     public fun initialize_validator_set(
         account: &signer,
     ) {
-        DiemSystem::initialize_validator_set<Marker::ChainMarker>(account);
+        ValidatorSystem::initialize_validator_set<Marker::ChainMarker>(account);
     }
 
     public fun add_validator(
         account: &signer,
         validator_addr: address,
     ) {
-        DiemSystem::add_validator(
+        ValidatorSystem::add_validator(
             validator_addr,
             Capability::acquire(account, &Marker::get())
         );
@@ -23,7 +23,7 @@ module AptosFramework::AptosValidatorSet {
         account: &signer,
         validator_addr: address,
     ) {
-        DiemSystem::remove_validator(
+        ValidatorSystem::remove_validator(
             validator_addr,
             Capability::acquire(account, &Marker::get())
         );

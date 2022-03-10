@@ -1,6 +1,6 @@
 /// Module which manages freezing of accounts.
 module DiemFramework::AccountFreezing {
-    use DiemFramework::DiemTimestamp;
+    use DiemFramework::Timestamp;
     use DiemFramework::CoreAddresses;
     use DiemFramework::Roles;
     use Std::Event::{Self, EventHandle};
@@ -46,7 +46,7 @@ module DiemFramework::AccountFreezing {
     const EACCOUNT_FROZEN: u64 = 5;
 
     public fun initialize(dr_account: &signer) {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         CoreAddresses::assert_diem_root(dr_account);
         assert!(
             !exists<FreezeEventsHolder>(Signer::address_of(dr_account)),
@@ -58,7 +58,7 @@ module DiemFramework::AccountFreezing {
         });
     }
     spec initialize {
-        include DiemTimestamp::AbortsIfNotGenesis;
+        include Timestamp::AbortsIfNotGenesis;
         include CoreAddresses::AbortsIfNotDiemRoot{account: dr_account};
         let addr = Signer::address_of(dr_account);
         aborts_if exists<FreezeEventsHolder>(addr) with Errors::ALREADY_PUBLISHED;
@@ -83,7 +83,7 @@ module DiemFramework::AccountFreezing {
         frozen_address: address,
     )
     acquires FreezingBit, FreezeEventsHolder {
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         Roles::assert_treasury_compliance(account);
         // The diem root account and TC cannot be frozen
         assert!(frozen_address != @DiemRoot, Errors::invalid_argument(ECANNOT_FREEZE_DIEM_ROOT));
@@ -100,7 +100,7 @@ module DiemFramework::AccountFreezing {
         );
     }
     spec freeze_account {
-        include DiemTimestamp::AbortsIfNotOperating;
+        include Timestamp::AbortsIfNotOperating;
         include Roles::AbortsIfNotTreasuryCompliance;
         aborts_if frozen_address == @DiemRoot with Errors::INVALID_ARGUMENT;
         aborts_if frozen_address == @TreasuryCompliance with Errors::INVALID_ARGUMENT;
@@ -125,7 +125,7 @@ module DiemFramework::AccountFreezing {
         unfrozen_address: address,
     )
     acquires FreezingBit, FreezeEventsHolder {
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         Roles::assert_treasury_compliance(account);
         assert!(exists<FreezingBit>(unfrozen_address), Errors::not_published(EFREEZING_BIT));
         borrow_global_mut<FreezingBit>(unfrozen_address).is_frozen = false;
@@ -139,7 +139,7 @@ module DiemFramework::AccountFreezing {
         );
     }
     spec unfreeze_account {
-        include DiemTimestamp::AbortsIfNotOperating;
+        include Timestamp::AbortsIfNotOperating;
         include Roles::AbortsIfNotTreasuryCompliance;
         aborts_if !exists<FreezingBit>(unfrozen_address) with Errors::NOT_PUBLISHED;
         ensures !spec_account_is_frozen(unfrozen_address);
@@ -193,7 +193,7 @@ module DiemFramework::AccountFreezing {
     /// # Initialization
     spec module {
         /// `FreezeEventsHolder` always exists after genesis.
-        invariant [suspendable] DiemTimestamp::is_operating() ==>
+        invariant [suspendable] Timestamp::is_operating() ==>
             exists<FreezeEventsHolder>(@DiemRoot);
     }
 
@@ -201,19 +201,19 @@ module DiemFramework::AccountFreezing {
     spec module {
         /// The account of DiemRoot is not freezable [[F1]][ROLE].
         /// After genesis, FreezingBit of DiemRoot is always false.
-        invariant [suspendable] DiemTimestamp::is_operating() ==>
+        invariant [suspendable] Timestamp::is_operating() ==>
             spec_account_is_not_frozen(@DiemRoot);
 
         /// The account of TreasuryCompliance is not freezable [[F2]][ROLE].
         /// After genesis, FreezingBit of TreasuryCompliance is always false.
-        invariant [suspendable] DiemTimestamp::is_operating() ==>
+        invariant [suspendable] Timestamp::is_operating() ==>
             spec_account_is_not_frozen(@TreasuryCompliance);
 
         /// resource struct FreezingBit persists
         invariant update forall addr: address where old(exists<FreezingBit>(addr)): exists<FreezingBit>(addr);
 
         /// resource struct FreezeEventsHolder is there forever after initialization
-        invariant [suspendable] DiemTimestamp::is_operating() ==> exists<FreezeEventsHolder>(@DiemRoot);
+        invariant [suspendable] Timestamp::is_operating() ==> exists<FreezeEventsHolder>(@DiemRoot);
 
         /// Only TreasuryCompliance can change the freezing bits of accounts [[H7]][PERMISSION].
         invariant update forall addr: address where old(exists<FreezingBit>(addr)):

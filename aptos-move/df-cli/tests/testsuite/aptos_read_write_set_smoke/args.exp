@@ -1,8 +1,8 @@
 Command `sandbox publish`:
 Command `experimental read-write-set storage/0x00000000000000000000000000000001/modules/PaymentScripts.mv peer_to_peer_with_metadata`:
 Accesses:
-0xa550c18/0x1::DiemTimestamp::CurrentTimeMicroseconds: Read
-0xa550c18/0x1::DiemTimestamp::CurrentTimeMicroseconds/microseconds: Read
+0xa550c18/0x1::Timestamp::CurrentTimeMicroseconds: Read
+0xa550c18/0x1::Timestamp::CurrentTimeMicroseconds/microseconds: Read
 0xa550c18/Diem::CurrencyInfo<#0>: Read
 0xa550c18/Diem::CurrencyInfo<#0>/to_xdx_exchange_rate: Read
 0xa550c18/Diem::CurrencyInfo<#0>/to_xdx_exchange_rate/value: Read

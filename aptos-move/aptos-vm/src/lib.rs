@@ -125,7 +125,7 @@ pub mod transaction_metadata;
 #[cfg(test)]
 mod unit_tests;
 
-pub use crate::{aptos_vm::DiemVM, aptos_vm_impl::convert_changeset_and_events};
+pub use crate::{aptos_vm::AptosVM, aptos_vm_impl::convert_changeset_and_events};
 
 use aptos_state_view::StateView;
 use aptos_types::{

@@ -24,7 +24,7 @@ use aptos_types::{
     trusted_state::{TrustedState, TrustedStateChange},
     waypoint::Waypoint,
 };
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use executor::block_executor::BlockExecutor;
 use executor_types::BlockExecutorTrait;
@@ -515,11 +515,11 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
 ) -> (
     Arc<AptosDB>,
     DbReaderWriter,
-    BlockExecutor<DiemVM>,
+    BlockExecutor<AptosVM>,
     Waypoint,
 ) {
     let (db, dbrw) = DbReaderWriter::wrap(AptosDB::new_for_test(&path));
-    let waypoint = bootstrap_genesis::<DiemVM>(&dbrw, genesis).unwrap();
+    let waypoint = bootstrap_genesis::<AptosVM>(&dbrw, genesis).unwrap();
     let executor = BlockExecutor::new(dbrw.clone());
 
     (db, dbrw, executor, waypoint)

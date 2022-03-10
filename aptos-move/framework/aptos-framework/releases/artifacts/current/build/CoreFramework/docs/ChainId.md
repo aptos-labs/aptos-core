@@ -3,7 +3,7 @@
 
 # Module `0x1::ChainId`
 
-The chain id distinguishes between different chains (e.g., testnet and the main Diem network).
+The chain id distinguishes between different chains (e.g., testnet and the main network).
 One important role is to prevent transactions intended for one chain from being executed on another.
 This code provides a container for storing a chain id and functions to initialize and get it.
 
@@ -14,10 +14,10 @@ This code provides a container for storing a chain id and functions to initializ
 -  [Function `get`](#0x1_ChainId_get)
 
 
-<pre><code><b>use</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
-<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
+<pre><code><b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer">0x1::Signer</a>;
 <b>use</b> <a href="SystemAddresses.md#0x1_SystemAddresses">0x1::SystemAddresses</a>;
+<b>use</b> <a href="Timestamp.md#0x1_Timestamp">0x1::Timestamp</a>;
 </code></pre>
 
 
@@ -68,7 +68,7 @@ The <code><a href="ChainId.md#0x1_ChainId">ChainId</a></code> resource was not i
 
 ## Function `initialize`
 
-Publish the chain ID <code>id</code> of this Diem instance under the SystemAddresses address
+Publish the chain ID <code>id</code> of this instance under the SystemAddresses address
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ChainId.md#0x1_ChainId_initialize">initialize</a>(account: &signer, id: u8)
@@ -81,7 +81,7 @@ Publish the chain ID <code>id</code> of this Diem instance under the SystemAddre
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ChainId.md#0x1_ChainId_initialize">initialize</a>(account: &signer, id: u8) {
-    <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
+    <a href="Timestamp.md#0x1_Timestamp_assert_genesis">Timestamp::assert_genesis</a>();
     <a href="SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(account);
     <b>assert</b>!(!<b>exists</b>&lt;<a href="ChainId.md#0x1_ChainId">ChainId</a>&gt;(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account)), <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="ChainId.md#0x1_ChainId_ECHAIN_ID">ECHAIN_ID</a>));
     <b>move_to</b>(account, <a href="ChainId.md#0x1_ChainId">ChainId</a> { id })
@@ -96,7 +96,7 @@ Publish the chain ID <code>id</code> of this Diem instance under the SystemAddre
 
 ## Function `get`
 
-Return the chain ID of this Diem instance
+Return the chain ID of this instance
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ChainId.md#0x1_ChainId_get">get</a>(): u8
@@ -109,7 +109,7 @@ Return the chain ID of this Diem instance
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ChainId.md#0x1_ChainId_get">get</a>(): u8 <b>acquires</b> <a href="ChainId.md#0x1_ChainId">ChainId</a> {
-    <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_operating">DiemTimestamp::assert_operating</a>();
+    <a href="Timestamp.md#0x1_Timestamp_assert_operating">Timestamp::assert_operating</a>();
     <b>borrow_global</b>&lt;<a href="ChainId.md#0x1_ChainId">ChainId</a>&gt;(@CoreResources).id
 }
 </code></pre>

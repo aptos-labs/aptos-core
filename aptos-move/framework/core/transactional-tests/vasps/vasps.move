@@ -19,7 +19,7 @@
 
 //# run --admin-script --signers DiemRoot DiemRoot
 script {
-    use DiemFramework::DiemTimestamp;
+    use DiemFramework::Timestamp;
     use DiemFramework::VASP;
     use DiemFramework::DualAttestation;
 
@@ -33,7 +33,7 @@ script {
         assert!(DualAttestation::human_name(@Parent) == b"Parent", 2007);
         assert!(DualAttestation::base_url(@Parent) == x"", 2008);
         assert!(
-            DualAttestation::expiration_date(@Parent) > DiemTimestamp::now_microseconds(),
+            DualAttestation::expiration_date(@Parent) > Timestamp::now_microseconds(),
             2009
         );
         assert!(VASP::num_children(@Parent) == 0, 2010);

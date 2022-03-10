@@ -31,7 +31,7 @@ use aptos_types::{
     on_chain_config::VMPublishingOption,
     transaction::{Transaction, TransactionStatus},
 };
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use bytes::Bytes;
 use executor::db_bootstrapper;
@@ -63,7 +63,7 @@ pub fn new_test_context() -> TestContext {
 
     let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(&tmp_dir));
     let ret =
-        db_bootstrapper::maybe_bootstrap::<DiemVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
+        db_bootstrapper::maybe_bootstrap::<AptosVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
     assert!(ret);
 
     let mempool = MockSharedMempool::new_in_runtime(&db_rw, VMValidator::new(db.clone()));
@@ -79,7 +79,7 @@ pub fn new_test_context() -> TestContext {
         rng,
         root_keys,
         validator_owner,
-        Box::new(BlockExecutor::<DiemVM>::new(db_rw)),
+        Box::new(BlockExecutor::<AptosVM>::new(db_rw)),
         mempool,
         db,
     )

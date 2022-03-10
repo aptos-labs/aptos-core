@@ -6,9 +6,9 @@
 //
 //# run --admin-script --signers DiemRoot DiemRoot --show-events
 script{
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     fun main(_dr: signer, account: signer) {
-        DiemSystem::remove_validator(&account, @Alice);
+        ValidatorSystem::remove_validator(&account, @Alice);
     }
 }
 
@@ -16,9 +16,9 @@ script{
 //
 //# run --admin-script --signers DiemRoot Alice --show-events
 script{
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     fun main(_dr: signer, account: signer) {
-        DiemSystem::remove_validator(&account, @Vivian);
+        ValidatorSystem::remove_validator(&account, @Vivian);
     }
 }
 
@@ -28,9 +28,9 @@ script{
 //
 //# run --admin-script --signers DiemRoot DiemRoot --show-events
 script{
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     fun main(_dr: signer, account: signer) {
-        DiemSystem::remove_validator(&account, @Vivian);
+        ValidatorSystem::remove_validator(&account, @Vivian);
     }
 }
 
@@ -38,8 +38,8 @@ script{
 //
 //# run --admin-script --signers DiemRoot DiemRoot --show-events
 script{
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     fun main(_dr: signer, account: signer) {
-        DiemSystem::remove_validator(&account, @Vivian);
+        ValidatorSystem::remove_validator(&account, @Vivian);
     }
 }

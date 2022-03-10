@@ -9,7 +9,7 @@ module DiemFramework::XDX {
     use Std::Errors;
     use Std::FixedPoint32;
     use DiemFramework::Diem;
-    use DiemFramework::DiemTimestamp;
+    use DiemFramework::Timestamp;
 
     /// The type tag representing the `XDX` currency on-chain.
     struct XDX { }
@@ -49,7 +49,7 @@ module DiemFramework::XDX {
         dr_account: &signer,
         tc_account: &signer,
     ) {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         // Operational constraint
         CoreAddresses::assert_currency_info(dr_account);
         // Reserve must not exist.
@@ -84,7 +84,7 @@ module DiemFramework::XDX {
         ensures exists<Reserve>(@DiemRoot);
 
         /// Registering XDX can only be done in genesis.
-        include DiemTimestamp::AbortsIfNotGenesis;
+        include Timestamp::AbortsIfNotGenesis;
         /// Only the DiemRoot account can register a new currency [[H8]][PERMISSION].
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
         /// Only the TreasuryCompliance role can update the `can_mint` field of CurrencyInfo [[H2]][PERMISSION].
@@ -121,29 +121,29 @@ module DiemFramework::XDX {
 
     spec module {
         /// After genesis, the Reserve resource exists.
-        invariant [suspendable] DiemTimestamp::is_operating() ==> reserve_exists();
+        invariant [suspendable] Timestamp::is_operating() ==> reserve_exists();
 
         /// After genesis, XDX is registered.
-        invariant [suspendable] DiemTimestamp::is_operating() ==> Diem::is_currency<XDX>();
+        invariant [suspendable] Timestamp::is_operating() ==> Diem::is_currency<XDX>();
 
         /// After genesis, the exchange rate to XDX is always equal to 1.0.
-        invariant [suspendable] DiemTimestamp::is_operating()
+        invariant [suspendable] Timestamp::is_operating()
              ==> Diem::spec_xdx_exchange_rate<XDX>() == FixedPoint32::spec_create_from_rational(1, 1);
 
         /// After genesis, XDX is always a synthetic currency.
-        invariant [suspendable] DiemTimestamp::is_operating()
+        invariant [suspendable] Timestamp::is_operating()
             ==> Diem::is_synthetic_currency<XDX>();
 
         /// After genesis, the scaling factor for XDX is always equal to 1,000,000.
-        invariant [suspendable] DiemTimestamp::is_operating()
+        invariant [suspendable] Timestamp::is_operating()
             ==> Diem::spec_currency_info<XDX>().scaling_factor == 1000000;
 
         /// After genesis, the fractional part for XDX is always equal to 1,000.
-        invariant [suspendable] DiemTimestamp::is_operating()
+        invariant [suspendable] Timestamp::is_operating()
             ==> Diem::spec_currency_info<XDX>().fractional_part == 1000;
 
         /// After genesis, the currency code for XDX is always "XDX".
-        invariant [suspendable] DiemTimestamp::is_operating()
+        invariant [suspendable] Timestamp::is_operating()
             ==> Diem::spec_currency_code<XDX>() == b"XDX";
     }
 
@@ -157,7 +157,7 @@ module DiemFramework::XDX {
         /// After genesis, `LimitsDefinition<XDX>` is published at Diem root. It's published by
         /// AccountLimits::publish_unrestricted_limits, but we can't prove the condition there because
         /// it does not hold for all types (but does hold for XDX).
-        invariant [suspendable] DiemTimestamp::is_operating()
+        invariant [suspendable] Timestamp::is_operating()
             ==> exists<AccountLimits::LimitsDefinition<XDX>>(@DiemRoot);
 
         /// `LimitsDefinition<XDX>` is not published at any other address

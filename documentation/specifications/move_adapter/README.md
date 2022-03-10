@@ -272,7 +272,7 @@ Next, there are a series of checks related to the transaction size and gas
 parameters. These checks are performed for `Script`, `ScriptFunction`,
 and `Module` payloads, but
 not for `WriteSet` transactions. The constraints for these checks are defined
-by the `GasConstants` structure in the `DiemVMConfig` module.
+by the `GasConstants` structure in the `VMConfig` module.
 
 * Check if the transaction size exceeds the limit specified by the
 `max_transaction_size_in_bytes` field of `GasConstants`. If the transaction is
@@ -312,11 +312,11 @@ functions are defined in the `DiemAccount` module of the Diem Framework:
 
 * Single-agent `ScriptFunction` and `Script`: The prologue function is `script_prologue`.
 In addition to the common checks listed below, it also calls the `is_script_allowed`
-function in the `DiemTransactionPublishingOption` module to determine if the script
+function in the `TransactionPublishingOption` module to determine if the script
 should be allowed. A script sent by an account with `has_aptos_root_role` is always
 allowed. Otherwise, a `Script` payload is allowed if the hash of the
 script bytecode is on the list of allowed scripts published at
-`0x1::DiemTransactionPublishingOption::DiemTransactionPublishingOption.script_allowlist`.
+`0x1::TransactionPublishingOption::TransactionPublishingOption.script_allowlist`.
 `ScriptFunction` payloads, for which the adapter uses an empty vector in place
 of the script hash, are always allowed. If the script is not allowed, validation
 fails with an `UNKNOWN_SCRIPT` status code.
@@ -336,7 +336,7 @@ In addition to the common checks listed below, it also performs the following ch
 
 * `Module`: The prologue function is `module_prologue`. In addition to the
 common checks listed below, it also calls the `is_module_allowed` function in
-the `DiemTransactionPublishingOption` module to see if publishing is allowed
+the `TransactionPublishingOption` module to see if publishing is allowed
 for the transaction sender. If not, validation fails with a
 `INVALID_MODULE_PUBLISHER` status code.
 
@@ -645,7 +645,7 @@ invariant for states. If one of those reads fails, the transaction will fail
 with a `STORAGE_ERROR` status code.
 
 * `BlockMetadata`: This transaction is handled by running the `block_prologue`
-function from the `DiemBlock` module in the Diem Framework to record the
+function from the `Block` module in the Diem Framework to record the
 metadata at the start of a new block. The sender of the transaction is set to
 the reserved VM address (zero), and the `round`, `timestamp_usecs`,
 `previous_block_votes` and `proposer` fields are extracted from the

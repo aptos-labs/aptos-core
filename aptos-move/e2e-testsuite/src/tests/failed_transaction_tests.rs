@@ -5,7 +5,7 @@ use aptos_state_view::StateView;
 use aptos_types::vm_status::{KeptVMStatus, StatusCode, VMStatus};
 use aptos_vm::{
     data_cache::StateViewCache, logging::AdapterLogSchema,
-    transaction_metadata::TransactionMetadata, DiemVM,
+    transaction_metadata::TransactionMetadata, AptosVM,
 };
 use language_e2e_tests::{
     account, common_transactions::peer_to_peer_txn, test_with_different_versions,
@@ -22,7 +22,7 @@ fn failed_transaction_cleanup_test() {
         executor.add_account_data(&sender);
 
         let log_context = AdapterLogSchema::new(executor.get_state_view().id(), 0);
-        let aptos_vm = DiemVM::new(executor.get_state_view());
+        let aptos_vm = AptosVM::new(executor.get_state_view());
         let data_cache = StateViewCache::new(executor.get_state_view());
 
         let txn_data = TransactionMetadata {

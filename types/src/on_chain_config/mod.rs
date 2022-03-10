@@ -28,7 +28,7 @@ mod vm_publishing_option;
 pub use self::{
     consensus_config::{ConsensusConfigV1, ConsensusConfigV2, OnChainConsensusConfig},
     diem_version::{
-        DiemVersion, DIEM_MAX_KNOWN_VERSION, DIEM_VERSION_2, DIEM_VERSION_3, DIEM_VERSION_4,
+        Version, DIEM_MAX_KNOWN_VERSION, DIEM_VERSION_2, DIEM_VERSION_3, DIEM_VERSION_4,
     },
     parallel_execution_config::{ParallelExecutionConfig, ReadWriteSetAnalysis},
     registered_currencies::RegisteredCurrencies,
@@ -70,7 +70,7 @@ impl fmt::Display for ConfigID {
 pub const ON_CHAIN_CONFIG_REGISTRY: &[ConfigID] = &[
     VMConfig::CONFIG_ID,
     VMPublishingOption::CONFIG_ID,
-    DiemVersion::CONFIG_ID,
+    Version::CONFIG_ID,
     ValidatorSet::CONFIG_ID,
     RegisteredCurrencies::CONFIG_ID,
     OnChainConsensusConfig::CONFIG_ID,
@@ -156,11 +156,11 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
     where
         T: ConfigStorage,
     {
-        let experimental_path = experimental_access_path_for_config(Self::CONFIG_ID);
-        match storage.fetch_config(experimental_path) {
+        let access_path = access_path_for_config(Self::CONFIG_ID);
+        match storage.fetch_config(access_path) {
             Some(bytes) => Self::deserialize_into_config(&bytes).ok(),
             None => storage
-                .fetch_config(default_access_path_for_config(Self::CONFIG_ID))
+                .fetch_config(dpn_access_path_for_config(Self::CONFIG_ID))
                 .and_then(|bytes| Self::deserialize_into_config(&bytes).ok()),
         }
     }
@@ -170,20 +170,20 @@ pub fn new_epoch_event_key() -> EventKey {
     EventKey::new_from_address(&config_address(), 4)
 }
 
-pub fn default_access_path_for_config(config_id: ConfigID) -> AccessPath {
+pub fn dpn_access_path_for_config(config_id: ConfigID) -> AccessPath {
     AccessPath::new(
         config_address(),
-        AccessPath::resource_access_vec(config_struct_tag(
+        AccessPath::resource_access_vec(diem_config_struct_tag(
             Identifier::new(config_id.1).expect("fail to make identifier"),
         )),
     )
 }
 
-pub fn config_struct_tag(config_name: Identifier) -> StructTag {
+pub fn diem_config_struct_tag(config_name: Identifier) -> StructTag {
     StructTag {
         address: CORE_CODE_ADDRESS,
         module: ConfigurationResource::MODULE_NAME.to_owned(),
-        name: ConfigurationResource::MODULE_NAME.to_owned(),
+        name: ident_str!("Reconfiguration").to_owned(),
         type_params: vec![TypeTag::Struct(StructTag {
             address: CORE_CODE_ADDRESS,
             module: config_name.clone(),
@@ -193,7 +193,7 @@ pub fn config_struct_tag(config_name: Identifier) -> StructTag {
     }
 }
 
-pub fn experimental_access_path_for_config(config_id: ConfigID) -> AccessPath {
+pub fn access_path_for_config(config_id: ConfigID) -> AccessPath {
     let struct_tag = StructTag {
         address: CORE_CODE_ADDRESS,
         module: Identifier::new(config_id.1).expect("fail to make identifier"),
@@ -253,7 +253,7 @@ impl Default for ConfigurationResource {
 }
 
 impl MoveStructType for ConfigurationResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("DiemConfig");
+    const MODULE_NAME: &'static IdentStr = ident_str!("Reconfiguration");
     const STRUCT_NAME: &'static IdentStr = ident_str!("Configuration");
 }
 

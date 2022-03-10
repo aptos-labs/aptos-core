@@ -80,7 +80,7 @@ pub struct ConsensusConfigV2 {
 }
 
 impl OnChainConfig for OnChainConsensusConfig {
-    const IDENTIFIER: &'static str = "DiemConsensusConfig";
+    const IDENTIFIER: &'static str = "ConsensusConfig";
 
     /// The Move resource is
     /// ```ignore

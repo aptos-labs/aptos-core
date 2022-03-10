@@ -49,5 +49,5 @@ impl VMPublishingOption {
 }
 
 impl OnChainConfig for VMPublishingOption {
-    const IDENTIFIER: &'static str = "DiemTransactionPublishingOption";
+    const IDENTIFIER: &'static str = "TransactionPublishingOption";
 }

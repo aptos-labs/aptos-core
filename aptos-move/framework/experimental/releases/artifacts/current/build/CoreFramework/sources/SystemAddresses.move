@@ -23,7 +23,7 @@ module CoreFramework::SystemAddresses {
         include AbortsIfNotCoreResource;
     }
 
-    /// Specifies that a function aborts if the account does not have the Diem root address.
+    /// Specifies that a function aborts if the account does not have the root address.
     spec schema AbortsIfNotCoreResource {
         addr: address;
         aborts_if addr != @CoreResources with Errors::REQUIRES_ADDRESS;

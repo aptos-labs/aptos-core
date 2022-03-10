@@ -4,32 +4,32 @@
 //
 //# run --admin-script --signers DiemRoot DiemRoot --show-events
 script{
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     use Std::Signer;
 
     fun main(_dr: signer, account: signer) {
         let sender = Signer::address_of(&account);
-        assert!(!DiemSystem::is_validator(sender), 1);
-        assert!(!DiemSystem::is_validator(@Alice), 2);
-        assert!(DiemSystem::is_validator(@Vivian), 3);
-        assert!(DiemSystem::is_validator(@Viola), 4);
+        assert!(!ValidatorSystem::is_validator(sender), 1);
+        assert!(!ValidatorSystem::is_validator(@Alice), 2);
+        assert!(ValidatorSystem::is_validator(@Vivian), 3);
+        assert!(ValidatorSystem::is_validator(@Viola), 4);
         // number of validators should equal the number we declared
         // TODO: currently 10 test validators are part of the test genesis so we have to count them.
-        assert!(DiemSystem::validator_set_size() == 10 + 2, 5);
-        assert!(DiemSystem::get_ith_validator_address(10) == @Vivian, 6);
-        assert!(DiemSystem::get_ith_validator_address(11) == @Viola, 7);
+        assert!(ValidatorSystem::validator_set_size() == 10 + 2, 5);
+        assert!(ValidatorSystem::get_ith_validator_address(10) == @Vivian, 6);
+        assert!(ValidatorSystem::get_ith_validator_address(11) == @Viola, 7);
     }
 }
 
 //# run --admin-script --signers DiemRoot Vivian --show-events
 script{
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     use Std::Signer;
 
     // check that sending from validator accounts works
     fun main(_dr: signer, account: signer) {
         let sender = Signer::address_of(&account);
-        assert!(DiemSystem::is_validator(sender), 8);
+        assert!(ValidatorSystem::is_validator(sender), 8);
     }
 }
 

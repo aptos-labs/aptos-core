@@ -1,6 +1,6 @@
 module AptosFramework::Marker {
     use Std::Capability;
-    use CoreFramework::DiemTimestamp;
+    use CoreFramework::Timestamp;
     use CoreFramework::SystemAddresses;
 
     friend AptosFramework::AptosAccount;
@@ -20,7 +20,7 @@ module AptosFramework::Marker {
 
     /// Initialize the capability of the marker so friend modules can acquire it for priviledged operations.
     public fun initialize(core_resource: &signer) {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         SystemAddresses::assert_core_resource(core_resource);
         Capability::create(core_resource, &get());
     }

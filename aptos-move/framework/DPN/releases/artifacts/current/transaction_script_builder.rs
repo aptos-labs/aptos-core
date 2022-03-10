@@ -1521,7 +1521,7 @@ pub enum ScriptFunctionCall {
     ///
     /// # Technical Description
     /// This script adds the account at `validator_address` to the validator set.
-    /// This transaction emits a `DiemConfig::NewEpochEvent` event and triggers a
+    /// This transaction emits a `Reconfiguration::NewEpochEvent` event and triggers a
     /// reconfiguration. Once the reconfiguration triggered by this script's
     /// execution has been performed, the account at the `validator_address` is
     /// considered to be a validator in the network.
@@ -1547,10 +1547,10 @@ pub enum ScriptFunctionCall {
     /// | `Errors::REQUIRES_ADDRESS` | `CoreAddresses::EDIEM_ROOT`                  | The sending account is not the Diem Root account.                                                                                         |
     /// | `Errors::REQUIRES_ROLE`    | `Roles::EDIEM_ROOT`                          | The sending account is not the Diem Root account.                                                                                         |
     /// | 0                          | 0                                            | The provided `validator_name` does not match the already-recorded human name for the validator.                                           |
-    /// | `Errors::INVALID_ARGUMENT` | `DiemSystem::EINVALID_PROSPECTIVE_VALIDATOR` | The validator to be added does not have a `ValidatorConfig::ValidatorConfig` resource published under it, or its `config` field is empty. |
-    /// | `Errors::INVALID_ARGUMENT` | `DiemSystem::EALREADY_A_VALIDATOR`           | The `validator_address` account is already a registered validator.                                                                        |
-    /// | `Errors::INVALID_STATE`    | `DiemConfig::EINVALID_BLOCK_TIME`            | An invalid time value was encountered in reconfiguration. Unlikely to occur.                                                              |
-    /// | `Errors::LIMIT_EXCEEDED`   | `DiemSystem::EMAX_VALIDATORS`                | The validator set is already at its maximum size. The validator could not be added.                                                       |
+    /// | `Errors::INVALID_ARGUMENT` | `ValidatorSystem::EINVALID_PROSPECTIVE_VALIDATOR` | The validator to be added does not have a `ValidatorConfig::ValidatorConfig` resource published under it, or its `config` field is empty. |
+    /// | `Errors::INVALID_ARGUMENT` | `ValidatorSystem::EALREADY_A_VALIDATOR`           | The `validator_address` account is already a registered validator.                                                                        |
+    /// | `Errors::INVALID_STATE`    | `Reconfiguration::EINVALID_BLOCK_TIME`            | An invalid time value was encountered in reconfiguration. Unlikely to occur.                                                              |
+    /// | `Errors::LIMIT_EXCEEDED`   | `ValidatorSystem::EMAX_VALIDATORS`                | The validator set is already at its maximum size. The validator could not be added.                                                       |
     ///
     /// # Related Scripts
     /// * `AccountCreationScripts::create_validator_account`
@@ -2170,7 +2170,7 @@ pub enum ScriptFunctionCall {
     ///
     /// # Technical Description
     /// Initializes the `DiemConsensusConfig` on-chain config to empty and allows future updates from DiemRoot via
-    /// `update_diem_consensus_config`. This doesn't emit a `DiemConfig::NewEpochEvent`.
+    /// `update_diem_consensus_config`. This doesn't emit a `Reconfiguration::NewEpochEvent`.
     ///
     /// # Parameters
     /// | Name            | Type      | Description                                                                |
@@ -2409,7 +2409,7 @@ pub enum ScriptFunctionCall {
     ///
     /// # Technical Description
     /// This updates the fields with corresponding names held in the `ValidatorConfig::ValidatorConfig`
-    /// config resource held under `validator_account`. It does not emit a `DiemConfig::NewEpochEvent`
+    /// config resource held under `validator_account`. It does not emit a `Reconfiguration::NewEpochEvent`
     /// so the copy of this config held in the validator set will not be updated, and the changes are
     /// only "locally" under the `validator_account` account address.
     ///
@@ -2451,7 +2451,7 @@ pub enum ScriptFunctionCall {
     ///
     /// # Technical Description
     /// This script removes the account at `validator_address` from the validator set. This transaction
-    /// emits a `DiemConfig::NewEpochEvent` event. Once the reconfiguration triggered by this event
+    /// emits a `Reconfiguration::NewEpochEvent` event. Once the reconfiguration triggered by this event
     /// has been performed, the account at `validator_address` is no longer considered to be a
     /// validator in the network. This transaction will fail if the validator at `validator_address`
     /// is not in the validator set.
@@ -2473,10 +2473,10 @@ pub enum ScriptFunctionCall {
     /// | `Errors::INVALID_ARGUMENT` | `SlidingNonce::ENONCE_ALREADY_RECORDED` | The `sliding_nonce` has been previously recorded.                                               |
     /// | `Errors::NOT_PUBLISHED`    | `SlidingNonce::ESLIDING_NONCE`          | The sending account is not the Diem Root account or Treasury Compliance account                |
     /// | 0                          | 0                                       | The provided `validator_name` does not match the already-recorded human name for the validator. |
-    /// | `Errors::INVALID_ARGUMENT` | `DiemSystem::ENOT_AN_ACTIVE_VALIDATOR` | The validator to be removed is not in the validator set.                                        |
+    /// | `Errors::INVALID_ARGUMENT` | `ValidatorSystem::ENOT_AN_ACTIVE_VALIDATOR` | The validator to be removed is not in the validator set.                                        |
     /// | `Errors::REQUIRES_ADDRESS` | `CoreAddresses::EDIEM_ROOT`            | The sending account is not the Diem Root account.                                              |
     /// | `Errors::REQUIRES_ROLE`    | `Roles::EDIEM_ROOT`                    | The sending account is not the Diem Root account.                                              |
-    /// | `Errors::INVALID_STATE`    | `DiemConfig::EINVALID_BLOCK_TIME`      | An invalid time value was encountered in reconfiguration. Unlikely to occur.                    |
+    /// | `Errors::INVALID_STATE`    | `Reconfiguration::EINVALID_BLOCK_TIME`      | An invalid time value was encountered in reconfiguration. Unlikely to occur.                    |
     ///
     /// # Related Scripts
     /// * `AccountCreationScripts::create_validator_account`
@@ -2726,8 +2726,8 @@ pub enum ScriptFunctionCall {
     /// metering. This transaction can only be sent from the Diem Root account.
     ///
     /// # Technical Description
-    /// Updates the on-chain config holding the `DiemVMConfig` and emits a
-    /// `DiemConfig::NewEpochEvent` to trigger a reconfiguration of the system.
+    /// Updates the on-chain config holding the `VMConfig` and emits a
+    /// `Reconfiguration::NewEpochEvent` to trigger a reconfiguration of the system.
     ///
     /// # Parameters
     /// | Name                                | Type     | Description                                                                                            |
@@ -2749,7 +2749,7 @@ pub enum ScriptFunctionCall {
     /// # Common Abort Conditions
     /// | Error Category             | Error Reason                                | Description                                                                                |
     /// | ----------------           | --------------                              | -------------                                                                              |
-    /// | `Errors::INVALID_ARGUMENT` | `DiemVMConfig::EGAS_CONSTANT_INCONSISTENCY` | The provided gas constants are inconsistent.                                               |
+    /// | `Errors::INVALID_ARGUMENT` | `VMConfig::EGAS_CONSTANT_INCONSISTENCY` | The provided gas constants are inconsistent.                                               |
     /// | `Errors::NOT_PUBLISHED`    | `SlidingNonce::ESLIDING_NONCE`              | A `SlidingNonce` resource is not published under `account`.                                |
     /// | `Errors::INVALID_ARGUMENT` | `SlidingNonce::ENONCE_TOO_OLD`              | The `sliding_nonce` is too old and it's impossible to determine if it's duplicated or not. |
     /// | `Errors::INVALID_ARGUMENT` | `SlidingNonce::ENONCE_TOO_NEW`              | The `sliding_nonce` is too far in the future.                                              |
@@ -2777,7 +2777,7 @@ pub enum ScriptFunctionCall {
     ///
     /// # Technical Description
     /// This updates the fields with corresponding names held in the `ValidatorConfig::ValidatorConfig`
-    /// config resource held under `validator_account`. It then emits a `DiemConfig::NewEpochEvent` to
+    /// config resource held under `validator_account`. It then emits a `Reconfiguration::NewEpochEvent` to
     /// trigger a reconfiguration of the system.  This reconfiguration will update the validator set
     /// on-chain with the updated `ValidatorConfig::ValidatorConfig`.
     ///
@@ -2797,7 +2797,7 @@ pub enum ScriptFunctionCall {
     /// | `Errors::REQUIRES_ROLE`    | `Roles::EVALIDATOR_OPERATOR`                   | `validator_operator_account` does not have a Validator Operator role.                                 |
     /// | `Errors::INVALID_ARGUMENT` | `ValidatorConfig::EINVALID_TRANSACTION_SENDER` | `validator_operator_account` is not the registered operator for the validator at `validator_address`. |
     /// | `Errors::INVALID_ARGUMENT` | `ValidatorConfig::EINVALID_CONSENSUS_KEY`      | `consensus_pubkey` is not a valid ed25519 public key.                                                 |
-    /// | `Errors::INVALID_STATE`    | `DiemConfig::EINVALID_BLOCK_TIME`             | An invalid time value was encountered in reconfiguration. Unlikely to occur.                          |
+    /// | `Errors::INVALID_STATE`    | `Reconfiguration::EINVALID_BLOCK_TIME`             | An invalid time value was encountered in reconfiguration. Unlikely to occur.                          |
     ///
     /// # Related Scripts
     /// * `AccountCreationScripts::create_validator_account`
@@ -2826,7 +2826,7 @@ pub enum ScriptFunctionCall {
     /// a Validator Operator role and have a `ValidatorOperatorConfig::ValidatorOperatorConfig`
     /// resource published under it. The sending `account` must be a Validator and have a
     /// `ValidatorConfig::ValidatorConfig` resource published under it. This script does not emit a
-    /// `DiemConfig::NewEpochEvent` and no reconfiguration of the system is initiated by this script.
+    /// `Reconfiguration::NewEpochEvent` and no reconfiguration of the system is initiated by this script.
     ///
     /// # Parameters
     /// | Name               | Type         | Description                                                                                  |
@@ -3011,7 +3011,7 @@ pub enum ScriptFunctionCall {
     /// transaction can only be sent from the Diem Root account.
     ///
     /// # Technical Description
-    /// Updates the `DiemConsensusConfig` on-chain config and emits a `DiemConfig::NewEpochEvent` to trigger
+    /// Updates the `DiemConsensusConfig` on-chain config and emits a `Reconfiguration::NewEpochEvent` to trigger
     /// a reconfiguration of the system.
     ///
     /// # Parameters
@@ -3036,7 +3036,7 @@ pub enum ScriptFunctionCall {
     /// transaction can only be sent from the Diem Root account.
     ///
     /// # Technical Description
-    /// Updates the `DiemVersion` on-chain config and emits a `DiemConfig::NewEpochEvent` to trigger
+    /// Updates the `Version` on-chain config and emits a `Reconfiguration::NewEpochEvent` to trigger
     /// a reconfiguration of the system. The `major` version that is passed in must be strictly greater
     /// than the current major version held on-chain. The VM reads this information and can use it to
     /// preserve backwards compatibility with previous major versions of the VM.
@@ -3056,7 +3056,7 @@ pub enum ScriptFunctionCall {
     /// | `Errors::INVALID_ARGUMENT` | `SlidingNonce::ENONCE_TOO_NEW`                | The `sliding_nonce` is too far in the future.                                              |
     /// | `Errors::INVALID_ARGUMENT` | `SlidingNonce::ENONCE_ALREADY_RECORDED`       | The `sliding_nonce` has been previously recorded.                                          |
     /// | `Errors::REQUIRES_ADDRESS` | `CoreAddresses::EDIEM_ROOT`                   | `account` is not the Diem Root account.                                                    |
-    /// | `Errors::INVALID_ARGUMENT` | `DiemVersion::EINVALID_MAJOR_VERSION_NUMBER`  | `major` is less-than or equal to the current major version stored on-chain.                |
+    /// | `Errors::INVALID_ARGUMENT` | `Version::EINVALID_MAJOR_VERSION_NUMBER`  | `major` is less-than or equal to the current major version stored on-chain.                |
     UpdateDiemVersion { sliding_nonce: u64, major: u64 },
 
     /// # Summary
@@ -3858,7 +3858,7 @@ pub fn encode_add_recovery_rotation_capability_script_function(
 ///
 /// # Technical Description
 /// This script adds the account at `validator_address` to the validator set.
-/// This transaction emits a `DiemConfig::NewEpochEvent` event and triggers a
+/// This transaction emits a `Reconfiguration::NewEpochEvent` event and triggers a
 /// reconfiguration. Once the reconfiguration triggered by this script's
 /// execution has been performed, the account at the `validator_address` is
 /// considered to be a validator in the network.
@@ -3884,10 +3884,10 @@ pub fn encode_add_recovery_rotation_capability_script_function(
 /// | `Errors::REQUIRES_ADDRESS` | `CoreAddresses::EDIEM_ROOT`                  | The sending account is not the Diem Root account.                                                                                         |
 /// | `Errors::REQUIRES_ROLE`    | `Roles::EDIEM_ROOT`                          | The sending account is not the Diem Root account.                                                                                         |
 /// | 0                          | 0                                            | The provided `validator_name` does not match the already-recorded human name for the validator.                                           |
-/// | `Errors::INVALID_ARGUMENT` | `DiemSystem::EINVALID_PROSPECTIVE_VALIDATOR` | The validator to be added does not have a `ValidatorConfig::ValidatorConfig` resource published under it, or its `config` field is empty. |
-/// | `Errors::INVALID_ARGUMENT` | `DiemSystem::EALREADY_A_VALIDATOR`           | The `validator_address` account is already a registered validator.                                                                        |
-/// | `Errors::INVALID_STATE`    | `DiemConfig::EINVALID_BLOCK_TIME`            | An invalid time value was encountered in reconfiguration. Unlikely to occur.                                                              |
-/// | `Errors::LIMIT_EXCEEDED`   | `DiemSystem::EMAX_VALIDATORS`                | The validator set is already at its maximum size. The validator could not be added.                                                       |
+/// | `Errors::INVALID_ARGUMENT` | `ValidatorSystem::EINVALID_PROSPECTIVE_VALIDATOR` | The validator to be added does not have a `ValidatorConfig::ValidatorConfig` resource published under it, or its `config` field is empty. |
+/// | `Errors::INVALID_ARGUMENT` | `ValidatorSystem::EALREADY_A_VALIDATOR`           | The `validator_address` account is already a registered validator.                                                                        |
+/// | `Errors::INVALID_STATE`    | `Reconfiguration::EINVALID_BLOCK_TIME`            | An invalid time value was encountered in reconfiguration. Unlikely to occur.                                                              |
+/// | `Errors::LIMIT_EXCEEDED`   | `ValidatorSystem::EMAX_VALIDATORS`                | The validator set is already at its maximum size. The validator could not be added.                                                       |
 ///
 /// # Related Scripts
 /// * `AccountCreationScripts::create_validator_account`
@@ -4691,7 +4691,7 @@ pub fn encode_freeze_account_script_function(
 ///
 /// # Technical Description
 /// Initializes the `DiemConsensusConfig` on-chain config to empty and allows future updates from DiemRoot via
-/// `update_diem_consensus_config`. This doesn't emit a `DiemConfig::NewEpochEvent`.
+/// `update_diem_consensus_config`. This doesn't emit a `Reconfiguration::NewEpochEvent`.
 ///
 /// # Parameters
 /// | Name            | Type      | Description                                                                |
@@ -5002,7 +5002,7 @@ pub fn encode_publish_shared_ed25519_public_key_script_function(
 ///
 /// # Technical Description
 /// This updates the fields with corresponding names held in the `ValidatorConfig::ValidatorConfig`
-/// config resource held under `validator_account`. It does not emit a `DiemConfig::NewEpochEvent`
+/// config resource held under `validator_account`. It does not emit a `Reconfiguration::NewEpochEvent`
 /// so the copy of this config held in the validator set will not be updated, and the changes are
 /// only "locally" under the `validator_account` account address.
 ///
@@ -5059,7 +5059,7 @@ pub fn encode_register_validator_config_script_function(
 ///
 /// # Technical Description
 /// This script removes the account at `validator_address` from the validator set. This transaction
-/// emits a `DiemConfig::NewEpochEvent` event. Once the reconfiguration triggered by this event
+/// emits a `Reconfiguration::NewEpochEvent` event. Once the reconfiguration triggered by this event
 /// has been performed, the account at `validator_address` is no longer considered to be a
 /// validator in the network. This transaction will fail if the validator at `validator_address`
 /// is not in the validator set.
@@ -5081,10 +5081,10 @@ pub fn encode_register_validator_config_script_function(
 /// | `Errors::INVALID_ARGUMENT` | `SlidingNonce::ENONCE_ALREADY_RECORDED` | The `sliding_nonce` has been previously recorded.                                               |
 /// | `Errors::NOT_PUBLISHED`    | `SlidingNonce::ESLIDING_NONCE`          | The sending account is not the Diem Root account or Treasury Compliance account                |
 /// | 0                          | 0                                       | The provided `validator_name` does not match the already-recorded human name for the validator. |
-/// | `Errors::INVALID_ARGUMENT` | `DiemSystem::ENOT_AN_ACTIVE_VALIDATOR` | The validator to be removed is not in the validator set.                                        |
+/// | `Errors::INVALID_ARGUMENT` | `ValidatorSystem::ENOT_AN_ACTIVE_VALIDATOR` | The validator to be removed is not in the validator set.                                        |
 /// | `Errors::REQUIRES_ADDRESS` | `CoreAddresses::EDIEM_ROOT`            | The sending account is not the Diem Root account.                                              |
 /// | `Errors::REQUIRES_ROLE`    | `Roles::EDIEM_ROOT`                    | The sending account is not the Diem Root account.                                              |
-/// | `Errors::INVALID_STATE`    | `DiemConfig::EINVALID_BLOCK_TIME`      | An invalid time value was encountered in reconfiguration. Unlikely to occur.                    |
+/// | `Errors::INVALID_STATE`    | `Reconfiguration::EINVALID_BLOCK_TIME`      | An invalid time value was encountered in reconfiguration. Unlikely to occur.                    |
 ///
 /// # Related Scripts
 /// * `AccountCreationScripts::create_validator_account`
@@ -5445,8 +5445,8 @@ pub fn encode_rotate_shared_ed25519_public_key_script_function(
 /// metering. This transaction can only be sent from the Diem Root account.
 ///
 /// # Technical Description
-/// Updates the on-chain config holding the `DiemVMConfig` and emits a
-/// `DiemConfig::NewEpochEvent` to trigger a reconfiguration of the system.
+/// Updates the on-chain config holding the `VMConfig` and emits a
+/// `Reconfiguration::NewEpochEvent` to trigger a reconfiguration of the system.
 ///
 /// # Parameters
 /// | Name                                | Type     | Description                                                                                            |
@@ -5468,7 +5468,7 @@ pub fn encode_rotate_shared_ed25519_public_key_script_function(
 /// # Common Abort Conditions
 /// | Error Category             | Error Reason                                | Description                                                                                |
 /// | ----------------           | --------------                              | -------------                                                                              |
-/// | `Errors::INVALID_ARGUMENT` | `DiemVMConfig::EGAS_CONSTANT_INCONSISTENCY` | The provided gas constants are inconsistent.                                               |
+/// | `Errors::INVALID_ARGUMENT` | `VMConfig::EGAS_CONSTANT_INCONSISTENCY` | The provided gas constants are inconsistent.                                               |
 /// | `Errors::NOT_PUBLISHED`    | `SlidingNonce::ESLIDING_NONCE`              | A `SlidingNonce` resource is not published under `account`.                                |
 /// | `Errors::INVALID_ARGUMENT` | `SlidingNonce::ENONCE_TOO_OLD`              | The `sliding_nonce` is too old and it's impossible to determine if it's duplicated or not. |
 /// | `Errors::INVALID_ARGUMENT` | `SlidingNonce::ENONCE_TOO_NEW`              | The `sliding_nonce` is too far in the future.                                              |
@@ -5519,7 +5519,7 @@ pub fn encode_set_gas_constants_script_function(
 ///
 /// # Technical Description
 /// This updates the fields with corresponding names held in the `ValidatorConfig::ValidatorConfig`
-/// config resource held under `validator_account`. It then emits a `DiemConfig::NewEpochEvent` to
+/// config resource held under `validator_account`. It then emits a `Reconfiguration::NewEpochEvent` to
 /// trigger a reconfiguration of the system.  This reconfiguration will update the validator set
 /// on-chain with the updated `ValidatorConfig::ValidatorConfig`.
 ///
@@ -5539,7 +5539,7 @@ pub fn encode_set_gas_constants_script_function(
 /// | `Errors::REQUIRES_ROLE`    | `Roles::EVALIDATOR_OPERATOR`                   | `validator_operator_account` does not have a Validator Operator role.                                 |
 /// | `Errors::INVALID_ARGUMENT` | `ValidatorConfig::EINVALID_TRANSACTION_SENDER` | `validator_operator_account` is not the registered operator for the validator at `validator_address`. |
 /// | `Errors::INVALID_ARGUMENT` | `ValidatorConfig::EINVALID_CONSENSUS_KEY`      | `consensus_pubkey` is not a valid ed25519 public key.                                                 |
-/// | `Errors::INVALID_STATE`    | `DiemConfig::EINVALID_BLOCK_TIME`             | An invalid time value was encountered in reconfiguration. Unlikely to occur.                          |
+/// | `Errors::INVALID_STATE`    | `Reconfiguration::EINVALID_BLOCK_TIME`             | An invalid time value was encountered in reconfiguration. Unlikely to occur.                          |
 ///
 /// # Related Scripts
 /// * `AccountCreationScripts::create_validator_account`
@@ -5583,7 +5583,7 @@ pub fn encode_set_validator_config_and_reconfigure_script_function(
 /// a Validator Operator role and have a `ValidatorOperatorConfig::ValidatorOperatorConfig`
 /// resource published under it. The sending `account` must be a Validator and have a
 /// `ValidatorConfig::ValidatorConfig` resource published under it. This script does not emit a
-/// `DiemConfig::NewEpochEvent` and no reconfiguration of the system is initiated by this script.
+/// `Reconfiguration::NewEpochEvent` and no reconfiguration of the system is initiated by this script.
 ///
 /// # Parameters
 /// | Name               | Type         | Description                                                                                  |
@@ -5823,7 +5823,7 @@ pub fn encode_unfreeze_account_script_function(
 /// transaction can only be sent from the Diem Root account.
 ///
 /// # Technical Description
-/// Updates the `DiemConsensusConfig` on-chain config and emits a `DiemConfig::NewEpochEvent` to trigger
+/// Updates the `DiemConsensusConfig` on-chain config and emits a `Reconfiguration::NewEpochEvent` to trigger
 /// a reconfiguration of the system.
 ///
 /// # Parameters
@@ -5864,7 +5864,7 @@ pub fn encode_update_diem_consensus_config_script_function(
 /// transaction can only be sent from the Diem Root account.
 ///
 /// # Technical Description
-/// Updates the `DiemVersion` on-chain config and emits a `DiemConfig::NewEpochEvent` to trigger
+/// Updates the `Version` on-chain config and emits a `Reconfiguration::NewEpochEvent` to trigger
 /// a reconfiguration of the system. The `major` version that is passed in must be strictly greater
 /// than the current major version held on-chain. The VM reads this information and can use it to
 /// preserve backwards compatibility with previous major versions of the VM.
@@ -5884,7 +5884,7 @@ pub fn encode_update_diem_consensus_config_script_function(
 /// | `Errors::INVALID_ARGUMENT` | `SlidingNonce::ENONCE_TOO_NEW`                | The `sliding_nonce` is too far in the future.                                              |
 /// | `Errors::INVALID_ARGUMENT` | `SlidingNonce::ENONCE_ALREADY_RECORDED`       | The `sliding_nonce` has been previously recorded.                                          |
 /// | `Errors::REQUIRES_ADDRESS` | `CoreAddresses::EDIEM_ROOT`                   | `account` is not the Diem Root account.                                                    |
-/// | `Errors::INVALID_ARGUMENT` | `DiemVersion::EINVALID_MAJOR_VERSION_NUMBER`  | `major` is less-than or equal to the current major version stored on-chain.                |
+/// | `Errors::INVALID_ARGUMENT` | `Version::EINVALID_MAJOR_VERSION_NUMBER`  | `major` is less-than or equal to the current major version stored on-chain.                |
 pub fn encode_update_diem_version_script_function(
     sliding_nonce: u64,
     major: u64,

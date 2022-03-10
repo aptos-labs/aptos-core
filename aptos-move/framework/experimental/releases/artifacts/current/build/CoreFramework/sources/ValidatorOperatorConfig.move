@@ -3,7 +3,7 @@ module CoreFramework::ValidatorOperatorConfig {
     use Std::Capability::Cap;
     use Std::Errors;
     use Std::Signer;
-    use CoreFramework::DiemTimestamp;
+    use CoreFramework::Timestamp;
     use CoreFramework::SystemAddresses;
 
     /// Marker to be stored under @CoreResources during genesis
@@ -20,7 +20,7 @@ module CoreFramework::ValidatorOperatorConfig {
     const ECHAIN_MARKER: u64 = 9;
 
     public fun initialize<T>(account: &signer) {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         SystemAddresses::assert_core_resource(account);
 
         assert!(
@@ -35,7 +35,7 @@ module CoreFramework::ValidatorOperatorConfig {
         human_name: vector<u8>,
         _cap: Cap<T>
     ) {
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         assert!(
             exists<ValidatorOperatorConfigChainMarker<T>>(@CoreResources),
             Errors::not_published(ECHAIN_MARKER)

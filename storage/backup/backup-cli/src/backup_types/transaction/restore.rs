@@ -27,7 +27,7 @@ use aptos_types::{
     proof::{TransactionAccumulatorRangeProof, TransactionInfoListWithProof},
     transaction::{Transaction, TransactionInfo, TransactionListWithProof, Version},
 };
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use aptosdb::backup::restore_handler::RestoreHandler;
 use executor::{chunk_executor::ChunkExecutor, components::apply_chunk_output::IntoLedgerView};
 use executor_types::TransactionReplayer;
@@ -413,7 +413,7 @@ impl TransactionRestoreBatchController {
         let persisted_view = restore_handler
             .get_tree_state(first_version)?
             .into_ledger_view(&db.reader)?;
-        let chunk_replayer = Arc::new(ChunkExecutor::<DiemVM>::new_with_view(db, persisted_view));
+        let chunk_replayer = Arc::new(ChunkExecutor::<AptosVM>::new_with_view(db, persisted_view));
 
         let db_commit_stream = txns_to_execute_stream
             .try_chunks(BATCH_SIZE)

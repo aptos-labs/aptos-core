@@ -114,7 +114,7 @@ The operation can only be performed by the VM
 </code></pre>
 
 
-Specifies that a function aborts if the account does not have the Diem root address.
+Specifies that a function aborts if the account does not have the root address.
 
 
 <a name="0x1_SystemAddresses_AbortsIfNotCoreResource"></a>

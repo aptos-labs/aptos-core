@@ -135,7 +135,7 @@ impl NetworkTest for ReconfigurationTest {
 
             if count % 2 == 1 {
                 let magic_number = 42;
-                println!("Bump DiemVersion to {}", magic_number);
+                println!("Bump Version to {}", magic_number);
                 let update_txn = aptos_root_account.sign_with_transaction_builder(
                     tx_factory.update_diem_version(allowed_nonce, magic_number),
                 );

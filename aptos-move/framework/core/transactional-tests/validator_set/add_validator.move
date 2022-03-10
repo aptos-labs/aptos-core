@@ -2,16 +2,16 @@
 //#      --addresses Alex=0x4b7653f6566a52c9b496f245628a69a0
 //#      --private-keys Alex=f5fd1521bd82454a9834ef977c389a0201f9525b11520334842ab73d2dcbf8b7
 
-// Add simple validator to DiemSystem's validator set.
+// Add simple validator to ValidatorSystem's validator set.
 
 //# run --admin-script --signers DiemRoot DiemRoot
 script {
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     use DiemFramework::ValidatorConfig;
     fun main() {
         // test bob is a validator
         assert!(ValidatorConfig::is_valid(@Bob) == true, 98);
-        assert!(DiemSystem::is_validator(@Bob) == true, 98);
+        assert!(ValidatorSystem::is_validator(@Bob) == true, 98);
     }
 }
 

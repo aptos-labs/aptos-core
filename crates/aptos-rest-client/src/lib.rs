@@ -94,9 +94,9 @@ impl Client {
             })
         }
 
-        // Returns root account DiemAccount::Config<DiemVersion> resource
-        pub async fn get_diem_version(&self) -> Result<Response<dpn::DiemConfig<dpn::DiemVersion>>> {
-            self.get_resource::<dpn::DiemConfig<dpn::DiemVersion>>(dpn::aptos_root_address(), &dpn::config_struct_tag(dpn::diem_version_identifier())).await
+        // Returns root account DiemAccount::Config<Version> resource
+        pub async fn get_diem_version(&self) -> Result<Response<dpn::Reconfiguration<dpn::Version>>> {
+            self.get_resource::<dpn::Reconfiguration<dpn::Version>>(dpn::aptos_root_address(), &dpn::diem_config_struct_tag(dpn::diem_version_identifier())).await
         }
 
         // Returns root account DiemAccount::Configuration resource

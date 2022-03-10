@@ -6,7 +6,7 @@ module DiemFramework::Diem {
     use DiemFramework::CoreAddresses;
     use DiemFramework::RegisteredCurrencies;
     use DiemFramework::Roles;
-    use DiemFramework::DiemTimestamp;
+    use DiemFramework::Timestamp;
     use Std::Errors;
     use Std::Event::{Self, EventHandle};
     use Std::FixedPoint32::{Self, FixedPoint32};
@@ -250,13 +250,13 @@ module DiemFramework::Diem {
     public fun initialize(
         dr_account: &signer,
     ) {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         // Operational constraint
         CoreAddresses::assert_diem_root(dr_account);
         RegisteredCurrencies::initialize(dr_account);
     }
     spec initialize {
-        include DiemTimestamp::AbortsIfNotGenesis;
+        include Timestamp::AbortsIfNotGenesis;
         include CoreAddresses::AbortsIfNotDiemRoot{account: dr_account};
         include RegisteredCurrencies::InitializeAbortsIf;
         include RegisteredCurrencies::InitializeEnsures;

@@ -16,7 +16,7 @@ use aptos_types::{
     network_address::NetworkAddress, on_chain_config::ValidatorSet,
     validator_config::ValidatorConfig, waypoint::Waypoint,
 };
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use executor::db_bootstrapper;
 use std::{
@@ -227,9 +227,9 @@ fn compute_genesis(
     let genesis = bcs::from_bytes(&buffer)
         .map_err(|e| Error::UnexpectedError(format!("Unable to parse genesis: {}", e)))?;
 
-    let waypoint = db_bootstrapper::generate_waypoint::<DiemVM>(&db_rw, &genesis)
+    let waypoint = db_bootstrapper::generate_waypoint::<AptosVM>(&db_rw, &genesis)
         .map_err(|e| Error::UnexpectedError(e.to_string()))?;
-    db_bootstrapper::maybe_bootstrap::<DiemVM>(&db_rw, &genesis, waypoint)
+    db_bootstrapper::maybe_bootstrap::<AptosVM>(&db_rw, &genesis, waypoint)
         .map_err(|e| Error::UnexpectedError(format!("Unable to commit genesis: {}", e)))?;
 
     Ok((db_rw, waypoint))

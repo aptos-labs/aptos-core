@@ -10,7 +10,7 @@ use aptos_jellyfish_merkle::metrics::{
     DIEM_JELLYFISH_INTERNAL_ENCODED_BYTES, DIEM_JELLYFISH_LEAF_ENCODED_BYTES,
     DIEM_JELLYFISH_STORAGE_READS,
 };
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use aptosdb::{
     metrics::DIEM_STORAGE_ROCKSDB_PROPERTIES, schema::JELLYFISH_MERKLE_NODE_CF_NAME, AptosDB,
 };
@@ -55,8 +55,8 @@ pub fn run(
     );
 
     // Bootstrap db with genesis
-    let waypoint = generate_waypoint::<DiemVM>(&db_rw, get_genesis_txn(&config).unwrap()).unwrap();
-    maybe_bootstrap::<DiemVM>(&db_rw, get_genesis_txn(&config).unwrap(), waypoint).unwrap();
+    let waypoint = generate_waypoint::<AptosVM>(&db_rw, get_genesis_txn(&config).unwrap()).unwrap();
+    maybe_bootstrap::<AptosVM>(&db_rw, get_genesis_txn(&config).unwrap(), waypoint).unwrap();
 
     let executor = Arc::new(BlockExecutor::new(db_rw));
     let executor_2 = executor.clone();

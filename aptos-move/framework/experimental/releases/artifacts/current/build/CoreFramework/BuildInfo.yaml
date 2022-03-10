@@ -20,34 +20,19 @@ compiled_package_info:
       name: BitVector
     : Std
     ? address: "00000000000000000000000000000001"
+      name: Block
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
       name: Capability
     : Std
     ? address: "00000000000000000000000000000001"
       name: ChainId
     : CoreFramework
     ? address: "00000000000000000000000000000001"
+      name: ConsensusConfig
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
       name: CoreGenesis
-    : CoreFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemBlock
-    : CoreFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemConfig
-    : CoreFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemConsensusConfig
-    : CoreFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemSystem
-    : CoreFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemTimestamp
-    : CoreFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemVMConfig
-    : CoreFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemVersion
     : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: Errors
@@ -71,6 +56,9 @@ compiled_package_info:
       name: ParallelExecutionConfig
     : CoreFramework
     ? address: "00000000000000000000000000000001"
+      name: Reconfiguration
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
       name: Signature
     : CoreFramework
     ? address: "00000000000000000000000000000001"
@@ -80,15 +68,30 @@ compiled_package_info:
       name: SystemAddresses
     : CoreFramework
     ? address: "00000000000000000000000000000001"
+      name: Timestamp
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: TransactionPublishingOption
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: VMConfig
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
       name: ValidatorConfig
     : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: ValidatorOperatorConfig
     : CoreFramework
     ? address: "00000000000000000000000000000001"
+      name: ValidatorSystem
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
       name: Vector
     : Std
-  source_digest: C1C17355E0E39239912E53B03C168597E91ED7623DD0317218EE8C79CB2DD442
+    ? address: "00000000000000000000000000000001"
+      name: Version
+    : CoreFramework
+  source_digest: D3022A34D78E1A49E07890B546AB70AF63F69A893A70A7421C1D6B8F3CFBB512
   build_flags:
     dev_mode: false
     test_mode: false

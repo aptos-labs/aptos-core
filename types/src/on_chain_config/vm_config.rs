@@ -37,7 +37,7 @@ impl CostTableInner {
 }
 
 impl OnChainConfig for VMConfig {
-    const IDENTIFIER: &'static str = "DiemVMConfig";
+    const IDENTIFIER: &'static str = "VMConfig";
 
     fn deserialize_into_config(bytes: &[u8]) -> Result<Self> {
         let raw_vm_config = bcs::from_bytes::<VMConfigInner>(bytes).map_err(|e| {

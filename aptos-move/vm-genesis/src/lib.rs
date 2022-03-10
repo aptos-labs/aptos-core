@@ -400,7 +400,7 @@ fn publish_stdlib(session: &mut Session<StateViewCache<GenesisStateView>>, stdli
 fn reconfigure(session: &mut Session<StateViewCache<GenesisStateView>>) {
     exec_function(
         session,
-        "DiemConfig",
+        "Reconfiguration",
         "emit_genesis_reconfiguration_event",
         vec![],
         vec![],

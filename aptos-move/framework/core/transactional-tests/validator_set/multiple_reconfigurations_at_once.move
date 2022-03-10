@@ -20,17 +20,17 @@
 
 //# run --admin-script --signers DiemRoot DiemRoot --show-events
 script{
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     // Decertify two validators to make sure we can remove both
     // from the set and trigger reconfiguration
     fun main(dr: signer, _dr2: signer) {
-        assert!(DiemSystem::is_validator(@Alice) == true, 98);
-        assert!(DiemSystem::is_validator(@Vivian) == true, 99);
-        assert!(DiemSystem::is_validator(@Viola) == true, 100);
-        DiemSystem::remove_validator(&dr, @Vivian);
-        assert!(DiemSystem::is_validator(@Alice) == true, 101);
-        assert!(DiemSystem::is_validator(@Vivian) == false, 102);
-        assert!(DiemSystem::is_validator(@Viola) == true, 103);
+        assert!(ValidatorSystem::is_validator(@Alice) == true, 98);
+        assert!(ValidatorSystem::is_validator(@Vivian) == true, 99);
+        assert!(ValidatorSystem::is_validator(@Viola) == true, 100);
+        ValidatorSystem::remove_validator(&dr, @Vivian);
+        assert!(ValidatorSystem::is_validator(@Alice) == true, 101);
+        assert!(ValidatorSystem::is_validator(@Vivian) == false, 102);
+        assert!(ValidatorSystem::is_validator(@Viola) == true, 103);
     }
 }
 
@@ -38,35 +38,35 @@ script{
 
 //# run --admin-script --signers DiemRoot Dave --show-events
 script {
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     use DiemFramework::ValidatorConfig;
     // Two reconfigurations cannot happen in the same block
     fun main(_dr: signer, account: signer) {
         let account = &account;
         // the local validator's key was the same as the key in the validator set
-        assert!(ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@Viola)) ==
+        assert!(ValidatorConfig::get_consensus_pubkey(&ValidatorSystem::get_validator_config(@Viola)) ==
                ValidatorConfig::get_consensus_pubkey(&ValidatorConfig::get_config(@Viola)), 99);
         ValidatorConfig::set_config(account, @Viola,
                                     x"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
                                     x"", x"");
         // the local validator's key is now different from the one in the validator set
-        assert!(ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@Viola)) !=
+        assert!(ValidatorConfig::get_consensus_pubkey(&ValidatorSystem::get_validator_config(@Viola)) !=
                ValidatorConfig::get_consensus_pubkey(&ValidatorConfig::get_config(@Viola)), 99);
-        let old_num_validators = DiemSystem::validator_set_size();
-        DiemSystem::update_config_and_reconfigure(account, @Viola);
-        assert!(old_num_validators == DiemSystem::validator_set_size(), 98);
+        let old_num_validators = ValidatorSystem::validator_set_size();
+        ValidatorSystem::update_config_and_reconfigure(account, @Viola);
+        assert!(old_num_validators == ValidatorSystem::validator_set_size(), 98);
         // the local validator's key is now the same as the key in the validator set
-        assert!(ValidatorConfig::get_consensus_pubkey(&DiemSystem::get_validator_config(@Viola)) ==
+        assert!(ValidatorConfig::get_consensus_pubkey(&ValidatorSystem::get_validator_config(@Viola)) ==
                ValidatorConfig::get_consensus_pubkey(&ValidatorConfig::get_config(@Viola)), 99);
     }
 }
 
 //# run --admin-script --signers DiemRoot Bob
 script{
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
 
     fun main(_dr: signer, account: signer) {
-        DiemSystem::update_config_and_reconfigure(&account, @Viola);
+        ValidatorSystem::update_config_and_reconfigure(&account, @Viola);
     }
 }
 
@@ -74,12 +74,12 @@ script{
 //
 //# run --admin-script --signers DiemRoot TreasuryCompliance
 script {
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     use DiemFramework::AccountFreezing;
     fun main(_dr: signer, tc_account: signer) {
-        assert!(DiemSystem::is_validator(@Alice) == true, 101);
+        assert!(ValidatorSystem::is_validator(@Alice) == true, 101);
         AccountFreezing::freeze_account(&tc_account, @Alice);
         assert!(AccountFreezing::account_is_frozen(@Alice), 1);
-        assert!(DiemSystem::is_validator(@Alice) == true, 102);
+        assert!(ValidatorSystem::is_validator(@Alice) == true, 102);
     }
 }

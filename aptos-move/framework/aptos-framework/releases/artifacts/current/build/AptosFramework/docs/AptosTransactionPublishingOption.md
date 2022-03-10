@@ -10,8 +10,8 @@
 
 
 <pre><code><b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability">0x1::Capability</a>;
-<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption">0x1::DiemTransactionPublishingOption</a>;
 <b>use</b> <a href="Marker.md#0x1_Marker">0x1::Marker</a>;
+<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/TransactionPublishingOption.md#0x1_TransactionPublishingOption">0x1::TransactionPublishingOption</a>;
 </code></pre>
 
 
@@ -36,7 +36,7 @@
     script_allow_list: vector&lt;vector&lt;u8&gt;&gt;,
     module_publishing_allowed: bool,
 ) {
-    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_initialize">DiemTransactionPublishingOption::initialize</a>&lt;ChainMarker&gt;(core_resource_account, script_allow_list, module_publishing_allowed);
+    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/TransactionPublishingOption.md#0x1_TransactionPublishingOption_initialize">TransactionPublishingOption::initialize</a>&lt;ChainMarker&gt;(core_resource_account, script_allow_list, module_publishing_allowed);
 }
 </code></pre>
 
@@ -60,7 +60,7 @@
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="AptosTransactionPublishingOption.md#0x1_AptosTransactionPublishingOption_set_module_publishing_allowed">set_module_publishing_allowed</a>(account: &signer, is_allowed: bool) {
-    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_set_module_publishing_allowed">DiemTransactionPublishingOption::set_module_publishing_allowed</a>(is_allowed, <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_acquire">Capability::acquire</a>(account, &<a href="Marker.md#0x1_Marker_get">Marker::get</a>()));
+    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/TransactionPublishingOption.md#0x1_TransactionPublishingOption_set_module_publishing_allowed">TransactionPublishingOption::set_module_publishing_allowed</a>(is_allowed, <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_acquire">Capability::acquire</a>(account, &<a href="Marker.md#0x1_Marker_get">Marker::get</a>()));
 }
 </code></pre>
 

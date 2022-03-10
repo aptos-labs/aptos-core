@@ -21,7 +21,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     on_chain_config,
     on_chain_config::{
-        config_address, default_access_path_for_config, ConfigurationResource, OnChainConfig,
+        config_address, dpn_access_path_for_config, ConfigurationResource, OnChainConfig,
         ValidatorSet,
     },
     proof::SparseMerkleRangeProof,
@@ -34,7 +34,7 @@ use aptos_types::{
     waypoint::Waypoint,
     write_set::{WriteOp, WriteSetMut},
 };
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use aptosdb::{AptosDB, GetRestoreHandler};
 use executor::{
     block_executor::BlockExecutor,
@@ -61,8 +61,8 @@ fn test_empty_db() {
     assert!(db_rw.reader.get_startup_info().unwrap().is_none());
 
     // Bootstrap empty DB.
-    let waypoint = generate_waypoint::<DiemVM>(&db_rw, &genesis_txn).expect("Should not fail.");
-    maybe_bootstrap::<DiemVM>(&db_rw, &genesis_txn, waypoint).unwrap();
+    let waypoint = generate_waypoint::<AptosVM>(&db_rw, &genesis_txn).expect("Should not fail.");
+    maybe_bootstrap::<AptosVM>(&db_rw, &genesis_txn, waypoint).unwrap();
     let startup_info = db_rw
         .reader
         .get_startup_info()
@@ -88,7 +88,7 @@ fn test_empty_db() {
     assert!(trusted_state_change.is_epoch_change());
 
     // `maybe_bootstrap()` does nothing on non-empty DB.
-    assert!(!maybe_bootstrap::<DiemVM>(&db_rw, &genesis_txn, waypoint).unwrap());
+    assert!(!maybe_bootstrap::<AptosVM>(&db_rw, &genesis_txn, waypoint).unwrap());
 }
 
 fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &ValidatorSigner) {
@@ -97,7 +97,7 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
     let version = li.ledger_info().version();
     let epoch = li.ledger_info().next_block_epoch();
     let target_version = version + txns.len() as u64;
-    let executor = BlockExecutor::<DiemVM>::new(db.clone());
+    let executor = BlockExecutor::<AptosVM>::new(db.clone());
     let output = executor
         .execute_block((block_id, txns), executor.committed_block_id())
         .unwrap();
@@ -270,7 +270,7 @@ fn test_pre_genesis() {
     let tmp_dir = TempPath::new();
     let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(&tmp_dir));
     let signer = ValidatorSigner::new(genesis.1[0].data.address, genesis.1[0].key.clone());
-    let waypoint = bootstrap_genesis::<DiemVM>(&db_rw, &genesis_txn).unwrap();
+    let waypoint = bootstrap_genesis::<AptosVM>(&db_rw, &genesis_txn).unwrap();
 
     // Mint for 2 demo accounts.
     let (account1, account1_key, account2, account2_key) = get_demo_accounts();
@@ -290,7 +290,7 @@ fn test_pre_genesis() {
     restore_state_to_db(&db, accounts_backup, proof, root_hash, PRE_GENESIS_VERSION);
 
     // DB is not empty, `maybe_bootstrap()` will try to apply and fail the waypoint check.
-    assert!(maybe_bootstrap::<DiemVM>(&db_rw, &genesis_txn, waypoint).is_err());
+    assert!(maybe_bootstrap::<AptosVM>(&db_rw, &genesis_txn, waypoint).is_err());
     // Nor is it able to boot BlockExecutor.
     assert!(db_rw.reader.get_startup_info().unwrap().is_none());
 
@@ -298,7 +298,7 @@ fn test_pre_genesis() {
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
         WriteSetMut::new(vec![
             (
-                default_access_path_for_config(ValidatorSet::CONFIG_ID),
+                dpn_access_path_for_config(ValidatorSet::CONFIG_ID),
                 WriteOp::Value(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
             ),
             (
@@ -317,8 +317,8 @@ fn test_pre_genesis() {
     )));
 
     // Bootstrap DB on top of pre-genesis state.
-    let waypoint = generate_waypoint::<DiemVM>(&db_rw, &genesis_txn).unwrap();
-    assert!(maybe_bootstrap::<DiemVM>(&db_rw, &genesis_txn, waypoint).unwrap());
+    let waypoint = generate_waypoint::<AptosVM>(&db_rw, &genesis_txn).unwrap();
+    assert!(maybe_bootstrap::<AptosVM>(&db_rw, &genesis_txn, waypoint).unwrap());
 
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
     let initial_accumulator = db_rw
@@ -348,7 +348,7 @@ fn test_new_genesis() {
     // Create bootstrapped DB.
     let tmp_dir = TempPath::new();
     let db = DbReaderWriter::new(AptosDB::new_for_test(&tmp_dir));
-    let waypoint = bootstrap_genesis::<DiemVM>(&db, &genesis_txn).unwrap();
+    let waypoint = bootstrap_genesis::<AptosVM>(&db, &genesis_txn).unwrap();
     let signer = ValidatorSigner::new(genesis.1[0].data.address, genesis.1[0].key.clone());
 
     // Mint for 2 demo accounts.
@@ -377,7 +377,7 @@ fn test_new_genesis() {
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
         WriteSetMut::new(vec![
             (
-                default_access_path_for_config(ValidatorSet::CONFIG_ID),
+                dpn_access_path_for_config(ValidatorSet::CONFIG_ID),
                 WriteOp::Value(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
             ),
             (
@@ -400,8 +400,8 @@ fn test_new_genesis() {
     )));
 
     // Bootstrap DB into new genesis.
-    let waypoint = generate_waypoint::<DiemVM>(&db, &genesis_txn).unwrap();
-    assert!(maybe_bootstrap::<DiemVM>(&db, &genesis_txn, waypoint).unwrap());
+    let waypoint = generate_waypoint::<AptosVM>(&db, &genesis_txn).unwrap();
+    assert!(maybe_bootstrap::<AptosVM>(&db, &genesis_txn, waypoint).unwrap());
     assert_eq!(waypoint.version(), 5);
 
     // Client bootable from waypoint.

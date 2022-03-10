@@ -7,10 +7,10 @@
 
 //# run --admin-script --signers DiemRoot DiemRoot --show-events
 script {
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     fun main(_dr: signer, account: signer) {
-        DiemSystem::remove_validator(&account, @Alice);
-        DiemSystem::remove_validator(&account, @Bob);
+        ValidatorSystem::remove_validator(&account, @Alice);
+        ValidatorSystem::remove_validator(&account, @Bob);
     }
 }
 
@@ -18,8 +18,8 @@ script {
 
 //# run --admin-script --signers DiemRoot DiemRoot
 script {
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     fun main(_dr: signer, account: signer) {
-        DiemSystem::remove_validator(&account, @Bob);
+        ValidatorSystem::remove_validator(&account, @Bob);
     }
 }

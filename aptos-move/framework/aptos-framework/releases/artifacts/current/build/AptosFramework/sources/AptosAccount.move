@@ -9,9 +9,9 @@ module AptosFramework::AptosAccount {
     use Std::BCS;
     use Std::Signer;
     use CoreFramework::Account;
-    use CoreFramework::DiemTimestamp;
+    use CoreFramework::Timestamp;
     use CoreFramework::SystemAddresses;
-    use CoreFramework::DiemTransactionPublishingOption;
+    use CoreFramework::TransactionPublishingOption;
     use AptosFramework::Marker;
     use AptosFramework::AptosValidatorConfig;
     use AptosFramework::AptosValidatorOperatorConfig;
@@ -47,7 +47,7 @@ module AptosFramework::AptosAccount {
 
     /// Initialize this module. This is only callable from genesis.
     public fun initialize(core_resource: &signer) {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         // Operational constraint, not a privilege constraint.
         SystemAddresses::assert_core_resource(core_resource);
         Account::initialize<Marker::ChainMarker>(
@@ -131,7 +131,7 @@ module AptosFramework::AptosAccount {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
-        assert!(DiemTransactionPublishingOption::is_module_allowed(), Errors::invalid_state(EMODULE_NOT_ALLOWED));
+        assert!(TransactionPublishingOption::is_module_allowed(), Errors::invalid_state(EMODULE_NOT_ALLOWED));
         prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
@@ -145,7 +145,7 @@ module AptosFramework::AptosAccount {
         chain_id: u8,
         script_hash: vector<u8>,
     ) {
-        assert!(DiemTransactionPublishingOption::is_script_allowed(&script_hash), Errors::invalid_state(ESCRIPT_NOT_ALLOWED));
+        assert!(TransactionPublishingOption::is_script_allowed(&script_hash), Errors::invalid_state(ESCRIPT_NOT_ALLOWED));
         prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
@@ -212,7 +212,7 @@ module AptosFramework::AptosAccount {
         chain_id: u8,
     ) {
         assert!(
-            DiemTimestamp::now_seconds() < txn_expiration_time,
+            Timestamp::now_seconds() < txn_expiration_time,
             Errors::invalid_argument(ETRANSACTION_EXPIRED),
         );
         Account::prologue(&sender, txn_sequence_number, txn_public_key, chain_id);

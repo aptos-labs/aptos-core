@@ -51,7 +51,7 @@ pub enum LegacyStdlibScript {
     TieredMint,
     UnfreezeAccount,
     UpdateExchangeRate,
-    UpdateDiemVersion,
+    UpdateVersion,
     UpdateMintingAbility,
     UpdateDualAttestationLimit,
     // ...add new scripts here
@@ -93,7 +93,7 @@ impl LegacyStdlibScript {
             TieredMint,
             UnfreezeAccount,
             UpdateExchangeRate,
-            UpdateDiemVersion,
+            UpdateVersion,
             UpdateMintingAbility,
             UpdateDualAttestationLimit,
             // ...add new scripts here
@@ -224,7 +224,7 @@ impl fmt::Display for LegacyStdlibScript {
                 TieredMint => "tiered_mint",
                 UpdateDualAttestationLimit => "update_dual_attestation_limit",
                 UnfreezeAccount => "unfreeze_account",
-                UpdateDiemVersion => "update_diem_version",
+                UpdateVersion => "update_diem_version",
                 UpdateExchangeRate => "update_exchange_rate",
                 UpdateMintingAbility => "update_minting_ability",
             }

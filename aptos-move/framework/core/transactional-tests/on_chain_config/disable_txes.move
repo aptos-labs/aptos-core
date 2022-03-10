@@ -5,9 +5,9 @@
 // Disable txes from all accounts except DiemRoot.
 //# run --admin-script --signers DiemRoot DiemRoot
 script {
-use DiemFramework::DiemTransactionPublishingOption;
+use DiemFramework::TransactionPublishingOption;
 fun main(dr: signer, _dr2: signer) {
-    DiemTransactionPublishingOption::halt_all_transactions(&dr);
+    TransactionPublishingOption::halt_all_transactions(&dr);
 }
 }
 // Sending allowlisted script from normal account fails
@@ -23,9 +23,9 @@ fun main(dr: signer, _dr2: signer) {
 // Re-enable. this also tests that sending from DiemRoot succeeds.
 //# run --admin-script --signers DiemRoot DiemRoot
 script {
-use DiemFramework::DiemTransactionPublishingOption;
+use DiemFramework::TransactionPublishingOption;
 fun main(dr: signer, _dr2: signer) {
-    DiemTransactionPublishingOption::resume_transactions(&dr);
+    TransactionPublishingOption::resume_transactions(&dr);
 }
 }
 
@@ -36,8 +36,8 @@ fun main(dr: signer, _dr2: signer) {
 // A normal account has insufficient privs to halt transactions.
 //# run --admin-script --signers DiemRoot Vivian
 script {
-use DiemFramework::DiemTransactionPublishingOption;
+use DiemFramework::TransactionPublishingOption;
 fun main(dr: signer, vv: signer) {
-    DiemTransactionPublishingOption::halt_all_transactions(&vv);
+    TransactionPublishingOption::halt_all_transactions(&vv);
 }
 }

@@ -5,7 +5,7 @@ module ExperimentalFramework::VoteTests {
     use Std::Signer;
     use Std::UnitTest;
     use Std::Vector;
-    use CoreFramework::DiemTimestamp;
+    use CoreFramework::Timestamp;
     use ExperimentalFramework::Genesis;
     use ExperimentalFramework::Vote;
 
@@ -164,7 +164,7 @@ module ExperimentalFramework::VoteTests {
             4,
         );
 
-        DiemTimestamp::update_global_time(&vm, @0xCAFE, 3000000);
+        Timestamp::update_global_time(&vm, @0xCAFE, 3000000);
         let remove_ballots = Vote::gc_test_helper<TestProposal>(addr);
         assert!(Vector::length(&remove_ballots) == 2, 0);
         assert!(&Vector::pop_back(&mut remove_ballots) == &Vote::new_ballot_id(1, addr), 0);

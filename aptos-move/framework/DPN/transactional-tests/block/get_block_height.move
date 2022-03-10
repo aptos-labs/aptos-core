@@ -2,10 +2,10 @@
 
 //# run --admin-script --signers DiemRoot DiemRoot
 script{
-use DiemFramework::DiemBlock;
+use DiemFramework::Block;
 fun main() {
     // check that the height of the initial block is zero
-    assert!(DiemBlock::get_current_block_height() == 0, 77);
+    assert!(Block::get_current_block_height() == 0, 77);
 }
 }
 
@@ -13,12 +13,12 @@ fun main() {
 
 //# run --admin-script --signers DiemRoot DiemRoot
 script{
-use DiemFramework::DiemBlock;
-use DiemFramework::DiemTimestamp;
+use DiemFramework::Block;
+use DiemFramework::Timestamp;
 
 fun main() {
-    assert!(DiemBlock::get_current_block_height() == 1, 76);
-    assert!(DiemTimestamp::now_microseconds() == 100000000, 80);
+    assert!(Block::get_current_block_height() == 1, 76);
+    assert!(Timestamp::now_microseconds() == 100000000, 80);
 }
 }
 
@@ -26,11 +26,11 @@ fun main() {
 
 //# run --admin-script --signers DiemRoot DiemRoot
 script{
-use DiemFramework::DiemBlock;
-use DiemFramework::DiemTimestamp;
+use DiemFramework::Block;
+use DiemFramework::Timestamp;
 
 fun main() {
-    assert!(DiemBlock::get_current_block_height() == 2, 76);
-    assert!(DiemTimestamp::now_microseconds() == 101000000, 80);
+    assert!(Block::get_current_block_height() == 2, 76);
+    assert!(Timestamp::now_microseconds() == 101000000, 80);
 }
 }

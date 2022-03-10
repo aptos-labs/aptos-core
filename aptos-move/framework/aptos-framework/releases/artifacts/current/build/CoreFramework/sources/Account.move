@@ -5,7 +5,7 @@ module CoreFramework::Account {
     use Std::Hash;
     use Std::Vector;
     use CoreFramework::ChainId;
-    use CoreFramework::DiemConfig;
+    use CoreFramework::Reconfiguration;
     use CoreFramework::SystemAddresses;
 
     /// Resource representing an account.
@@ -226,6 +226,6 @@ module CoreFramework::Account {
     ) acquires Account {
         SystemAddresses::assert_core_resource(account);
         epilogue(account, witness);
-        if (should_trigger_reconfiguration) DiemConfig::reconfigure();
+        if (should_trigger_reconfiguration) Reconfiguration::reconfigure();
     }
 }

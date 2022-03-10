@@ -3,7 +3,7 @@
 
 use crate::{
     adapter_common::{PreprocessedTransaction, VMAdapter},
-    aptos_vm::DiemVM,
+    aptos_vm::AptosVM,
     data_cache::RemoteStorage,
     logging::AdapterLogSchema,
     parallel_executor::{storage_wrapper::VersionedView, DiemTransactionOutput},
@@ -20,7 +20,7 @@ use aptos_types::{
 use move_core_types::vm_status::VMStatus;
 
 pub(crate) struct DiemVMWrapper<'a, S> {
-    vm: DiemVM,
+    vm: AptosVM,
     base_view: &'a S,
 }
 
@@ -31,7 +31,7 @@ impl<'a, S: 'a + StateView> ExecutorTask for DiemVMWrapper<'a, S> {
     type Argument = &'a S;
 
     fn init(argument: &'a S) -> Self {
-        let vm = DiemVM::new(argument);
+        let vm = AptosVM::new(argument);
 
         // Loading `0x1::DiemAccount` and its transitive dependency into the code cache.
         //
@@ -75,7 +75,7 @@ impl<'a, S: 'a + StateView> ExecutorTask for DiemVMWrapper<'a, S> {
                         }
                     };
                 }
-                if DiemVM::should_restart_execution(&output) {
+                if AptosVM::should_restart_execution(&output) {
                     ExecutionStatus::SkipRest(DiemTransactionOutput::new(output))
                 } else {
                     ExecutionStatus::Success(DiemTransactionOutput::new(output))

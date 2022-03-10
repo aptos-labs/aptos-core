@@ -10,12 +10,12 @@ use crate::{
         DesignatedDealerPreburns, DiemAccountResource, FreezingBit, ParentVASP,
         PreburnQueueResource, PreburnResource,
     },
-    block_metadata::DiemBlockResource,
-    diem_timestamp::DiemTimestampResource,
+    block_metadata::BlockResource,
     on_chain_config::{
-        default_access_path_for_config, experimental_access_path_for_config, ConfigurationResource,
-        DiemVersion, OnChainConfig, RegisteredCurrencies, VMPublishingOption, ValidatorSet,
+        access_path_for_config, dpn_access_path_for_config, ConfigurationResource, OnChainConfig,
+        RegisteredCurrencies, VMPublishingOption, ValidatorSet, Version,
     },
+    timestamp::TimestampResource,
     validator_config::{ValidatorConfigResource, ValidatorOperatorConfigResource},
 };
 use anyhow::{format_err, Error, Result};
@@ -104,8 +104,8 @@ impl AccountState {
         self.get_resource::<ConfigurationResource>()
     }
 
-    pub fn get_diem_timestamp_resource(&self) -> Result<Option<DiemTimestampResource>> {
-        self.get_resource::<DiemTimestampResource>()
+    pub fn get_timestamp_resource(&self) -> Result<Option<TimestampResource>> {
+        self.get_resource::<TimestampResource>()
     }
 
     pub fn get_validator_config_resource(&self) -> Result<Option<ValidatorConfigResource>> {
@@ -175,13 +175,13 @@ impl AccountState {
         self.get_config::<ValidatorSet>()
     }
 
-    pub fn get_diem_version(&self) -> Result<Option<DiemVersion>> {
-        self.get_config::<DiemVersion>()
+    pub fn get_version(&self) -> Result<Option<Version>> {
+        self.get_config::<Version>()
     }
 
     pub fn get_vm_publishing_option(&self) -> Result<Option<VMPublishingOption>> {
         self.0
-            .get(&default_access_path_for_config(VMPublishingOption::CONFIG_ID).path)
+            .get(&dpn_access_path_for_config(VMPublishingOption::CONFIG_ID).path)
             .map(|bytes| VMPublishingOption::deserialize_into_config(bytes))
             .transpose()
             .map_err(Into::into)
@@ -206,8 +206,8 @@ impl AccountState {
         }
     }
 
-    pub fn get_diem_block_resource(&self) -> Result<Option<DiemBlockResource>> {
-        self.get_resource::<DiemBlockResource>()
+    pub fn get_block_resource(&self) -> Result<Option<BlockResource>> {
+        self.get_resource::<BlockResource>()
     }
 
     pub fn get(&self, key: &[u8]) -> Option<&Vec<u8>> {
@@ -235,9 +235,9 @@ impl AccountState {
     }
 
     pub fn get_config<T: OnChainConfig>(&self) -> Result<Option<T>> {
-        match self.get_resource_impl(&experimental_access_path_for_config(T::CONFIG_ID).path)? {
+        match self.get_resource_impl(&access_path_for_config(T::CONFIG_ID).path)? {
             Some(config) => Ok(Some(config)),
-            _ => self.get_resource_impl(&default_access_path_for_config(T::CONFIG_ID).path),
+            _ => self.get_resource_impl(&dpn_access_path_for_config(T::CONFIG_ID).path),
         }
     }
 
@@ -309,9 +309,9 @@ impl fmt::Debug for AccountState {
             .map(|account_resource_opt| format!("{:#?}", account_resource_opt))
             .unwrap_or_else(|e| format!("parse error: {:#?}", e));
 
-        let diem_timestamp_str = self
-            .get_diem_timestamp_resource()
-            .map(|diem_timestamp_opt| format!("{:#?}", diem_timestamp_opt))
+        let timestamp_str = self
+            .get_timestamp_resource()
+            .map(|timestamp_opt| format!("{:#?}", timestamp_opt))
             .unwrap_or_else(|e| format!("parse: {:#?}", e));
 
         let validator_config_str = self
@@ -327,12 +327,12 @@ impl fmt::Debug for AccountState {
         write!(
             f,
             "{{ \n \
-             DiemAccountResource {{ {} }} \n \
-             DiemTimestamp {{ {} }} \n \
+             AccountResource {{ {} }} \n \
+             Timestamp {{ {} }} \n \
              ValidatorConfig {{ {} }} \n \
              ValidatorSet {{ {} }} \n \
              }}",
-            account_resource_str, diem_timestamp_str, validator_config_str, validator_set_str,
+            account_resource_str, timestamp_str, validator_config_str, validator_set_str,
         )
     }
 }

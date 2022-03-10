@@ -4,8 +4,8 @@ module CoreFramework::ParallelExecutionConfig {
     use Std::Capability::Cap;
     use Std::Errors;
     use Std::Option::{Self, Option};
-    use CoreFramework::DiemConfig;
-    use CoreFramework::DiemTimestamp;
+    use CoreFramework::Reconfiguration;
+    use CoreFramework::Timestamp;
     use CoreFramework::SystemAddresses;
 
     /// Error with chain marker
@@ -16,18 +16,18 @@ module CoreFramework::ParallelExecutionConfig {
     /// Marker to be stored under @CoreResources during genesis
     struct ParallelExecutionConfigChainMarker<phantom T> has key {}
 
-    /// The struct to hold the read/write set analysis result for the whole Diem Framework.
+    /// The struct to hold the read/write set analysis result for the whole core Framework.
     struct ParallelExecutionConfig has key {
-        /// Serialized analysis result for the Diem Framework.
-        /// If this payload is not None, DiemVM will use this config to execute transactions in parallel.
+        /// Serialized analysis result for the core Framework.
+        /// If this payload is not None, VM will use this config to execute transactions in parallel.
         read_write_analysis_result: Option<vector<u8>>
     }
 
-    /// Enable parallel execution functionality of DiemVM by setting the read_write_set analysis result.
+    /// Enable parallel execution functionality of VM by setting the read_write_set analysis result.
     public fun initialize_parallel_execution<T>(
         account: &signer,
     ) {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         SystemAddresses::assert_core_resource(account);
 
         assert!(
@@ -54,26 +54,26 @@ module CoreFramework::ParallelExecutionConfig {
         read_write_inference_result: vector<u8>,
         _cap: &Cap<T>
     ) acquires ParallelExecutionConfig {
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         assert!(
             exists<ParallelExecutionConfigChainMarker<T>>(@CoreResources),
             Errors::not_published(ECHAIN_MARKER)
         );
         let result_ref = &mut borrow_global_mut<ParallelExecutionConfig>(@CoreResources).read_write_analysis_result;
         *result_ref = Option::some(read_write_inference_result);
-        DiemConfig::reconfigure();
+        Reconfiguration::reconfigure();
     }
 
     public fun disable_parallel_execution<T>(
         _cap: &Cap<T>
     ) acquires ParallelExecutionConfig {
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         assert!(
             exists<ParallelExecutionConfigChainMarker<T>>(@CoreResources),
             Errors::not_published(ECHAIN_MARKER)
         );
         let result_ref = &mut borrow_global_mut<ParallelExecutionConfig>(@CoreResources).read_write_analysis_result;
         *result_ref = Option::none();
-        DiemConfig::reconfigure();
+        Reconfiguration::reconfigure();
     }
 }

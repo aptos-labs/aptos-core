@@ -1,16 +1,16 @@
 module ExperimentalFramework::ExperimentalConsensusConfig {
     use Std::Capability;
-    use CoreFramework::DiemConsensusConfig;
+    use CoreFramework::ConsensusConfig;
 
     struct ExperimentalConsensusConfig has drop {}
 
     public fun initialize(account: &signer) {
-        DiemConsensusConfig::initialize<ExperimentalConsensusConfig>(account);
+        ConsensusConfig::initialize<ExperimentalConsensusConfig>(account);
         Capability::create<ExperimentalConsensusConfig>(account, &ExperimentalConsensusConfig {});
     }
 
     public fun set(account: &signer, config: vector<u8>) {
-        DiemConsensusConfig::set(
+        ConsensusConfig::set(
             config, &Capability::acquire(account, &ExperimentalConsensusConfig {})
         );
     }

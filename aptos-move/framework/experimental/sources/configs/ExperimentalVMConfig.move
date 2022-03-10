@@ -1,6 +1,6 @@
 module ExperimentalFramework::ExperimentalVMConfig {
     use Std::Capability;
-    use CoreFramework::DiemVMConfig;
+    use CoreFramework::VMConfig;
 
     struct ExperimentalVMConfig has drop {}
 
@@ -10,7 +10,7 @@ module ExperimentalFramework::ExperimentalVMConfig {
         instruction_schedule: vector<u8>,
         native_schedule: vector<u8>,
     ) {
-        DiemVMConfig::initialize<ExperimentalVMConfig>(account, instruction_schedule, native_schedule);
+        VMConfig::initialize<ExperimentalVMConfig>(account, instruction_schedule, native_schedule);
         Capability::create<ExperimentalVMConfig>(account, &ExperimentalVMConfig {});
     }
 
@@ -28,7 +28,7 @@ module ExperimentalFramework::ExperimentalVMConfig {
         gas_unit_scaling_factor: u64,
         default_account_size: u64,
     ) {
-        DiemVMConfig::set_gas_constants<ExperimentalVMConfig>(
+        VMConfig::set_gas_constants<ExperimentalVMConfig>(
             global_memory_per_byte_cost,
             global_memory_per_byte_write_cost,
             min_transaction_gas_units,

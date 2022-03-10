@@ -583,7 +583,7 @@ impl MetadataView {
             self.script_hash_allow_list = Some(vm_publishing_option.script_allow_list);
             self.module_publishing_allowed = Some(vm_publishing_option.is_open_module);
         }
-        if let Some(diem_version) = aptos_root.get_diem_version()? {
+        if let Some(diem_version) = aptos_root.get_version()? {
             self.diem_version = Some(diem_version.major);
         }
         if let Some(limit) = aptos_root.get_resource::<Limit>()? {

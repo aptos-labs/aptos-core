@@ -34,6 +34,9 @@ compiled_package_info:
       name: BitVector
     : Std
     ? address: "00000000000000000000000000000001"
+      name: Block
+    : DiemFramework
+    ? address: "00000000000000000000000000000001"
       name: CRSN
     : DiemFramework
     ? address: "00000000000000000000000000000001"
@@ -41,6 +44,9 @@ compiled_package_info:
     : Std
     ? address: "00000000000000000000000000000001"
       name: ChainId
+    : DiemFramework
+    ? address: "00000000000000000000000000000001"
+      name: ConsensusConfig
     : DiemFramework
     ? address: "00000000000000000000000000000001"
       name: CoreAddresses
@@ -55,31 +61,7 @@ compiled_package_info:
       name: DiemAccount
     : DiemFramework
     ? address: "00000000000000000000000000000001"
-      name: DiemBlock
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemConfig
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemConsensusConfig
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
       name: DiemId
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemSystem
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemTimestamp
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemTransactionPublishingOption
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemVMConfig
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemVersion
     : DiemFramework
     ? address: "00000000000000000000000000000001"
       name: DualAttestation
@@ -115,6 +97,9 @@ compiled_package_info:
       name: PaymentScripts
     : DiemFramework
     ? address: "00000000000000000000000000000001"
+      name: Reconfiguration
+    : DiemFramework
+    ? address: "00000000000000000000000000000001"
       name: RecoveryAddress
     : DiemFramework
     ? address: "00000000000000000000000000000001"
@@ -139,7 +124,13 @@ compiled_package_info:
       name: SystemAdministrationScripts
     : DiemFramework
     ? address: "00000000000000000000000000000001"
+      name: Timestamp
+    : DiemFramework
+    ? address: "00000000000000000000000000000001"
       name: TransactionFee
+    : DiemFramework
+    ? address: "00000000000000000000000000000001"
+      name: TransactionPublishingOption
     : DiemFramework
     ? address: "00000000000000000000000000000001"
       name: TreasuryComplianceScripts
@@ -151,21 +142,30 @@ compiled_package_info:
       name: VASPDomain
     : DiemFramework
     ? address: "00000000000000000000000000000001"
+      name: VMConfig
+    : DiemFramework
+    ? address: "00000000000000000000000000000001"
       name: ValidatorConfig
     : DiemFramework
     ? address: "00000000000000000000000000000001"
       name: ValidatorOperatorConfig
     : DiemFramework
     ? address: "00000000000000000000000000000001"
+      name: ValidatorSystem
+    : DiemFramework
+    ? address: "00000000000000000000000000000001"
       name: Vector
     : Std
+    ? address: "00000000000000000000000000000001"
+      name: Version
+    : DiemFramework
     ? address: "00000000000000000000000000000001"
       name: XDX
     : DiemFramework
     ? address: "00000000000000000000000000000001"
       name: XUS
     : DiemFramework
-  source_digest: AB3A0AFA209632232E07C3F45B318EBA645477FA4BF0227EFE41422987F78453
+  source_digest: 6A26EBC25039145832D140AAFA228BF5CEFC3BAD6375DF7397AB2F865DF9FA35
   build_flags:
     dev_mode: false
     test_mode: false

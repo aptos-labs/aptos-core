@@ -16,24 +16,24 @@ when executing from a fresh state.
 
 
 <pre><code><b>use</b> <a href="AccountFreezing.md#0x1_AccountFreezing">0x1::AccountFreezing</a>;
+<b>use</b> <a href="Block.md#0x1_Block">0x1::Block</a>;
 <b>use</b> <a href="ChainId.md#0x1_ChainId">0x1::ChainId</a>;
+<b>use</b> <a href="ConsensusConfig.md#0x1_ConsensusConfig">0x1::ConsensusConfig</a>;
 <b>use</b> <a href="Diem.md#0x1_Diem">0x1::Diem</a>;
 <b>use</b> <a href="DiemAccount.md#0x1_DiemAccount">0x1::DiemAccount</a>;
-<b>use</b> <a href="DiemBlock.md#0x1_DiemBlock">0x1::DiemBlock</a>;
-<b>use</b> <a href="DiemConfig.md#0x1_DiemConfig">0x1::DiemConfig</a>;
-<b>use</b> <a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig">0x1::DiemConsensusConfig</a>;
-<b>use</b> <a href="DiemSystem.md#0x1_DiemSystem">0x1::DiemSystem</a>;
-<b>use</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
-<b>use</b> <a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption">0x1::DiemTransactionPublishingOption</a>;
-<b>use</b> <a href="DiemVMConfig.md#0x1_DiemVMConfig">0x1::DiemVMConfig</a>;
-<b>use</b> <a href="DiemVersion.md#0x1_DiemVersion">0x1::DiemVersion</a>;
 <b>use</b> <a href="DualAttestation.md#0x1_DualAttestation">0x1::DualAttestation</a>;
 <b>use</b> <a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig">0x1::ParallelExecutionConfig</a>;
+<b>use</b> <a href="Reconfiguration.md#0x1_Reconfiguration">0x1::Reconfiguration</a>;
 <b>use</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer">0x1::Signer</a>;
+<b>use</b> <a href="Timestamp.md#0x1_Timestamp">0x1::Timestamp</a>;
 <b>use</b> <a href="TransactionFee.md#0x1_TransactionFee">0x1::TransactionFee</a>;
+<b>use</b> <a href="TransactionPublishingOption.md#0x1_TransactionPublishingOption">0x1::TransactionPublishingOption</a>;
+<b>use</b> <a href="VMConfig.md#0x1_VMConfig">0x1::VMConfig</a>;
 <b>use</b> <a href="ValidatorConfig.md#0x1_ValidatorConfig">0x1::ValidatorConfig</a>;
 <b>use</b> <a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig">0x1::ValidatorOperatorConfig</a>;
+<b>use</b> <a href="ValidatorSystem.md#0x1_ValidatorSystem">0x1::ValidatorSystem</a>;
 <b>use</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector">0x1::Vector</a>;
+<b>use</b> <a href="Version.md#0x1_Version">0x1::Version</a>;
 <b>use</b> <a href="XDX.md#0x1_XDX">0x1::XDX</a>;
 <b>use</b> <a href="XUS.md#0x1_XUS">0x1::XUS</a>;
 </code></pre>
@@ -105,7 +105,7 @@ be verified **together** with the module(s) which provides the invariant.
 Assume that this is called in genesis state (no timestamp).
 
 
-<pre><code><b>requires</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_genesis">DiemTimestamp::is_genesis</a>();
+<pre><code><b>requires</b> <a href="Timestamp.md#0x1_Timestamp_is_genesis">Timestamp::is_genesis</a>();
 </code></pre>
 
 
@@ -146,10 +146,10 @@ Initializes the Diem Framework. Internal so it can be used by both genesis code,
     <a href="ChainId.md#0x1_ChainId_initialize">ChainId::initialize</a>(dr_account, chain_id);
 
     // On-chain config setup
-    <a href="DiemConfig.md#0x1_DiemConfig_initialize">DiemConfig::initialize</a>(dr_account);
+    <a href="Reconfiguration.md#0x1_Reconfiguration_initialize">Reconfiguration::initialize</a>(dr_account);
 
     // Consensus config setup
-    <a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig_initialize">DiemConsensusConfig::initialize</a>(dr_account);
+    <a href="ConsensusConfig.md#0x1_ConsensusConfig_initialize">ConsensusConfig::initialize</a>(dr_account);
 
     // Parallel execution config setup
     <a href="ParallelExecutionConfig.md#0x1_ParallelExecutionConfig_initialize_parallel_execution">ParallelExecutionConfig::initialize_parallel_execution</a>(dr_account);
@@ -165,10 +165,10 @@ Initializes the Diem Framework. Internal so it can be used by both genesis code,
     <a href="AccountFreezing.md#0x1_AccountFreezing_initialize">AccountFreezing::initialize</a>(dr_account);
     <a href="TransactionFee.md#0x1_TransactionFee_initialize">TransactionFee::initialize</a>(tc_account);
 
-    <a href="DiemSystem.md#0x1_DiemSystem_initialize_validator_set">DiemSystem::initialize_validator_set</a>(dr_account);
-    <a href="DiemVersion.md#0x1_DiemVersion_initialize">DiemVersion::initialize</a>(dr_account, initial_diem_version);
+    <a href="ValidatorSystem.md#0x1_ValidatorSystem_initialize_validator_set">ValidatorSystem::initialize_validator_set</a>(dr_account);
+    <a href="Version.md#0x1_Version_initialize">Version::initialize</a>(dr_account, initial_diem_version);
     <a href="DualAttestation.md#0x1_DualAttestation_initialize">DualAttestation::initialize</a>(dr_account);
-    <a href="DiemBlock.md#0x1_DiemBlock_initialize_block_metadata">DiemBlock::initialize_block_metadata</a>(dr_account);
+    <a href="Block.md#0x1_Block_initialize_block_metadata">Block::initialize_block_metadata</a>(dr_account);
 
     // Rotate auth keys for DiemRoot and TreasuryCompliance accounts <b>to</b> the given
     // values
@@ -180,24 +180,24 @@ Initializes the Diem Framework. Internal so it can be used by both genesis code,
     <a href="DiemAccount.md#0x1_DiemAccount_rotate_authentication_key">DiemAccount::rotate_authentication_key</a>(&tc_rotate_key_cap, tc_auth_key);
     <a href="DiemAccount.md#0x1_DiemAccount_restore_key_rotation_capability">DiemAccount::restore_key_rotation_capability</a>(tc_rotate_key_cap);
 
-    <a href="DiemTransactionPublishingOption.md#0x1_DiemTransactionPublishingOption_initialize">DiemTransactionPublishingOption::initialize</a>(
+    <a href="TransactionPublishingOption.md#0x1_TransactionPublishingOption_initialize">TransactionPublishingOption::initialize</a>(
         dr_account,
         initial_script_allow_list,
         is_open_module,
     );
 
-    <a href="DiemVMConfig.md#0x1_DiemVMConfig_initialize">DiemVMConfig::initialize</a>(
+    <a href="VMConfig.md#0x1_VMConfig_initialize">VMConfig::initialize</a>(
         dr_account,
         instruction_schedule,
         native_schedule,
     );
 
-    <a href="DiemConsensusConfig.md#0x1_DiemConsensusConfig_set">DiemConsensusConfig::set</a>(dr_account, consensus_config);
+    <a href="ConsensusConfig.md#0x1_ConsensusConfig_set">ConsensusConfig::set</a>(dr_account, consensus_config);
 
     // After we have called this function, all invariants which are guarded by
-    // `<a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>() ==&gt; ...` will become active and a verification condition.
+    // `<a href="Timestamp.md#0x1_Timestamp_is_operating">Timestamp::is_operating</a>() ==&gt; ...` will become active and a verification condition.
     // See also discussion at function specification.
-    <a href="DiemTimestamp.md#0x1_DiemTimestamp_set_time_has_started">DiemTimestamp::set_time_has_started</a>(dr_account);
+    <a href="Timestamp.md#0x1_Timestamp_set_time_has_started">Timestamp::set_time_has_started</a>(dr_account);
 }
 </code></pre>
 
@@ -304,7 +304,7 @@ Finally, each validator must specify the network address
         );
 
         // finally, add this validator <b>to</b> the validator set
-        <a href="DiemSystem.md#0x1_DiemSystem_add_validator">DiemSystem::add_validator</a>(&dr_account, owner_address);
+        <a href="ValidatorSystem.md#0x1_ValidatorSystem_add_validator">ValidatorSystem::add_validator</a>(&dr_account, owner_address);
 
         i = i + 1;
     }

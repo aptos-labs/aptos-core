@@ -12,7 +12,6 @@ pub mod block_info;
 pub mod block_metadata;
 pub mod chain_id;
 pub mod contract_event;
-pub mod diem_timestamp;
 pub mod epoch_change;
 pub mod epoch_state;
 pub mod event;
@@ -30,6 +29,7 @@ pub mod serde_helper;
 pub mod state_proof;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test_helpers;
+pub mod timestamp;
 pub mod transaction;
 pub mod trusted_state;
 pub mod validator_config;

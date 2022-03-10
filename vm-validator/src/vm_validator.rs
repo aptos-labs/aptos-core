@@ -10,7 +10,7 @@ use aptos_types::{
     on_chain_config::OnChainConfigPayload,
     transaction::{SignedTransaction, VMValidatorResult},
 };
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use executor::components::apply_chunk_output::IntoLedgerView;
 use fail::fail_point;
 use std::{convert::TryFrom, sync::Arc};
@@ -52,7 +52,7 @@ fn latest_state_view(db_reader: &Arc<dyn DbReader>) -> VerifiedStateView {
 pub struct VMValidator {
     db_reader: Arc<dyn DbReader>,
     cached_state_view: VerifiedStateView,
-    vm: DiemVM,
+    vm: AptosVM,
 }
 
 impl Clone for VMValidator {
@@ -65,7 +65,7 @@ impl VMValidator {
     pub fn new(db_reader: Arc<dyn DbReader>) -> Self {
         let cached_state_view = latest_state_view(&db_reader);
 
-        let vm = DiemVM::new_for_validation(&cached_state_view);
+        let vm = AptosVM::new_for_validation(&cached_state_view);
         VMValidator {
             db_reader,
             cached_state_view,
@@ -75,7 +75,7 @@ impl VMValidator {
 }
 
 impl TransactionValidation for VMValidator {
-    type ValidationInstance = DiemVM;
+    type ValidationInstance = AptosVM;
 
     fn validate_transaction(&self, txn: SignedTransaction) -> Result<VMValidatorResult> {
         fail_point!("vm_validator::validate_transaction", |_| {
@@ -91,7 +91,7 @@ impl TransactionValidation for VMValidator {
     fn restart(&mut self, _config: OnChainConfigPayload) -> Result<()> {
         self.notify_commit();
 
-        self.vm = DiemVM::new_for_validation(&self.cached_state_view);
+        self.vm = AptosVM::new_for_validation(&self.cached_state_view);
         Ok(())
     }
 

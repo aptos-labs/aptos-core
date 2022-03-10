@@ -1,8 +1,8 @@
 /// This module defines structs and methods to initialize VM configurations,
 /// including different costs of running the VM.
 module DiemFramework::ParallelExecutionConfig {
-    use DiemFramework::DiemConfig::{Self, DiemConfig};
-    use DiemFramework::DiemTimestamp;
+    use DiemFramework::Reconfiguration::{Self, Reconfiguration};
+    use DiemFramework::Timestamp;
     use DiemFramework::Roles;
     use Std::Option::{Self, Option};
 
@@ -19,7 +19,7 @@ module DiemFramework::ParallelExecutionConfig {
     ) {
         // The permission "UpdateVMConfig" is granted to DiemRoot [[H11]][PERMISSION].
         Roles::assert_diem_root(dr_account);
-        DiemConfig::publish_new_config(
+        Reconfiguration::publish_new_config(
             dr_account,
             ParallelExecutionConfig {
                 read_write_analysis_result: Option::none(),
@@ -31,9 +31,9 @@ module DiemFramework::ParallelExecutionConfig {
        dr_account: &signer,
        read_write_inference_result: vector<u8>,
     ) {
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         Roles::assert_diem_root(dr_account);
-        DiemConfig::set(dr_account, ParallelExecutionConfig {
+        Reconfiguration::set(dr_account, ParallelExecutionConfig {
             read_write_analysis_result: Option::some(read_write_inference_result),
         });
     }
@@ -41,9 +41,9 @@ module DiemFramework::ParallelExecutionConfig {
     public fun disable_parallel_execution(
        dr_account: &signer,
     ) {
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         Roles::assert_diem_root(dr_account);
-        DiemConfig::set(dr_account, ParallelExecutionConfig {
+        Reconfiguration::set(dr_account, ParallelExecutionConfig {
             read_write_analysis_result: Option::none(),
         });
     }
@@ -52,38 +52,38 @@ module DiemFramework::ParallelExecutionConfig {
         /// Must abort if the signer does not have the DiemRoot role [[H11]][PERMISSION].
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
 
-        include DiemConfig::PublishNewConfigAbortsIf<ParallelExecutionConfig>;
-        include DiemConfig::PublishNewConfigEnsures<ParallelExecutionConfig> {
+        include Reconfiguration::PublishNewConfigAbortsIf<ParallelExecutionConfig>;
+        include Reconfiguration::PublishNewConfigEnsures<ParallelExecutionConfig> {
             payload: ParallelExecutionConfig {
                 read_write_analysis_result: Option::none(),
             }};
     }
 
     spec enable_parallel_execution_with_config {
-        include DiemTimestamp::AbortsIfNotOperating;
-        /// No one can update DiemVMConfig except for the Diem Root account [[H11]][PERMISSION].
+        include Timestamp::AbortsIfNotOperating;
+        /// No one can update VMConfig except for the Diem Root account [[H11]][PERMISSION].
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
-        include DiemConfig::SetAbortsIf<ParallelExecutionConfig>{account: dr_account };
-        ensures DiemConfig::spec_is_published<ParallelExecutionConfig>();
+        include Reconfiguration::SetAbortsIf<ParallelExecutionConfig>{account: dr_account };
+        ensures Reconfiguration::spec_is_published<ParallelExecutionConfig>();
 
         // TODO: How to replace this assertion since we can't invoke Option::some here?
-        //        ensures DiemConfig::get<ParallelExecutionConfig>() == ParallelExecutionConfig {
+        //        ensures Reconfiguration::get<ParallelExecutionConfig>() == ParallelExecutionConfig {
         //            read_write_analysis_result: result,
         //        };
 
-        ensures old(DiemConfig::spec_has_config()) == DiemConfig::spec_has_config();
+        ensures old(Reconfiguration::spec_has_config()) == Reconfiguration::spec_has_config();
     }
 
     spec disable_parallel_execution {
-        include DiemTimestamp::AbortsIfNotOperating;
-        /// No one can update DiemVMConfig except for the Diem Root account [[H11]][PERMISSION].
+        include Timestamp::AbortsIfNotOperating;
+        /// No one can update VMConfig except for the Diem Root account [[H11]][PERMISSION].
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
-        include DiemConfig::SetAbortsIf<ParallelExecutionConfig>{account: dr_account };
-        ensures DiemConfig::spec_is_published<ParallelExecutionConfig>();
-        ensures DiemConfig::get<ParallelExecutionConfig>() == ParallelExecutionConfig {
+        include Reconfiguration::SetAbortsIf<ParallelExecutionConfig>{account: dr_account };
+        ensures Reconfiguration::spec_is_published<ParallelExecutionConfig>();
+        ensures Reconfiguration::get<ParallelExecutionConfig>() == ParallelExecutionConfig {
             read_write_analysis_result: Option::none(),
         };
-        ensures old(DiemConfig::spec_has_config()) == DiemConfig::spec_has_config();
+        ensures old(Reconfiguration::spec_has_config()) == Reconfiguration::spec_has_config();
     }
 
 
@@ -94,22 +94,22 @@ module DiemFramework::ParallelExecutionConfig {
     /// The permission "UpdateParallelExecutionConfig" is granted to DiemRoot [[H11]][PERMISSION].
     spec module {
         invariant [suspendable] forall addr: address
-            where exists<DiemConfig<ParallelExecutionConfig>>(addr): addr == @DiemRoot;
+            where exists<Reconfiguration<ParallelExecutionConfig>>(addr): addr == @DiemRoot;
 
-        invariant update [suspendable] old(DiemConfig::spec_is_published<ParallelExecutionConfig>())
-            && DiemConfig::spec_is_published<ParallelExecutionConfig>()
-            && old(DiemConfig::get<ParallelExecutionConfig>()) != DiemConfig::get<ParallelExecutionConfig>()
+        invariant update [suspendable] old(Reconfiguration::spec_is_published<ParallelExecutionConfig>())
+            && Reconfiguration::spec_is_published<ParallelExecutionConfig>()
+            && old(Reconfiguration::get<ParallelExecutionConfig>()) != Reconfiguration::get<ParallelExecutionConfig>()
                 ==> Roles::spec_signed_by_diem_root_role();
     }
 
     // TODO: The following is the old style spec, which can removed later.
-    /// No one can update DiemVMConfig except for the Diem Root account [[H11]][PERMISSION].
-    spec schema DiemVMConfigRemainsSame {
-        ensures old(DiemConfig::spec_is_published<ParallelExecutionConfig>()) ==>
-            global<DiemConfig<ParallelExecutionConfig>>(@DiemRoot) ==
-                old(global<DiemConfig<ParallelExecutionConfig>>(@DiemRoot));
+    /// No one can update VMConfig except for the Diem Root account [[H11]][PERMISSION].
+    spec schema VMConfigRemainsSame {
+        ensures old(Reconfiguration::spec_is_published<ParallelExecutionConfig>()) ==>
+            global<Reconfiguration<ParallelExecutionConfig>>(@DiemRoot) ==
+                old(global<Reconfiguration<ParallelExecutionConfig>>(@DiemRoot));
     }
     spec module {
-        apply DiemVMConfigRemainsSame to * except enable_parallel_execution_with_config, disable_parallel_execution;
+        apply VMConfigRemainsSame to * except enable_parallel_execution_with_config, disable_parallel_execution;
     }
 }

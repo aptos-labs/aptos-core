@@ -4,9 +4,7 @@
 use crate::{
     adapter_common::PreprocessedTransaction,
     script_to_script_function::remapping,
-    system_module_names::{
-        BLOCK_PROLOGUE, DIEM_BLOCK_MODULE, SCRIPT_PROLOGUE_NAME, USER_EPILOGUE_NAME,
-    },
+    system_module_names::{BLOCK_MODULE, BLOCK_PROLOGUE, SCRIPT_PROLOGUE_NAME, USER_EPILOGUE_NAME},
 };
 use anyhow::{anyhow, bail, Result};
 use aptos_types::{
@@ -35,7 +33,7 @@ const TRANSACTION_FEES_NAME: &IdentStr = ident_str!("TransactionFee");
 
 pub fn add_on_functions_list() -> Vec<(ModuleId, Identifier)> {
     vec![
-        (DIEM_BLOCK_MODULE.clone(), BLOCK_PROLOGUE.to_owned()),
+        (BLOCK_MODULE.clone(), BLOCK_PROLOGUE.to_owned()),
         (
             account_config::constants::DIEM_ACCOUNT_MODULE.clone(),
             SCRIPT_PROLOGUE_NAME.to_owned(),
@@ -186,7 +184,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
                     MoveValue::Address(proposer),
                 ]);
                 let metadata_access = self.get_partially_concretized_summary(
-                    &DIEM_BLOCK_MODULE,
+                    &BLOCK_MODULE,
                     BLOCK_PROLOGUE,
                     &[],
                     &args,

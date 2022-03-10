@@ -25,7 +25,7 @@ use aptos_types::{
     },
     vm_status::KeptVMStatus,
 };
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_FRESH};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
 use move_compiler::{
@@ -546,7 +546,7 @@ impl<'a> DiemTestAdapter<'a> {
     /// Should error if the transaction ends up being discarded, or having a status other than
     /// EXECUTED.
     fn run_transaction(&mut self, txn: Transaction) -> Result<TransactionOutput> {
-        let mut outputs = DiemVM::execute_block_and_keep_vm_status(vec![txn], &self.storage)?;
+        let mut outputs = AptosVM::execute_block_and_keep_vm_status(vec![txn], &self.storage)?;
 
         assert_eq!(outputs.len(), 1);
 

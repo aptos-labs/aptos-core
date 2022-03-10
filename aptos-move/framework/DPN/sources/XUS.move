@@ -2,7 +2,7 @@
 module DiemFramework::XUS {
     use DiemFramework::AccountLimits;
     use DiemFramework::Diem;
-    use DiemFramework::DiemTimestamp;
+    use DiemFramework::Timestamp;
     use DiemFramework::Roles;
     use Std::FixedPoint32;
 
@@ -14,7 +14,7 @@ module DiemFramework::XUS {
         dr_account: &signer,
         tc_account: &signer,
     ) {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         Roles::assert_treasury_compliance(tc_account);
         Roles::assert_diem_root(dr_account);
         Diem::register_SCS_currency<XUS>(
@@ -37,7 +37,7 @@ module DiemFramework::XUS {
         include Diem::RegisterSCSCurrencyEnsures<XUS>;
         include AccountLimits::PublishUnrestrictedLimitsEnsures<XUS>{publish_account: dr_account};
         /// Registering XUS can only be done in genesis.
-        include DiemTimestamp::AbortsIfNotGenesis;
+        include Timestamp::AbortsIfNotGenesis;
         /// Only the DiemRoot account can register a new currency [[H8]][PERMISSION].
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
         /// Only a TreasuryCompliance account can have the MintCapability [[H1]][PERMISSION].
@@ -53,12 +53,12 @@ module DiemFramework::XUS {
     /// # Persistence of Resources
     spec module {
         /// After genesis, XUS is registered.
-        invariant [suspendable] DiemTimestamp::is_operating() ==> Diem::is_currency<XUS>();
+        invariant [suspendable] Timestamp::is_operating() ==> Diem::is_currency<XUS>();
 
         /// After genesis, `LimitsDefinition<XUS>` is published at Diem root. It's published by
         /// AccountLimits::publish_unrestricted_limits, but we can't prove the condition there because
         /// it does not hold for all types (but does hold for XUS).
-        invariant [suspendable] DiemTimestamp::is_operating()
+        invariant [suspendable] Timestamp::is_operating()
             ==> exists<AccountLimits::LimitsDefinition<XUS>>(@DiemRoot);
 
         /// `LimitsDefinition<XUS>` is not published at any other address
@@ -66,19 +66,19 @@ module DiemFramework::XUS {
             addr == @DiemRoot;
 
         /// After genesis, XUS is always a non-synthetic currency.
-        invariant [suspendable] DiemTimestamp::is_operating()
+        invariant [suspendable] Timestamp::is_operating()
             ==> !Diem::is_synthetic_currency<XUS>();
 
         /// After genesis, the scaling factor for XUS is always equal to 1,000,000.
-        invariant [suspendable] DiemTimestamp::is_operating()
+        invariant [suspendable] Timestamp::is_operating()
             ==> Diem::spec_currency_info<XUS>().scaling_factor == 1000000;
 
         /// After genesis, the fractional part for XUS is always equal to 100.
-        invariant [suspendable] DiemTimestamp::is_operating()
+        invariant [suspendable] Timestamp::is_operating()
             ==> Diem::spec_currency_info<XUS>().fractional_part == 100;
 
         /// After genesis, the currency code for XUS is always "XUS".
-        invariant [suspendable] DiemTimestamp::is_operating()
+        invariant [suspendable] Timestamp::is_operating()
             ==> Diem::spec_currency_code<XUS>() == b"XUS";
     }
 

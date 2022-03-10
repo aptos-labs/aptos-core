@@ -1,6 +1,6 @@
 address 0x1 {
 module ValidatorAdministrationScripts {
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     use DiemFramework::SlidingNonce;
     use DiemFramework::ValidatorConfig;
     use DiemFramework::ValidatorOperatorConfig;
@@ -12,7 +12,7 @@ module ValidatorAdministrationScripts {
     ///
     /// # Technical Description
     /// This script adds the account at `validator_address` to the validator set.
-    /// This transaction emits a `DiemConfig::NewEpochEvent` event and triggers a
+    /// This transaction emits a `Reconfiguration::NewEpochEvent` event and triggers a
     /// reconfiguration. Once the reconfiguration triggered by this script's
     /// execution has been performed, the account at the `validator_address` is
     /// considered to be a validator in the network.
@@ -38,10 +38,10 @@ module ValidatorAdministrationScripts {
     /// | `Errors::REQUIRES_ADDRESS` | `CoreAddresses::EDIEM_ROOT`                  | The sending account is not the Diem Root account.                                                                                         |
     /// | `Errors::REQUIRES_ROLE`    | `Roles::EDIEM_ROOT`                          | The sending account is not the Diem Root account.                                                                                         |
     /// | 0                          | 0                                            | The provided `validator_name` does not match the already-recorded human name for the validator.                                           |
-    /// | `Errors::INVALID_ARGUMENT` | `DiemSystem::EINVALID_PROSPECTIVE_VALIDATOR` | The validator to be added does not have a `ValidatorConfig::ValidatorConfig` resource published under it, or its `config` field is empty. |
-    /// | `Errors::INVALID_ARGUMENT` | `DiemSystem::EALREADY_A_VALIDATOR`           | The `validator_address` account is already a registered validator.                                                                        |
-    /// | `Errors::INVALID_STATE`    | `DiemConfig::EINVALID_BLOCK_TIME`            | An invalid time value was encountered in reconfiguration. Unlikely to occur.                                                              |
-    /// | `Errors::LIMIT_EXCEEDED`   | `DiemSystem::EMAX_VALIDATORS`                | The validator set is already at its maximum size. The validator could not be added.                                                       |
+    /// | `Errors::INVALID_ARGUMENT` | `ValidatorSystem::EINVALID_PROSPECTIVE_VALIDATOR` | The validator to be added does not have a `ValidatorConfig::ValidatorConfig` resource published under it, or its `config` field is empty. |
+    /// | `Errors::INVALID_ARGUMENT` | `ValidatorSystem::EALREADY_A_VALIDATOR`           | The `validator_address` account is already a registered validator.                                                                        |
+    /// | `Errors::INVALID_STATE`    | `Reconfiguration::EINVALID_BLOCK_TIME`            | An invalid time value was encountered in reconfiguration. Unlikely to occur.                                                              |
+    /// | `Errors::LIMIT_EXCEEDED`   | `ValidatorSystem::EMAX_VALIDATORS`                | The validator set is already at its maximum size. The validator could not be added.                                                       |
     ///
     /// # Related Scripts
     /// * `AccountCreationScripts::create_validator_account`
@@ -60,7 +60,7 @@ module ValidatorAdministrationScripts {
     ) {
         SlidingNonce::record_nonce_or_abort(&dr_account, sliding_nonce);
         assert!(ValidatorConfig::get_human_name(validator_address) == validator_name, 0);
-        DiemSystem::add_validator(&dr_account, validator_address);
+        ValidatorSystem::add_validator(&dr_account, validator_address);
     }
 
 
@@ -68,7 +68,7 @@ module ValidatorAdministrationScripts {
         use DiemFramework::DiemAccount;
         use Std::Errors;
         use DiemFramework::Roles;
-        use DiemFramework::DiemConfig;
+        use DiemFramework::Reconfiguration;
 
         include DiemAccount::TransactionChecks{sender: dr_account}; // properties checked by the prologue.
         include SlidingNonce::RecordNonceAbortsIf{seq_nonce: sliding_nonce, account: dr_account};
@@ -76,10 +76,10 @@ module ValidatorAdministrationScripts {
         include ValidatorConfig::AbortsIfNoValidatorConfig{addr: validator_address};
         // TODO: use an error code from Errors.move instead of 0.
         aborts_if ValidatorConfig::get_human_name(validator_address) != validator_name with 0;
-        include DiemSystem::AddValidatorAbortsIf{validator_addr: validator_address};
-        include DiemSystem::AddValidatorEnsures{validator_addr: validator_address};
+        include ValidatorSystem::AddValidatorAbortsIf{validator_addr: validator_address};
+        include ValidatorSystem::AddValidatorEnsures{validator_addr: validator_address};
 
-        /// Reports INVALID_STATE because of is_operating() and !exists<DiemSystem::CapabilityHolder>.
+        /// Reports INVALID_STATE because of is_operating() and !exists<ValidatorSystem::CapabilityHolder>.
         /// is_operating() is always true during transactions, and CapabilityHolder is published
         /// during initialization (Genesis).
         /// Reports REQUIRES_ROLE if dr_account is not Diem root, but that can't happen
@@ -93,7 +93,7 @@ module ValidatorAdministrationScripts {
             Errors::LIMIT_EXCEEDED,
             Errors::REQUIRES_ROLE;
 
-        include DiemConfig::ReconfigureEmits;
+        include Reconfiguration::ReconfigureEmits;
 
         /// **Access Control:**
         /// Only the Diem Root account can add Validators [[H14]][PERMISSION].
@@ -108,7 +108,7 @@ module ValidatorAdministrationScripts {
     ///
     /// # Technical Description
     /// This updates the fields with corresponding names held in the `ValidatorConfig::ValidatorConfig`
-    /// config resource held under `validator_account`. It does not emit a `DiemConfig::NewEpochEvent`
+    /// config resource held under `validator_account`. It does not emit a `Reconfiguration::NewEpochEvent`
     /// so the copy of this config held in the validator set will not be updated, and the changes are
     /// only "locally" under the `validator_account` account address.
     ///
@@ -184,7 +184,7 @@ module ValidatorAdministrationScripts {
     ///
     /// # Technical Description
     /// This script removes the account at `validator_address` from the validator set. This transaction
-    /// emits a `DiemConfig::NewEpochEvent` event. Once the reconfiguration triggered by this event
+    /// emits a `Reconfiguration::NewEpochEvent` event. Once the reconfiguration triggered by this event
     /// has been performed, the account at `validator_address` is no longer considered to be a
     /// validator in the network. This transaction will fail if the validator at `validator_address`
     /// is not in the validator set.
@@ -206,10 +206,10 @@ module ValidatorAdministrationScripts {
     /// | `Errors::INVALID_ARGUMENT` | `SlidingNonce::ENONCE_ALREADY_RECORDED` | The `sliding_nonce` has been previously recorded.                                               |
     /// | `Errors::NOT_PUBLISHED`    | `SlidingNonce::ESLIDING_NONCE`          | The sending account is not the Diem Root account or Treasury Compliance account                |
     /// | 0                          | 0                                       | The provided `validator_name` does not match the already-recorded human name for the validator. |
-    /// | `Errors::INVALID_ARGUMENT` | `DiemSystem::ENOT_AN_ACTIVE_VALIDATOR` | The validator to be removed is not in the validator set.                                        |
+    /// | `Errors::INVALID_ARGUMENT` | `ValidatorSystem::ENOT_AN_ACTIVE_VALIDATOR` | The validator to be removed is not in the validator set.                                        |
     /// | `Errors::REQUIRES_ADDRESS` | `CoreAddresses::EDIEM_ROOT`            | The sending account is not the Diem Root account.                                              |
     /// | `Errors::REQUIRES_ROLE`    | `Roles::EDIEM_ROOT`                    | The sending account is not the Diem Root account.                                              |
-    /// | `Errors::INVALID_STATE`    | `DiemConfig::EINVALID_BLOCK_TIME`      | An invalid time value was encountered in reconfiguration. Unlikely to occur.                    |
+    /// | `Errors::INVALID_STATE`    | `Reconfiguration::EINVALID_BLOCK_TIME`      | An invalid time value was encountered in reconfiguration. Unlikely to occur.                    |
     ///
     /// # Related Scripts
     /// * `AccountCreationScripts::create_validator_account`
@@ -229,14 +229,14 @@ module ValidatorAdministrationScripts {
         SlidingNonce::record_nonce_or_abort(&dr_account, sliding_nonce);
         // TODO: Use an error code from Errors.move
         assert!(ValidatorConfig::get_human_name(validator_address) == validator_name, 0);
-        DiemSystem::remove_validator(&dr_account, validator_address);
+        ValidatorSystem::remove_validator(&dr_account, validator_address);
     }
 
     spec remove_validator_and_reconfigure {
         use DiemFramework::DiemAccount;
         use Std::Errors;
         use DiemFramework::Roles;
-        use DiemFramework::DiemConfig;
+        use DiemFramework::Reconfiguration;
 
         include DiemAccount::TransactionChecks{sender: dr_account}; // properties checked by the prologue.
         include SlidingNonce::RecordNonceAbortsIf{seq_nonce: sliding_nonce, account: dr_account};
@@ -244,10 +244,10 @@ module ValidatorAdministrationScripts {
         include ValidatorConfig::AbortsIfNoValidatorConfig{addr: validator_address};
         // TODO: use an error code from Errors.move instead of 0.
         aborts_if ValidatorConfig::get_human_name(validator_address) != validator_name with 0;
-        include DiemSystem::RemoveValidatorAbortsIf{validator_addr: validator_address};
-        include DiemSystem::RemoveValidatorEnsures{validator_addr: validator_address};
+        include ValidatorSystem::RemoveValidatorAbortsIf{validator_addr: validator_address};
+        include ValidatorSystem::RemoveValidatorEnsures{validator_addr: validator_address};
 
-        /// Reports INVALID_STATE because of is_operating() and !exists<DiemSystem::CapabilityHolder>.
+        /// Reports INVALID_STATE because of is_operating() and !exists<ValidatorSystem::CapabilityHolder>.
         /// is_operating() is always true during transactions, and CapabilityHolder is published
         /// during initialization (Genesis).
         /// Reports REQUIRES_ROLE if dr_account is not Diem root, but that can't happen
@@ -260,7 +260,7 @@ module ValidatorAdministrationScripts {
             Errors::INVALID_STATE,
             Errors::REQUIRES_ROLE;
 
-        include DiemConfig::ReconfigureEmits;
+        include Reconfiguration::ReconfigureEmits;
 
         /// **Access Control:**
         /// Only the Diem Root account can remove Validators [[H14]][PERMISSION].
@@ -274,7 +274,7 @@ module ValidatorAdministrationScripts {
     ///
     /// # Technical Description
     /// This updates the fields with corresponding names held in the `ValidatorConfig::ValidatorConfig`
-    /// config resource held under `validator_account`. It then emits a `DiemConfig::NewEpochEvent` to
+    /// config resource held under `validator_account`. It then emits a `Reconfiguration::NewEpochEvent` to
     /// trigger a reconfiguration of the system.  This reconfiguration will update the validator set
     /// on-chain with the updated `ValidatorConfig::ValidatorConfig`.
     ///
@@ -294,7 +294,7 @@ module ValidatorAdministrationScripts {
     /// | `Errors::REQUIRES_ROLE`    | `Roles::EVALIDATOR_OPERATOR`                   | `validator_operator_account` does not have a Validator Operator role.                                 |
     /// | `Errors::INVALID_ARGUMENT` | `ValidatorConfig::EINVALID_TRANSACTION_SENDER` | `validator_operator_account` is not the registered operator for the validator at `validator_address`. |
     /// | `Errors::INVALID_ARGUMENT` | `ValidatorConfig::EINVALID_CONSENSUS_KEY`      | `consensus_pubkey` is not a valid ed25519 public key.                                                 |
-    /// | `Errors::INVALID_STATE`    | `DiemConfig::EINVALID_BLOCK_TIME`             | An invalid time value was encountered in reconfiguration. Unlikely to occur.                          |
+    /// | `Errors::INVALID_STATE`    | `Reconfiguration::EINVALID_BLOCK_TIME`             | An invalid time value was encountered in reconfiguration. Unlikely to occur.                          |
     ///
     /// # Related Scripts
     /// * `AccountCreationScripts::create_validator_account`
@@ -319,14 +319,14 @@ module ValidatorAdministrationScripts {
             validator_network_addresses,
             fullnode_network_addresses
         );
-        DiemSystem::update_config_and_reconfigure(&validator_operator_account, validator_account);
+        ValidatorSystem::update_config_and_reconfigure(&validator_operator_account, validator_account);
      }
 
     spec set_validator_config_and_reconfigure {
         use DiemFramework::DiemAccount;
-        use DiemFramework::DiemConfig;
-        use DiemFramework::DiemSystem;
-        use DiemFramework::DiemTimestamp;
+        use DiemFramework::Reconfiguration;
+        use DiemFramework::ValidatorSystem;
+        use DiemFramework::Timestamp;
         use Std::Errors;
         use Std::Signer;
 
@@ -334,8 +334,8 @@ module ValidatorAdministrationScripts {
        include DiemAccount::TransactionChecks{sender: validator_operator_account};
         // UpdateConfigAndReconfigureEnsures includes properties such as not changing info
         // for validators in the validator_set other than that for validator_account, etc.
-        // These properties are important for access control. See notes in DiemSystem.
-        include DiemSystem::UpdateConfigAndReconfigureEnsures{validator_addr: validator_account};
+        // These properties are important for access control. See notes in ValidatorSystem.
+        include ValidatorSystem::UpdateConfigAndReconfigureEnsures{validator_addr: validator_account};
         ensures ValidatorConfig::is_valid(validator_account);
         // The published ValidatorConfig has the correct data, according to the arguments to
         // set_validator_config_and_reconfigure
@@ -347,28 +347,28 @@ module ValidatorAdministrationScripts {
         };
 
         include ValidatorConfig::SetConfigAbortsIf{validator_addr: validator_account};
-        include DiemSystem::UpdateConfigAndReconfigureAbortsIf{validator_addr: validator_account};
+        include ValidatorSystem::UpdateConfigAndReconfigureAbortsIf{validator_addr: validator_account};
 
         // Reconfiguration only happens if validator info changes for a validator in the validator set.
         // v_info.config is the old config (if it exists) and the Config with args from set_config is
         // the new config
         let is_validator_info_updated =
-            (exists v_info in DiemSystem::spec_get_validators():
+            (exists v_info in ValidatorSystem::spec_get_validators():
                 v_info.addr == validator_account
                 && v_info.config != ValidatorConfig::Config {
                         consensus_pubkey,
                         validator_network_addresses,
                         fullnode_network_addresses,
                    });
-        include is_validator_info_updated ==> DiemConfig::ReconfigureAbortsIf;
-        let validator_index = DiemSystem::spec_index_of_validator(DiemSystem::spec_get_validators(), validator_account);
-        let last_config_time = DiemSystem::spec_get_validators()[validator_index].last_config_update_time;
-        aborts_if is_validator_info_updated && last_config_time > DiemSystem::MAX_U64 - DiemSystem::FIVE_MINUTES
+        include is_validator_info_updated ==> Reconfiguration::ReconfigureAbortsIf;
+        let validator_index = ValidatorSystem::spec_index_of_validator(ValidatorSystem::spec_get_validators(), validator_account);
+        let last_config_time = ValidatorSystem::spec_get_validators()[validator_index].last_config_update_time;
+        aborts_if is_validator_info_updated && last_config_time > ValidatorSystem::MAX_U64 - ValidatorSystem::FIVE_MINUTES
             with Errors::LIMIT_EXCEEDED;
-        aborts_if is_validator_info_updated && DiemTimestamp::spec_now_microseconds() <= last_config_time + DiemSystem::FIVE_MINUTES
+        aborts_if is_validator_info_updated && Timestamp::spec_now_microseconds() <= last_config_time + ValidatorSystem::FIVE_MINUTES
             with Errors::LIMIT_EXCEEDED;
 
-        /// This reports a possible INVALID_STATE abort, which comes from an assert in DiemConfig::reconfigure_
+        /// This reports a possible INVALID_STATE abort, which comes from an assert in Reconfiguration::reconfigure_
         /// that config.last_reconfiguration_time is not in the future. This is a system error that a user
         /// for which there is no useful recovery except to resubmit the transaction.
         aborts_with [check]
@@ -377,7 +377,7 @@ module ValidatorAdministrationScripts {
             Errors::INVALID_ARGUMENT,
             Errors::INVALID_STATE;
 
-        include is_validator_info_updated ==> DiemConfig::ReconfigureEmits;
+        include is_validator_info_updated ==> Reconfiguration::ReconfigureEmits;
 
         /// **Access Control:**
         /// Only the Validator Operator account which has been registered with the validator can
@@ -399,7 +399,7 @@ module ValidatorAdministrationScripts {
     /// a Validator Operator role and have a `ValidatorOperatorConfig::ValidatorOperatorConfig`
     /// resource published under it. The sending `account` must be a Validator and have a
     /// `ValidatorConfig::ValidatorConfig` resource published under it. This script does not emit a
-    /// `DiemConfig::NewEpochEvent` and no reconfiguration of the system is initiated by this script.
+    /// `Reconfiguration::NewEpochEvent` and no reconfiguration of the system is initiated by this script.
     ///
     /// # Parameters
     /// | Name               | Type         | Description                                                                                  |
@@ -450,7 +450,7 @@ module ValidatorAdministrationScripts {
         include ValidatorConfig::SetOperatorAbortsIf{validator_account: account, operator_addr: operator_account};
         include ValidatorConfig::SetOperatorEnsures{validator_account: account, operator_addr: operator_account};
 
-        /// Reports INVALID_STATE because of !exists<DiemSystem::CapabilityHolder>, but that can't happen
+        /// Reports INVALID_STATE because of !exists<ValidatorSystem::CapabilityHolder>, but that can't happen
         /// because CapabilityHolder is published during initialization (Genesis).
         aborts_with [check]
             0, // Odd error code in assert on second statement in add_validator_and_reconfigure

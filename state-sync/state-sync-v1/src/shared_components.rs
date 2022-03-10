@@ -93,7 +93,7 @@ pub(crate) mod test_utils {
         transaction::{Transaction, WriteSetPayload},
         waypoint::Waypoint,
     };
-    use aptos_vm::DiemVM;
+    use aptos_vm::AptosVM;
     use aptosdb::AptosDB;
     use channel::{aptos_channel, message_queues::QueueStyle};
     use event_notifications::{EventNotificationSender, EventSubscriptionService};
@@ -116,12 +116,12 @@ pub(crate) mod test_utils {
     pub(crate) fn create_coordinator_with_config_and_waypoint(
         node_config: NodeConfig,
         waypoint: Waypoint,
-    ) -> StateSyncCoordinator<ExecutorProxy<ChunkExecutor<DiemVM>>, MempoolNotifier> {
+    ) -> StateSyncCoordinator<ExecutorProxy<ChunkExecutor<AptosVM>>, MempoolNotifier> {
         create_state_sync_coordinator_for_tests(node_config, waypoint, false)
     }
 
     pub(crate) fn create_validator_coordinator(
-    ) -> StateSyncCoordinator<ExecutorProxy<ChunkExecutor<DiemVM>>, MempoolNotifier> {
+    ) -> StateSyncCoordinator<ExecutorProxy<ChunkExecutor<AptosVM>>, MempoolNotifier> {
         let mut node_config = NodeConfig::default();
         node_config.base.role = RoleType::Validator;
 
@@ -130,7 +130,7 @@ pub(crate) mod test_utils {
 
     #[cfg(test)]
     pub(crate) fn create_full_node_coordinator(
-    ) -> StateSyncCoordinator<ExecutorProxy<ChunkExecutor<DiemVM>>, MempoolNotifier> {
+    ) -> StateSyncCoordinator<ExecutorProxy<ChunkExecutor<AptosVM>>, MempoolNotifier> {
         let mut node_config = NodeConfig::default();
         node_config.base.role = RoleType::FullNode;
 
@@ -139,7 +139,7 @@ pub(crate) mod test_utils {
 
     #[cfg(test)]
     pub(crate) fn create_read_only_coordinator(
-    ) -> StateSyncCoordinator<ExecutorProxy<ChunkExecutor<DiemVM>>, MempoolNotifier> {
+    ) -> StateSyncCoordinator<ExecutorProxy<ChunkExecutor<AptosVM>>, MempoolNotifier> {
         let mut node_config = NodeConfig::default();
         node_config.base.role = RoleType::Validator;
 
@@ -150,7 +150,7 @@ pub(crate) mod test_utils {
         node_config: NodeConfig,
         waypoint: Waypoint,
         read_only_mode: bool,
-    ) -> StateSyncCoordinator<ExecutorProxy<ChunkExecutor<DiemVM>>, MempoolNotifier> {
+    ) -> StateSyncCoordinator<ExecutorProxy<ChunkExecutor<AptosVM>>, MempoolNotifier> {
         // Generate a genesis change set
         let (genesis, _) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
 
@@ -161,7 +161,7 @@ pub(crate) mod test_utils {
 
         // Bootstrap the genesis transaction
         let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
-        bootstrap_genesis::<DiemVM>(&db_rw, &genesis_txn).unwrap();
+        bootstrap_genesis::<AptosVM>(&db_rw, &genesis_txn).unwrap();
 
         // Create the event subscription service and notify initial configs
         let storage: Arc<dyn DbReader> = db.clone();
@@ -175,7 +175,7 @@ pub(crate) mod test_utils {
             .unwrap();
 
         // Create executor proxy
-        let chunk_executor = Arc::new(ChunkExecutor::<DiemVM>::new(db_rw).unwrap());
+        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw).unwrap());
         let executor_proxy = ExecutorProxy::new(db, chunk_executor, event_subscription_service);
 
         // Get initial state

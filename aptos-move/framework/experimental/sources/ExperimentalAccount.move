@@ -6,7 +6,7 @@ module ExperimentalFramework::ExperimentalAccount {
     use Std::Event;
     use Std::Errors;
     use CoreFramework::Account;
-    use CoreFramework::DiemTimestamp;
+    use CoreFramework::Timestamp;
     use CoreFramework::SystemAddresses;
 
     use ExperimentalFramework::ExperimentalValidatorConfig;
@@ -84,7 +84,7 @@ module ExperimentalFramework::ExperimentalAccount {
         dr_account: &signer,
         dummy_auth_key_prefix: vector<u8>,
     ) {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         // Operational constraint, not a privilege constraint.
         SystemAddresses::assert_core_resource(dr_account);
         Account::initialize<ExperimentalAccountMarker>(
@@ -128,7 +128,7 @@ module ExperimentalFramework::ExperimentalAccount {
     fun create_diem_root_account(
         auth_key_prefix: vector<u8>,
     ) {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         let (dr_account, _) = create_core_account(@CoreResources, auth_key_prefix);
         SystemAddresses::assert_core_resource(&dr_account);
         assert!(

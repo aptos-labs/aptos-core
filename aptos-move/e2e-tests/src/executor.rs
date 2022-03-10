@@ -29,7 +29,7 @@ use aptos_types::{
     },
     block_metadata::{new_block_event_key, BlockMetadata, NewBlockEvent},
     on_chain_config::{
-        DiemVersion, OnChainConfig, ParallelExecutionConfig, VMPublishingOption, ValidatorSet,
+        OnChainConfig, ParallelExecutionConfig, VMPublishingOption, ValidatorSet, Version,
     },
     transaction::{
         ChangeSet, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
@@ -39,8 +39,8 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::{
-    convert_changeset_and_events, data_cache::RemoteStorage, parallel_executor::ParallelDiemVM,
-    DiemVM, VMExecutor, VMValidator,
+    convert_changeset_and_events, data_cache::RemoteStorage, parallel_executor::ParallelAptosVM,
+    AptosVM, VMExecutor, VMValidator,
 };
 use aptos_writeset_generator::{
     encode_disable_parallel_execution, encode_enable_parallel_execution_with_config,
@@ -159,7 +159,7 @@ impl FakeExecutor {
         //  - the e2e test outputs a golden file, and
         //  - the environment variable is properly set
         if let Some(env_trace_dir) = env::var_os(ENV_TRACE_DIR) {
-            let aptos_version = DiemVersion::fetch_config(&self.data_store).map_or(0, |v| v.major);
+            let aptos_version = Version::fetch_config(&self.data_store).map_or(0, |v| v.major);
 
             let trace_dir = Path::new(&env_trace_dir).join(file_name);
             if trace_dir.exists() {
@@ -340,7 +340,7 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<SignedTransaction>,
     ) -> Result<Vec<(VMStatus, TransactionOutput)>, VMStatus> {
-        DiemVM::execute_block_and_keep_vm_status(
+        AptosVM::execute_block_and_keep_vm_status(
             txn_block
                 .into_iter()
                 .map(Transaction::UserTransaction)
@@ -374,7 +374,7 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let (result, _) = ParallelDiemVM::execute_block(txn_block, &self.data_store)?;
+        let (result, _) = ParallelAptosVM::execute_block(txn_block, &self.data_store)?;
 
         Ok(result)
     }
@@ -396,7 +396,7 @@ impl FakeExecutor {
             }
         }
 
-        let output = DiemVM::execute_block(txn_block.clone(), &self.data_store);
+        let output = AptosVM::execute_block(txn_block.clone(), &self.data_store);
         let parallel_output = self.execute_transaction_block_parallel(txn_block);
         assert_eq!(output, parallel_output);
 
@@ -461,7 +461,7 @@ impl FakeExecutor {
 
     /// Verifies the given transaction by running it through the VM verifier.
     pub fn verify_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
-        let vm = DiemVM::new(self.get_state_view());
+        let vm = AptosVM::new(self.get_state_view());
         vm.validate_transaction(txn, &self.data_store)
     }
 

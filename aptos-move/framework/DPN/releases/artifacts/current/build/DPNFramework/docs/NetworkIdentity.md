@@ -20,11 +20,11 @@ Module managing Diemnet NetworkIdentity
 -  [Function `remove_members_internal`](#0x1_NetworkIdentity_remove_members_internal)
 
 
-<pre><code><b>use</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
-<b>use</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
+<pre><code><b>use</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
 <b>use</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event">0x1::Event</a>;
 <b>use</b> <a href="Roles.md#0x1_Roles">0x1::Roles</a>;
 <b>use</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer">0x1::Signer</a>;
+<b>use</b> <a href="Timestamp.md#0x1_Timestamp">0x1::Timestamp</a>;
 <b>use</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector">0x1::Vector</a>;
 </code></pre>
 
@@ -371,7 +371,7 @@ Update and create if not exist <code><a href="NetworkIdentity.md#0x1_NetworkIden
             <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a> {
                 account: account_addr,
                 identities: *&identity.identities,
-                time_rotated_seconds: <a href="DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>(),
+                time_rotated_seconds: <a href="Timestamp.md#0x1_Timestamp_now_seconds">Timestamp::now_seconds</a>(),
             }
         );
     }
@@ -399,13 +399,13 @@ Update and create if not exist <code><a href="NetworkIdentity.md#0x1_NetworkIden
 <b>let</b> <b>post</b> msg = <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a> {
     account: account_addr,
     identities: <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr).identities,
-    time_rotated_seconds: <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_seconds">DiemTimestamp::spec_now_seconds</a>(),
+    time_rotated_seconds: <a href="Timestamp.md#0x1_Timestamp_spec_now_seconds">Timestamp::spec_now_seconds</a>(),
 };
 <b>aborts_if</b> !<a href="NetworkIdentity.md#0x1_NetworkIdentity_tc_network_identity_event_handle_exists">tc_network_identity_event_handle_exists</a>() <b>with</b> Errors::NOT_PUBLISHED;
 <b>aborts_if</b> len(to_add) == 0 <b>with</b> Errors::INVALID_ARGUMENT;
 <b>aborts_if</b> len(prior_identities) + len(to_add) &gt; MAX_U64;
 <b>aborts_if</b> len(prior_identities) + len(to_add) &gt; <a href="NetworkIdentity.md#0x1_NetworkIdentity_MAX_ADDR_IDENTITIES">MAX_ADDR_IDENTITIES</a> <b>with</b> Errors::LIMIT_EXCEEDED;
-<b>include</b> has_change ==&gt; <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotOperating">DiemTimestamp::AbortsIfNotOperating</a>;
+<b>include</b> has_change ==&gt; <a href="Timestamp.md#0x1_Timestamp_AbortsIfNotOperating">Timestamp::AbortsIfNotOperating</a>;
 <b>include</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_AddMembersInternalEnsures">AddMembersInternalEnsures</a>&lt;vector&lt;u8&gt;&gt; {
     old_members: prior_identities,
     new_members: <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr).identities,
@@ -459,7 +459,7 @@ Remove <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a
             <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a> {
                 account: account_addr,
                 identities: *&identity.identities,
-                time_rotated_seconds: <a href="DiemTimestamp.md#0x1_DiemTimestamp_now_seconds">DiemTimestamp::now_seconds</a>(),
+                time_rotated_seconds: <a href="Timestamp.md#0x1_Timestamp_now_seconds">Timestamp::now_seconds</a>(),
             }
         );
     };
@@ -482,13 +482,13 @@ Remove <code><a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a
 <b>let</b> <b>post</b> msg = <a href="NetworkIdentity.md#0x1_NetworkIdentity_NetworkIdentityChangeNotification">NetworkIdentityChangeNotification</a> {
     account: account_addr,
     identities: <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr).identities,
-    time_rotated_seconds: <a href="DiemTimestamp.md#0x1_DiemTimestamp_spec_now_seconds">DiemTimestamp::spec_now_seconds</a>(),
+    time_rotated_seconds: <a href="Timestamp.md#0x1_Timestamp_spec_now_seconds">Timestamp::spec_now_seconds</a>(),
 };
 <b>aborts_if</b> !<a href="NetworkIdentity.md#0x1_NetworkIdentity_tc_network_identity_event_handle_exists">tc_network_identity_event_handle_exists</a>() <b>with</b> Errors::NOT_PUBLISHED;
 <b>aborts_if</b> len(to_remove) == 0 <b>with</b> Errors::INVALID_ARGUMENT;
 <b>aborts_if</b> len(to_remove) &gt; <a href="NetworkIdentity.md#0x1_NetworkIdentity_MAX_ADDR_IDENTITIES">MAX_ADDR_IDENTITIES</a> <b>with</b> Errors::LIMIT_EXCEEDED;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr) <b>with</b> Errors::NOT_PUBLISHED;
-<b>include</b> has_change ==&gt; <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotOperating">DiemTimestamp::AbortsIfNotOperating</a>;
+<b>include</b> has_change ==&gt; <a href="Timestamp.md#0x1_Timestamp_AbortsIfNotOperating">Timestamp::AbortsIfNotOperating</a>;
 <b>include</b> <a href="NetworkIdentity.md#0x1_NetworkIdentity_RemoveMembersInternalEnsures">RemoveMembersInternalEnsures</a>&lt;vector&lt;u8&gt;&gt; {
     old_members: prior_identities,
     new_members: <b>global</b>&lt;<a href="NetworkIdentity.md#0x1_NetworkIdentity">NetworkIdentity</a>&gt;(account_addr).identities,

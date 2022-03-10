@@ -23,7 +23,7 @@ use aptos_types::{
     on_chain_config::{VMPublishingOption, ON_CHAIN_CONFIG_REGISTRY},
     waypoint::Waypoint,
 };
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use backup_service::start_backup_service;
 use consensus::consensus_provider::start_consensus;
@@ -278,7 +278,7 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
 
     // Create the chunk executor
     let chunk_executor = Arc::new(
-        ChunkExecutor::<DiemVM>::new(db_rw.clone()).expect("Unable to create the chunk executor!"),
+        ChunkExecutor::<AptosVM>::new(db_rw.clone()).expect("Unable to create the chunk executor!"),
     );
 
     // Create the state sync multiplexer
@@ -459,7 +459,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     let genesis_waypoint = node_config.base.waypoint.genesis_waypoint();
     // if there's genesis txn and waypoint, commit it if the result matches.
     if let Some(genesis) = get_genesis_txn(node_config) {
-        maybe_bootstrap::<DiemVM>(&db_rw, genesis, genesis_waypoint)
+        maybe_bootstrap::<AptosVM>(&db_rw, genesis, genesis_waypoint)
             .expect("Db-bootstrapper should not fail.");
     } else {
         info!("Genesis txn not provided, it's fine if you don't expect to apply it otherwise please double check config");

@@ -183,20 +183,20 @@ async fn test_get_module_aptos_config() {
     let address = "0x1";
 
     let resp = context.get(&account_modules(address)).await;
-    let res = find_value(&resp, |v| v["abi"]["name"] == "DiemConfig");
+    let res = find_value(&resp, |v| v["abi"]["name"] == "Reconfiguration");
     assert_json(
         res["abi"].clone(),
         json!({
             "address": "0x1",
-            "name": "DiemConfig",
+            "name": "Reconfiguration",
             "friends": [
-                "0x1::DiemConsensusConfig",
-                "0x1::DiemSystem",
-                "0x1::DiemTransactionPublishingOption",
-                "0x1::DiemVMConfig",
-                "0x1::DiemVersion",
+                "0x1::ConsensusConfig",
                 "0x1::ParallelExecutionConfig",
-                "0x1::RegisteredCurrencies"
+                "0x1::RegisteredCurrencies",
+                "0x1::TransactionPublishingOption",
+                "0x1::VMConfig",
+                "0x1::ValidatorSystem",
+                "0x1::Version",
             ],
             "exposed_functions": [
                 {
@@ -260,7 +260,7 @@ async fn test_get_module_aptos_config() {
                         "T0"
                     ],
                     "return": [
-                        "0x1::DiemConfig::ModifyConfigCapability<T0>"
+                        "0x1::Reconfiguration::ModifyConfigCapability<T0>"
                     ]
                 },
                 {
@@ -303,7 +303,7 @@ async fn test_get_module_aptos_config() {
                         }
                     ],
                     "params": [
-                        "&0x1::DiemConfig::ModifyConfigCapability<T0>",
+                        "&0x1::Reconfiguration::ModifyConfigCapability<T0>",
                         "T0"
                     ],
                     "return": []
@@ -328,31 +328,7 @@ async fn test_get_module_aptos_config() {
                         },
                         {
                             "name": "events",
-                            "type": "0x1::Event::EventHandle<0x1::DiemConfig::NewEpochEvent>"
-                        }
-                    ]
-                },
-                {
-                    "name": "DiemConfig",
-                    "is_native": false,
-                    "abilities": [
-                        "store",
-                        "key"
-                    ],
-                    "generic_type_params": [
-                        {
-                            "constraints": [
-                                "copy",
-                                "drop",
-                                "store"
-                            ],
-                            "is_phantom": false
-                        }
-                    ],
-                    "fields": [
-                        {
-                            "name": "payload",
-                            "type": "T0"
+                            "type": "0x1::Event::EventHandle<0x1::Reconfiguration::NewEpochEvent>"
                         }
                     ]
                 },
@@ -404,7 +380,31 @@ async fn test_get_module_aptos_config() {
                             "type": "u64"
                         }
                     ]
-                }
+                },
+                {
+                    "name": "Reconfiguration",
+                    "is_native": false,
+                    "abilities": [
+                        "store",
+                        "key"
+                    ],
+                    "generic_type_params": [
+                        {
+                            "constraints": [
+                                "copy",
+                                "drop",
+                                "store"
+                            ],
+                            "is_phantom": false
+                        }
+                    ],
+                    "fields": [
+                        {
+                            "name": "payload",
+                            "type": "T0"
+                        }
+                    ]
+                },
             ]
         }),
     );

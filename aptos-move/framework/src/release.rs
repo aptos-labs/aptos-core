@@ -111,9 +111,14 @@ impl ReleaseOptions {
 
         if !self.script_builder {
             println!("Generating script builders");
+            let mut abi_paths: Vec<&Path> = vec![&output_path];
+            let legacy_path = Path::new("DPN/releases/legacy/script_abis");
+            if self.package.ends_with("DPN") {
+                abi_paths.push(legacy_path);
+            }
             generate_script_builder(
                 &output_path.join("transaction_script_builder.rs"),
-                &[&output_path],
+                &abi_paths[..],
             )
         }
     }

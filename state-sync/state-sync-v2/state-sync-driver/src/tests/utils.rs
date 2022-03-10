@@ -23,7 +23,7 @@ use aptos_types::{
     },
     waypoint::Waypoint,
 };
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use consensus_notifications::ConsensusNotifier;
 use data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
@@ -99,7 +99,7 @@ fn create_driver_for_tests(
     // Bootstrap the genesis transaction
     let (genesis, _) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
-    bootstrap_genesis::<DiemVM>(&db_rw, &genesis_txn).unwrap();
+    bootstrap_genesis::<AptosVM>(&db_rw, &genesis_txn).unwrap();
 
     // Create the event subscription service and notify initial configs
     let storage: Arc<dyn DbReader> = db;
@@ -122,7 +122,7 @@ fn create_driver_for_tests(
         mempool_notifications::new_mempool_notifier_listener_pair();
 
     // Create the chunk executor
-    let chunk_executor = Arc::new(ChunkExecutor::<DiemVM>::new(db_rw.clone()).unwrap());
+    let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()).unwrap());
 
     // Create a streaming service client
     let (streaming_service_client, _) = new_streaming_service_client_listener_pair();

@@ -194,7 +194,7 @@ fn validator_batch_remove() {
         // Make sure both validators are removed from the validator set.
         assert!(executor
             .try_exec(
-                "DiemSystem",
+                "ValidatorSystem",
                 "remove_validator",
                 vec![],
                 serialize_values(&vec![
@@ -205,7 +205,7 @@ fn validator_batch_remove() {
             .is_err());
         assert!(executor
             .try_exec(
-                "DiemSystem",
+                "ValidatorSystem",
                 "remove_validator",
                 vec![],
                 serialize_values(&vec![
@@ -221,7 +221,7 @@ fn validator_batch_remove() {
 #[test]
 fn halt_network() {
     // This can only run on versions >= 2 since
-    // `DiemTransactionPublishingOption::halt_all_transactions` is not available in version 1.
+    // `TransactionPublishingOption::halt_all_transactions` is not available in version 1.
     test_with_different_versions! {2..=DIEM_MAX_KNOWN_VERSION.major, |test_env| {
         let mut executor = test_env.executor;
         let aptos_root_account = test_env.dr_account;

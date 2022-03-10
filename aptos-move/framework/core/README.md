@@ -11,9 +11,9 @@ You will need to write wrapper modules for the following core modules:
 - Account
 - CoreGenesis
 - DiemConsensusConfig
-- DiemSystem
-- DiemVersion
-- DiemVMConfig
+- ValidatorSystem
+- Version
+- VMConfig
 - ParallelExecutionConfig
 - ValidatorConfig
 - ValidatorOperatorConfig
@@ -39,4 +39,4 @@ we know for sure that only the wrapper module can decide who or which module is 
 
 #### How to write wrapper modules?
 
-Read `DiemVersion.move` and then `ExperimentalVersion.move` to get the idea.
+Read `Version.move` and then `ExperimentalVersion.move` to get the idea.

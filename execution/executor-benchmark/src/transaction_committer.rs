@@ -8,7 +8,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::Version,
 };
-use aptos_vm::DiemVM;
+use aptos_vm::AptosVM;
 use aptosdb::metrics::DIEM_STORAGE_API_LATENCY_SECONDS;
 use executor::{
     block_executor::BlockExecutor,
@@ -44,14 +44,14 @@ pub(crate) fn gen_li_with_sigs(
 }
 
 pub struct TransactionCommitter {
-    executor: Arc<BlockExecutor<DiemVM>>,
+    executor: Arc<BlockExecutor<AptosVM>>,
     version: Version,
     block_receiver: mpsc::Receiver<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
 }
 
 impl TransactionCommitter {
     pub fn new(
-        executor: Arc<BlockExecutor<DiemVM>>,
+        executor: Arc<BlockExecutor<AptosVM>>,
         version: Version,
         block_receiver: mpsc::Receiver<(HashValue, HashValue, Instant, Instant, Duration, usize)>,
     ) -> Self {

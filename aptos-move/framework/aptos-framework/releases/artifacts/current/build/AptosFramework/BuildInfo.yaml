@@ -51,37 +51,19 @@ compiled_package_info:
       name: BitVector
     : Std
     ? address: "00000000000000000000000000000001"
+      name: Block
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
       name: Capability
     : Std
     ? address: "00000000000000000000000000000001"
       name: ChainId
     : CoreFramework
     ? address: "00000000000000000000000000000001"
+      name: ConsensusConfig
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
       name: CoreGenesis
-    : CoreFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemBlock
-    : CoreFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemConfig
-    : CoreFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemConsensusConfig
-    : CoreFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemSystem
-    : CoreFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemTimestamp
-    : CoreFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemTransactionPublishingOption
-    : CoreFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemVMConfig
-    : CoreFramework
-    ? address: "00000000000000000000000000000001"
-      name: DiemVersion
     : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: Errors
@@ -111,6 +93,9 @@ compiled_package_info:
       name: ParallelExecutionConfig
     : CoreFramework
     ? address: "00000000000000000000000000000001"
+      name: Reconfiguration
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
       name: Signature
     : CoreFramework
     ? address: "00000000000000000000000000000001"
@@ -123,8 +108,17 @@ compiled_package_info:
       name: TestCoin
     : AptosFramework
     ? address: "00000000000000000000000000000001"
+      name: Timestamp
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
       name: TransactionFee
     : AptosFramework
+    ? address: "00000000000000000000000000000001"
+      name: TransactionPublishingOption
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
+      name: VMConfig
+    : CoreFramework
     ? address: "00000000000000000000000000000001"
       name: ValidatorConfig
     : CoreFramework
@@ -132,9 +126,15 @@ compiled_package_info:
       name: ValidatorOperatorConfig
     : CoreFramework
     ? address: "00000000000000000000000000000001"
+      name: ValidatorSystem
+    : CoreFramework
+    ? address: "00000000000000000000000000000001"
       name: Vector
     : Std
-  source_digest: AB79639AF9BD277A8630DEDFB2889C138EC0E8D0946BDE64101842DA60A99F44
+    ? address: "00000000000000000000000000000001"
+      name: Version
+    : CoreFramework
+  source_digest: BB850C264A9737737330FBC5A4012B656B15E9D7821C1D77AFF97B53CB055B3C
   build_flags:
     dev_mode: false
     test_mode: false

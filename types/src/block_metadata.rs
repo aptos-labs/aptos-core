@@ -87,21 +87,21 @@ pub fn new_block_event_key() -> EventKey {
     EventKey::new_from_address(&aptos_root_address(), 17)
 }
 
-/// The path to the new block event handle under a DiemBlock::BlockMetadata resource.
+/// The path to the new block event handle under a Block::BlockMetadata resource.
 pub static NEW_BLOCK_EVENT_PATH: Lazy<Vec<u8>> = Lazy::new(|| {
-    let mut path = DiemBlockResource::resource_path();
+    let mut path = BlockResource::resource_path();
     // it can be anything as long as it's referenced in AccountState::get_event_handle_by_query_path
     path.extend_from_slice(b"/new_block_event/");
     path
 });
 
 #[derive(Deserialize, Serialize)]
-pub struct DiemBlockResource {
+pub struct BlockResource {
     height: u64,
     new_block_events: EventHandle,
 }
 
-impl DiemBlockResource {
+impl BlockResource {
     pub fn new_block_events(&self) -> &EventHandle {
         &self.new_block_events
     }
@@ -111,12 +111,12 @@ impl DiemBlockResource {
     }
 }
 
-impl MoveStructType for DiemBlockResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("DiemBlock");
+impl MoveStructType for BlockResource {
+    const MODULE_NAME: &'static IdentStr = ident_str!("Block");
     const STRUCT_NAME: &'static IdentStr = ident_str!("BlockMetadata");
 }
 
-impl MoveResource for DiemBlockResource {}
+impl MoveResource for BlockResource {}
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct NewBlockEvent {

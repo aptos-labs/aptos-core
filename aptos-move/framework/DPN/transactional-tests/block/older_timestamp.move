@@ -4,12 +4,12 @@
 
 //# run --signers DiemRoot DiemRoot --admin-script
 script{
-use DiemFramework::DiemBlock;
-use DiemFramework::DiemTimestamp;
+use DiemFramework::Block;
+use DiemFramework::Timestamp;
 
 fun main() {
-    assert!(DiemBlock::get_current_block_height() == 1, 76);
-    assert!(DiemTimestamp::now_microseconds() == 100000000, 77);
+    assert!(Block::get_current_block_height() == 1, 76);
+    assert!(Timestamp::now_microseconds() == 100000000, 77);
 }
 }
 

@@ -175,7 +175,7 @@ mod tests {
         block_info::BlockInfo, ledger_info::LedgerInfo, on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
         waypoint::Waypoint,
     };
-    use aptos_vm::DiemVM;
+    use aptos_vm::AptosVM;
     use aptosdb::AptosDB;
     use consensus_notifications::new_consensus_notifier_listener_pair;
     use data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
@@ -198,7 +198,7 @@ mod tests {
 
         // Bootstrap the database
         let (node_config, _) = test_config();
-        bootstrap_genesis::<DiemVM>(&db_rw, get_genesis_txn(&node_config).unwrap()).unwrap();
+        bootstrap_genesis::<AptosVM>(&db_rw, get_genesis_txn(&node_config).unwrap()).unwrap();
 
         // Create mempool and consensus notifiers
         let (mempool_notifier, _) = new_mempool_notifier_listener_pair();
@@ -234,7 +234,7 @@ mod tests {
             mempool_notifier,
             consensus_listener,
             db_rw.reader.clone(),
-            Arc::new(ChunkExecutor::<DiemVM>::new(db_rw).unwrap()),
+            Arc::new(ChunkExecutor::<AptosVM>::new(db_rw).unwrap()),
             &node_config,
             Waypoint::new_any(&LedgerInfo::new(BlockInfo::empty(), HashValue::random())),
             event_subscription_service,

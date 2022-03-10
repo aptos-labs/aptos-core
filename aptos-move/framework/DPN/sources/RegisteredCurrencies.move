@@ -1,13 +1,13 @@
 /// Module for registering currencies in Diem. Basically, this means adding a
-/// string (vector<u8>) for the currency name to vector of names in DiemConfig.
+/// string (vector<u8>) for the currency name to vector of names in Reconfiguration.
 module DiemFramework::RegisteredCurrencies {
-    use DiemFramework::DiemConfig;
-    use DiemFramework::DiemTimestamp;
+    use DiemFramework::Reconfiguration;
+    use DiemFramework::Timestamp;
     use DiemFramework::Roles;
     use Std::Errors;
     use Std::Vector;
 
-    /// A DiemConfig config holding all of the currency codes for registered
+    /// A Reconfiguration config holding all of the currency codes for registered
     /// currencies. The inner vector<u8>'s are string representations of
     /// currency names.
     struct RegisteredCurrencies has copy, drop, store {
@@ -20,9 +20,9 @@ module DiemFramework::RegisteredCurrencies {
     /// Initializes this module. Can only be called from genesis, with
     /// a Diem root signer.
     public fun initialize(dr_account: &signer) {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         Roles::assert_diem_root(dr_account);
-        DiemConfig::publish_new_config(
+        Reconfiguration::publish_new_config(
             dr_account,
             RegisteredCurrencies { currency_codes: Vector::empty() }
         );
@@ -34,12 +34,12 @@ module DiemFramework::RegisteredCurrencies {
 
     spec schema InitializeAbortsIf {
         dr_account: signer;
-        include DiemTimestamp::AbortsIfNotGenesis;
+        include Timestamp::AbortsIfNotGenesis;
         include Roles::AbortsIfNotDiemRoot{account: dr_account};
-        include DiemConfig::PublishNewConfigAbortsIf<RegisteredCurrencies>;
+        include Reconfiguration::PublishNewConfigAbortsIf<RegisteredCurrencies>;
     }
     spec schema InitializeEnsures {
-        include DiemConfig::PublishNewConfigEnsures<RegisteredCurrencies>{
+        include Reconfiguration::PublishNewConfigEnsures<RegisteredCurrencies>{
             payload: RegisteredCurrencies { currency_codes: Vector::empty() }
         };
         ensures len(get_currency_codes()) == 0;
@@ -50,13 +50,13 @@ module DiemFramework::RegisteredCurrencies {
         dr_account: &signer,
         currency_code: vector<u8>,
     ) {
-        let config = DiemConfig::get<RegisteredCurrencies>();
+        let config = Reconfiguration::get<RegisteredCurrencies>();
         assert!(
             !Vector::contains(&config.currency_codes, &currency_code),
             Errors::invalid_argument(ECURRENCY_CODE_ALREADY_TAKEN)
         );
         Vector::push_back(&mut config.currency_codes, currency_code);
-        DiemConfig::set(dr_account, config);
+        Reconfiguration::set(dr_account, config);
     }
     spec add_currency_code {
         include AddCurrencyCodeAbortsIf;
@@ -65,10 +65,10 @@ module DiemFramework::RegisteredCurrencies {
     spec schema AddCurrencyCodeAbortsIf {
         dr_account: &signer;
         currency_code: vector<u8>;
-        include DiemConfig::SetAbortsIf<RegisteredCurrencies>{ account: dr_account };
+        include Reconfiguration::SetAbortsIf<RegisteredCurrencies>{ account: dr_account };
         /// The same currency code can be only added once.
         aborts_if contains(
-            DiemConfig::get<RegisteredCurrencies>().currency_codes,
+            Reconfiguration::get<RegisteredCurrencies>().currency_codes,
             currency_code
         ) with Errors::INVALID_ARGUMENT;
     }
@@ -76,7 +76,7 @@ module DiemFramework::RegisteredCurrencies {
         currency_code: vector<u8>;
         // The resulting currency_codes is the one before this function is called, with the new one added to the end.
         ensures Vector::eq_push_back(get_currency_codes(), old(get_currency_codes()), currency_code);
-        include DiemConfig::SetEnsures<RegisteredCurrencies> {payload: DiemConfig::get<RegisteredCurrencies>()};
+        include Reconfiguration::SetEnsures<RegisteredCurrencies> {payload: Reconfiguration::get<RegisteredCurrencies>()};
     }
 
     // =================================================================
@@ -88,7 +88,7 @@ module DiemFramework::RegisteredCurrencies {
 
     spec module {
         /// Global invariant that currency config is always available after genesis.
-        invariant [suspendable] DiemTimestamp::is_operating() ==> DiemConfig::spec_is_published<RegisteredCurrencies>();
+        invariant [suspendable] Timestamp::is_operating() ==> Reconfiguration::spec_is_published<RegisteredCurrencies>();
     }
 
     /// # Helper Functions
@@ -96,7 +96,7 @@ module DiemFramework::RegisteredCurrencies {
     spec module {
         /// Helper to get the currency code vector.
         fun get_currency_codes(): vector<vector<u8>> {
-            DiemConfig::get<RegisteredCurrencies>().currency_codes
+            Reconfiguration::get<RegisteredCurrencies>().currency_codes
         }
     }
 }

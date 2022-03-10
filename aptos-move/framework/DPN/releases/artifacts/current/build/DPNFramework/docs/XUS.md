@@ -18,9 +18,9 @@ This module defines the coin type XUS and its initialization function.
 
 <pre><code><b>use</b> <a href="AccountLimits.md#0x1_AccountLimits">0x1::AccountLimits</a>;
 <b>use</b> <a href="Diem.md#0x1_Diem">0x1::Diem</a>;
-<b>use</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp">0x1::DiemTimestamp</a>;
 <b>use</b> <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/FixedPoint32.md#0x1_FixedPoint32">0x1::FixedPoint32</a>;
 <b>use</b> <a href="Roles.md#0x1_Roles">0x1::Roles</a>;
+<b>use</b> <a href="Timestamp.md#0x1_Timestamp">0x1::Timestamp</a>;
 </code></pre>
 
 
@@ -73,7 +73,7 @@ Registers the <code><a href="XUS.md#0x1_XUS">XUS</a></code> cointype. This can o
     dr_account: &signer,
     tc_account: &signer,
 ) {
-    <a href="DiemTimestamp.md#0x1_DiemTimestamp_assert_genesis">DiemTimestamp::assert_genesis</a>();
+    <a href="Timestamp.md#0x1_Timestamp_assert_genesis">Timestamp::assert_genesis</a>();
     <a href="Roles.md#0x1_Roles_assert_treasury_compliance">Roles::assert_treasury_compliance</a>(tc_account);
     <a href="Roles.md#0x1_Roles_assert_diem_root">Roles::assert_diem_root</a>(dr_account);
     <a href="Diem.md#0x1_Diem_register_SCS_currency">Diem::register_SCS_currency</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;(
@@ -110,7 +110,7 @@ Registers the <code><a href="XUS.md#0x1_XUS">XUS</a></code> cointype. This can o
 Registering XUS can only be done in genesis.
 
 
-<pre><code><b>include</b> <a href="DiemTimestamp.md#0x1_DiemTimestamp_AbortsIfNotGenesis">DiemTimestamp::AbortsIfNotGenesis</a>;
+<pre><code><b>include</b> <a href="Timestamp.md#0x1_Timestamp_AbortsIfNotGenesis">Timestamp::AbortsIfNotGenesis</a>;
 </code></pre>
 
 
@@ -146,7 +146,7 @@ Moreover, only a TreasuryCompliance account can have the BurnCapability [[H3]][P
 After genesis, XUS is registered.
 
 
-<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>() ==&gt; <a href="Diem.md#0x1_Diem_is_currency">Diem::is_currency</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;();
+<pre><code><b>invariant</b> [suspendable] <a href="Timestamp.md#0x1_Timestamp_is_operating">Timestamp::is_operating</a>() ==&gt; <a href="Diem.md#0x1_Diem_is_currency">Diem::is_currency</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;();
 </code></pre>
 
 
@@ -155,7 +155,7 @@ AccountLimits::publish_unrestricted_limits, but we can't prove the condition the
 it does not hold for all types (but does hold for XUS).
 
 
-<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+<pre><code><b>invariant</b> [suspendable] <a href="Timestamp.md#0x1_Timestamp_is_operating">Timestamp::is_operating</a>()
     ==&gt; <b>exists</b>&lt;<a href="AccountLimits.md#0x1_AccountLimits_LimitsDefinition">AccountLimits::LimitsDefinition</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;&gt;(@DiemRoot);
 </code></pre>
 
@@ -171,7 +171,7 @@ it does not hold for all types (but does hold for XUS).
 After genesis, XUS is always a non-synthetic currency.
 
 
-<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+<pre><code><b>invariant</b> [suspendable] <a href="Timestamp.md#0x1_Timestamp_is_operating">Timestamp::is_operating</a>()
     ==&gt; !<a href="Diem.md#0x1_Diem_is_synthetic_currency">Diem::is_synthetic_currency</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;();
 </code></pre>
 
@@ -179,7 +179,7 @@ After genesis, XUS is always a non-synthetic currency.
 After genesis, the scaling factor for XUS is always equal to 1,000,000.
 
 
-<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+<pre><code><b>invariant</b> [suspendable] <a href="Timestamp.md#0x1_Timestamp_is_operating">Timestamp::is_operating</a>()
     ==&gt; <a href="Diem.md#0x1_Diem_spec_currency_info">Diem::spec_currency_info</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;().scaling_factor == 1000000;
 </code></pre>
 
@@ -187,7 +187,7 @@ After genesis, the scaling factor for XUS is always equal to 1,000,000.
 After genesis, the fractional part for XUS is always equal to 100.
 
 
-<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+<pre><code><b>invariant</b> [suspendable] <a href="Timestamp.md#0x1_Timestamp_is_operating">Timestamp::is_operating</a>()
     ==&gt; <a href="Diem.md#0x1_Diem_spec_currency_info">Diem::spec_currency_info</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;().fractional_part == 100;
 </code></pre>
 
@@ -195,7 +195,7 @@ After genesis, the fractional part for XUS is always equal to 100.
 After genesis, the currency code for XUS is always "XUS".
 
 
-<pre><code><b>invariant</b> [suspendable] <a href="DiemTimestamp.md#0x1_DiemTimestamp_is_operating">DiemTimestamp::is_operating</a>()
+<pre><code><b>invariant</b> [suspendable] <a href="Timestamp.md#0x1_Timestamp_is_operating">Timestamp::is_operating</a>()
     ==&gt; <a href="Diem.md#0x1_Diem_spec_currency_code">Diem::spec_currency_code</a>&lt;<a href="XUS.md#0x1_XUS">XUS</a>&gt;() == b"<a href="XUS.md#0x1_XUS">XUS</a>";
 </code></pre>
 

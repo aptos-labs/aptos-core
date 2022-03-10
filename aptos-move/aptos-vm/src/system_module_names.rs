@@ -7,12 +7,11 @@ use move_core_types::{ident_str, identifier::IdentStr, language_storage::ModuleI
 use once_cell::sync::Lazy;
 
 // Data to resolve basic account and transaction flow functions and structs
-/// The ModuleId for the diem writeset manager module
 /// The ModuleId for the diem block module
-pub static DIEM_BLOCK_MODULE: Lazy<ModuleId> = Lazy::new(|| {
+pub static BLOCK_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(
         account_config::CORE_CODE_ADDRESS,
-        ident_str!("DiemBlock").to_owned(),
+        ident_str!("Block").to_owned(),
     )
 });
 

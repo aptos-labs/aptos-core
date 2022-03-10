@@ -9,11 +9,11 @@
 
 //# run --admin-script --signers DiemRoot Bob
 script {
-    use DiemFramework::DiemTimestamp;
+    use DiemFramework::Timestamp;
     use DiemFramework::ValidatorConfig;
 
     fun main(_dr: signer, account: signer) {
-        assert!(DiemTimestamp::now_microseconds() == 0, 999);
+        assert!(Timestamp::now_microseconds() == 0, 999);
         // register alice as bob's delegate
         ValidatorConfig::set_operator(&account, @Alice);
     }
@@ -32,10 +32,10 @@ script {
 
 //# run --admin-script --signers DiemRoot Alice
 script {
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     fun main(_dr: signer, account: signer) {
         // update is too soon, will fail
-        DiemSystem::update_config_and_reconfigure(&account, @Bob);
+        ValidatorSystem::update_config_and_reconfigure(&account, @Bob);
     }
 }
 
@@ -43,12 +43,12 @@ script {
 
 //# run --admin-script --signers DiemRoot Alice
 script {
-    use DiemFramework::DiemTimestamp;
-    use DiemFramework::DiemSystem;
+    use DiemFramework::Timestamp;
+    use DiemFramework::ValidatorSystem;
     fun main(_dr: signer, account: signer) {
         // update is too soon, will not trigger the reconfiguration
-        assert!(DiemTimestamp::now_microseconds() == 300000000, 999);
-        DiemSystem::update_config_and_reconfigure(&account, @Bob);
+        assert!(Timestamp::now_microseconds() == 300000000, 999);
+        ValidatorSystem::update_config_and_reconfigure(&account, @Bob);
     }
 }
 
@@ -56,13 +56,13 @@ script {
 
 //# run --admin-script --signers DiemRoot Alice --show-events
 script {
-    use DiemFramework::DiemTimestamp;
-    use DiemFramework::DiemSystem;
+    use DiemFramework::Timestamp;
+    use DiemFramework::ValidatorSystem;
     fun main(_dr: signer, account: signer) {
 
         // update is in exactly 5 minutes and 1 microsecond, so will succeed
-        assert!(DiemTimestamp::now_microseconds() == 300000001, 999);
-        DiemSystem::update_config_and_reconfigure(&account, @Bob);
+        assert!(Timestamp::now_microseconds() == 300000001, 999);
+        ValidatorSystem::update_config_and_reconfigure(&account, @Bob);
     }
 }
 
@@ -70,13 +70,13 @@ script {
 
 //# run --admin-script --signers DiemRoot Alice --show-events
 script {
-    use DiemFramework::DiemTimestamp;
-    use DiemFramework::DiemSystem;
+    use DiemFramework::Timestamp;
+    use DiemFramework::ValidatorSystem;
     fun main(_dr: signer, account: signer) {
 
         // too soon to reconfig, but validator have not changed, should succeed but not reconfigure
-        assert!(DiemTimestamp::now_microseconds() == 600000000, 999);
-        DiemSystem::update_config_and_reconfigure(&account, @Bob);
+        assert!(Timestamp::now_microseconds() == 600000000, 999);
+        ValidatorSystem::update_config_and_reconfigure(&account, @Bob);
     }
 }
 
@@ -85,17 +85,17 @@ script {
 
 //# run --admin-script --signers DiemRoot Alice --show-events
 script {
-    use DiemFramework::DiemTimestamp;
-    use DiemFramework::DiemSystem;
+    use DiemFramework::Timestamp;
+    use DiemFramework::ValidatorSystem;
     use DiemFramework::ValidatorConfig;
     fun main(_dr: signer, account: signer) {
 
         // good to reconfig
-        assert!(DiemTimestamp::now_microseconds() == 600000002, 999);
+        assert!(Timestamp::now_microseconds() == 600000002, 999);
         ValidatorConfig::set_config(&account, @Bob,
                                     x"d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
                                     x"", x"");
-        DiemSystem::update_config_and_reconfigure(&account, @Bob);
+        ValidatorSystem::update_config_and_reconfigure(&account, @Bob);
     }
 }
 
@@ -103,12 +103,12 @@ script {
 
 //# run --admin-script --signers DiemRoot DiemRoot --show-events
 script{
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     fun main(_dr: signer, account: signer) {
 
-        DiemSystem::remove_validator(&account, @Bob);
-        assert!(!DiemSystem::is_validator(@Bob), 77);
-        assert!(DiemSystem::is_validator(@Carrol), 78);
+        ValidatorSystem::remove_validator(&account, @Bob);
+        assert!(!ValidatorSystem::is_validator(@Bob), 77);
+        assert!(ValidatorSystem::is_validator(@Carrol), 78);
     }
 }
 
@@ -116,15 +116,15 @@ script{
 
 //# run --admin-script --signers DiemRoot DiemRoot --show-events
 script{
-    use DiemFramework::DiemTimestamp;
-    use DiemFramework::DiemSystem;
+    use DiemFramework::Timestamp;
+    use DiemFramework::ValidatorSystem;
     fun main(_dr: signer, account: signer) {
 
         // add validator back
-        assert!(DiemTimestamp::now_microseconds() == 600000004, 999);
-        DiemSystem::add_validator(&account, @Bob);
-        assert!(DiemSystem::is_validator(@Bob), 79);
-        assert!(DiemSystem::is_validator(@Carrol), 80);
+        assert!(Timestamp::now_microseconds() == 600000004, 999);
+        ValidatorSystem::add_validator(&account, @Bob);
+        assert!(ValidatorSystem::is_validator(@Bob), 79);
+        assert!(ValidatorSystem::is_validator(@Carrol), 80);
     }
 }
 
@@ -132,17 +132,17 @@ script{
 
 //# run --admin-script --signers DiemRoot Alice --show-events
 script {
-    use DiemFramework::DiemTimestamp;
-    use DiemFramework::DiemSystem;
+    use DiemFramework::Timestamp;
+    use DiemFramework::ValidatorSystem;
     use DiemFramework::ValidatorConfig;
     fun main(_dr: signer, account: signer) {
 
         // update too soon
-        assert!(DiemTimestamp::now_microseconds() == 900000004, 999);
+        assert!(Timestamp::now_microseconds() == 900000004, 999);
         ValidatorConfig::set_config(&account, @Bob,
                                     x"3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c",
                                     x"", x"");
-        DiemSystem::update_config_and_reconfigure(&account, @Bob);
+        ValidatorSystem::update_config_and_reconfigure(&account, @Bob);
     }
 }
 
@@ -150,16 +150,16 @@ script {
 
 //# run --admin-script --signers DiemRoot Alice --show-events
 script {
-    use DiemFramework::DiemTimestamp;
-    use DiemFramework::DiemSystem;
+    use DiemFramework::Timestamp;
+    use DiemFramework::ValidatorSystem;
     use DiemFramework::ValidatorConfig;
     fun main(_dr: signer, account: signer) {
 
         // good to reconfigure
-        assert!(DiemTimestamp::now_microseconds() == 900000005, 999);
+        assert!(Timestamp::now_microseconds() == 900000005, 999);
         ValidatorConfig::set_config(&account, @Bob,
                                     x"3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c",
                                     x"", x"");
-        DiemSystem::update_config_and_reconfigure(&account, @Bob);
+        ValidatorSystem::update_config_and_reconfigure(&account, @Bob);
     }
 }

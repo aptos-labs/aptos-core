@@ -9,7 +9,7 @@ use crate::{
     },
     aptos_vm_impl::{
         charge_global_write_gas_usage, convert_changeset_and_events, get_currency_info,
-        get_gas_currency_code, get_transaction_output, DiemVMImpl, DiemVMInternals,
+        get_gas_currency_code, get_transaction_output, AptosVMImpl, AptosVMInternals,
     },
     counters::*,
     data_cache::{RemoteStorage, StateViewCache},
@@ -27,7 +27,7 @@ use aptos_types::{
     account_config,
     block_metadata::BlockMetadata,
     on_chain_config::{
-        DiemVersion, OnChainConfig, ParallelExecutionConfig, VMConfig, VMPublishingOption,
+        OnChainConfig, ParallelExecutionConfig, VMConfig, VMPublishingOption, Version,
         DIEM_VERSION_2, DIEM_VERSION_3,
     },
     transaction::{
@@ -57,11 +57,11 @@ use std::{
 };
 
 #[derive(Clone)]
-pub struct DiemVM(pub(crate) DiemVMImpl);
+pub struct AptosVM(pub(crate) AptosVMImpl);
 
-impl DiemVM {
+impl AptosVM {
     pub fn new<S: StateView>(state: &S) -> Self {
-        Self(DiemVMImpl::new(state))
+        Self(AptosVMImpl::new(state))
     }
 
     pub fn new_for_validation<S: StateView>(state: &S) -> Self {
@@ -73,19 +73,19 @@ impl DiemVM {
     }
 
     pub fn init_with_config(
-        version: DiemVersion,
+        version: Version,
         on_chain_config: VMConfig,
         publishing_option: VMPublishingOption,
     ) -> Self {
         info!("Adapter restarted for Validation");
-        DiemVM(DiemVMImpl::init_with_config(
+        AptosVM(AptosVMImpl::init_with_config(
             version,
             on_chain_config,
             publishing_option,
         ))
     }
-    pub fn internals(&self) -> DiemVMInternals {
-        DiemVMInternals::new(&self.0)
+    pub fn internals(&self) -> AptosVMInternals {
+        AptosVMInternals::new(&self.0)
     }
 
     /// Load a module into its internal MoveVM's code cache.
@@ -212,7 +212,7 @@ impl DiemVM {
 
             match payload {
                 TransactionPayload::Script(script) => {
-                    let aptos_version = self.0.get_diem_version()?;
+                    let aptos_version = self.0.get_version()?;
                     let remapped_script =
                         if aptos_version < aptos_types::on_chain_config::DIEM_VERSION_2 {
                             None
@@ -244,7 +244,7 @@ impl DiemVM {
                     }
                 }
                 TransactionPayload::ScriptFunction(script_fn) => {
-                    let aptos_version = self.0.get_diem_version()?;
+                    let aptos_version = self.0.get_version()?;
                     let mut senders = vec![txn_data.sender()];
                     if aptos_version >= DIEM_VERSION_3 {
                         senders.extend(txn_data.secondary_signers());
@@ -423,7 +423,7 @@ impl DiemVM {
             WriteSetPayload::Direct(change_set) => change_set.clone(),
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(storage);
-                let aptos_version = self.0.get_diem_version().map_err(Err)?;
+                let aptos_version = self.0.get_version().map_err(Err)?;
                 let senders = match txn_sender {
                     None => vec![*execute_as],
                     Some(sender) => vec![sender, *execute_as],
@@ -530,13 +530,7 @@ impl DiemVM {
             MoveValue::Address(proposer),
         ]);
         session
-            .execute_function(
-                &DIEM_BLOCK_MODULE,
-                BLOCK_PROLOGUE,
-                vec![],
-                args,
-                &mut gas_status,
-            )
+            .execute_function(&BLOCK_MODULE, BLOCK_PROLOGUE, vec![], args, &mut gas_status)
             .map(|_return_vals| ())
             .or_else(|e| {
                 expect_only_successful_execution(e, BLOCK_PROLOGUE.as_str(), log_context)
@@ -706,7 +700,7 @@ impl DiemVM {
     ) -> Result<Vec<(VMStatus, TransactionOutput)>, VMStatus> {
         let mut state_view_cache = StateViewCache::new(state_view);
         let count = transactions.len();
-        let vm = DiemVM::new(&state_view_cache);
+        let vm = AptosVM::new(&state_view_cache);
         let res = adapter_common::execute_block_impl(&vm, transactions, &mut state_view_cache)?;
         // Record the histogram count for transactions per block.
         BLOCK_TRANSACTION_COUNT.observe(count as f64);
@@ -715,7 +709,7 @@ impl DiemVM {
 }
 
 // Executor external API
-impl VMExecutor for DiemVM {
+impl VMExecutor for AptosVM {
     /// Execute a block of `transactions`. The output vector will have the exact same length as the
     /// input vector. The discarded transactions will be marked as `TransactionStatus::Discard` and
     /// have an empty `WriteSet`. Also `state_view` is immutable, and does not have interior
@@ -740,7 +734,7 @@ impl VMExecutor for DiemVM {
             // Note that writeset transactions will be executed sequentially as it won't be inferred
             // by the read write set analysis and thus fall into the sequential path.
             let (result, _) =
-                crate::parallel_executor::ParallelDiemVM::execute_block(transactions, state_view)?;
+                crate::parallel_executor::ParallelAptosVM::execute_block(transactions, state_view)?;
             Ok(result)
         } else {
             let output = Self::execute_block_and_keep_vm_status(transactions, state_view)?;
@@ -753,14 +747,14 @@ impl VMExecutor for DiemVM {
 }
 
 // VMValidator external API
-impl VMValidator for DiemVM {
+impl VMValidator for AptosVM {
     /// Determine if a transaction is valid. Will return `None` if the transaction is accepted,
     /// `Some(Err)` if the VM rejects it, with `Err` as an error code. Verification performs the
     /// following steps:
     /// 1. The signature on the `SignedTransaction` matches the public key included in the
     ///    transaction
     /// 2. The script to be executed is under given specific configuration.
-    /// 3. Invokes `DiemAccount.prologue`, which checks properties such as the transaction has the
+    /// 3. Invokes `Account.prologue`, which checks properties such as the transaction has the
     /// right sequence number and the sender has enough balance to pay for the gas.
     /// TBD:
     /// 1. Transaction arguments matches the main function's type signature.
@@ -774,7 +768,7 @@ impl VMValidator for DiemVM {
     }
 }
 
-impl VMAdapter for DiemVM {
+impl VMAdapter for AptosVM {
     fn new_session<'r, R: MoveResolver>(&self, remote: &'r R) -> Session<'r, '_, R> {
         self.0.new_session(remote)
     }
@@ -784,7 +778,7 @@ impl VMAdapter for DiemVM {
     }
 
     fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus> {
-        if txn.is_multi_agent() && self.0.get_diem_version()? < DIEM_VERSION_3 {
+        if txn.is_multi_agent() && self.0.get_version()? < DIEM_VERSION_3 {
             // Multi agent is not allowed
             return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING));
         }
@@ -833,8 +827,8 @@ impl VMAdapter for DiemVM {
                     .run_script_prologue(session, &txn_data, &currency_code, log_context)
             }
             TransactionPayload::ScriptFunction(_) => {
-                // gate the behavior until the Diem version is ready
-                if self.0.get_diem_version()? < DIEM_VERSION_2 {
+                // gate the behavior until the version is ready
+                if self.0.get_version()? < DIEM_VERSION_2 {
                     return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING));
                 }
                 // NOTE: Script and ScriptFunction shares the same prologue
@@ -919,14 +913,14 @@ impl VMAdapter for DiemVM {
     }
 }
 
-impl AsRef<DiemVMImpl> for DiemVM {
-    fn as_ref(&self) -> &DiemVMImpl {
+impl AsRef<AptosVMImpl> for AptosVM {
+    fn as_ref(&self) -> &AptosVMImpl {
         &self.0
     }
 }
 
-impl AsMut<DiemVMImpl> for DiemVM {
-    fn as_mut(&mut self) -> &mut DiemVMImpl {
+impl AsMut<AptosVMImpl> for AptosVM {
+    fn as_mut(&mut self) -> &mut AptosVMImpl {
         &mut self.0
     }
 }

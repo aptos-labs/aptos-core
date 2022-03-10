@@ -4,9 +4,9 @@
 
 //# run --admin-script --signers DiemRoot DiemRoot --show-events
 script{
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
     fun main(_dr: signer, account: signer) {
-        DiemSystem::remove_validator(&account, @Vivian);
+        ValidatorSystem::remove_validator(&account, @Vivian);
     }
 }
 
@@ -14,11 +14,11 @@ script{
 
 //# run --admin-script --signers DiemRoot DiemRoot
 script{
-    use DiemFramework::DiemSystem;
+    use DiemFramework::ValidatorSystem;
 
     fun main() {
-        assert!(!DiemSystem::is_validator(@Vivian), 70);
-        assert!(!DiemSystem::is_validator(@Alice), 71);
-        assert!(DiemSystem::is_validator(@Viola), 72);
+        assert!(!ValidatorSystem::is_validator(@Vivian), 70);
+        assert!(!ValidatorSystem::is_validator(@Alice), 71);
+        assert!(ValidatorSystem::is_validator(@Viola), 72);
     }
 }

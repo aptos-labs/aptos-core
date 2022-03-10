@@ -5,10 +5,10 @@
 // Reconfiguration can only be invoked by the diem root.
 //# run --admin-script --signers DiemRoot Vivian --show-events
 script {
-use DiemFramework::DiemConfig;
+use DiemFramework::Reconfiguration;
 
 fun main(_dr: signer, vv: signer) {
-    DiemConfig::reconfigure(&vv);
+    Reconfiguration::reconfigure(&vv);
 }
 }
 
@@ -16,11 +16,11 @@ fun main(_dr: signer, vv: signer) {
 // Reconfiguration can only be invoked by the diem root.
 //# run --admin-script --signers DiemRoot DiemRoot --show-events
 script {
-use DiemFramework::DiemConfig;
+use DiemFramework::Reconfiguration;
 
 fun main(dr: signer, _dr2: signer) {
-    DiemConfig::reconfigure(&dr);
-    DiemConfig::reconfigure(&dr);
+    Reconfiguration::reconfigure(&dr);
+    Reconfiguration::reconfigure(&dr);
 }
 }
 
@@ -29,9 +29,9 @@ fun main(dr: signer, _dr2: signer) {
 // Make sure two reconfigurations will only trigger one reconfiguration event.
 //# run --admin-script --signers DiemRoot DiemRoot --show-events
 script {
-use DiemFramework::DiemConfig;
+use DiemFramework::Reconfiguration;
 
 fun main(dr: signer, _dr2: signer) {
-    DiemConfig::reconfigure(&dr);
+    Reconfiguration::reconfigure(&dr);
 }
 }

@@ -12,9 +12,9 @@ use aptos_types::{
     access_path::AccessPath,
     account_config::aptos_root_address,
     block_info::{BlockInfo, GENESIS_EPOCH, GENESIS_ROUND, GENESIS_TIMESTAMP_USECS},
-    diem_timestamp::DiemTimestampResource,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::{config_address, ConfigurationResource},
+    timestamp::TimestampResource,
     transaction::Transaction,
     waypoint::Waypoint,
 };
@@ -179,11 +179,11 @@ fn get_state_timestamp(state_view: &VerifiedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
         .get(&AccessPath::new(
             aptos_root_address(),
-            DiemTimestampResource::resource_path(),
+            TimestampResource::resource_path(),
         ))?
-        .ok_or_else(|| format_err!("DiemTimestampResource missing."))?;
-    let rsrc = bcs::from_bytes::<DiemTimestampResource>(rsrc_bytes)?;
-    Ok(rsrc.diem_timestamp.microseconds)
+        .ok_or_else(|| format_err!("TimestampResource missing."))?;
+    let rsrc = bcs::from_bytes::<TimestampResource>(rsrc_bytes)?;
+    Ok(rsrc.timestamp.microseconds)
 }
 
 fn get_state_epoch(state_view: &VerifiedStateView) -> Result<u64> {

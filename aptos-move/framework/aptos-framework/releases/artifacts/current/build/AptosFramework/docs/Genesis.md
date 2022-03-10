@@ -36,7 +36,7 @@
 
 
 
-<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize">initialize</a>(core_resource_account: signer, _tc_account: signer, core_resource_account_auth_key: vector&lt;u8&gt;, _tc_auth_key: vector&lt;u8&gt;, initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_diem_version: u64, consensus_config: vector&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize">initialize</a>(core_resource_account: signer, _tc_account: signer, core_resource_account_auth_key: vector&lt;u8&gt;, _tc_auth_key: vector&lt;u8&gt;, initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_version: u64, consensus_config: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -55,7 +55,7 @@
     instruction_schedule: vector&lt;u8&gt;,
     native_schedule: vector&lt;u8&gt;,
     chain_id: u8,
-    initial_diem_version: u64,
+    initial_version: u64,
     consensus_config: vector&lt;u8&gt;,
 ) {
     <a href="Genesis.md#0x1_Genesis_initialize_internal">initialize_internal</a>(
@@ -66,7 +66,7 @@
         instruction_schedule,
         native_schedule,
         chain_id,
-        initial_diem_version,
+        initial_version,
         consensus_config,
     )
 }
@@ -82,7 +82,7 @@
 
 
 
-<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize_internal">initialize_internal</a>(core_resource_account: &signer, core_resource_account_auth_key: vector&lt;u8&gt;, initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_diem_version: u64, consensus_config: vector&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize_internal">initialize_internal</a>(core_resource_account: &signer, core_resource_account_auth_key: vector&lt;u8&gt;, initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_version: u64, consensus_config: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -99,7 +99,7 @@
     instruction_schedule: vector&lt;u8&gt;,
     native_schedule: vector&lt;u8&gt;,
     chain_id: u8,
-    initial_diem_version: u64,
+    initial_version: u64,
     consensus_config: vector&lt;u8&gt;,
 ) {
     // initialize the chain marker first
@@ -113,7 +113,7 @@
     // Consensus config setup
     <a href="AptosConsensusConfig.md#0x1_AptosConsensusConfig_initialize">AptosConsensusConfig::initialize</a>(core_resource_account);
     <a href="AptosValidatorSet.md#0x1_AptosValidatorSet_initialize_validator_set">AptosValidatorSet::initialize_validator_set</a>(core_resource_account);
-    <a href="AptosVersion.md#0x1_AptosVersion_initialize">AptosVersion::initialize</a>(core_resource_account, initial_diem_version);
+    <a href="AptosVersion.md#0x1_AptosVersion_initialize">AptosVersion::initialize</a>(core_resource_account, initial_version);
 
     <a href="AptosVMConfig.md#0x1_AptosVMConfig_initialize">AptosVMConfig::initialize</a>(
         core_resource_account,
@@ -130,7 +130,7 @@
     <a href="TestCoin.md#0x1_TestCoin_initialize">TestCoin::initialize</a>(core_resource_account, 1000000);
     <a href="TestCoin.md#0x1_TestCoin_mint">TestCoin::mint</a>(core_resource_account, <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(core_resource_account), 18446744073709551615);
 
-    // Pad the event counter for the Diem Root account <b>to</b> match DPN. This
+    // Pad the event counter for the Root account <b>to</b> match DPN. This
     // _MUST_ match the new epoch event counter otherwise all manner of
     // things start <b>to</b> <b>break</b>.
     <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_destroy_handle">Event::destroy_handle</a>(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_new_event_handle">Event::new_event_handle</a>&lt;u64&gt;(core_resource_account));
@@ -149,7 +149,7 @@
 
 ## Function `create_initialize_owners_operators`
 
-Sets up the initial validator set for the Diem network.
+Sets up the initial validator set for the network.
 The validator "owner" accounts, their UTF-8 names, and their authentication
 keys are encoded in the <code>owners</code>, <code>owner_names</code>, and <code>owner_auth_key</code> vectors.
 Each validator signs consensus messages with the private key corresponding to the Ed25519
@@ -158,7 +158,7 @@ Each validator owner has its operation delegated to an "operator" (which may be
 the owner). The operators, their names, and their authentication keys are encoded
 in the <code>operators</code>, <code>operator_names</code>, and <code>operator_auth_keys</code> vectors.
 Finally, each validator must specify the network address
-(see diem/types/src/network_address/mod.rs) for itself and its full nodes.
+(see types/src/network_address/mod.rs) for itself and its full nodes.
 
 
 <pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_create_initialize_owners_operators">create_initialize_owners_operators</a>(core_resource_account: signer, owners: vector&lt;signer&gt;, owner_names: vector&lt;vector&lt;u8&gt;&gt;, owner_auth_keys: vector&lt;vector&lt;u8&gt;&gt;, consensus_pubkeys: vector&lt;vector&lt;u8&gt;&gt;, operators: vector&lt;signer&gt;, operator_names: vector&lt;vector&lt;u8&gt;&gt;, operator_auth_keys: vector&lt;vector&lt;u8&gt;&gt;, validator_network_addresses: vector&lt;vector&lt;u8&gt;&gt;, full_node_network_addresses: vector&lt;vector&lt;u8&gt;&gt;)

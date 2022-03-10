@@ -1,14 +1,14 @@
 /// The ValidatorConfig resource holds information about a validator. Information
 /// is published and updated by Diem root in a `Self::ValidatorConfig` in preparation for
-/// later inclusion (by functions in DiemConfig) in a `DiemConfig::DiemConfig<DiemSystem>`
-/// struct (the `Self::ValidatorConfig` in a `DiemConfig::ValidatorInfo` which is a member
-/// of the `DiemSystem::DiemSystem.validators` vector).
+/// later inclusion (by functions in Reconfiguration) in a `Reconfiguration::Reconfiguration<ValidatorSystem>`
+/// struct (the `Self::ValidatorConfig` in a `Reconfiguration::ValidatorInfo` which is a member
+/// of the `ValidatorSystem::ValidatorSystem.validators` vector).
 module CoreFramework::ValidatorConfig {
     use Std::Capability::Cap;
     use Std::Errors;
     use Std::Option::{Self, Option};
     use Std::Signer;
-    use CoreFramework::DiemTimestamp;
+    use CoreFramework::Timestamp;
     use CoreFramework::ValidatorOperatorConfig;
     use CoreFramework::Signature;
     use CoreFramework::SystemAddresses;
@@ -44,7 +44,7 @@ module CoreFramework::ValidatorConfig {
     const ECHAIN_MARKER: u64 = 9;
 
     public fun initialize<T>(account: &signer) {
-        DiemTimestamp::assert_genesis();
+        Timestamp::assert_genesis();
         SystemAddresses::assert_core_resource(account);
 
         assert!(
@@ -66,7 +66,7 @@ module CoreFramework::ValidatorConfig {
         human_name: vector<u8>,
         _cap: Cap<T>
     ) {
-        DiemTimestamp::assert_operating();
+        Timestamp::assert_operating();
         assert!(
             exists<ValidatorConfigChainMarker<T>>(@CoreResources),
             Errors::not_published(ECHAIN_MARKER)
@@ -119,7 +119,7 @@ module CoreFramework::ValidatorConfig {
 
     /// Rotate the config in the validator_account.
     /// Once the config is set, it can not go back to `Option::none` - this is crucial for validity
-    /// of the DiemSystem's code.
+    /// of the ValidatorSystem's code.
     public fun set_config(
         validator_operator_account: &signer,
         validator_addr: address,

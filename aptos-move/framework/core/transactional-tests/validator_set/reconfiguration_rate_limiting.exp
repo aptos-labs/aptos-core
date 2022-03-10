@@ -5,7 +5,7 @@ Events:
 {
     key:     11000000000000000000000000000000000000000a550c18
     seq_num: 0
-    type:    0x1::DiemBlock::NewBlockEvent
+    type:    0x1::Block::NewBlockEvent
     data:    "000000000000000000000000000000000000000000000000000000000000000000"
 }
 
@@ -17,7 +17,7 @@ Events:
 {
     key:     11000000000000000000000000000000000000000a550c18
     seq_num: 1
-    type:    0x1::DiemBlock::NewBlockEvent
+    type:    0x1::Block::NewBlockEvent
     data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d60000a3e11100000000"
 }
 
@@ -29,7 +29,7 @@ Events:
 {
     key:     11000000000000000000000000000000000000000a550c18
     seq_num: 2
-    type:    0x1::DiemBlock::NewBlockEvent
+    type:    0x1::Block::NewBlockEvent
     data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d60001a3e11100000000"
 }
 
@@ -38,7 +38,7 @@ Events:
 {
     key:     04000000000000000000000000000000000000000a550c18
     seq_num: 1
-    type:    0x1::DiemConfig::NewEpochEvent
+    type:    0x1::Reconfiguration::NewEpochEvent
     data:    "0200000000000000"
 }
 {
@@ -53,7 +53,7 @@ Events:
 {
     key:     11000000000000000000000000000000000000000a550c18
     seq_num: 3
-    type:    0x1::DiemBlock::NewBlockEvent
+    type:    0x1::Block::NewBlockEvent
     data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d6000046c32300000000"
 }
 
@@ -71,7 +71,7 @@ Events:
 {
     key:     11000000000000000000000000000000000000000a550c18
     seq_num: 4
-    type:    0x1::DiemBlock::NewBlockEvent
+    type:    0x1::Block::NewBlockEvent
     data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d6000246c32300000000"
 }
 
@@ -80,7 +80,7 @@ Events:
 {
     key:     04000000000000000000000000000000000000000a550c18
     seq_num: 2
-    type:    0x1::DiemConfig::NewEpochEvent
+    type:    0x1::Reconfiguration::NewEpochEvent
     data:    "0300000000000000"
 }
 {
@@ -95,7 +95,7 @@ Events:
 {
     key:     11000000000000000000000000000000000000000a550c18
     seq_num: 5
-    type:    0x1::DiemBlock::NewBlockEvent
+    type:    0x1::Block::NewBlockEvent
     data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d6000346c32300000000"
 }
 
@@ -104,7 +104,7 @@ Events:
 {
     key:     04000000000000000000000000000000000000000a550c18
     seq_num: 3
-    type:    0x1::DiemConfig::NewEpochEvent
+    type:    0x1::Reconfiguration::NewEpochEvent
     data:    "0400000000000000"
 }
 {
@@ -119,7 +119,7 @@ Events:
 {
     key:     11000000000000000000000000000000000000000a550c18
     seq_num: 6
-    type:    0x1::DiemBlock::NewBlockEvent
+    type:    0x1::Block::NewBlockEvent
     data:    "0000000000000000579a43fcffed03d31e1bd13e729669e7000446c32300000000"
 }
 
@@ -128,7 +128,7 @@ Events:
 {
     key:     04000000000000000000000000000000000000000a550c18
     seq_num: 4
-    type:    0x1::DiemConfig::NewEpochEvent
+    type:    0x1::Reconfiguration::NewEpochEvent
     data:    "0500000000000000"
 }
 {
@@ -143,7 +143,7 @@ Events:
 {
     key:     11000000000000000000000000000000000000000a550c18
     seq_num: 7
-    type:    0x1::DiemBlock::NewBlockEvent
+    type:    0x1::Block::NewBlockEvent
     data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d60004e9a43500000000"
 }
 
@@ -155,7 +155,7 @@ Events:
 {
     key:     11000000000000000000000000000000000000000a550c18
     seq_num: 8
-    type:    0x1::DiemBlock::NewBlockEvent
+    type:    0x1::Block::NewBlockEvent
     data:    "0000000000000000c5e34b925cf6875fec02d4b77adbd2d60005e9a43500000000"
 }
 
@@ -164,7 +164,7 @@ Events:
 {
     key:     04000000000000000000000000000000000000000a550c18
     seq_num: 5
-    type:    0x1::DiemConfig::NewEpochEvent
+    type:    0x1::Reconfiguration::NewEpochEvent
     data:    "0600000000000000"
 }
 {

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 pub use aptos_types::account_config::{aptos_root_address, BalanceResource, CORE_CODE_ADDRESS};
 pub use aptos_types::on_chain_config::{
-    config_struct_tag, ConfigurationResource, DiemVersion as OnChainDiemVersion, OnChainConfig,
+    diem_config_struct_tag, ConfigurationResource, OnChainConfig, Version as OnChainVersion,
 };
 
 use crate::types::EventHandle;
@@ -35,16 +35,16 @@ impl AccountBalance {
 }
 
 pub fn diem_version_identifier() -> Identifier {
-    Identifier::new(OnChainDiemVersion::IDENTIFIER).unwrap()
+    Identifier::new(OnChainVersion::IDENTIFIER).unwrap()
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DiemConfig<T> {
+pub struct Reconfiguration<T> {
     pub payload: T,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DiemVersion {
+pub struct Version {
     pub major: U64,
 }
 

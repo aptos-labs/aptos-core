@@ -87,7 +87,7 @@ fn admin_script_rotate_key_single_signer_new_epoch() {
     let script_body = {
         let code = r#"
 import 0x1.DiemAccount;
-import 0x1.DiemConfig;
+import 0x1.Reconfiguration;
 
 main(dr_account: signer, account: signer, auth_key_prefix: vector<u8>) {
   let rotate_cap: DiemAccount.KeyRotationCapability;
@@ -96,7 +96,7 @@ label b0:
   DiemAccount.rotate_authentication_key(&rotate_cap, move(auth_key_prefix));
   DiemAccount.restore_key_rotation_capability(move(rotate_cap));
 
-  DiemConfig.reconfigure(&dr_account);
+  Reconfiguration.reconfigure(&dr_account);
   return;
 }
 "#;
