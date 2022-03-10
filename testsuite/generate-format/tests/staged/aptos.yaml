@@ -45,16 +45,6 @@ ChangeSet:
     - events:
         SEQ:
           TYPENAME: ContractEvent
-CoinTradeMetadata:
-  ENUM:
-    0:
-      CoinTradeMetadataV0:
-        NEWTYPE:
-          TYPENAME: CoinTradeMetadataV0
-CoinTradeMetadataV0:
-  STRUCT:
-    - trade_ids:
-        SEQ: STR
 ContractEvent:
   ENUM:
     0:
@@ -113,10 +103,6 @@ Metadata:
       RefundMetadata:
         NEWTYPE:
           TYPENAME: RefundMetadata
-    5:
-      CoinTradeMetadata:
-        NEWTYPE:
-          TYPENAME: CoinTradeMetadata
     6:
       PaymentMetadata:
         NEWTYPE:

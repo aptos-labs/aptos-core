@@ -15,7 +15,6 @@ enum Metadata {
   TravelRuleMetadata(TravelRuleMetadata),
   UnstructuredByteMetadata(Option<Vec<u8>>),
   RefundMetadata(RefundMetadata),
-  CoinTradeMetadata(CoinTradeMetadata),
 }
 ```
 
@@ -62,18 +61,6 @@ type OffChainReferenceId = Option<String>;
 ```
 
 The TravelRuleMetadata completes a transaction that began with a pre-flight, or off-chain exchange. During this exchange, the two parties should have agreed on an `OffChainReferenceId`, likley a `reference_id` or a [UUID-128](https://tools.ietf.org/html/rfc4122).
-
-## Coin Trades with Designated Dealers Using CoinTradeMetadata
-
-```
-enum CoinTradeMetadata {
-    CoinTradeMetadataVersion0(TradeIds),
-}
-
-type TradeIds = Vec<String>;
-```
-
-As defined in [DIP-12](https://dip.aptoslabs.com/dip-12/), a coin trade transaction involves a VASP selling or purchasing coins to or from a DD. Each coin trade is represented by a trade id, which is an identifier agreed to by the VASP and DD off-chain. One or more of these off-chain interactions can be settled on-chain via a CoinTradeMetadata transaction.
 
 ## Refunds Using RefundMetadata
 
