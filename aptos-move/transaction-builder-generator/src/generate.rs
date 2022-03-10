@@ -63,7 +63,7 @@ struct Options {
     /// Optional version number for the `aptos_types` module (useful in Rust).
     /// If `--with-aptos-types` is passed, this will be the version of the generated `aptos_types` module.
     #[structopt(long, default_value = "0.1.0")]
-    diem_version_number: String,
+    aptos_version_number: String,
 
     /// Optional package name (Python) or module path (Go) of the `aptos_types` dependency.
     #[structopt(long)]
@@ -165,10 +165,10 @@ fn main() {
         };
         let (aptos_package_name, diem_package_path) = match options.language {
             Language::Rust => (
-                if options.diem_version_number == "0.1.0" {
+                if options.aptos_version_number == "0.1.0" {
                     "aptos-types".to_string()
                 } else {
-                    format!("aptos-types:{}", options.diem_version_number)
+                    format!("aptos-types:{}", options.aptos_version_number)
                 },
                 vec!["aptos-types"],
             ),
@@ -201,7 +201,7 @@ fn main() {
             Language::Swift => Box::new(buildgen::swift::Installer::new(install_dir)),
             Language::Rust => Box::new(buildgen::rust::Installer::new(
                 install_dir,
-                options.diem_version_number,
+                options.aptos_version_number,
             )),
             Language::Cpp => Box::new(buildgen::cpp::Installer::new(install_dir)),
             Language::Java => Box::new(buildgen::java::Installer::new(install_dir)),

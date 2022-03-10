@@ -6,7 +6,7 @@ custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/language/tra
 
 # Transaction Builder Generator
 
-A *transaction builder* is a helper function that converts its arguments into the payload of a Diem transaction calling a particular Move script.
+A *transaction builder* is a helper function that converts its arguments into the payload of a Aptos transaction calling a particular Move script.
 
 In Rust, the signature of such a function typically looks like this:
 ```rust
@@ -21,10 +21,10 @@ pub fn encode_peer_to_peer_with_metadata_script(
 
 This crate provide a binary tool `generate-transaction-builders` to generate and install transaction builders in several programming languages.
 
-The tool will also generate and install type definitions for Diem types such as `TypeTag`, `AccountAddress`, and `Script`.
+The tool will also generate and install type definitions for Aptos types such as `TypeTag`, `AccountAddress`, and `Script`.
 
-In practice, hashing and signing Diem transactions additionally requires a runtime library for Binary Canonical Serialization ("BCS").
-Such a library will be installed together with the Diem types.
+In practice, hashing and signing Aptos transactions additionally requires a runtime library for Binary Canonical Serialization ("BCS").
+Such a library will be installed together with the Aptos types.
 
 
 ## Supported Languages
@@ -39,7 +39,7 @@ The following languages are currently supported:
 
 * Go >= 1.13
 
-* Rust (NOTE: Code generation of dependency-free Rust is experimental. Consider using the libraries of the Diem repository instead.)
+* Rust (NOTE: Code generation of dependency-free Rust is experimental. Consider using the libraries of the Aptos repository instead.)
 
 * TypeScript / JavaScript
 
@@ -48,28 +48,22 @@ The following languages are currently supported:
 
 ## Quick Start
 
-From the root of the Diem repository, run `cargo build -p transaction-builder-generator`.
+From the root of the Aptos repository, run `cargo build -p transaction-builder-generator`.
 
 You may browse command line options with `target/debug/generate-transaction-builders --help`.
 
-NOTE: until the Diem version flag is set to greater than `2` the path
-used for generating transaction builders should be
-`aptos-move/framework/legacy/transaction_scripts/abi`. You can query
-this version number by submitting a `get_metadata` request to the JSON-RPC
-endpoint.
-
 ### Python
 
-To install Python3 modules `serde`, `bcs`, `aptos_types`, and `diem_framework` into a target directory `$DEST`, run:
+To install Python3 modules `serde`, `bcs`, `aptos_types`, and `aptos_framework` into a target directory `$DEST`, run:
 ```bash
 target/debug/generate-transaction-builders \
     --language python3 \
-    --module-name diem_framework \
-    --with-aptos-types "testsuite/generate-format/tests/staged/diem.yaml" \
+    --module-name aptos_framework \
+    --with-aptos-types "testsuite/generate-format/tests/staged/aptos.yaml" \
     --target-source-dir "$DEST" \
-    --with-custom-aptos-code aptos-move/transaction-builder-generator/examples/python3/custom_aptos_code/*.py -- \
-    "aptos-move/framework/DPN/releases/legacy" \
-    "aptos-move/framework/DPN/releases/artifacts/current"
+    --with-custom-aptos-code aptos-move/transaction-builder-generator/examples/python3/custom_aptos_code/*.py \
+    -- \
+    "aptos-move/framework/aptos-framework/releases/artifacts/current"
 ```
 Next, you may copy and execute the [Python demo file](examples/python3/stdlib_demo.py) with:
 ```bash
@@ -79,35 +73,34 @@ PYTHONPATH="$PYTHONPATH:$DEST" python3 "$DEST/stdlib_demo.py"
 
 ### C++
 
-To install C++ files `serde.hpp`, `bcs.hpp`, `aptos_types.hpp`, `diem_framework.hpp`, `diem_framework.cpp` into a target directory `$DEST`, run:
+To install C++ files `serde.hpp`, `bcs.hpp`, `aptos_types.hpp`, `aptos_framework.hpp`, `aptos_framework.cpp` into a target directory `$DEST`, run:
 ```bash
 target/debug/generate-transaction-builders \
     --language cpp \
-    --module-name diem_framework \
-    --with-aptos-types "testsuite/generate-format/tests/staged/diem.yaml" \
+    --module-name aptos_framework \
+    --with-aptos-types "testsuite/generate-format/tests/staged/aptos.yaml" \
     --target-source-dir "$DEST" \
-    "aptos-move/framework/DPN/releases/legacy" \
-    "aptos-move/framework/DPN/releases/artifacts/current"
+    "aptos-move/framework/aptos-framework/releases/artifacts/current"
 ```
 Next, you may copy and execute the [C++ demo file](examples/cpp/stdlib_demo.cpp) with:
 ```bash
 cp aptos-move/transaction-builder-generator/examples/cpp/stdlib_demo.cpp "$DEST"
-clang++ --std=c++17 -I "$DEST" "$DEST/diem_framework.cpp" "$DEST/stdlib_demo.cpp" -o "$DEST/stdlib_demo"
+clang++ --std=c++17 -I "$DEST" "$DEST/aptos_framework.cpp" "$DEST/stdlib_demo.cpp" -o "$DEST/stdlib_demo"
 "$DEST/stdlib_demo"
 ```
 
 ### Java
 
-To install Java source packages `com.novi.serde`, `com.novi.bcs`, `com.diem.types`, and `com.diem.stdlib` into a target directory `$DEST`, run:
+To install Java source packages `com.novi.serde`, `com.novi.bcs`, `com.aptos.types`, and `com.aptos.stdlib` into a target directory `$DEST`, run:
 ```bash
 target/debug/generate-transaction-builders \
     --language java \
-    --module-name com.diem.stdlib \
-    --with-aptos-types "testsuite/generate-format/tests/staged/diem.yaml" \
+    --module-name com.aptos.stdlib \
+    --with-aptos-types "testsuite/generate-format/tests/staged/aptos.yaml" \
     --target-source-dir "$DEST" \
-    --with-custom-aptos-code aptos-move/transaction-builder-generator/examples/java/custom_aptos_code/*.java -- \
-    "aptos-move/framework/DPN/releases/legacy" \
-    "aptos-move/framework/DPN/releases/artifacts/current"
+    --with-custom-aptos-code aptos-move/transaction-builder-generator/examples/java/custom_aptos_code/*.java \
+    -- \
+    "aptos-move/framework/aptos-framework/releases/artifacts/current"
 ```
 Next, you may copy and execute the [Java demo file](examples/java/StdlibDemo.java) with:
 ```bash
@@ -118,17 +111,16 @@ java -enableassertions -cp "$DEST" StdlibDemo
 
 ### Go
 
-To generate the Go "packages" `testing/diemtypes`, and `testing/diemstdlib` into a target directory `$DEST`, run:
+To generate the Go "packages" `testing/aptostypes`, and `testing/aptosstdlib` into a target directory `$DEST`, run:
 
 ```bash
 target/debug/generate-transaction-builders \
     --language go \
-    --module-name diemstdlib \
+    --module-name aptosstdlib \
     --aptos-package-name testing \
-    --with-aptos-types "testsuite/generate-format/tests/staged/diem.yaml" \
+    --with-aptos-types "testsuite/generate-format/tests/staged/aptos.yaml" \
     --target-source-dir "$DEST" \
-    "aptos-move/framework/DPN/releases/legacy" \
-    "aptos-move/framework/DPN/releases/artifacts/current"
+    "aptos-move/framework/aptos-framework/releases/artifacts/current"
 ```
 Next, you may copy and execute the [Go demo file](examples/golang/stdlib_demo.go) as follows:
 (Note that `$DEST` must be an absolute path)
@@ -139,59 +131,57 @@ cp aptos-move/transaction-builder-generator/examples/golang/stdlib_demo.go "$DES
 
 ### Rust (experimental)
 
-To install dependency-free Rust crates `aptos-types` and `diem-framework` into a target directory `$DEST`, run:
+To install dependency-free Rust crates `aptos-types` and `aptos-framework` into a target directory `$DEST`, run:
 ```bash
 target/debug/generate-transaction-builders \
     --language rust \
     --module-name framework \
-    --with-aptos-types "testsuite/generate-format/tests/staged/diem.yaml" \
+    --with-aptos-types "testsuite/generate-format/tests/staged/aptos.yaml" \
     --target-source-dir "$DEST" \
-    "aptos-move/framework/DPN/releases/legacy" \
-    "aptos-move/framework/DPN/releases/artifacts/current"
+    "aptos-move/framework/aptos-framework/releases/artifacts/current"
 ```
 Next, you may copy and execute the [Rust demo file](examples/rust/stdlib_demo.rs). (See [unit test](tests/generation.rs) for details.)
 
 ### TypeScript/JavaScript
 
-To generate the TypeScript "module" `diemStdlib` and its submodules into a target directory `$DEST`, run:
+To generate the TypeScript "module" `aptosStdlib` and its submodules into a target directory `$DEST`, run:
 
 ```bash
 target/debug/generate-transaction-builders \
     --language typescript \
-    --module-name diemStdlib \
-    --with-aptos-types "testsuite/generate-format/tests/staged/diem.yaml" \
+    --module-name aptosStdlib \
+    --with-aptos-types "testsuite/generate-format/tests/staged/aptos.yaml" \
     --target-source-dir "$DEST" \
-    "aptos-move/framework/DPN/releases/legacy" \
-    "aptos-move/framework/DPN/releases/artifacts/current"
+    "aptos-move/framework/aptos-framework/releases/artifacts/current"
 ```
 
 ### C#
 
-To install C# source `Serde`, `Bcs`, `Diem.Types`, and `Diem.Stdlib` into a target directory `$DEST`, run:
+To install C# source `Serde`, `Bcs`, `Aptos.Types`, and `Aptos.Stdlib` into a target directory `$DEST`, run:
 ```bash
 target/debug/generate-transaction-builders \
     --language csharp \
-    --module-name Diem.Stdlib \
-    --with-aptos-types "testsuite/generate-format/tests/staged/diem.yaml" \
+    --module-name Aptos.Stdlib \
+    --with-aptos-types "testsuite/generate-format/tests/staged/aptos.yaml" \
     --target-source-dir "$DEST" \
-    --with-custom-aptos-code aptos-move/transaction-builder-generator/examples/csharp/custom_aptos_code/*.cs -- \
-    "aptos-move/framework/DPN/releases/legacy" \
-    "aptos-move/framework/DPN/releases/artifacts/current"
+    --with-custom-aptos-code aptos-move/transaction-builder-generator/examples/csharp/custom_aptos_code/*.cs \
+    -- \
+    "aptos-move/framework/aptos-framework/releases/artifacts/current"
 ```
 Next, you may copy and execute the [C# demo file](examples/csharp/StdlibDemo.cs) with:
 ```bash
 mkdir "$DEST"/Demo
 cp aptos-move/transaction-builder-generator/examples/csharp/StdlibDemo.cs "$DEST/Demo"
-cd "$DEST/Diem/Stdlib"
-dotnet new classlib -n Diem.Stdlib -o .
-dotnet add Diem.Stdlib.csproj reference ../Types/Diem.Types.csproj
+cd "$DEST/Aptos/Stdlib"
+dotnet new classlib -n Aptos.Stdlib -o .
+dotnet add Aptos.Stdlib.csproj reference ../Types/Aptos.Types.csproj
 rm Class1.cs
 cd "../../Demo"
 dotnet new sln
 dotnet new console
 rm Program.cs
-dotnet add Demo.csproj reference ../Diem/Stdlib/Diem.Stdlib.csproj
-dotnet add Demo.csproj reference ../Diem/Types/Diem.Types.csproj
+dotnet add Demo.csproj reference ../Aptos/Stdlib/Aptos.Stdlib.csproj
+dotnet add Demo.csproj reference ../Aptos/Types/Aptos.Types.csproj
 dotnet add Demo.csproj reference ../Serde/Serde.csproj
 dotnet add Demo.csproj reference ../Bcs/Bcs.csproj
 dotnet run --project Demo.csproj
@@ -199,15 +189,14 @@ dotnet run --project Demo.csproj
 
 ### Swift
 
-To install Swift source `Serde`, `Bcs`, `DiemTypes`, and `DiemStdlib` into a target directory `$DEST`, run:
+To install Swift source `Serde`, `Bcs`, `AptosTypes`, and `AptosStdlib` into a target directory `$DEST`, run:
 ```bash
 target/debug/generate-transaction-builders \
     --language swift \
-    --module-name DiemStdlib \
-    --with-aptos-types "testsuite/generate-format/tests/staged/diem.yaml" \
+    --module-name AptosStdlib \
+    --with-aptos-types "testsuite/generate-format/tests/staged/aptos.yaml" \
     --target-source-dir "$DEST" \
-    "language/diem-framework/DPN/releases/legacy" \
-    "language/diem-framework/DPN/releases/artifacts/current"
+    "language/framework/aptos-framework/releases/artifacts/current"
 ```
 
 Next, you may copy the [Swift demo](examples/swift/main.swift), create the
@@ -215,7 +204,7 @@ Swift package for the transaction builders, and execute the example with the
 following:
 
 ```bash
-cp language/transaction-builder/generator/examples/swift/main.swift "$DEST/Sources/DiemStdlib"
+cp language/transaction-builder/generator/examples/swift/main.swift "$DEST/Sources/AptosStdlib"
 cd "$DEST"
 cat >Package.swift <<EOF
 // swift-tools-version:5.3
@@ -223,19 +212,19 @@ cat >Package.swift <<EOF
 import PackageDescription
 
 let package = Package(
-    name: "DiemStdlib",
+    name: "AptosStdlib",
     targets: [
         .target(
             name: "Serde",
             dependencies: []
         ),
         .target(
-            name: "DiemTypes",
+            name: "AptosTypes",
             dependencies: ["Serde"]
         ),
         .target(
-            name: "DiemStdlib",
-            dependencies: ["Serde", "DiemTypes"]
+            name: "AptosStdlib",
+            dependencies: ["Serde", "AptosTypes"]
         ),
     ]
 )
@@ -247,7 +236,7 @@ swift run
 
 Supporting transaction builders in an additional programming language boils down to providing the following items:
 
-1. Code generation for Diem types (Rust library and tool),
+1. Code generation for Aptos types (Rust library and tool),
 
 2. BCS runtime (library in target language),
 
@@ -256,9 +245,9 @@ Supporting transaction builders in an additional programming language boils down
 
 Items (1) and (2) are provided by the Rust library `serde-generate` which is developed in a separate [github repository](https://github.com/novifinancial/serde-reflection).
 
-Item (3) --- this tool --- is currently developed in the Diem repository.
+Item (3) --- this tool --- is currently developed in the Aptos repository.
 
-Items (2) and (3) are mostly independent. Both crucially depend on (1) to be sufficiently stable, therefore our suggestion for adding a new language is first to open a new github issue in `serde-generate` and contact the Diem maintainers.
+Items (2) and (3) are mostly independent. Both crucially depend on (1) to be sufficiently stable, therefore our suggestion for adding a new language is first to open a new github issue in `serde-generate` and contact the Aptos maintainers.
 
 
 The new issue created on `serde-generate` should include:
