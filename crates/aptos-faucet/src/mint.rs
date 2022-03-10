@@ -4,18 +4,17 @@
 use crate::Service;
 use anyhow::Result;
 use aptos_crypto::ed25519::Ed25519PublicKey;
+use aptos_rest_client::{PendingTransaction, Response as TxResponse};
 use aptos_sdk::{
     transaction_builder::aptos_stdlib,
     types::{
         account_address::AccountAddress,
-        transaction::{
-            authenticator::{AuthenticationKey, AuthenticationKeyPreimage},
-            SignedTransaction,
-        },
+        transaction::authenticator::{AuthenticationKey, AuthenticationKeyPreimage},
     },
 };
 use reqwest::StatusCode;
 use serde::Deserialize;
+use serde_json;
 use std::{convert::Infallible, fmt, sync::Arc};
 use warp::{Filter, Rejection, Reply};
 
@@ -48,7 +47,7 @@ async fn handle(
 #[derive(Debug)]
 pub enum Response {
     DDAccountNextSeqNum(u64),
-    SubmittedTxns(Vec<SignedTransaction>),
+    SubmittedTxns(Vec<PendingTransaction>),
 }
 
 impl std::fmt::Display for Response {
@@ -56,7 +55,7 @@ impl std::fmt::Display for Response {
         match self {
             Response::DDAccountNextSeqNum(v1) => write!(f, "{}", v1),
             Response::SubmittedTxns(v2) => {
-                write!(f, "{}", hex::encode(bcs::to_bytes(&v2).unwrap()))
+                write!(f, "{}", serde_json::to_string(&v2).unwrap())
             }
         }
     }
@@ -73,7 +72,6 @@ impl std::fmt::Display for MintParams {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "<Mint {:?} to {:?}>", self.amount, self.receiver())
     }
-
 }
 
 impl MintParams {
@@ -139,21 +137,22 @@ async fn process(service: &Service, params: MintParams) -> Result<Response> {
     }
 
     let requests = txns.iter().map(|txn| service.client.submit(txn));
-    let mut responses = futures::future::join_all(requests).await;
+    let responses = futures::future::join_all(requests).await;
 
     // If there was an issue submitting a transaction we should just reset our sequence_numbers
     // to what was on chain
     if responses.iter().any(Result::is_err) {
         *service.faucet_account.lock().unwrap().sequence_number_mut() = faucet_seq;
     }
-
-    while !responses.is_empty() {
-        let response = responses.swap_remove(0);
-        response?;
-    }
+    let responses = responses
+        .into_iter()
+        .collect::<Result<Vec<TxResponse<PendingTransaction>>>>()?
+        .into_iter()
+        .map(|r| r.into_inner())
+        .collect();
 
     if params.return_txns.unwrap_or(false) {
-        Ok(Response::SubmittedTxns(txns))
+        Ok(Response::SubmittedTxns(responses))
     } else {
         Ok(Response::DDAccountNextSeqNum(
             service.faucet_account.lock().unwrap().sequence_number(),
