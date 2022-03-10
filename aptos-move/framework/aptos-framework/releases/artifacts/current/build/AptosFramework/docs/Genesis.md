@@ -128,6 +128,7 @@
     <a href="AptosTransactionPublishingOption.md#0x1_AptosTransactionPublishingOption_initialize">AptosTransactionPublishingOption::initialize</a>(core_resource_account, initial_script_allow_list, is_open_module);
 
     <a href="TestCoin.md#0x1_TestCoin_initialize">TestCoin::initialize</a>(core_resource_account, 1000000);
+    <a href="TestCoin.md#0x1_TestCoin_mint">TestCoin::mint</a>(core_resource_account, <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(core_resource_account), 18446744073709551615);
 
     // Pad the event counter for the Diem Root account <b>to</b> match DPN. This
     // _MUST_ match the new epoch event counter otherwise all manner of

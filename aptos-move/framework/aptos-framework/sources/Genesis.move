@@ -82,6 +82,7 @@ module AptosFramework::Genesis {
         AptosTransactionPublishingOption::initialize(core_resource_account, initial_script_allow_list, is_open_module);
 
         TestCoin::initialize(core_resource_account, 1000000);
+        TestCoin::mint(core_resource_account, Signer::address_of(core_resource_account), 18446744073709551615);
 
         // Pad the event counter for the Diem Root account to match DPN. This
         // _MUST_ match the new epoch event counter otherwise all manner of

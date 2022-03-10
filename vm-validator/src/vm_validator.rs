@@ -7,7 +7,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, AccountSequenceInfo},
     account_state::AccountState,
-    on_chain_config::{DiemVersion, OnChainConfigPayload, VMConfig, VMPublishingOption},
+    on_chain_config::OnChainConfigPayload,
     transaction::{SignedTransaction, VMValidatorResult},
 };
 use aptos_vm::DiemVM;
