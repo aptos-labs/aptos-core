@@ -321,9 +321,11 @@ mod tests {
     #[tokio::test]
     async fn test_mint_with_txns_response() {
         let (accounts, service) = setup(None);
+        let faucet_address = service.faucet_account.lock().unwrap().address();
         let filter = routes(service);
 
         let pub_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
+        let addr = AccountAddress::try_from("25C62C0E0820F422000814CDBA407835".to_owned()).unwrap();
         let amount = 13345;
         let resp = warp::test::request()
             .method("POST")
@@ -337,12 +339,11 @@ mod tests {
             .reply(&filter)
             .await;
         let body = resp.body();
-        let bytes = hex::decode(body).expect("hex encoded response body");
-        let txns: Vec<SignedTransaction> = bcs::from_bytes(&bytes).expect("valid bcs vec");
+        let txns: Vec<PendingTransaction> = serde_json::from_slice(body).unwrap();
         assert_eq!(txns.len(), 2);
+        assert_eq!(txns[0].request.sender.inner(), &faucet_address);
 
         let reader = accounts.read();
-        let addr = AccountAddress::try_from("25C62C0E0820F422000814CDBA407835".to_owned()).unwrap();
         let account = reader.get(&addr).expect("account should be created");
         assert_eq!(account.balance, amount);
     }

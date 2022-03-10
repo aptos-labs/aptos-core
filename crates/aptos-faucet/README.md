@@ -34,19 +34,33 @@ which is the account sequence number of the account `0xa550c18` after executing 
 Nominally, this number can be used for looking up the submitted transaction.
 However, under load, this number may be shared by multiple transactions.
 
-If the query param `return_txns` is set, the server will respond with the transactions for creating and funding your account.
-The response HTTP body is hex encoded bytes of BCS encoded `Vec<aptos_types::transaction::SignedTransaction>`.
-
-Decode Example ([source](https://diem.github.io/client-sdk-python/diem/testnet.html#diem.testnet.Faucet)):
-
-``` python
-  de = bcs.BcsDeserializer(bytes.fromhex(response.text))
-  length = de.deserialize_len()
-
-  txns = []
-  for i in range(length):
-    txns.push(de.deserialize_any(aptos_types.SignedTransaction))
-
+If the query param `return_txns` is set, the server will respond with the transaction(s) for creating and funding your account.
+Here is an example:
+```
+  {
+    "hash": "0x92d52234640c364d484a2c833ea7b239759a5b71d44125ff16152c3c30727462",
+    "sender": "0xa550c18",
+    "sequence_number": "152",
+    "max_gas_amount": "1000000",
+    "gas_unit_price": "0",
+    "gas_currency_code": "XUS",
+    "expiration_timestamp_secs": "1646896796",
+    "payload": {
+      "type": "script_function_payload",
+      "function": "0x1::BasicScripts::mint",
+      "type_arguments": [],
+      "arguments": [
+        "0x25c62c0e0820f422000814cdba407835",
+        "1"
+      ]
+    },
+    "signature": {
+      "type": "ed25519_signature",
+      "public_key": "0xbf53669d37c17042a97b41faa58bef5ca4243f73d7536da4fb7f3565dac89c42",
+      "signature": "0x6f2234c01bc8e9495395b64bd639ff5a5dee74abcbda8b7230aa97d5076af4167092c40c46cccda070bf49fe3c9ca575a9619ba8cd0809542590892e24e1dc03"
+    }
+  }
+]
 ```
 
 You should retry the mint API call if the transaction execution fails.

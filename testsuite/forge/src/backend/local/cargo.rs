@@ -110,7 +110,9 @@ fn git_is_worktree_dirty() -> Result<bool> {
 pub fn git_get_upstream_remote() -> Result<String> {
     let output = Command::new("sh")
         .arg("-c")
-        .arg("git remote -v | grep \"https://github.com/aptos-labs/aptos-core.* (fetch)\" | cut -f1")
+        .arg(
+            "git remote -v | grep \"https://github.com/aptos-labs/aptos-core.* (fetch)\" | cut -f1",
+        )
         .output()
         .context("Failed to get upstream remote")?;
 
