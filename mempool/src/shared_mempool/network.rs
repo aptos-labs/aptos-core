@@ -413,7 +413,7 @@ impl MempoolNetworkInterface {
             // If the number of un-ACK'ed un-expired broadcasts reaches this threshold, we do not broadcast anymore
             // and wait until an ACK is received or a sent broadcast expires.
             // This helps rate-limit egress network bandwidth and not overload a remote peer or this
-            // node's Diem network sender.
+            // node's network sender.
             if pending_broadcasts >= self.mempool_config.max_broadcasts_per_peer {
                 return Err(BroadcastError::TooManyPendingBroadcasts(peer));
             }
