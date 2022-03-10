@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+
+# Copyright (c) The Aptos Foundation
+# SPDX-License-Identifier: Apache-2.0
+
+from nacl.signing import SigningKey
+import hashlib
+import requests
+import time
+from typing import Any, Dict, Optional, Sequence
+
+TESTNET_URL = "https://dev.fullnode.aptoslabs.com"
+FAUCET_URL = "https://faucet.fullnode.aptoslabs.com"
+
+
+"""
+install requirements first:
+pip3 install pynacl requests
+"""
+
+
+class Account:
+    """Represents an account as well as the private, public key-pair for the Aptos blockchain."""
+
+    def __init__(self) -> None:
+        self.signing_key = SigningKey.generate()
+
+    def address(self) -> str:
+        """Returns the address associated with the given account"""
+
+        return self.auth_key()[-32:]
+
+    def auth_key(self) -> str:
+        """Returns the auth_key for the associated account"""
+
+        hasher = hashlib.sha3_256()
+        hasher.update(self.signing_key.verify_key.encode() + b'\x00')
+        return hasher.hexdigest()
+
+    def pub_key(self) -> str:
+        """Returns the public key for the associated account"""
+
+        return self.signing_key.verify_key.encode().hex()
+
+
+class RestClient:
+    """A wrapper around the Aptos-core Rest API"""
+
+    def __init__(self, url: str) -> None:
+        self.url = url
+
+    def account(self, account_address: str) -> Dict[str, str]:
+        """Returns the sequence number and authentication key for an account"""
+
+        response = requests.get(f"{self.url}/accounts/{account_address}")
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    def account_resources(self, account_address: str) -> Dict[str, Any]:
+        """Returns all resources associated with the account"""
+
+        response = requests.get(f"{self.url}/accounts/{account_address}/resources")
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    def account_balance(self, account_address: str) -> Optional[int]:
+        """Returns the test coin balance associated with the account"""
+
+        resources = self.account_resources(account_address)
+        for resource in resources:
+            if resource["type"] == "0x1::TestCoin::Balance":
+                return int(resource["data"]["coin"]["value"])
+        return None
+
+    def transfer(self, account_from: Account, recipient: str, amount: int) -> (int, str):
+        """Transfer a given coin amount from a given Account to the recipient's account address.
+        Returns the sequence number of the transaction used to transfer."""
+
+        payload = {
+            "type": "script_function_payload",
+            "function": "0x1::BasicScripts::transfer",
+            "type_arguments": [],
+            "arguments": [
+                f"0x{recipient}",
+                str(amount),
+            ]
+        }
+        txn_request = self.generate_transaction(account_from.address(), payload)
+        signed_txn = self.sign_transaction(account_from, txn_request)
+        res = self.submit_transaction(signed_txn).json()
+        return int(signed_txn["sequence_number"]), str(res["hash"])
+
+    def generate_transaction(self, sender: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Generates a transaction request that can be submitted to produce a raw transaction that
+        can be signed, which upon being signed can be submitted to the blockchain. """
+
+        account_res = self.account(sender)
+        seq_num = int(account_res["sequence_number"])
+        txn_request = {
+            "sender": f"0x{sender}",
+            "sequence_number": str(seq_num),
+            "max_gas_amount": "1000000",
+            "gas_unit_price": "1",
+            "gas_currency_code": "XUS",
+            "expiration_timestamp_secs": str(int(time.time()) + 600),
+            "payload": payload,
+        }
+        return txn_request
+
+    def sign_transaction(self, account_from: Account, txn_request: Dict[str, Any]) -> Dict[str, Any]:
+        """Converts a transaction request produced by `generate_transaction` into a properly signed
+        transaction, which can then be submitted to the blockchain."""
+
+        res = requests.post(f"{self.url}/transactions/signing_message", json=txn_request)
+        assert res.status_code == 200, res.text
+        to_sign = bytes.fromhex(res.json()['message'][2:])
+        signature = account_from.signing_key.sign(to_sign).signature
+        txn_request["signature"] = {
+            "type": "ed25519_signature",
+            "public_key": f"0x{account_from.pub_key()}",
+            "signature": f"0x{signature.hex()}",
+        }
+        return txn_request
+
+    def submit_transaction(self, txn: Dict[str, Any]) -> requests.Response:
+        """Submits a signed transaction to the blockchain."""
+
+        headers = {'Content-Type': 'application/json'}
+        response = requests.post(f"{self.url}/transactions", headers=headers, json=txn)
+        assert response.status_code == 202, response.text
+        return response
+
+    def transaction_pending(self, txn_hash: str) -> bool:
+        response = requests.get(f"{self.url}/transactions/{txn_hash}")
+        if response.status_code == 404:
+            return True
+        assert response.status_code == 200, response.text
+        return response.json()["type"] == "pending_transaction"
+
+    def wait_for_transaction(self, txn_hash: str) -> None:
+        """Waits up to 10 seconds for a transaction to move past pending state."""
+
+        count = 0
+        while self.transaction_pending(txn_hash):
+            assert count < 10
+            time.sleep(1)
+            count += 1
+
+
+class FaucetClient:
+    """Faucet creates and funds accounts. This is a thin wrapper around that."""
+
+    def __init__(self, url: str) -> None:
+        self.url = url
+
+    def fund_account(self, pub_key: str, amount: int) -> None:
+        """This creates an account if it does not exist and mints the specified amount of
+        coins into that account."""
+
+        txns = requests.post(f"{self.url}/mint?amount={amount}&pub_key={pub_key}")
+        assert txns.status_code == 200, txns.text
+        for txn_hash in txns.json():
+            rest_client.wait_for_transaction(txn_hash)
+
+
+if __name__ == "__main__":
+    rest_client = RestClient(TESTNET_URL)
+    faucet_client = FaucetClient(FAUCET_URL)
+
+    # Create two accounts, Alice and Bob, and fund Alice but not Bob
+    alice = Account()
+    bob = Account()
+
+    print("\n=== Addresses ===")
+    print(f"Alice: {alice.address()}")
+    print(f"Bob: {bob.address()}")
+
+    faucet_client.fund_account(alice.pub_key(), 1_000_000_000)
+    faucet_client.fund_account(bob.pub_key(), 0)
+
+    print("\n=== Initial Balances ===")
+    print(f"Alice: {rest_client.account_balance(alice.address())}")
+    print(f"Bob: {rest_client.account_balance(bob.address())}")
+
+    # Have Alice give Bob 10 coins
+    seq_no, tx_hash = rest_client.transfer(alice, bob.address(), 1_000)
+    rest_client.wait_for_transaction(tx_hash)
+
+    print("\n=== Final Balances ===")
+    print(f"Alice: {rest_client.account_balance(alice.address())}")
+    print(f"Bob: {rest_client.account_balance(bob.address())}")
