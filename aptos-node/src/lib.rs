@@ -179,13 +179,13 @@ pub fn load_test_environment<R>(
     println!("Completed generating configuration:");
     println!("\tLog file: {:?}", log_file);
     println!("\tConfig path: {:?}", validators[0].config_path());
-    println!("\tDiem root key path: {:?}", aptos_root_key_path);
+    println!("\tAptos root key path: {:?}", aptos_root_key_path);
     println!("\tWaypoint: {}", genesis_waypoint);
     println!("\tChainId: {}", ChainId::test());
 
     print_api_config(&validators[0].config, lazy);
 
-    println!("Diem is running, press ctrl-c to exit");
+    println!("Aptos is running, press ctrl-c to exit");
     println!();
 
     start(&validators[0].config, Some(log_file))
@@ -216,9 +216,9 @@ fn fetch_chain_id(db: &DbReaderWriter) -> ChainId {
                 .fetch_synced_version()
                 .expect("[aptos-node] failed fetching synced version."),
         )
-        .expect("[aptos-node] failed to get Diem root address account state")
+        .expect("[aptos-node] failed to get Aptos root address account state")
         .0
-        .expect("[aptos-node] missing Diem root address account state");
+        .expect("[aptos-node] missing Aptos root address account state");
     AccountState::try_from(&blob)
         .expect("[aptos-node] failed to convert blob to account state")
         .get_chain_id_resource()
@@ -262,7 +262,7 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
         &db_rw,
     );
 
-    // Start the diem data client
+    // Start the data client
     let (aptos_data_client, aptos_data_client_runtime) = setup_aptos_data_client(
         node_config.state_sync.storage_service,
         node_config.state_sync.aptos_data_client,
@@ -337,7 +337,7 @@ fn setup_aptos_data_client(
         peer_metadata_storage,
     );
 
-    // Create the diem data client
+    // Create the data client
     let (aptos_data_client, data_summary_poller) = AptosNetDataClient::new(
         aptos_data_client_config,
         storage_service_config,
@@ -345,12 +345,12 @@ fn setup_aptos_data_client(
         network_client,
     );
 
-    // Create a new runtime for the diem data client and spawn the data poller
+    // Create a new runtime for the data client and spawn the data poller
     let aptos_data_client_runtime = Builder::new_multi_thread()
         .thread_name("aptos-data-client")
         .enable_all()
         .build()
-        .expect("Failed to create diem data client!");
+        .expect("Failed to create aptos data client!");
     aptos_data_client_runtime.spawn(data_summary_poller.start());
 
     (aptos_data_client, aptos_data_client_runtime)
