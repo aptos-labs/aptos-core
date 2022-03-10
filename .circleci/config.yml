@@ -3,6 +3,7 @@ version: 2.1
 orbs:
   aws-cli: circleci/aws-cli@2.1.0
   kubernetes: circleci/kubernetes@1.3.0
+  slack: circleci/slack@4.8.3
 
 jobs:
   build-benchmarks:
@@ -20,6 +21,9 @@ jobs:
       - dev-setup
       - run: cargo nextest --nextest-profile ci --package aptos-crypto --features='u32' --no-default-features
       - run: cargo nextest --nextest-profile ci --package aptos-crypto --features='u64' --no-default-features
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
   lint:
     docker:
       - image: cimg/base:2020.01
@@ -36,6 +40,9 @@ jobs:
       - run: cargo xclippy --workspace --all-targets
       - run: cargo fmt
       - run: cargo xfmt --check
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
   e2e-test:
     machine:
       image: ubuntu-2004:current
@@ -43,6 +50,9 @@ jobs:
     steps:
       - dev-setup
       - run: RUST_BACKTRACE=full cargo nextest --nextest-profile ci --partition hash:1/1 --test-threads 5 --package smoke-test
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
   unit-test:
     machine:
       image: ubuntu-2004:current
@@ -51,6 +61,9 @@ jobs:
       - dev-setup
       - run: cargo xtest --doc --unit --changed-since "origin/main"
       - run: cargo nextest --nextest-profile ci --partition hash:1/1 --unit --exclude backup-cli --changed-since "origin/main"
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
   docker-build-push:
     docker:
       - image: cimg/base:stable
@@ -71,6 +84,9 @@ jobs:
             else
               echo "Image tag $IMAGE_TAG already present. Skipping build..."
             fi
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
   forge-k8s:
     docker:
       - image: cimg/base:stable
@@ -95,7 +111,9 @@ jobs:
             -X POST -d "{\"body\": \"Forge run: ${CIRCLE_BUILD_URL}\"}" \
             "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/issues/${PR_NUMBER}/comments"
             exit 0
-
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
   # a dummy job so that we can require auto or canary branches
   require-bors:
     machine:
