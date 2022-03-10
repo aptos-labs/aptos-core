@@ -1,3 +1,4 @@
+// Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_sdk::move_types::gas_schedule::{GasAlgebra, GasConstants};

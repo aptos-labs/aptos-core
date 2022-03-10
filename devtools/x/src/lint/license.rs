@@ -3,10 +3,9 @@
 
 use anyhow::Context;
 use globset::{Glob, GlobSet, GlobSetBuilder};
-use std::collections::HashSet;
 use x_lint::prelude::*;
 
-static LICENSE_HEADER: &str = "\
+static LICENSE_HEADER: &str = "Copyright (c) The Aptos Foundation\n\
                                SPDX-License-Identifier: Apache-2.0\n\
                                ";
 
@@ -56,16 +55,12 @@ impl<'cfg> ContentLinter for LicenseHeader<'cfg> {
         // Determine if the file is missing the license header
         let missing_header = match file_type {
             FileType::Rust | FileType::Proto => {
-                let maybe_license: HashSet<_> = content
+                let maybe_license = content
                     .lines()
                     .skip_while(|line| line.is_empty())
                     .take(2)
-                    .map(|s| s.trim_start_matches("// "))
-                    .collect();
-                !LICENSE_HEADER
-                    .lines()
-                    .collect::<HashSet<_>>()
-                    .is_subset(&maybe_license)
+                    .map(|s| s.trim_start_matches("// "));
+                !LICENSE_HEADER.lines().eq(maybe_license)
             }
             FileType::Shell => {
                 let maybe_license = content
@@ -73,12 +68,8 @@ impl<'cfg> ContentLinter for LicenseHeader<'cfg> {
                     .skip_while(|line| line.starts_with("#!"))
                     .skip_while(|line| line.is_empty())
                     .take(2)
-                    .map(|s| s.trim_start_matches("# "))
-                    .collect();
-                !LICENSE_HEADER
-                    .lines()
-                    .collect::<HashSet<_>>()
-                    .is_subset(&maybe_license)
+                    .map(|s| s.trim_start_matches("# "));
+                !LICENSE_HEADER.lines().eq(maybe_license)
             }
         };
 
