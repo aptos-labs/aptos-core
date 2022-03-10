@@ -7,7 +7,7 @@ testcases = { path = "testsuite/testcases" }
 
 [cargo.sccache]
 bucket = "ci-artifacts.aptoslabs.com"
-prefix = "sccache/diem/"
+prefix = "sccache/aptos/"
 public = true
 region = "us-west-2"
 endpoint = "https://s3-us-west-2.amazonaws.com"
@@ -149,11 +149,11 @@ allow = [
 features = ["failpoints", "fuzzing"]
 
 # This is a list of test-only members. These are workspace members that do not form part of the main
-# Diem production codebase, and are only used to verify correctness and/or performance.
+# Aptos production codebase, and are only used to verify correctness and/or performance.
 #
 # *** IMPORTANT ***
 #
-# Published developer tools (e.g. Move compiler) ARE part of the production Diem codebase.
+# Published developer tools (e.g. Move compiler) ARE part of the production Aptos codebase.
 # They should be listed in the root Cargo.toml's default-members, not here!
 #
 # Before adding a new crate to this list, ensure that it is *actually* test-only. If not, add it
@@ -196,9 +196,9 @@ members = [
 
 [workspace.move-to-aptos-deps]
 # By default, all crates in the language directory are considered Move crates
-# and are forbidden from depending on any Diem crates.
+# and are forbidden from depending on any Aptos crates.
 #
-# Adding a crate's name to this list will mark it as a Diem crate so that the
+# Adding a crate's name to this list will mark it as a Aptos crate so that the
 # linter will not impose said restriction on it.
 #
 # Note: if your crate is indeed a Move crate and you are getting the linter
@@ -206,14 +206,14 @@ members = [
 # dependency, instead of adding the crate to this list and silencing the lint.
 aptos_crates_in_language = [
 ]
-# A special set of diem crates Move crates are allowed to depend on.
+# A special set of aptos crates Move crates are allowed to depend on.
 #
 # You should not add new entries to this list unless you have a rare justifiable
 # reason. (read: Just don't.)
 #
 # Particularly, please do not abuse this to silence the lint when it complains
-# about Move crates depending on Diem ones. Again, you should instead fix
-# the design of your crate so it doesn't have to depend on Diem.
+# about Move crates depending on Aptos ones. Again, you should instead fix
+# the design of your crate so it doesn't have to depend on Aptos.
 exclude = [
     "aptos-workspace-hack",
 ]
@@ -222,19 +222,19 @@ exclude = [
 # checking dependency summaries.
 
 [subsets.lsr]
-# The Diem safety rules TCB.
+# The Aptos safety rules TCB.
 root-members = [
     "safety-rules",
 ]
 
 [subsets.lec]
-# The Diem execution correctness TCB.
+# The Aptos execution correctness TCB.
 root-members = [
     "execution-correctness",
 ]
 
 [subsets.release]
-# The Diem release binaries
+# The Aptos release binaries
 root-members = [
     "backup-cli",
     "db-bootstrapper",
