@@ -48,7 +48,7 @@ const VAULT_TESTS: &[fn()] = &[
     test_vault_tokens,
 ];
 
-/// A test for verifying VaultStorage properly implements the DiemSecureStorage API and enforces
+/// A test for verifying VaultStorage properly implements the SecureStorage API and enforces
 /// strict separation between unique namespaces. This test depends on running Vault, which can be
 /// done by using the provided docker run script in `docker/vault/run.sh`
 #[test]
