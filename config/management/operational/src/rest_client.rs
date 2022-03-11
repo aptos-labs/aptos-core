@@ -61,7 +61,7 @@ impl RestClient {
     }
 
     /// This method returns all validator infos currently registered in the validator set of the
-    /// Diem blockchain. If account is specified, only a single validator info is returned: the
+    /// blockchain. If account is specified, only a single validator info is returned: the
     /// one that matches the given account.
     pub async fn validator_set(
         &self,

@@ -16,7 +16,7 @@ use aptos_crypto::PrivateKey;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// ConfigKey places a clonable wrapper around PrivateKeys for config purposes only. The only time
-/// configs have keys is either for testing or for low security requirements. Diem recommends that
+/// configs have keys is either for testing or for low security requirements. We recommend that
 /// keys be stored in key managers. If we make keys unclonable, then the configs must be mutable
 /// and that becomes a requirement strictly as a result of supporting test environments, which is
 /// undesirable. Hence this internal wrapper allows for keys to be clonable but only from configs.

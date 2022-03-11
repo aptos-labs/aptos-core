@@ -59,7 +59,7 @@ impl StorageHelper {
         storage
             .import_private_key(APTOS_ROOT_KEY, Ed25519PrivateKey::generate(&mut rng))
             .unwrap();
-        // TODO(davidiw) use distinct keys in tests for treasury and diem root keys
+        // TODO(davidiw) use distinct keys in tests for treasury and root keys
         let aptos_root_key = storage.export_private_key(APTOS_ROOT_KEY).unwrap();
         storage
             .import_private_key(TREASURY_COMPLIANCE_KEY, aptos_root_key)

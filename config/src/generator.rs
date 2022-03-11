@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Convenience structs and functions for generating a random set of Diem ndoes without the
+//! Convenience structs and functions for generating a random set of nodes without the
 //! genesis.blob.
 
 use crate::{
