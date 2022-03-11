@@ -42,7 +42,7 @@ use fail::fail_point;
 use move_binary_format::errors::VMResult;
 use move_core_types::{
     account_address::AccountAddress,
-    gas_schedule::GasAlgebra,
+    gas_schedule::{GasAlgebra, GasUnits},
     identifier::IdentStr,
     language_storage::ModuleId,
     resolver::MoveResolver,
@@ -516,6 +516,7 @@ impl AptosVM {
 
         let txn_data = TransactionMetadata {
             sender: account_config::reserved_vm_address(),
+            max_gas_amount: GasUnits::new(0),
             ..Default::default()
         };
         let mut gas_status = GasStatus::new_unmetered();
