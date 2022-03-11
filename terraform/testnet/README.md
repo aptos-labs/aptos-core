@@ -1,4 +1,4 @@
-Libra Testnet Deployment
+Aptos Testnet Deployment
 ========================
 
 This directory contains Terraform configs to deploy a self-contained Aptos
@@ -45,7 +45,7 @@ Creating a new deployment
 -------------------------
 
 1. Install dependencies:
-   * Terraform 1.0.0: https://www.terraform.io/downloads.html
+   * Terraform 1.1.0: https://www.terraform.io/downloads.html
    * kubectl: https://kubernetes.io/docs/tasks/tools/install-kubectl/
    * Vault: https://www.vaultproject.io/downloads
 
@@ -79,6 +79,6 @@ Creating a new deployment
 
        $ aws eks update-kubeconfig --name aptos-<workspace>
 
-[Helm chart]: ../../helm/validator
+[Helm chart]: ../helm/validator
 [AWS Terraform]: ../validator/aws/
 [vault-init Terraform]: ../validator/vault-init/
