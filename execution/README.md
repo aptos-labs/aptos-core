@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/executor/REA
 
 ## Overview
 
-The Diem Blockchain is a replicated state machine. Each validator is a replica
+The Aptos Blockchain is a replicated state machine. Each validator is a replica
 of the system. Starting from genesis state S<sub>0</sub>, each transaction
 T<sub>i</sub> updates previous state S<sub>i-1</sub> to S<sub>i</sub>. Each
 S<sub>i</sub> is a mapping from accounts (represented by 32-byte addresses) to
