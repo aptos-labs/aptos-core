@@ -2,7 +2,7 @@
 name = "aptos-management"
 version = "0.1.0"
 authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
-description = "Aptos Management is a tool used to manage the configuration of a Diem Node"
+description = "Aptos Management is a tool used to manage the configuration of a Node"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"

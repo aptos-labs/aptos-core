@@ -1,14 +1,14 @@
-# Diem Configuration
+# Aptos Configuration
 
-The Diem Configuration describes the operational details for a Diem Node
-(Validator or Full node) and provides the Diem Clients information on how to
+The configuration describes the operational details for a node
+(Validator or Full node) and provides the clients' information on how to
 connect to the blockchain and derive trust.
 
 Validators perform the BFT protocol and host the source of truth for the
 blockchain.
 
-Fullnodes offer replication services for the Diem blockchain as the primary
-entry point for Diem Clients to submit read requests (i.e., queries about the
+Fullnodes offer replication services for the blockchain as the primary
+entry point for clients to submit read requests (i.e., queries about the
 state of the blockchain). In turn, Validators focus on optimizing transaction
 throughput.
 
@@ -21,7 +21,7 @@ post](https://developers.aptoslabs.com/blog/2020/01/23/full-node-basics).
 
 ## Organization
 
-Diem Configuration is broken up into many utilities:
+Configuration is broken up into many utilities:
 - `src/config` hosts the core configuration file structure
 - `src/generator.rs` assists in building sets of configurations for a Validator
   or Fullnode set
@@ -40,7 +40,7 @@ configuration from many of the services.
 
 `config-builder` builds an entire configuration for a Validator or FullNode,
 including the genesis blob. It takes as one of its input parameters an index that
-specifies the specific node config to return. This can be used to create a Diem
+specifies the specific node config to return. This can be used to create an Aptos
 TestNet by constructing compatible configurations for the full set of Validators.
 Similarly the tool can be used to add Fullnodes to an existing network.  Finally,
 it enables generation of a mint/faucet client capable of performing mint
@@ -148,14 +148,14 @@ Similarly a public network could be added via:
 
 ## Internals
 
-There are several different configurations contained within Diem Configuration.
+There are several configurations contained within the configuration.
 
-### Diem Node Configuration
-The Diem Node configuration contains several modules:
+### Node Configuration
+The node configuration contains several modules:
 
-- AdmissionControlConfig - Where a Diem Node hosts their AC
+- AdmissionControlConfig - Where a node hosts their admission control
 - BaseConfig - Specifies the Node's role and base directories
-- ConsensusConfig - The behaviors of Consensus including the SafetyRules TCB
+- ConsensusConfig - The behaviors of Consensus including the SafetyRules trusted computing base
 - DebugInterface - A special gRPC service for identifying internals of the
   system
 - ExecutionConfig - The gRPC service endpoint and path to the genesis file
@@ -165,19 +165,19 @@ The Diem Node configuration contains several modules:
 - NetworkConfig - AptosNet configuration file that specifies peers with keys,
   seed addresses to connect to upstream peers, the local peers network keys,
 and other network configuration parameters
-- NodeConfig - Hosts all configuration files for a Diem Node
-- SafetyRulesConfig - Specifies the persistency strategy for Diem Safety
+- NodeConfig - Hosts all configuration files for a node
+- SafetyRulesConfig - Specifies the persistency strategy for Safety
   Rules
 - StateSyncConfig - Specifies parameters around state sycnhronization and the
   set of peers that provide the data
 - StorageConfig - Where the AptosDB is stored and its gRPC service endpoints
 
 ### External Component Configurations
-Outside of each Diem Node, external components can also be configured:
+Outside of each node, external components can also be configured:
 
 - KeyManagerConfig - This contains configurations details for starting and
 operating the Key Manager: the component service responsible for rotating
-cryptographic keys for Diem Nodes.
+cryptographic keys for nodes.
 
 ### Shared Configuration
 
@@ -194,8 +194,8 @@ Configuration tests serve several purposes:
 - Verifying that default filename assumptions are maintained
 
 Several of the defaults in the configurations, in particular paths and
-addresses, have dependencies outside the Diem code base. These tests serve as
-a reminder that there may be rammifications from breaking these tests, which
+addresses, have dependencies outside the codebase. These tests serve as
+a reminder that there may be ramifications from breaking these tests, which
 may impact production deployments.
 
 The test configs currently live in `src/config/test_data`.

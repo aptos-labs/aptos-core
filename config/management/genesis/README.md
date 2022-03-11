@@ -1,4 +1,4 @@
-# Aptos Config Manager
+# Aptos Genesis Tool
 
 The `aptos-genesis-tool` provides a tool for the genesis ceremony of the Aptos blockchain. The functionality of the tool is dictated by the organization of nodes within the system:
 
