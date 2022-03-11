@@ -22,15 +22,10 @@ impl AptosTest for GasCheck {
         let account2 = ctx.random_account();
         ctx.create_user_account(account2.public_key()).await?;
 
-        let transfer_txn = account1.sign_with_transaction_builder(
-            ctx.transaction_factory()
-                .payload(aptos_stdlib::encode_transfer_script_function(
-                    account2.address(),
-                    100,
-                ))
-                .gas_unit_price(1)
-                .max_gas_amount(1000),
-        );
+        let transfer_txn =
+            account1.sign_with_transaction_builder(ctx.aptos_transaction_factory().payload(
+                aptos_stdlib::encode_transfer_script_function(account2.address(), 100),
+            ));
         // fail due to not enough gas
         ctx.client()
             .submit_and_wait(&transfer_txn)
@@ -42,9 +37,9 @@ impl AptosTest for GasCheck {
         // succeed with enough gas
         ctx.client().submit_and_wait(&transfer_txn).await?;
 
-        // update the minimum required gas unit
+        // update to allow 0 gas unit price
         let gas_constant = GasConstants::default();
-        let txn_factory = ctx.transaction_factory();
+        let txn_factory = ctx.aptos_transaction_factory();
 
         let update_txn = ctx
             .root_account()
@@ -56,7 +51,7 @@ impl AptosTest for GasCheck {
                     gas_constant.large_transaction_cutoff.get(),
                     gas_constant.intrinsic_gas_per_byte.get(),
                     gas_constant.maximum_number_of_gas_units.get(),
-                    1, // updated value
+                    0, // updated value
                     gas_constant.max_price_per_gas_unit.get(),
                     gas_constant.max_transaction_size_in_bytes,
                     gas_constant.gas_unit_scaling_factor,
@@ -66,7 +61,7 @@ impl AptosTest for GasCheck {
         ctx.client().submit_and_wait(&update_txn).await?;
 
         let zero_gas_txn = account1.sign_with_transaction_builder(
-            ctx.transaction_factory()
+            ctx.aptos_transaction_factory()
                 .payload(aptos_stdlib::encode_transfer_script_function(
                     account2.address(),
                     100,
@@ -76,10 +71,7 @@ impl AptosTest for GasCheck {
         while ctx.client().get_ledger_information().await?.inner().epoch < 2 {
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
-        ctx.client()
-            .submit_and_wait(&zero_gas_txn)
-            .await
-            .unwrap_err();
+        ctx.client().submit_and_wait(&zero_gas_txn).await?;
         Ok(())
     }
 }

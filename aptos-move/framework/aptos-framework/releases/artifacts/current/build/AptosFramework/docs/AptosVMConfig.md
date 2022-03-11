@@ -37,7 +37,8 @@ Publishes the VM config.
     instruction_schedule: vector&lt;u8&gt;,
     native_schedule: vector&lt;u8&gt;,
 ) {
-    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/VMConfig.md#0x1_VMConfig_initialize">VMConfig::initialize</a>&lt;<a href="Marker.md#0x1_Marker_ChainMarker">Marker::ChainMarker</a>&gt;(account, instruction_schedule, native_schedule);
+    // require <b>min</b> price per gas unit &gt; 0
+    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/VMConfig.md#0x1_VMConfig_initialize">VMConfig::initialize</a>&lt;<a href="Marker.md#0x1_Marker_ChainMarker">Marker::ChainMarker</a>&gt;(account, instruction_schedule, native_schedule, 1);
 }
 </code></pre>
 

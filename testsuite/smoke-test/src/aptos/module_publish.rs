@@ -39,7 +39,7 @@ impl AptosTest for ModulePublish {
             .serialize(&mut blobs)
             .unwrap();
 
-        let txn_factory = ctx.transaction_factory();
+        let txn_factory = ctx.aptos_transaction_factory();
         let publish_txn = ctx
             .root_account()
             .sign_with_transaction_builder(txn_factory.payload(TransactionPayload::ModuleBundle(

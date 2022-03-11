@@ -82,6 +82,7 @@ module CoreFramework::VMConfig {
         account: &signer,
         instruction_schedule: vector<u8>,
         native_schedule: vector<u8>,
+        min_price_per_gas_unit: u64,
     ) {
         Timestamp::assert_genesis();
 
@@ -106,7 +107,7 @@ module CoreFramework::VMConfig {
             large_transaction_cutoff: 600,
             intrinsic_gas_per_byte: 8,
             maximum_number_of_gas_units: 4000000,
-            min_price_per_gas_unit: 0,
+            min_price_per_gas_unit,
             max_price_per_gas_unit: 10000,
             max_transaction_size_in_bytes: 4096,
             gas_unit_scaling_factor: 1000,

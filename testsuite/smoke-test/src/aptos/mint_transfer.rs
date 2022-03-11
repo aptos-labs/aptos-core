@@ -20,16 +20,16 @@ impl AptosTest for MintTransfer {
         let account2 = ctx.random_account();
         ctx.create_user_account(account2.public_key()).await?;
 
-        ctx.mint(account1.address(), 1000).await?;
+        ctx.mint(account1.address(), 10000).await?;
 
         let transfer_txn =
-            account1.sign_with_transaction_builder(ctx.transaction_factory().payload(
+            account1.sign_with_transaction_builder(ctx.aptos_transaction_factory().payload(
                 aptos_stdlib::encode_transfer_script_function(account2.address(), 400),
             ));
         ctx.client().submit_and_wait(&transfer_txn).await?;
 
         // test delegation
-        let txn_factory = ctx.transaction_factory();
+        let txn_factory = ctx.aptos_transaction_factory();
         let delegate_txn = ctx
             .root_account()
             .sign_with_transaction_builder(txn_factory.payload(

@@ -70,16 +70,22 @@ impl<'t> AptosContext<'t> {
         TransactionFactory::new(self.chain_id())
     }
 
+    pub fn aptos_transaction_factory(&self) -> TransactionFactory {
+        TransactionFactory::new(self.chain_id())
+            .with_gas_unit_price(1)
+            .with_max_gas_amount(1000)
+    }
+
     pub async fn create_user_account(&mut self, pubkey: &Ed25519PublicKey) -> Result<()> {
         let preimage = AuthenticationKeyPreimage::ed25519(pubkey);
         let auth_key = AuthenticationKey::from_preimage(&preimage);
         let create_account_txn = self.public_info.root_account.sign_with_transaction_builder(
-            self.transaction_factory().payload(
-                aptos_stdlib::encode_create_account_script_function(
+            self.transaction_factory()
+                .payload(aptos_stdlib::encode_create_account_script_function(
                     auth_key.derived_address(),
                     preimage.into_vec(),
-                ),
-            ),
+                ))
+                .gas_unit_price(1),
         );
         self.public_info
             .rest_client
@@ -91,7 +97,8 @@ impl<'t> AptosContext<'t> {
     pub async fn mint(&mut self, addr: AccountAddress, amount: u64) -> Result<()> {
         let mint_txn = self.public_info.root_account.sign_with_transaction_builder(
             self.transaction_factory()
-                .payload(aptos_stdlib::encode_mint_script_function(addr, amount)),
+                .payload(aptos_stdlib::encode_mint_script_function(addr, amount))
+                .gas_unit_price(1),
         );
         self.public_info
             .rest_client

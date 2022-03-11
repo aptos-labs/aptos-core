@@ -64,7 +64,7 @@ Publishes the VM config.
     instruction_schedule: vector&lt;u8&gt;,
     native_schedule: vector&lt;u8&gt;,
 ) {
-    <a href="../../../../../../../experimental/releases/artifacts/current/build/CoreFramework/docs/VMConfig.md#0x1_VMConfig_initialize">VMConfig::initialize</a>&lt;<a href="ExperimentalVMConfig.md#0x1_ExperimentalVMConfig">ExperimentalVMConfig</a>&gt;(account, instruction_schedule, native_schedule);
+    <a href="../../../../../../../experimental/releases/artifacts/current/build/CoreFramework/docs/VMConfig.md#0x1_VMConfig_initialize">VMConfig::initialize</a>&lt;<a href="ExperimentalVMConfig.md#0x1_ExperimentalVMConfig">ExperimentalVMConfig</a>&gt;(account, instruction_schedule, native_schedule, 0);
     <a href="../../../../../../../experimental/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_create">Capability::create</a>&lt;<a href="ExperimentalVMConfig.md#0x1_ExperimentalVMConfig">ExperimentalVMConfig</a>&gt;(account, &<a href="ExperimentalVMConfig.md#0x1_ExperimentalVMConfig">ExperimentalVMConfig</a> {});
 }
 </code></pre>

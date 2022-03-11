@@ -9,7 +9,8 @@ module AptosFramework::AptosVMConfig {
         instruction_schedule: vector<u8>,
         native_schedule: vector<u8>,
     ) {
-        VMConfig::initialize<Marker::ChainMarker>(account, instruction_schedule, native_schedule);
+        // require min price per gas unit > 0
+        VMConfig::initialize<Marker::ChainMarker>(account, instruction_schedule, native_schedule, 1);
     }
 
     public fun set_gas_constants(

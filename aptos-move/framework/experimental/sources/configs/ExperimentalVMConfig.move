@@ -10,7 +10,7 @@ module ExperimentalFramework::ExperimentalVMConfig {
         instruction_schedule: vector<u8>,
         native_schedule: vector<u8>,
     ) {
-        VMConfig::initialize<ExperimentalVMConfig>(account, instruction_schedule, native_schedule);
+        VMConfig::initialize<ExperimentalVMConfig>(account, instruction_schedule, native_schedule, 0);
         Capability::create<ExperimentalVMConfig>(account, &ExperimentalVMConfig {});
     }
 

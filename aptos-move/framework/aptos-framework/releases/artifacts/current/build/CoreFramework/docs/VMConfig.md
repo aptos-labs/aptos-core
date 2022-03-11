@@ -267,7 +267,7 @@ The provided gas constants were inconsistent.
 Initialize the table under the root account
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="VMConfig.md#0x1_VMConfig_initialize">initialize</a>&lt;T&gt;(account: &signer, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="VMConfig.md#0x1_VMConfig_initialize">initialize</a>&lt;T&gt;(account: &signer, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, min_price_per_gas_unit: u64)
 </code></pre>
 
 
@@ -280,6 +280,7 @@ Initialize the table under the root account
     account: &signer,
     instruction_schedule: vector&lt;u8&gt;,
     native_schedule: vector&lt;u8&gt;,
+    min_price_per_gas_unit: u64,
 ) {
     <a href="Timestamp.md#0x1_Timestamp_assert_genesis">Timestamp::assert_genesis</a>();
 
@@ -304,7 +305,7 @@ Initialize the table under the root account
         large_transaction_cutoff: 600,
         intrinsic_gas_per_byte: 8,
         maximum_number_of_gas_units: 4000000,
-        min_price_per_gas_unit: 0,
+        min_price_per_gas_unit,
         max_price_per_gas_unit: 10000,
         max_transaction_size_in_bytes: 4096,
         gas_unit_scaling_factor: 1000,
