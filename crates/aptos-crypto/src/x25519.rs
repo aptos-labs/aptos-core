@@ -3,7 +3,7 @@
 
 //! An abstraction of x25519 elliptic curve keys required for
 //! [Diffie-Hellman key exchange](https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange)
-//! in the Diem project.
+//!
 //! Ideally, only `x25519::PrivateKey` and `x25519::PublicKey` should be used throughout the
 //! codebase, until the bytes are actually used in cryptographic operations.
 //!
@@ -46,7 +46,7 @@ use proptest_derive::Arbitrary;
 // =========================
 //
 // We re-export the dalek-x25519 library,
-// This makes it easier to uniformalize build dalek-x25519 in diem-core.
+// This makes it easier to uniformalize build dalek-x25519.
 //
 
 pub use x25519_dalek;

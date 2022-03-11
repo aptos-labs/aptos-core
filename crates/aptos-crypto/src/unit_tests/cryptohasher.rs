@@ -5,7 +5,7 @@
 
 use crate as aptos_crypto;
 use crate::{
-    hash::{CryptoHash, CryptoHasher, DIEM_HASH_PREFIX},
+    hash::{CryptoHash, CryptoHasher, HASH_PREFIX},
     HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -41,7 +41,7 @@ impl CryptoHash for Bar {
 
 #[test]
 fn test_cryptohasher_name() {
-    let mut salt = DIEM_HASH_PREFIX.to_vec();
+    let mut salt = HASH_PREFIX.to_vec();
     salt.extend_from_slice(b"Foo");
 
     let value = Bar {};
@@ -58,7 +58,7 @@ fn test_cryptohasher_name() {
 
 #[test]
 fn test_bcs_cryptohash() {
-    let mut salt = DIEM_HASH_PREFIX.to_vec();
+    let mut salt = HASH_PREFIX.to_vec();
     salt.extend_from_slice(b"Foo");
 
     let value = Foo { a: 5, b: 1025 };
@@ -84,7 +84,7 @@ fn test_bcs_cryptohash_with_generics() {
 
 fn prefixed_sha3(input: &[u8]) -> [u8; 32] {
     let mut sha3 = ::tiny_keccak::Sha3::v256();
-    let salt: Vec<u8> = [DIEM_HASH_PREFIX, input].concat();
+    let salt: Vec<u8> = [HASH_PREFIX, input].concat();
     sha3.update(&salt);
     let mut output = [0u8; 32];
     sha3.finalize(&mut output);

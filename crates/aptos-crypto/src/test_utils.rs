@@ -145,7 +145,7 @@ impl ::core::clone::Clone for TestAptosCryptoHasher {
     }
 }
 #[cfg(any(test, feature = "fuzzing"))]
-static TEST_DIEM_CRYPTO_SEED: crate::_once_cell::sync::OnceCell<[u8; 32]> =
+static TEST_CRYPTO_SEED: crate::_once_cell::sync::OnceCell<[u8; 32]> =
     crate::_once_cell::sync::OnceCell::new();
 #[cfg(any(test, feature = "fuzzing"))]
 impl TestAptosCryptoHasher {
@@ -156,18 +156,18 @@ impl TestAptosCryptoHasher {
     }
 }
 #[cfg(any(test, feature = "fuzzing"))]
-static TEST_DIEM_CRYPTO_HASHER: crate::_once_cell::sync::Lazy<TestAptosCryptoHasher> =
+static TEST_CRYPTO_HASHER: crate::_once_cell::sync::Lazy<TestAptosCryptoHasher> =
     crate::_once_cell::sync::Lazy::new(TestAptosCryptoHasher::new);
 #[cfg(any(test, feature = "fuzzing"))]
 impl std::default::Default for TestAptosCryptoHasher {
     fn default() -> Self {
-        TEST_DIEM_CRYPTO_HASHER.clone()
+        TEST_CRYPTO_HASHER.clone()
     }
 }
 #[cfg(any(test, feature = "fuzzing"))]
 impl crate::hash::CryptoHasher for TestAptosCryptoHasher {
     fn seed() -> &'static [u8; 32] {
-        TEST_DIEM_CRYPTO_SEED.get_or_init(|| {
+        TEST_CRYPTO_SEED.get_or_init(|| {
             let name = crate::_serde_name::trace_name::<TestAptosCrypto>()
                 .expect("The `CryptoHasher` macro only applies to structs and enums.")
                 .as_bytes();

@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Noise is a [protocol framework](https://noiseprotocol.org/) which we use in Diem to
+//! Noise is a [protocol framework](https://noiseprotocol.org/) which we use to
 //! encrypt and authenticate communications between nodes of the network.
 //!
 //! This file implements a stripped-down version of Noise_IK_25519_AESGCM_SHA256.
