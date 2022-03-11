@@ -4,7 +4,7 @@
 //! Project and package linters that run queries on guppy.
 
 use crate::config::{
-    BannedDepsConfig, DirectDepDupsConfig, EnforcedAttributesConfig, MoveToDiemDepsConfig,
+    BannedDepsConfig, DirectDepDupsConfig, EnforcedAttributesConfig, MoveToAptosDepsConfig,
     OverlayConfig,
 };
 use guppy::{
@@ -590,25 +590,25 @@ impl PackageLinter for CratesInCratesDirectory {
     }
 }
 
-// Ensure that Move crates do not depend on Diem crates.
+// Ensure that Move crates do not depend on Aptos crates.
 #[derive(Debug)]
-pub struct MoveCratesDontDependOnDiemCrates<'cfg> {
-    config: &'cfg MoveToDiemDepsConfig,
+pub struct MoveCratesDontDependOnAptosCrates<'cfg> {
+    config: &'cfg MoveToAptosDepsConfig,
 }
 
-impl<'cfg> MoveCratesDontDependOnDiemCrates<'cfg> {
-    pub fn new(config: &'cfg MoveToDiemDepsConfig) -> Self {
+impl<'cfg> MoveCratesDontDependOnAptosCrates<'cfg> {
+    pub fn new(config: &'cfg MoveToAptosDepsConfig) -> Self {
         Self { config }
     }
 }
 
-impl<'cfg> Linter for MoveCratesDontDependOnDiemCrates<'cfg> {
+impl<'cfg> Linter for MoveCratesDontDependOnAptosCrates<'cfg> {
     fn name(&self) -> &'static str {
         "move-crates-dont-depend-on-aptos-crates"
     }
 }
 
-impl<'cfg> PackageLinter for MoveCratesDontDependOnDiemCrates<'cfg> {
+impl<'cfg> PackageLinter for MoveCratesDontDependOnAptosCrates<'cfg> {
     fn run<'l>(
         &self,
         ctx: &PackageContext<'l>,
@@ -619,10 +619,10 @@ impl<'cfg> PackageLinter for MoveCratesDontDependOnDiemCrates<'cfg> {
         let crate_name = metadata.name();
         let crate_path = metadata.source().to_string();
 
-        // Determine if a crate is considered a Move crate or Diem crate.
+        // Determine if a crate is considered a Move crate or Aptos crate.
         //
         // Current criteria:
-        //   1. All crates outside language are considered Diem crates.
+        //   1. All crates outside language are considered Aptos crates.
         //   2. All crates inside language are considered Move crates, unless marked otherwise.
         let is_move_crate = |crate_path: &str, crate_name: &str| {
             if crate_path.starts_with("language/") {
@@ -649,7 +649,7 @@ impl<'cfg> PackageLinter for MoveCratesDontDependOnDiemCrates<'cfg> {
                         format!(
                             "depending on non-move crate `{}`\n\
                                 Note: all crates in language/ are considered Move crates by default. \
-                                If you are creating a new Diem crate in language, you need to add its name to the \
+                                If you are creating a new Aptos crate in language, you need to add its name to the \
                                 aptos_crates_in_language list in x.toml to make the linter recognize it.",
                             dep_name
                         ),

@@ -35,11 +35,11 @@ pub fn sccache_should_run(cargo_config: &CargoConfig, warn_if_not_correct_locati
             if !correct_location && warn_if_not_correct_location {
                 warn!("You will not benefit from sccache in this build!!!");
                 warn!(
-                    "To get the best experience, please move your diem source code to {} and your set your CARGO_HOME to be {}, simply export it in your .profile or .bash_rc",
+                    "To get the best experience, please move your aptos source code to {} and your set your CARGO_HOME to be {}, simply export it in your .profile or .bash_rc",
                     &sccache_config.required_git_home, &sccache_config.required_cargo_home
                 );
                 warn!(
-                    "Current diem root is '{}',  and current CARGO_HOME is '{}'",
+                    "Current aptos root is '{}',  and current CARGO_HOME is '{}'",
                     project_root(),
                     var_os("CARGO_HOME").unwrap_or_default().to_string_lossy()
                 );

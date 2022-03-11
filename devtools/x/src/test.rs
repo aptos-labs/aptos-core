@@ -22,7 +22,7 @@ pub struct Args {
     #[structopt(flatten)]
     pub(crate) package_args: SelectedPackageArgs,
     #[structopt(long, short)]
-    /// Skip running expensive diem testsuite integration tests
+    /// Skip running expensive testsuite integration tests
     unit: bool,
     #[structopt(long)]
     /// Only run doctests
