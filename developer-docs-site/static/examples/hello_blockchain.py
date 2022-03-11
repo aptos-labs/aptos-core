@@ -8,12 +8,14 @@ import sys
 
 from first_transaction import Account, FaucetClient, RestClient
 
-TESTNET_URL = "http://127.0.0.1:8080"
-FAUCET_URL = "http://127.0.0.1:8081"
+TESTNET_URL = "https://dev.fullnode.aptoslabs.com"
+FAUCET_URL = "https://faucet.dev.aptoslabs.com"
 
 
 class HelloBlockchainClient(RestClient):
     def get_message(self, contract_address, account_address) -> str:
+        """ Retrieve the resource Message::MessageHolder::message """
+
         resources = self.account_resources(account_address)
         for resource in resources:
             if resource["type"] == f"0x{contract_address}::Message::MessageHolder":
@@ -35,6 +37,8 @@ class HelloBlockchainClient(RestClient):
         return str(res["hash"])
 
     def set_message(self, contract_address: str, account_from: Account, message: str) -> str:
+        """ Potentially initialize and set the resource Message::MessageHolder::message """
+
         payload = {
             "type": "script_function_payload",
             "function": f"0x{contract_address}::Message::set_message",

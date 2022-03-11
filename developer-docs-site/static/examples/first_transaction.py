@@ -10,7 +10,7 @@ import time
 from typing import Any, Dict, Optional, Sequence
 
 TESTNET_URL = "https://dev.fullnode.aptoslabs.com"
-FAUCET_URL = "https://faucet.fullnode.aptoslabs.com"
+FAUCET_URL = "https://faucet.dev.aptoslabs.com"
 
 
 """

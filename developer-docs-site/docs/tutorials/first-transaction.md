@@ -339,6 +339,6 @@ The data can be verified by visiting either a REST interface or the explorer:
 
 [account_basics]: /basics/basics-accounts
 [alice_account_rest]: https://dev.fullnode.aptoslabs.com/accounts/e26d69b8d3ff12874358da6a4082a2ac/resources
-[bob_account_explorer]: https://aptos-explorer.netlify.app/account/c8585f009c8a90f22c6b603f28b9ed8c
+[bob_account_explorer]: https://explorer.devnet.aptos.dev/account/c8585f009c8a90f22c6b603f28b9ed8c
 [rest_spec]: https://dev.fullnode.aptoslabs.com/spec.html
 [python_download]: /examples/first_transaction.py
