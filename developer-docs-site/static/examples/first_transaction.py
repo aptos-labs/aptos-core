@@ -22,8 +22,11 @@ pip3 install pynacl requests
 class Account:
     """Represents an account as well as the private, public key-pair for the Aptos blockchain."""
 
-    def __init__(self) -> None:
-        self.signing_key = SigningKey.generate()
+    def __init__(self, signing_key = None) -> None:
+        if signing_key is None:
+            self.signing_key = SigningKey.generate()
+        else:
+            self.signing_key = SigningKey(signing_key)
 
     def address(self) -> str:
         """Returns the address associated with the given account"""
@@ -99,8 +102,8 @@ class RestClient:
         txn_request = {
             "sender": f"0x{sender}",
             "sequence_number": str(seq_num),
-            "max_gas_amount": "1000000",
-            "gas_unit_price": "1",
+            "max_gas_amount": "2000000",
+            "gas_unit_price": "2",
             "gas_currency_code": "XUS",
             "expiration_timestamp_secs": str(int(time.time()) + 600),
             "payload": payload,
@@ -150,8 +153,9 @@ class RestClient:
 class FaucetClient:
     """Faucet creates and funds accounts. This is a thin wrapper around that."""
 
-    def __init__(self, url: str) -> None:
+    def __init__(self, url: str, rest_client: RestClient) -> None:
         self.url = url
+        self.rest_client = rest_client
 
     def fund_account(self, pub_key: str, amount: int) -> None:
         """This creates an account if it does not exist and mints the specified amount of
@@ -160,12 +164,12 @@ class FaucetClient:
         txns = requests.post(f"{self.url}/mint?amount={amount}&pub_key={pub_key}")
         assert txns.status_code == 200, txns.text
         for txn_hash in txns.json():
-            rest_client.wait_for_transaction(txn_hash)
+            self.rest_client.wait_for_transaction(txn_hash)
 
 
 if __name__ == "__main__":
     rest_client = RestClient(TESTNET_URL)
-    faucet_client = FaucetClient(FAUCET_URL)
+    faucet_client = FaucetClient(FAUCET_URL, rest_client)
 
     # Create two accounts, Alice and Bob, and fund Alice but not Bob
     alice = Account()
@@ -175,7 +179,7 @@ if __name__ == "__main__":
     print(f"Alice: {alice.address()}")
     print(f"Bob: {bob.address()}")
 
-    faucet_client.fund_account(alice.pub_key(), 1_000_000_000)
+    faucet_client.fund_account(alice.pub_key(), 1_000_000)
     faucet_client.fund_account(bob.pub_key(), 0)
 
     print("\n=== Initial Balances ===")
