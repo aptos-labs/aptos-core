@@ -268,7 +268,7 @@ impl NetworkTask {
                             response_sender: callback,
                         };
                         if let Err(e) = self.block_retrieval_tx.push(peer_id, req_with_callback) {
-                            warn!(error = ?e, "diem channel closed");
+                            warn!(error = ?e, "aptos channel closed");
                         }
                     }
                     _ => {

@@ -5,7 +5,7 @@
 
 //! Consensus for the Aptos Core blockchain
 //!
-//! The consensus protocol implemented is DiemBFT (based on
+//! The consensus protocol implemented is AptosBFT (based on
 //! [HotStuff](https://arxiv.org/pdf/1803.05069.pdf)).
 
 #![cfg_attr(not(feature = "fuzzing"), deny(missing_docs))]
@@ -36,7 +36,7 @@ mod twins;
 mod txn_manager;
 mod util;
 
-/// DiemBFT implementation
+/// AptosBFT implementation
 pub mod consensus_provider;
 /// AptosNet interface.
 pub mod network_interface;

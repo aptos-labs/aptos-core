@@ -119,7 +119,7 @@ pub struct MaybeSignedVoteProposal {
     /// The vote proposal to be signed.
     pub vote_proposal: VoteProposal,
 
-    /// The signature of this proposal's hash from Diem Execution Correctness service. It is
+    /// The signature of this proposal's hash from the Execution Correctness service. It is
     /// an `Option` because the LEC can be configured to not sign the vote hash.
     pub signature: Option<Ed25519Signature>,
 }
