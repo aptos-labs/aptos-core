@@ -20,7 +20,7 @@ impl<T> Mutex<T> {
     pub fn lock(&self) -> MutexGuard<'_, T> {
         self.0
             .lock()
-            .expect("diem cannot currently handle a poisoned lock")
+            .expect("Cannot currently handle a poisoned lock")
     }
 }
 
@@ -31,7 +31,7 @@ mod tests {
     use std::{sync::Arc, thread};
 
     #[test]
-    fn test_diem_mutex() {
+    fn test_mutex() {
         let a = 7u8;
         let mutex = Arc::new(Mutex::new(a));
         let mutex2 = mutex.clone();

@@ -20,21 +20,21 @@ impl<T> RwLock<T> {
     pub fn read(&self) -> RwLockReadGuard<'_, T> {
         self.0
             .read()
-            .expect("diem cannot currently handle a poisoned lock")
+            .expect("Cannot currently handle a poisoned lock")
     }
 
     /// lock the rwlock in write mode
     pub fn write(&self) -> RwLockWriteGuard<'_, T> {
         self.0
             .write()
-            .expect("diem cannot currently handle a poisoned lock")
+            .expect("Cannot currently handle a poisoned lock")
     }
 
     /// return the owned type consuming the lock
     pub fn into_inner(self) -> T {
         self.0
             .into_inner()
-            .expect("diem cannot currently handle a poisoned lock")
+            .expect("Cannot currently handle a poisoned lock")
     }
 }
 
