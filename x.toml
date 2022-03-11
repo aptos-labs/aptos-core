@@ -267,7 +267,7 @@ mark-changed = []
 
 [[determinator.path-rule]]
 # A bunch of images that should be ignored, I guess.
-globs = ["diem.png", ".assets/diem.png", ".assets/aptos.png", "storage/data.png"]
+globs = ["diem.png", ".assets/aptos_banner.png", ".assets/aptos.png", "storage/data.png"]
 mark-changed = []
 
 [[determinator.path-rule]]
