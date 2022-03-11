@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! The following document is a minimalist version of Diem Wallet. Note that this Wallet does
+//! The following document is a minimalist version of Aptos Wallet. Note that this Wallet does
 //! not promote security as the mnemonic is stored in unencrypted form. In future iterations,
 //! we will be releasing more robust Wallet implementations. It is our intention to present a
 //! foundation that is simple to understand and incrementally improve the AptosWallet
@@ -155,7 +155,7 @@ impl WalletLibrary {
         Ok(ret)
     }
 
-    /// Simple public function that allows to sign a Diem RawTransaction with the PrivateKey
+    /// Simple public function that allows to sign a Aptos RawTransaction with the PrivateKey
     /// associated to a particular AccountAddress. If the PrivateKey associated to an
     /// AccountAddress is not contained in the addr_map, then this function will return an Error
     pub fn sign_txn(&self, txn: RawTransaction) -> Result<SignedTransaction> {

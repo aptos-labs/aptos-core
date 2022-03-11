@@ -4,7 +4,7 @@
 //! The following is a minimalist version of a hierarchical key derivation library for the
 //! AptosWallet.
 //!
-//! Note that the Diem Blockchain makes use of ed25519 Edwards Digital Signature Algorithm
+//! Note that the blockchain makes use of ed25519 Edwards Digital Signature Algorithm
 //! (EdDSA) and therefore, BIP32 Public Key derivation is not available without falling back to
 //! a non-deterministic Schnorr signature scheme. As AptosWallet is meant to be a minimalist
 //! reference implementation of a simple wallet, the following does not deviate from the
@@ -114,10 +114,10 @@ impl ExtendedPrivKey {
         AuthenticationKey::ed25519(&self.get_public())
     }
 
-    /// Diem specific sign function that is capable of signing an arbitrary
+    /// Sign function that is capable of signing an arbitrary
     /// Serializable value.
     ///
-    /// NOTE: In Diem, we do not sign the raw bytes of a transaction, but
+    /// NOTE: We do not sign the raw bytes of a transaction, but
     /// those raw bytes prefixed by a domain separation hash.
     /// Informally signed_bytes = sha3(domain_separator) || bcs_serialization_bytes
     ///
@@ -158,7 +158,7 @@ impl KeyFactory {
     ///
     /// Note that the function below  adheres to [HKDF RFC 5869](https://tools.ietf.org/html/rfc5869).
     pub fn private_child(&self, child: ChildNumber) -> Result<ExtendedPrivKey> {
-        // application info in the HKDF context is defined as Diem derived key$child_number.
+        // application info in the HKDF context is defined as a derived key$child_number.
         let mut le_n = [0u8; 8];
         LittleEndian::write_u64(&mut le_n, child.0);
         let mut info = KeyFactory::INFO_PREFIX.to_vec();
