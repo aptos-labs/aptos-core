@@ -32,7 +32,7 @@ impl Writer for VecWriter {
 
 #[test]
 fn verify_tracing_kvs() {
-    // set up the diem logger
+    // set up the logger
     let writer = VecWriter::default();
     let logs = writer.logs.clone();
     AptosData::builder()

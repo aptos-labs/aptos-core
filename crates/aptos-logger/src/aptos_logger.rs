@@ -254,7 +254,7 @@ impl AptosDataBuilder {
                 filter_builder.build()
             };
 
-            DiemFilter {
+            FilterPair {
                 local_filter,
                 remote_filter,
             }
@@ -292,14 +292,14 @@ impl AptosDataBuilder {
 }
 
 /// A combination of `Filter`s to control where logs are written
-struct DiemFilter {
+struct FilterPair {
     /// The local printer `Filter` to control what is logged in text output
     local_filter: Filter,
     /// The remote logging `Filter` to control what is sent to external logging
     remote_filter: Filter,
 }
 
-impl DiemFilter {
+impl FilterPair {
     fn enabled(&self, metadata: &Metadata) -> bool {
         self.local_filter.enabled(metadata) || self.remote_filter.enabled(metadata)
     }
@@ -308,7 +308,7 @@ impl DiemFilter {
 pub struct AptosData {
     sender: Option<SyncSender<LoggerServiceEvent>>,
     printer: Option<Box<dyn Writer>>,
-    filter: RwLock<DiemFilter>,
+    filter: RwLock<FilterPair>,
     pub(crate) formatter: fn(&LogEntry) -> Result<String, fmt::Error>,
 }
 

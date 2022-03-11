@@ -1,7 +1,7 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! This crates provides an API for logging in diem.
+//! This crates provides an API for logging.
 //! # Instrumenting with Logs
 //! ## Basic instrumenting with Logs
 //!
