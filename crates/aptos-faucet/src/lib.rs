@@ -52,7 +52,7 @@ pub struct Service {
     transaction_factory: TransactionFactory,
     client: Client,
     endpoint: String,
-    fixed_amount: Option<u64>,
+    maximum_amount: Option<u64>,
 }
 
 impl Service {
@@ -60,7 +60,7 @@ impl Service {
         endpoint: String,
         chain_id: ChainId,
         faucet_account: LocalAccount,
-        fixed_amount: Option<u64>,
+        maximum_amount: Option<u64>,
     ) -> Self {
         let client = Client::new(Url::parse(&endpoint).expect("Invalid rest endpoint"));
         Service {
@@ -69,7 +69,7 @@ impl Service {
                 .with_transaction_expiration_time(30),
             client,
             endpoint,
-            fixed_amount,
+            maximum_amount,
         }
     }
 
@@ -241,20 +241,11 @@ async fn fund_account(
     address: AccountAddress,
     params: FundAccountParams,
 ) -> Result<SignedTransaction> {
-    if service.fixed_amount.is_some() && params.amount.is_some() {
-        return Err(anyhow::format_err!(
-            "Mint amount is fixed to {} on this faucet",
-            service.fixed_amount.unwrap()
-        ));
-    }
-
-    if service.fixed_amount.is_none() && params.amount.is_none() {
-        return Err(anyhow::format_err!("Mint amount must be provided"));
-    }
-
-    let amount = service
-        .fixed_amount
-        .unwrap_or_else(|| params.amount.unwrap());
+    let asked_amount = params
+        .amount
+        .ok_or_else(|| anyhow::format_err!("Mint amount must be provided"))?;
+    let service_amount = service.maximum_amount.unwrap_or(asked_amount);
+    let amount = std::cmp::min(asked_amount, service_amount);
 
     // Check to ensure the account has already been created
     if service.client.get_account(address).await.is_err() {

@@ -42,11 +42,9 @@ struct Args {
     /// Note: Chain ID of 0 is not allowed; Use number if chain id is not predefined.
     #[structopt(short = "c", long, default_value = "2")]
     pub chain_id: ChainId,
-    /// Fixed amount of coins to mint.
-    /// If this is unset, users can specify the amount to mint.
-    /// For Aptos public testnets, this is always set.
-    #[structopt(short = "f", long)]
-    pub fixed_amount: Option<u64>,
+    /// Maximum amount of coins to mint.
+    #[structopt(long)]
+    pub maximum_amount: Option<u64>,
 }
 
 #[tokio::main]
@@ -62,7 +60,7 @@ async fn main() {
         "[faucet]: chain id: {}, server url: {} . Limit: {:?}",
         args.chain_id,
         args.server_url.as_str(),
-        args.fixed_amount,
+        args.maximum_amount,
     );
 
     let key = generate_key::load_key(&args.mint_key_file_path);
@@ -74,7 +72,7 @@ async fn main() {
         args.server_url,
         args.chain_id,
         faucet_account,
-        args.fixed_amount,
+        args.maximum_amount,
     ));
 
     info!(
@@ -137,7 +135,7 @@ mod tests {
         }
     }
 
-    fn setup(fixed_amount: Option<u64>) -> (AccountStates, Arc<Service>) {
+    fn setup(maximum_amount: Option<u64>) -> (AccountStates, Arc<Service>) {
         let f = tempfile::NamedTempFile::new()
             .unwrap()
             .into_temp_path()
@@ -179,7 +177,7 @@ mod tests {
             format!("http://localhost:{}/", address.port()),
             chain_id,
             faucet_account,
-            fixed_amount,
+            maximum_amount,
         );
         (accounts, Arc::new(service))
     }
@@ -361,20 +359,6 @@ mod tests {
 
         assert_eq!(resp.status(), 200);
         assert_eq!(resp.body(), 0.to_string().as_str());
-    }
-
-    #[tokio::test]
-    async fn test_mint_send_amount_when_not_allowed() {
-        let (_accounts, service) = setup(Some(7));
-        let filter = routes(service);
-
-        let pub_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
-        let resp = warp::test::request()
-            .method("POST")
-            .path(format!("/mint?pub_key={}&amount=1000000", pub_key).as_str())
-            .reply(&filter)
-            .await;
-        assert_eq!(resp.body(), "Mint amount is fixed to 7 on this faucet");
     }
 
     #[tokio::test]

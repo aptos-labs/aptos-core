@@ -88,20 +88,11 @@ impl MintParams {
 }
 
 async fn process(service: &Service, params: MintParams) -> Result<Response> {
-    if service.fixed_amount.is_some() && params.amount.is_some() {
-        return Err(anyhow::format_err!(
-            "Mint amount is fixed to {} on this faucet",
-            service.fixed_amount.unwrap()
-        ));
-    }
-
-    if service.fixed_amount.is_none() && params.amount.is_none() {
-        return Err(anyhow::format_err!("Mint amount must be provided"));
-    }
-
-    let amount = service
-        .fixed_amount
-        .unwrap_or_else(|| params.amount.unwrap());
+    let asked_amount = params
+        .amount
+        .ok_or_else(|| anyhow::format_err!("Mint amount must be provided"))?;
+    let service_amount = service.maximum_amount.unwrap_or(asked_amount);
+    let amount = std::cmp::min(asked_amount, service_amount);
 
     let (faucet_seq, receiver_seq) = sequences(service, params.receiver()).await?;
 
