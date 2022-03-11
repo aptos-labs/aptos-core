@@ -55,6 +55,11 @@ jobs:
     docker:
       - image: cimg/base:stable
     resource_class: medium
+    parameters:
+      addl_tag:
+        description: Additional image tag
+        type: string
+        default: latest
     steps:
       - checkout
       - aws-setup
@@ -67,7 +72,7 @@ jobs:
             ret=$?
             if [ $ret -ne 0 ]; then
               echo "Image tag $IMAGE_TAG not present. Starting build..."
-              ./docker/build-aws.sh --build-all --version $(git rev-parse --short=8 HEAD) --addl_tags latest
+              ./docker/build-aws.sh --build-all --version $(git rev-parse --short=8 HEAD) --addl_tags "<<parameters.addl_tag>>"
             else
               echo "Image tag $IMAGE_TAG already present. Skipping build..."
             fi
@@ -142,6 +147,19 @@ workflows:
           context: aws-dev
           requires:
             - docker-build-push
+  ### Automated workflows
+  continuous-push:
+    triggers:
+      - schedule:
+          cron: "15 0,4,8,12,16,20 * * *"
+          filters:
+            branches:
+              only:
+                - main
+    jobs:
+      - docker-build-push:
+          context: aws-dev
+          addl_tag: main
 commands:
   dev-setup:
     steps:
