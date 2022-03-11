@@ -304,7 +304,7 @@ impl RecoveryData {
     }
 }
 
-/// The proxy we use to persist data in diem db storage service via grpc.
+/// The proxy we use to persist data in db storage service via grpc.
 pub struct StorageWriteProxy {
     db: Arc<ConsensusDB>,
     aptos_db: Arc<dyn DbReader>,

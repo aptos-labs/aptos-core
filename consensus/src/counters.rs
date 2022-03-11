@@ -83,7 +83,7 @@ pub static VOTE_NIL_COUNT: Lazy<IntCounter> = Lazy::new(|| {
 /// Committed proposals from this validator when using LeaderReputation as the ProposerElection
 pub static COMMITTED_PROPOSALS_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "diem_committed_proposals_in_window",
+        "aptos_committed_proposals_in_window",
         "Total number of this validator's committed proposals in the current reputation window"
     )
     .unwrap()
@@ -92,7 +92,7 @@ pub static COMMITTED_PROPOSALS_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
 /// Committed votes from this validator when using LeaderReputation as the ProposerElection
 pub static COMMITTED_VOTES_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "diem_committed_votes_in_window",
+        "aptos_committed_votes_in_window",
         "Total number of this validator's committed votes in the current reputation window"
     )
     .unwrap()
@@ -193,7 +193,7 @@ pub static NUM_BLOCKS_IN_TREE: Lazy<IntGauge> = Lazy::new(|| {
 // pub static UNWRAPPED_PROPOSAL_SIZE_BYTES: Lazy<Histogram> = Lazy::new(|| {
 //     register_histogram!(
 //         "aptos_consensus_unwrapped_proposal_size_bytes",
-//         "Histogram of proposal size after BCS but before wrapping with GRPC and diem net."
+//         "Histogram of proposal size after BCS but before wrapping with GRPC and aptos net."
 //     )
 //     .unwrap()
 // });
