@@ -131,8 +131,8 @@ pub struct WorkspaceConfig {
     pub test_only: TestOnlyConfig,
     /// Exceptions to whitespace linters
     pub whitespace_exceptions: Vec<String>,
-    /// Move to Diem dependencies
-    pub move_to_aptos_deps: MoveToDiemDepsConfig,
+    /// Move to Aptos dependencies
+    pub move_to_aptos_deps: MoveToAptosDepsConfig,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -160,7 +160,7 @@ pub struct DirectDepDupsConfig {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct MoveToDiemDepsConfig {
+pub struct MoveToAptosDepsConfig {
     pub aptos_crates_in_language: HashSet<String>,
     pub exclude: HashSet<String>,
 }
