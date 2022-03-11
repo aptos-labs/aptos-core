@@ -22,14 +22,16 @@ const config = {
       /** @type {import('@docusaurus/preset-classic').Options} */
       ({
         docs: {
-          routeBasePath: '/',
-          sidebarPath: require.resolve('./sidebars.js'),
-          // TODO: Please change this to your repo.
-          editUrl: 'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
+          routeBasePath: "/",
+          sidebarPath: require.resolve("./sidebars.js"),
+          editUrl: "https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/",
         },
         blog: false,
         theme: {
-          customCss: require.resolve('./src/css/custom.css'),
+          customCss: require.resolve("./src/css/custom.css"),
+        },
+        gtag: {
+          trackingID: "G-HVB7QFB9PQ",
         },
       }),
     ],
@@ -47,7 +49,7 @@ const config = {
         },
         items: [
           {
-            href: 'TODO: https://github.com/facebook/docusaurus',
+            href: 'https://github.com/aptos-labs/aptos-core/',
             label: 'GitHub',
             position: 'right',
           },
