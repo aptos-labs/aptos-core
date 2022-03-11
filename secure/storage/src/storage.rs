@@ -8,7 +8,7 @@ use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signatur
 use enum_dispatch::enum_dispatch;
 use serde::{de::DeserializeOwned, Serialize};
 
-/// This is the Diem interface into secure storage. Any storage engine implementing this trait
+/// This is the interface into secure storage. Any storage engine implementing this trait
 /// should support both key/value operations (e.g., get, set and create) and cryptographic key
 /// operations (e.g., generate_key, sign and rotate_key).
 
