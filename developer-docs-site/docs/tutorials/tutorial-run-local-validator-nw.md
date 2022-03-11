@@ -1,6 +1,7 @@
 ---
 title: "Run a local test validator network"
 slug: "tutorial-run-local-validator-nw"
+sidebar_position: 9
 ---
 import BlockQuote from "@site/src/components/BlockQuote";
 

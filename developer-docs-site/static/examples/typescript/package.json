@@ -1,0 +1,18 @@
+{
+  "name": "tsdemo",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "first": "node --loader ts-node/esm first_transaction.ts",
+    "hello_blockchain": "node --loader ts-node/esm hello_blockchain.ts"
+  },
+  "keywords": [],
+  "dependencies": {
+    "@types/node": "^17.0.21",
+    "cross-fetch": "^3.1.5",
+    "js-sha3": "^0.8.0",
+    "ts-node": "^10.7.0",
+    "tweetnacl": "^1.0.3",
+    "typescript": "^4.6.2"
+  }
+}

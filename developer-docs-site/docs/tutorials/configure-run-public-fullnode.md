@@ -1,6 +1,7 @@
 ---
 title: "Configure and run a public FullNode"
 slug: "configure-run-public-fullnode"
+sidebar_position: 10
 ---
 You can run [FullNodes](/basics/basics-fullnodes) to verify the state and synchronize to the Aptos Blockchain. FullNodes can be run by anyone. FullNodes replicate the full state of the blockchain by querying each other, or by querying the validators directly.
 
