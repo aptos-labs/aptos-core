@@ -68,13 +68,20 @@ jobs:
           name: Build or skip
           shell: /bin/bash
           command: |
-            aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG
-            ret=$?
-            if [ $ret -ne 0 ]; then
-              echo "Image tag $IMAGE_TAG not present. Starting build..."
+            MANIFEST=$(aws ecr batch-get-image --repository-name aptos/validator --image-ids imageTag=$IMAGE_TAG --query 'images[].imageManifest' --output text)
+            echo $MANIFEST
+            if [ -z "$MANIFEST" ]; then
+              echo "Image tag $IMAGE_TAG not present. Starting build all..."
               ./docker/build-aws.sh --build-all --version $(git rev-parse --short=8 HEAD) --addl_tags "<<parameters.addl_tag>>"
             else
               echo "Image tag $IMAGE_TAG already present. Skipping build..."
+              echo "Continue retagging to <<parameters.addl_tag>>"
+              imgs=( validator forge init validator_tcb tools faucet )
+              for img in "${imgs[@]}"
+              do
+                MANIFEST=$(aws ecr batch-get-image --repository-name aptos/${img} --image-ids imageTag=$IMAGE_TAG --query 'images[].imageManifest' --output text)
+                aws ecr put-image --repository-name aptos/${img} --image-tag main --image-manifest $MANIFEST
+              done
             fi
   forge-k8s:
     docker:
