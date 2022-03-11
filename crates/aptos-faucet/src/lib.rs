@@ -66,6 +66,7 @@ impl Service {
         Service {
             faucet_account: Mutex::new(faucet_account),
             transaction_factory: TransactionFactory::new(chain_id)
+                .with_gas_unit_price(1)
                 .with_transaction_expiration_time(30),
             client,
             endpoint,
