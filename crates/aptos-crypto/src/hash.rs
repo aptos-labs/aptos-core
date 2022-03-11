@@ -3,7 +3,6 @@
 
 //! This module defines traits and implementations of
 //! [cryptographic hash functions](https://en.wikipedia.org/wiki/Cryptographic_hash_function)
-//! for the Diem project.
 //!
 //! It is designed to help authors protect against two types of real world attacks:
 //!
@@ -21,9 +20,9 @@
 //!    same input to the hash function and therefore the same hash. This
 //!    creates a collision.
 //!
-//! Regarding (1), this library makes it easy for Diem developers to create as
+//! Regarding (1), this library makes it easy for developers to create as
 //! many new "hashable" Rust types as needed so that each Rust type hashed and signed
-//! in Diem has a unique meaning, that is, unambiguously captures the intent of a signer.
+//! has a unique meaning, that is, unambiguously captures the intent of a signer.
 //!
 //! Regarding (2), this library provides the `CryptoHasher` abstraction to easily manage
 //! cryptographic seeds for hashing. Hashing seeds aim to ensure that
@@ -115,10 +114,10 @@ use std::{
 };
 use tiny_keccak::{Hasher, Sha3};
 
-/// A prefix used to begin the salt of every diem hashable structure. The salt
+/// A prefix used to begin the salt of every hashable structure. The salt
 /// consists in this global prefix, concatenated with the specified
 /// serialization name of the struct.
-pub(crate) const DIEM_HASH_PREFIX: &[u8] = b"DIEM::";
+pub(crate) const HASH_PREFIX: &[u8] = b"DIEM::";
 
 /// Output value of our hash function. Intentionally opaque for safety and modularity.
 #[derive(Clone, Copy, Eq, Hash, PartialEq, PartialOrd, Ord)]
@@ -507,7 +506,7 @@ impl DefaultHasher {
     pub fn prefixed_hash(buffer: &[u8]) -> [u8; HashValue::LENGTH] {
         // The salt is initial material we prefix to actual value bytes for
         // domain separation. Its length is variable.
-        let salt: Vec<u8> = [DIEM_HASH_PREFIX, buffer].concat();
+        let salt: Vec<u8> = [HASH_PREFIX, buffer].concat();
         // The seed is a fixed-length hash of the salt, thereby preventing
         // suffix attacks on the domain separation bytes.
         HashValue::sha3_256_of(&salt[..]).hash

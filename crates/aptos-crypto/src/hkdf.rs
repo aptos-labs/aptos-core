@@ -1,8 +1,8 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! An implementation of HKDF, the HMAC-based Extract-and-Expand Key Derivation Function for the
-//! Diem project based on [RFC 5869](https://tools.ietf.org/html/rfc5869).
+//! An implementation of HKDF, the HMAC-based Extract-and-Expand Key Derivation Function
+//! based on [RFC 5869](https://tools.ietf.org/html/rfc5869).
 //!
 //! The key derivation function (KDF) is intended to support a wide range of applications and
 //! requirements, and is conservative in its use of cryptographic hash functions. In particular,
@@ -21,7 +21,7 @@
 //!
 //! HKDF is intended for use in a wide variety of KDF applications (see [Key derivation function](https://en.wikipedia.org/wiki/Key_derivation_function)), including:
 //! a) derivation of keys from an origin high-entropy master seed. This is the recommended approach
-//! for generating keys in Diem, especially when a True Random Generator is not available.
+//! for generating keys, especially when a True Random Generator is not available.
 //! b) derivation of session keys from a shared Diffie-Hellman value in a key-agreement protocol.
 //! c) combining entropy from multiple sources of randomness, such as entropy collected
 //! from system events, user's keystrokes, /dev/urandom etc. The combined seed can then be used to
