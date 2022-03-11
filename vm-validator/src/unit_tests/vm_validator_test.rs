@@ -59,7 +59,7 @@ impl std::ops::Deref for TestValidator {
 // errors are not exercised:
 // * SEQUENCE_NUMBER_TOO_OLD -- We can't test sequence number too old here without running execution
 //   first in order to bump the account's sequence number. This needs to (and is) tested in the
-//   language e2e tests in: diem/language/e2e-testsuite/src/tests/verify_txn.rs ->
+//   language e2e tests in: aptos-core/language/e2e-testsuite/src/tests/verify_txn.rs ->
 //   verify_simple_payment.
 // * SEQUENCE_NUMBER_TOO_NEW -- This error is filtered out when running validation; it is only
 //   testable when running the executor.
@@ -406,7 +406,7 @@ fn test_validate_non_genesis_write_set() {
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert!(ret.status().is_none());
 
-    // A WriteSet txn is only valid when sent from the Diem root account.
+    // A WriteSet txn is only valid when sent from the root account.
     let bad_transaction = transaction_test_helpers::get_write_set_txn(
         account_config::treasury_compliance_account_address(),
         1,
