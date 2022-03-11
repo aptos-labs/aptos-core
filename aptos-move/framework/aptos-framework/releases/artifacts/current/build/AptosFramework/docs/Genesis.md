@@ -107,8 +107,11 @@
     // initialize the core resource account
     <a href="AptosAccount.md#0x1_AptosAccount_initialize">AptosAccount::initialize</a>(core_resource_account);
     <b>let</b> dummy_auth_key_prefix = x"00000000000000000000000000000000";
-    <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">AptosAccount::create_account_internal</a>(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(core_resource_account), dummy_auth_key_prefix);
-    <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key">AptosAccount::rotate_authentication_key</a>(core_resource_account, core_resource_account_auth_key);
+    <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">AptosAccount::create_account_internal</a>(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(core_resource_account), <b>copy</b> dummy_auth_key_prefix);
+    <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key">AptosAccount::rotate_authentication_key</a>(core_resource_account, <b>copy</b> core_resource_account_auth_key);
+    // initialize the core framework account
+    <b>let</b> core_framework_account = <a href="AptosAccount.md#0x1_AptosAccount_create_core_framework_account">AptosAccount::create_core_framework_account</a>(dummy_auth_key_prefix);
+    <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key">AptosAccount::rotate_authentication_key</a>(&core_framework_account, core_resource_account_auth_key);
 
     // Consensus config setup
     <a href="AptosConsensusConfig.md#0x1_AptosConsensusConfig_initialize">AptosConsensusConfig::initialize</a>(core_resource_account);

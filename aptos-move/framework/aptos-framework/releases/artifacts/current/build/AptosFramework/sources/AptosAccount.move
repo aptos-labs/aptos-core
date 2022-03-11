@@ -45,6 +45,13 @@ module AptosFramework::AptosAccount {
         Account::create_account(account_address, auth_key_prefix, &Marker::get())
     }
 
+    /// Create the account for @CoreFramework to help module upgrades on testnet.
+    public(friend) fun create_core_framework_account(auth_key_prefix: vector<u8>): signer {
+        Timestamp::assert_genesis();
+        let (signer, _) = Account::create_account(@CoreFramework, auth_key_prefix, &Marker::get());
+        signer
+    }
+
     /// Initialize this module. This is only callable from genesis.
     public fun initialize(core_resource: &signer) {
         Timestamp::assert_genesis();

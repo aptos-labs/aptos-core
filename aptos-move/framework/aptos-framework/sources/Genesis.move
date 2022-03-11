@@ -61,8 +61,11 @@ module AptosFramework::Genesis {
         // initialize the core resource account
         AptosAccount::initialize(core_resource_account);
         let dummy_auth_key_prefix = x"00000000000000000000000000000000";
-        AptosAccount::create_account_internal(Signer::address_of(core_resource_account), dummy_auth_key_prefix);
-        AptosAccount::rotate_authentication_key(core_resource_account, core_resource_account_auth_key);
+        AptosAccount::create_account_internal(Signer::address_of(core_resource_account), copy dummy_auth_key_prefix);
+        AptosAccount::rotate_authentication_key(core_resource_account, copy core_resource_account_auth_key);
+        // initialize the core framework account
+        let core_framework_account = AptosAccount::create_core_framework_account(dummy_auth_key_prefix);
+        AptosAccount::rotate_authentication_key(&core_framework_account, core_resource_account_auth_key);
 
         // Consensus config setup
         AptosConsensusConfig::initialize(core_resource_account);
@@ -197,6 +200,10 @@ module AptosFramework::Genesis {
 
     #[test(account = @CoreResources)]
     fun test_setup(account: signer) {
+        use CoreFramework::Account;
+
         setup(&account);
+        assert!(Account::exists_at(@CoreFramework), 0);
+        assert!(Account::exists_at(@CoreResources), 0);
     }
 }

@@ -10,6 +10,7 @@ transaction in addition to the core prologue and epilogue.
 
 -  [Constants](#@Constants_0)
 -  [Function `create_account_internal`](#0x1_AptosAccount_create_account_internal)
+-  [Function `create_core_framework_account`](#0x1_AptosAccount_create_core_framework_account)
 -  [Function `initialize`](#0x1_AptosAccount_initialize)
 -  [Function `create_account`](#0x1_AptosAccount_create_account)
 -  [Function `exists_at`](#0x1_AptosAccount_exists_at)
@@ -172,6 +173,33 @@ transaction in addition to the core prologue and epilogue.
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="AptosAccount.md#0x1_AptosAccount_ECANNOT_CREATE_AT_CORE_CODE">ECANNOT_CREATE_AT_CORE_CODE</a>)
     );
     <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Account.md#0x1_Account_create_account">Account::create_account</a>(account_address, auth_key_prefix, &<a href="Marker.md#0x1_Marker_get">Marker::get</a>())
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_AptosAccount_create_core_framework_account"></a>
+
+## Function `create_core_framework_account`
+
+Create the account for @CoreFramework to help module upgrades on testnet.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_core_framework_account">create_core_framework_account</a>(auth_key_prefix: vector&lt;u8&gt;): signer
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_core_framework_account">create_core_framework_account</a>(auth_key_prefix: vector&lt;u8&gt;): signer {
+    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Timestamp.md#0x1_Timestamp_assert_genesis">Timestamp::assert_genesis</a>();
+    <b>let</b> (signer, _) = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Account.md#0x1_Account_create_account">Account::create_account</a>(@CoreFramework, auth_key_prefix, &<a href="Marker.md#0x1_Marker_get">Marker::get</a>());
+    signer
 }
 </code></pre>
 
