@@ -230,7 +230,7 @@ impl Config {
     }
 }
 
-/// Create a new Diem Channel and returns the two ends of the channel.
+/// Create a new Channel and returns the two ends of the channel.
 pub fn new<K: Eq + Hash + Clone, M>(
     queue_style: QueueStyle,
     max_queue_size_per_key: usize,
