@@ -12,7 +12,7 @@
 [![grcov](https://img.shields.io/badge/Coverage-grcov-green)](https://ci-artifacts.aptoslabs.com/coverage/unit-coverage/latest/index.html)
 [![test history](https://img.shields.io/badge/Test-History-green)](https://ci-artifacts.aptoslabs.com/testhistory/aptos/aptos/auto/ci-test.yml/index.html)
 [![Automated Issues](https://img.shields.io/github/issues-search?color=orange&label=Automated%20Issues&query=repo%3Aaptos%2Faptos%20is%3Aopen%20author%3Aapp%2Fgithub-actions)](https://github.com/aptos-labs/aptos-core/issues/created_by/app/github-actions)
-[![Discord chat](https://img.shields.io/discord/903339070925721652.svg?logo=discord&style=flat-square)](https://discord.gg/epNwRT2wcd)
+[![Discord chat](https://img.shields.io/discord/945856774056083548?style=flat-square)](https://discord.gg/gEV3C5jSnw)
 
 
 Aptos Core implements a decentralized, programmable database which provides a financial infrastructure that can empower billions of people.
@@ -48,7 +48,7 @@ To begin contributing, [sign the CLA](https://aptoslabs.com/en-US/cla-sign/). Yo
 
 ## Community
 
-* Join us on the [Aptos Discord](https://discord.gg/epNwRT2wcd) or [Discourse](https://community.aptoslabs.com).
+* Join us on the [Aptos Discord](https://discord.gg/gEV3C5jSnw).
 * Ask a question on [Stack Overflow](https://stackoverflow.com/questions/tagged/aptos).
 * Get the latest updates to our project by signing up for our [newsletter](https://developers.aptoslabs.com/newsletter_form).
 
