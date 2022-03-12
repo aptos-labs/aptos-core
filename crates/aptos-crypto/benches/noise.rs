@@ -1,4 +1,4 @@
-// Copyright (c) The Aptos Foundation
+// Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
 //! Don't forget to run this benchmark with AES-NI enable.

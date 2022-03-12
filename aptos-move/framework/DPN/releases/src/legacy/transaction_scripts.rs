@@ -1,4 +1,4 @@
-// Copyright (c) The Aptos Foundation
+// Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
 //! Rust representation of a Move transaction script that can be executed on the Diem blockchain.

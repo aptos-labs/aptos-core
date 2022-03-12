@@ -1,4 +1,4 @@
-// Copyright (c) The Aptos Foundation
+// Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
 //! How and where to record the Serde format of interesting Aptos types.

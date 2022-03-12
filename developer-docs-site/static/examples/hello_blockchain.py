@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (c) The Aptos Foundation
+# Copyright (c) The Diem Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
 from typing import Any, Dict, Optional, Sequence

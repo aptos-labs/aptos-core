@@ -1,4 +1,4 @@
-// Copyright (c) The Aptos Foundation
+// Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::peer_to_peer::{check_and_apply_transfer_output, create_cyclic_transfers};

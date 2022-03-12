@@ -1,4 +1,4 @@
-// Copyright (c) The Aptos Foundation
+// Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
     cargo::{build_args::BuildArgs, selected_package::SelectedPackageArgs, CargoCommand},

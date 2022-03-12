@@ -1,5 +1,5 @@
 #!/bin/bash -eux
-# Copyright (c) The Aptos Foundation
+# Copyright (c) The Diem Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
 # this file builds a single fuzzer target

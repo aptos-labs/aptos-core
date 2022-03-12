@@ -1,4 +1,4 @@
-// Copyright (c) The Aptos Foundation
+// Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
 // modified from https://rust-unofficial.github.io/too-many-lists/fourth-final.html (MIT License)

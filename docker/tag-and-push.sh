@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) The Aptos Foundation
+# Copyright (c) The Diem Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 # tag-and-push.sh is used tag an image with multiple tags and push them to the target repo. Use ":" as the separator
 # between multiple tags

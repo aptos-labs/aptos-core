@@ -1,4 +1,4 @@
-// Copyright (c) The Aptos Foundation
+// Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
 // FIXME: (gnazario) storage helper doesn't belong in the genesis tool, but it's attached to it right now

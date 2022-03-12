@@ -1,4 +1,4 @@
-// Copyright (c) The Aptos Foundation
+// Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_transaction_builder::stdlib::{encode_create_parent_vasp_account_script, ScriptCall};

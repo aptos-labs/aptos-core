@@ -1,11 +1,11 @@
-// Copyright (c) The Aptos Foundation
+// Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Context;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use x_lint::prelude::*;
 
-static LICENSE_HEADER: &str = "Copyright (c) The Aptos Foundation\n\
+static LICENSE_HEADER: &str = "Copyright (c) The Diem Core Contributors\n\
                                SPDX-License-Identifier: Apache-2.0\n\
                                ";
 

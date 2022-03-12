@@ -1,4 +1,4 @@
-// Copyright (c) The Aptos Foundation
+// Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
 ///! This is a copy of `futures::try_stream::try_buffered` from `futures 0.3.16`, except that it uses

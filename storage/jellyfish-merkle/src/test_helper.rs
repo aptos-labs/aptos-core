@@ -1,4 +1,4 @@
-// Copyright (c) The Aptos Foundation
+// Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{mock_tree_store::MockTreeStore, node_type::LeafNode, JellyfishMerkleTree};

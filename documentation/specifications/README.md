@@ -10,7 +10,7 @@ The reference implementations for all LPN specifications is [Aptos Core](https:/
 
 ## Overview
 
-The Aptos Foundation is an independent membership organization headquartered in Geneva, Switzerland. The Association's purpose is to coordinate and provide a framework of governance decision-making for the Diem network and Reserve; to oversee the operation of the Diem payment system; to facilitate the provision of services on top of the Diem Blockchain in a safe and compliant manner; and to establish social impact grant-making in support of financial inclusion.
+The Diem Core Contributors is an independent membership organization headquartered in Geneva, Switzerland. The Association's purpose is to coordinate and provide a framework of governance decision-making for the Diem network and Reserve; to oversee the operation of the Diem payment system; to facilitate the provision of services on top of the Diem Blockchain in a safe and compliant manner; and to establish social impact grant-making in support of financial inclusion.
 
 The LPN is backed by the Diem Blockchain that serves as a solid foundation for financial services, including a new global payment system that meets the daily financial needs of billions of people. The Diem blockchain was created to meet the following three requirements:
 
@@ -79,7 +79,7 @@ The process for upgrading the LPN specifications is as follows:
 
     In order to describe the LPN upgrade process, we will define specification S with current in-production version V and next accepted version V+1.
 
-    * **Backwards-incompatible specification changes** The Aptos Foundation will publicly announce that a backwards-incompatible specification change to S is occurring with V+1 and that on a production date (e.g. 3-6 months in the future), the V+1 specification will become eligible to be deployed in production. All validators and clients will be required to have already upgraded to software that can support V+1 by that point. After the production date, the Aptos Foundation will ensure that the LPN validators have upgraded (i.e., by verifying the software versions) and after verification will submit an on-chain transaction to make V+1 active. After the transaction is committed, all clients that have upgraded will interoperate on V+1 rather than V automatically. All older software that is unable to interoperate with V+1 will fail. In summary:
+    * **Backwards-incompatible specification changes** The Diem Core Contributors will publicly announce that a backwards-incompatible specification change to S is occurring with V+1 and that on a production date (e.g. 3-6 months in the future), the V+1 specification will become eligible to be deployed in production. All validators and clients will be required to have already upgraded to software that can support V+1 by that point. After the production date, the Aptos Foundation will ensure that the LPN validators have upgraded (i.e., by verifying the software versions) and after verification will submit an on-chain transaction to make V+1 active. After the transaction is committed, all clients that have upgraded will interoperate on V+1 rather than V automatically. All older software that is unable to interoperate with V+1 will fail. In summary:
 
       1. Aptos Foundation announces a production date and the software versions validators and clients need to run in order to continue to interoperate with the LPN.
       2. Validators and clients upgrade to the prescribed software versions prior to the production date.

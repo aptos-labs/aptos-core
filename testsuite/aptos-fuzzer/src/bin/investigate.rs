@@ -1,4 +1,4 @@
-// Copyright (c) The Aptos Foundation
+// Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_fuzzer::FuzzTarget;
@@ -8,7 +8,7 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "Diem-Fuzzer Investigator",
-    author = "The Aptos Foundation",
+    author = "The Diem Core Contributors",
     about = "Utility tool to investigate fuzzing artifacts"
 )]
 struct Args {
