@@ -185,7 +185,7 @@ pub trait NodeExt: Node {
         if let Some(direction) = direction {
             map.insert("direction".to_string(), direction.to_string());
         }
-        self.get_metric_with_fields("diem_connections", map).await
+        self.get_metric_with_fields("aptos_connections", map).await
     }
 
     async fn liveness_check(&self, seconds: u64) -> Result<()> {

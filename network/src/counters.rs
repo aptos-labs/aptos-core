@@ -26,7 +26,7 @@ pub const FAILED_LABEL: &str = "failed";
 
 pub static DIEM_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
-        "diem_connections",
+        "aptos_connections",
         "Number of current connections and their direction",
         &["role_type", "network_id", "peer_id", "direction"]
     )
@@ -44,7 +44,7 @@ pub fn connections(network_context: &NetworkContext, origin: ConnectionOrigin) -
 
 pub static DIEM_CONNECTIONS_REJECTED: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "diem_connections_rejected",
+        "aptos_connections_rejected",
         "Number of connections rejected per interface",
         &["role_type", "network_id", "peer_id", "direction"]
     )
