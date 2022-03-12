@@ -276,13 +276,13 @@ async fn test_set_operator_and_add_new_validator() {
         swarm.validators().next().unwrap(),
         write_key_to_file_hex_format,
     );
-    let diem_backend = create_root_storage(&mut swarm);
+    let root_backend = create_root_storage(&mut swarm);
     let val_human_name = "new_validator";
     let (txn_ctx, _) = op_tool
         .create_validator(
             val_human_name,
             validator_key_path.to_str().unwrap(),
-            &diem_backend,
+            &root_backend,
             false,
         )
         .await
@@ -301,7 +301,7 @@ async fn test_set_operator_and_add_new_validator() {
         .create_validator_operator(
             op_human_name,
             operator_key_path.to_str().unwrap(),
-            &diem_backend,
+            &root_backend,
             true,
         )
         .await
@@ -405,7 +405,7 @@ async fn test_set_operator_and_add_new_validator() {
 
     // Add the validator to the validator set
     let txn_ctx = op_tool
-        .add_validator(validator_account, &diem_backend, true)
+        .add_validator(validator_account, &root_backend, true)
         .await
         .unwrap();
 
@@ -432,7 +432,7 @@ async fn test_set_operator_and_add_new_validator() {
 
     // Try and add the same validator again and watch it fail
     let txn_ctx = op_tool
-        .add_validator(validator_account, &diem_backend, false)
+        .add_validator(validator_account, &root_backend, false)
         .await
         .unwrap();
     assert!(!txn_ctx.execution_result.unwrap().success);
