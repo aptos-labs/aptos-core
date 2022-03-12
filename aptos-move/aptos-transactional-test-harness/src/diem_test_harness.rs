@@ -28,10 +28,12 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_FRESH};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
+use move_command_line_common::files::verify_and_create_named_address_mapping;
 use move_compiler::{
-    shared::{verify_and_create_named_address_mapping, NumberFormat, NumericalAddress},
+    shared::{NumberFormat, NumericalAddress},
     FullyCompiledProgram,
 };
+
 use move_core_types::{
     account_address::AccountAddress,
     gas_schedule::{GasAlgebra, GasConstants},
@@ -355,11 +357,14 @@ fn panic_missing_private_key(cmd_name: &str) -> ! {
 }
 
 static PRECOMPILED_DIEM_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
+    let deps = vec![(
+        framework::dpn_files(),
+        framework::diem_framework_named_addresses(),
+    )];
     let program_res = move_compiler::construct_pre_compiled_lib(
-        &framework::dpn_files(),
+        deps,
         None,
         move_compiler::Flags::empty().set_sources_shadow_deps(false),
-        framework::diem_framework_named_addresses(),
     )
     .unwrap();
     match program_res {
@@ -372,11 +377,14 @@ static PRECOMPILED_DIEM_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
 });
 
 static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
+    let deps = vec![(
+        framework::aptos_files(),
+        framework::aptos_framework_named_addresses(),
+    )];
     let program_res = move_compiler::construct_pre_compiled_lib(
-        &framework::aptos_files(),
+        deps,
         None,
         move_compiler::Flags::empty().set_sources_shadow_deps(false),
-        framework::aptos_framework_named_addresses(),
     )
     .unwrap();
     match program_res {

@@ -4,6 +4,7 @@
 use anyhow::Result;
 use move_cli::{Command, Move};
 use move_core_types::errmap::ErrorMapping;
+use move_vm_types::gas_schedule::INITIAL_COST_SCHEDULE;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -29,6 +30,7 @@ fn main() -> Result<()> {
     match &args.cmd {
         DfCommands::Command(cmd) => move_cli::run_cli(
             aptos_vm::natives::aptos_natives(),
+            &INITIAL_COST_SCHEDULE,
             &error_descriptions,
             &args.move_args,
             cmd,

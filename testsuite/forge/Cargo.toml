@@ -23,7 +23,7 @@ kube = "0.51.0"
 rand = "0.8.3"
 rand_core = "0.6.2"
 rayon = "1.5.0"
-regex = "1.4.3"
+regex = "1.5.5"
 reqwest = { version = "0.11.2", features = ["blocking", "json"] }
 rusoto_core = "0.46.0"
 rusoto_credential = "0.46.0"

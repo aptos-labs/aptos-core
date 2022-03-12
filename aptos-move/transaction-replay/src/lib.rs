@@ -400,10 +400,14 @@ fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {
 
 fn compile_move_script(file_path: &str) -> Result<Vec<u8>> {
     let cur_path = file_path.to_owned();
-    let targets = &vec![cur_path];
-    let (files, units_or_diags) = Compiler::new(targets, &framework::dpn_files())
+    let targets = vec![(vec![cur_path], framework::diem_framework_named_addresses())];
+    let deps = vec![(
+        framework::dpn_files(),
+        framework::diem_framework_named_addresses(),
+    )];
+
+    let (files, units_or_diags) = Compiler::new(targets, deps)
         .set_flags(Flags::empty().set_sources_shadow_deps(false))
-        .set_named_address_values(framework::diem_framework_named_addresses())
         .build()?;
     let unit = match units_or_diags {
         Err(diags) => {
