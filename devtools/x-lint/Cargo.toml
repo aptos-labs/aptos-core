@@ -1,7 +1,7 @@
 [package]
 name = "x-lint"
 version = "0.1.0"
-authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Lint engine for x"
 edition = "2018"
 publish = false

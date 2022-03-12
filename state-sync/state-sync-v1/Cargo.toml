@@ -1,7 +1,7 @@
 [package]
 name = "state-sync-v1"
 version = "0.1.0"
-authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos state synchronizer v1 (state sync v1)"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"

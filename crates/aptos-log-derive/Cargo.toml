@@ -1,7 +1,7 @@
 [package]
 name = "aptos-log-derive"
 version = "0.1.0"
-authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos structured log type macros"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"

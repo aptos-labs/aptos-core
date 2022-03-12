@@ -131,7 +131,7 @@ license-exceptions = [
 ]
 
 [workspace.enforced-attributes]
-authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 license = "Apache-2.0"
 
 [workspace.banned-deps.direct]

@@ -2,7 +2,7 @@
 name = "vm-genesis"
 version = "0.1.0"
 edition = "2018"
-authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos vm genesis"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"

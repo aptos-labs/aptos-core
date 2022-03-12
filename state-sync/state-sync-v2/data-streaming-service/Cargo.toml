@@ -1,7 +1,7 @@
 [package]
 name = "data-streaming-service"
 version = "0.1.0"
-authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 repository = "https://github.com/aptos-labs/aptos-core"
 description = "The data streaming service that sends data notifications to clients"
 homepage = "https://aptoslabs.com"

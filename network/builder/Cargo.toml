@@ -1,7 +1,7 @@
 [package]
 name = "network-builder"
 version = "0.1.0"
-authors = ["Aptos Foundation <opensource@aptoslabs.com>"]
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos network builder for constructing a network"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
