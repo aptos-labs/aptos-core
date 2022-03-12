@@ -172,7 +172,6 @@ members = [
     "aptos-retrier",
     "aptos-transactional-test-harness",
     "aptos-transaction-benchmarks",
-    "aptos-wallet",
     "aptos-writeset-generator",
     "diem-experimental-framework-releases",
     "executor-benchmark",

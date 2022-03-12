@@ -1114,26 +1114,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-wallet"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-temppath",
- "aptos-types",
- "aptos-workspace-hack",
- "byteorder",
- "hex",
- "hmac",
- "mirai-annotations",
- "pbkdf2",
- "rand 0.8.4",
- "serde 1.0.136",
- "sha2",
- "thiserror",
-]
-
-[[package]]
 name = "aptos-workspace-hack"
 version = "0.1.0"
 dependencies = [
@@ -1457,12 +1437,6 @@ name = "base64"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
-
-[[package]]
-name = "base64ct"
-version = "1.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "874f8444adcb4952a8bc51305c8be95c8ec8237bb0d2e78d2e039f771f8828a0"
 
 [[package]]
 name = "bcs"
@@ -5519,16 +5493,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "password-hash"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54986aa4bfc9b98c6a5f40184223658d187159d7b3c6af33f2b2aa25ae1db0fa"
-dependencies = [
- "base64ct",
- "rand_core 0.6.3",
-]
-
-[[package]]
 name = "paste"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5541,19 +5505,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8835116a5c179084a830efb3adc117ab007512b535bc1a21c991d3b32a6b44dd"
 dependencies = [
  "camino",
-]
-
-[[package]]
-name = "pbkdf2"
-version = "0.7.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf916dd32dd26297907890d99dc2740e33f6bd9073965af4ccff2967962f5508"
-dependencies = [
- "base64ct",
- "crypto-mac",
- "hmac",
- "password-hash",
- "sha2",
 ]
 
 [[package]]

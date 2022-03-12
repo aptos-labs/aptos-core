@@ -54,7 +54,6 @@ members = [
     "crates/aptos-retrier",
     "crates/aptos-temppath",
     "crates/aptos-time-service",
-    "crates/aptos-wallet",
     "crates/aptos-workspace-hack",
     "crates/bounded-executor",
     "crates/channel",
