@@ -19,6 +19,9 @@ metadata:
     alb.ingress.kubernetes.io/certificate-arn: {{ .Values.ingress.acm_certificate }}
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
     {{- end }}
+    {{- if .Values.ingress.wafAclId }}
+    alb.ingress.kubernetes.io/waf-acl-id: {{ .Values.ingress.wafAclId }}
+    {{- end }}
 spec:
   rules:
   - host: mon.{{ .Values.service.domain }}
