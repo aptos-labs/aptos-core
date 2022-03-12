@@ -86,7 +86,7 @@ validator_backend:
 Overview of fields:
 
 * `chain_id` specifies a distinct chain and is written into genesis, checked during network connections, and part of each transaction. It is provided by the association.
-* `json_server` specifies a Aptos JSON Server. This can be any that connect to your network including your own of one run by the association. It is not used in genesis, so a dummy value is acceptable during initial configuration.
+* `json_server` specifies an Aptos JSON Server. This can be any that connect to your network including your own of one run by the association. It is not used in genesis, so a dummy value is acceptable during initial configuration.
 * `shared_backend` is a pointer to the associaton's `shared storage`.
 * `validator_backend` is a pointer to the local validator node's secure storage.
 

@@ -23,7 +23,7 @@ pub type FileHandle = String;
 pub struct TextLine(String);
 ```
 
-A AptosDB **backup storage** stores **backups** and **metadata lines**.
+An AptosDB **backup storage** stores **backups** and **metadata lines**.
 
 Each of the **backups** contains information that reflects different aspects of the blockchain history. It is identified by its manifest file (human readable, in JSON), which can contain links to data files. Depending on the specific type of backup, the content differs. The backup system doesn’t care about how physically the storage organizes backups, it dumps backups as group of files (although it does try to hint the storage that the group are related to each other, see the [Backup Storage interface](#backup-storage-interface)), asking back one single FileHandle to identify the whole backup. The restore system takes `FileHandle`s pointing to manifests, it’s up to the human / external system to decide which manifests are relevant, probably based on the **metadata**.
 

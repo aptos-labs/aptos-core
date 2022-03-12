@@ -180,7 +180,7 @@ pub enum Order {
 }
 
 /// Trait that is implemented by a DB that supports certain public (to client) read APIs
-/// expected of a Aptos DB
+/// expected of an Aptos DB
 #[allow(unused_variables)]
 pub trait DbReader: Send + Sync {
     /// See [`AptosDB::get_epoch_ending_ledger_infos`].
@@ -567,7 +567,7 @@ impl MoveStorage for &dyn DbReader {
 }
 
 /// Trait that is implemented by a DB that supports certain public (to client) write APIs
-/// expected of a Aptos DB. This adds write APIs to DbReader.
+/// expected of an Aptos DB. This adds write APIs to DbReader.
 #[allow(unused_variables)]
 pub trait DbWriter: Send + Sync {
     /// Persist transactions. Called by the executor module when either syncing nodes or committing
