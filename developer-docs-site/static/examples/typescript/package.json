@@ -1,7 +1,13 @@
 {
-  "name": "tsdemo",
-  "version": "1.0.0",
-  "main": "index.js",
+  "name": "aptos-tutorial",
+  "description": "Aptos Typescript tutorial files",
+  "version": "0.0.1",
+  "homepage": "https://aptoslabs.com",
+  "repository": "https://github.com/aptos-labs/aptos-core",
+  "maintainers": [
+    "Aptos Labs <opensource@aptoslabs.com>"
+  ],
+  "license": "Apache-2.0",
   "scripts": {
     "first": "node --loader ts-node/esm first_transaction.ts",
     "hello_blockchain": "node --loader ts-node/esm hello_blockchain.ts"

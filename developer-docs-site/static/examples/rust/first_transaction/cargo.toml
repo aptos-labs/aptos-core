@@ -1,0 +1,19 @@
+[package]
+name = "first-transaction"
+version = "0.0.1"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "Aptos Rust tutorial files: First Transaction"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+serde = { version = "1.0.124", features = ["derive"], default-features = false }
+serde_json = "1.0.64"
+rand = "0.8.3"
+hex = "0.4.3"
+reqwest = { version = "0.11.2", features = ["blocking", "json"] }
+tiny-keccak = { version = "2.0.2", default-features = false, features = ["sha3"] }
+ed25519-dalek = { version = "0.1.0", package = "ed25519-dalek-fiat", default-features = false, features = ["std", "serde", "fiat_u64_backend"] }

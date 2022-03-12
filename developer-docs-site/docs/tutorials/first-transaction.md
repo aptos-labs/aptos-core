@@ -56,6 +56,10 @@ Each Aptos account has a unique account address.  The owner of that account hold
   </TabItem>
   <TabItem value="rust" label="Rust" default>
 
+```rust
+:!: static/examples/rust/first_transaction/src/lib.rs section_1
+```
+
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
 
@@ -79,6 +83,11 @@ Aptos exposes a [REST interface][rest_spec] for interacting with the blockchain.
 
   </TabItem>
   <TabItem value="rust" label="Rust" default>
+
+```rust
+:!: static/examples/rust/first_transaction/src/lib.rs section_2
+```
+
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
 
@@ -102,6 +111,11 @@ The following are wrappers for querying account data.
 
   </TabItem>
   <TabItem value="rust" label="Rust" default>
+
+```rust
+:!: static/examples/rust/first_transaction/src/lib.rs section_3
+```
+
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
 
@@ -124,6 +138,11 @@ The following demonstrate the core functionality for constructing, signing, and 
 
   </TabItem>
   <TabItem value="rust" label="Rust" default>
+
+```rust
+:!: static/examples/rust/first_transaction/src/lib.rs section_4
+```
+
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
 
@@ -147,6 +166,11 @@ The following demonstrate how to read data from the blockchain and how to write 
 
   </TabItem>
   <TabItem value="rust" label="Rust" default>
+
+```rust
+:!: static/examples/rust/first_transaction/src/lib.rs section_5
+```
+
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
 
@@ -170,6 +194,11 @@ A blockchain faucet provides an account some amount of tokens that can be used f
 
   </TabItem>
   <TabItem value="rust" label="Rust" default>
+
+```rust
+:!: static/examples/rust/first_transaction/src/lib.rs section_6
+```
+
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
 
@@ -191,6 +220,11 @@ A blockchain faucet provides an account some amount of tokens that can be used f
 
   </TabItem>
   <TabItem value="rust" label="Rust" default>
+
+```rust
+:!: static/examples/rust/first_transaction/src/main.rs section_7
+```
+
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
 

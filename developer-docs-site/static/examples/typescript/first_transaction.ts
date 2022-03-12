@@ -172,7 +172,7 @@ export class RestClient {
 
   /** Transfer a given coin amount from a given Account to the recipient's account address.
    Returns the sequence number of the transaction used to transfer. */
-  async transfer(accountFrom: Account, recipient: string, amount: number): Promise<[number, string]> {
+  async transfer(accountFrom: Account, recipient: string, amount: number): Promise<string> {
     const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
       function: "0x1::TestCoin::transfer",
@@ -185,7 +185,7 @@ export class RestClient {
     const txnRequest = await this.generateTransaction(accountFrom.address(), payload);
     const signedTxn = await this.signTransaction(accountFrom, txnRequest);
     const res = await this.submitTransaction(accountFrom, signedTxn);
-    return [parseInt(signedTxn["sequence_number"]), res["hash"].toString()];
+    return res["hash"].toString();
   }
 
 }
@@ -241,7 +241,7 @@ async function main() {
   console.log(`Bob: ${await restClient.accountBalance(bob.address())}`);
 
   // Have Alice give Bob 1000 coins
-  const [seqNo, txHash] = await restClient.transfer(alice, bob.address(), 1_000);
+  const txHash = await restClient.transfer(alice, bob.address(), 1_000);
   await restClient.waitForTransaction(txHash);
 
   console.log("\n=== Final Balances ===");

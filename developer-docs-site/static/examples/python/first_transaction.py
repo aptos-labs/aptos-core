@@ -88,7 +88,7 @@ class RestClient:
 
         res = requests.post(f"{self.url}/transactions/signing_message", json=txn_request)
         assert res.status_code == 200, res.text
-        to_sign = bytes.fromhex(res.json()['message'][2:])
+        to_sign = bytes.fromhex(res.json()["message"][2:])
         signature = account_from.signing_key.sign(to_sign).signature
         txn_request["signature"] = {
             "type": "ed25519_signature",
@@ -131,7 +131,7 @@ class RestClient:
                 return int(resource["data"]["coin"]["value"])
         return None
 
-    def transfer(self, account_from: Account, recipient: str, amount: int) -> (int, str):
+    def transfer(self, account_from: Account, recipient: str, amount: int) -> str:
         """Transfer a given coin amount from a given Account to the recipient's account address.
         Returns the sequence number of the transaction used to transfer."""
 
@@ -147,7 +147,7 @@ class RestClient:
         txn_request = self.generate_transaction(account_from.address(), payload)
         signed_txn = self.sign_transaction(account_from, txn_request)
         res = self.submit_transaction(signed_txn)
-        return int(signed_txn["sequence_number"]), str(res["hash"])
+        return str(res["hash"])
     #<:!:section_5
 
 #:!:>section_6
@@ -190,7 +190,7 @@ if __name__ == "__main__":
     print(f"Bob: {rest_client.account_balance(bob.address())}")
 
     # Have Alice give Bob 10 coins
-    seq_no, tx_hash = rest_client.transfer(alice, bob.address(), 1_000)
+    tx_hash = rest_client.transfer(alice, bob.address(), 1_000)
     rest_client.wait_for_transaction(tx_hash)
 
     print("\n=== Final Balances ===")

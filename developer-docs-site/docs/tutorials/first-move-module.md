@@ -131,6 +131,11 @@ Now we return to our application to deploy and interact with the module on the A
 
   </TabItem>
   <TabItem value="rust" label="Rust" default>
+
+```rust
+:!: static/examples/rust/hello_blockchain/src/lib.rs section_1
+```
+
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
 
@@ -154,6 +159,11 @@ The module is published at an address. This is the `contract_address` below. Thi
 
   </TabItem>
   <TabItem value="rust" label="Rust" default>
+
+```rust
+:!: static/examples/rust/hello_blockchain/src/lib.rs section_2
+```
+
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
 
@@ -180,6 +190,11 @@ Note: while the REST interface can display strings, due to limitations of JSON a
 
   </TabItem>
   <TabItem value="rust" label="Rust" default>
+
+```rust
+:!: static/examples/rust/hello_blockchain/src/lib.rs section_3
+```
+
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
 
@@ -202,8 +217,14 @@ For Python3:
 * Execute the example: `python3 hello_blockchain.py Message.mv`
 
 </TabItem>
-  <TabItem value="rust" label="Rust">
-  </TabItem>
+<TabItem value="rust" label="Rust">
+For Rust:
+
+* Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust)
+* Open your favorite terminal and navigate to where you downloaded the above example project
+* Execute the example: `cargo run --bin hello-blockchain -- Message.mv`
+
+</TabItem>
 <TabItem value="typescript" label="Typescript">
 For Typescript:
 

@@ -48,7 +48,8 @@ const plugin = (options) => {
         if (!matches) {
           throw new Error(`Could not find open/closing tags for section '${sectionName}' in ${filepath}`);
         }
-        node.value = matches[1].trim();
+        // Remove line breaks from start/end, but not whitespace
+        node.value = matches[1].replace(/^[\r\n]+|[\r\n]+$/g, "");
       }
     });
   };

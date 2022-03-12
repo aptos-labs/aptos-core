@@ -3,7 +3,7 @@
 # Copyright (c) The Diem Core Contributors
 # SPDX-License-Identifier: Apache-2.0
 
-from typing import Any, Dict, Optional, Sequence
+from typing import Optional
 import sys
 
 from first_transaction import Account, FaucetClient, RestClient, TESTNET_URL, FAUCET_URL
