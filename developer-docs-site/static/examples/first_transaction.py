@@ -9,8 +9,8 @@ import requests
 import time
 from typing import Any, Dict, Optional, Sequence
 
-TESTNET_URL = "https://dev.fullnode.aptoslabs.com"
-FAUCET_URL = "https://faucet.dev.aptoslabs.com"
+TESTNET_URL = "https://fullnode.devnet.aptoslabs.com"
+FAUCET_URL = "https://faucet.devnet.aptoslabs.com"
 
 
 """
@@ -102,8 +102,8 @@ class RestClient:
         txn_request = {
             "sender": f"0x{sender}",
             "sequence_number": str(seq_num),
-            "max_gas_amount": "2000000",
-            "gas_unit_price": "2",
+            "max_gas_amount": "1000",
+            "gas_unit_price": "1",
             "gas_currency_code": "XUS",
             "expiration_timestamp_secs": str(int(time.time()) + 600),
             "payload": payload,

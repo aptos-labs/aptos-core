@@ -8,8 +8,8 @@ import sys
 
 from first_transaction import Account, FaucetClient, RestClient
 
-TESTNET_URL = "https://dev.fullnode.aptoslabs.com"
-FAUCET_URL = "https://faucet.dev.aptoslabs.com"
+TESTNET_URL = "https://fullnode.devnet.aptoslabs.com"
+FAUCET_URL = "https://faucet.devnet.aptoslabs.com"
 
 
 class HelloBlockchainClient(RestClient):
