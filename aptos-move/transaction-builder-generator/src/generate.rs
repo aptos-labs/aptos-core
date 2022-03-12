@@ -44,7 +44,7 @@ struct Options {
     #[structopt(long)]
     target_source_dir: Option<PathBuf>,
 
-    /// Also install the aptos.types described by the given YAML file, along with the BCS runtime.
+    /// Also install the aptos types described by the given YAML file, along with the BCS runtime.
     #[structopt(long)]
     with_aptos_types: Option<PathBuf>,
 

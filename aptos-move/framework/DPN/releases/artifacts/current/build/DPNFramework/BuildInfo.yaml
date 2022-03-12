@@ -61,9 +61,6 @@ compiled_package_info:
       name: DiemAccount
     : DiemFramework
     ? address: "00000000000000000000000000000001"
-      name: DiemId
-    : DiemFramework
-    ? address: "00000000000000000000000000000001"
       name: DualAttestation
     : DiemFramework
     ? address: "00000000000000000000000000000001"
@@ -165,7 +162,7 @@ compiled_package_info:
     ? address: "00000000000000000000000000000001"
       name: XUS
     : DiemFramework
-  source_digest: 6A26EBC25039145832D140AAFA228BF5CEFC3BAD6375DF7397AB2F865DF9FA35
+  source_digest: 451F8D7354C12242B7D4EC549C85C9053CD75EAD8F2DD380A437A72C0F691BC0
   build_flags:
     dev_mode: false
     test_mode: false

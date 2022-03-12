@@ -110,7 +110,7 @@ where
             writeln!(
                 self.out,
                 r#"
-// Copyright (c) The Aptos Core Contributors
+// Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
 // This file was generated. Do not modify!
@@ -274,7 +274,7 @@ impl ScriptFunctionCall {
         writeln!(
             self.out,
             r#"
-/// Build a Aptos `Script` from a structured object `ScriptCall`.
+/// Build an Aptos `Script` from a structured object `ScriptCall`.
 pub fn encode(self) -> Script {{"#
         )?;
         self.out.indent();
@@ -293,7 +293,7 @@ pub fn encode(self) -> Script {{"#
         writeln!(
             self.out,
             r#"
-/// Build a Aptos `TransactionPayload` from a structured object `ScriptFunctionCall`.
+/// Build an Aptos `TransactionPayload` from a structured object `ScriptFunctionCall`.
 pub fn encode(self) -> TransactionPayload {{"#
         )?;
         self.out.indent();
@@ -328,7 +328,7 @@ pub fn encode(self) -> TransactionPayload {{"#
         writeln!(
             self.out,
             r#"
-/// Try to recognize a Aptos `Script` and convert it into a structured object `ScriptCall`.
+/// Try to recognize an Aptos `Script` and convert it into a structured object `ScriptCall`.
 pub fn decode(script: &Script) -> Option<ScriptCall> {{
     match TRANSACTION_SCRIPT_DECODER_MAP.get({}) {{
         Some(decoder) => decoder(script),
@@ -347,7 +347,7 @@ pub fn decode(script: &Script) -> Option<ScriptCall> {{
         writeln!(
             self.out,
             r#"
-/// Try to recognize a Aptos `TransactionPayload` and convert it into a structured object `ScriptFunctionCall`.
+/// Try to recognize an Aptos `TransactionPayload` and convert it into a structured object `ScriptFunctionCall`.
 pub fn decode(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {{
     if let TransactionPayload::ScriptFunction(script) = payload {{
         match SCRIPT_FUNCTION_DECODER_MAP.get(&format!("{{}}{{}}", {}, {})) {{
@@ -378,7 +378,7 @@ pub fn decode(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {{
         writeln!(
             self.out,
             r#"
-/// Return the name of a Aptos `Script` from a structured object `ScriptCall`.
+/// Return the name of an Aptos `Script` from a structured object `ScriptCall`.
 pub fn name(&self) -> &'static str {{"#
         )?;
         self.out.indent();

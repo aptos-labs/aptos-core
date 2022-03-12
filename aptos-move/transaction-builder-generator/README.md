@@ -6,7 +6,7 @@ custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/language/tra
 
 # Transaction Builder Generator
 
-A *transaction builder* is a helper function that converts its arguments into the payload of a Aptos transaction calling a particular Move script.
+A *transaction builder* is a helper function that converts its arguments into the payload of an Aptos transaction calling a particular Move script.
 
 In Rust, the signature of such a function typically looks like this:
 ```rust

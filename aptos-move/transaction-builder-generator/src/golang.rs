@@ -185,7 +185,7 @@ where
             writeln!(
                 self.out,
                 r#"
-// Build a Aptos `Script` from a structured object `ScriptCall`.
+// Build an Aptos `Script` from a structured object `ScriptCall`.
 func EncodeScript(call ScriptCall) aptostypes.Script {{"#
             )?;
             self.out.indent();
@@ -217,7 +217,7 @@ func EncodeScript(call ScriptCall) aptostypes.Script {{"#
             writeln!(
                 self.out,
                 r#"
-// Build a Aptos `TransactionPayload` from a structured object `ScriptFunctionCall`.
+// Build an Aptos `TransactionPayload` from a structured object `ScriptFunctionCall`.
 func EncodeScriptFunction(call ScriptFunctionCall) aptostypes.TransactionPayload {{"#
             )?;
             self.out.indent();
@@ -251,7 +251,7 @@ func EncodeScriptFunction(call ScriptFunctionCall) aptostypes.TransactionPayload
         writeln!(
             self.out,
             r#"
-// Try to recognize a Aptos `Script` and convert it into a structured object `ScriptCall`.
+// Try to recognize an Aptos `Script` and convert it into a structured object `ScriptCall`.
 func DecodeScript(script *aptostypes.Script) (ScriptCall, error) {{
 	if helper := script_decoder_map[string(script.Code)]; helper != nil {{
 		val, err := helper(script)
@@ -267,7 +267,7 @@ func DecodeScript(script *aptostypes.Script) (ScriptCall, error) {{
         writeln!(
             self.out,
             r#"
-// Try to recognize a Aptos `TransactionPayload` and convert it into a structured object `ScriptFunctionCall`.
+// Try to recognize an Aptos `TransactionPayload` and convert it into a structured object `ScriptFunctionCall`.
 func DecodeScriptFunctionPayload(script aptostypes.TransactionPayload) (ScriptFunctionCall, error) {{
     switch script := script.(type) {{
         case *aptostypes.TransactionPayload__ScriptFunction:

@@ -94,7 +94,7 @@ from {}aptos_types import (Script, ScriptFunction, TransactionPayload, Transacti
             self.out,
             r#"
 def encode_script(call: ScriptCall) -> Script:
-    """Build a Aptos `Script` from a structured object `ScriptCall`.
+    """Build an Aptos `Script` from a structured object `ScriptCall`.
     """
     helper = TRANSACTION_SCRIPT_ENCODER_MAP[call.__class__]
     return helper(call)
@@ -104,7 +104,7 @@ def encode_script(call: ScriptCall) -> Script:
             self.out,
             r#"
 def encode_script_function(call: ScriptFunctionCall) -> TransactionPayload:
-    """Build a Aptos `ScriptFunction` `TransactionPayload` from a structured object `ScriptFunctionCall`.
+    """Build an Aptos `ScriptFunction` `TransactionPayload` from a structured object `ScriptFunctionCall`.
     """
     helper = SCRIPT_FUNCTION_ENCODER_MAP[call.__class__]
     return helper(call)
@@ -117,7 +117,7 @@ def encode_script_function(call: ScriptFunctionCall) -> TransactionPayload:
             self.out,
             r#"
 def decode_script(script: Script) -> ScriptCall:
-    """Try to recognize a Aptos `Script` and convert it into a structured object `ScriptCall`.
+    """Try to recognize an Aptos `Script` and convert it into a structured object `ScriptCall`.
     """
     helper = TRANSACTION_SCRIPT_DECODER_MAP.get(script.code)
     if helper is None:
@@ -129,7 +129,7 @@ def decode_script(script: Script) -> ScriptCall:
             self.out,
             r#"
 def decode_script_function_payload(payload: TransactionPayload) -> ScriptFunctionCall:
-    """Try to recognize a Aptos `TransactionPayload` and convert it into a structured object `ScriptFunctionCall`.
+    """Try to recognize an Aptos `TransactionPayload` and convert it into a structured object `ScriptFunctionCall`.
     """
     if not isinstance(payload, TransactionPayload__ScriptFunction):
         raise ValueError("Unexpected transaction payload")
