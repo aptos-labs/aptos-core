@@ -7,11 +7,11 @@ use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
-    name = "Diem format generator",
-    about = "Trace serde (de)serialization to generate format descriptions for Diem types"
+    name = "Aptos format generator",
+    about = "Trace serde (de)serialization to generate format descriptions for Aptos types"
 )]
 struct Options {
-    #[structopt(long, possible_values = &Corpus::variants(), default_value = "Diem", case_insensitive = true)]
+    #[structopt(long, possible_values = &Corpus::variants(), default_value = "Aptos", case_insensitive = true)]
     corpus: Corpus,
 
     #[structopt(long)]
