@@ -257,7 +257,7 @@ Sequence number exceeded the maximum value for a u64
 
 
 
-<pre><code><b>const</b> <a href="Account.md#0x1_Account_PROLOGUE_EBAD_CHAIN_ID">PROLOGUE_EBAD_CHAIN_ID</a>: u64 = 1005;
+<pre><code><b>const</b> <a href="Account.md#0x1_Account_PROLOGUE_EBAD_CHAIN_ID">PROLOGUE_EBAD_CHAIN_ID</a>: u64 = 1007;
 </code></pre>
 
 
@@ -275,7 +275,7 @@ Sequence number exceeded the maximum value for a u64
 
 
 
-<pre><code><b>const</b> <a href="Account.md#0x1_Account_PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG">PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG</a>: u64 = 1006;
+<pre><code><b>const</b> <a href="Account.md#0x1_Account_PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG">PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG</a>: u64 = 1011;
 </code></pre>
 
 

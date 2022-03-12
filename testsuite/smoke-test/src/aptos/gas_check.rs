@@ -27,10 +27,12 @@ impl AptosTest for GasCheck {
                 aptos_stdlib::encode_transfer_script_function(account2.address(), 100),
             ));
         // fail due to not enough gas
-        ctx.client()
+        let err = ctx
+            .client()
             .submit_and_wait(&transfer_txn)
             .await
             .unwrap_err();
+        assert!(format!("{:?}", err).contains("INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE"));
 
         ctx.mint(account1.address(), 1000).await?;
 

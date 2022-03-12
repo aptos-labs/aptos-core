@@ -85,15 +85,6 @@ transaction in addition to the core prologue and epilogue.
 
 
 
-<a name="0x1_AptosAccount_ECANT_PAY_GAS_DEPOSIT"></a>
-
-
-
-<pre><code><b>const</b> <a href="AptosAccount.md#0x1_AptosAccount_ECANT_PAY_GAS_DEPOSIT">ECANT_PAY_GAS_DEPOSIT</a>: u64 = 5;
-</code></pre>
-
-
-
 <a name="0x1_AptosAccount_EGAS"></a>
 
 
@@ -130,20 +121,59 @@ transaction in addition to the core prologue and epilogue.
 
 
 
-<a name="0x1_AptosAccount_ETRANSACTION_EXPIRED"></a>
-
-
-
-<pre><code><b>const</b> <a href="AptosAccount.md#0x1_AptosAccount_ETRANSACTION_EXPIRED">ETRANSACTION_EXPIRED</a>: u64 = 4;
-</code></pre>
-
-
-
 <a name="0x1_AptosAccount_EWRITESET_NOT_ALLOWED"></a>
 
 
 
 <pre><code><b>const</b> <a href="AptosAccount.md#0x1_AptosAccount_EWRITESET_NOT_ALLOWED">EWRITESET_NOT_ALLOWED</a>: u64 = 6;
+</code></pre>
+
+
+
+<a name="0x1_AptosAccount_PROLOGUE_ECANT_PAY_GAS_DEPOSIT"></a>
+
+Prologue errors. These are separated out from the other errors in this
+module since they are mapped separately to major VM statuses, and are
+important to the semantics of the system.
+
+
+<pre><code><b>const</b> <a href="AptosAccount.md#0x1_AptosAccount_PROLOGUE_ECANT_PAY_GAS_DEPOSIT">PROLOGUE_ECANT_PAY_GAS_DEPOSIT</a>: u64 = 1005;
+</code></pre>
+
+
+
+<a name="0x1_AptosAccount_PROLOGUE_EINVALID_WRITESET_SENDER"></a>
+
+
+
+<pre><code><b>const</b> <a href="AptosAccount.md#0x1_AptosAccount_PROLOGUE_EINVALID_WRITESET_SENDER">PROLOGUE_EINVALID_WRITESET_SENDER</a>: u64 = 1010;
+</code></pre>
+
+
+
+<a name="0x1_AptosAccount_PROLOGUE_EMODULE_NOT_ALLOWED"></a>
+
+
+
+<pre><code><b>const</b> <a href="AptosAccount.md#0x1_AptosAccount_PROLOGUE_EMODULE_NOT_ALLOWED">PROLOGUE_EMODULE_NOT_ALLOWED</a>: u64 = 1009;
+</code></pre>
+
+
+
+<a name="0x1_AptosAccount_PROLOGUE_ESCRIPT_NOT_ALLOWED"></a>
+
+
+
+<pre><code><b>const</b> <a href="AptosAccount.md#0x1_AptosAccount_PROLOGUE_ESCRIPT_NOT_ALLOWED">PROLOGUE_ESCRIPT_NOT_ALLOWED</a>: u64 = 1008;
+</code></pre>
+
+
+
+<a name="0x1_AptosAccount_PROLOGUE_ETRANSACTION_EXPIRED"></a>
+
+
+
+<pre><code><b>const</b> <a href="AptosAccount.md#0x1_AptosAccount_PROLOGUE_ETRANSACTION_EXPIRED">PROLOGUE_ETRANSACTION_EXPIRED</a>: u64 = 1006;
 </code></pre>
 
 
@@ -422,7 +452,7 @@ Rotate the authentication key for the account under cap.account_address
     txn_expiration_time: u64,
     chain_id: u8,
 ) {
-    <b>assert</b>!(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/TransactionPublishingOption.md#0x1_TransactionPublishingOption_is_module_allowed">TransactionPublishingOption::is_module_allowed</a>(), <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="AptosAccount.md#0x1_AptosAccount_EMODULE_NOT_ALLOWED">EMODULE_NOT_ALLOWED</a>));
+    <b>assert</b>!(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/TransactionPublishingOption.md#0x1_TransactionPublishingOption_is_module_allowed">TransactionPublishingOption::is_module_allowed</a>(), <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="AptosAccount.md#0x1_AptosAccount_PROLOGUE_EMODULE_NOT_ALLOWED">PROLOGUE_EMODULE_NOT_ALLOWED</a>));
     <a href="AptosAccount.md#0x1_AptosAccount_prologue_common">prologue_common</a>(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
 }
 </code></pre>
@@ -456,7 +486,7 @@ Rotate the authentication key for the account under cap.account_address
     chain_id: u8,
     script_hash: vector&lt;u8&gt;,
 ) {
-    <b>assert</b>!(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/TransactionPublishingOption.md#0x1_TransactionPublishingOption_is_script_allowed">TransactionPublishingOption::is_script_allowed</a>(&script_hash), <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="AptosAccount.md#0x1_AptosAccount_ESCRIPT_NOT_ALLOWED">ESCRIPT_NOT_ALLOWED</a>));
+    <b>assert</b>!(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/TransactionPublishingOption.md#0x1_TransactionPublishingOption_is_script_allowed">TransactionPublishingOption::is_script_allowed</a>(&script_hash), <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="AptosAccount.md#0x1_AptosAccount_PROLOGUE_ESCRIPT_NOT_ALLOWED">PROLOGUE_ESCRIPT_NOT_ALLOWED</a>));
     <a href="AptosAccount.md#0x1_AptosAccount_prologue_common">prologue_common</a>(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
 }
 </code></pre>
@@ -487,7 +517,7 @@ Rotate the authentication key for the account under cap.account_address
     _txn_expiration_time: u64,
     _chain_id: u8,
 ) {
-    <b>assert</b>!(<b>false</b>, <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="AptosAccount.md#0x1_AptosAccount_EWRITESET_NOT_ALLOWED">EWRITESET_NOT_ALLOWED</a>));
+    <b>assert</b>!(<b>false</b>, <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="AptosAccount.md#0x1_AptosAccount_PROLOGUE_EINVALID_WRITESET_SENDER">PROLOGUE_EINVALID_WRITESET_SENDER</a>));
 }
 </code></pre>
 
@@ -624,12 +654,14 @@ Rotate the authentication key for the account under cap.account_address
 ) {
     <b>assert</b>!(
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Timestamp.md#0x1_Timestamp_now_seconds">Timestamp::now_seconds</a>() &lt; txn_expiration_time,
-        <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="AptosAccount.md#0x1_AptosAccount_ETRANSACTION_EXPIRED">ETRANSACTION_EXPIRED</a>),
+        <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="AptosAccount.md#0x1_AptosAccount_PROLOGUE_ETRANSACTION_EXPIRED">PROLOGUE_ETRANSACTION_EXPIRED</a>),
     );
     <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Account.md#0x1_Account_prologue">Account::prologue</a>(&sender, txn_sequence_number, txn_public_key, chain_id);
     <b>let</b> max_transaction_fee = txn_gas_price * txn_max_gas_units;
-    <b>let</b> balance = <a href="TestCoin.md#0x1_TestCoin_balance_of">TestCoin::balance_of</a>(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(&sender));
-    <b>assert</b>!(balance &gt;= max_transaction_fee, <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_state">Errors::invalid_state</a>(<a href="AptosAccount.md#0x1_AptosAccount_ECANT_PAY_GAS_DEPOSIT">ECANT_PAY_GAS_DEPOSIT</a>));
+    <b>let</b> addr = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(&sender);
+    <b>assert</b>!(<a href="TestCoin.md#0x1_TestCoin_exists_at">TestCoin::exists_at</a>(addr), <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="AptosAccount.md#0x1_AptosAccount_PROLOGUE_ECANT_PAY_GAS_DEPOSIT">PROLOGUE_ECANT_PAY_GAS_DEPOSIT</a>));
+    <b>let</b> balance = <a href="TestCoin.md#0x1_TestCoin_balance_of">TestCoin::balance_of</a>(addr);
+    <b>assert</b>!(balance &gt;= max_transaction_fee, <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="AptosAccount.md#0x1_AptosAccount_PROLOGUE_ECANT_PAY_GAS_DEPOSIT">PROLOGUE_ECANT_PAY_GAS_DEPOSIT</a>));
 }
 </code></pre>
 

@@ -9,3 +9,5 @@ mod gas_check;
 pub use gas_check::*;
 mod module_publish;
 pub use module_publish::*;
+mod error_report;
+pub use error_report::*;

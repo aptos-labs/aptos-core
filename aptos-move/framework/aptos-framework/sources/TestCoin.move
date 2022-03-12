@@ -138,6 +138,10 @@ module AptosFramework::TestCoin {
         coin_info.total_value = coin_info.total_value + (amount as u128);
     }
 
+    public fun exists_at(addr: address): bool{
+        exists<Balance>(addr)
+    }
+
     /// Returns the balance of `owner`.
     public fun balance_of(owner: address): u64 acquires Balance {
         assert!(exists<Balance>(owner), Errors::not_published(EBALANCE_NOT_PUBLISHED));

@@ -24,6 +24,7 @@ modified from https://github.com/diem/move/tree/main/language/documentation/tuto
 -  [Function `claim_mint_capability`](#0x1_TestCoin_claim_mint_capability)
 -  [Function `find_delegation`](#0x1_TestCoin_find_delegation)
 -  [Function `mint`](#0x1_TestCoin_mint)
+-  [Function `exists_at`](#0x1_TestCoin_exists_at)
 -  [Function `balance_of`](#0x1_TestCoin_balance_of)
 -  [Function `transfer`](#0x1_TestCoin_transfer)
 -  [Function `withdraw`](#0x1_TestCoin_withdraw)
@@ -584,6 +585,30 @@ Mint coins with capability.
     // Update the total supply
     <b>let</b> coin_info = <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a>&gt;(@CoreResources);
     coin_info.total_value = coin_info.total_value + (amount <b>as</b> u128);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_TestCoin_exists_at"></a>
+
+## Function `exists_at`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_exists_at">exists_at</a>(addr: <b>address</b>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_exists_at">exists_at</a>(addr: <b>address</b>): bool{
+    <b>exists</b>&lt;<a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>&gt;(addr)
 }
 </code></pre>
 

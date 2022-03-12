@@ -26,12 +26,19 @@ module AptosFramework::AptosAccount {
     const EGAS: u64 = 1;
     const ECANNOT_CREATE_AT_CORE_CODE: u64 = 2;
     const EADDR_NOT_MATCH_PREIMAGE: u64 = 3;
-    const ETRANSACTION_EXPIRED: u64 = 4;
-    const ECANT_PAY_GAS_DEPOSIT: u64 = 5;
     const EWRITESET_NOT_ALLOWED: u64 = 6;
     const EMULTI_AGENT_NOT_SUPPORTED: u64 = 7;
     const EMODULE_NOT_ALLOWED: u64 = 8;
     const ESCRIPT_NOT_ALLOWED: u64 = 9;
+
+    /// Prologue errors. These are separated out from the other errors in this
+    /// module since they are mapped separately to major VM statuses, and are
+    /// important to the semantics of the system.
+    const PROLOGUE_ECANT_PAY_GAS_DEPOSIT: u64 = 1005;
+    const PROLOGUE_ETRANSACTION_EXPIRED: u64 = 1006;
+    const PROLOGUE_ESCRIPT_NOT_ALLOWED: u64 = 1008;
+    const PROLOGUE_EMODULE_NOT_ALLOWED: u64 = 1009;
+    const PROLOGUE_EINVALID_WRITESET_SENDER: u64 = 1010;
 
     public(friend) fun create_account_internal(account_address: address, auth_key_prefix: vector<u8>): (signer, vector<u8>) {
         assert!(
@@ -138,7 +145,7 @@ module AptosFramework::AptosAccount {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
-        assert!(TransactionPublishingOption::is_module_allowed(), Errors::invalid_state(EMODULE_NOT_ALLOWED));
+        assert!(TransactionPublishingOption::is_module_allowed(), Errors::invalid_state(PROLOGUE_EMODULE_NOT_ALLOWED));
         prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
@@ -152,7 +159,7 @@ module AptosFramework::AptosAccount {
         chain_id: u8,
         script_hash: vector<u8>,
     ) {
-        assert!(TransactionPublishingOption::is_script_allowed(&script_hash), Errors::invalid_state(ESCRIPT_NOT_ALLOWED));
+        assert!(TransactionPublishingOption::is_script_allowed(&script_hash), Errors::invalid_state(PROLOGUE_ESCRIPT_NOT_ALLOWED));
         prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
@@ -163,7 +170,7 @@ module AptosFramework::AptosAccount {
         _txn_expiration_time: u64,
         _chain_id: u8,
     ) {
-        assert!(false, Errors::invalid_argument(EWRITESET_NOT_ALLOWED));
+        assert!(false, Errors::invalid_argument(PROLOGUE_EINVALID_WRITESET_SENDER));
     }
 
     fun multi_agent_script_prologue(
@@ -220,11 +227,13 @@ module AptosFramework::AptosAccount {
     ) {
         assert!(
             Timestamp::now_seconds() < txn_expiration_time,
-            Errors::invalid_argument(ETRANSACTION_EXPIRED),
+            Errors::invalid_argument(PROLOGUE_ETRANSACTION_EXPIRED),
         );
         Account::prologue(&sender, txn_sequence_number, txn_public_key, chain_id);
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
-        let balance = TestCoin::balance_of(Signer::address_of(&sender));
-        assert!(balance >= max_transaction_fee, Errors::invalid_state(ECANT_PAY_GAS_DEPOSIT));
+        let addr = Signer::address_of(&sender);
+        assert!(TestCoin::exists_at(addr), Errors::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
+        let balance = TestCoin::balance_of(addr);
+        assert!(balance >= max_transaction_fee, Errors::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
     }
 }
