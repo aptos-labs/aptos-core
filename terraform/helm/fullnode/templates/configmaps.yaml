@@ -17,7 +17,7 @@ metadata:
   labels:
     {{- include "aptos-fullnode.labels" . | nindent 4 }}
 data:
-  waypoint.txt: {{ (get .Values.aptos_chains .Values.chain.name).waypoint }}
+  waypoint.txt: {{ .Files.Get (print "files/genesis/" .Values.chain.name "-waypoint.txt") }}
 binaryData:
-  genesis.blob: {{ .Files.Get (print "files/genesis/" .Values.chain.name ".blob") | b64enc }}
+  genesis.blob: {{ .Files.Get (print "files/genesis/" .Values.chain.name "-genesis.blob") | b64enc }}
 {{- end }}

@@ -1,13 +1,13 @@
 # This compose file defines a Public Fullnode docker compose wrapper around aptos-node.
 #
-# In order to use, place a copy of the proper genesis.blob and waypoint.txt in this directory.
+# The configuration will load genesis blob and waypoint for connecting to Aptos devnet
 #
 # Note this compose comes with a pre-configured node.config for fullnodes, see
 # public_full_node.yaml. The config is pretty well documented and aligns with instructions herein.
 # It is intended for use with testnet but can be easily modified for other systems.
 #
-# TODO:
-# * add url for genesis blob and waypoint
+# To run the docker compose:
+#   * `docker-compose -f docker-compose.yaml up -d`
 #
 # TODO:
 #   * Directions on the correct image
@@ -31,13 +31,13 @@
 version: "3.8"
 services:
   fullnode:
-    image: aptos/validator:devnet
+    image: aptos/validator:latest
     volumes:
       - type: volume
         source: db
         target: /opt/aptos/data
       - type: bind
-        source: ./genesis.blob
+        source: ./devnet-genesis.blob
         target: /opt/aptos/etc/genesis.blob
         read_only: true
       - type: bind
@@ -45,7 +45,7 @@ services:
         target: /opt/aptos/etc/node.yaml
         read_only: true
       - type: bind
-        source: ./waypoint.txt
+        source: ./devnet-waypoint.txt
         target: /opt/aptos/etc/waypoint.txt
         read_only: true
     command: ["/opt/aptos/bin/aptos-node", "-f", "/opt/aptos/etc/node.yaml"]

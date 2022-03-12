@@ -1,0 +1,1 @@
+../../../devnet-config/devnet-waypoint.txt

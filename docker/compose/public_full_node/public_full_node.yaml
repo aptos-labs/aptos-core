@@ -20,6 +20,6 @@ full_node_networks:
       listen_address: "/ip4/127.0.0.1/tcp/6180"
       network_id: "public"
 
-json_rpc:
+api:
     # This specifies your REST API endpoint. Intentionally on public so that Docker can export it.
     address: 0.0.0.0:8080
