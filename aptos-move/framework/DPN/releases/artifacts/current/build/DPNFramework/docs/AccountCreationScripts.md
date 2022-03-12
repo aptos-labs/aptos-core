@@ -68,7 +68,7 @@ The sender of the transaction must be a Parent VASP account.
 Creates a <code>ChildVASP</code> account for the sender <code>parent_vasp</code> at <code>child_address</code> with a balance of
 <code>child_initial_balance</code> in <code>CoinType</code> and an initial authentication key of
 <code>auth_key_prefix | child_address</code>. Authentication key prefixes, and how to construct them from an ed25519 public key is described
-[here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+[here](https://aptos.dev/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
 
 If <code>add_all_currencies</code> is true, the child address will have a zero balance in all available
 currencies in the system.
@@ -250,7 +250,7 @@ Creates an account with a Validator Operator role at <code>new_account_address</
 <code><a href="ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_ValidatorOperatorConfig">ValidatorOperatorConfig::ValidatorOperatorConfig</a></code> resource with the specified <code>human_name</code>.
 This script does not assign the validator operator to any validator accounts but only creates the account.
 Authentication key prefixes, and how to construct them from an ed25519 public key are described
-[here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+[here](https://aptos.dev/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
 
 
 <a name="@Events_8"></a>
@@ -396,7 +396,7 @@ Creates an account with a Validator role at <code>new_account_address</code>, wi
 This script does not add the validator to the validator set or the system,
 but only creates the account.
 Authentication keys, prefixes, and how to construct them from an ed25519 public key are described
-[here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+[here](https://aptos.dev/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
 
 
 <a name="@Events_14"></a>
@@ -539,7 +539,7 @@ Creates an account with the Parent VASP role at <code><b>address</b></code> with
 also be added. This can only be invoked by an TreasuryCompliance account.
 <code>sliding_nonce</code> is a unique nonce for operation, see <code><a href="SlidingNonce.md#0x1_SlidingNonce">SlidingNonce</a></code> for details.
 Authentication keys, prefixes, and how to construct them from an ed25519 public key are described
-[here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+[here](https://aptos.dev/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
 
 
 <a name="@Events_20"></a>
@@ -679,7 +679,7 @@ Creates an account with the Designated Dealer role at <code>addr</code> with aut
 0 balances for all available currencies in the system will also be added. This can only be
 invoked by an account with the TreasuryCompliance role.
 Authentication keys, prefixes, and how to construct them from an ed25519 public key are described
-[here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+[here](https://aptos.dev/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
 
 At the time of creation the account is also initialized with default mint tiers of (500_000,
 5000_000, 50_000_000, 500_000_000), and preburn areas for each currency that is added to the

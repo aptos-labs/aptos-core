@@ -10,7 +10,7 @@ module DiemFramework::AccountCreationScripts {
     /// Creates a `ChildVASP` account for the sender `parent_vasp` at `child_address` with a balance of
     /// `child_initial_balance` in `CoinType` and an initial authentication key of
     /// `auth_key_prefix | child_address`. Authentication key prefixes, and how to construct them from an ed25519 public key is described
-    /// [here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+    /// [here](https://aptos.dev/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
     ///
     /// If `add_all_currencies` is true, the child address will have a zero balance in all available
     /// currencies in the system.
@@ -155,7 +155,7 @@ module DiemFramework::AccountCreationScripts {
     /// `ValidatorOperatorConfig::ValidatorOperatorConfig` resource with the specified `human_name`.
     /// This script does not assign the validator operator to any validator accounts but only creates the account.
     /// Authentication key prefixes, and how to construct them from an ed25519 public key are described
-    /// [here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+    /// [here](https://aptos.dev/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
     ///
     /// # Events
     /// Successful execution will emit:
@@ -251,7 +251,7 @@ module DiemFramework::AccountCreationScripts {
     /// This script does not add the validator to the validator set or the system,
     /// but only creates the account.
     /// Authentication keys, prefixes, and how to construct them from an ed25519 public key are described
-    /// [here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+    /// [here](https://aptos.dev/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
     ///
     /// # Events
     /// Successful execution will emit:
@@ -344,7 +344,7 @@ module DiemFramework::AccountCreationScripts {
     /// also be added. This can only be invoked by an TreasuryCompliance account.
     /// `sliding_nonce` is a unique nonce for operation, see `SlidingNonce` for details.
     /// Authentication keys, prefixes, and how to construct them from an ed25519 public key are described
-    /// [here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+    /// [here](https://aptos.dev/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
     ///
     /// # Events
     /// Successful execution will emit:
@@ -434,7 +434,7 @@ module DiemFramework::AccountCreationScripts {
     /// 0 balances for all available currencies in the system will also be added. This can only be
     /// invoked by an account with the TreasuryCompliance role.
     /// Authentication keys, prefixes, and how to construct them from an ed25519 public key are described
-    /// [here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+    /// [here](https://aptos.dev/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
     ///
     /// At the time of creation the account is also initialized with default mint tiers of (500_000,
     /// 5000_000, 50_000_000, 500_000_000), and preburn areas for each currency that is added to the

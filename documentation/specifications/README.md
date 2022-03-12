@@ -6,7 +6,7 @@ This document describes the protocol specifications for the Diem Payment Network
 * Developers who work on supporting transaction validation and interface with the validation protocols.
 * Those interested in improving the protocol specifications and/or understanding the LPN in more detail.
 
-The reference implementations for all LPN specifications is [Aptos Core](https://github.com/diem/diem). Aptos Core is maintained by the open-source developer community on behalf of the [Aptos Labs](https://aptoslabs.com/en-US/association/). After the initial launch of the LPN, all specification changes will be proposed via the Diem Improvement Proposals (DIP) process - which is not yet finalized and public. For expedience prior to the launch of the LPN, changes to the specification will be made directly in the documentation and code.
+The reference implementations for all LPN specifications is [Aptos Core](https://github.com/aptos-core/aptos-labs). Aptos Core is maintained by the open-source developer community on behalf of the [Aptos Labs](https://aptoslabs.com/en-US/association/). After the initial launch of the LPN, all specification changes will be proposed via the Diem Improvement Proposals (DIP) process - which is not yet finalized and public. For expedience prior to the launch of the LPN, changes to the specification will be made directly in the documentation and code.
 
 ## Overview
 
@@ -19,7 +19,7 @@ latency, and an efficient, high-capacity storage system.
 * Highly secure to ensure the safety of funds and financial data.
 * Flexible, so that it can power future innovation in financial services.
 
-The Diem Blockchain is designed from the ground up to holistically address these requirements and builds on the learnings from existing projects and research — a combination of innovative approaches and well-understood techniques. The [Diem whitepaper](https://developers.aptoslabs.com/docs/assets/papers/the-diem-blockchain/2019-09-26.pdf) provides much of the rationale behind the overall design.  More details on the Aptos Labs and its mission are available on [aptoslabs.com](https://aptoslabs.com)
+The Diem Blockchain is designed from the ground up to holistically address these requirements and builds on the learnings from existing projects and research — a combination of innovative approaches and well-understood techniques. The [Diem whitepaper](https://aptos.dev/docs/assets/papers/the-diem-blockchain/2019-09-26.pdf) provides much of the rationale behind the overall design.  More details on the Aptos Labs and its mission are available on [aptoslabs.com](https://aptoslabs.com)
 
 ## Architecture
 

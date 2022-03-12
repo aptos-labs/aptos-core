@@ -53,7 +53,7 @@ pub enum ScriptFunctionCall {
     /// This script does not add the validator to the validator set or the system,
     /// but only creates the account.
     /// Authentication keys, prefixes, and how to construct them from an ed25519 public key are described
-    /// [here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+    /// [here](https://aptos.dev/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
     ///
     /// # Events
     /// Successful execution will emit:
@@ -105,7 +105,7 @@ pub enum ScriptFunctionCall {
     /// `ValidatorOperatorConfig::ValidatorOperatorConfig` resource with the specified `human_name`.
     /// This script does not assign the validator operator to any validator accounts but only creates the account.
     /// Authentication key prefixes, and how to construct them from an ed25519 public key are described
-    /// [here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+    /// [here](https://aptos.dev/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
     ///
     /// # Events
     /// Successful execution will emit:
@@ -456,7 +456,7 @@ pub fn encode_create_account_script_function(
 /// This script does not add the validator to the validator set or the system,
 /// but only creates the account.
 /// Authentication keys, prefixes, and how to construct them from an ed25519 public key are described
-/// [here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+/// [here](https://aptos.dev/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
 ///
 /// # Events
 /// Successful execution will emit:
@@ -522,7 +522,7 @@ pub fn encode_create_validator_account_script_function(
 /// `ValidatorOperatorConfig::ValidatorOperatorConfig` resource with the specified `human_name`.
 /// This script does not assign the validator operator to any validator accounts but only creates the account.
 /// Authentication key prefixes, and how to construct them from an ed25519 public key are described
-/// [here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+/// [here](https://aptos.dev/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
 ///
 /// # Events
 /// Successful execution will emit:

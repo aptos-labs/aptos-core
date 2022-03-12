@@ -11,7 +11,7 @@ module ExperimentalFramework::AccountCreationScripts {
     /// `ValidatorOperatorConfig::ValidatorOperatorConfig` resource with the specified `human_name`.
     /// This script does not assign the validator operator to any validator accounts but only creates the account.
     /// Authentication key prefixes, and how to construct them from an ed25519 public key are described
-    /// [here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+    /// [here](https://aptos.dev/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
     ///
     /// # Events
     /// Successful execution will emit:
@@ -75,7 +75,7 @@ module ExperimentalFramework::AccountCreationScripts {
     /// This script does not add the validator to the validator set or the system,
     /// but only creates the account.
     /// Authentication keys, prefixes, and how to construct them from an ed25519 public key are described
-    /// [here](https://developers.aptoslabs.com/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
+    /// [here](https://aptos.dev/docs/core/accounts/#addresses-authentication-keys-and-cryptographic-keys).
     ///
     /// # Events
     /// Successful execution will emit:

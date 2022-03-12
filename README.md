@@ -1,4 +1,4 @@
-<a href="https://developers.aptoslabs.com">
+<a href="https://aptos.dev">
 	<img width="100%" src="./.assets/aptos_banner.png" alt="Aptos Banner" />
 </a>
 
@@ -22,33 +22,33 @@ Aptos Core implements a decentralized, programmable database which provides a fi
 
 ## Contributing
 
-To begin contributing, [sign the CLA](https://aptoslabs.com/en-US/cla-sign/). You can learn more about contributing to the Aptos project by reading our [Contribution Guide](https://developers.aptoslabs.com/docs/community/contributing) and by viewing our [Code of Conduct](https://developers.aptoslabs.com/docs/policies/code-of-conduct).
+To begin contributing, [sign the CLA](https://aptoslabs.com/en-US/cla-sign/). You can learn more about contributing to the Aptos project by reading our [Contribution Guide](https://aptos.dev/docs/community/contributing) and by viewing our [Code of Conduct](https://aptos.dev/docs/policies/code-of-conduct).
 
 ## Getting Started
 
 ### Learn About Aptos
-* [Welcome](https://developers.aptoslabs.com/docs/welcome-to-aptos)
-* [Basic Concepts](https://developers.aptoslabs.com/docs/basics/basics-txns-states)
-* [Life of a Transaction](https://developers.aptoslabs.com/docs/transactions/basics-life-of-txn)
+* [Welcome](https://aptos.dev/docs/welcome-to-aptos)
+* [Basic Concepts](https://aptos.dev/docs/basics/basics-txns-states)
+* [Life of a Transaction](https://aptos.dev/docs/transactions/basics-life-of-txn)
 * [JSON-RPC SPEC](json-rpc/json-rpc-spec.md)
 
 ### Try Aptos Core
-* [My First Transaction](https://developers.aptoslabs.com/docs/tutorials/tutorial-my-first-transaction)
+* [My First Transaction](https://aptos.dev/docs/tutorials/tutorial-my-first-transaction)
 * [Getting Started With Move](https://aptos.github.io/move/introduction.html)
 
 ### Technical Papers
-* [The Aptos Blockchain](https://developers.aptoslabs.com/docs/technical-papers/the-aptos-blockchain-paper)
-* [Move: A Language With Programmable Resources](https://developers.aptoslabs.com/docs/technical-papers/move-paper)
-* [State Machine Replication in the Aptos Blockchain](https://developers.aptoslabs.com/docs/technical-papers/state-machine-replication-paper)
+* [The Aptos Blockchain](https://aptos.dev/docs/technical-papers/the-aptos-blockchain-paper)
+* [Move: A Language With Programmable Resources](https://aptos.dev/docs/technical-papers/move-paper)
+* [State Machine Replication in the Aptos Blockchain](https://aptos.dev/docs/technical-papers/state-machine-replication-paper)
 
 ### Blog
-* [Aptos: The Path Forward](https://developers.aptoslabs.com/blog/2019/06/18/the-path-forward/)
+* [Aptos: The Path Forward](https://aptos.dev/blog/2019/06/18/the-path-forward/)
 
 ## Community
 
 * Join us on the [Aptos Discord](https://discord.gg/gEV3C5jSnw).
 * Ask a question on [Stack Overflow](https://stackoverflow.com/questions/tagged/aptos).
-* Get the latest updates to our project by signing up for our [newsletter](https://developers.aptoslabs.com/newsletter_form).
+* Get the latest updates to our project by signing up for our [newsletter](https://aptos.dev/newsletter_form).
 
 ## License
 

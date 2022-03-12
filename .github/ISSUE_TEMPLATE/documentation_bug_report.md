@@ -1,5 +1,5 @@
 ---
-name: "\U0001F41B Documentation/developers.aptoslabs.com Bug report"
+name: "\U0001F41B Documentation/aptos.dev Bug report"
 about: Create a bug report to help improve the Diem Developers' Website
 title: "[Bug]"
 labels: bug
