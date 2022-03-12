@@ -4,7 +4,7 @@
 use crate::{
     smoke_test_environment::new_local_swarm,
     test_utils::{
-        diem_swarm_utils::{create_root_storage, load_validators_backend_storage},
+        swarm_utils::{create_root_storage, load_validators_backend_storage},
         write_key_to_file_bcs_format, write_key_to_file_hex_format,
     },
 };

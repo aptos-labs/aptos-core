@@ -4,7 +4,7 @@
 use crate::{
     smoke_test_environment::new_local_swarm,
     test_utils::{
-        assert_balance, create_and_fund_account, diem_swarm_utils::insert_waypoint,
+        assert_balance, create_and_fund_account, swarm_utils::insert_waypoint,
         transfer_and_reconfig, transfer_coins,
     },
     workspace_builder,

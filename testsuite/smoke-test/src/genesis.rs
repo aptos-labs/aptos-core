@@ -6,7 +6,7 @@ use crate::{
     storage::{db_backup, db_restore},
     test_utils::{
         assert_balance, create_and_fund_account,
-        diem_swarm_utils::{create_root_storage, insert_waypoint},
+        swarm_utils::{create_root_storage, insert_waypoint},
         transfer_coins,
     },
     workspace_builder,

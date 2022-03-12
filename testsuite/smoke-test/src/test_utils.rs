@@ -103,7 +103,7 @@ pub async fn assert_balance(client: &RestClient, account: &LocalAccount, balance
 /// require a SmokeTestEnvironment, as it provides a generic interface across
 /// AptosSwarms, regardless of if the swarm is a validator swarm, validator full
 /// node swarm, or a public full node swarm.
-pub mod diem_swarm_utils {
+pub mod swarm_utils {
     use crate::test_utils::fetch_backend_storage;
     use aptos_config::config::{NodeConfig, OnDiskStorageConfig, SecureBackend, WaypointConfig};
     use aptos_global_constants::{APTOS_ROOT_KEY, TREASURY_COMPLIANCE_KEY};
