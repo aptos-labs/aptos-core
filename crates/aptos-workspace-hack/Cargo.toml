@@ -41,7 +41,7 @@ parking_lot = { version = "0.12.0", features = ["send_guard"] }
 phf_shared = { version = "0.10.0", features = ["std", "uncased"] }
 plotters = { version = "0.3.1", default-features = false, features = ["area_series", "evcxr", "histogram", "line_series", "plotters-svg", "svg_backend"] }
 rand = { version = "0.8.4", features = ["alloc", "getrandom", "libc", "rand_chacha", "rand_hc", "small_rng", "std", "std_rng"] }
-regex = { version = "1.4.3", features = ["aho-corasick", "memchr", "perf", "perf-cache", "perf-dfa", "perf-inline", "perf-literal", "std", "thread_local", "unicode", "unicode-age", "unicode-bool", "unicode-case", "unicode-gencat", "unicode-perl", "unicode-script", "unicode-segment"] }
+regex = { version = "1.5.5", features = ["aho-corasick", "memchr", "perf", "perf-cache", "perf-dfa", "perf-inline", "perf-literal", "std", "unicode", "unicode-age", "unicode-bool", "unicode-case", "unicode-gencat", "unicode-perl", "unicode-script", "unicode-segment"] }
 regex-automata = { version = "0.1.10", features = ["regex-syntax", "std"] }
 reqwest = { version = "0.11.9", features = ["__tls", "blocking", "cookie_crate", "cookie_store", "cookies", "default-tls", "hyper-tls", "json", "native-tls-crate", "proc-macro-hack", "serde_json", "stream", "tokio-native-tls", "tokio-util"] }
 rusty-fork = { version = "0.3.0", features = ["timeout", "wait-timeout"] }
@@ -53,7 +53,7 @@ subtle = { version = "2.4.1", default-features = false, features = ["std"] }
 tokio = { version = "1.17.0", features = ["bytes", "fs", "full", "io-std", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "socket2", "sync", "test-util", "time", "tokio-macros", "winapi"] }
 tokio-util = { version = "0.6.9", features = ["codec", "compat", "futures-io", "io"] }
 toml = { version = "0.5.8" }
-tracing = { version = "0.1.31", features = ["attributes", "log", "std", "tracing-attributes"] }
+tracing = { version = "0.1.32", features = ["attributes", "log", "std", "tracing-attributes"] }
 warp = { version = "0.3.2", features = ["multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
 zeroize = { version = "1.5.3", features = ["alloc", "zeroize_derive"] }
 
@@ -89,7 +89,7 @@ parking_lot = { version = "0.12.0", features = ["send_guard"] }
 phf_shared = { version = "0.10.0", features = ["std", "uncased"] }
 plotters = { version = "0.3.1", default-features = false, features = ["area_series", "evcxr", "histogram", "line_series", "plotters-svg", "svg_backend"] }
 rand = { version = "0.8.4", features = ["alloc", "getrandom", "libc", "rand_chacha", "rand_hc", "small_rng", "std", "std_rng"] }
-regex = { version = "1.4.3", features = ["aho-corasick", "memchr", "perf", "perf-cache", "perf-dfa", "perf-inline", "perf-literal", "std", "thread_local", "unicode", "unicode-age", "unicode-bool", "unicode-case", "unicode-gencat", "unicode-perl", "unicode-script", "unicode-segment"] }
+regex = { version = "1.5.5", features = ["aho-corasick", "memchr", "perf", "perf-cache", "perf-dfa", "perf-inline", "perf-literal", "std", "unicode", "unicode-age", "unicode-bool", "unicode-case", "unicode-gencat", "unicode-perl", "unicode-script", "unicode-segment"] }
 regex-automata = { version = "0.1.10", features = ["regex-syntax", "std"] }
 reqwest = { version = "0.11.9", features = ["__tls", "blocking", "cookie_crate", "cookie_store", "cookies", "default-tls", "hyper-tls", "json", "native-tls-crate", "proc-macro-hack", "serde_json", "stream", "tokio-native-tls", "tokio-util"] }
 rusty-fork = { version = "0.3.0", features = ["timeout", "wait-timeout"] }
@@ -98,11 +98,11 @@ serde_json = { version = "1.0.79", features = ["indexmap", "preserve_order", "st
 sha-1 = { version = "0.9.8", features = ["std"] }
 standback = { version = "0.2.17", default-features = false, features = ["std"] }
 subtle = { version = "2.4.1", default-features = false, features = ["std"] }
-syn = { version = "1.0.86", features = ["clone-impls", "derive", "extra-traits", "full", "parsing", "printing", "proc-macro", "quote", "visit", "visit-mut"] }
+syn = { version = "1.0.86", features = ["clone-impls", "derive", "extra-traits", "fold", "full", "parsing", "printing", "proc-macro", "quote", "visit", "visit-mut"] }
 tokio = { version = "1.17.0", features = ["bytes", "fs", "full", "io-std", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "socket2", "sync", "test-util", "time", "tokio-macros", "winapi"] }
 tokio-util = { version = "0.6.9", features = ["codec", "compat", "futures-io", "io"] }
 toml = { version = "0.5.8" }
-tracing = { version = "0.1.31", features = ["attributes", "log", "std", "tracing-attributes"] }
+tracing = { version = "0.1.32", features = ["attributes", "log", "std", "tracing-attributes"] }
 warp = { version = "0.3.2", features = ["multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
 zeroize = { version = "1.5.3", features = ["alloc", "zeroize_derive"] }
 

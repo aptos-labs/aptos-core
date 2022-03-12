@@ -40,7 +40,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
 };
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
-use move_vm_types::gas_schedule::{GasStatus, INITIAL_GAS_SCHEDULE};
+use move_vm_types::gas_schedule::{GasStatus, INITIAL_COST_SCHEDULE};
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use transaction_builder::encode_create_designated_dealer_script_function;
@@ -239,7 +239,7 @@ fn create_and_initialize_main_accounts(
             .collect(),
     );
 
-    let genesis_gas_schedule = &INITIAL_GAS_SCHEDULE;
+    let genesis_gas_schedule = &INITIAL_COST_SCHEDULE;
     let instr_gas_costs = bcs::to_bytes(&genesis_gas_schedule.instruction_table)
         .expect("Failure serializing genesis instr gas costs");
     let native_gas_costs = bcs::to_bytes(&genesis_gas_schedule.native_table)

@@ -43,13 +43,13 @@ pub type FileHandleRef = str;
 /// Through this, the backup controller promises to the storage the names passed to
 /// `create_backup()` and `create_for_write()` don't contain funny characters tricky to deal with
 /// in shell commands.
-/// Specifically, names follow the pattern "\A[a-zA-Z0-9][a-zA-Z0-9._-]{0,126}\z"
+/// Specifically, names follow the pattern "\A[a-zA-Z0-9][a-zA-Z0-9._-]{2,126}\z"
 #[cfg_attr(test, derive(Hash, Eq, PartialEq))]
 #[derive(Debug)]
 pub struct ShellSafeName(String);
 
 impl ShellSafeName {
-    const PATTERN: &'static str = r"\A[a-zA-Z0-9][a-zA-Z0-9._-]{0,126}\z";
+    const PATTERN: &'static str = r"\A[a-zA-Z0-9][a-zA-Z0-9._-]{2,126}\z";
 
     fn sanitize(name: &str) -> Result<()> {
         static RE: Lazy<Regex> = Lazy::new(|| Regex::new(ShellSafeName::PATTERN).unwrap());

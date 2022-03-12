@@ -30,8 +30,8 @@ tiny-keccak = { version = "2.0.2", default-features = false, features = ["sha3"]
 bcs = "0.1.2"
 aptos-crypto = { path = "../crates/aptos-crypto", version = "0.0.3" }
 aptos-crypto-derive = { path = "../crates/aptos-crypto-derive", version = "0.0.3" }
-move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860", version = "0.0.3" }
-move-read-write-set-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860" }
+move-core-types = { git = "https://github.com/diem/move", rev = "8a260b82dda8175a98ea848fab5adcce467585b3", version = "0.0.3" }
+move-read-write-set-types = { git = "https://github.com/diem/move", rev = "8a260b82dda8175a98ea848fab5adcce467585b3" }
 aptos-workspace-hack = { version = "0.1", path = "../crates/aptos-workspace-hack" }
 
 [dev-dependencies]
@@ -41,7 +41,7 @@ proptest-derive = "0.3.0"
 serde_json = "1.0.64"
 
 aptos-crypto = { path = "../crates/aptos-crypto", features = ["fuzzing"] }
-move-core-types = { git = "https://github.com/diem/move", rev = "98ed299a7e3a9223019c9bdf4dd92fea9faef860", features = ["fuzzing"]  }
+move-core-types = { git = "https://github.com/diem/move", rev = "8a260b82dda8175a98ea848fab5adcce467585b3", features = ["fuzzing"]  }
 
 [features]
 default = []

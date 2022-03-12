@@ -222,7 +222,7 @@ TransactionPayload:
 TypeTag:
   ENUM:
     0:
-      Bool: UNIT
+      bool: UNIT
     1:
       U8: UNIT
     2:
