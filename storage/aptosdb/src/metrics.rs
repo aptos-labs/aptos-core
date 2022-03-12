@@ -12,7 +12,7 @@ pub static DIEM_STORAGE_LEDGER: Lazy<IntGaugeVec> = Lazy::new(|| {
         // metric name
         "aptos_storage_ledger",
         // metric description
-        "Diem storage ledger counters",
+        "Aptos storage ledger counters",
         // metric labels (dimensions)
         &["type"]
     )
@@ -22,7 +22,7 @@ pub static DIEM_STORAGE_LEDGER: Lazy<IntGaugeVec> = Lazy::new(|| {
 pub static DIEM_STORAGE_COMMITTED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_storage_committed_txns",
-        "Diem storage committed transactions"
+        "Aptos storage committed transactions"
     )
     .unwrap()
 });
@@ -30,7 +30,7 @@ pub static DIEM_STORAGE_COMMITTED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
 pub static DIEM_STORAGE_LATEST_TXN_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_storage_latest_transaction_version",
-        "Diem storage latest transaction version"
+        "Aptos storage latest transaction version"
     )
     .unwrap()
 });
@@ -60,13 +60,13 @@ pub static DIEM_STORAGE_LATEST_ACCOUNT_COUNT: Lazy<IntGauge> = Lazy::new(|| {
 });
 
 pub static DIEM_STORAGE_PRUNE_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!("aptos_storage_prune_window", "Diem storage prune window").unwrap()
+    register_int_gauge!("aptos_storage_prune_window", "Aptos storage prune window").unwrap()
 });
 
 pub static DIEM_STORAGE_PRUNER_LEAST_READABLE_STATE_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_storage_pruner_least_readable_state_version",
-        "Diem storage pruner least readable state version"
+        "Aptos storage pruner least readable state version"
     )
     .unwrap()
 });
@@ -76,7 +76,7 @@ pub static DIEM_STORAGE_API_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
         // metric name
         "aptos_storage_api_latency_seconds",
         // metric description
-        "Diem storage api latency in seconds",
+        "Aptos storage api latency in seconds",
         // metric labels (dimensions)
         &["api_name", "result"]
     )

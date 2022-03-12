@@ -96,7 +96,7 @@ impl BackupCoordinator {
         }
     }
     pub async fn run(&self) -> Result<()> {
-        // Connect to both the local Diem node and the backup storage.
+        // Connect to both the local node and the backup storage.
         let backup_state = metadata::cache::sync_and_load(
             &self.metadata_cache_opt,
             Arc::clone(&self.storage),
@@ -174,7 +174,7 @@ impl BackupCoordinator {
                 }
             }
             Err(e) => warn!(
-                "Failed pulling DbState from local Diem node: {}. Will keep trying.",
+                "Failed pulling DbState from local node: {}. Will keep trying.",
                 e
             ),
         };

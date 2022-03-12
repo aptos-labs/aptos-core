@@ -24,7 +24,7 @@ use backup_cli::{
 };
 
 #[derive(StructOpt)]
-#[structopt(about = "Diem backup tool.")]
+#[structopt(about = "Ledger backup tool.")]
 enum Command {
     #[structopt(about = "Manually run one shot commands.")]
     OneShot(OneShotCommand),
@@ -34,7 +34,7 @@ enum Command {
 
 #[derive(StructOpt)]
 enum OneShotCommand {
-    #[structopt(about = "Query the backup service builtin in the local Diem node.")]
+    #[structopt(about = "Query the backup service builtin in the local node.")]
     Query(OneShotQueryType),
     #[structopt(about = "Do a one shot backup.")]
     Backup(OneShotBackupOpt),
@@ -43,7 +43,7 @@ enum OneShotCommand {
 #[derive(StructOpt)]
 enum OneShotQueryType {
     #[structopt(
-        about = "Queries the latest epoch, committed version and synced version of the local Diem \
+        about = "Queries the latest epoch, committed version and synced version of the local \
         node, via the backup service within it."
     )]
     NodeState(OneShotQueryNodeStateOpt),
