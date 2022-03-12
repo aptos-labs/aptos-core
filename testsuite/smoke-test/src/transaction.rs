@@ -3,7 +3,7 @@
 
 use anyhow::bail;
 use aptos_rest_client::{
-    aptos_api_types::{HexEncodedBytes, ScriptPayload, TransactionPayload},
+    aptos_api_types::{ScriptFunctionPayload, TransactionPayload},
     Transaction,
 };
 use aptos_sdk::{
@@ -66,7 +66,6 @@ impl ExternalTransactionSigner {
 
         let unsigned_txn = ctx
             .transaction_factory()
-            .with_aptos_version(0) // Force Script not ScriptFunctions
             .peer_to_peer(Currency::XUS, receiver.address(), amount)
             .sender(sender_address)
             .sequence_number(test_sequence_number)
@@ -103,19 +102,12 @@ impl ExternalTransactionSigner {
                 );
                 assert_eq!(user_txn.request.max_gas_amount.0, test_max_gas_amount);
 
-                if let TransactionPayload::ScriptPayload(ScriptPayload {
-                    code,
+                if let TransactionPayload::ScriptFunctionPayload(ScriptFunctionPayload {
+                    function: _,
                     type_arguments,
                     arguments,
                 }) = user_txn.request.payload
                 {
-                    let expected_code = match unsigned_txn.clone().into_payload() {
-                        aptos_types::transaction::TransactionPayload::Script(script) => {
-                            HexEncodedBytes::from(script.code().to_vec())
-                        }
-                        _ => bail!("unexpected transaction payload: {:?}", &unsigned_txn),
-                    };
-                    assert_eq!(code.bytecode, expected_code);
                     assert_eq!(
                         type_arguments
                             .into_iter()
