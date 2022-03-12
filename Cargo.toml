@@ -81,7 +81,6 @@ members = [
     "network/memsocket",
     "network/netcore",
     "sdk",
-    "sdk/offchain",
     "sdk/transaction-builder",
     "secure/net",
     "secure/push-metrics",

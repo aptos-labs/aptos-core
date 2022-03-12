@@ -184,7 +184,6 @@ members = [
     "language-e2e-testsuite",
     "memsocket",
     "move-examples",
-    "offchain",
     "smoke-test",
     "transaction-emitter",
     "x",
