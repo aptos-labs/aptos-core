@@ -3,7 +3,7 @@
 
 use anyhow::{format_err, Context, Result};
 use aptos_logger::*;
-use aptos_rest_client::{views::AmountView, Client as RestClient, PendingTransaction, Response};
+use aptos_rest_client::{Client as RestClient, PendingTransaction, Response};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{Currency, TransactionFactory},
@@ -359,9 +359,11 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
         let client = self.client.clone();
         println!("Creating and minting faucet account");
         let faucet_account = &mut self.designated_dealer_account;
-        let balance = retrieve_account_balance(&client, faucet_account.address()).await?;
-        for b in balance {
-            if b.currency.eq(XUS_NAME) {
+        let balances = client
+            .get_account_balances(faucet_account.address())
+            .await?;
+        for b in balances.into_inner() {
+            if b.currency_code().eq(XUS_NAME) {
                 println!(
                     "DD account current balances are {}, requested {} coins",
                     b.amount, coins_total
@@ -677,22 +679,6 @@ impl<'t, 'd> TxnEmitter<'t, 'd> {
         let deadline = Instant::now() + TXN_MAX_WAIT;
         Ok(deadline)
     }
-}
-
-async fn retrieve_account_balance(
-    client: &RestClient,
-    address: AccountAddress,
-) -> Result<Vec<AmountView>> {
-    Ok(client
-        .get_account_balances(address)
-        .await?
-        .into_inner()
-        .into_iter()
-        .map(|b| AmountView {
-            amount: b.amount,
-            currency: b.currency_code(),
-        })
-        .collect())
 }
 
 pub async fn execute_and_wait_transactions(

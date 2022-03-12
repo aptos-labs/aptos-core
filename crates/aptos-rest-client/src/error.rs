@@ -1,8 +1,6 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::views;
-
 pub type Result<T, E = Error> = ::std::result::Result<T, E>;
 
 #[derive(Debug)]
@@ -139,36 +137,5 @@ impl std::error::Error for Error {
 impl From<serde_json::Error> for Error {
     fn from(e: serde_json::Error) -> Self {
         Self::decode(e)
-    }
-}
-
-#[allow(clippy::large_enum_variant)]
-#[derive(Debug)]
-pub enum WaitForTransactionError {
-    // Get account transaction error
-    GetTransactionError(Error),
-    // Transaction hash does not match transaction hash argument
-    TransactionHashMismatchError(views::TransactionView),
-    // Got transaction and it's vm_status#type is not "executed" (execution success)
-    TransactionExecutionFailed(views::TransactionView),
-    // Wait timeout
-    Timeout,
-    // Transaction not found, latest known block (ledger info) timestamp is more recent
-    // than expiration_time_secs argument.
-    TransactionExpired,
-}
-
-impl std::fmt::Display for WaitForTransactionError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:#?}", self)
-    }
-}
-
-impl std::error::Error for WaitForTransactionError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            WaitForTransactionError::GetTransactionError(e) => Some(e),
-            _ => None,
-        }
     }
 }

@@ -25,7 +25,6 @@ mod state;
 use state::State;
 pub mod types;
 pub use types::{DiemAccount, Resource, RestError};
-pub mod views;
 
 macro_rules! cfg_dpn {
     ($($item:item)*) => {
