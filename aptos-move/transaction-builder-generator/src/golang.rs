@@ -26,14 +26,14 @@ use std::{
 pub fn output(
     out: &mut dyn Write,
     serde_module_path: Option<String>,
-    diem_module_path: Option<String>,
+    aptos_module_path: Option<String>,
     package_name: String,
     abis: &[ScriptABI],
 ) -> Result<()> {
     let mut emitter = GoEmitter {
         out: IndentedWriter::new(out, IndentConfig::Tab),
         serde_module_path,
-        diem_module_path,
+        aptos_module_path,
         package_name,
     };
     emitter.output_script_call_enum_with_imports(abis)?;
@@ -82,9 +82,9 @@ struct GoEmitter<T> {
     /// Go module path for Serde runtime packages
     /// `None` to use the default path.
     serde_module_path: Option<String>,
-    /// Go module path for Diem types.
+    /// Go module path for Aptos types.
     /// `None` to use an empty path.
-    diem_module_path: Option<String>,
+    aptos_module_path: Option<String>,
     /// Name of the package owning the generated definitions (e.g. "my_package")
     package_name: String,
 }
@@ -94,9 +94,9 @@ where
     T: Write,
 {
     fn output_script_call_enum_with_imports(&mut self, abis: &[ScriptABI]) -> Result<()> {
-        let aptos_types_package = match &self.diem_module_path {
-            Some(path) => format!("{}/diemtypes", path),
-            None => "diemtypes".into(),
+        let aptos_types_package = match &self.aptos_module_path {
+            Some(path) => format!("{}/aptostypes", path),
+            None => "aptostypes".into(),
         };
         let mut external_definitions =
             crate::common::get_external_definitions(&aptos_types_package);
@@ -185,8 +185,8 @@ where
             writeln!(
                 self.out,
                 r#"
-// Build a Diem `Script` from a structured object `ScriptCall`.
-func EncodeScript(call ScriptCall) diemtypes.Script {{"#
+// Build a Aptos `Script` from a structured object `ScriptCall`.
+func EncodeScript(call ScriptCall) aptostypes.Script {{"#
             )?;
             self.out.indent();
             writeln!(self.out, "switch call := call.(type) {{")?;
@@ -217,8 +217,8 @@ func EncodeScript(call ScriptCall) diemtypes.Script {{"#
             writeln!(
                 self.out,
                 r#"
-// Build a Diem `TransactionPayload` from a structured object `ScriptFunctionCall`.
-func EncodeScriptFunction(call ScriptFunctionCall) diemtypes.TransactionPayload {{"#
+// Build a Aptos `TransactionPayload` from a structured object `ScriptFunctionCall`.
+func EncodeScriptFunction(call ScriptFunctionCall) aptostypes.TransactionPayload {{"#
             )?;
             self.out.indent();
             writeln!(self.out, "switch call := call.(type) {{")?;
@@ -251,8 +251,8 @@ func EncodeScriptFunction(call ScriptFunctionCall) diemtypes.TransactionPayload 
         writeln!(
             self.out,
             r#"
-// Try to recognize a Diem `Script` and convert it into a structured object `ScriptCall`.
-func DecodeScript(script *diemtypes.Script) (ScriptCall, error) {{
+// Try to recognize a Aptos `Script` and convert it into a structured object `ScriptCall`.
+func DecodeScript(script *aptostypes.Script) (ScriptCall, error) {{
 	if helper := script_decoder_map[string(script.Code)]; helper != nil {{
 		val, err := helper(script)
                 return val, err
@@ -267,10 +267,10 @@ func DecodeScript(script *diemtypes.Script) (ScriptCall, error) {{
         writeln!(
             self.out,
             r#"
-// Try to recognize a Diem `TransactionPayload` and convert it into a structured object `ScriptFunctionCall`.
-func DecodeScriptFunctionPayload(script diemtypes.TransactionPayload) (ScriptFunctionCall, error) {{
+// Try to recognize a Aptos `TransactionPayload` and convert it into a structured object `ScriptFunctionCall`.
+func DecodeScriptFunctionPayload(script aptostypes.TransactionPayload) (ScriptFunctionCall, error) {{
     switch script := script.(type) {{
-        case *diemtypes.TransactionPayload__ScriptFunction:
+        case *aptostypes.TransactionPayload__ScriptFunction:
             if helper := script_function_decoder_map[string(script.Value.Module.Name) + string(script.Value.Function)]; helper != nil {{
                     val, err := helper(script)
                     return val, err
@@ -290,7 +290,7 @@ func DecodeScriptFunctionPayload(script diemtypes.TransactionPayload) (ScriptFun
     ) -> Result<()> {
         writeln!(
             self.out,
-            "\n{}\nfunc Encode{}Script({}) diemtypes.Script {{",
+            "\n{}\nfunc Encode{}Script({}) aptostypes.Script {{",
             Self::quote_doc(abi.doc()),
             abi.name().to_camel_case(),
             [
@@ -303,10 +303,10 @@ func DecodeScriptFunctionPayload(script diemtypes.TransactionPayload) (ScriptFun
         self.out.indent();
         writeln!(
             self.out,
-            r#"return diemtypes.Script {{
+            r#"return aptostypes.Script {{
 	Code: append([]byte(nil), {}_code...),
-	TyArgs: []diemtypes.TypeTag{{{}}},
-	Args: []diemtypes.TransactionArgument{{{}}},
+	TyArgs: []aptostypes.TypeTag{{{}}},
+	Args: []aptostypes.TransactionArgument{{{}}},
 }}"#,
             abi.name(),
             Self::quote_type_arguments(abi.ty_args()),
@@ -319,7 +319,7 @@ func DecodeScriptFunctionPayload(script diemtypes.TransactionPayload) (ScriptFun
     fn output_script_function_encoder_function(&mut self, abi: &ScriptFunctionABI) -> Result<()> {
         writeln!(
             self.out,
-            "\n{}\nfunc Encode{}ScriptFunction({}) diemtypes.TransactionPayload {{",
+            "\n{}\nfunc Encode{}ScriptFunction({}) aptostypes.TransactionPayload {{",
             Self::quote_doc(abi.doc()),
             abi.name().to_camel_case(),
             [
@@ -332,11 +332,11 @@ func DecodeScriptFunctionPayload(script diemtypes.TransactionPayload) (ScriptFun
         self.out.indent();
         writeln!(
             self.out,
-            r#"return &diemtypes.TransactionPayload__ScriptFunction {{
-            diemtypes.ScriptFunction {{
+            r#"return &aptostypes.TransactionPayload__ScriptFunction {{
+            aptostypes.ScriptFunction {{
                 Module: {},
                 Function: {},
-                TyArgs: []diemtypes.TypeTag{{{}}},
+                TyArgs: []aptostypes.TypeTag{{{}}},
                 Args: [][]byte{{{}}},
     }},
 }}"#,
@@ -355,7 +355,7 @@ func DecodeScriptFunctionPayload(script diemtypes.TransactionPayload) (ScriptFun
     ) -> Result<()> {
         writeln!(
             self.out,
-            "\nfunc decode_{}_script(script *diemtypes.Script) (ScriptCall, error) {{",
+            "\nfunc decode_{}_script(script *aptostypes.Script) (ScriptCall, error) {{",
             abi.name(),
         )?;
         self.out.indent();
@@ -405,7 +405,7 @@ func DecodeScriptFunctionPayload(script diemtypes.TransactionPayload) (ScriptFun
     fn output_script_function_decoder_function(&mut self, abi: &ScriptFunctionABI) -> Result<()> {
         writeln!(
             self.out,
-            "\nfunc decode_{}_script_function(script diemtypes.TransactionPayload) (ScriptFunctionCall, error) {{",
+            "\nfunc decode_{}_script_function(script aptostypes.TransactionPayload) (ScriptFunctionCall, error) {{",
             abi.name(),
         )?;
         self.out.indent();
@@ -413,7 +413,7 @@ func DecodeScriptFunctionPayload(script diemtypes.TransactionPayload) (ScriptFun
         self.out.indent();
         writeln!(
             self.out,
-            "case *diemtypes.TransactionPayload__ScriptFunction:"
+            "case *aptostypes.TransactionPayload__ScriptFunction:"
         )?;
         self.out.indent();
         writeln!(
@@ -489,7 +489,7 @@ if val, err := {}; err == nil {{
         writeln!(
             self.out,
             r#"
-var script_decoder_map = map[string]func(*diemtypes.Script) (ScriptCall, error) {{"#
+var script_decoder_map = map[string]func(*aptostypes.Script) (ScriptCall, error) {{"#
         )?;
         self.out.indent();
         for abi in abis {
@@ -508,7 +508,7 @@ var script_decoder_map = map[string]func(*diemtypes.Script) (ScriptCall, error) 
         writeln!(
             self.out,
             r#"
-var script_function_decoder_map = map[string]func(diemtypes.TransactionPayload) (ScriptFunctionCall, error) {{"#
+var script_function_decoder_map = map[string]func(aptostypes.TransactionPayload) (ScriptFunctionCall, error) {{"#
         )?;
         self.out.indent();
         for abi in abis {
@@ -592,8 +592,8 @@ func encode_{}_argument(arg {}) []byte {{
         writeln!(
             self.out,
             r#"
-func decode_{0}_argument(arg diemtypes.TransactionArgument) (value {1}, err error) {{
-	if arg, ok := arg.(*diemtypes.TransactionArgument__{2}); ok {{
+func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err error) {{
+	if arg, ok := arg.(*aptostypes.TransactionArgument__{2}); ok {{
 		{3}
 	}} else {{
 		err = fmt.Errorf("Was expecting a {2} argument")
@@ -642,7 +642,7 @@ func decode_{0}_argument(arg diemtypes.TransactionArgument) (value {1}, err erro
 
     fn quote_module_id(module_id: &ModuleId) -> String {
         format!(
-            "diemtypes.ModuleId {{ Address: {}, Name: {} }}",
+            "aptostypes.ModuleId {{ Address: {}, Name: {} }}",
             Self::quote_address(module_id.address()),
             Self::quote_identifier(module_id.name().as_str()),
         )
@@ -656,7 +656,7 @@ func decode_{0}_argument(arg diemtypes.TransactionArgument) (value {1}, err erro
     fn quote_type_parameters(ty_args: &[TypeArgumentABI]) -> Vec<String> {
         ty_args
             .iter()
-            .map(|ty_arg| format!("{} diemtypes.TypeTag", ty_arg.name()))
+            .map(|ty_arg| format!("{} aptostypes.TypeTag", ty_arg.name()))
             .collect()
     }
 
@@ -695,10 +695,10 @@ func decode_{0}_argument(arg diemtypes.TransactionArgument) (value {1}, err erro
             U8 => "uint8".into(),
             U64 => "uint64".into(),
             U128 => "serde.Uint128".into(),
-            Address => "diemtypes.AccountAddress".into(),
+            Address => "aptostypes.AccountAddress".into(),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => "[]byte".into(),
-                Vector(type_tag) if type_tag.as_ref() == &U8 => "diemtypes.VecBytes".into(),
+                Vector(type_tag) if type_tag.as_ref() == &U8 => "aptostypes.VecBytes".into(),
                 _ => common::type_not_allowed(type_tag),
             },
             Struct(_) | Signer => common::type_not_allowed(type_tag),
@@ -716,13 +716,13 @@ func decode_{0}_argument(arg diemtypes.TransactionArgument) (value {1}, err erro
     fn quote_transaction_argument_for_script(type_tag: &TypeTag, name: &str) -> String {
         use TypeTag::*;
         match type_tag {
-            Bool => format!("(*diemtypes.TransactionArgument__Bool)(&{})", name),
-            U8 => format!("(*diemtypes.TransactionArgument__U8)(&{})", name),
-            U64 => format!("(*diemtypes.TransactionArgument__U64)(&{})", name),
-            U128 => format!("(*diemtypes.TransactionArgument__U128)(&{})", name),
-            Address => format!("&diemtypes.TransactionArgument__Address{{{}}}", name),
+            Bool => format!("(*aptostypes.TransactionArgument__Bool)(&{})", name),
+            U8 => format!("(*aptostypes.TransactionArgument__U8)(&{})", name),
+            U64 => format!("(*aptostypes.TransactionArgument__U64)(&{})", name),
+            U128 => format!("(*aptostypes.TransactionArgument__U128)(&{})", name),
+            Address => format!("&aptostypes.TransactionArgument__Address{{{}}}", name),
             Vector(type_tag) => match type_tag.as_ref() {
-                U8 => format!("(*diemtypes.TransactionArgument__U8Vector)(&{})", name),
+                U8 => format!("(*aptostypes.TransactionArgument__U8Vector)(&{})", name),
                 _ => common::type_not_allowed(type_tag),
             },
             Struct(_) | Signer => common::type_not_allowed(type_tag),
@@ -754,19 +754,19 @@ func decode_{0}_argument(arg diemtypes.TransactionArgument) (value {1}, err erro
 pub struct Installer {
     install_dir: PathBuf,
     serde_module_path: Option<String>,
-    diem_module_path: Option<String>,
+    aptos_module_path: Option<String>,
 }
 
 impl Installer {
     pub fn new(
         install_dir: PathBuf,
         serde_module_path: Option<String>,
-        diem_module_path: Option<String>,
+        aptos_module_path: Option<String>,
     ) -> Self {
         Installer {
             install_dir,
             serde_module_path,
-            diem_module_path,
+            aptos_module_path,
         }
     }
 }
@@ -785,7 +785,7 @@ impl crate::SourceInstaller for Installer {
         output(
             &mut file,
             self.serde_module_path.clone(),
-            self.diem_module_path.clone(),
+            self.aptos_module_path.clone(),
             name.to_string(),
             abis,
         )?;

@@ -1,18 +1,18 @@
-import DiemTypes
+import AptosTypes
 
 func demo_peer_to_peer_script() throws {
-    let address = DiemTypes.AccountAddress(value: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
-    let module = DiemTypes.Identifier(value: "XDX")
-    let name = DiemTypes.Identifier(value: "XDX")
-    let type_params: [DiemTypes.TypeTag] = []
-    let struct_tag = DiemTypes.StructTag(
+    let address = AptosTypes.AccountAddress(value: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
+    let module = AptosTypes.Identifier(value: "XDX")
+    let name = AptosTypes.Identifier(value: "XDX")
+    let type_params: [AptosTypes.TypeTag] = []
+    let struct_tag = AptosTypes.StructTag(
         address: address,
         module: module,
         name: name,
         type_params: type_params
     )
-    let token = DiemTypes.TypeTag.Struct(struct_tag)
-    let payee = DiemTypes.AccountAddress(value: [
+    let token = AptosTypes.TypeTag.Struct(struct_tag)
+    let payee = AptosTypes.AccountAddress(value: [
         0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22,
         0x22,
     ])
@@ -38,18 +38,18 @@ func demo_peer_to_peer_script() throws {
 }
 
 func demo_peer_to_peer_script_function() throws {
-    let address = DiemTypes.AccountAddress(value: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
-    let module = DiemTypes.Identifier(value: "XDX")
-    let name = DiemTypes.Identifier(value: "XDX")
-    let type_params: [DiemTypes.TypeTag] = []
-    let struct_tag = DiemTypes.StructTag(
+    let address = AptosTypes.AccountAddress(value: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
+    let module = AptosTypes.Identifier(value: "XDX")
+    let name = AptosTypes.Identifier(value: "XDX")
+    let type_params: [AptosTypes.TypeTag] = []
+    let struct_tag = AptosTypes.StructTag(
         address: address,
         module: module,
         name: name,
         type_params: type_params
     )
-    let token = DiemTypes.TypeTag.Struct(struct_tag)
-    let payee = DiemTypes.AccountAddress(value: [
+    let token = AptosTypes.TypeTag.Struct(struct_tag)
+    let payee = AptosTypes.AccountAddress(value: [
         0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22,
         0x22,
     ])

@@ -67,7 +67,7 @@ struct PythonEmitter<T> {
     out: IndentedWriter<T>,
     /// Package where to find the serde module (if any).
     serde_package_name: Option<String>,
-    /// Package where to find the diem module (if any).
+    /// Package where to find the aptos module (if any).
     aptos_package_name: Option<String>,
 }
 
@@ -76,7 +76,7 @@ where
     T: Write,
 {
     fn output_additional_imports(&mut self) -> Result<()> {
-        let diem_pkg_root = match &self.aptos_package_name {
+        let aptos_pkg_root = match &self.aptos_package_name {
             None => "".into(),
             Some(package) => package.clone() + ".",
         };
@@ -85,7 +85,7 @@ where
             r#"
 from {}bcs import (deserialize as bcs_deserialize, serialize as bcs_serialize)
 from {}aptos_types import (Script, ScriptFunction, TransactionPayload, TransactionPayload__ScriptFunction, Identifier, ModuleId, TypeTag, AccountAddress, TransactionArgument, VecBytes, TransactionArgument__Bool, TransactionArgument__U8, TransactionArgument__U64, TransactionArgument__U128, TransactionArgument__Address, TransactionArgument__U8Vector)"#,
-            diem_pkg_root, diem_pkg_root
+            aptos_pkg_root, aptos_pkg_root
         )
     }
 
@@ -94,7 +94,7 @@ from {}aptos_types import (Script, ScriptFunction, TransactionPayload, Transacti
             self.out,
             r#"
 def encode_script(call: ScriptCall) -> Script:
-    """Build a Diem `Script` from a structured object `ScriptCall`.
+    """Build a Aptos `Script` from a structured object `ScriptCall`.
     """
     helper = TRANSACTION_SCRIPT_ENCODER_MAP[call.__class__]
     return helper(call)
@@ -104,7 +104,7 @@ def encode_script(call: ScriptCall) -> Script:
             self.out,
             r#"
 def encode_script_function(call: ScriptFunctionCall) -> TransactionPayload:
-    """Build a Diem `ScriptFunction` `TransactionPayload` from a structured object `ScriptFunctionCall`.
+    """Build a Aptos `ScriptFunction` `TransactionPayload` from a structured object `ScriptFunctionCall`.
     """
     helper = SCRIPT_FUNCTION_ENCODER_MAP[call.__class__]
     return helper(call)
@@ -117,7 +117,7 @@ def encode_script_function(call: ScriptFunctionCall) -> TransactionPayload:
             self.out,
             r#"
 def decode_script(script: Script) -> ScriptCall:
-    """Try to recognize a Diem `Script` and convert it into a structured object `ScriptCall`.
+    """Try to recognize a Aptos `Script` and convert it into a structured object `ScriptCall`.
     """
     helper = TRANSACTION_SCRIPT_DECODER_MAP.get(script.code)
     if helper is None:
@@ -129,7 +129,7 @@ def decode_script(script: Script) -> ScriptCall:
             self.out,
             r#"
 def decode_script_function_payload(payload: TransactionPayload) -> ScriptFunctionCall:
-    """Try to recognize a Diem `TransactionPayload` and convert it into a structured object `ScriptFunctionCall`.
+    """Try to recognize a Aptos `TransactionPayload` and convert it into a structured object `ScriptFunctionCall`.
     """
     if not isinstance(payload, TransactionPayload__ScriptFunction):
         raise ValueError("Unexpected transaction payload")

@@ -88,7 +88,7 @@ fn write_script_call_files(
     namespace_name: &str,
     abis: &[ScriptABI],
 ) -> Result<()> {
-    let external_definitions = crate::common::get_external_definitions("Diem.Types");
+    let external_definitions = crate::common::get_external_definitions("Aptos.Types");
     let (transaction_script_abis, script_fun_abis): (Vec<_>, Vec<_>) = abis
         .iter()
         .cloned()
@@ -181,7 +181,7 @@ using System.Collections;
 using System.Collections.Generic; // For List, Dictonary
 using System.Numerics; // For BigInteger
 using Bcs;
-using Diem.Types; // For Script, TransactionArgument, VecBytes, TypeTag, TransactionPayload, ScriptFunction
+using Aptos.Types; // For Script, TransactionArgument, VecBytes, TypeTag, TransactionPayload, ScriptFunction
 using Serde; // For ValueArray (e.g., ValueArray<byte>)
 "#,
         )?;
@@ -194,7 +194,7 @@ using Serde; // For ValueArray (e.g., ValueArray<byte>)
             self.out,
             r#"
 /// <summary>
-/// Build a Diem Script from a structured value {{@link ScriptCall}}.
+/// Build a Aptos Script from a structured value {{@link ScriptCall}}.
 /// </summary>
 /// <returns>
 /// Encoded Script
@@ -210,7 +210,7 @@ public static Script EncodeScript(ScriptCall call) {{
             self.out,
             r#"
 /// <summary>
-/// Build a Diem Transaction Script from a structured value {{@link ScriptFunctionCall}}.
+/// Build a Aptos Transaction Script from a structured value {{@link ScriptFunctionCall}}.
 /// </summary>
 /// <returns>
 /// Encoded TransactionPayload holding a ScriptFunction
@@ -228,7 +228,7 @@ public static TransactionPayload EncodeScriptFunction(ScriptFunctionCall call) {
             self.out,
             r#"
 /// <summary>
-/// Try to recognize a Diem Script and convert it into a structured value Script.
+/// Try to recognize a Aptos Script and convert it into a structured value Script.
 /// </summary>
 /// <returns>
 /// Decoded ScriptCall value
@@ -248,7 +248,7 @@ public static ScriptCall DecodeScript(Script script) {{
             self.out,
             r#"
 /// <summary>
-/// Try to recognize a Diem TransactionPayload holding a ScriptFunction and convert it into a structured value ScriptFunction.
+/// Try to recognize a Aptos TransactionPayload holding a ScriptFunction and convert it into a structured value ScriptFunction.
 /// </summary>
 /// <returns>
 /// Decoded ScriptFunctionCall value
@@ -330,7 +330,7 @@ public static ScriptFunctionCall DecodeScriptFunctionPayload(TransactionPayload 
             Self::quote_doc(
                 abi.doc(),
                 [quoted_type_params_doc, quoted_params_doc].concat(),
-                "Encoded Diem.Types.Script value.",
+                "Encoded Aptos.Types.Script value.",
             ),
             abi.name(),
             [quoted_type_params, quoted_params].concat().join(", ")
@@ -367,7 +367,7 @@ return new Script(
             Self::quote_doc(
                 abi.doc(),
                 [quoted_type_params_doc, quoted_params_doc].concat(),
-                "Encoded Diem.Types.TransactionPayload value holding a ScriptFunction.",
+                "Encoded Aptos.Types.TransactionPayload value holding a ScriptFunction.",
             ),
             abi.name(),
             [quoted_type_params, quoted_params].concat().join(", ")

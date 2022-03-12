@@ -1,8 +1,8 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-import * as DiemStdlib from "./diemStdlib/mod.ts";
-import * as DiemTypes from "./diemTypes/mod.ts";
+import * as AptosStdlib from "./aptosStdlib/mod.ts";
+import * as AptosTypes from "./aptosTypes/mod.ts";
 import { BcsSerializer } from "./bcs/mod.ts";
 import { ListTuple } from "./serde/mod.ts";
 import { equal } from "https://deno.land/x/equal/mod.ts";
@@ -12,18 +12,18 @@ demoPeerToPeerScriptFunction();
 
 function demoPeerToPeerScript() {
   const address = hexToAccountAddress("0x00000000000000000000000000000001");
-  const token = new DiemTypes.TypeTagVariantStruct(
-    new DiemTypes.StructTag(
+  const token = new AptosTypes.TypeTagVariantStruct(
+    new AptosTypes.StructTag(
       address,
-      new DiemTypes.Identifier("XDX"),
-      new DiemTypes.Identifier("XDX"),
+      new AptosTypes.Identifier("XDX"),
+      new AptosTypes.Identifier("XDX"),
       [],
     ),
   );
 
   const payee = hexToAccountAddress("0x22222222222222222222222222222222");
   const amount = BigInt(1_234_567);
-  const script = DiemStdlib.Stdlib.encodePeerToPeerWithMetadataScript(
+  const script = AptosStdlib.Stdlib.encodePeerToPeerWithMetadataScript(
     token,
     payee,
     amount,
@@ -31,7 +31,7 @@ function demoPeerToPeerScript() {
     new Uint8Array(),
   );
 
-  const scriptCall = DiemStdlib.Stdlib.decodePeerToPeerWithMetadataScript(
+  const scriptCall = AptosStdlib.Stdlib.decodePeerToPeerWithMetadataScript(
     script,
   );
   if (scriptCall.amount != amount || scriptCall.payee != payee) {
@@ -48,18 +48,18 @@ function demoPeerToPeerScript() {
 
 function demoPeerToPeerScriptFunction() {
   const address = hexToAccountAddress("0x00000000000000000000000000000001");
-  const token = new DiemTypes.TypeTagVariantStruct(
-    new DiemTypes.StructTag(
+  const token = new AptosTypes.TypeTagVariantStruct(
+    new AptosTypes.StructTag(
       address,
-      new DiemTypes.Identifier("XDX"),
-      new DiemTypes.Identifier("XDX"),
+      new AptosTypes.Identifier("XDX"),
+      new AptosTypes.Identifier("XDX"),
       [],
     ),
   );
 
   const payee = hexToAccountAddress("0x22222222222222222222222222222222");
   const amount = BigInt(1_234_567);
-  const payload = DiemStdlib.Stdlib.encodePeerToPeerWithMetadataScriptFunction(
+  const payload = AptosStdlib.Stdlib.encodePeerToPeerWithMetadataScriptFunction(
     token,
     payee,
     amount,
@@ -67,7 +67,7 @@ function demoPeerToPeerScriptFunction() {
     new Uint8Array(),
   );
 
-  const scriptFunCall = DiemStdlib.Stdlib.decodePeerToPeerWithMetadataScriptFunction(
+  const scriptFunCall = AptosStdlib.Stdlib.decodePeerToPeerWithMetadataScriptFunction(
     payload,
   );
   if (scriptFunCall.amount != amount || !equal(scriptFunCall.payee.value, payee.value)) {
@@ -82,7 +82,7 @@ function demoPeerToPeerScriptFunction() {
   console.log(bcsSerializer.getBytes().join(" ") + " ");
 }
 
-function hexToAccountAddress(hex: string): DiemTypes.AccountAddress {
+function hexToAccountAddress(hex: string): AptosTypes.AccountAddress {
   if (hex.startsWith("0x")) {
     hex = hex.slice(2);
   }
@@ -90,7 +90,7 @@ function hexToAccountAddress(hex: string): DiemTypes.AccountAddress {
   for (const entry of hexToBytes(hex)) { // encode as bytes
     senderListTuple.push([entry]);
   }
-  return new DiemTypes.AccountAddress(senderListTuple);
+  return new AptosTypes.AccountAddress(senderListTuple);
 }
 
 function hexToBytes(hex: string) {

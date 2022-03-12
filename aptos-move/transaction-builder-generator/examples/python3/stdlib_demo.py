@@ -3,21 +3,21 @@
 
 # pyre-strict
 
-import aptos_types as diem
+import aptos_types as aptos
 import serde_types as st
-import diem_framework as stdlib
+import aptos_framework as stdlib
 
 
 def demo_p2p_script() -> None:
-    token = diem.TypeTag__Struct(
-        value=diem.StructTag(
-            address=diem.AccountAddress.from_bytes(b"\x00" * 15 + b"\x01"),
-            module=diem.Identifier("XDX"),
-            name=diem.Identifier("XDX"),
+    token = aptos.TypeTag__Struct(
+        value=aptos.StructTag(
+            address=aptos.AccountAddress.from_bytes(b"\x00" * 15 + b"\x01"),
+            module=aptos.Identifier("XDX"),
+            name=aptos.Identifier("XDX"),
             type_params=[],
         )
     )
-    payee = diem.AccountAddress.from_bytes(b"\x22" * 16)
+    payee = aptos.AccountAddress.from_bytes(b"\x22" * 16)
     amount = st.uint64(1_234_567)
     script = stdlib.encode_peer_to_peer_with_metadata_script(token, payee, amount, b"", b"")
 
@@ -31,15 +31,15 @@ def demo_p2p_script() -> None:
     print()
 
 def demo_p2p_script_function() -> None:
-    token = diem.TypeTag__Struct(
-        value=diem.StructTag(
-            address=diem.AccountAddress.from_bytes(b"\x00" * 15 + b"\x01"),
-            module=diem.Identifier("XDX"),
-            name=diem.Identifier("XDX"),
+    token = aptos.TypeTag__Struct(
+        value=aptos.StructTag(
+            address=aptos.AccountAddress.from_bytes(b"\x00" * 15 + b"\x01"),
+            module=aptos.Identifier("XDX"),
+            name=aptos.Identifier("XDX"),
             type_params=[],
         )
     )
-    payee = diem.AccountAddress.from_bytes(b"\x22" * 16)
+    payee = aptos.AccountAddress.from_bytes(b"\x22" * 16)
     amount = st.uint64(1_234_567)
     payload = stdlib.encode_peer_to_peer_with_metadata_script_function(token, payee, amount, b"", b"")
 

@@ -1,11 +1,11 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "diem_framework.hpp"
+#include "aptos_framework.hpp"
 #include "aptos_types.hpp"
 #include <memory>
 
-using namespace diem_framework;
+using namespace aptos_framework;
 using namespace aptos_types;
 
 void demo_p2p_script() {

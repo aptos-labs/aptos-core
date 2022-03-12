@@ -5,22 +5,22 @@ package main
 
 import (
 	"fmt"
-	stdlib "testing/diemstdlib"
-	diem "testing/diemtypes"
+	stdlib "testing/aptosstdlib"
+	aptos "testing/aptostypes"
 )
 
 func demo_p2p_script() {
-	token := &diem.TypeTag__Struct{
-		Value: diem.StructTag{
-			Address: diem.AccountAddress(
+	token := &aptos.TypeTag__Struct{
+		Value: aptos.StructTag{
+			Address: aptos.AccountAddress(
 				[16]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 			),
-			Module:     diem.Identifier("XDX"),
-			Name:       diem.Identifier("XDX"),
-			TypeParams: []diem.TypeTag{},
+			Module:     aptos.Identifier("XDX"),
+			Name:       aptos.Identifier("XDX"),
+			TypeParams: []aptos.TypeTag{},
 		},
 	}
-	payee := diem.AccountAddress(
+	payee := aptos.AccountAddress(
 		[16]uint8{0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22},
 	)
 	amount := uint64(1_234_567)
@@ -46,17 +46,17 @@ func demo_p2p_script() {
 }
 
 func demo_p2p_script_function() {
-	token := &diem.TypeTag__Struct{
-		Value: diem.StructTag{
-			Address: diem.AccountAddress(
+	token := &aptos.TypeTag__Struct{
+		Value: aptos.StructTag{
+			Address: aptos.AccountAddress(
 				[16]uint8{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 			),
-			Module:     diem.Identifier("XDX"),
-			Name:       diem.Identifier("XDX"),
-			TypeParams: []diem.TypeTag{},
+			Module:     aptos.Identifier("XDX"),
+			Name:       aptos.Identifier("XDX"),
+			TypeParams: []aptos.TypeTag{},
 		},
 	}
-	payee := diem.AccountAddress(
+	payee := aptos.AccountAddress(
 		[16]uint8{0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22},
 	)
 	amount := uint64(1_234_567)

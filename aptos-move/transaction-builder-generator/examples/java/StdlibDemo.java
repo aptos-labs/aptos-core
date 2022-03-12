@@ -6,15 +6,15 @@ import java.util.ArrayList;
 
 import com.novi.serde.Bytes;
 import com.novi.serde.Unsigned; // used as documentation.
-import com.diem.stdlib.Helpers;
-import com.diem.stdlib.ScriptCall;;
-import com.diem.stdlib.ScriptFunctionCall;;
-import com.diem.types.AccountAddress;
-import com.diem.types.Identifier;
-import com.diem.types.Script;
-import com.diem.types.StructTag;
-import com.diem.types.TypeTag;
-import com.diem.types.TransactionPayload;
+import com.aptos.stdlib.Helpers;
+import com.aptos.stdlib.ScriptCall;;
+import com.aptos.stdlib.ScriptFunctionCall;;
+import com.aptos.types.AccountAddress;
+import com.aptos.types.Identifier;
+import com.aptos.types.Script;
+import com.aptos.types.StructTag;
+import com.aptos.types.TypeTag;
+import com.aptos.types.TransactionPayload;
 
 public class StdlibDemo {
     private static void demo_p2p_script() throws Exception {
@@ -22,7 +22,7 @@ public class StdlibDemo {
         builder.address = AccountAddress.valueOf(new byte[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1});
         builder.module = new Identifier("XDX");
         builder.name = new Identifier("XDX");
-        builder.type_params = new ArrayList<com.diem.types.TypeTag>();
+        builder.type_params = new ArrayList<com.aptos.types.TypeTag>();
         StructTag tag = builder.build();
 
         TypeTag token = new TypeTag.Struct(tag);
@@ -50,7 +50,7 @@ public class StdlibDemo {
         builder.address = AccountAddress.valueOf(new byte[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1});
         builder.module = new Identifier("XDX");
         builder.name = new Identifier("XDX");
-        builder.type_params = new ArrayList<com.diem.types.TypeTag>();
+        builder.type_params = new ArrayList<com.aptos.types.TypeTag>();
         StructTag tag = builder.build();
 
         TypeTag token = new TypeTag.Struct(tag);

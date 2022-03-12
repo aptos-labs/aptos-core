@@ -44,7 +44,7 @@ struct Options {
     #[structopt(long)]
     target_source_dir: Option<PathBuf>,
 
-    /// Also install the diem types described by the given YAML file, along with the BCS runtime.
+    /// Also install the aptos.types described by the given YAML file, along with the BCS runtime.
     #[structopt(long)]
     with_aptos_types: Option<PathBuf>,
 
@@ -67,9 +67,9 @@ struct Options {
 
     /// Optional package name (Python) or module path (Go) of the `aptos_types` dependency.
     #[structopt(long)]
-    aptos_package_name: Option<String>,
+    package_name: Option<String>,
 
-    /// Read custom code for Diem containers from the given file paths. Containers will be matched with file stems.
+    /// Read custom code for Aptos containers from the given file paths. Containers will be matched with file stems.
     /// (e.g. `AddressAccount` <- `path/to/AddressAccount.py`)
     #[structopt(long)]
     with_custom_aptos_code: Vec<PathBuf>,
@@ -89,7 +89,7 @@ fn main() {
                 Language::Python3 => buildgen::python3::output(
                     &mut out,
                     options.serde_package_name.clone(),
-                    options.aptos_package_name.clone(),
+                    options.package_name.clone(),
                     &abis,
                 )
                 .unwrap(),
@@ -106,7 +106,7 @@ fn main() {
                     buildgen::golang::output(
                         &mut out,
                         options.serde_package_name.clone(),
-                        options.aptos_package_name.clone(),
+                        options.package_name.clone(),
                         options.module_name.as_deref().unwrap_or("main").to_string(),
                         &abis,
                     )
@@ -127,7 +127,7 @@ fn main() {
         Some(dir) => dir,
     };
 
-    // Diem types
+    // Aptos types
     if let Some(registry_file) = options.with_aptos_types {
         let installer: Box<dyn serdegen::SourceInstaller<Error = Box<dyn std::error::Error>>> =
             match options.language {
@@ -163,7 +163,7 @@ fn main() {
         if let Language::TypeScript = options.language {
             buildgen::typescript::replace_keywords(&mut registry);
         };
-        let (aptos_package_name, diem_package_path) = match options.language {
+        let (package_name, package_path) = match options.language {
             Language::Rust => (
                 if options.aptos_version_number == "0.1.0" {
                     "aptos-types".to_string()
@@ -172,18 +172,18 @@ fn main() {
                 },
                 vec!["aptos-types"],
             ),
-            Language::Java => ("com.diem.types".to_string(), vec!["com", "diem", "types"]),
-            Language::Csharp => ("Diem.Types".to_string(), vec!["Diem", "Types"]),
-            Language::Go => ("diemtypes".to_string(), vec!["diemtypes"]),
-            Language::TypeScript => ("diemTypes".to_string(), vec!["diemTypes"]),
-            Language::Swift => ("DiemTypes".to_string(), vec!["DiemTypes"]),
+            Language::Java => ("com.aptos.types".to_string(), vec!["com", "aptos", "types"]),
+            Language::Csharp => ("Aptos.Types".to_string(), vec!["Aptos", "Types"]),
+            Language::Go => ("aptostypes".to_string(), vec!["aptostypes"]),
+            Language::TypeScript => ("aptosTypes".to_string(), vec!["aptosTypes"]),
+            Language::Swift => ("AptosTypes".to_string(), vec!["AptosTypes"]),
             _ => ("aptos_types".to_string(), vec!["aptos_types"]),
         };
         let custom_aptos_code = buildgen::read_custom_code_from_paths(
-            &diem_package_path,
+            &package_path,
             options.with_custom_aptos_code.into_iter(),
         );
-        let config = serdegen::CodeGeneratorConfig::new(aptos_package_name)
+        let config = serdegen::CodeGeneratorConfig::new(package_name)
             .with_encodings(vec![serdegen::Encoding::Bcs])
             .with_custom_code(custom_aptos_code);
         installer.install_module(&config, &registry).unwrap();
@@ -195,7 +195,7 @@ fn main() {
             Language::Python3 => Box::new(buildgen::python3::Installer::new(
                 install_dir,
                 options.serde_package_name,
-                options.aptos_package_name,
+                options.package_name,
             )),
             Language::TypeScript => Box::new(buildgen::typescript::Installer::new(install_dir)),
             Language::Swift => Box::new(buildgen::swift::Installer::new(install_dir)),
@@ -209,7 +209,7 @@ fn main() {
             Language::Go => Box::new(buildgen::golang::Installer::new(
                 install_dir,
                 options.serde_package_name,
-                options.aptos_package_name,
+                options.package_name,
             )),
         };
 

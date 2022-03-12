@@ -48,8 +48,8 @@ export interface ArgDef {{
 }}
 
 export interface ScriptDef {{
-  readonly stdlibEncodeFunction: (...args: any[]) => DiemTypes.Script;
-  readonly stdlibDecodeFunction: (script: DiemTypes.Script) => ScriptCall;
+  readonly stdlibEncodeFunction: (...args: any[]) => AptosTypes.Script;
+  readonly stdlibDecodeFunction: (script: AptosTypes.Script) => ScriptCall;
   readonly codeName: string;
   readonly description: string;
   readonly typeArgs: string[];
@@ -57,7 +57,7 @@ export interface ScriptDef {{
 }}
 
 export interface ScriptFunctionDef {{
-  readonly stdlibEncodeFunction: (...args: any[]) => DiemTypes.TransactionPayload;
+  readonly stdlibEncodeFunction: (...args: any[]) => AptosTypes.TransactionPayload;
   readonly description: string;
   readonly typeArgs: string[];
   readonly args: ArgDef[];
@@ -153,7 +153,7 @@ fn write_helpers(out: &mut dyn Write, abis: &[ScriptABI]) -> Result<()> {
 fn write_script_calls(out: &mut dyn Write, abis: &[ScriptABI]) -> Result<()> {
     let txn_script_abis = common::transaction_script_abis(abis);
     let script_fun_abis = common::script_function_abis(abis);
-    let external_definitions = crate::common::get_external_definitions("diemTypes");
+    let external_definitions = crate::common::get_external_definitions("aptosTypes");
     let script_registry: BTreeMap<_, _> = vec![
         (
             "ScriptCall".to_string(),
@@ -227,7 +227,7 @@ where
     fn output_script_function_encoder_function(&mut self, abi: &ScriptFunctionABI) -> Result<()> {
         writeln!(
             self.out,
-            "\n{}static encode{}ScriptFunction({}): DiemTypes.TransactionPayload {{",
+            "\n{}static encode{}ScriptFunction({}): AptosTypes.TransactionPayload {{",
             Self::quote_doc(abi.doc()),
             abi.name().to_camel_case(),
             [
@@ -240,12 +240,12 @@ where
         self.out.indent();
         writeln!(
             self.out,
-            r#"const tyArgs: Seq<DiemTypes.TypeTag> = [{}];
+            r#"const tyArgs: Seq<AptosTypes.TypeTag> = [{}];
 {}const args: Seq<bytes> = [{}];
-const module_id: DiemTypes.ModuleId = {};
-const function_name: DiemTypes.Identifier = {};
-const script = new DiemTypes.ScriptFunction(module_id, function_name, tyArgs, args);
-return new DiemTypes.TransactionPayloadVariantScriptFunction(script);"#,
+const module_id: AptosTypes.ModuleId = {};
+const function_name: AptosTypes.Identifier = {};
+const script = new AptosTypes.ScriptFunction(module_id, function_name, tyArgs, args);
+return new AptosTypes.TransactionPayloadVariantScriptFunction(script);"#,
             Self::quote_type_arguments(abi.ty_args()),
             Self::quote_serialize_arguments(abi.args()),
             abi.args()
@@ -269,7 +269,7 @@ return new DiemTypes.TransactionPayloadVariantScriptFunction(script);"#,
 
     fn quote_module_id(module_id: &ModuleId) -> String {
         format!(
-            "new DiemTypes.ModuleId({}, {})",
+            "new AptosTypes.ModuleId({}, {})",
             Self::quote_address(module_id.address()),
             Self::quote_identifier(module_id.name().as_str())
         )
@@ -277,7 +277,7 @@ return new DiemTypes.TransactionPayloadVariantScriptFunction(script);"#,
 
     fn quote_address(address: &AccountAddress) -> String {
         format!(
-            "new DiemTypes.AccountAddress([{}])",
+            "new AptosTypes.AccountAddress([{}])",
             address
                 .to_vec()
                 .iter()
@@ -288,13 +288,13 @@ return new DiemTypes.TransactionPayloadVariantScriptFunction(script);"#,
     }
 
     fn quote_identifier(ident: &str) -> String {
-        format!("new DiemTypes.Identifier(\"{}\")", ident)
+        format!("new AptosTypes.Identifier(\"{}\")", ident)
     }
 
     fn output_script_encoder_function(&mut self, abi: &TransactionScriptABI) -> Result<()> {
         writeln!(
             self.out,
-            "\n{}static encode{}Script({}): DiemTypes.Script {{",
+            "\n{}static encode{}Script({}): AptosTypes.Script {{",
             Self::quote_doc(abi.doc()),
             abi.name().to_camel_case(),
             [
@@ -308,9 +308,9 @@ return new DiemTypes.TransactionPayloadVariantScriptFunction(script);"#,
         writeln!(
             self.out,
             r#"const code = Stdlib.{}_CODE;
-const tyArgs: Seq<DiemTypes.TypeTag> = [{}];
-const args: Seq<DiemTypes.TransactionArgument> = [{}];
-return new DiemTypes.Script(code, tyArgs, args);"#,
+const tyArgs: Seq<AptosTypes.TypeTag> = [{}];
+const args: Seq<AptosTypes.TransactionArgument> = [{}];
+return new AptosTypes.Script(code, tyArgs, args);"#,
             abi.name().to_shouty_snake_case(),
             Self::quote_type_arguments(abi.ty_args()),
             Self::quote_arguments(abi.args()),
@@ -330,7 +330,7 @@ return new DiemTypes.Script(code, tyArgs, args);"#,
         );
         writeln!(
             self.out,
-            "\nstatic decode{}ScriptFunction({}: DiemTypes.TransactionPayload): ScriptFunctionCallVariant{0} {{",
+            "\nstatic decode{}ScriptFunction({}: AptosTypes.TransactionPayload): ScriptFunctionCallVariant{0} {{",
             abi.name().to_camel_case(),
             // prevent warning "unused variable"
             arg_name,
@@ -338,7 +338,7 @@ return new DiemTypes.Script(code, tyArgs, args);"#,
 
         writeln!(
             self.out,
-            "if ({} instanceof DiemTypes.TransactionPayloadVariantScriptFunction) {{",
+            "if ({} instanceof AptosTypes.TransactionPayloadVariantScriptFunction) {{",
             arg_name
         )?;
         self.out.indent();
@@ -392,7 +392,7 @@ return new DiemTypes.Script(code, tyArgs, args);"#,
     fn output_script_decoder_function(&mut self, abi: &TransactionScriptABI) -> Result<()> {
         writeln!(
             self.out,
-            "\nstatic decode{}Script({}script: DiemTypes.Script): ScriptCallVariant{0} {{",
+            "\nstatic decode{}Script({}script: AptosTypes.Script): ScriptCallVariant{0} {{",
             abi.name().to_camel_case(),
             // prevent warning "unused variable"
             if abi.ty_args().is_empty() && abi.args().is_empty() {
@@ -540,7 +540,7 @@ return new DiemTypes.Script(code, tyArgs, args);"#,
             .iter()
             .map(|ty_arg| {
                 format!(
-                    "{}: DiemTypes.TypeTagVariantStruct",
+                    "{}: AptosTypes.TypeTagVariantStruct",
                     ty_arg.name().to_mixed_case()
                 )
             })
@@ -575,7 +575,7 @@ return new DiemTypes.Script(code, tyArgs, args);"#,
     fn quote_type_parameters(ty_args: &[TypeArgumentABI]) -> Vec<String> {
         ty_args
             .iter()
-            .map(|ty_arg| format!("{}: DiemTypes.TypeTag", ty_arg.name()))
+            .map(|ty_arg| format!("{}: AptosTypes.TypeTag", ty_arg.name()))
             .collect()
     }
 
@@ -607,7 +607,7 @@ return new DiemTypes.Script(code, tyArgs, args);"#,
             U8 => "number".into(),
             U64 => "bigint".into(),
             U128 => "bigint".into(),
-            Address => "DiemTypes.AccountAddress".into(),
+            Address => "AptosTypes.AccountAddress".into(),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => "Uint8Array".into(),
                 _ => common::type_not_allowed(type_tag),
@@ -620,13 +620,13 @@ return new DiemTypes.Script(code, tyArgs, args);"#,
     fn quote_transaction_argument_type(type_tag: &TypeTag) -> String {
         use TypeTag::*;
         match type_tag {
-            Bool => "DiemTypes.TransactionArgumentVariantBool".to_string(),
-            U8 => "DiemTypes.TransactionArgumentVariantU8".to_string(),
-            U64 => "DiemTypes.TransactionArgumentVariantU64".to_string(),
-            U128 => "DiemTypes.TransactionArgumentVariantU128".to_string(),
-            Address => "DiemTypes.TransactionArgumentVariantAddress".to_string(),
+            Bool => "AptosTypes.TransactionArgumentVariantBool".to_string(),
+            U8 => "AptosTypes.TransactionArgumentVariantU8".to_string(),
+            U64 => "AptosTypes.TransactionArgumentVariantU64".to_string(),
+            U128 => "AptosTypes.TransactionArgumentVariantU128".to_string(),
+            Address => "AptosTypes.TransactionArgumentVariantAddress".to_string(),
             Vector(type_tag) => match type_tag.as_ref() {
-                U8 => "DiemTypes.TransactionArgumentVariantU8Vector".to_string(),
+                U8 => "AptosTypes.TransactionArgumentVariantU8Vector".to_string(),
                 _ => common::type_not_allowed(type_tag),
             },
 
@@ -649,7 +649,7 @@ return new DiemTypes.Script(code, tyArgs, args);"#,
             U8 => format!("{}.deserializeU8()", ser_name),
             U64 => format!("{}.deserializeU64()", ser_name),
             U128 => format!("{}.deserializeU128()", ser_name),
-            Address => format!("DiemTypes.AccountAddress.deserialize({})", ser_name),
+            Address => format!("AptosTypes.AccountAddress.deserialize({})", ser_name),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => format!("{}.deserializeBytes()", ser_name),
                 // TODO: support vec<vec<u8>>

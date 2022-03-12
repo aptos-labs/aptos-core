@@ -33,7 +33,7 @@ struct SwiftEmitter<T> {
 
 /// Output transaction builders and decoders in TypeScript for the given ABIs.
 pub fn output(out: &mut dyn Write, abis: &[ScriptABI]) -> Result<()> {
-    writeln!(out, "import DiemTypes")?;
+    writeln!(out, "import AptosTypes")?;
     write_script_calls(out, abis)?;
     write_helpers(out, abis)?;
     Ok(())
@@ -66,7 +66,7 @@ fn write_helpers(out: &mut dyn Write, abis: &[ScriptABI]) -> Result<()> {
 fn write_script_calls(out: &mut dyn Write, abis: &[ScriptABI]) -> Result<()> {
     let txn_script_abis = common::transaction_script_abis(abis);
     let script_fun_abis = common::script_function_abis(abis);
-    let external_definitions = crate::common::get_external_definitions("DiemTypes");
+    let external_definitions = crate::common::get_external_definitions("AptosTypes");
     let script_registry: BTreeMap<_, _> = vec![
         (
             "ScriptCall".to_string(),
@@ -113,7 +113,7 @@ fn write_script_calls(out: &mut dyn Write, abis: &[ScriptABI]) -> Result<()> {
         "Structured representation of a call into a known Move script function.".into(),
     );
 
-    let config = CodeGeneratorConfig::new("DiemStdlib".to_string())
+    let config = CodeGeneratorConfig::new("AptosStdlib".to_string())
         .with_comments(comments)
         .with_external_definitions(external_definitions)
         .with_serialization(false);
@@ -139,7 +139,7 @@ impl crate::SourceInstaller for Installer {
     ) -> std::result::Result<(), Self::Error> {
         let dir_path = self.install_dir.join("Sources").join(name);
         std::fs::create_dir_all(&dir_path)?;
-        let mut file = std::fs::File::create(dir_path.join("DiemStdlib.swift"))?;
+        let mut file = std::fs::File::create(dir_path.join("AptosStdlib.swift"))?;
         output(&mut file, abis)?;
         Ok(())
     }
@@ -156,7 +156,7 @@ where
 public enum PayloadDecodingError: Error {{
     case invalidInput(issue: String)
 }}
-public func into_script_function(payload: DiemTypes.TransactionPayload) throws -> DiemTypes.ScriptFunction {{
+public func into_script_function(payload: AptosTypes.TransactionPayload) throws -> AptosTypes.ScriptFunction {{
     switch payload {{
         case .ScriptFunction(let script_function): return script_function
         default: throw PayloadDecodingError.invalidInput(issue: "Unexpected transaction payload")
@@ -200,7 +200,7 @@ public func into_script_function(payload: DiemTypes.TransactionPayload) throws -
         self.output_comment(0, &common::prepare_doc_string(abi.doc()))?;
         writeln!(
             self.out,
-            "public func encode_{}_script({}) -> DiemTypes.Script {{",
+            "public func encode_{}_script({}) -> AptosTypes.Script {{",
             abi.name(),
             [
                 Self::quote_type_parameters(abi.ty_args()),
@@ -212,7 +212,7 @@ public func into_script_function(payload: DiemTypes.TransactionPayload) throws -
         self.out.indent();
         writeln!(
             self.out,
-            "return DiemTypes.Script(code: CodeConstants.{}, ty_args: [{}], args: [{}])",
+            "return AptosTypes.Script(code: CodeConstants.{}, ty_args: [{}], args: [{}])",
             abi.name().to_shouty_snake_case(),
             Self::quote_type_arguments(abi.ty_args()),
             Self::quote_arguments_for_script(abi.args()),
@@ -225,7 +225,7 @@ public func into_script_function(payload: DiemTypes.TransactionPayload) throws -
         self.output_comment(0, &common::prepare_doc_string(abi.doc()))?;
         writeln!(
             self.out,
-            "public static func encode_{}_script_function({}) throws -> DiemTypes.TransactionPayload {{",
+            "public static func encode_{}_script_function({}) throws -> AptosTypes.TransactionPayload {{",
             abi.name(),
             [
                 Self::quote_type_parameters(abi.ty_args()),
@@ -237,7 +237,7 @@ public func into_script_function(payload: DiemTypes.TransactionPayload) throws -
         self.out.indent();
         writeln!(self.out, "{}", Self::quote_arguments(abi.args()))?;
         writeln!(self.out,
-            "return DiemTypes.TransactionPayload.ScriptFunction(DiemTypes.ScriptFunction(module: {}, function: {}, ty_args: [{}], args: [{}]))",
+            "return AptosTypes.TransactionPayload.ScriptFunction(AptosTypes.ScriptFunction(module: {}, function: {}, ty_args: [{}], args: [{}]))",
             Self::quote_module_id(abi.module_name()),
             Self::quote_identifier(abi.name()),
             Self::quote_type_arguments(abi.ty_args()),
@@ -250,7 +250,7 @@ public func into_script_function(payload: DiemTypes.TransactionPayload) throws -
     }
 
     fn output_script_function_decoder_function(&mut self, abi: &ScriptFunctionABI) -> Result<()> {
-        writeln!(self.out, "\n public static func decode_{}_script_function(payload: DiemTypes.TransactionPayload) throws -> ScriptFunctionCall {{", abi.name())?;
+        writeln!(self.out, "\n public static func decode_{}_script_function(payload: AptosTypes.TransactionPayload) throws -> ScriptFunctionCall {{", abi.name())?;
         self.out.indent();
         if !abi.args().is_empty() || !abi.ty_args().is_empty() {
             writeln!(
@@ -291,7 +291,7 @@ public func into_script_function(payload: DiemTypes.TransactionPayload) throws -
     fn output_script_decoder_function(&mut self, abi: &TransactionScriptABI) -> Result<()> {
         writeln!(
             self.out,
-            "\n public func decode_{}_script(script: DiemTypes.Script) throws -> ScriptCall {{",
+            "\n public func decode_{}_script(script: AptosTypes.Script) throws -> ScriptCall {{",
             abi.name()
         )?;
         self.out.indent();
@@ -344,7 +344,7 @@ public func into_script_function(payload: DiemTypes.TransactionPayload) throws -
         writeln!(
             self.out,
             r#"
-func decode_{}_argument(_ arg: DiemTypes.TransactionArgument) throws -> {} {{
+func decode_{}_argument(_ arg: AptosTypes.TransactionArgument) throws -> {} {{
     switch arg {{
         case .{}(let value): return {}
         default: throw PayloadDecodingError.invalidInput(issue: "Unexpected transaction argument")
@@ -393,13 +393,13 @@ func decode_{}_argument(_ arg: DiemTypes.TransactionArgument) throws -> {} {{
     fn quote_transaction_argument_for_script(type_tag: &TypeTag, name: &str) -> String {
         use TypeTag::*;
         match type_tag {
-            Bool => format!("DiemTypes.TransactionArgument.Bool({})", name),
-            U8 => format!("DiemTypes.TransactionArgument.U8({})", name),
-            U64 => format!("DiemTypes.TransactionArgument.U64({})", name),
-            U128 => format!("DiemTypes.TransactionArgument.U128({})", name),
-            Address => format!("DiemTypes.TransactionArgument.Address({})", name),
+            Bool => format!("AptosTypes.TransactionArgument.Bool({})", name),
+            U8 => format!("AptosTypes.TransactionArgument.U8({})", name),
+            U64 => format!("AptosTypes.TransactionArgument.U64({})", name),
+            U128 => format!("AptosTypes.TransactionArgument.U128({})", name),
+            Address => format!("AptosTypes.TransactionArgument.Address({})", name),
             Vector(type_tag) => match type_tag.as_ref() {
-                U8 => format!("DiemTypes.TransactionArgument.U8Vector({})", name),
+                U8 => format!("AptosTypes.TransactionArgument.U8Vector({})", name),
                 _ => common::type_not_allowed(type_tag),
             },
 
@@ -417,7 +417,7 @@ func decode_{}_argument(_ arg: DiemTypes.TransactionArgument) throws -> {} {{
     fn quote_type_parameters(ty_args: &[TypeArgumentABI]) -> Vec<String> {
         ty_args
             .iter()
-            .map(|ty_arg| format!("{}: DiemTypes.TypeTag", ty_arg.name()))
+            .map(|ty_arg| format!("{}: AptosTypes.TypeTag", ty_arg.name()))
             .collect()
     }
 
@@ -449,7 +449,7 @@ func decode_{}_argument(_ arg: DiemTypes.TransactionArgument) throws -> {} {{
             U8 => "UInt8".into(),
             U64 => "UInt64".into(),
             U128 => "BigInt8".into(),
-            Address => "DiemTypes.AccountAddress".into(),
+            Address => "AptosTypes.AccountAddress".into(),
             Vector(type_tag) => match type_tag.as_ref() {
                 U8 => "[UInt8]".into(),
                 _ => common::type_not_allowed(type_tag),
@@ -466,7 +466,7 @@ func decode_{}_argument(_ arg: DiemTypes.TransactionArgument) throws -> {} {{
             U64 => format!("{}.deserialize_u64()", ser_name),
             U128 => format!("{}.deserialize_u128()", ser_name),
             Address => format!(
-                "DiemTypes.AccountAddress.deserialize(deserializer: {})",
+                "AptosTypes.AccountAddress.deserialize(deserializer: {})",
                 ser_name
             ),
             Vector(type_tag) => match type_tag.as_ref() {
@@ -528,7 +528,7 @@ func decode_{}_argument(_ arg: DiemTypes.TransactionArgument) throws -> {} {{
 
     fn quote_module_id(module_id: &ModuleId) -> String {
         format!(
-            "DiemTypes.ModuleId(address: {}, name: {})",
+            "AptosTypes.ModuleId(address: {}, name: {})",
             Self::quote_address(module_id.address()),
             Self::quote_identifier(module_id.name().as_str())
         )
@@ -536,7 +536,7 @@ func decode_{}_argument(_ arg: DiemTypes.TransactionArgument) throws -> {} {{
 
     fn quote_address(address: &AccountAddress) -> String {
         format!(
-            "DiemTypes.AccountAddress(value: [{}])",
+            "AptosTypes.AccountAddress(value: [{}])",
             address
                 .to_vec()
                 .iter()
@@ -547,7 +547,7 @@ func decode_{}_argument(_ arg: DiemTypes.TransactionArgument) throws -> {} {{
     }
 
     fn quote_identifier(ident: &str) -> String {
-        format!("DiemTypes.Identifier(value: \"{}\")", ident)
+        format!("AptosTypes.Identifier(value: \"{}\")", ident)
     }
 
     fn format_args(x: impl Iterator<Item = String>) -> String {

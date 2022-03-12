@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using Diem.Stdlib;
-using Diem.Types;
+using Aptos.Stdlib;
+using Aptos.Types;
 using Serde;
 using System.Diagnostics;
 

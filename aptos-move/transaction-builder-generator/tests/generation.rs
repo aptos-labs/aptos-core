@@ -17,7 +17,7 @@ fn get_aptos_registry() -> Registry {
 }
 
 fn get_tx_script_abis() -> Vec<ScriptABI> {
-    // This is also a custom rule in diem/x.toml.
+    // This is also a custom rule in aptos-core/x.toml.
     let legacy_path = Path::new("../framework/DPN/releases/legacy/script_abis");
     buildgen::read_abis(&[legacy_path]).expect("reading legacy ABI files should not fail")
 }
@@ -67,7 +67,7 @@ fn test_that_typescript_generation_runs() {
     let dir = tempdir().unwrap();
     let dir_path = dir.path();
 
-    let config = serdegen::CodeGeneratorConfig::new("diemTypes".to_string())
+    let config = serdegen::CodeGeneratorConfig::new("aptosTypes".to_string())
         .with_encodings(vec![serdegen::Encoding::Bcs]);
     let bcs_installer = serdegen::typescript::Installer::new(dir_path.to_path_buf());
     bcs_installer.install_serde_runtime().unwrap();
@@ -76,7 +76,7 @@ fn test_that_typescript_generation_runs() {
 
     let abi_installer = buildgen::typescript::Installer::new(dir_path.to_path_buf());
     abi_installer
-        .install_transaction_builders("diemStdlib", &abis)
+        .install_transaction_builders("aptosStdlib", &abis)
         .unwrap();
 
     std::fs::copy("examples/typescript/mod.ts", dir_path.join("mod.ts")).unwrap();
@@ -94,7 +94,7 @@ fn test_that_typescript_generation_runs() {
     );
     assert!(output.status.success());
 }
-// Cannot run this test in the CI of Diem.
+// Cannot run this test in CI
 #[test]
 #[ignore]
 fn test_that_python_code_parses_and_passes_pyre_check() {
@@ -118,7 +118,7 @@ fn test_that_python_code_parses_and_passes_pyre_check() {
     installer.install_serde_runtime().unwrap();
     installer.install_bcs_runtime().unwrap();
 
-    let stdlib_dir_path = src_dir_path.join("diem_framework");
+    let stdlib_dir_path = src_dir_path.join("aptos_framework");
     std::fs::create_dir_all(stdlib_dir_path.clone()).unwrap();
     let source_path = stdlib_dir_path.join("__init__.py");
 
@@ -273,7 +273,7 @@ fn test_that_cpp_code_compiles_and_demo_runs() {
 
     let abi_installer = buildgen::cpp::Installer::new(dir.path().to_path_buf());
     abi_installer
-        .install_transaction_builders("diem_framework", &abis)
+        .install_transaction_builders("aptos_framework", &abis)
         .unwrap();
 
     std::fs::copy(
@@ -285,7 +285,7 @@ fn test_that_cpp_code_compiles_and_demo_runs() {
     let status = Command::new("clang++")
         .arg("--std=c++17")
         .arg("-g")
-        .arg(dir.path().join("diem_framework.cpp"))
+        .arg(dir.path().join("aptos_framework.cpp"))
         .arg(dir.path().join("stdlib_demo.cpp"))
         .arg("-o")
         .arg(dir.path().join("stdlib_demo"))
@@ -310,7 +310,7 @@ fn test_that_swift_code_compiles_and_demo_runs() {
     let abis = get_stdlib_script_abis();
     let path = tempdir().unwrap().path().to_owned();
 
-    let config = serdegen::CodeGeneratorConfig::new("DiemTypes".to_string())
+    let config = serdegen::CodeGeneratorConfig::new("AptosTypes".to_string())
         .with_encodings(vec![serdegen::Encoding::Bcs]);
     let bcs_installer = serdegen::swift::Installer::new(path.clone());
     bcs_installer.install_module(&config, &registry).unwrap();
@@ -319,12 +319,12 @@ fn test_that_swift_code_compiles_and_demo_runs() {
 
     let abi_installer = buildgen::swift::Installer::new(path.clone());
     abi_installer
-        .install_transaction_builders("DiemStdlib", &abis)
+        .install_transaction_builders("AptosStdlib", &abis)
         .unwrap();
 
     std::fs::copy(
         "examples/swift/main.swift",
-        path.join("Sources").join("DiemStdlib").join("main.swift"),
+        path.join("Sources").join("AptosStdlib").join("main.swift"),
     )
     .unwrap();
     std::fs::write(
@@ -334,19 +334,19 @@ fn test_that_swift_code_compiles_and_demo_runs() {
 import PackageDescription
 
 let package = Package(
-    name: "DiemStdlib",
+    name: "AptosStdlib",
     targets: [
         .target(
             name: "Serde",
             dependencies: []
         ),
         .target(
-            name: "DiemTypes",
+            name: "AptosTypes",
             dependencies: ["Serde"]
         ),
         .target(
-            name: "DiemStdlib",
-            dependencies: ["Serde", "DiemTypes"]
+            name: "AptosStdlib",
+            dependencies: ["Serde", "AptosTypes"]
         ),
     ]
 )
@@ -377,10 +377,10 @@ fn test_that_java_code_compiles_and_demo_runs() {
     let paths = std::fs::read_dir("examples/java/custom_aptos_code")
         .unwrap()
         .map(|e| e.unwrap().path());
-    let config = serdegen::CodeGeneratorConfig::new("com.diem.types".to_string())
+    let config = serdegen::CodeGeneratorConfig::new("com.aptos.types".to_string())
         .with_encodings(vec![serdegen::Encoding::Bcs])
         .with_custom_code(buildgen::read_custom_code_from_paths(
-            &["com", "diem", "types"],
+            &["com", "aptos", "types"],
             paths,
         ));
     let bcs_installer = serdegen::java::Installer::new(dir.path().to_path_buf());
@@ -390,7 +390,7 @@ fn test_that_java_code_compiles_and_demo_runs() {
 
     let abi_installer = buildgen::java::Installer::new(dir.path().to_path_buf());
     abi_installer
-        .install_transaction_builders("com.diem.stdlib", &abis)
+        .install_transaction_builders("com.aptos.stdlib", &abis)
         .unwrap();
 
     std::fs::copy(
@@ -403,8 +403,8 @@ fn test_that_java_code_compiles_and_demo_runs() {
         std::iter::empty()
             .chain(std::fs::read_dir(dir.path().join("com/novi/serde")).unwrap())
             .chain(std::fs::read_dir(dir.path().join("com/novi/bcs")).unwrap())
-            .chain(std::fs::read_dir(dir.path().join("com/diem/types")).unwrap())
-            .chain(std::fs::read_dir(dir.path().join("com/diem/stdlib")).unwrap())
+            .chain(std::fs::read_dir(dir.path().join("com/aptos/types")).unwrap())
+            .chain(std::fs::read_dir(dir.path().join("com/aptos/stdlib")).unwrap())
             .map(|e| e.unwrap().path())
             .chain(std::iter::once(dir.path().join("StdlibDemo.java")))
     };
@@ -455,9 +455,9 @@ fn test_that_csharp_code_compiles_and_demo_runs() {
     // the path string is shorter. So make the temp path shorter and all is good.
     // Avoids this:
     // "Unhandled exception. System.IO.FileNotFoundException: Could not load file
-    // or assembly \'Diem.Types, Version=1.0.0.0, Culture=neutral,
+    // or assembly \'Aptos.Types, Version=1.0.0.0, Culture=neutral,
     // PublicKeyToken=null\'. The system cannot find the file specified.\n\n
-    // File name: \'Diem.Types, Version=1.0.0.0, Culture=neutral,
+    // File name: \'Aptos.Types, Version=1.0.0.0, Culture=neutral,
     // PublicKeyToken=null\'\n\n\n"`,
     if std::env::consts::OS == "macos" {
         std::env::set_var("TMPDIR", "/private/tmp/");
@@ -467,10 +467,10 @@ fn test_that_csharp_code_compiles_and_demo_runs() {
     let paths = std::fs::read_dir("examples/csharp/custom_aptos_code")
         .unwrap()
         .map(|e| e.unwrap().path());
-    let config = serdegen::CodeGeneratorConfig::new("Diem.Types".to_string())
+    let config = serdegen::CodeGeneratorConfig::new("Aptos.Types".to_string())
         .with_encodings(vec![serdegen::Encoding::Bcs])
         .with_custom_code(buildgen::read_custom_code_from_paths(
-            &["Diem", "Types"],
+            &["Aptos", "Types"],
             paths,
         ));
     let bcs_installer = serdegen::csharp::Installer::new(dir.path().to_path_buf());
@@ -480,7 +480,7 @@ fn test_that_csharp_code_compiles_and_demo_runs() {
 
     let abi_installer = buildgen::csharp::Installer::new(dir.path().to_path_buf());
     abi_installer
-        .install_transaction_builders("Diem.Stdlib", &abis)
+        .install_transaction_builders("Aptos.Stdlib", &abis)
         .unwrap();
 
     std::fs::create_dir(dir.path().join("Demo")).unwrap();
@@ -494,24 +494,24 @@ fn test_that_csharp_code_compiles_and_demo_runs() {
         .arg("new")
         .arg("classlib")
         .arg("-n")
-        .arg("Diem.Stdlib")
+        .arg("Aptos.Stdlib")
         .arg("-o")
-        .arg(dir.path().join("Diem/Stdlib"))
+        .arg(dir.path().join("Aptos/Stdlib"))
         .status()
         .unwrap();
     assert!(status.success());
 
     let status = Command::new("rm")
-        .arg(dir.path().join("Diem/Stdlib/Class1.cs"))
+        .arg(dir.path().join("Aptos/Stdlib/Class1.cs"))
         .status()
         .unwrap();
     assert!(status.success());
 
     let status = Command::new("dotnet")
         .arg("add")
-        .arg(dir.path().join("Diem/Stdlib/Diem.Stdlib.csproj"))
+        .arg(dir.path().join("Aptos/Stdlib/Aptos.Stdlib.csproj"))
         .arg("reference")
-        .arg(dir.path().join("Diem/Types/Diem.Types.csproj"))
+        .arg(dir.path().join("Aptos/Types/Aptos.Types.csproj"))
         .status()
         .unwrap();
     assert!(status.success());
@@ -548,7 +548,7 @@ fn test_that_csharp_code_compiles_and_demo_runs() {
         .arg("add")
         .arg(dir.path().join("Demo/Demo.csproj"))
         .arg("reference")
-        .arg(dir.path().join("Diem/Stdlib/Diem.Stdlib.csproj"))
+        .arg(dir.path().join("Aptos/Stdlib/Aptos.Stdlib.csproj"))
         .status()
         .unwrap();
     assert!(status.success());
@@ -557,7 +557,7 @@ fn test_that_csharp_code_compiles_and_demo_runs() {
         .arg("add")
         .arg(dir.path().join("Demo/Demo.csproj"))
         .arg("reference")
-        .arg(dir.path().join("Diem/Types/Diem.Types.csproj"))
+        .arg(dir.path().join("Aptos/Types/Aptos.Types.csproj"))
         .status()
         .unwrap();
     assert!(status.success());
@@ -608,7 +608,7 @@ fn test_that_golang_code_compiles_and_demo_runs() {
     let abis = get_stdlib_script_abis();
     let dir = tempdir().unwrap();
 
-    let config = serdegen::CodeGeneratorConfig::new("diemtypes".to_string())
+    let config = serdegen::CodeGeneratorConfig::new("aptostypes".to_string())
         .with_encodings(vec![serdegen::Encoding::Bcs]);
     let bcs_installer = serdegen::golang::Installer::new(
         dir.path().to_path_buf(),
@@ -622,7 +622,7 @@ fn test_that_golang_code_compiles_and_demo_runs() {
         Some("testing".to_string()),
     );
     abi_installer
-        .install_transaction_builders("diemstdlib", &abis)
+        .install_transaction_builders("aptosstdlib", &abis)
         .unwrap();
 
     std::fs::copy(
