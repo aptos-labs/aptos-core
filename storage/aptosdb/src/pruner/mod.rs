@@ -13,10 +13,10 @@ use aptos_types::transaction::Version;
 use schemadb::DB;
 use std::{
     sync::{
-        Arc,
         mpsc::{channel, Sender},
+        Arc,
     },
-    thread::{JoinHandle, sleep},
+    thread::{sleep, JoinHandle},
     time::{Duration, Instant},
 };
 use worker::{Command, Worker};
@@ -45,6 +45,9 @@ pub(crate) struct Pruner {
     #[allow(dead_code)]
     least_readable_version: Arc<Mutex<Vec<Version>>>,
 }
+
+const STATE_STORE_PRUNER_INDEX: usize = 0;
+const TRANSACTION_STORE_PRUNER_INDEX: usize = 1;
 
 impl Pruner {
     /// Creates a worker thread that waits on a channel for pruning commands.
@@ -101,7 +104,11 @@ impl Pruner {
     /// (For tests only.) Notifies the worker thread and waits for it to finish its job by polling
     /// an internal counter.
     #[cfg(test)]
-    pub fn wake_and_wait(&self, latest_version: Version) -> anyhow::Result<()> {
+    pub fn wake_and_wait(
+        &self,
+        latest_version: Version,
+        transaction_store_index: usize,
+    ) -> anyhow::Result<()> {
         self.wake(latest_version);
 
         if latest_version > self.state_store_prune_window
@@ -113,7 +120,11 @@ impl Pruner {
             let end = Instant::now() + TIMEOUT;
 
             while Instant::now() < end {
-                if *self.least_readable_version.lock().get(0).unwrap()
+                if *self
+                    .least_readable_version
+                    .lock()
+                    .get(transaction_store_index)
+                    .unwrap()
                     >= least_readable_state_store_version
                 {
                     return Ok(());
@@ -141,6 +152,6 @@ impl Drop for Pruner {
 }
 
 mod db_pruner;
-pub(crate) mod worker;
 pub(crate) mod state_store;
 pub(crate) mod transaction_store;
+pub(crate) mod worker;

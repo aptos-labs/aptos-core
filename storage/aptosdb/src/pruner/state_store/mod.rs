@@ -2,18 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    DIEM_STORAGE_OTHER_TIMERS_SECONDS,
-    jellyfish_merkle_node::JellyfishMerkleNodeSchema, metrics::DIEM_STATE_STORAGE_PRUNER_LEAST_READABLE_VERSION,
-    pruner::db_pruner::DBPruner, stale_node_index::StaleNodeIndexSchema,
+    jellyfish_merkle_node::JellyfishMerkleNodeSchema,
+    metrics::DIEM_STATE_STORAGE_PRUNER_LEAST_READABLE_VERSION, pruner::db_pruner::DBPruner,
+    stale_node_index::StaleNodeIndexSchema, DIEM_STORAGE_OTHER_TIMERS_SECONDS,
 };
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::StaleNodeIndex;
 use aptos_logger::{error, info, warn};
 use aptos_types::transaction::{AtomicVersion, Version};
-use schemadb::{DB, ReadOptions, SchemaBatch, SchemaIterator};
+use schemadb::{ReadOptions, SchemaBatch, SchemaIterator, DB};
 use std::{
     iter::Peekable,
-    sync::{Arc, atomic::Ordering},
+    sync::{atomic::Ordering, Arc},
     thread::sleep,
     time::{Duration, Instant},
 };

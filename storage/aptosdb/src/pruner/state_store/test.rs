@@ -1,8 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::pruner::*;
-use crate::{change_set::ChangeSet, state_store::StateStore, AptosDB};
+use crate::{change_set::ChangeSet, pruner::*, state_store::StateStore, AptosDB};
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
 use aptos_types::{account_address::AccountAddress, account_state_blob::AccountStateBlob};
@@ -79,14 +78,18 @@ fn test_state_store_pruner() {
 
     // Prune till version=0.
     {
-        pruner.wake_and_wait(0 /* latest_version */).unwrap();
+        pruner
+            .wake_and_wait(0 /* latest_version */, STATE_STORE_PRUNER_INDEX)
+            .unwrap();
         verify_state_in_store(state_store, address, Some(&value0), 0);
         verify_state_in_store(state_store, address, Some(&value1), 1);
         verify_state_in_store(state_store, address, Some(&value2), 2);
     }
     // Prune till version=1.
     {
-        pruner.wake_and_wait(1 /* latest_version */).unwrap();
+        pruner
+            .wake_and_wait(1 /* latest_version */, STATE_STORE_PRUNER_INDEX)
+            .unwrap();
         // root0 is gone.
         assert!(state_store
             .get_account_state_with_proof_by_version(address, 0)
@@ -97,7 +100,9 @@ fn test_state_store_pruner() {
     }
     // Prune till version=2.
     {
-        pruner.wake_and_wait(2 /* latest_version */).unwrap();
+        pruner
+            .wake_and_wait(2 /* latest_version */, STATE_STORE_PRUNER_INDEX)
+            .unwrap();
         // root1 is gone.
         assert!(state_store
             .get_account_state_with_proof_by_version(address, 1)

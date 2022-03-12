@@ -1,9 +1,11 @@
 // Copyright (c) The Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+mod test;
+
 use crate::{
     metrics::DIEM_TRANSACTION_PRUNER_LEAST_READABLE_VERSION, pruner::db_pruner::DBPruner,
-    stale_node_index::StaleNodeIndexSchema, transaction::TransactionSchema,
+    transaction::TransactionSchema,
 };
 use aptos_logger::{error, info};
 use aptos_types::transaction::{AtomicVersion, Version};
@@ -53,10 +55,11 @@ impl DBPruner for TransactionStorePruner {
             self.target_version(),
         );
         iter.seek(&least_readable_version)?;
-        self.db.range_delete::<StaleNodeIndexSchema, Version>(
+        self.db.range_delete::<TransactionSchema, Version>(
             &self.least_readable_version(),
             &current_target_version,
         )?;
+        self.record_progress(current_target_version);
         Ok(current_target_version)
     }
 
@@ -74,22 +77,22 @@ impl DBPruner for TransactionStorePruner {
         self.least_readable_version.load(Ordering::Relaxed)
     }
 
-    fn record_progress(&self, least_readable_version: Version) {
-        self.least_readable_version
-            .store(least_readable_version, Ordering::Relaxed);
-        DIEM_TRANSACTION_PRUNER_LEAST_READABLE_VERSION.set(least_readable_version as i64);
+    fn set_target_version(&self, target_version: Version) {
+        self.target_version.store(target_version, Ordering::Relaxed)
     }
 
     fn target_version(&self) -> Version {
         self.target_version.load(Ordering::Relaxed)
     }
 
-    fn is_pruning_pending(&self) -> bool {
-        self.least_readable_version() >= self.target_version()
+    fn record_progress(&self, least_readable_version: Version) {
+        self.least_readable_version
+            .store(least_readable_version, Ordering::Relaxed);
+        DIEM_TRANSACTION_PRUNER_LEAST_READABLE_VERSION.set(least_readable_version as i64);
     }
 
-    fn set_target_version(&self, target_version: Version) {
-        self.target_version.store(target_version, Ordering::Relaxed)
+    fn is_pruning_pending(&self) -> bool {
+        self.least_readable_version() >= self.target_version()
     }
 }
 

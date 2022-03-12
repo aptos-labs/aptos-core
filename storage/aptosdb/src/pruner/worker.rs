@@ -3,17 +3,14 @@
 use aptos_types::transaction::Version;
 use schemadb::DB;
 
-use crate::pruner::{
-    db_pruner::DBPruner,
-    transaction_store::TransactionStorePruner,
-};
+use crate::pruner::{db_pruner::DBPruner, transaction_store::TransactionStorePruner};
 use aptos_infallible::Mutex;
 
+use crate::pruner::state_store::StateStorePruner;
 use std::{
     sync::{mpsc::Receiver, Arc},
     time::Instant,
 };
-use crate::pruner::state_store::StateStorePruner;
 
 /// Maintains all the DBPruners and periodically calls the db_pruner's prune method to prune the DB.
 /// This also exposes API to report the progress to the parent thread.
