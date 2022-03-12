@@ -77,11 +77,13 @@ jobs:
               echo "Image tag $IMAGE_TAG already present. Skipping build..."
               echo "Continue retagging to <<parameters.addl_tag>>"
               imgs=( validator forge init validator_tcb tools faucet )
+              ret=0
               for img in "${imgs[@]}"
               do
                 MANIFEST=$(aws ecr batch-get-image --repository-name aptos/${img} --image-ids imageTag=$IMAGE_TAG --query 'images[].imageManifest' --output text)
-                aws ecr put-image --repository-name aptos/${img} --image-tag main --image-manifest $MANIFEST
+                aws ecr put-image --repository-name aptos/${img} --image-tag main --image-manifest "$MANIFEST" || ret=$?
               done
+              exit $ret
             fi
   forge-k8s:
     docker:
