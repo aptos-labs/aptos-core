@@ -11,7 +11,7 @@ use std::str::FromStr;
 pub struct RestError {
     pub code: u32,
     pub message: String,
-    pub diem_ledger_version: Option<U64>,
+    pub aptos_ledger_version: Option<U64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize)]

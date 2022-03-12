@@ -459,7 +459,7 @@ components:
               - example:
                   code: 404
                   message: "resource not found"
-                  diem_ledger_version: "37829327"
+                  aptos_ledger_version: "37829327"
     "413":
       description: |
         The request payload is too large.
@@ -505,7 +505,7 @@ components:
           type: integer
         message:
           type: string
-        diem_ledger_version:
+        aptos_ledger_version:
           $ref: '#/components/schemas/LedgerVersion'
     Uint64:
       title: uint64

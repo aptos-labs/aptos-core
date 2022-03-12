@@ -406,7 +406,7 @@ impl AdminTest for GetMetadata {
     fn run<'t>(&self, ctx: &mut AdminContext<'t>) -> Result<()> {
         let client = ctx.rest_client();
         let runtime = Runtime::new().unwrap();
-        runtime.block_on(client.get_diem_version()).unwrap();
+        runtime.block_on(client.get_aptos_version()).unwrap();
         runtime.block_on(client.get_ledger_information()).unwrap();
 
         Ok(())

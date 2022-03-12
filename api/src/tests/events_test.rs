@@ -113,7 +113,7 @@ async fn test_get_events_by_invalid_account_event_handle_struct_address() {
         json!({
           "code": 404,
           "message": "resource not found by address(0xa550c18), struct tag(0x9::DiemAccount::AccountOperationsCapability) and ledger version(0)",
-          "diem_ledger_version": "0"
+          "aptos_ledger_version": "0"
         }),
     );
 }
@@ -133,7 +133,7 @@ async fn test_get_events_by_invalid_account_event_handle_struct_module() {
         json!({
           "code": 404,
           "message": "resource not found by address(0xa550c18), struct tag(0x1::NotFound::AccountOperationsCapability) and ledger version(0)",
-          "diem_ledger_version": "0"
+          "aptos_ledger_version": "0"
         }),
     );
 }
@@ -151,7 +151,7 @@ async fn test_get_events_by_invalid_account_event_handle_struct_name() {
         json!({
           "code": 404,
           "message": "resource not found by address(0xa550c18), struct tag(0x1::DiemAccount::NotFound) and ledger version(0)",
-          "diem_ledger_version": "0"
+          "aptos_ledger_version": "0"
         }),
     );
 }
@@ -169,7 +169,7 @@ async fn test_get_events_by_invalid_account_event_handle_field_name() {
         json!({
           "code": 404,
           "message": "resource not found by address(0xa550c18), struct tag(0x1::DiemAccount::AccountOperationsCapability), field name(not_found) and ledger version(0)",
-          "diem_ledger_version": "0"
+          "aptos_ledger_version": "0"
         }),
     );
 }
@@ -210,7 +210,7 @@ async fn test_get_events_by_struct_type_has_generic_type_parameter() {
         json!({
           "code": 404,
           "message": "resource not found by address(0x1), struct tag(0x1::DiemAccount::Balance<0x1::ABC::ABC>) and ledger version(0)",
-          "diem_ledger_version": "0"
+          "aptos_ledger_version": "0"
         }),
     );
 }

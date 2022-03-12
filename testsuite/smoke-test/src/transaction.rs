@@ -66,7 +66,7 @@ impl ExternalTransactionSigner {
 
         let unsigned_txn = ctx
             .transaction_factory()
-            .with_diem_version(0) // Force Script not ScriptFunctions
+            .with_aptos_version(0) // Force Script not ScriptFunctions
             .peer_to_peer(Currency::XUS, receiver.address(), amount)
             .sender(sender_address)
             .sequence_number(test_sequence_number)

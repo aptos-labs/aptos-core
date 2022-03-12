@@ -28,7 +28,7 @@ async fn test_get_account_resources_by_address_0x0() {
         json!({
             "code": 404,
             "message": "account not found by address(0x0) and ledger version(0)",
-            "diem_ledger_version": info.ledger_version,
+            "aptos_ledger_version": info.ledger_version,
         }),
         resp
     );
@@ -514,7 +514,7 @@ async fn test_get_account_resources_by_ledger_version_is_too_large() {
         json!({
             "code": 404,
             "message": "ledger not found by version(1000000000000000000)",
-            "diem_ledger_version": "0"
+            "aptos_ledger_version": "0"
         }),
     );
 }
@@ -588,7 +588,7 @@ async fn test_get_core_account_data_not_found() {
         json!({
             "code": 404,
             "message": "account not found by address(0xf) and ledger version(0)",
-            "diem_ledger_version": "0"
+            "aptos_ledger_version": "0"
         }),
         resp
     );

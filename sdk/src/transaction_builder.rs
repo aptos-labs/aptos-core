@@ -124,7 +124,7 @@ impl TransactionFactory {
         self
     }
 
-    pub fn with_diem_version(mut self, diem_version: u64) -> Self {
+    pub fn with_aptos_version(mut self, diem_version: u64) -> Self {
         self.diem_version = diem_version;
         self
     }

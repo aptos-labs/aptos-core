@@ -186,7 +186,7 @@ async fn test_get_transactions_with_start_version_is_too_large() {
         json!({
           "code": 404,
           "message": "transaction not found by version(1000000)",
-          "diem_ledger_version": ledger_version.to_string()
+          "aptos_ledger_version": ledger_version.to_string()
         }),
     );
 }
@@ -802,7 +802,7 @@ async fn test_get_transaction_by_hash_not_found() {
         json!({
             "code": 404,
             "message": "transaction not found by hash(0xdadfeddcca7cb6396c735e9094c76c6e4e9cb3e3ef814730693aed59bd87b31d)",
-            "diem_ledger_version": "0"
+            "aptos_ledger_version": "0"
         }),
     )
 }
@@ -837,7 +837,7 @@ async fn test_get_transaction_by_version_not_found() {
         json!({
             "code": 404,
             "message": "transaction not found by version(10000)",
-            "diem_ledger_version": "0"
+            "aptos_ledger_version": "0"
         }),
     )
 }
@@ -881,7 +881,7 @@ async fn test_get_pending_transaction_by_hash() {
         json!({
             "code": 404,
             "message": "transaction not found by hash(0xdadfeddcca7cb6396c735e9094c76c6e4e9cb3e3ef814730693aed59bd87b31d)",
-            "diem_ledger_version": "0"
+            "aptos_ledger_version": "0"
         }),
     )
 }
