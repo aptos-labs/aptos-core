@@ -191,10 +191,10 @@ workflows:
   build-test-deploy:
     jobs:
 #      - build-benchmarks
-      - crypto
-      - e2e-test
-      - lint
-      - unit-test
+      # - crypto
+      # - e2e-test
+      # - lint
+      # - unit-test
       ### bors-controlled workflows ###
       - require-bors:
           filters:
@@ -202,27 +202,29 @@ workflows:
               only:
                 - auto
                 - canary
-      - docker-build-push:
-          context: aws-dev
-          requires:
-            - require-bors
-      - forge-k8s:
-          context: aws-dev
-          requires:
-            - docker-build-push
-  ### Automated workflows
-  continuous-push:
-    triggers:
-      - schedule:
-          cron: "15 0,4,8,12,16,20 * * *"
-          filters:
-            branches:
-              only:
-                - main
-    jobs:
+  #     - docker-build-push:
+  #         context: aws-dev
+  #         requires:
+  #           - require-bors
+  #     - forge-k8s:
+  #         context: aws-dev
+  #         requires:
+  #           - docker-build-push
+  # ### Automated workflows
+  # continuous-push:
+  #   triggers:
+  #     - schedule:
+  #         cron: "15 0,4,8,12,16,20 * * *"
+  #         filters:
+  #           branches:
+  #             only:
+  #               - main
+    # jobs:
       - docker-build-push:
           context: aws-dev
           addl_tag: main
+          requires:
+            - require-bors
       - ecr-dockerhub-mirror:
           context:
             - aws-dev
