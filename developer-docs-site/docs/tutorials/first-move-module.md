@@ -1,5 +1,5 @@
 ---
-title: "Your first Move Module on the Aptos Blockchain"
+title: "Your first Move Module"
 slug: "your-first-move-module"
 sidebar_position: 2
 ---
@@ -7,39 +7,34 @@ sidebar_position: 2
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Overview
+# Your first Move Module
 
-This tutorial details how to write, compile, test, publish, and interact with Move Modules on the Aptos Blockchain.
-The steps to doing so:
+This tutorial details how to write, compile, test, publish, and interact with Move Modules on the Aptos Blockchain. The steps to doing so:
 
 * Write, compile, and test the Move Module
 * Publish the Move Module to the Aptos Blockchain
 * Initialize and interact with resources of the Move Module
 
-This tutorial builds on "[Your first transaction](/tutorials/your-first-transaction)" and borrows that code as a library
-for this example. The following tutorial contains example code that can be downloaded in its entirety below:
+This tutorial builds on "[Your first transaction](/tutorials/your-first-transaction)" and borrows that code as a library for this example. The following tutorial contains example code that can be downloaded in its entirety below:
 
 <Tabs>
   <TabItem value="python" label="Python" default>
 
-For this tutorial, will be focusing on `hello_blockchain.py`, 
-and re-using the `first_transaction.py` library from the previous tutorial.
+For this tutorial, will be focusing on `hello_blockchain.py` and re-using the `first_transaction.py` library from the previous tutorial.
 
 You can find the python project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/python)
 
   </TabItem>
   <TabItem value="rust" label="Rust" default>
 
-For this tutorial, will be focusing on `hello_blockchain.rs`,
-and re-using the `first_transaction.rs` library from the previous tutorial.
+For this tutorial, will be focusing on `hello_blockchain.rs` and re-using the `first_transaction.rs` library from the previous tutorial.
 
 You can find the rust project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust)
 
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
 
-For this tutorial, will be focusing on `hello_blockchain.ts`,
-and re-using the `first_transaction.ts` library from the previous tutorial.
+For this tutorial, will be focusing on `hello_blockchain.ts` and re-using the `first_transaction.ts` library from the previous tutorial.
 
 You can find the typescript project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript)
 
@@ -50,9 +45,7 @@ You can find the typescript project [here](https://github.com/aptos-labs/aptos-c
 
 ### Step 1.1) Download Aptos-core
 
-For the simplicity of this exercise, Aptos-core has a `move-examples` directory that makes it easy to build and test
-Move modules without downloading additional resources. Over time, we will expand this section to describe how to
-leverage [Move](https://github.com/diem/move) tools for development.
+For the simplicity of this exercise, Aptos-core has a `move-examples` directory that makes it easy to build and test Move modules without downloading additional resources. Over time, we will expand this section to describe how to leverage [Move](https://github.com/diem/move) tools for development.
 
 For now, download and prepare Aptos-core:
 
@@ -65,12 +58,9 @@ source ~/.cargo/env
 
 ### Step 1.2) Review the Module
 
-In this terminal, change directories to `aptos-move/move-examples`.
-Keep this terminal window for the rest of this tutorial- we will refer to it later as the "Move Window".
-The rest of this section will review the file `sources/HelloBlockchain.move`.
+In this terminal, change directories to `aptos-move/move-examples`. Keep this terminal window for the rest of this tutorial- we will refer to it later as the "Move Window". The rest of this section will review the file `sources/HelloBlockchain.move`.
 
-This module enables users to create a `String` resource under their account and set it.
-Users are only able to set their resource and cannot set other's resources.
+This module enables users to create a `String` resource under their account and set it. Users are only able to set their resource and cannot set other's resources.
 
 ```rust
 module HelloBlockchain::Message {
@@ -98,16 +88,11 @@ module HelloBlockchain::Message {
 }
 ```
 
-In the previous code, the two important sections are the struct `MessageHolder` and the function `set_message`.
-`set_message` is a `script` function allowing it to be called directly by transactions. Upon calling it, the function
-will determine if the current account has a `MessageHolder` resource and creates and stores the `message` it if it does
-not exist. If the resource exists, the `message` in the `MessageHolder` is overwritten.
+In the previous code, the two important sections are the struct `MessageHolder` and the function `set_message`. `set_message` is a `script` function allowing it to be called directly by transactions. Upon calling it, the function will determine if the current account has a `MessageHolder` resource and creates and stores the `message` it if it does not exist. If the resource exists, the `message` in the `MessageHolder` is overwritten.
 
 ### Step 1.3) Testing the Module
 
-Move allows for inline tests, so we add `get_message` to make retrieving the `message` convenient and a test
-function `sender_can_set_message` to validate an end-to-end flow. This can be validated by running `cargo test`. There
-is another test under `sources/HelloBlockchainTest.move` that demonstrates another method for writing tests.
+Move allows for inline tests, so we add `get_message` to make retrieving the `message` convenient and a test function `sender_can_set_message` to validate an end-to-end flow. This can be validated by running `cargo test`. There is another test under `sources/HelloBlockchainTest.move` that demonstrates another method for writing tests.
 
 Note: `sender_can_set_message` is a `script` function in order to call the `script` function `set_message`.
 
@@ -133,11 +118,7 @@ Note: `sender_can_set_message` is a `script` function in order to call the `scri
 
 ## Step 2) Publishing and Interacting with the Move Module
 
-Now we return to our application to deploy and interact with the module on the Atpos blockchain. As mentioned earlier,
-this tutorial builds upon the earlier tutorial and shares the common code. As a result, this tutorial only discusses new
-features for that library including the ability to publish, send the `set_message` transaction, and
-reading `MessageHolder::message`. The only difference from publishing a module and submitting a transaction is the
-payload type. See the following:
+Now we return to our application to deploy and interact with the module on the Atpos blockchain. As mentioned earlier, this tutorial builds upon the earlier tutorial and shares the common code. As a result, this tutorial only discusses new features for that library including the ability to publish, send the `set_message` transaction, and reading `MessageHolder::message`. The only difference from publishing a module and submitting a transaction is the payload type. See the following:
 
 ### Step 2.1) Publishing the Move Module
 
@@ -162,8 +143,7 @@ payload type. See the following:
 
 ### Step 2.2) Reading a resource
 
-The module is published at an address. This is the `contract_address` below. This is similar to the previous example,
-where the `TestCoin` is at `0x1`. The `contract_address` will be the same as the account that publishes it.
+The module is published at an address. This is the `contract_address` below. This is similar to the previous example, where the `TestCoin` is at `0x1`. The `contract_address` will be the same as the account that publishes it.
 
 <Tabs>
   <TabItem value="python" label="Python" default>
@@ -189,9 +169,7 @@ where the `TestCoin` is at `0x1`. The `contract_address` will be the same as the
 Move modules must expose `script` functions for initializing and manipulating resources. The `script` can then be called
 from a transaction.
 
-Note: while the REST interface can display strings, due to limitations of JSON and Move, it cannot determine if an
-argument is a string or a hex-encoded string. So the transaction arguments always assume the latter. Hence, in this
-example, the message is encoded as a hex-string.
+Note: while the REST interface can display strings, due to limitations of JSON and Move, it cannot determine if an argument is a string or a hex-encoded string. So the transaction arguments always assume the latter. Hence, in this example, the message is encoded as a hex-string.
 
 <Tabs>
   <TabItem value="python" label="Python" default>
