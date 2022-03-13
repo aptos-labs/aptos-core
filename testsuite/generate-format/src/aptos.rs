@@ -57,8 +57,6 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
     tracer.trace_type::<transaction::metadata::Metadata>(&samples)?;
     tracer.trace_type::<transaction::metadata::GeneralMetadata>(&samples)?;
-    tracer.trace_type::<transaction::metadata::RefundMetadata>(&samples)?;
-    tracer.trace_type::<transaction::metadata::RefundReason>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
     tracer.trace_type::<transaction::VecBytes>(&samples)?;

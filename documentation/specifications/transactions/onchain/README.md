@@ -49,34 +49,6 @@ Lifetime of subaddresses:
 
 Subaddresses should be used with great care to not accidentally leak personally identifiable information (PII). However, implementors must be mindful of the permissive nature of subaddresses as outlined in this specification.
 
-## Refunds Using RefundMetadata
-
-```
-enum RefundMetadata {
-  RefundMetadataV0(Refund),
-}
-
-struct Refund {
-  transaction_version: u64,
-  reason: RefundReason,
-}
-
-
-enum RefundReason {
-  OtherReason = 0,
-  InvalidSubaddress = 1,
-  UserInitiatedPartialRefund = 2,
-  UserInitiatedFullRefund = 3,
-  InvalidReferenceId = 4,
-}
-```
-
-Diem supports refund transactions, as defined in [DIP-4](https://dip.aptoslabs.com/dip-4/). The refund includes the `transaction_version`, a globally unique value, for the transaction that is being refunded as well as the reason for the refund. For example, an errant transaction to a non-existent destination as well as user-driven refunds. However, use of the refund type is optional.
-
-Participants can be configured to automatically refund invalid transactions but in order to prevent ping-pong or recursive refunds, only a single transaction should be sent per peer per transaction stream. That is if a payment is followed by a invalid refund no follow up refund should be issued. Instead this should be surfaced to directly to the other party as this is an implementation bug.
-
-All other transactions, may use the refund transaction but are not strictly required to do so. Usage of the refund transaction, however, makes it clear what is a refund and the intent or reason for it.
-
 ## Dual Attestation Credentials
 
 Diem defines a [DualAttestation::Credential](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/core/sources/DualAttestation.move) resource to support off-chain protocols. This resource contains the `human_name`, `base_url`, and `compliance_public_key` for a VASP. The `base_url` specifies where the VASP hosts its off-chain API and the `compliance_public_key` is used to verify signed transaction metadata and establish authentication in off-chain communication. The values can be set and updated via the [rotate_dual_attestation_info](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/transaction_scripts/rotate_dual_attestation_info.move) script.

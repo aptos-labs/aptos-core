@@ -95,10 +95,6 @@ Metadata:
       UnstructuredBytesMetadata:
         NEWTYPE:
           TYPENAME: UnstructuredBytesMetadata
-    3:
-      RefundMetadata:
-        NEWTYPE:
-          TYPENAME: RefundMetadata
 Module:
   STRUCT:
     - code: BYTES
@@ -130,29 +126,6 @@ RawTransaction:
     - expiration_timestamp_secs: U64
     - chain_id:
         TYPENAME: ChainId
-RefundMetadata:
-  ENUM:
-    0:
-      RefundMetadataV0:
-        NEWTYPE:
-          TYPENAME: RefundMetadataV0
-RefundMetadataV0:
-  STRUCT:
-    - transaction_version: U64
-    - reason:
-        TYPENAME: RefundReason
-RefundReason:
-  ENUM:
-    0:
-      OtherReason: UNIT
-    1:
-      InvalidSubaddress: UNIT
-    2:
-      UserInitiatedPartialRefund: UNIT
-    3:
-      UserInitiatedFullRefund: UNIT
-    4:
-      InvalidReferenceId: UNIT
 Script:
   STRUCT:
     - code: BYTES

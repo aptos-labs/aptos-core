@@ -22,10 +22,6 @@ When a transaction is submitted to the blockchain it is evaluated many times bot
 
 Users do not have direct ability to send and receive payments on the Diem network and must do so through VASPs. One method to do so, is to store potentially personally identifiable information in a transaction metadata, Diem also supports an off-chain framework that can negotiate one-time use transaction identifiers called `reference_id`s. The off-chain framework is also used by support travel rule compliance.
 
-### Refunds
-
-Diem defines refunds as part of the transaction framework. The refund includes a pointer to the transaction that is being refunded and the reason for the refund, for example, an errant transaction to a non-existent destination as well as user-driven refunds. However, use of the refund type is optional.
-
 ## Common Flows
 
 ### Transfer with Subaddresses
@@ -46,10 +42,6 @@ In the case that Bob would send Alice an amount that exceeds the travel rule lim
 * Bob's VASP will initiate an off-chain KYC exchange with Alice's VASP
 * Upon successful completion of the exchange, Alice and Bob's VASP would have agreed on a `reference_id` and Alice's VASP would have provided a signature for the transaction metadata that Bob's VASP will submit to the chain
 * Bob's VASP will submit a transaction metadata that contains the `reference_id` instead of the subaddresses
-
-### Refunds
-
-There are two cases for refunds, those initiated by the recipient and those that have no valid recipient. In practice, those initiated by a recipient can be sent back as a transfer to the originating VASP and subaddress. Diem also provides for native refunds that contain a reason for the refund, so that VASPs need not speculate or confer off-chain on the reason why funds were returned, e.g., a purchase refund or an invalid subaddress.
 
 ## Transactions Overview
 

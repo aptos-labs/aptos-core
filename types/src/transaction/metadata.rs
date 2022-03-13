@@ -14,7 +14,6 @@ pub enum Metadata {
     Undefined,
     GeneralMetadata(GeneralMetadata),
     UnstructuredBytesMetadata(UnstructuredBytesMetadata),
-    RefundMetadata(RefundMetadata),
 }
 
 /// List of supported transaction metadata format versions for regular
@@ -74,28 +73,4 @@ pub struct UnstructuredBytesMetadata {
     /// Unstructured byte vector metadata
     #[serde(with = "serde_bytes")]
     pub metadata: Option<Vec<u8>>,
-}
-
-/// List of supported transaction metadata format versions for refund transaction
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum RefundMetadata {
-    RefundMetadataV0(RefundMetadataV0),
-}
-
-/// Transaction metadata format for transactions subject to refund transaction
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct RefundMetadataV0 {
-    /// Transaction version that is refunded
-    pub transaction_version: u64,
-    /// The reason of the refund
-    pub reason: RefundReason,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum RefundReason {
-    OtherReason,
-    InvalidSubaddress,
-    UserInitiatedPartialRefund,
-    UserInitiatedFullRefund,
-    InvalidReferenceId,
 }
