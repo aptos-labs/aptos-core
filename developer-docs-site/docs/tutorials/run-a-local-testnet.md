@@ -1,19 +1,21 @@
 ---
-title: "Run a local test validator network"
-slug: "tutorial-run-local-validator-nw"
+title: "Run a local testnet"
+slug: "run-a-local-testnet"
 sidebar_position: 9
 ---
 import BlockQuote from "@site/src/components/BlockQuote";
 
-You can run a local test validator network to test and develop against a Aptos Blockchain, including Move changes. This network is not part of the Aptos Ecosystem and is only for testing and development purposes.
+# Run a Local Testnet
+
+You can run a local testnet to test and develop against an Aptos Blockchain. This network runs independently of the Aptos ecosystem and is for testing and development purposes only.
 
 <BlockQuote type="info">
-Your local test network will not be connected to testnet or mainnet of the Aptos Blockchain. 
+Your local testnet will not be connected Aptos devnet.
 </BlockQuote>
 
 ## Getting Started
 
-You can run a local test validator network in two ways: using the Aptos-core source code or Docker. The Aptos-core source code is useful when testing modifications to the Aptos-core code base. Docker is particularly useful when building services on top of the Aptos Blockchain as there is no build overhead and the ledger state persists across restarts of the network by default.
+You can run a local testnet in two ways: using the Aptos-core source code or Docker. The Aptos-core source code is useful when testing modifications to the Aptos-core code base or Aptos Framework. Docker is particularly useful when building services on top of the Aptos Blockchain or applications on top of the Aptos Framework as there is no build overhead and the ledger state persists across restarts of the network by default.
 
 ### Using Aptos-core source code
 
@@ -33,7 +35,7 @@ Note: this command runs `aptos-node` from a genesis-only ledger state. If you wa
 
 1. Install Docker and Docker-Compose.
 2. Create a directory for your local test validator network.
-3. Download the validator testnet docker compose.
+3. Download the [validator testnet docker compose](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/validator-testnet/docker-compose.yaml) and [validator configuration](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/validator-testnet/validator_node_template.yaml).
 4. Create configuration files in the same directory so that the data can be exported out of the docker container:
     ```
     # Linux / Mac
@@ -66,3 +68,13 @@ This output contains information required for starting the Aptos CLI tool:
 * Waypoint - a verifiable checkpoint into the blockchain (available in the docker compose folder under waypoint.txt)
 * REST endpoint - `http://127.0.0.1:8080`.
 * ChainId - uniquely distinguishes this chain from other chains.
+
+## Next Steps
+
+At this point, you will have a special root account at `0x1` that can perform the mint operation. Follow up with 
+
+* [Your first transaction](/tutorials/your-first-transaction) for how to submit transactions
+* [Your first Move module](/tutorials/your-first-move-module) for how to create Move modules
+* [Interacting with the Aptos Blockchain](/transactions/interacting-with-the-aptos-blockchain) to mint coins
+
+It is important to note, that this solution does not include a Faucet. That is left as an exercise to the reader.
