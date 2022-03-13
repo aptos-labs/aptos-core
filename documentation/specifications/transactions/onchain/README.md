@@ -11,43 +11,11 @@ The metadata is represented by the following `Rust` enum encoded in [Binary Cano
 ```
 enum Metadata {
   Undefined,
-  GeneralMetadata(GeneralMetadata),
   UnstructuredByteMetadata(Option<Vec<u8>>),
-  RefundMetadata(RefundMetadata),
 }
 ```
 
 Note: This is the canonical list and should be referred to in future DIPs so that authors need not reproduce the list in future DIPs.
-
-## Payments Using GeneralMetadata
-
-```
-enum GeneralMetadata {
-   GeneralMetadataV0(GeneralMetadataV0),
-}
-
-struct GeneralMetadataV0 {
-   to_subaddress: Option<Vec<u8>>,
-   from_subaddress: Option<Vec<u8>>,
-   referenced_event: Option<u64>, // Deprecated
-}
-```
-
-GeneralMetadata leverages the notion of subaddresses to indicate a source and destination and are stored in the fields `from_subaddress` and `to_subaddress`, respectively.
-
-Subaddresses have the following properties:
-* 8-bytes
-* Subaddresses should be unique
-* The address represented by 8 zero bytes (or None/Null within the GeneralMetadataV0) is reserved to denote the root (VASP owned) account
-
-Lifetime of subaddresses:
-* There are no explicit lifetimes of subaddresses
-* The same `from_address` may receive multiple payments from distinct `to_subaddress`
-* A `from_subaddress` may be the recipient or a `to_subaddress` in an ensuing transaction
-* `to_subaddress` should be generated fresh each time upon user request
-* `from_subaddress` should be unique for each transaction
-
-Subaddresses should be used with great care to not accidentally leak personally identifiable information (PII). However, implementors must be mindful of the permissive nature of subaddresses as outlined in this specification.
 
 ## Dual Attestation Credentials
 

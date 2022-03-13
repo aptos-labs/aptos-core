@@ -65,20 +65,6 @@ Ed25519Signature:
   NEWTYPESTRUCT: BYTES
 EventKey:
   NEWTYPESTRUCT: BYTES
-GeneralMetadata:
-  ENUM:
-    0:
-      GeneralMetadataVersion0:
-        NEWTYPE:
-          TYPENAME: GeneralMetadataV0
-GeneralMetadataV0:
-  STRUCT:
-    - to_subaddress:
-        OPTION: BYTES
-    - from_subaddress:
-        OPTION: BYTES
-    - referenced_event:
-        OPTION: U64
 HashValue:
   NEWTYPESTRUCT: BYTES
 Identifier:
@@ -88,10 +74,6 @@ Metadata:
     0:
       Undefined: UNIT
     1:
-      GeneralMetadata:
-        NEWTYPE:
-          TYPENAME: GeneralMetadata
-    2:
       UnstructuredBytesMetadata:
         NEWTYPE:
           TYPENAME: UnstructuredBytesMetadata

@@ -12,59 +12,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Metadata {
     Undefined,
-    GeneralMetadata(GeneralMetadata),
     UnstructuredBytesMetadata(UnstructuredBytesMetadata),
-}
-
-/// List of supported transaction metadata format versions for regular
-/// addressing with optional subaddressing or refund reference
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum GeneralMetadata {
-    GeneralMetadataVersion0(GeneralMetadataV0),
-}
-
-/// Transaction metadata for regular addressing with optional subaddressing
-/// or refunded transaction reference
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct GeneralMetadataV0 {
-    /// Subaddress to which the funds are being sent
-    #[serde(with = "serde_bytes")]
-    to_subaddress: Option<Vec<u8>>,
-    /// Subaddress from which the funds are being sent
-    #[serde(with = "serde_bytes")]
-    from_subaddress: Option<Vec<u8>>,
-    /// In the case of refunds, referenced_event refers to the event sequence
-    /// number of the sender’s original sent payment event.
-    /// Since refunds are just another form of P2P transfer, the referenced
-    /// event field allows a refunded payment to refer back to the original
-    /// payment
-    referenced_event: Option<u64>,
-}
-
-impl GeneralMetadataV0 {
-    pub fn new(
-        to_subaddress: Option<Vec<u8>>,
-        from_subaddress: Option<Vec<u8>>,
-        referenced_event: Option<u64>,
-    ) -> Self {
-        GeneralMetadataV0 {
-            to_subaddress,
-            from_subaddress,
-            referenced_event,
-        }
-    }
-
-    pub fn to_subaddress(&self) -> &Option<Vec<u8>> {
-        &self.to_subaddress
-    }
-
-    pub fn from_subaddress(&self) -> &Option<Vec<u8>> {
-        &self.from_subaddress
-    }
-
-    pub fn referenced_event(&self) -> &Option<u64> {
-        &self.referenced_event
-    }
 }
 
 /// Opaque binary transaction metadata
