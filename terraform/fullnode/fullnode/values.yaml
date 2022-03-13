@@ -22,7 +22,7 @@ service:
 
 ingress:
   acm_certificate:
-  wafAclId:
+  wafAclArn:
   loadBalancerSourceRanges:
 
 monitoring:

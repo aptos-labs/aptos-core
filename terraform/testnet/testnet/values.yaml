@@ -84,6 +84,7 @@ service:
 
 ingress:
   acm_certificate:
+  wafAclArn:
   loadBalancerSourceRanges:
 
 monitoring:
