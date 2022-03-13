@@ -1,13 +1,16 @@
 ---
-title: "Configure and run a public FullNode"
-slug: "configure-run-public-fullnode"
+title: "Run a FullNode"
+slug: "run-a-fullnode"
 sidebar_position: 10
 ---
-You can run [FullNodes](/basics/basics-fullnodes) to verify the state and synchronize to the Aptos Blockchain. FullNodes can be run by anyone. FullNodes replicate the full state of the blockchain by querying each other, or by querying the validators directly.
 
-This tutorial details how to configure a public FullNode to connect to *testnet*, the Aptos Payment Network’s public test network..
+# Run a FullNode
 
-> **Note:** Your public FullNode will be connected to testnet with a JSON-RPC endpoint accessible on your computer at localhost:8080.
+You can run [FullNodes](/basics/basics-fullnodes) to verify the state and synchronize to the Aptos Blockchain. FullNodes can be run by anyone. FullNodes replicate the full state of the blockchain by querying each other or the validators directly.
+
+This tutorial details how to configure a public FullNode to connect to the Aptos devnet. The FullNodes provided by Aptos Labs have rate limits that can impede development on Testnet. This will provide you with the data directly to avoid such rate limiting.
+
+> **Note:** Your public FullNode will be connected to devnet with a REST endpoint accessible on your computer at localhost:8080.
 >
 
 #### Prerequisites
@@ -28,36 +31,28 @@ You can configure a public FullNode in two ways: using the Aptos-core source cod
      ./scripts/dev_setup.sh
      source ~/.cargo/env
      ```
-
-2. Checkout the branch for testnet using `git checkout origin/testnet`.
-
+2. Checkout the branch for devnet using `git checkout origin/devnet`.
 3. To prepare your configuration file:
-
      * Copy `config/src/config/test_data/public_full_node.yaml` to your current working directory.
-
-     * Download [genesis][testnet_genesis] and [waypoint][testnet_waypoint] files for testnet.
-
+     * Download [genesis][devnet_genesis] and [waypoint][devnet_waypoint] files for devnet.
      * Update the public_full_node.yaml file in your current working directory by:
-
-       * Specifying the directory where you want testnet to store its database next to `base:data_dir`; for example, `./data`.
-
+       * Specifying the directory where you want devnet to store its database next to `base:data_dir`; for example, `./data`.
        * Copying and pasting the contents of the waypoint file to the `waypoint` field.
-
        * Reading through the config and making any other desired changes. You can see what configurations the `public_full_node.yaml` file should have by checking the following file as an example: `docker/compose/public_full_node/public_full_node.yaml`
 4. Run the aptos-node using `cargo run -p aptos-node --release -- -f ./public_full_node.yaml`
 
-You have now successfully configured and started running a public FullNode in testnet..
+You have now successfully configured and started running a FullNode connected to Aptos devnet.
 
 Note: This will build a release binary under `target/release/aptos-node`. The release binaries tend to be substantially faster than debug binaries but lack debugging information useful for development. Simply omit the `--release` flag to build a debug binary.
 
 ## Using Docker
 
-You can also use Docker to configure and run your PublicFullNode.
+You can also use Docker to configure and run your FullNode.
 
 1. Install Docker and Docker-Compose.
 2. Create a directory for your public FullNode composition.
 3. Download the public FullNode [docker compose][pfn_docker_compose] and [aptos-core][pfn_config_file] configuration files into this directory.
-4. Download [genesis][testnet_genesis] and [waypoint][testnet_waypoint] files for testnet into that directory.
+4. Download [genesis][devnet_genesis] and [waypoint][devnet_waypoint] files for devnet into that directory.
 5. Run docker-compose: `docker-compose up`.
 
 ### Understand and verify the correctness of your FullNode
@@ -79,7 +74,7 @@ During the initial synchronization of your FullNode, there may be a lot of data 
 
 * At the same time, the StateSync component will output similar information but show the destination.
 
-* The blockchain (testnet) ledger’s volume can be monitored by entering the container:
+* The blockchain (devnet) ledger’s volume can be monitored by entering the container:
 
   ```
   # Obtain the container id:
@@ -93,5 +88,5 @@ During the initial synchronization of your FullNode, there may be a lot of data 
 [pfn_config_file]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/public_full_node.yaml
 [pfn_docker_compose]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/docker-compose.yaml
 [rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api
-[testnet_genesis]: https://dev.fullnode.aptoslabs.com/genesis.blob
-[testnet_waypoint]: https://dev.fullnode.aptoslabs.com/waypoint.txt
+[devnet_genesis]: https://fullnode.devnet.aptoslabs.com/genesis.blob
+[devnet_waypoint]: https://fullnode.devnet.aptoslabs.com/waypoint.txt
