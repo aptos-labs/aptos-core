@@ -9,8 +9,8 @@
 # * If you use this compose for different Aptos Networks, you will need remove the db volume first.
 # * If you would like to use the current Aptos version within this repository, execute the
 #     `build.sh` in `docker/validator` and change the image tag below to aptos_e2e:latest
-# * Validator images can be found at https://hub.docker.com/r/devnet/validator/tags
-# * Faucet images can be found at https://hub.docker.com/r/devnet/faucet/tags
+# * Validator images can be found at https://hub.docker.com/repository/docker/aptoslab/validator/tags
+# * Faucet images can be found at https://hub.docker.com/repository/docker/aptoslab/faucet/tags
 
 # Monitoring:
 # If you want to install the monitoring components for your validator-testnet
@@ -26,7 +26,7 @@ services:
   validator:
     # Note this image currently does not support this, will update to the appropriate minimum
     # version shortly
-    image: "aptos/validator:${IMAGE_TAG:-devnet}"
+    image: "aptoslab/validator:${IMAGE_TAG:-devnet}"
     networks:
       shared:
     volumes:
@@ -43,7 +43,7 @@ services:
       - 9101
 
   faucet:
-    image: "aptos/faucet:${IMAGE_TAG:-devnet}"
+    image: "aptoslab/faucet:${IMAGE_TAG:-devnet}"
     depends_on:
       - validator
     networks:

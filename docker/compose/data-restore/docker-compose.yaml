@@ -3,7 +3,7 @@
 version: "3.8"
 services:
   restore:
-    image: aptos/tools:devnet
+    image: aptoslab/tools:devnet
     volumes:
       - type: volume
         source: db
