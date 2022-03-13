@@ -13,13 +13,13 @@ execution:
     genesis_file_location: "/opt/aptos/etc/genesis.blob"
 
 full_node_networks:
-      # Disabled for testnet
-    - discovery_method: "none"
+    - network_id: "public"
+      discovery_method: "onchain"
       # The network must have a listen address to specify protocols. This runs it locally to
       # prevent remote, incoming connections.
       listen_address: "/ip4/127.0.0.1/tcp/6180"
       network_id: "public"
 
-json_rpc:
+api:
     # This specifies your REST API endpoint. Intentionally on public so that Docker can export it.
     address: 0.0.0.0:8080
