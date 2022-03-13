@@ -30,12 +30,21 @@ impl AptosTest for MintTransfer {
 
         // test delegation
         let txn_factory = ctx.aptos_transaction_factory();
-        let delegate_txn = ctx
+        let delegate_txn1 = ctx
             .root_account()
             .sign_with_transaction_builder(txn_factory.payload(
                 aptos_stdlib::encode_delegate_mint_capability_script_function(account1.address()),
             ));
-        ctx.client().submit_and_wait(&delegate_txn).await?;
+        ctx.client().submit_and_wait(&delegate_txn1).await?;
+
+        // Test delegating more than one at a time: faucet startup stampeding herd
+        let delegate_txn2 = ctx
+            .root_account()
+            .sign_with_transaction_builder(txn_factory.payload(
+                aptos_stdlib::encode_delegate_mint_capability_script_function(account2.address()),
+            ));
+        ctx.client().submit_and_wait(&delegate_txn2).await?;
+
         let claim_txn = account1.sign_with_transaction_builder(
             txn_factory.payload(aptos_stdlib::encode_claim_mint_capability_script_function()),
         );
