@@ -1,5 +1,5 @@
 ---
-title: "Your first transaction on the Aptos Blockchain"
+title: "Your first transaction"
 slug: "your-first-transaction"
 sidebar_position: 1
 ---
@@ -7,7 +7,7 @@ sidebar_position: 1
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Overview
+# Your first transaction
 
 This tutorial details how to generate, submit, and verify transactions submitted to the Aptos Blockchain. The steps to doing so:
 
@@ -44,9 +44,7 @@ You can find the typescript project [here](https://github.com/aptos-labs/aptos-c
 
 ## Step 1) Create a representation of an account
 
-Each Aptos account has a unique account address.
-The owner of that account holds the public, private key-pair that maps to the Aptos account address and, in turn, the authentication key stored in that account.
-See more in [account basics][account_basics]. The following snippets demonstrate what's described in that section.
+Each Aptos account has a unique account address.  The owner of that account holds the public, private key-pair that maps to the Aptos account address and, in turn, the authentication key stored in that account.  See more in [account basics][account_basics]. The following snippets demonstrate what's described in that section.
 
 <Tabs>
   <TabItem value="python" label="Python" default>
@@ -161,9 +159,7 @@ The following demonstrate how to read data from the blockchain and how to write 
 
 ## Step 3) Faucet interface
 
-A blockchain faucet provides an account some amount of tokens that can be used for paying gas fees or transferring of tokens betwen users.
-The Aptos faucet additionally can create an account if one does not exist yet.
-The Aptos faucet interface requires a public key represented in a hex-encoded string.
+A blockchain faucet provides an account some amount of tokens that can be used for paying gas fees or transferring of tokens betwen users. The Aptos faucet additionally can create an account if one does not exist yet. The Aptos faucet interface requires a public key represented in a hex-encoded string.
 
 <Tabs>
 <TabItem value="python" label="Python" default>
@@ -220,16 +216,14 @@ Alice: 999998957
 Bob: 1000
 ```
 
-The outcome shows that Bob received 1000 coins from Alice.
-Alice paid 43 coins for gas.
+The outcome shows that Bob received 1000 coins from Alice. Alice paid 43 coins for gas.
 
 The data can be verified by visiting either a REST interface or the explorer:
 * Alice's account via the [REST interface][alice_account_rest]
 * Bob's account via the [explorer][bob_account_explorer]
 
 :::info
-The devnet gets cleared out from time to time, so the above links may not work.<br/>
-Try the tutorial yourself and check their accounts in the explorer after!
+The devnet gets cleared out from time to time, so the above links may not work.<br/> Try the tutorial yourself and check their accounts in the explorer after!
 
 [account_basics]: /basics/basics-accounts
 [alice_account_rest]: https://dev.fullnode.aptoslabs.com/accounts/e26d69b8d3ff12874358da6a4082a2ac/resources
