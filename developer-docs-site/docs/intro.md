@@ -26,7 +26,7 @@ Or even if you just want to stop by to say gm! 🌅 : there's a little something
 
 ### 🤿 Want to dive in?
 Start with the basics, such as how [Accounts](/basics/basics-accounts) work.
-Want something a bit more interactive? You can dive right in to our [tutorials](/tutorials/your-first-transaction).
+Want something a bit more interactive? You can dive right in to our [tutorials](/tutorials/getting-started).
 
 Or you can go straight to the [source](https://github.com/aptos-labs/aptos-core) (ha ha) and help us build the Layer 1 for everyone.
 
