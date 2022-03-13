@@ -13,43 +13,18 @@
 [![Discord chat](https://img.shields.io/discord/945856774056083548?style=flat-square)](https://discord.gg/gEV3C5jSnw)
 
 
-Aptos Core implements a decentralized, programmable database which provides a financial infrastructure that can empower billions of people.
-
-## Note to Developers
-* Aptos Core is a prototype.
-* The APIs are constantly evolving and designed to demonstrate types of functionality. Expect substantial changes before the release.
-* We’ve launched a testnet that is a live demonstration of an early prototype of the Aptos Blockchain software.
-
-## Contributing
-
-To begin contributing, [sign the CLA](https://aptoslabs.com/en-US/cla-sign/). You can learn more about contributing to the Aptos project by reading our [Contribution Guide](https://aptos.dev/docs/community/contributing) and by viewing our [Code of Conduct](https://aptos.dev/docs/policies/code-of-conduct).
+Aptos-core strives towards being the safest and most scalable layer one blockchain solution. Today, this powers the Aptos Devnet, tomorrow Mainnet in order to create universal and fair access to decentralized assets for billions of people.
 
 ## Getting Started
 
-### Learn About Aptos
-* [Welcome](https://aptos.dev/docs/welcome-to-aptos)
-* [Basic Concepts](https://aptos.dev/docs/basics/basics-txns-states)
+* [Aptos Labs](https://aptoslabs.com/)
+* [Aptos Developer Network](https://aptos.dev)
+* [Getting Started](https://aptos.dev/tutorials/getting-started)
 * [Life of a Transaction](https://aptos.dev/docs/transactions/basics-life-of-txn)
-* [JSON-RPC SPEC](json-rpc/json-rpc-spec.md)
-
-### Try Aptos Core
-* [My First Transaction](https://aptos.dev/docs/tutorials/tutorial-my-first-transaction)
-* [Getting Started With Move](https://aptos.github.io/move/introduction.html)
-
-### Technical Papers
-* [The Aptos Blockchain](https://aptos.dev/docs/technical-papers/the-aptos-blockchain-paper)
-* [Move: A Language With Programmable Resources](https://aptos.dev/docs/technical-papers/move-paper)
-* [State Machine Replication in the Aptos Blockchain](https://aptos.dev/docs/technical-papers/state-machine-replication-paper)
-
-### Blog
-* [Aptos: The Path Forward](https://aptos.dev/blog/2019/06/18/the-path-forward/)
-
-## Community
-
 * Join us on the [Aptos Discord](https://discord.gg/gEV3C5jSnw).
-* Ask a question on [Stack Overflow](https://stackoverflow.com/questions/tagged/aptos).
-* Get the latest updates to our project by signing up for our [newsletter](https://aptos.dev/newsletter_form).
 
-## License
+## Contributing
+
+To begin contributing, [sign the CLA](https://github.com/aptos-labs/aptos-core/tree/main/documentation/contributing). You can learn more about contributing to the Aptos project by reading our [Contribution Guide](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md) and by viewing our [Code of Conduct](https://github.com/aptos-labs/aptos-core/blob/main/CODE_OF_CONDUCT.md).
 
 Aptos Core is licensed as [Apache 2.0](https://github.com/aptos-labs/aptos-core/blob/main/LICENSE).
