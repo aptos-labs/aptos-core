@@ -17,6 +17,7 @@ transaction in addition to the core prologue and epilogue.
 -  [Function `create_validator_account`](#0x1_AptosAccount_create_validator_account)
 -  [Function `create_validator_operator_account`](#0x1_AptosAccount_create_validator_operator_account)
 -  [Function `rotate_authentication_key`](#0x1_AptosAccount_rotate_authentication_key)
+-  [Function `rotate_authentication_key_internal`](#0x1_AptosAccount_rotate_authentication_key_internal)
 -  [Function `module_prologue`](#0x1_AptosAccount_module_prologue)
 -  [Function `script_prologue`](#0x1_AptosAccount_script_prologue)
 -  [Function `writeset_prologue`](#0x1_AptosAccount_writeset_prologue)
@@ -283,7 +284,7 @@ Initialize this module. This is only callable from genesis.
 Basic account creation method.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account">create_account</a>(new_account_address: <b>address</b>, auth_key_preimage: vector&lt;u8&gt;): signer
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account">create_account</a>(new_account_address: <b>address</b>, auth_key_preimage: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -292,10 +293,7 @@ Basic account creation method.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account">create_account</a>(
-    new_account_address: <b>address</b>,
-    auth_key_preimage: vector&lt;u8&gt;,
-): signer {
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account">create_account</a>(new_account_address: <b>address</b>, auth_key_preimage: vector&lt;u8&gt;) {
     <b>let</b> auth_key = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Hash.md#0x1_Hash_sha3_256">Hash::sha3_256</a>(auth_key_preimage);
     <b>let</b> bytes = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/BCS.md#0x1_BCS_to_bytes">BCS::to_bytes</a>(&new_account_address);
     <b>let</b> len = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&bytes);
@@ -306,7 +304,7 @@ Basic account creation method.
     };
 
     <b>let</b> (signer, _) = <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">create_account_internal</a>(new_account_address, auth_key);
-    signer
+    <a href="TestCoin.md#0x1_TestCoin_register">TestCoin::register</a>(&signer);
 }
 </code></pre>
 
@@ -407,7 +405,7 @@ Create a Validator Operator account
 Rotate the authentication key for the account under cap.account_address
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key">rotate_authentication_key</a>(account: &signer, new_authentication_key: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key">rotate_authentication_key</a>(account: signer, new_authentication_key: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -416,7 +414,34 @@ Rotate the authentication key for the account under cap.account_address
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key">rotate_authentication_key</a>(
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key">rotate_authentication_key</a>(
+    account: signer,
+    new_authentication_key: vector&lt;u8&gt;,
+) {
+  <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key_internal">rotate_authentication_key_internal</a>(&account, new_authentication_key);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_AptosAccount_rotate_authentication_key_internal"></a>
+
+## Function `rotate_authentication_key_internal`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key_internal">rotate_authentication_key_internal</a>(account: &signer, new_authentication_key: vector&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key_internal">rotate_authentication_key_internal</a>(
     account: &signer,
     new_authentication_key: vector&lt;u8&gt;,
 ) {

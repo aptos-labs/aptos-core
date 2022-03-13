@@ -52,7 +52,7 @@ Publishes the VM config.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AptosVMConfig.md#0x1_AptosVMConfig_set_gas_constants">set_gas_constants</a>(account: &signer, global_memory_per_byte_cost: u64, global_memory_per_byte_write_cost: u64, min_transaction_gas_units: u64, large_transaction_cutoff: u64, intrinsic_gas_per_byte: u64, maximum_number_of_gas_units: u64, min_price_per_gas_unit: u64, max_price_per_gas_unit: u64, max_transaction_size_in_bytes: u64, gas_unit_scaling_factor: u64, default_account_size: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AptosVMConfig.md#0x1_AptosVMConfig_set_gas_constants">set_gas_constants</a>(account: signer, global_memory_per_byte_cost: u64, global_memory_per_byte_write_cost: u64, min_transaction_gas_units: u64, large_transaction_cutoff: u64, intrinsic_gas_per_byte: u64, maximum_number_of_gas_units: u64, min_price_per_gas_unit: u64, max_price_per_gas_unit: u64, max_transaction_size_in_bytes: u64, gas_unit_scaling_factor: u64, default_account_size: u64)
 </code></pre>
 
 
@@ -61,8 +61,8 @@ Publishes the VM config.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AptosVMConfig.md#0x1_AptosVMConfig_set_gas_constants">set_gas_constants</a>(
-    account: &signer,
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AptosVMConfig.md#0x1_AptosVMConfig_set_gas_constants">set_gas_constants</a>(
+    account: signer,
     global_memory_per_byte_cost: u64,
     global_memory_per_byte_write_cost: u64,
     min_transaction_gas_units: u64,
@@ -87,7 +87,7 @@ Publishes the VM config.
         max_transaction_size_in_bytes,
         gas_unit_scaling_factor,
         default_account_size,
-        &<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_acquire">Capability::acquire</a>(account, &<a href="Marker.md#0x1_Marker_get">Marker::get</a>()),
+        &<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_acquire">Capability::acquire</a>(&account, &<a href="Marker.md#0x1_Marker_get">Marker::get</a>()),
     );
 }
 </code></pre>

@@ -108,10 +108,10 @@
     <a href="AptosAccount.md#0x1_AptosAccount_initialize">AptosAccount::initialize</a>(core_resource_account);
     <b>let</b> dummy_auth_key_prefix = x"00000000000000000000000000000000";
     <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">AptosAccount::create_account_internal</a>(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(core_resource_account), <b>copy</b> dummy_auth_key_prefix);
-    <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key">AptosAccount::rotate_authentication_key</a>(core_resource_account, <b>copy</b> core_resource_account_auth_key);
+    <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key_internal">AptosAccount::rotate_authentication_key_internal</a>(core_resource_account, <b>copy</b> core_resource_account_auth_key);
     // initialize the core framework account
     <b>let</b> core_framework_account = <a href="AptosAccount.md#0x1_AptosAccount_create_core_framework_account">AptosAccount::create_core_framework_account</a>(dummy_auth_key_prefix);
-    <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key">AptosAccount::rotate_authentication_key</a>(&core_framework_account, core_resource_account_auth_key);
+    <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key_internal">AptosAccount::rotate_authentication_key_internal</a>(&core_framework_account, core_resource_account_auth_key);
 
     // Consensus config setup
     <a href="AptosConsensusConfig.md#0x1_AptosConsensusConfig_initialize">AptosConsensusConfig::initialize</a>(core_resource_account);
@@ -131,7 +131,7 @@
     <a href="AptosTransactionPublishingOption.md#0x1_AptosTransactionPublishingOption_initialize">AptosTransactionPublishingOption::initialize</a>(core_resource_account, initial_script_allow_list, is_open_module);
 
     <a href="TestCoin.md#0x1_TestCoin_initialize">TestCoin::initialize</a>(core_resource_account, 1000000);
-    <a href="TestCoin.md#0x1_TestCoin_mint">TestCoin::mint</a>(core_resource_account, <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(core_resource_account), 18446744073709551615);
+    <a href="TestCoin.md#0x1_TestCoin_mint_internal">TestCoin::mint_internal</a>(core_resource_account, <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(core_resource_account), 18446744073709551615);
 
     // Pad the event counter for the Root account <b>to</b> match DPN. This
     // _MUST_ match the new epoch event counter otherwise all manner of
@@ -213,7 +213,7 @@ Finally, each validator must specify the network address
         );
 
         <b>let</b> owner_auth_key = *<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(&owner_auth_keys, i);
-        <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key">AptosAccount::rotate_authentication_key</a>(owner, owner_auth_key);
+        <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key_internal">AptosAccount::rotate_authentication_key_internal</a>(owner, owner_auth_key);
 
         <b>let</b> operator = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(&operators, i);
         <b>let</b> operator_address = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(operator);
@@ -224,7 +224,7 @@ Finally, each validator must specify the network address
                 &core_resource_account, operator_address, <b>copy</b> dummy_auth_key_prefix, <b>copy</b> operator_name
             );
             <b>let</b> operator_auth_key = *<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(&operator_auth_keys, i);
-            <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key">AptosAccount::rotate_authentication_key</a>(operator, operator_auth_key);
+            <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key_internal">AptosAccount::rotate_authentication_key_internal</a>(operator, operator_auth_key);
         };
         // assign the operator <b>to</b> its validator
         <b>assert</b>!(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/ValidatorOperatorConfig.md#0x1_ValidatorOperatorConfig_get_human_name">ValidatorOperatorConfig::get_human_name</a>(operator_address) == operator_name, 0);

@@ -254,14 +254,18 @@ mod tests {
                     let previous = writer.insert(address, AccountState::new(0));
                     assert!(previous.is_none(), "should not create account twice");
                 }
-                ScriptFunctionCall::Mint { addr, amount, .. } => {
+                ScriptFunctionCall::Mint {
+                    mint_addr, amount, ..
+                } => {
                     // Sometimes we call CreateAccount and Mint at the same time (from our tests: this is a test method)
                     // If the account doesn't exist yet, we sleep for 100ms to let the other request finish
-                    if accounts.write().get_mut(&addr).is_none() {
+                    if accounts.write().get_mut(&mint_addr).is_none() {
                         yield_now().await;
                     }
                     let mut writer = accounts.write();
-                    let account = writer.get_mut(&addr).expect("account should be created");
+                    let account = writer
+                        .get_mut(&mint_addr)
+                        .expect("account should be created");
                     account.balance += amount;
                 }
                 script => panic!("unexpected type of script function: {:?}", script),

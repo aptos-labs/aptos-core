@@ -62,10 +62,10 @@ module AptosFramework::Genesis {
         AptosAccount::initialize(core_resource_account);
         let dummy_auth_key_prefix = x"00000000000000000000000000000000";
         AptosAccount::create_account_internal(Signer::address_of(core_resource_account), copy dummy_auth_key_prefix);
-        AptosAccount::rotate_authentication_key(core_resource_account, copy core_resource_account_auth_key);
+        AptosAccount::rotate_authentication_key_internal(core_resource_account, copy core_resource_account_auth_key);
         // initialize the core framework account
         let core_framework_account = AptosAccount::create_core_framework_account(dummy_auth_key_prefix);
-        AptosAccount::rotate_authentication_key(&core_framework_account, core_resource_account_auth_key);
+        AptosAccount::rotate_authentication_key_internal(&core_framework_account, core_resource_account_auth_key);
 
         // Consensus config setup
         AptosConsensusConfig::initialize(core_resource_account);
@@ -85,7 +85,7 @@ module AptosFramework::Genesis {
         AptosTransactionPublishingOption::initialize(core_resource_account, initial_script_allow_list, is_open_module);
 
         TestCoin::initialize(core_resource_account, 1000000);
-        TestCoin::mint(core_resource_account, Signer::address_of(core_resource_account), 18446744073709551615);
+        TestCoin::mint_internal(core_resource_account, Signer::address_of(core_resource_account), 18446744073709551615);
 
         // Pad the event counter for the Root account to match DPN. This
         // _MUST_ match the new epoch event counter otherwise all manner of
@@ -147,7 +147,7 @@ module AptosFramework::Genesis {
             );
 
             let owner_auth_key = *Vector::borrow(&owner_auth_keys, i);
-            AptosAccount::rotate_authentication_key(owner, owner_auth_key);
+            AptosAccount::rotate_authentication_key_internal(owner, owner_auth_key);
 
             let operator = Vector::borrow(&operators, i);
             let operator_address = Signer::address_of(operator);
@@ -158,7 +158,7 @@ module AptosFramework::Genesis {
                     &core_resource_account, operator_address, copy dummy_auth_key_prefix, copy operator_name
                 );
                 let operator_auth_key = *Vector::borrow(&operator_auth_keys, i);
-                AptosAccount::rotate_authentication_key(operator, operator_auth_key);
+                AptosAccount::rotate_authentication_key_internal(operator, operator_auth_key);
             };
             // assign the operator to its validator
             assert!(ValidatorOperatorConfig::get_human_name(operator_address) == operator_name, 0);

@@ -15,9 +15,6 @@ compiled_package_info:
       name: Account
     : CoreFramework
     ? address: "00000000000000000000000000000001"
-      name: AdminScripts
-    : AptosFramework
-    ? address: "00000000000000000000000000000001"
       name: AptosAccount
     : AptosFramework
     ? address: "00000000000000000000000000000001"
@@ -44,9 +41,6 @@ compiled_package_info:
     ? address: "00000000000000000000000000000001"
       name: BCS
     : Std
-    ? address: "00000000000000000000000000000001"
-      name: BasicScripts
-    : AptosFramework
     ? address: "00000000000000000000000000000001"
       name: BitVector
     : Std
@@ -134,7 +128,7 @@ compiled_package_info:
     ? address: "00000000000000000000000000000001"
       name: Version
     : CoreFramework
-  source_digest: 3B95510C64DD284876E288D78AFEC1B6F3E15137F110C6BB86CF8B3FB825EDA0
+  source_digest: 0638850467F3BD5AECE657D2CE0EC7928BE82F37321094900EF380CC710D6F4B
   build_flags:
     dev_mode: false
     test_mode: false

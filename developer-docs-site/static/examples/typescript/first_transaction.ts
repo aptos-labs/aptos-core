@@ -175,7 +175,7 @@ export class RestClient {
   async transfer(accountFrom: Account, recipient: string, amount: number): Promise<[number, string]> {
     const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
-      function: "0x1::BasicScripts::transfer",
+      function: "0x1::TestCoin::transfer",
       type_arguments: [],
       arguments: [
         `0x${recipient}`,

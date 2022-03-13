@@ -23,7 +23,7 @@ The payload for instructing the blockchain to perform a transfer is:
 ```
 {
   "type": "script_function_payload",
-  "function": "0x1::BasicScripts::transfer",
+  "function": "0x1::TestCoin::transfer",
   "type_arguments": [],
   "arguments": [
     "0x737b36c96926043794ed3a0b3eaaceaf",
@@ -32,7 +32,7 @@ The payload for instructing the blockchain to perform a transfer is:
 }
 ```
 
-This instructs the VM to execute the `script` `0x1::BasicScripts::transfer`. The first argument is the recipient address, `0x737b36c96926043794ed3a0b3eaaceaf`, and the second is the amount to transfer, `1000`.
+This instructs the VM to execute the `script` `0x1::TestCoin::transfer`. The first argument is the recipient address, `0x737b36c96926043794ed3a0b3eaaceaf`, and the second is the amount to transfer, `1000`.
 
 ## Creating a new account
 
@@ -41,7 +41,7 @@ The payload for instructing the blockchain to create a new account is:
 ```
 {
   "type": "script_function_payload",
-  "function": "0x1::BasicScripts::create_account",
+  "function": "0x1::AptosAccount::create_account",
   "type_arguments": [],
   "arguments": [
     "0x0c7e09cd9185a27104fa218a0b26ea88",
@@ -50,7 +50,7 @@ The payload for instructing the blockchain to create a new account is:
 }
 ```
 
-This instructs the VM to execute the `script` `0x1::BasicScripts::create_account`. The first argument is the address of the account to create and the second is the authentication key pre-image, which is briefly mentioned in [Accounts][accounts]. For single signer authentication this is the public key concatenated by the by `0` byte or `pubkey_A | 0x00`. This is required to prevent account address land grabbing. The execution of this instruction verifies that the last 16-bytes of the authentication token are the same as the 16-byte account address. We are actively working on improving this API to support taking in a 32-byte account address that would eliminate concerns around land grabbing or account manipulation.
+This instructs the VM to execute the `script` `0x1::AptosAccount::create_account`. The first argument is the address of the account to create and the second is the authentication key pre-image, which is briefly mentioned in [Accounts][accounts]. For single signer authentication this is the public key concatenated by the by `0` byte or `pubkey_A | 0x00`. This is required to prevent account address land grabbing. The execution of this instruction verifies that the last 16-bytes of the authentication token are the same as the 16-byte account address. We are actively working on improving this API to support taking in a 32-byte account address that would eliminate concerns around land grabbing or account manipulation.
 
 ## Publishing modules
 

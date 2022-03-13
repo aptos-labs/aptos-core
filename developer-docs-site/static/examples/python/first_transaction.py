@@ -137,7 +137,7 @@ class RestClient:
 
         payload = {
             "type": "script_function_payload",
-            "function": "0x1::BasicScripts::transfer",
+            "function": "0x1::TestCoin::transfer",
             "type_arguments": [],
             "arguments": [
                 f"0x{recipient}",

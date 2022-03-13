@@ -82,10 +82,7 @@ module AptosFramework::AptosAccount {
     /// Basic account creation method.
     ///////////////////////////////////////////////////////////////////////////
 
-    public fun create_account(
-        new_account_address: address,
-        auth_key_preimage: vector<u8>,
-    ): signer {
+    public(script) fun create_account(new_account_address: address, auth_key_preimage: vector<u8>) {
         let auth_key = Hash::sha3_256(auth_key_preimage);
         let bytes = BCS::to_bytes(&new_account_address);
         let len = Vector::length(&bytes);
@@ -96,7 +93,7 @@ module AptosFramework::AptosAccount {
         };
 
         let (signer, _) = create_account_internal(new_account_address, auth_key);
-        signer
+        TestCoin::register(&signer);
     }
 
     public fun exists_at(addr: address): bool {
@@ -126,7 +123,14 @@ module AptosFramework::AptosAccount {
     }
 
     /// Rotate the authentication key for the account under cap.account_address
-    public fun rotate_authentication_key(
+    public(script) fun rotate_authentication_key(
+        account: signer,
+        new_authentication_key: vector<u8>,
+    ) {
+      rotate_authentication_key_internal(&account, new_authentication_key);
+    }
+
+    public fun rotate_authentication_key_internal(
         account: &signer,
         new_authentication_key: vector<u8>,
     ) {

@@ -13,8 +13,8 @@ module AptosFramework::AptosVMConfig {
         VMConfig::initialize<Marker::ChainMarker>(account, instruction_schedule, native_schedule, 1);
     }
 
-    public fun set_gas_constants(
-        account: &signer,
+    public(script) fun set_gas_constants(
+        account: signer,
         global_memory_per_byte_cost: u64,
         global_memory_per_byte_write_cost: u64,
         min_transaction_gas_units: u64,
@@ -39,7 +39,7 @@ module AptosFramework::AptosVMConfig {
             max_transaction_size_in_bytes,
             gas_unit_scaling_factor,
             default_account_size,
-            &Capability::acquire(account, &Marker::get()),
+            &Capability::acquire(&account, &Marker::get()),
         );
     }
 }

@@ -24,6 +24,7 @@ modified from https://github.com/diem/move/tree/main/language/documentation/tuto
 -  [Function `claim_mint_capability`](#0x1_TestCoin_claim_mint_capability)
 -  [Function `find_delegation`](#0x1_TestCoin_find_delegation)
 -  [Function `mint`](#0x1_TestCoin_mint)
+-  [Function `mint_internal`](#0x1_TestCoin_mint_internal)
 -  [Function `exists_at`](#0x1_TestCoin_exists_at)
 -  [Function `balance_of`](#0x1_TestCoin_balance_of)
 -  [Function `transfer`](#0x1_TestCoin_transfer)
@@ -469,7 +470,7 @@ minting or transferring to the account.
 Create delegated token for the address so the account could claim MintCapability later.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_delegate_mint_capability">delegate_mint_capability</a>(account: &signer, <b>to</b>: <b>address</b>)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_delegate_mint_capability">delegate_mint_capability</a>(account: signer, <b>to</b>: <b>address</b>)
 </code></pre>
 
 
@@ -478,8 +479,8 @@ Create delegated token for the address so the account could claim MintCapability
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_delegate_mint_capability">delegate_mint_capability</a>(account: &signer, <b>to</b>: <b>address</b>) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> {
-    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(account);
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_delegate_mint_capability">delegate_mint_capability</a>(account: signer, <b>to</b>: <b>address</b>) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> {
+    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(&account);
     <b>let</b> delegations = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a>&gt;(@CoreResources).inner;
     <b>let</b> i = 0;
     <b>while</b> (i &lt; <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(delegations)) {
@@ -501,7 +502,7 @@ Create delegated token for the address so the account could claim MintCapability
 Claim the delegated mint capability and destroy the delegated token.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_claim_mint_capability">claim_mint_capability</a>(account: &signer)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_claim_mint_capability">claim_mint_capability</a>(account: signer)
 </code></pre>
 
 
@@ -510,14 +511,14 @@ Claim the delegated mint capability and destroy the delegated token.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_claim_mint_capability">claim_mint_capability</a>(account: &signer) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> {
-    <b>let</b> maybe_index = <a href="TestCoin.md#0x1_TestCoin_find_delegation">find_delegation</a>(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account));
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_claim_mint_capability">claim_mint_capability</a>(account: signer) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> {
+    <b>let</b> maybe_index = <a href="TestCoin.md#0x1_TestCoin_find_delegation">find_delegation</a>(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(&account));
     <b>assert</b>!(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_is_some">Option::is_some</a>(&maybe_index), <a href="TestCoin.md#0x1_TestCoin_EDELEGATION_NOT_FOUND">EDELEGATION_NOT_FOUND</a>);
     <b>let</b> idx = *<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_borrow">Option::borrow</a>(&maybe_index);
     <b>let</b> delegations = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a>&gt;(@CoreResources).inner;
     <b>let</b> <a href="TestCoin.md#0x1_TestCoin_DelegatedMintCapability">DelegatedMintCapability</a> { <b>to</b>: _} = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_swap_remove">Vector::swap_remove</a>(delegations, idx);
 
-    <b>move_to</b>(account, <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a> {});
+    <b>move_to</b>(&account, <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a> {});
 }
 </code></pre>
 
@@ -568,7 +569,7 @@ Claim the delegated mint capability and destroy the delegated token.
 Mint coins with capability.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_mint">mint</a>(account: &signer, mint_addr: <b>address</b>, amount: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_mint">mint</a>(account: signer, mint_addr: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -577,7 +578,36 @@ Mint coins with capability.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_mint">mint</a>(account: &signer, mint_addr: <b>address</b>, amount: u64) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>, <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a>, <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> {
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_mint">mint</a>(
+    account: signer,
+    mint_addr: <b>address</b>,
+    amount: u64
+) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>, <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a>, <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a>
+{
+    <a href="TestCoin.md#0x1_TestCoin_mint_internal">mint_internal</a>(&account, mint_addr, amount);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_TestCoin_mint_internal"></a>
+
+## Function `mint_internal`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_mint_internal">mint_internal</a>(account: &signer, mint_addr: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_mint_internal">mint_internal</a>(account: &signer, mint_addr: <b>address</b>, amount: u64) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>, <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a>, <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> {
     <b>let</b> sender_addr = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>let</b> _cap = <b>borrow_global</b>&lt;<a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a>&gt;(sender_addr);
     // Deposit `amount` of tokens <b>to</b> `mint_addr`'s balance
@@ -649,7 +679,7 @@ Returns the balance of <code>owner</code>.
 Transfers <code>amount</code> of tokens from <code>from</code> to <code><b>to</b></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_transfer">transfer</a>(from: &signer, <b>to</b>: <b>address</b>, amount: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_transfer">transfer</a>(from: signer, <b>to</b>: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -658,11 +688,11 @@ Transfers <code>amount</code> of tokens from <code>from</code> to <code><b>to</b
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_transfer">transfer</a>(from: &signer, <b>to</b>: <b>address</b>, amount: u64) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>, <a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a> {
-    <b>let</b> check = <a href="TestCoin.md#0x1_TestCoin_withdraw">withdraw</a>(from, amount);
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_transfer">transfer</a>(from: signer, <b>to</b>: <b>address</b>, amount: u64) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>, <a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a> {
+    <b>let</b> check = <a href="TestCoin.md#0x1_TestCoin_withdraw">withdraw</a>(&from, amount);
     <a href="TestCoin.md#0x1_TestCoin_deposit">deposit</a>(<b>to</b>, check);
     // emit events
-    <b>let</b> sender_handle = <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a>&gt;(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(from));
+    <b>let</b> sender_handle = <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a>&gt;(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(&from));
     <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>&lt;<a href="TestCoin.md#0x1_TestCoin_SentEvent">SentEvent</a>&gt;(
         &<b>mut</b> sender_handle.sent_events,
         <a href="TestCoin.md#0x1_TestCoin_SentEvent">SentEvent</a> { amount, <b>to</b> },
@@ -670,7 +700,7 @@ Transfers <code>amount</code> of tokens from <code>from</code> to <code><b>to</b
     <b>let</b> receiver_handle = <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a>&gt;(<b>to</b>);
     <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>&lt;<a href="TestCoin.md#0x1_TestCoin_ReceivedEvent">ReceivedEvent</a>&gt;(
         &<b>mut</b> receiver_handle.received_events,
-        <a href="TestCoin.md#0x1_TestCoin_ReceivedEvent">ReceivedEvent</a> { amount, from: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(from) },
+        <a href="TestCoin.md#0x1_TestCoin_ReceivedEvent">ReceivedEvent</a> { amount, from: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(&from) },
     );
 }
 </code></pre>

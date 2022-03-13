@@ -35,25 +35,26 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum ScriptFunctionCall {
+    /// Claim the delegated mint capability and destroy the delegated token.
     ClaimMintCapability {},
 
+    /// Basic account creation method.
     CreateAccount {
         new_account_address: AccountAddress,
-        auth_key_prefix: Bytes,
+        auth_key_preimage: Bytes,
     },
 
-    DelegateMintCapability {
-        addr: AccountAddress,
-    },
+    /// Create delegated token for the address so the account could claim MintCapability later.
+    DelegateMintCapability { to: AccountAddress },
 
+    /// Mint coins with capability.
     Mint {
-        addr: AccountAddress,
+        mint_addr: AccountAddress,
         amount: u64,
     },
 
-    RotateAuthenticationKey {
-        new_authentication_key: Bytes,
-    },
+    /// Rotate the authentication key for the account under cap.account_address
+    RotateAuthenticationKey { new_authentication_key: Bytes },
 
     SetGasConstants {
         global_memory_per_byte_cost: u64,
@@ -69,10 +70,8 @@ pub enum ScriptFunctionCall {
         default_account_size: u64,
     },
 
-    Transfer {
-        to: AccountAddress,
-        amount: u64,
-    },
+    /// Transfers `amount` of tokens from `from` to `to`.
+    Transfer { to: AccountAddress, amount: u64 },
 }
 
 impl ScriptFunctionCall {
@@ -83,12 +82,10 @@ impl ScriptFunctionCall {
             ClaimMintCapability {} => encode_claim_mint_capability_script_function(),
             CreateAccount {
                 new_account_address,
-                auth_key_prefix,
-            } => encode_create_account_script_function(new_account_address, auth_key_prefix),
-            DelegateMintCapability { addr } => {
-                encode_delegate_mint_capability_script_function(addr)
-            }
-            Mint { addr, amount } => encode_mint_script_function(addr, amount),
+                auth_key_preimage,
+            } => encode_create_account_script_function(new_account_address, auth_key_preimage),
+            DelegateMintCapability { to } => encode_delegate_mint_capability_script_function(to),
+            Mint { mint_addr, amount } => encode_mint_script_function(mint_addr, amount),
             RotateAuthenticationKey {
                 new_authentication_key,
             } => encode_rotate_authentication_key_script_function(new_authentication_key),
@@ -138,11 +135,12 @@ impl ScriptFunctionCall {
     }
 }
 
+/// Claim the delegated mint capability and destroy the delegated token.
 pub fn encode_claim_mint_capability_script_function() -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
-            ident_str!("AdminScripts").to_owned(),
+            ident_str!("TestCoin").to_owned(),
         ),
         ident_str!("claim_mint_capability").to_owned(),
         vec![],
@@ -150,58 +148,62 @@ pub fn encode_claim_mint_capability_script_function() -> TransactionPayload {
     ))
 }
 
+/// Basic account creation method.
 pub fn encode_create_account_script_function(
     new_account_address: AccountAddress,
-    auth_key_prefix: Vec<u8>,
+    auth_key_preimage: Vec<u8>,
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
-            ident_str!("BasicScripts").to_owned(),
+            ident_str!("AptosAccount").to_owned(),
         ),
         ident_str!("create_account").to_owned(),
         vec![],
         vec![
             bcs::to_bytes(&new_account_address).unwrap(),
-            bcs::to_bytes(&auth_key_prefix).unwrap(),
+            bcs::to_bytes(&auth_key_preimage).unwrap(),
         ],
     ))
 }
 
-pub fn encode_delegate_mint_capability_script_function(addr: AccountAddress) -> TransactionPayload {
+/// Create delegated token for the address so the account could claim MintCapability later.
+pub fn encode_delegate_mint_capability_script_function(to: AccountAddress) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
-            ident_str!("AdminScripts").to_owned(),
+            ident_str!("TestCoin").to_owned(),
         ),
         ident_str!("delegate_mint_capability").to_owned(),
         vec![],
-        vec![bcs::to_bytes(&addr).unwrap()],
+        vec![bcs::to_bytes(&to).unwrap()],
     ))
 }
 
-pub fn encode_mint_script_function(addr: AccountAddress, amount: u64) -> TransactionPayload {
+/// Mint coins with capability.
+pub fn encode_mint_script_function(mint_addr: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
-            ident_str!("AdminScripts").to_owned(),
+            ident_str!("TestCoin").to_owned(),
         ),
         ident_str!("mint").to_owned(),
         vec![],
         vec![
-            bcs::to_bytes(&addr).unwrap(),
+            bcs::to_bytes(&mint_addr).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
         ],
     ))
 }
 
+/// Rotate the authentication key for the account under cap.account_address
 pub fn encode_rotate_authentication_key_script_function(
     new_authentication_key: Vec<u8>,
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
-            ident_str!("BasicScripts").to_owned(),
+            ident_str!("AptosAccount").to_owned(),
         ),
         ident_str!("rotate_authentication_key").to_owned(),
         vec![],
@@ -225,7 +227,7 @@ pub fn encode_set_gas_constants_script_function(
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
-            ident_str!("AdminScripts").to_owned(),
+            ident_str!("AptosVMConfig").to_owned(),
         ),
         ident_str!("set_gas_constants").to_owned(),
         vec![],
@@ -245,11 +247,12 @@ pub fn encode_set_gas_constants_script_function(
     ))
 }
 
+/// Transfers `amount` of tokens from `from` to `to`.
 pub fn encode_transfer_script_function(to: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
-            ident_str!("BasicScripts").to_owned(),
+            ident_str!("TestCoin").to_owned(),
         ),
         ident_str!("transfer").to_owned(),
         vec![],
@@ -273,7 +276,7 @@ fn decode_create_account_script_function(
     if let TransactionPayload::ScriptFunction(script) = payload {
         Some(ScriptFunctionCall::CreateAccount {
             new_account_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-            auth_key_prefix: bcs::from_bytes(script.args().get(1)?).ok()?,
+            auth_key_preimage: bcs::from_bytes(script.args().get(1)?).ok()?,
         })
     } else {
         None
@@ -285,7 +288,7 @@ fn decode_delegate_mint_capability_script_function(
 ) -> Option<ScriptFunctionCall> {
     if let TransactionPayload::ScriptFunction(script) = payload {
         Some(ScriptFunctionCall::DelegateMintCapability {
-            addr: bcs::from_bytes(script.args().get(0)?).ok()?,
+            to: bcs::from_bytes(script.args().get(0)?).ok()?,
         })
     } else {
         None
@@ -295,7 +298,7 @@ fn decode_delegate_mint_capability_script_function(
 fn decode_mint_script_function(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
     if let TransactionPayload::ScriptFunction(script) = payload {
         Some(ScriptFunctionCall::Mint {
-            addr: bcs::from_bytes(script.args().get(0)?).ok()?,
+            mint_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
             amount: bcs::from_bytes(script.args().get(1)?).ok()?,
         })
     } else {
@@ -361,31 +364,31 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
     once_cell::sync::Lazy::new(|| {
         let mut map: ScriptFunctionDecoderMap = std::collections::HashMap::new();
         map.insert(
-            "AdminScriptsclaim_mint_capability".to_string(),
+            "TestCoinclaim_mint_capability".to_string(),
             Box::new(decode_claim_mint_capability_script_function),
         );
         map.insert(
-            "BasicScriptscreate_account".to_string(),
+            "AptosAccountcreate_account".to_string(),
             Box::new(decode_create_account_script_function),
         );
         map.insert(
-            "AdminScriptsdelegate_mint_capability".to_string(),
+            "TestCoindelegate_mint_capability".to_string(),
             Box::new(decode_delegate_mint_capability_script_function),
         );
         map.insert(
-            "AdminScriptsmint".to_string(),
+            "TestCoinmint".to_string(),
             Box::new(decode_mint_script_function),
         );
         map.insert(
-            "BasicScriptsrotate_authentication_key".to_string(),
+            "AptosAccountrotate_authentication_key".to_string(),
             Box::new(decode_rotate_authentication_key_script_function),
         );
         map.insert(
-            "AdminScriptsset_gas_constants".to_string(),
+            "AptosVMConfigset_gas_constants".to_string(),
             Box::new(decode_set_gas_constants_script_function),
         );
         map.insert(
-            "BasicScriptstransfer".to_string(),
+            "TestCointransfer".to_string(),
             Box::new(decode_transfer_script_function),
         );
         map
