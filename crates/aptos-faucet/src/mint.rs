@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::Service;
+use crate::{get_and_update_seq_no, Service};
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PublicKey, hash::HashValue};
 use aptos_sdk::{
@@ -16,7 +16,7 @@ use aptos_sdk::{
 };
 use reqwest::StatusCode;
 use serde::Deserialize;
-use std::{convert::Infallible, fmt, sync::Arc};
+use std::{convert::Infallible, fmt, ops::DerefMut, sync::Arc};
 use warp::{Filter, Rejection, Reply};
 
 pub fn mint_routes(
@@ -94,41 +94,34 @@ async fn process(service: &Service, params: MintParams) -> Result<Response> {
     let service_amount = service.maximum_amount.unwrap_or(asked_amount);
     let amount = std::cmp::min(asked_amount, service_amount);
 
-    let (faucet_seq, receiver_seq) = sequences(service, params.receiver()).await?;
-
-    {
-        let mut faucet_account = service.faucet_account.lock().unwrap();
-
-        // If the onchain sequence_number is greater than what we have, update our
-        // sequence_numbers
-        if faucet_seq > faucet_account.sequence_number() {
-            *faucet_account.sequence_number_mut() = faucet_seq;
-        }
-    }
+    let mut faucet_account = service.faucet_account.lock().await;
+    get_and_update_seq_no(service, faucet_account.deref_mut()).await?;
 
     let mut txns = vec![];
 
-    {
-        let mut faucet_account = service.faucet_account.lock().unwrap();
+    let receiver_seq = service
+        .client
+        .get_account(params.receiver())
+        .await
+        .ok()
+        .map(|account| account.inner().sequence_number);
 
-        if receiver_seq.is_none() {
-            let builder = service.transaction_factory.payload(
+    if receiver_seq.is_none() {
+        txns.push(faucet_account.sign_with_transaction_builder(
+            service.transaction_factory.payload(
                 aptos_stdlib::encode_create_account_script_function(
                     params.receiver(),
                     params.pre_image().into_vec(),
                 ),
-            );
-
-            let txn = faucet_account.sign_with_transaction_builder(builder);
-            txns.push(txn)
-        }
-
-        txns.push(
-            faucet_account.sign_with_transaction_builder(service.transaction_factory.payload(
-                aptos_stdlib::encode_mint_script_function(params.receiver(), amount),
-            )),
-        );
+            ),
+        ))
     }
+
+    txns.push(
+        faucet_account.sign_with_transaction_builder(service.transaction_factory.payload(
+            aptos_stdlib::encode_mint_script_function(params.receiver(), amount),
+        )),
+    );
 
     let requests = txns.iter().map(|txn| service.client.submit(txn));
     let mut responses = futures::future::join_all(requests).await;
@@ -136,7 +129,7 @@ async fn process(service: &Service, params: MintParams) -> Result<Response> {
     // If there was an issue submitting a transaction we should just reset our sequence_numbers
     // to what was on chain
     if responses.iter().any(Result::is_err) {
-        *service.faucet_account.lock().unwrap().sequence_number_mut() = faucet_seq;
+        get_and_update_seq_no(service, faucet_account.deref_mut()).await?;
     }
 
     while !responses.is_empty() {
@@ -153,24 +146,4 @@ async fn process(service: &Service, params: MintParams) -> Result<Response> {
             .collect();
         Ok(Response::SubmittedTxnsHashes(hashes))
     }
-}
-
-async fn sequences(service: &Service, receiver: AccountAddress) -> Result<(u64, Option<u64>)> {
-    let faucet_address = service.faucet_account.lock().unwrap().address();
-    let f_request = service.client.get_account(faucet_address);
-    let r_request = service.client.get_account(receiver);
-    let mut responses = futures::future::join_all([f_request, r_request]).await;
-
-    let receiver_seq_num = responses
-        .remove(1)
-        .as_ref()
-        .ok()
-        .map(|account| account.inner().sequence_number);
-    let faucet_seq_num = responses
-        .remove(0)
-        .map_err(|_| anyhow::format_err!("faucet account {} not found", faucet_address))?
-        .inner()
-        .sequence_number;
-
-    Ok((faucet_seq_num, receiver_seq_num))
 }

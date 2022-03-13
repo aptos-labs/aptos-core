@@ -6,6 +6,7 @@ use crate::{CoreContext, Result, TestReport};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     crypto::ed25519::Ed25519PublicKey,
+    move_types::identifier::Identifier,
     transaction_builder::TransactionFactory,
     types::{
         account_address::AccountAddress,
@@ -105,6 +106,28 @@ impl<'t> AptosContext<'t> {
             .submit_and_wait(&mint_txn)
             .await?;
         Ok(())
+    }
+
+    pub async fn get_balance(&self, address: AccountAddress) -> Option<u64> {
+        let module = Identifier::new("TestCoin".to_string()).unwrap();
+        let name = Identifier::new("Balance".to_string()).unwrap();
+        self.public_info
+            .rest_client
+            .get_account_resources(address)
+            .await
+            .unwrap()
+            .into_inner()
+            .into_iter()
+            .find(|r| r.resource_type.name == name && r.resource_type.module == module)
+            .and_then(|coin| {
+                coin.data
+                    .get("coin")
+                    .unwrap()
+                    .get("value")
+                    .unwrap()
+                    .as_str()
+                    .and_then(|s| s.parse::<u64>().ok())
+            })
     }
 
     pub fn root_account(&mut self) -> &mut LocalAccount {

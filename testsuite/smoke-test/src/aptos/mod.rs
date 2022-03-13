@@ -11,3 +11,5 @@ mod module_publish;
 pub use module_publish::*;
 mod error_report;
 pub use error_report::*;
+mod faucet_delegation;
+pub use faucet_delegation::*;

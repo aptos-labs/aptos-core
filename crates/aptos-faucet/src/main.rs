@@ -1,13 +1,11 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_faucet::delegate_account;
 use aptos_logger::info;
-use aptos_sdk::{
-    transaction_builder::aptos_stdlib,
-    types::{
-        account_address::AccountAddress, account_config::aptos_root_address, chain_id::ChainId,
-        transaction::authenticator::AuthenticationKeyPreimage, LocalAccount,
-    },
+use aptos_sdk::types::{
+    account_address::AccountAddress, account_config::aptos_root_address, chain_id::ChainId,
+    LocalAccount,
 };
 use std::sync::Arc;
 use structopt::StructOpt;
@@ -48,11 +46,11 @@ struct Args {
     /// Maximum amount of coins to mint.
     #[structopt(long)]
     pub maximum_amount: Option<u64>,
-    /// If this is set, the faucet will use the root key to create a new account,
-    /// give it permissions to mint, and use that new account from then on.   
-    /// For Aptos public testnets, this is always set.
+    /// If this is set, the faucet will use the root key to mint from,
+    /// instead of creating a new account, giving it permissions to mint,
+    /// and using that one.
     #[structopt(short = "d", long)]
-    pub delegate_on_start: bool,
+    pub do_not_delegate: bool,
 }
 
 #[tokio::main]
@@ -84,10 +82,10 @@ async fn main() {
         args.maximum_amount,
     ));
 
-    if args.delegate_on_start {
+    if !args.do_not_delegate {
         service =
             delegate_account(service, args.server_url, args.chain_id, args.maximum_amount).await;
-        let faucet_address = service.faucet_account.lock().unwrap().address();
+        let faucet_address = service.faucet_account.lock().await.address();
         info!(
             "[faucet]: running on: {}. Minting from {} via delegation",
             address, faucet_address
@@ -102,108 +100,6 @@ async fn main() {
     warp::serve(aptos_faucet::routes(service))
         .run(address)
         .await;
-}
-
-async fn delegate_account(
-    service: Arc<aptos_faucet::Service>,
-    server_url: String,
-    chain_id: ChainId,
-    maximum_amount: Option<u64>,
-) -> Arc<aptos_faucet::Service> {
-    // Create a new random account, then delegate to it
-    let delegated_account = LocalAccount::generate(&mut rand::rngs::OsRng);
-
-    {
-        let mut faucet_account = service.faucet_account.lock().unwrap();
-        let faucet_sequence_number = service
-            .client
-            .get_account(faucet_account.address())
-            .await
-            .unwrap()
-            .into_inner()
-            .sequence_number;
-        if faucet_sequence_number > faucet_account.sequence_number() {
-            *faucet_account.sequence_number_mut() = faucet_sequence_number;
-        }
-
-        // Create the account
-        service
-            .client
-            .submit_and_wait(
-                &faucet_account.sign_with_transaction_builder(
-                    service.transaction_factory.payload(
-                        aptos_stdlib::encode_create_account_script_function(
-                            delegated_account.address(),
-                            AuthenticationKeyPreimage::ed25519(delegated_account.public_key())
-                                .into_vec(),
-                        ),
-                    ),
-                ),
-            )
-            .await
-            .unwrap();
-
-        // Delegate minting to the account
-        service
-            .client
-            .submit_and_wait(&faucet_account.sign_with_transaction_builder(
-                service.transaction_factory.payload(
-                    aptos_stdlib::encode_delegate_mint_capability_script_function(
-                        delegated_account.address(),
-                    ),
-                ),
-            ))
-            .await
-            .unwrap();
-
-        // Give the new account some moolah
-        service
-            .client
-            .submit_and_wait(
-                &faucet_account.sign_with_transaction_builder(service.transaction_factory.payload(
-                    aptos_stdlib::encode_mint_script_function(
-                        delegated_account.address(),
-                        // we hold the world ransom for  one...? hundred...? billion dollars
-                        100_000_000,
-                    ),
-                )),
-            )
-            .await
-            .unwrap();
-    }
-
-    let service = Arc::new(aptos_faucet::Service::new(
-        server_url,
-        chain_id,
-        delegated_account,
-        maximum_amount,
-    ));
-    {
-        let mut faucet_account = service.faucet_account.lock().unwrap();
-        let faucet_sequence_number = service
-            .client
-            .get_account(faucet_account.address())
-            .await
-            .unwrap()
-            .into_inner()
-            .sequence_number;
-        if faucet_sequence_number > faucet_account.sequence_number() {
-            *faucet_account.sequence_number_mut() = faucet_sequence_number;
-        }
-        // claim the capability!
-        service
-            .client
-            .submit_and_wait(
-                &faucet_account.sign_with_transaction_builder(
-                    service
-                        .transaction_factory
-                        .payload(aptos_stdlib::encode_claim_mint_capability_script_function()),
-                ),
-            )
-            .await
-            .unwrap();
-    }
-    service
 }
 
 #[cfg(test)]
@@ -504,9 +400,10 @@ mod tests {
     #[tokio::test]
     async fn test_mint_fullnode_error() {
         let (accounts, service) = setup(None);
-        let address = service.faucet_account.lock().unwrap().address();
+        let address = service.faucet_account.lock().await.address();
         accounts.write().remove(&address);
         let filter = routes(service);
+        // assert_eq!("".to_string(), format!("{:?}  -  {}", &accounts, &address));
 
         let pub_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
         let resp = warp::test::request()
@@ -514,7 +411,6 @@ mod tests {
             .path(format!("/mint?pub_key={}&amount=1000000", pub_key).as_str())
             .reply(&filter)
             .await;
-
         assert_eq!(
             resp.body(),
             &format!("faucet account {:?} not found", address)

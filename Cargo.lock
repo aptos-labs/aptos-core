@@ -6943,6 +6943,7 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
+ "aptos-faucet",
  "aptos-framework-releases",
  "aptos-genesis-tool",
  "aptos-global-constants",
