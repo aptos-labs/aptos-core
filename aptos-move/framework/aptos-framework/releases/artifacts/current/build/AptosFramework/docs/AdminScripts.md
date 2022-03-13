@@ -33,7 +33,7 @@
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AdminScripts.md#0x1_AdminScripts_delegate_mint_capability">delegate_mint_capability</a>(core_resource_account: signer, addr: <b>address</b>) {
-    <a href="TestCoin.md#0x1_TestCoin_delegte_mint_capability">TestCoin::delegte_mint_capability</a>(&core_resource_account, addr);
+    <a href="TestCoin.md#0x1_TestCoin_delegate_mint_capability">TestCoin::delegate_mint_capability</a>(&core_resource_account, addr);
 }
 </code></pre>
 

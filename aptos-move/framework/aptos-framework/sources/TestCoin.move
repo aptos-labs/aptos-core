@@ -89,7 +89,7 @@ module AptosFramework::TestCoin {
     }
 
     /// Create delegated token for the address so the account could claim MintCapability later.
-    public fun delegte_mint_capability(account: &signer, to: address) acquires Delegations {
+    public fun delegate_mint_capability(account: &signer, to: address) acquires Delegations {
         SystemAddresses::assert_core_resource(account);
         let delegations = &mut borrow_global_mut<Delegations>(@CoreResources).inner;
         let i = 0;
@@ -317,7 +317,7 @@ module AptosFramework::TestCoin {
         initialize(&account, 1000000);
         register(&delegatee);
         let addr = Signer::address_of(&delegatee);
-        delegte_mint_capability(&account, addr);
+        delegate_mint_capability(&account, addr);
         claim_mint_capability(&delegatee);
 
         mint(&delegatee, addr, 1000);
@@ -329,7 +329,7 @@ module AptosFramework::TestCoin {
     fun mint_delegation_claim_fail(account: signer, random: signer) acquires Delegations  {
         initialize(&account, 1000000);
         let delegatee = @0x1234;
-        delegte_mint_capability(&account, delegatee);
+        delegate_mint_capability(&account, delegatee);
         claim_mint_capability(&random);
     }
 
@@ -337,6 +337,6 @@ module AptosFramework::TestCoin {
     #[expected_failure]
     fun mint_delegation_delegate_fail(account: signer, random: signer) acquires Delegations  {
         initialize(&account, 1000000);
-        delegte_mint_capability(&random, @0x1);
+        delegate_mint_capability(&random, @0x1);
     }
 }

@@ -51,6 +51,10 @@ pub enum ScriptFunctionCall {
         amount: u64,
     },
 
+    RotateAuthenticationKey {
+        new_authentication_key: Bytes,
+    },
+
     SetGasConstants {
         global_memory_per_byte_cost: u64,
         global_memory_per_byte_write_cost: u64,
@@ -85,6 +89,9 @@ impl ScriptFunctionCall {
                 encode_delegate_mint_capability_script_function(addr)
             }
             Mint { addr, amount } => encode_mint_script_function(addr, amount),
+            RotateAuthenticationKey {
+                new_authentication_key,
+            } => encode_rotate_authentication_key_script_function(new_authentication_key),
             SetGasConstants {
                 global_memory_per_byte_cost,
                 global_memory_per_byte_write_cost,
@@ -188,6 +195,20 @@ pub fn encode_mint_script_function(addr: AccountAddress, amount: u64) -> Transac
     ))
 }
 
+pub fn encode_rotate_authentication_key_script_function(
+    new_authentication_key: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            ident_str!("BasicScripts").to_owned(),
+        ),
+        ident_str!("rotate_authentication_key").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&new_authentication_key).unwrap()],
+    ))
+}
+
 pub fn encode_set_gas_constants_script_function(
     global_memory_per_byte_cost: u64,
     global_memory_per_byte_write_cost: u64,
@@ -282,6 +303,18 @@ fn decode_mint_script_function(payload: &TransactionPayload) -> Option<ScriptFun
     }
 }
 
+fn decode_rotate_authentication_key_script_function(
+    payload: &TransactionPayload,
+) -> Option<ScriptFunctionCall> {
+    if let TransactionPayload::ScriptFunction(script) = payload {
+        Some(ScriptFunctionCall::RotateAuthenticationKey {
+            new_authentication_key: bcs::from_bytes(script.args().get(0)?).ok()?,
+        })
+    } else {
+        None
+    }
+}
+
 fn decode_set_gas_constants_script_function(
     payload: &TransactionPayload,
 ) -> Option<ScriptFunctionCall> {
@@ -342,6 +375,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "AdminScriptsmint".to_string(),
             Box::new(decode_mint_script_function),
+        );
+        map.insert(
+            "BasicScriptsrotate_authentication_key".to_string(),
+            Box::new(decode_rotate_authentication_key_script_function),
         );
         map.insert(
             "AdminScriptsset_gas_constants".to_string(),

@@ -20,7 +20,7 @@ modified from https://github.com/diem/move/tree/main/language/documentation/tuto
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_TestCoin_initialize)
 -  [Function `register`](#0x1_TestCoin_register)
--  [Function `delegte_mint_capability`](#0x1_TestCoin_delegte_mint_capability)
+-  [Function `delegate_mint_capability`](#0x1_TestCoin_delegate_mint_capability)
 -  [Function `claim_mint_capability`](#0x1_TestCoin_claim_mint_capability)
 -  [Function `find_delegation`](#0x1_TestCoin_find_delegation)
 -  [Function `mint`](#0x1_TestCoin_mint)
@@ -462,14 +462,14 @@ minting or transferring to the account.
 
 </details>
 
-<a name="0x1_TestCoin_delegte_mint_capability"></a>
+<a name="0x1_TestCoin_delegate_mint_capability"></a>
 
-## Function `delegte_mint_capability`
+## Function `delegate_mint_capability`
 
 Create delegated token for the address so the account could claim MintCapability later.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_delegte_mint_capability">delegte_mint_capability</a>(account: &signer, <b>to</b>: <b>address</b>)
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_delegate_mint_capability">delegate_mint_capability</a>(account: &signer, <b>to</b>: <b>address</b>)
 </code></pre>
 
 
@@ -478,7 +478,7 @@ Create delegated token for the address so the account could claim MintCapability
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_delegte_mint_capability">delegte_mint_capability</a>(account: &signer, <b>to</b>: <b>address</b>) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_delegate_mint_capability">delegate_mint_capability</a>(account: &signer, <b>to</b>: <b>address</b>) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> {
     <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(account);
     <b>let</b> delegations = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a>&gt;(@CoreResources).inner;
     <b>let</b> i = 0;

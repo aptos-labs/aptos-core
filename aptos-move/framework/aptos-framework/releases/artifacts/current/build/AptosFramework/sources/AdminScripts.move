@@ -3,7 +3,7 @@ module AptosFramework::AdminScripts {
     use AptosFramework::AptosVMConfig;
 
     public(script) fun delegate_mint_capability(core_resource_account: signer, addr: address) {
-        TestCoin::delegte_mint_capability(&core_resource_account, addr);
+        TestCoin::delegate_mint_capability(&core_resource_account, addr);
     }
 
     public(script) fun claim_mint_capability(sender: signer) {
