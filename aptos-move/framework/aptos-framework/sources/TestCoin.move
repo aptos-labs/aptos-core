@@ -96,6 +96,7 @@ module AptosFramework::TestCoin {
         while (i < Vector::length(delegations)) {
             let element = Vector::borrow(delegations, i);
             assert!(element.to != to, Errors::invalid_argument(EALREADY_DELEGATED));
+            i = i + 1;
         };
         Vector::push_back(delegations, DelegatedMintCapability { to });
     }
@@ -330,11 +331,14 @@ module AptosFramework::TestCoin {
         assert!(total_supply() == 1000, 0);
     }
 
-    #[test(account = @CoreResources, delegatee = @0x1)]
-    public(script) fun mint_delegation_success(account: signer, delegatee: signer) acquires Balance, CoinInfo, Delegations, MintCapability  {
+    #[test(account = @CoreResources, account_clone = @CoreResources, delegatee = @0x1)]
+    public(script) fun mint_delegation_success(account: signer, account_clone: signer, delegatee: signer) acquires Balance, CoinInfo, Delegations, MintCapability  {
         initialize(&account, 1000000);
         register(&delegatee);
         let addr = Signer::address_of(&delegatee);
+        let addr1 = @0x2;
+        // make sure can delegate more than one
+        delegate_mint_capability(account_clone, addr1);
         delegate_mint_capability(account, addr);
         claim_mint_capability_internal(&delegatee);
 

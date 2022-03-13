@@ -22,6 +22,7 @@ modified from https://github.com/diem/move/tree/main/language/documentation/tuto
 -  [Function `register`](#0x1_TestCoin_register)
 -  [Function `delegate_mint_capability`](#0x1_TestCoin_delegate_mint_capability)
 -  [Function `claim_mint_capability`](#0x1_TestCoin_claim_mint_capability)
+-  [Function `claim_mint_capability_internal`](#0x1_TestCoin_claim_mint_capability_internal)
 -  [Function `find_delegation`](#0x1_TestCoin_find_delegation)
 -  [Function `mint`](#0x1_TestCoin_mint)
 -  [Function `mint_internal`](#0x1_TestCoin_mint_internal)
@@ -486,6 +487,7 @@ Create delegated token for the address so the account could claim MintCapability
     <b>while</b> (i &lt; <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(delegations)) {
         <b>let</b> element = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(delegations, i);
         <b>assert</b>!(element.<b>to</b> != <b>to</b>, <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="TestCoin.md#0x1_TestCoin_EALREADY_DELEGATED">EALREADY_DELEGATED</a>));
+        i = i + 1;
     };
     <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_push_back">Vector::push_back</a>(delegations, <a href="TestCoin.md#0x1_TestCoin_DelegatedMintCapability">DelegatedMintCapability</a> { <b>to</b> });
 }
@@ -512,13 +514,37 @@ Claim the delegated mint capability and destroy the delegated token.
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_claim_mint_capability">claim_mint_capability</a>(account: signer) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> {
-    <b>let</b> maybe_index = <a href="TestCoin.md#0x1_TestCoin_find_delegation">find_delegation</a>(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(&account));
+    <a href="TestCoin.md#0x1_TestCoin_claim_mint_capability_internal">claim_mint_capability_internal</a>(&account);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_TestCoin_claim_mint_capability_internal"></a>
+
+## Function `claim_mint_capability_internal`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_claim_mint_capability_internal">claim_mint_capability_internal</a>(account: &signer)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_claim_mint_capability_internal">claim_mint_capability_internal</a>(account: &signer) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> {
+    <b>let</b> maybe_index = <a href="TestCoin.md#0x1_TestCoin_find_delegation">find_delegation</a>(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account));
     <b>assert</b>!(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_is_some">Option::is_some</a>(&maybe_index), <a href="TestCoin.md#0x1_TestCoin_EDELEGATION_NOT_FOUND">EDELEGATION_NOT_FOUND</a>);
     <b>let</b> idx = *<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_borrow">Option::borrow</a>(&maybe_index);
     <b>let</b> delegations = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a>&gt;(@CoreResources).inner;
     <b>let</b> <a href="TestCoin.md#0x1_TestCoin_DelegatedMintCapability">DelegatedMintCapability</a> { <b>to</b>: _} = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_swap_remove">Vector::swap_remove</a>(delegations, idx);
 
-    <b>move_to</b>(&account, <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a> {});
+    <b>move_to</b>(account, <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a> {});
 }
 </code></pre>
 
