@@ -88,5 +88,5 @@ During the initial synchronization of your FullNode, there may be a lot of data 
 [pfn_config_file]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/public_full_node.yaml
 [pfn_docker_compose]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/docker-compose.yaml
 [rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api
-[devnet_genesis]: https://fullnode.devnet.aptoslabs.com/genesis.blob
-[devnet_waypoint]: https://fullnode.devnet.aptoslabs.com/waypoint.txt
+[devnet_genesis]: https://devnet.aptoslabs.com/genesis.blob
+[devnet_waypoint]: https://devnet.aptoslabs.com/waypoint.txt
