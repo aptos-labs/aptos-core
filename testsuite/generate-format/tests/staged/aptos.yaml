@@ -69,14 +69,6 @@ HashValue:
   NEWTYPESTRUCT: BYTES
 Identifier:
   NEWTYPESTRUCT: STR
-Metadata:
-  ENUM:
-    0:
-      Undefined: UNIT
-    1:
-      UnstructuredBytesMetadata:
-        NEWTYPE:
-          TYPENAME: UnstructuredBytesMetadata
 Module:
   STRUCT:
     - code: BYTES
@@ -249,10 +241,6 @@ TypeTag:
       Struct:
         NEWTYPE:
           TYPENAME: StructTag
-UnstructuredBytesMetadata:
-  STRUCT:
-    - metadata:
-        OPTION: BYTES
 VecBytes:
   NEWTYPESTRUCT:
     SEQ: BYTES

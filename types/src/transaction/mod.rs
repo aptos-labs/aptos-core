@@ -40,7 +40,6 @@ use std::{
 pub mod authenticator;
 mod change_set;
 pub mod helpers;
-pub mod metadata;
 mod module;
 mod script;
 mod transaction_argument;

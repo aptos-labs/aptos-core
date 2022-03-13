@@ -4,18 +4,7 @@ Diem transactions mutate and create state (or resources) within the set of [on-c
 
 ## Peer to Peer Payments and Transaction Metadata
 
-Most transactions will use the [peer_to_peer_with_metadata script function](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/script_documentation/script_documentation.md#0x1_PaymentScripts_peer_to_peer_with_metadata). This single transaction represents all current transfers between two participants and distinguishes the types of transfers via the embedded metadata.
-
-The metadata is represented by the following `Rust` enum encoded in [Binary Canonical Serialization (BCS)](https://github.com/diem/bcs):
-
-```
-enum Metadata {
-  Undefined,
-  UnstructuredByteMetadata(Option<Vec<u8>>),
-}
-```
-
-Note: This is the canonical list and should be referred to in future DIPs so that authors need not reproduce the list in future DIPs.
+Most transactions will use the [peer_to_peer_with_metadata script function](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/script_documentation/script_documentation.md#0x1_PaymentScripts_peer_to_peer_with_metadata). This single transaction represents all current transfers between two participants.
 
 ## Dual Attestation Credentials
 

@@ -6,9 +6,8 @@ use crate::{
     account_config::XUS_NAME,
     chain_id::ChainId,
     transaction::{
-        metadata, AccountTransactionsWithProof, RawTransaction, Script, SignedTransaction,
-        Transaction, TransactionInfo, TransactionListWithProof, TransactionPayload,
-        TransactionWithProof,
+        AccountTransactionsWithProof, RawTransaction, Script, SignedTransaction, Transaction,
+        TransactionInfo, TransactionListWithProof, TransactionPayload, TransactionWithProof,
     },
 };
 use aptos_crypto::{
