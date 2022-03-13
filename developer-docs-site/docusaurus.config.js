@@ -12,7 +12,7 @@ const config = {
   tagline: "Developer Documentation",
   url: "https://docs.aptoslabs.com",
   baseUrl: "/",
-  onBrokenLinks: "throw",
+  onBrokenLinks: "warn",
   onBrokenMarkdownLinks: "warn",
   favicon: "img/favicon.ico",
   organizationName: "aptos-labs", // Usually your GitHub org/user name.
