@@ -598,52 +598,41 @@ where
 
     /// Queries a `key` in this `SparseMerkleTree`.
     pub fn get(&self, key: HashValue) -> AccountStatus<V> {
-        let mut cur = self.smt.root_weak();
+        let mut subtree = self.smt.root_weak();
         let mut bits = key.iter_bits();
 
         loop {
-            if let Some(node) = cur.get_node_if_in_mem(self.base_generation) {
-                if let NodeInner::Internal(internal_node) = node.inner() {
-                    match bits.next() {
-                        Some(bit) => {
-                            cur = if bit {
-                                internal_node.right.weak()
-                            } else {
-                                internal_node.left.weak()
-                            };
-                            continue;
-                        }
-                        None => panic!("Tree is deeper than {} levels.", HashValue::LENGTH_IN_BITS),
-                    }
-                }
-            }
-            break;
-        }
-
-        let ret = match cur {
-            SubTree::Empty => AccountStatus::DoesNotExist,
-            SubTree::NonEmpty { root, .. } => match root.get_if_in_mem() {
-                None => AccountStatus::Unknown,
-                Some(node) => match node.inner() {
-                    NodeInner::Internal(_) => {
-                        unreachable!("There is an internal node at the bottom of the tree.")
-                    }
-                    NodeInner::Leaf(leaf_node) => {
-                        if leaf_node.key == key {
-                            match &leaf_node.value.data.get_if_in_mem() {
-                                Some(value) => {
-                                    AccountStatus::ExistsInScratchPad(value.as_ref().clone())
+            match subtree {
+                SubTree::Empty => return AccountStatus::DoesNotExist,
+                SubTree::NonEmpty { .. } => {
+                    match subtree.get_node_if_in_mem(self.base_generation) {
+                        None => return AccountStatus::Unknown,
+                        Some(node) => match node.inner() {
+                            NodeInner::Internal(internal_node) => {
+                                subtree = if bits.next().expect("Tree is too deep.") {
+                                    internal_node.right.weak()
+                                } else {
+                                    internal_node.left.weak()
+                                };
+                                continue;
+                            } // end NodeInner::Internal
+                            NodeInner::Leaf(leaf_node) => {
+                                return if leaf_node.key == key {
+                                    match &leaf_node.value.data.get_if_in_mem() {
+                                        Some(value) => AccountStatus::ExistsInScratchPad(
+                                            value.as_ref().clone(),
+                                        ),
+                                        None => AccountStatus::ExistsInDB,
+                                    }
+                                } else {
+                                    AccountStatus::DoesNotExist
                                 }
-                                None => AccountStatus::ExistsInDB,
-                            }
-                        } else {
-                            AccountStatus::DoesNotExist
-                        }
+                            } // end NodeInner::Leaf
+                        }, // end Some(node) got from mem
                     }
-                },
-            },
-        };
-        ret
+                } // end SubTree::NonEmpty
+            }
+        } // end loop
     }
 }
 
