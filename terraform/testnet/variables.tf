@@ -127,9 +127,19 @@ variable "utility_instance_type" {
   default     = "t3.medium"
 }
 
+variable "num_utilities_instance" {
+  description = "Number of instances for utilities node pool, when it's 0, it will be set to 3 * num_validators"
+  default     = 0
+}
+
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
   default     = "c5.xlarge"
+}
+
+variable "num_validator_instance" {
+  description = "Number of instances for validator node pool, when it's 0, it will be set to 3 * num_validator + num_public_fullnode"
+  default     = 0
 }
 
 variable "trusted_instance_type" {
