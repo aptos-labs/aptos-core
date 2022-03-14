@@ -70,7 +70,7 @@ Each Aptos account has a unique account address.  The owner of that account hold
   </TabItem>
 </Tabs>
 
-## Step 2) Rest interface
+## Step 2) REST interface
 
 Aptos exposes a [REST interface][rest_spec] for interacting with the blockchain. While the data from the REST interface can be read directly, the following snippets of code demonstrate a more ergonomic approach. This next set of code snippets demonstrates how to use the REST interface to retrieve ledger data from the FullNode including account and account resource data. It also demonstrates how to use the REST interface for constructing a signed transactions represented by JSON formatting.
 
