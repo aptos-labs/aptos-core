@@ -16,8 +16,7 @@ use std::{
         mpsc::{channel, Sender},
         Arc,
     },
-    thread::{sleep, JoinHandle},
-    time::{Duration, Instant},
+    thread::JoinHandle,
 };
 use worker::{Command, Worker};
 
@@ -46,7 +45,9 @@ pub(crate) struct Pruner {
     least_readable_version: Arc<Mutex<Vec<Version>>>,
 }
 
+#[cfg(test)]
 const STATE_STORE_PRUNER_INDEX: usize = 0;
+#[cfg(test)]
 const TRANSACTION_STORE_PRUNER_INDEX: usize = 1;
 
 impl Pruner {
@@ -79,7 +80,7 @@ impl Pruner {
     }
 
     pub fn get_state_store_pruner_window(&self) -> Version {
-        self.state_store_prune_window.clone()
+        self.state_store_prune_window
     }
 
     /// Sends pruning command to the worker thread when necessary.
@@ -109,6 +110,11 @@ impl Pruner {
         latest_version: Version,
         transaction_store_index: usize,
     ) -> anyhow::Result<()> {
+        use std::{
+            thread::sleep,
+            time::{Duration, Instant},
+        };
+
         self.wake(latest_version);
 
         if latest_version > self.state_store_prune_window

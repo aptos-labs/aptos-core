@@ -32,7 +32,7 @@ use std::fmt;
 mod position_test;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct Position(u64);
+pub struct Position(pub u64);
 // invariant Position.0 < u64::max_value() - 1
 
 #[derive(Debug, Eq, PartialEq)]

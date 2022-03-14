@@ -1,4 +1,4 @@
-// Copyright (c) The Aptos Foundation
+// Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 use aptos_types::transaction::Version;
 use schemadb::DB;
@@ -79,7 +79,7 @@ impl Worker {
     fn record_progress(&mut self) {
         let mut updated_least_readable_versions: Vec<Version> = Vec::new();
         for x in &self.db_pruners {
-            updated_least_readable_versions.push(x.lock().least_readable_version().clone())
+            updated_least_readable_versions.push(x.lock().least_readable_version())
         }
         *self.least_readable_versions.lock() = updated_least_readable_versions;
     }

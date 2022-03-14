@@ -1,4 +1,4 @@
-// Copyright (c) The Aptos Foundation
+// Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -102,8 +102,7 @@ impl DBPruner for StateStorePruner {
     }
 
     fn least_readable_version(&self) -> Version {
-        let version = self.least_readable_version.load(Ordering::Relaxed);
-        version
+        self.least_readable_version.load(Ordering::Relaxed)
     }
 
     fn set_target_version(&self, target_version: Version) {
@@ -111,8 +110,7 @@ impl DBPruner for StateStorePruner {
     }
 
     fn target_version(&self) -> Version {
-        let version = self.target_version.load(Ordering::Relaxed);
-        version
+        self.target_version.load(Ordering::Relaxed)
     }
 
     fn record_progress(&self, least_readable_version: Version) {

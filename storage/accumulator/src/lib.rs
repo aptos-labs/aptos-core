@@ -363,7 +363,6 @@ where
             leaf_index,
             self.num_leaves
         );
-
         let siblings = self.get_siblings(leaf_index, |_p| true)?;
         Ok(AccumulatorProof::new(siblings))
     }
