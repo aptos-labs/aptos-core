@@ -44,11 +44,11 @@ const config = {
   /** @type {import("@docusaurus/preset-classic").ThemeConfig} */
     ({
       navbar: {
-        title: "Developer Documentation",
+        title: "| Developer Network",
         logo: {
           alt: "Aptos Labs Logo",
-          src: "img/aptos_logo_wordmark_transparent_blk.png",
-          srcDark: "img/aptos_logo_wordmark_transparent_white.png",
+          src: "img/aptos_word.svg",
+          srcDark: "/img/aptos_word.svg",
         },
         items: [
           {
@@ -62,24 +62,64 @@ const config = {
         style: "dark",
         links: [
           {
-            title: "Community",
+            title: null,
             items: [
               {
-                label: "Reddit",
-                href: "https://www.reddit.com/r/aptoslabs/",
+                html: `
+                  <a class="social-link" href="https://aptoslabs.com" target="_blank" rel="noopener noreferrer" title="Git">
+                     <img class="logo" src="/img/aptos_word.svg" alt="Git Icon" />
+                  </a>
+                `
               },
+            ],
+          },
+          {
+            title: null,
+            items: [
               {
-                label: "Discord",
-                href: "https://discord.gg/zTDYBEud7U",
+                html: `
+                <p class="emails">
+                  If you have any questions, please contact us at </br>
+                  <a href="mailto:info@aptoslabs.com" target="_blank" rel="noreferrer noopener">
+                    info@aptoslabs.com
+                  </a> or
+                  <a href="mailto:press@aptoslabs.com" target="_blank" rel="noreferrer noopener">
+                    press@aptoslabs.com
+                  </a> 
+                </p>
+              `,
               },
+            ],
+          },
+          {
+            title: null,
+            items: [
               {
-                label: "Twitter",
-                href: "https://twitter.com/aptoslabs",
+                html: `
+                  <p class="right">
+                    <nav class="social-links">
+                        <a class="social-link" href="https://github.com/aptoslabs" target="_blank" rel="noopener noreferrer" title="Git">
+                         <img class="icon" src="/img/socials/git.svg" alt="Git Icon" />
+                        </a>
+                        <a class="social-link" href="https://discord.gg/zTDYBEud7U" target="_blank" rel="noopener noreferrer" title="Discord">
+                          <img class="icon" src="/img/socials/discord.svg" alt="Discord Icon" />
+                        </a>
+                        <a class="social-link" href="https://twitter.com/aptoslabs/" target="_blank" rel="noopener noreferrer" title="Twitter">
+                          <img class="icon" src="/img/socials/twitter.svg" alt="Twitter Icon" />
+                        </a>
+                        <a class="social-link" href="https://aptoslabs.medium.com/" target="_blank" rel="noopener noreferrer" title="Medium">
+                          <img class="icon" src="/img/socials/medium.svg" alt="Medium Icon" />
+                        </a>
+                        <a class="social-link" href="https://www.linkedin.com/company/aptoslabs/" target="_blank" rel="noopener noreferrer" title="LinkedIn">
+                          <img class="icon" src="/img/socials/linkedin.svg" alt="LinkedIn Icon" />
+                        </a>
+                    </nav>
+                  </p>
+              `,
               },
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} Aptos Labs`,
       },
       prism: {
         theme: lightCodeTheme,

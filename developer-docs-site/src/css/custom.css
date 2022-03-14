@@ -55,3 +55,58 @@ img.deep-dive-image {
 main article a {
   /* color: red !important;*/
 }
+
+footer.footer {
+  background-color: black;
+  color:white;
+  font-size: 18px;
+  font-weight: 300;
+  letter-spacing: normal;
+  line-height: 28px;
+}
+
+footer.footer a {
+  color:white;
+  text-decoration: underline;
+}
+footer.footer .emails{
+  text-align: center;
+}
+
+footer.footer .right{
+  text-align: right;
+}
+
+footer.footer .icon{
+  width: 20px;
+  height: 20px;
+}
+
+footer.footer .logo{
+  width: 150px;
+}
+
+
+footer.footer a.social-link{
+  text-decoration: none;
+  height: 20px;
+  padding-right: 30px;
+}
+
+footer.footer nav.social-links {
+  text-align: right;
+}
+
+footer.footer > div.container-fluid {
+  max-width: inherit;
+}
+
+div.navbar__logo {
+  filter: brightness(0) saturate(100%);
+  height: 1.6rem;
+}
+
+b.navbar__title{
+  font-size: 1.6rem;
+  font-weight: normal;
+}
