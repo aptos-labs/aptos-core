@@ -16,11 +16,7 @@ Join our [Discord](https://discord.gg/zTDYBEud7U) to speak with our developers a
 
 Or even if you just want to stop by to say gm! 🌅 : there's a little something for everyone!
 
-** Make sure to fill out our Typeform to receive access! **
-
-**TODO: LINK THE TYPEFORM!**
-
-**TODO: LINK THE TYPEFORM!**
+Make sure to fill out our [Developer Network Typeform](https://www.aptoslabs.com/developers) to receive access!
 
 ### 🤿 Want to dive in?
 
