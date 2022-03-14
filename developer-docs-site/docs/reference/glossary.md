@@ -44,19 +44,19 @@ An Aptos node is a peer entity of the Aptos network that tracks the state of the
 
 - **Aptos protocol** is the specification of how transactions are submitted, ordered, executed, and recorded within the Aptos network.
 
-## AptosAccount.T
+## AptosAccount
 
-- A **`AptosAccount.T`** is a Move resource that holds all the administrative data associated with an account, such as sequence number, balance, and authentication key.
-- A **`AptosAccount.T`** is the only resource that every account is guaranteed to contain.
+- A **`AptosAccount`** is a Move resource that holds all the administrative data associated with an account, such as sequence number, balance, and authentication key.
+- A **`AptosAccount`** is the only resource that every account is guaranteed to contain.
 
 ## AptosAccount module
 
 - **The AptosAccount module** is a Move module that contains the code for manipulating the administrative data held in a particular `AptosAccount.T` resource.
 - Code for checking or incrementing sequence numbers, withdrawing or depositing currency, and extracting gas deposits is included in the AptosAccount module.
 
-## Aptos testnet
+## Aptos devnet
 
-- See [testnet](#testnet).
+- See [devnet](#devnet).
 
 # B
 
@@ -85,6 +85,14 @@ An Aptos node is a peer entity of the Aptos network that tracks the state of the
 - A **consensus protocol** is collectively executed by n validators to accept or reject a transaction and to agree on the ordering of transactions and [execution results](#execution-result).
 - See [BFT](#byzantine-fault-tolerance-bft)
 
+# D
+
+## devnet
+
+- The **devnet** is a publicly deployed instance of the Aptos network that runs using a set of validator test nodes.
+- The devnet is a demonstration of the Aptos network that is built for experimenting with new ideas
+- The devnet simulates a digital payment system and the coins on the devnet have _no real world value_.
+
 # E
 
 ## Ed25519
@@ -95,8 +103,8 @@ An Aptos node is a peer entity of the Aptos network that tracks the state of the
 ## Event
 
 - An **event** is the user-facing representation of the effects of executing a transaction.
-- A transaction may be designed to emit any number of events as a list. For example, a peer-to-peer payment transaction emits a `SentPaymentEvent` for the sender account and a `ReceivedPaymentEvent` for the recipient account.
-- In the Aptos protocol, events provide evidence that the successful execution of a transaction resulted in a specific effect. The `ReceivedPaymentEvent` (in the above example) allows the recipient to confirm that a payment was received into their account.
+- A transaction may be designed to emit any number of events as a list. For example, a `TestCoin` transfer emits a `SentEvent` for the sender account and a `ReceivedEvent` for the recipient account.
+- In the Aptos protocol, events provide evidence that the successful execution of a transaction resulted in a specific effect. The `ReceivedEvent` (in the above example) allows the recipient to confirm that a payment was received into their account.
 - Events are persisted on the blockchain and are used to answer queries by [clients](#client).
 
 ## Expiration Time
@@ -113,8 +121,8 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 ## Faucet
 
-- **Faucet** is the way to create Aptos currency with no real-world value, only on our testnet.
-- The Faucet is a service running along with the testnet. This service only exists to facilitate minting coins for the testnet.
+- **Faucet** is the way to create Aptos currency with no real-world value, only on our devnet.
+- The Faucet is a service running along with the devnet. This service only exists to facilitate minting coins for the devnet.
 - You can use the Faucet by sending a request to create coins and transfer them into a given account on your behalf.
 
 # G
@@ -220,10 +228,6 @@ then there is a guarantee that T_N will never be included in the blockchain.
 
 # P
 
-## ParentVASP account
-
-The ParentVASP account is your unique root account. You can have only one parent account per Regulated VASP. Aptos Networks will create a ParentVASP account on your behalf with your authentication key.
-
 ## Proof
 
 - A **proof** is a way to verify the accuracy of data in the blockchain.
@@ -274,12 +278,6 @@ The ParentVASP account is your unique root account. You can have only one parent
 - **State root hash** is a [Merkle hash](https://en.wikipedia.org/wiki/Merkle_tree) over all keys and values the state of the Aptos Blockchain at a given version.
 
 # T
-
-## testnet
-
-- The **testnet** is a publicly deployed instance of the Aptos network that runs using a set of validator test nodes.
-- The testnet is a demonstration of the Aptos network that is built for experimenting with new ideas
-- The testnet simulates a digital payment system and the coins on the testnet have _no real world value_.
 
 ## Transaction
 
