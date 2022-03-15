@@ -95,7 +95,7 @@ async fn process(service: &Service, params: MintParams) -> Result<Response> {
     let amount = std::cmp::min(asked_amount, service_amount);
 
     let mut faucet_account = service.faucet_account.lock().await;
-    get_and_update_seq_no(service, faucet_account.deref_mut()).await?;
+    let faucet_seq = get_and_update_seq_no(service, faucet_account.deref_mut()).await?;
 
     let mut txns = vec![];
 
@@ -129,7 +129,7 @@ async fn process(service: &Service, params: MintParams) -> Result<Response> {
     // If there was an issue submitting a transaction we should just reset our sequence_numbers
     // to what was on chain
     if responses.iter().any(Result::is_err) {
-        get_and_update_seq_no(service, faucet_account.deref_mut()).await?;
+        *faucet_account.sequence_number_mut() = faucet_seq;
     }
 
     while !responses.is_empty() {

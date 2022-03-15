@@ -59,13 +59,14 @@ impl Service {
         chain_id: ChainId,
         faucet_account: LocalAccount,
         maximum_amount: Option<u64>,
+        transaction_timeout: u64,
     ) -> Self {
         let client = Client::new(Url::parse(&endpoint).expect("Invalid rest endpoint"));
         Service {
             faucet_account: Arc::new(Mutex::new(faucet_account)),
             transaction_factory: TransactionFactory::new(chain_id)
                 .with_gas_unit_price(1)
-                .with_transaction_expiration_time(10),
+                .with_transaction_expiration_time(transaction_timeout),
             client,
             endpoint,
             maximum_amount,
@@ -136,10 +137,10 @@ pub async fn delegate_account(
     server_url: String,
     chain_id: ChainId,
     maximum_amount: Option<u64>,
+    transaction_timeout: u64,
 ) -> Arc<Service> {
     // Create a new random account, then delegate to it
     let delegated_account = LocalAccount::generate(&mut rand::rngs::OsRng);
-
     // Create the account
     service
         .client
@@ -195,6 +196,7 @@ pub async fn delegate_account(
             chain_id,
             delegated_account,
             maximum_amount,
+            transaction_timeout,
         ))
     };
     {
@@ -265,7 +267,7 @@ async fn create_account(
         return Err(anyhow!("account already exists"));
     }
     let mut faucet_account = service.faucet_account.lock().await;
-    get_and_update_seq_no(&service, faucet_account.deref_mut()).await?;
+    let faucet_seq = get_and_update_seq_no(&service, faucet_account.deref_mut()).await?;
 
     let txn = faucet_account.sign_with_transaction_builder(service.transaction_factory.payload(
         aptos_stdlib::encode_create_account_script_function(
@@ -273,7 +275,12 @@ async fn create_account(
             params.pre_image().into_vec(),
         ),
     ));
-    service.client.submit(&txn).await?;
+    let resp = service.client.submit(&txn).await;
+    // If there was an issue submitting a transaction we should just reset our sequence_numbers to what was on chain
+    if resp.is_err() {
+        *faucet_account.sequence_number_mut() = faucet_seq;
+        resp?;
+    }
     Ok(txn)
 }
 
@@ -330,7 +337,7 @@ pub(crate) async fn fund_account_unchecked(
     }
 
     let mut faucet_account = service.faucet_account.lock().await;
-    get_and_update_seq_no(&service, faucet_account.deref_mut()).await?;
+    let faucet_seq = get_and_update_seq_no(&service, faucet_account.deref_mut()).await?;
 
     let txn = faucet_account.sign_with_transaction_builder(
         service
@@ -338,7 +345,12 @@ pub(crate) async fn fund_account_unchecked(
             .payload(aptos_stdlib::encode_mint_script_function(address, amount)),
     );
 
-    service.client.submit(&txn).await?;
+    let resp = service.client.submit(&txn).await;
+    // If there was an issue submitting a transaction we should just reset our sequence_numbers to what was on chain
+    if resp.is_err() {
+        *faucet_account.sequence_number_mut() = faucet_seq;
+        resp?;
+    }
     Ok(txn)
 }
 

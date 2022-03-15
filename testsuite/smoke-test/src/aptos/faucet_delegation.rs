@@ -33,10 +33,17 @@ impl AptosTest for FaucetDelegation {
             ctx.chain_id(),
             root_clone,
             None,
+            30,
         ));
 
-        let new_service =
-            delegate_account(service.clone(), ctx.url().to_string(), ctx.chain_id(), None).await;
+        let new_service = delegate_account(
+            service.clone(),
+            ctx.url().to_string(),
+            ctx.chain_id(),
+            None,
+            30,
+        )
+        .await;
 
         let old_root_address = ctx.root_account().address();
         let new_account_address = new_service.faucet_account.lock().await.address();

@@ -51,6 +51,9 @@ struct Args {
     /// and using that one.
     #[structopt(short = "d", long)]
     pub do_not_delegate: bool,
+    /// How long should faucet transactions wait in mempool before dying?
+    #[structopt(short = "o", long, default_value = "30")]
+    pub transaction_timeout: u64,
 }
 
 #[tokio::main]
@@ -80,11 +83,18 @@ async fn main() {
         args.chain_id,
         faucet_account,
         args.maximum_amount,
+        args.transaction_timeout,
     ));
 
     if !args.do_not_delegate {
-        service =
-            delegate_account(service, args.server_url, args.chain_id, args.maximum_amount).await;
+        service = delegate_account(
+            service,
+            args.server_url,
+            args.chain_id,
+            args.maximum_amount,
+            args.transaction_timeout,
+        )
+        .await;
         let faucet_address = service.faucet_account.lock().await.address();
         info!(
             "[faucet]: running on: {}. Minting from {} via delegation",
@@ -196,6 +206,7 @@ mod tests {
             chain_id,
             faucet_account,
             maximum_amount,
+            30,
         );
         (accounts, Arc::new(service))
     }
