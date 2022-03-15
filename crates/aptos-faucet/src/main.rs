@@ -45,6 +45,8 @@ struct Args {
     /// Maximum amount of coins to mint.
     #[structopt(long)]
     pub maximum_amount: Option<u64>,
+    #[structopt(long)]
+    pub do_not_delegate: bool,
 }
 
 #[tokio::main]
@@ -68,18 +70,40 @@ async fn main() {
     let faucet_address: AccountAddress =
         args.mint_account_address.unwrap_or_else(aptos_root_address);
     let faucet_account = LocalAccount::new(faucet_address, key, 0);
+
+    // Do not use maximum amount on delegation, this allows the new delegated faucet to
+    // mint a lot for themselves!
+    let maximum_amount = if args.do_not_delegate {
+        args.maximum_amount
+    } else {
+        None
+    };
+
     let service = Arc::new(aptos_faucet::Service::new(
-        args.server_url,
+        args.server_url.clone(),
         args.chain_id,
         faucet_account,
-        args.maximum_amount,
+        maximum_amount,
     ));
+
+    let actual_service = if args.do_not_delegate {
+        service
+    } else {
+        aptos_faucet::delegate_mint_account(
+            service,
+            args.server_url,
+            args.chain_id,
+            args.maximum_amount,
+        )
+        .await
+    };
 
     info!(
         "[faucet]: running on: {}. Minting from {}",
-        address, faucet_address
+        address,
+        actual_service.faucet_account.lock().unwrap().address()
     );
-    warp::serve(aptos_faucet::routes(service))
+    warp::serve(aptos_faucet::routes(actual_service))
         .run(address)
         .await;
 }

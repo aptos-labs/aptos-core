@@ -23,11 +23,8 @@ use anyhow::Result;
 use aptos_logger::info;
 use aptos_rest_client::Client;
 use aptos_sdk::{
-    transaction_builder::TransactionFactory,
-    types::{
-        chain_id::ChainId,
-        LocalAccount,
-    },
+    transaction_builder::{aptos_stdlib, TransactionFactory},
+    types::{chain_id::ChainId, LocalAccount},
 };
 use reqwest::StatusCode;
 use std::{
@@ -132,4 +129,78 @@ impl<T: fmt::Display> fmt::Display for OptFmt<T> {
             f.write_str("-")
         }
     }
+}
+
+/// The idea is that this may be happening concurrently. If we end up in such a race, the faucets
+/// might attempt to send transactions with the same sequence number, in such an event, one will
+/// succeed and the other will hit an unwrap. Eventually all faucets should get online.
+pub async fn delegate_mint_account(
+    service: Arc<Service>,
+    server_url: String,
+    chain_id: ChainId,
+    maximum_amount: Option<u64>,
+) -> Arc<Service> {
+    // Create a new random account, then delegate to it
+    let mut delegated_account = LocalAccount::generate(&mut rand::rngs::OsRng);
+
+    // Create the account
+    let response = mint::process(
+        &service,
+        mint::MintParams {
+            amount: 100_000_000_000,
+            pub_key: delegated_account.public_key().clone(),
+            return_txns: Some(true),
+        },
+    )
+    .await
+    .unwrap();
+
+    match response {
+        mint::Response::SubmittedTxns(txns) => {
+            for txn in txns {
+                service
+                    .client
+                    .wait_for_signed_transaction(&txn)
+                    .await
+                    .unwrap();
+            }
+        }
+        _ => panic!("Expected a set of Response::SubmittedTxns"),
+    }
+
+    // Delegate minting to the account
+    {
+        let mut faucet_account = service.faucet_account.lock().unwrap();
+        service
+            .client
+            .submit_and_wait(&faucet_account.sign_with_transaction_builder(
+                service.transaction_factory.payload(
+                    aptos_stdlib::encode_delegate_mint_capability_script_function(
+                        delegated_account.address(),
+                    ),
+                ),
+            ))
+            .await
+            .unwrap();
+    }
+
+    // claim the capability!
+    service
+        .client
+        .submit_and_wait(
+            &delegated_account.sign_with_transaction_builder(
+                service
+                    .transaction_factory
+                    .payload(aptos_stdlib::encode_claim_mint_capability_script_function()),
+            ),
+        )
+        .await
+        .unwrap();
+
+    Arc::new(Service::new(
+        server_url,
+        chain_id,
+        delegated_account,
+        maximum_amount,
+    ))
 }

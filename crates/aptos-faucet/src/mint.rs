@@ -87,7 +87,7 @@ impl MintParams {
     }
 }
 
-async fn process(service: &Service, params: MintParams) -> Result<Response> {
+pub async fn process(service: &Service, params: MintParams) -> Result<Response> {
     let maybe_maximum_amount = service.maximum_amount.unwrap_or(params.amount);
     let amount = std::cmp::min(params.amount, maybe_maximum_amount);
 
