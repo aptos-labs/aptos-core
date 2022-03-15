@@ -3,10 +3,8 @@ title: "Proof"
 slug: "basics-merkle-proof"
 ---
 
-A proof is a way to verify the truth of data in the Aptos Blockchain.
+The Aptos Blockchain uses proofs as a way to verify the authenticity and correctness of blockchain data.
 
-All data in the Aptos Blockchain is stored in a single-version distributed database. A validator node's [storage component](basics-validator-nodes.md#storage) is used to persist agreed upon blocks of transactions and their execution results. The blockchain is represented as an ever-growing [Merkle tree](/reference/glossary#merkle-trees). A “leaf” is appended to the tree for each transaction executed on the blockchain.
+All data in the Aptos Blockchain is stored in a single-version distributed database. Each validator and FullNode's [storage](basics-validator-nodes.md#storage) is responsible for persisting agreed upon blocks of transactions and their execution results to the database. The blockchain is represented as an ever-growing [Merkle tree](/reference/glossary#merkle-trees), where each leaf appended to the tree represents a single transaction executed by the blockchain.
 
-Every operation stored on the blockchain can be verified cryptographically. The resultant proof also proves that the validator nodes all agreed on the state at that time. For example, if the client queried the latest _n_ transactions from an account, the proof verifies that no transactions are added, omitted, or modified from the query response.
-
-In a blockchain, the client does not need to trust the entity from which it is receiving data. A client could query for the state of an account, ask whether a specific transaction was processed, and so on. As with other Merkle trees, the ledger history can provide an $O(\log n)$-sized proof of a specific transaction object, where _n_ is the total number of transactions processed.
+All operations executed by the blockchain and all account states can be verified cryptographically. These cryptographic proofs ensure that the validator nodes agree on the states. By supporting proofs, the client does not need to trust the entity from which it is receiving data. For example, if a client fetches the last _n_ transactions from an account, a proof can attest that no transactions were added, omitted or modified in the response. The client could also query for the state of an account, ask whether a specific transaction was processed, and so on.
