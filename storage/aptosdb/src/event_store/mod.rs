@@ -30,8 +30,9 @@ use aptos_types::{
     proof::{position::Position, EventAccumulatorProof, EventProof},
     transaction::Version,
 };
-use schemadb::{schema::ValueCodec, ReadOptions, SchemaIterator, DB};
+use schemadb::{schema::ValueCodec, ReadOptions, SchemaBatch, SchemaIterator, DB};
 use std::{
+    collections::{hash_map::Entry, HashMap, HashSet},
     convert::{TryFrom, TryInto},
     iter::Peekable,
     sync::Arc,
@@ -119,7 +120,7 @@ impl EventStore {
         Ok((event, proof))
     }
 
-    fn get_txn_ver_by_seq_num(&self, event_key: &EventKey, seq_num: u64) -> Result<u64> {
+    pub fn get_txn_ver_by_seq_num(&self, event_key: &EventKey, seq_num: u64) -> Result<u64> {
         let (ver, _) = self
             .db
             .get::<EventByKeySchema>(&(*event_key, seq_num))?
@@ -127,7 +128,7 @@ impl EventStore {
         Ok(ver)
     }
 
-    fn get_event_by_key(
+    pub fn get_event_by_key(
         &self,
         event_key: &EventKey,
         seq_num: u64,
@@ -359,6 +360,73 @@ impl EventStore {
         version
             .checked_sub(1)
             .ok_or_else(|| format_err!("A block with non-zero seq num started at version 0."))
+    }
+
+    /// Prunes the events by key store for a set of events
+    pub fn prune_events_by_key(
+        &self,
+        candidate_events: &[ContractEvent],
+        db_batch: &mut SchemaBatch,
+    ) -> anyhow::Result<()> {
+        let mut sequence_range_by_event_keys: HashMap<EventKey, (u64, u64)> = HashMap::new();
+
+        candidate_events.iter().for_each(|event| {
+            let event_key = event.key();
+            // Events should be sorted by sequence numbers, so the first sequence number for the
+            // event key should be the minimum
+            match sequence_range_by_event_keys.entry(*event_key) {
+                Entry::Occupied(mut occupied) => {
+                    occupied.insert((occupied.get().0, event.sequence_number()));
+                }
+                Entry::Vacant(vacant) => {
+                    vacant.insert((event.sequence_number(), event.sequence_number()));
+                }
+            }
+        });
+
+        for (event_key, (min, max)) in sequence_range_by_event_keys {
+            db_batch
+                .delete_range_inclusive::<EventByKeySchema>(&(event_key, min), &(event_key, max));
+        }
+        Ok(())
+    }
+
+    /// Prunes events by accumulator store for a range of version in [begin, end)
+    pub fn prune_event_accumulator(
+        &self,
+        begin: Version,
+        end: Version,
+        db_batch: &mut SchemaBatch,
+    ) -> anyhow::Result<()> {
+        db_batch.delete_range::<EventAccumulatorSchema>(
+            &(begin, Position::from_inorder_index(0)),
+            &(end, Position::from_inorder_index(0)),
+        )
+    }
+
+    /// Prunes events by version store for a set of events in version range [begin, end)
+    pub fn prune_events_by_version(
+        &self,
+        event_keys: HashSet<EventKey>,
+        begin: Version,
+        end: Version,
+        db_batch: &mut SchemaBatch,
+    ) -> anyhow::Result<()> {
+        for event_key in event_keys {
+            db_batch
+                .delete_range::<EventByVersionSchema>(&(event_key, begin, 0), &(event_key, end, 0));
+        }
+        Ok(())
+    }
+
+    /// Prunes the event schema for a range of version in [begin, end)
+    pub fn prune_event_schema(
+        &self,
+        begin: Version,
+        end: Version,
+        db_batch: &mut SchemaBatch,
+    ) -> anyhow::Result<()> {
+        db_batch.delete_range::<EventSchema>(&(begin, 0_u64), &(end, 0_u64))
     }
 }
 

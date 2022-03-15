@@ -11,7 +11,7 @@ use std::collections::HashMap;
 /// To be specific it carries a batch of db alternations and counter increases that'll be converted
 /// to DB alternations on "sealing". This is required to be converted to `SealedChangeSet` before
 /// committing to the DB.
-pub(crate) struct ChangeSet {
+pub struct ChangeSet {
     /// A batch of db alternations.
     pub batch: SchemaBatch,
     /// Counter bumps to be made on commit.

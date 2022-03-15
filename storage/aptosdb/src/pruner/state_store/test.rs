@@ -58,6 +58,8 @@ fn test_state_store_pruner() {
             default_prune_window: Some(0),
         },
         Arc::clone(transaction_store),
+        Arc::clone(&aptos_db.ledger_store),
+        Arc::clone(&aptos_db.event_store),
     );
 
     let _root0 = put_account_state_set(
@@ -160,17 +162,19 @@ fn test_worker_quit_eagerly() {
         let worker = Worker::new(
             Arc::clone(&db),
             Arc::clone(&aptos_db.transaction_store),
+            Arc::clone(&aptos_db.ledger_store),
+            Arc::clone(&aptos_db.event_store),
             command_receiver,
             Arc::new(Mutex::new(vec![0, 0])), /* progress */
         );
         command_sender
             .send(Command::Prune {
-                target_db_versions: vec![1, 0],
+                target_db_versions: vec![1, 0, 0, 0, 0, 0],
             })
             .unwrap();
         command_sender
             .send(Command::Prune {
-                target_db_versions: vec![2, 0],
+                target_db_versions: vec![2, 0, 0, 0, 0, 0],
             })
             .unwrap();
         command_sender.send(Command::Quit).unwrap();

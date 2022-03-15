@@ -5,6 +5,8 @@
 //! meant to be triggered by other threads as they commit new data to the DB.
 
 mod db_pruner;
+pub(crate) mod event_store;
+mod ledger_store;
 pub(crate) mod state_store;
 pub(crate) mod transaction_store;
 pub(crate) mod worker;
@@ -14,7 +16,7 @@ use crate::metrics::DIEM_STORAGE_PRUNE_WINDOW;
 use aptos_config::config::StoragePrunerConfig;
 use aptos_infallible::Mutex;
 
-use crate::TransactionStore;
+use crate::{EventStore, LedgerStore, TransactionStore};
 use aptos_types::transaction::Version;
 use schemadb::DB;
 use std::{
@@ -55,6 +57,10 @@ pub(crate) struct Pruner {
 pub enum PrunerIndex {
     StateStorePrunerIndex,
     TransactionStorePrunerIndex,
+    _LedgerStorePrunerIndex,
+    EventStorePrunerIndex,
+    EpochStorePrunerIndex,
+    WriteSetPrunerIndex,
 }
 
 impl Pruner {
@@ -63,10 +69,12 @@ impl Pruner {
         db: Arc<DB>,
         storage_pruner_config: StoragePrunerConfig,
         transaction_store: Arc<TransactionStore>,
+        ledger_store: Arc<LedgerStore>,
+        event_store: Arc<EventStore>,
     ) -> Self {
         let (command_sender, command_receiver) = channel();
 
-        let least_readable_version = Arc::new(Mutex::new(vec![0, 0]));
+        let least_readable_version = Arc::new(Mutex::new(vec![0, 0, 0, 0, 0, 0]));
         let worker_progress_clone = Arc::clone(&least_readable_version);
 
         DIEM_STORAGE_PRUNE_WINDOW
@@ -74,6 +82,8 @@ impl Pruner {
         let worker = Worker::new(
             db,
             transaction_store,
+            ledger_store,
+            event_store,
             command_receiver,
             least_readable_version,
         );
@@ -111,6 +121,10 @@ impl Pruner {
             .send(Command::Prune {
                 target_db_versions: vec![
                     least_readable_state_store_version,
+                    least_readable_default_store_version,
+                    least_readable_default_store_version,
+                    least_readable_default_store_version,
+                    least_readable_default_store_version,
                     least_readable_default_store_version,
                 ],
             })

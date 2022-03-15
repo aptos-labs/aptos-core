@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 /// Types of ledger counters.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, ToPrimitive, NumVariants)]
 #[cfg_attr(test, derive(Arbitrary))]
-pub(crate) enum LedgerCounter {
+pub enum LedgerCounter {
     EventsCreated = 101,
 
     NewStateLeaves = 201,
@@ -89,7 +89,7 @@ impl InnerLedgerCounters {
 }
 
 /// Represents `LedgerCounter` bumps yielded by saving a batch of transactions.
-pub(crate) struct LedgerCounterBumps {
+pub struct LedgerCounterBumps {
     bumps: InnerLedgerCounters,
 }
 

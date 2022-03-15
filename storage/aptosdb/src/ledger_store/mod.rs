@@ -8,8 +8,8 @@ use crate::{
     change_set::ChangeSet,
     errors::AptosDbError,
     schema::{
-        epoch_by_version::EpochByVersionSchema, ledger_info::LedgerInfoSchema,
-        transaction_accumulator::TransactionAccumulatorSchema,
+        epoch_by_version::EpochByVersionSchema, ledger_counters::LedgerCountersSchema,
+        ledger_info::LedgerInfoSchema, transaction_accumulator::TransactionAccumulatorSchema,
         transaction_info::TransactionInfoSchema,
     },
 };
@@ -30,12 +30,12 @@ use aptos_types::{
 };
 use arc_swap::ArcSwap;
 use itertools::Itertools;
-use schemadb::{ReadOptions, SchemaIterator, DB};
+use schemadb::{ReadOptions, SchemaBatch, SchemaIterator, DB};
 use std::{ops::Deref, sync::Arc};
 use storage_interface::{StartupInfo, TreeState};
 
 #[derive(Debug)]
-pub(crate) struct LedgerStore {
+pub struct LedgerStore {
     db: Arc<DB>,
 
     /// We almost always need the latest ledger info and signatures to serve read requests, so we
@@ -140,7 +140,7 @@ impl LedgerStore {
         })
     }
 
-    fn get_epoch_state(&self, epoch: u64) -> Result<EpochState> {
+    pub fn get_epoch_state(&self, epoch: u64) -> Result<EpochState> {
         ensure!(epoch > 0, "EpochState only queryable for epoch >= 1.",);
 
         let ledger_info_with_sigs =
@@ -368,6 +368,28 @@ impl LedgerStore {
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
         Accumulator::get_root_hash(self, version + 1)
     }
+
+    /// Prune the ledger counters stored in DB in the range [being, end)
+    pub fn prune_ledger_couners(
+        &self,
+        begin: Version,
+        end: Version,
+        db_batch: &mut SchemaBatch,
+    ) -> anyhow::Result<()> {
+        db_batch.delete_range::<LedgerCountersSchema>(&begin, &end)?;
+        Ok(())
+    }
+
+    /// Prune the epoch by version stored in DB in the range [being, end)
+    pub fn prune_epoch_by_version(
+        &self,
+        begin: Version,
+        end: Version,
+        db_batch: &mut SchemaBatch,
+    ) -> anyhow::Result<()> {
+        db_batch.delete_range::<EpochByVersionSchema>(&begin, &end)?;
+        Ok(())
+    }
 }
 
 pub(crate) type Accumulator = MerkleAccumulator<LedgerStore, TransactionAccumulatorHasher>;
@@ -455,5 +477,7 @@ impl<'a> Iterator for EpochEndingLedgerInfoIter<'a> {
 
 #[cfg(test)]
 mod ledger_info_test;
+#[cfg(test)]
+pub(crate) mod ledger_info_test_utils;
 #[cfg(test)]
 mod transaction_info_test;

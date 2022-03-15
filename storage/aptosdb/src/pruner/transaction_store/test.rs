@@ -12,7 +12,11 @@ use aptos_types::{
 };
 
 use accumulator::HashReader;
-use aptos_types::{proof::position::Position, transaction::TransactionInfo};
+use aptos_types::{
+    proof::position::Position,
+    transaction::{TransactionInfo, Version},
+    write_set::WriteSet,
+};
 use proptest::{collection::vec, prelude::*};
 
 proptest! {
@@ -25,16 +29,68 @@ proptest! {
             any::<SignedTransaction>().prop_map(Transaction::UserTransaction),
         ], 1..100,),
         txn_infos in vec(any::<TransactionInfo>(),100,),
-        step_size in 1..20,
+        step_size in 1usize..20,
     ) {
         verify_txn_store_pruner(txns, txn_infos, step_size)
+    }
+
+     #[test]
+    fn test_write_set_pruner(
+        write_set in vec(any::<WriteSet>(), 100),
+        ) {
+            verify_write_set_pruner(write_set);
+        }
+}
+
+fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
+    let tmp_dir = TempPath::new();
+    let aptos_db = AptosDB::new_for_test(&tmp_dir);
+    let transaction_store = &aptos_db.transaction_store;
+    let num_write_sets = write_sets.len();
+
+    let pruner = Pruner::new(
+        Arc::clone(&aptos_db.db),
+        StoragePrunerConfig {
+            state_store_prune_window: Some(0),
+            default_prune_window: Some(0),
+        },
+        Arc::clone(transaction_store),
+        Arc::clone(&aptos_db.ledger_store),
+        Arc::clone(&aptos_db.event_store),
+    );
+
+    // write sets
+    let mut cs = ChangeSet::new();
+    for (ver, ws) in write_sets.iter().enumerate() {
+        transaction_store
+            .put_write_set(ver as Version, ws, &mut cs)
+            .unwrap();
+    }
+    aptos_db.db.write_schemas(cs.batch).unwrap();
+    // start pruning write sets in batches of size 2 and verify transactions have been pruned from DB
+    for i in (0..=num_write_sets).step_by(2) {
+        pruner
+            .wake_and_wait(
+                i as u64, /* latest_version */
+                PrunerIndex::WriteSetPrunerIndex as usize,
+            )
+            .unwrap();
+        // ensure that all transaction up to i * 2 has been pruned
+        for j in 0..i {
+            assert!(transaction_store.get_write_set(j as u64).is_err());
+        }
+        // ensure all other are valid in DB
+        for j in i..num_write_sets {
+            let write_set_from_db = transaction_store.get_write_set(j as u64).unwrap();
+            assert_eq!(write_set_from_db, *write_sets.get(j).unwrap());
+        }
     }
 }
 
 fn verify_txn_store_pruner(
     txns: Vec<Transaction>,
     txn_infos: Vec<TransactionInfo>,
-    step_size: i32,
+    step_size: usize,
 ) {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
@@ -49,6 +105,8 @@ fn verify_txn_store_pruner(
             default_prune_window: Some(0),
         },
         Arc::clone(transaction_store),
+        Arc::clone(&aptos_db.ledger_store),
+        Arc::clone(&aptos_db.event_store),
     );
 
     let ledger_version = num_transaction as Version - 1;
@@ -60,8 +118,8 @@ fn verify_txn_store_pruner(
         &txns,
     );
 
-    // start pruning transactions batches of size 2 and verify transactions have been pruned from DB
-    for i in (0..=num_transaction).step_by(step_size as usize) {
+    // start pruning transactions batches of size step_size and verify transactions have been pruned from DB
+    for i in (0..=num_transaction).step_by(step_size) {
         pruner
             .wake_and_wait(
                 i as u64, /* latest_version */

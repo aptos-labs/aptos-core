@@ -244,6 +244,17 @@ impl TransactionStore {
         Ok(())
     }
 
+    /// Prune the transaction schema store between a range of version in [begin, end)
+    pub fn prune_write_set(
+        &self,
+        begin: Version,
+        end: Version,
+        db_batch: &mut SchemaBatch,
+    ) -> anyhow::Result<()> {
+        db_batch.delete_range::<WriteSetSchema>(&begin, &end)?;
+        Ok(())
+    }
+
     /// Prune the transaction schema store between a range of version in [begin, end).
     pub fn prune_transaction_accumulator(
         &self,

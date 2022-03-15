@@ -223,7 +223,7 @@ pub struct AptosDB {
     transaction_store: Arc<TransactionStore>,
     state_store: Arc<StateStore>,
     event_store: Arc<EventStore>,
-    system_store: SystemStore,
+    system_store: Arc<SystemStore>,
     rocksdb_property_reporter: RocksdbPropertyReporter,
     pruner: Option<Pruner>,
 }
@@ -256,21 +256,26 @@ impl AptosDB {
     ) -> Self {
         let db = Arc::new(db);
         let transaction_store = Arc::new(TransactionStore::new(Arc::clone(&db)));
+        let event_store = Arc::new(EventStore::new(Arc::clone(&db)));
+        let ledger_store = Arc::new(LedgerStore::new(Arc::clone(&db)));
+        let system_store = Arc::new(SystemStore::new(Arc::clone(&db)));
 
         AptosDB {
             db: Arc::clone(&db),
-            event_store: Arc::new(EventStore::new(Arc::clone(&db))),
-            ledger_store: Arc::new(LedgerStore::new(Arc::clone(&db))),
+            event_store: Arc::clone(&event_store),
+            ledger_store: Arc::clone(&ledger_store),
             state_store: Arc::new(StateStore::new(Arc::clone(&db), account_count_migration)),
             transaction_store: Arc::clone(&transaction_store),
-            system_store: SystemStore::new(Arc::clone(&db)),
+            system_store: Arc::clone(&system_store),
             rocksdb_property_reporter: RocksdbPropertyReporter::new(Arc::clone(&db)),
             pruner: match storage_pruner_config {
                 NO_OP_STORAGE_PRUNER_CONFIG => None,
                 _ => Some(Pruner::new(
                     Arc::clone(&db),
                     storage_pruner_config,
-                    Arc::clone(&transaction_store),
+                    transaction_store,
+                    ledger_store,
+                    event_store,
                 )),
             },
         }

@@ -3,10 +3,22 @@
 use aptos_types::transaction::Version;
 use schemadb::DB;
 
-use crate::pruner::{db_pruner::DBPruner, transaction_store::TransactionStorePruner};
+use crate::pruner::db_pruner::DBPruner;
 use aptos_infallible::Mutex;
 
-use crate::{pruner::state_store::StateStorePruner, TransactionStore};
+use crate::{
+    pruner::{
+        event_store::event_store_pruner::EventStorePruner,
+        ledger_store::{
+            epoch_info_pruner::EpochInfoPruner, ledger_store_pruner::LedgerStorePruner,
+        },
+        state_store::StateStorePruner,
+        transaction_store::{
+            transaction_store_pruner::TransactionStorePruner, write_set_pruner::WriteSetPruner,
+        },
+    },
+    EventStore, LedgerStore, TransactionStore,
+};
 use itertools::zip_eq;
 use std::{
     sync::{mpsc::Receiver, Arc},
@@ -29,11 +41,13 @@ pub struct Worker {
 }
 
 impl Worker {
-    const MAX_VERSIONS_TO_PRUNE_PER_BATCH: usize = 100;
+    const MAX_VERSIONS_TO_PRUNE_PER_BATCH: u64 = 100;
 
     pub(crate) fn new(
         db: Arc<DB>,
         transaction_store: Arc<TransactionStore>,
+        ledger_store: Arc<LedgerStore>,
+        event_store: Arc<EventStore>,
         command_receiver: Receiver<Command>,
         least_readable_versions: Arc<Mutex<Vec<Version>>>,
     ) -> Self {
@@ -45,6 +59,22 @@ impl Worker {
                     Instant::now(),
                 ))),
                 Mutex::new(Arc::new(TransactionStorePruner::new(
+                    Arc::clone(&db),
+                    Arc::clone(&transaction_store),
+                ))),
+                Mutex::new(Arc::new(LedgerStorePruner::new(
+                    Arc::clone(&db),
+                    Arc::clone(&ledger_store),
+                ))),
+                Mutex::new(Arc::new(EventStorePruner::new(
+                    Arc::clone(&db),
+                    Arc::clone(&event_store),
+                ))),
+                Mutex::new(Arc::new(EpochInfoPruner::new(
+                    Arc::clone(&db),
+                    Arc::clone(&ledger_store),
+                ))),
+                Mutex::new(Arc::new(WriteSetPruner::new(
                     Arc::clone(&db),
                     Arc::clone(&transaction_store),
                 ))),

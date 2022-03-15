@@ -8,18 +8,19 @@ use crate::{
 };
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::StaleNodeIndex;
-use aptos_logger::{error, info, warn};
+use aptos_logger::{error, warn};
 use aptos_types::transaction::{AtomicVersion, Version};
 use schemadb::{ReadOptions, SchemaBatch, SchemaIterator, DB};
 use std::{
     iter::Peekable,
     sync::{atomic::Ordering, Arc},
-    thread::sleep,
     time::{Duration, Instant},
 };
 
 #[cfg(test)]
 mod test;
+
+pub const STATE_STORE_PRUNER_NAME: &str = "state store pruner";
 
 pub struct StateStorePruner {
     db: Arc<DB>,
@@ -31,40 +32,18 @@ pub struct StateStorePruner {
 }
 
 impl DBPruner for StateStorePruner {
-    /// Find out the first undeleted item in the stale node index.
-    ///
-    /// Seeking from the beginning (version 0) is potentially costly, we do it once upon worker
-    /// thread start, record the progress and seek from that position afterwards.
-    fn initialize(&self) {
-        loop {
-            match self.initialize_least_readable_version() {
-                Ok(least_readable_version) => {
-                    info!(
-                        least_readable_version = least_readable_version,
-                        "[state pruner worker] initialized."
-                    );
-                    self.record_progress(least_readable_version);
-                    return;
-                }
-                Err(e) => {
-                    error!(
-                        error = ?e,
-                        "[state pruner worker] Error on first seek. Retrying in 1 second.",
-                    );
-                    sleep(Duration::from_secs(1));
-                }
-            }
-        }
+    fn name(&self) -> &'static str {
+        STATE_STORE_PRUNER_NAME
     }
 
-    fn prune(&self, max_versions: usize) -> anyhow::Result<Version> {
+    fn prune(&self, max_versions: u64) -> anyhow::Result<Version> {
         let least_readable_version = self.least_readable_version.load(Ordering::Relaxed);
         let target_version = self.target_version();
         return match prune_state_store(
             self.db.clone(),
             least_readable_version,
             target_version,
-            max_versions,
+            max_versions as usize,
         ) {
             Ok(new_least_readable_version) => {
                 self.record_progress(new_least_readable_version);
@@ -119,10 +98,6 @@ impl DBPruner for StateStorePruner {
         DIEM_PRUNER_LEAST_READABLE_VERSION
             .with_label_values(&["state_store"])
             .set(least_readable_version as i64);
-    }
-
-    fn is_pruning_pending(&self) -> bool {
-        self.least_readable_version() >= self.target_version()
     }
 }
 
