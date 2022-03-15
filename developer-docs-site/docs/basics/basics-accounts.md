@@ -17,7 +17,7 @@ An account may contain an arbitrary number of Move resources and Move modules.
 
 An Aptos account is referenced by an account address, which is a 16-byte value. The account address is derived from the initial public verification key(s) for that account. Specifically, the account address is the last 16-bytes of the SHA-3 256 cryptographic hash of the initial public verification key(s) concatenated with a signature scheme identifier byte. The Aptos Blockchain supports two signature schemes: [Ed25519](/reference/glossary#ed25519) and MultiEd25519 (for multi-signature transactions). The account's private key is necessary for signing transactions.
 
-Each account also stores a `sequence_number`, which represents the next transaaction sequence number to prevent replay attacks of transactions. This is initialized to `0` at account creation time.
+Each account also stores a `sequence_number`, which represents the next transaction sequence number to prevent replay attacks of transactions. This is initialized to `0` at account creation time.
 
 ## Authentication Keys
 
@@ -27,7 +27,7 @@ Each account stores an authentication key. This authentication key enables accou
 
 To generate an authentication key and account address:
 
-1. **Generate a key-pair**: Generate a fresh key-pair (`pubkey_A`, `privkey_A`). The Aptos uses the PureEdDSA scheme over the Ed25519 curve, as defined in RFC 8032.
+1. **Generate a key-pair**: Generate a fresh key-pair (`pubkey_A`, `privkey_A`). The Aptos Blockchain uses the PureEdDSA scheme over the Ed25519 curve, as defined in RFC 8032.
 2. **Derive a 32-byte authentication key**: Derive a 32-byte authentication key `auth_key = sha3-256(pubkey_A | 0x00)`, where | denotes concatenation. The `0x00` is a 1-byte signature scheme identifier where 0x00 means single-signature. The first 16 bytes of `auth_key` is the "authentication key prefix". The last 16 bytes of `auth_key` is the account address. Any transaction that creates an account needs both an account address and an authentication key prefix, but a transaction that is interacting with an existing account only needs the address.
 
 ### Multisigner authentication
