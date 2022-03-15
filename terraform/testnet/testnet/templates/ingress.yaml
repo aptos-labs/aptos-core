@@ -47,6 +47,18 @@ spec:
             port:
               number: 80
   {{- end }}
+  {{- if .Values.service.fullnode.exposeApi }}
+  - host: fullnode.{{ .Values.service.domain }}
+    http:
+      paths:
+      - path: /*
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ include "testnet.fullname" . }}-api
+            port:
+              number: 80
+  {{- end }}
   - http:
       paths:
       - path: /waypoint.txt
