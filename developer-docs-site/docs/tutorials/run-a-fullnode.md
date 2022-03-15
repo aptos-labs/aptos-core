@@ -23,6 +23,15 @@ Before you get started with this tutorial, we recommend you familiarize yourself
 ## Getting started
 You can configure a public FullNode in two ways: using the Aptos-core source code or Docker.
 
+### Hardware requirement
+For running a production grade Fullnode we recommend using hardware with:
+* CPU: Intel Xeon Skylake or newer, 4 cores
+* Memory: 8GiB RAM
+
+If running the Fullnode for development or testing purpose:
+* CPU: 2 cores
+* Memory: 4GiB RAM
+
 ### Using Aptos-core source code
 1. Download and clone the Aptos-core repository from GitHub and prepare your developer environment by running the following commands:
      ```
