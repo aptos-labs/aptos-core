@@ -4,6 +4,7 @@
 use crate::Service;
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PublicKey, hash::HashValue};
+use aptos_logger::{error, info, warn};
 use aptos_sdk::{
     transaction_builder::aptos_stdlib,
     types::{
@@ -91,15 +92,43 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
     let maybe_maximum_amount = service.maximum_amount.unwrap_or(params.amount);
     let amount = std::cmp::min(params.amount, maybe_maximum_amount);
 
-    let (faucet_seq, receiver_seq) = sequences(service, params.receiver()).await?;
-
-    {
+    let (mut faucet_seq, mut receiver_seq) = sequences(service, params.receiver()).await?;
+    let our_faucet_seq = {
         let mut faucet_account = service.faucet_account.lock().unwrap();
 
         // If the onchain sequence_number is greater than what we have, update our
         // sequence_numbers
         if faucet_seq > faucet_account.sequence_number() {
             *faucet_account.sequence_number_mut() = faucet_seq;
+        }
+        faucet_account.sequence_number()
+    };
+
+    // We shouldn't have too many outstanding txns
+    for _ in 0..60 {
+        if our_faucet_seq < faucet_seq + 50 {
+            break;
+        }
+        warn!(
+            "We have too many outstanding transactions: {}. Sleeping to let the system catchup.",
+            (our_faucet_seq - faucet_seq)
+        );
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        let (lhs, rhs) = sequences(service, params.receiver()).await?;
+        faucet_seq = lhs;
+        receiver_seq = rhs;
+    }
+
+    // After 30 seconds, we still have not caught up, we are likely unhealthy
+    if our_faucet_seq >= faucet_seq + 50 {
+        error!("We are unhealthy, transactions have likely expired.");
+        let mut faucet_account = service.faucet_account.lock().unwrap();
+        if faucet_account.sequence_number() >= faucet_seq + 50 {
+            info!("Reseting the sequence number counter.");
+            *faucet_account.sequence_number_mut() = faucet_seq;
+        } else {
+            info!("Someone else reset the sequence number counter ahead of us.");
         }
     }
 
