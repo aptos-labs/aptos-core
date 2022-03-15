@@ -24,16 +24,6 @@ metadata:
     {{- end }}
 spec:
   rules:
-  - host: mon.{{ .Values.service.domain }}
-    http:
-      paths:
-      - path: /*
-        pathType: Prefix
-        backend:
-          service:
-            name: {{ include "pfn.fullname" . }}-monitoring
-            port:
-              number: 80
   - http:
       paths:
       - path: /*
