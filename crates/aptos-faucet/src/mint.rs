@@ -66,7 +66,7 @@ impl std::fmt::Display for Response {
 
 #[derive(Deserialize, Debug)]
 pub struct MintParams {
-    pub amount: Option<u64>,
+    pub amount: u64,
     pub pub_key: Ed25519PublicKey,
     pub return_txns: Option<bool>,
 }
@@ -88,11 +88,8 @@ impl MintParams {
 }
 
 async fn process(service: &Service, params: MintParams) -> Result<Response> {
-    let asked_amount = params
-        .amount
-        .ok_or_else(|| anyhow::format_err!("Mint amount must be provided"))?;
-    let service_amount = service.maximum_amount.unwrap_or(asked_amount);
-    let amount = std::cmp::min(asked_amount, service_amount);
+    let maybe_maximum_amount = service.maximum_amount.unwrap_or(params.amount);
+    let amount = std::cmp::min(params.amount, maybe_maximum_amount);
 
     let (faucet_seq, receiver_seq) = sequences(service, params.receiver()).await?;
 
@@ -123,11 +120,13 @@ async fn process(service: &Service, params: MintParams) -> Result<Response> {
             txns.push(txn)
         }
 
-        txns.push(
-            faucet_account.sign_with_transaction_builder(service.transaction_factory.payload(
-                aptos_stdlib::encode_mint_script_function(params.receiver(), amount),
-            )),
-        );
+        if amount != 0 {
+            txns.push(
+                faucet_account.sign_with_transaction_builder(service.transaction_factory.payload(
+                    aptos_stdlib::encode_mint_script_function(params.receiver(), amount),
+                )),
+            );
+        }
     }
 
     let requests = txns.iter().map(|txn| service.client.submit(txn));

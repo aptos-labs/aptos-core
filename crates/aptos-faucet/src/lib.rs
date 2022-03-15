@@ -19,24 +19,17 @@
 //! cargo run -p aptos-faucet -- -h
 //! ```
 
-use anyhow::{anyhow, Result};
-use aptos_crypto::ed25519::Ed25519PublicKey;
+use anyhow::Result;
 use aptos_logger::info;
 use aptos_rest_client::Client;
 use aptos_sdk::{
-    transaction_builder::{aptos_stdlib, TransactionFactory},
+    transaction_builder::TransactionFactory,
     types::{
-        account_address::AccountAddress,
         chain_id::ChainId,
-        transaction::{
-            authenticator::{AuthenticationKey, AuthenticationKeyPreimage},
-            SignedTransaction,
-        },
         LocalAccount,
     },
 };
 use reqwest::StatusCode;
-use serde::Deserialize;
 use std::{
     convert::Infallible,
     fmt,
@@ -83,12 +76,10 @@ pub fn routes(
     service: Arc<Service>,
 ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     let mint = mint::mint_routes(service.clone());
-    let accounts = accounts_routes(service.clone());
     let health = health_route(service);
 
     health
         .or(mint)
-        .or(accounts)
         .with(warp::log::custom(|info| {
             info!(
                 "{} \"{} {} {:?}\" {} \"{}\" \"{}\" {:?}",
@@ -125,158 +116,6 @@ async fn handle_health(service: Arc<Service>) -> Result<Box<dyn warp::Reply>, In
             StatusCode::INTERNAL_SERVER_ERROR,
         ))),
     }
-}
-
-fn accounts_routes(
-    service: Arc<Service>,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
-    create_account_route(service.clone()).or(fund_account_route(service))
-}
-
-#[derive(Deserialize)]
-struct CreateAccountParams {
-    pub_key: Ed25519PublicKey,
-}
-
-impl CreateAccountParams {
-    fn pre_image(&self) -> AuthenticationKeyPreimage {
-        AuthenticationKeyPreimage::ed25519(&self.pub_key)
-    }
-
-    fn receiver(&self) -> AccountAddress {
-        AuthenticationKey::ed25519(&self.pub_key).derived_address()
-    }
-}
-fn create_account_route(
-    service: Arc<Service>,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
-    warp::path::path("accounts")
-        .and(warp::post())
-        .and(warp::any().map(move || service.clone()))
-        .and(warp::query().map(move |params: CreateAccountParams| params))
-        .and_then(handle_create_account)
-}
-
-async fn handle_create_account(
-    service: Arc<Service>,
-    params: CreateAccountParams,
-) -> Result<Box<dyn warp::Reply>, Infallible> {
-    match create_account(service, params).await {
-        Ok(txn) => Ok(Box::new(hex::encode(bcs::to_bytes(&txn).unwrap()))),
-        Err(err) => Ok(Box::new(warp::reply::with_status(
-            err.to_string(),
-            StatusCode::INTERNAL_SERVER_ERROR,
-        ))),
-    }
-}
-
-async fn create_account(
-    service: Arc<Service>,
-    params: CreateAccountParams,
-) -> Result<SignedTransaction> {
-    // Check to ensure the account hasn't already been created
-    if service.client.get_account(params.receiver()).await.is_ok() {
-        return Err(anyhow!("account already exists"));
-    }
-
-    let faucet_account_address = service.faucet_account.lock().unwrap().address();
-    let faucet_sequence_number = service
-        .client
-        .get_account(faucet_account_address)
-        .await
-        .map_err(|_| anyhow::format_err!("faucet account {} not found", faucet_account_address))?
-        .into_inner()
-        .sequence_number;
-
-    let txn = {
-        let mut faucet_account = service.faucet_account.lock().unwrap();
-        if faucet_sequence_number > faucet_account.sequence_number() {
-            *faucet_account.sequence_number_mut() = faucet_sequence_number;
-        }
-
-        let builder = service.transaction_factory.payload(
-            aptos_stdlib::encode_create_account_script_function(
-                params.receiver(),
-                params.pre_image().into_vec(),
-            ),
-        );
-
-        faucet_account.sign_with_transaction_builder(builder)
-    };
-
-    service.client.submit(&txn).await?;
-    Ok(txn)
-}
-
-#[derive(Deserialize)]
-struct FundAccountParams {
-    amount: Option<u64>,
-}
-
-fn fund_account_route(
-    service: Arc<Service>,
-) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
-    warp::path!("accounts" / AccountAddress / "fund")
-        .and(warp::post())
-        .and(warp::any().map(move || service.clone()))
-        .and(warp::query().map(move |params: FundAccountParams| params))
-        .and_then(handle_fund_account)
-}
-
-async fn handle_fund_account(
-    address: AccountAddress,
-    service: Arc<Service>,
-    params: FundAccountParams,
-) -> Result<Box<dyn warp::Reply>, Infallible> {
-    match fund_account(service, address, params).await {
-        Ok(txn) => Ok(Box::new(hex::encode(bcs::to_bytes(&txn).unwrap()))),
-        Err(err) => Ok(Box::new(warp::reply::with_status(
-            err.to_string(),
-            StatusCode::INTERNAL_SERVER_ERROR,
-        ))),
-    }
-}
-
-async fn fund_account(
-    service: Arc<Service>,
-    address: AccountAddress,
-    params: FundAccountParams,
-) -> Result<SignedTransaction> {
-    let asked_amount = params
-        .amount
-        .ok_or_else(|| anyhow::format_err!("Mint amount must be provided"))?;
-    let service_amount = service.maximum_amount.unwrap_or(asked_amount);
-    let amount = std::cmp::min(asked_amount, service_amount);
-
-    // Check to ensure the account has already been created
-    if service.client.get_account(address).await.is_err() {
-        return Err(anyhow!("account doesn't exist"));
-    }
-
-    let faucet_account_address = service.faucet_account.lock().unwrap().address();
-    let faucet_sequence_number = service
-        .client
-        .get_account(faucet_account_address)
-        .await
-        .map_err(|_| anyhow::format_err!("faucet account {} not found", faucet_account_address))?
-        .into_inner()
-        .sequence_number;
-
-    let txn = {
-        let mut faucet_account = service.faucet_account.lock().unwrap();
-        if faucet_sequence_number > faucet_account.sequence_number() {
-            *faucet_account.sequence_number_mut() = faucet_sequence_number;
-        }
-
-        faucet_account.sign_with_transaction_builder(
-            service
-                .transaction_factory
-                .payload(aptos_stdlib::encode_mint_script_function(address, amount)),
-        )
-    };
-
-    service.client.submit(&txn).await?;
-    Ok(txn)
 }
 
 //

@@ -445,10 +445,9 @@ mod tests {
                 .unwrap();
 
         let (res1, res2) = tokio::task::spawn_blocking(move || {
-            let address = AuthenticationKey::ed25519(&pub_key).derived_address();
             (
-                faucet_client.create_account(pub_key),
-                faucet_client.fund(address, 10),
+                faucet_client.create_account(pub_key.clone()),
+                faucet_client.fund(pub_key, 10),
             )
         })
         .await
