@@ -3,8 +3,6 @@
 Faucet is a service for creating and funding accounts on the Aptos Network.
 It is meant to be used for devnets and testnets.
 
-During startup, by default, the Faucet will use the root key to create a new account, fund it, give it permissions to
-mint, and use that new account to mint from. To avoid this behaviour, you can pass `--do-not-delgate`.
 
 ## Mint API
 
@@ -31,7 +29,7 @@ Notes:
 
 ### Response
 
-If the query param `return_txns` is not provided, or it is not "true", the server returns a json-encoded list of transaction hash values. These can be used to monitor the status of submitted transactions.
+If the query param `return_txns` is not provided, or it is not "true", the server returns a json-encoded list of transaction has values. These can be used to monitor the status of submitted transactions.
 
 If the query param `return_txns` is set, the server will respond with the transactions for creating and funding your account.
 The response HTTP body is hex encoded bytes of BCS encoded `Vec<aptos_types::transaction::SignedTransaction>`.

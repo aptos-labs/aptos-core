@@ -3,7 +3,7 @@
 
 use forge::{forge_main, ForgeConfig, LocalFactory, Options, Result};
 use smoke_test::aptos::{
-    AccountCreation, ErrorReport, FaucetDelegation, GasCheck, MintTransfer, ModulePublish,
+    AccountCreation, ErrorReport, GasCheck, MintTransfer, ModulePublish,
 };
 
 fn main() -> Result<()> {
@@ -14,7 +14,6 @@ fn main() -> Result<()> {
             &GasCheck,
             &ModulePublish,
             &ErrorReport,
-            &FaucetDelegation,
         ])
         .with_genesis_modules_bytes(aptos_framework_releases::current_module_blobs().to_vec());
 

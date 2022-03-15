@@ -26,7 +26,6 @@ framework =  { path = "../../aptos-move/framework" }
 diem-framework-releases = { path = "../../aptos-move/framework/DPN/releases" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
-aptos-faucet = {path = "../../crates/aptos-faucet"}
 aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
