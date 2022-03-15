@@ -51,7 +51,6 @@ services:
     command: ["/opt/aptos/bin/aptos-node", "-f", "/opt/aptos/etc/node.yaml"]
     ports:
       - "8080:8080"
-    expose:
-      - 9101
+      - "9101:9101"
 volumes:
   db:
