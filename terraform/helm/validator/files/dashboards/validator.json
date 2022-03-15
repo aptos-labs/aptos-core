@@ -1060,7 +1060,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted|commit_rejected\", owner=~\"$owner\"}[1m])/rate(aptos_core_mempool_txn_commit_latency_count{stage=~\"commit_accepted|commit_rejected\", owner=~\"$owner\"}[1m])",
+          "expr": "rate(core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted|commit_rejected\", owner=~\"$owner\"}[1m])/rate(core_mempool_txn_commit_latency_count{stage=~\"commit_accepted|commit_rejected\", owner=~\"$owner\"}[1m])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1159,7 +1159,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_core_mempool_index_size{index=\"system_ttl\", owner=~\"$owner\"}",
+          "expr": "core_mempool_index_size{index=\"system_ttl\", owner=~\"$owner\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,

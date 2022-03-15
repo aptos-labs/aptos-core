@@ -451,14 +451,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_core_mempool_index_size{index=\"system_ttl\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}",
+          "expr": "core_mempool_index_size{index=\"system_ttl\", kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{kubernetes_pod_name}}",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "aptos_core_mempool_index_size{index=\"system_ttl\", job=~\".*fullnode.*\", owner=~\"$owner\"}",
+          "expr": "core_mempool_index_size{index=\"system_ttl\", job=~\".*fullnode.*\", owner=~\"$owner\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "{{owner}}-{{job}}",
@@ -537,14 +537,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_core_mempool_txn_commit_latency_sum{kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"} / aptos_core_mempool_txn_commit_latency_count{kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}",
+          "expr": "core_mempool_txn_commit_latency_sum{kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"} / core_mempool_txn_commit_latency_count{kubernetes_pod_name=~\".*fullnode.*\", owner=~\"$owner\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{kubernetes_pod_name}}",
           "refId": "A"
         },
         {
           "exemplar": true,
-          "expr": "aptos_core_mempool_txn_commit_latency_sum{job=~\".*fullnode.*\", owner=~\"$owner\"} / aptos_core_mempool_txn_commit_latency_count{job=~\".*fullnode.*\", owner=~\"$owner\"}",
+          "expr": "core_mempool_txn_commit_latency_sum{job=~\".*fullnode.*\", owner=~\"$owner\"} / core_mempool_txn_commit_latency_count{job=~\".*fullnode.*\", owner=~\"$owner\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "{{owner}}-{{job}}",
