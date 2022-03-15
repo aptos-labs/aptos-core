@@ -1,7 +1,7 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{get_and_update_seq_no, Service};
+use crate::{get_and_update_seq_no, Service, ServiceObject, ServicePool};
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PublicKey, hash::HashValue};
 use aptos_sdk::{
@@ -20,7 +20,7 @@ use std::{convert::Infallible, fmt, ops::DerefMut, sync::Arc};
 use warp::{Filter, Rejection, Reply};
 
 pub fn mint_routes(
-    service: Arc<Service>,
+    service: ServicePool,
 ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     // POST /?amount=25&pub_key=xxx
     // POST /mint?amount=25&pub_key=xxx
@@ -33,9 +33,10 @@ pub fn mint_routes(
 }
 
 async fn handle(
-    service: Arc<Service>,
+    service: ServicePool,
     params: MintParams,
 ) -> Result<Box<dyn warp::Reply>, Infallible> {
+    let service = service.clone().get().await.unwrap();
     match process(&service, params).await {
         Ok(body) => Ok(Box::new(body.to_string())),
         Err(err) => Ok(Box::new(warp::reply::with_status(
@@ -95,7 +96,7 @@ async fn process(service: &Service, params: MintParams) -> Result<Response> {
     let amount = std::cmp::min(asked_amount, service_amount);
 
     let mut faucet_account = service.faucet_account.lock().await;
-    let faucet_seq = get_and_update_seq_no(service, faucet_account.deref_mut()).await?;
+    //let faucet_seq = get_and_update_seq_no(service, faucet_account.deref_mut()).await?;
 
     let mut txns = vec![];
 
@@ -129,7 +130,7 @@ async fn process(service: &Service, params: MintParams) -> Result<Response> {
     // If there was an issue submitting a transaction we should just reset our sequence_numbers
     // to what was on chain
     if responses.iter().any(Result::is_err) {
-        *faucet_account.sequence_number_mut() = faucet_seq;
+        //*faucet_account.sequence_number_mut() = faucet_seq;
     }
 
     while !responses.is_empty() {

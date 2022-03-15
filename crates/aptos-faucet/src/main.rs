@@ -1,7 +1,8 @@
 // Copyright (c) The Diem Core Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_faucet::delegate_account;
+use anyhow::Chain;
+use aptos_faucet::{delegate_account, Service};
 use aptos_logger::info;
 use aptos_sdk::types::{
     account_address::AccountAddress, account_config::aptos_root_address, chain_id::ChainId,
@@ -46,15 +47,14 @@ struct Args {
     /// Maximum amount of coins to mint.
     #[structopt(long)]
     pub maximum_amount: Option<u64>,
-    /// If this is set, the faucet will use the root key to mint from,
-    /// instead of creating a new account, giving it permissions to mint,
-    /// and using that one.
-    #[structopt(short = "d", long)]
-    pub do_not_delegate: bool,
+    /// How many new accounts to delegate to
+    #[structopt(short = "d", long, default_value = "2")]
+    pub delegate_count: u16,
     /// How long should faucet transactions wait in mempool before dying?
     #[structopt(short = "o", long, default_value = "30")]
     pub transaction_timeout: u64,
 }
+use deadpool::unmanaged::Pool;
 
 #[tokio::main]
 async fn main() {
@@ -78,7 +78,7 @@ async fn main() {
         args.mint_account_address.unwrap_or_else(aptos_root_address);
     let faucet_account = LocalAccount::new(faucet_address, key, 0);
 
-    let mut service = Arc::new(aptos_faucet::Service::new(
+    let mut main_service = Arc::new(aptos_faucet::Service::new(
         args.server_url.clone(),
         args.chain_id,
         faucet_account,
@@ -86,30 +86,40 @@ async fn main() {
         args.transaction_timeout,
     ));
 
-    if !args.do_not_delegate {
-        service = delegate_account(
-            service,
-            args.server_url,
-            args.chain_id,
-            args.maximum_amount,
-            args.transaction_timeout,
-        )
-        .await;
-        let faucet_address = service.faucet_account.lock().await.address();
-        info!(
-            "[faucet]: running on: {}. Minting from {} via delegation",
-            address, faucet_address
-        );
-    } else {
-        info!(
-            "[faucet]: running on: {}. Minting from {}",
-            address, faucet_address
+    let mut services: Vec<Arc<Service>> = vec![];
+    for i in 0..(args.delegate_count) {
+        services.push(
+            delegate_account(
+                main_service.clone(),
+                args.server_url.clone(),
+                args.chain_id,
+                args.maximum_amount,
+                args.transaction_timeout,
+            )
+            .await,
         );
     }
+    let pool = Pool::from(services);
 
-    warp::serve(aptos_faucet::routes(service))
+    info!(
+        "[faucet]: running on: {}. Minting from {} accounts via delegation",
+        address, args.delegate_count
+    );
+
+    warp::serve(aptos_faucet::routes(Arc::new(pool)))
         .run(address)
         .await;
+}
+
+use aptos_crypto::ed25519::Ed25519PrivateKey;
+
+pub async fn start(
+    faucet_address: AccountAddress,
+    key: Ed25519PrivateKey,
+    chain_id: ChainId,
+    maximum_amount: Option<u64>,
+    transaction_timeout: u64,
+) {
 }
 
 #[cfg(test)]
@@ -414,7 +424,6 @@ mod tests {
         let address = service.faucet_account.lock().await.address();
         accounts.write().remove(&address);
         let filter = routes(service);
-        // assert_eq!("".to_string(), format!("{:?}  -  {}", &accounts, &address));
 
         let pub_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
         let resp = warp::test::request()
@@ -422,6 +431,7 @@ mod tests {
             .path(format!("/mint?pub_key={}&amount=1000000", pub_key).as_str())
             .reply(&filter)
             .await;
+
         assert_eq!(
             resp.body(),
             &format!("faucet account {:?} not found", address)

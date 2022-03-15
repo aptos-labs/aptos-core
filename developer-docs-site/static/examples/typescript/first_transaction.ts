@@ -8,7 +8,7 @@ import assert from "assert";
 
 
 export const TESTNET_URL = "https://fullnode.devnet.aptoslabs.com";
-export const FAUCET_URL = "https://faucet.devnet.aptosdev.com";
+export const FAUCET_URL = "https://faucet.devnet.aptoslabs.com";
 
 //:!:>section_1
 /** A subset of the fields of a TransactionRequest, for this tutorial */

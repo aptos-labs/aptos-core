@@ -23,6 +23,7 @@ structopt = "0.3.21"
 tokio = { version = "1.8.1", features = ["full"] }
 url = "2.2.2"
 warp = "0.3.2"
+deadpool = { version = "0.9.2", features = ["unmanaged"] }
 
 generate-key = { path = "../../config/generate-key" }
 aptos-crypto = { path = "../aptos-crypto" }

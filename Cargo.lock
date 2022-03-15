@@ -344,6 +344,7 @@ dependencies = [
  "aptos-workspace-hack",
  "bcs",
  "bytes",
+ "deadpool",
  "futures",
  "generate-key",
  "hex",
@@ -2331,6 +2332,24 @@ dependencies = [
  "storage-interface",
  "structopt",
 ]
+
+[[package]]
+name = "deadpool"
+version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bf0c5365c0925c80a838a6810a1bf38d3304ca6b4eb25829e29e33da12de786"
+dependencies = [
+ "async-trait",
+ "deadpool-runtime",
+ "num_cpus",
+ "tokio",
+]
+
+[[package]]
+name = "deadpool-runtime"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eaa37046cc0f6c3cc6090fbdbf73ef0b8ef4cfcc37f6befc0020f63e8cf121e1"
 
 [[package]]
 name = "debug-ignore"

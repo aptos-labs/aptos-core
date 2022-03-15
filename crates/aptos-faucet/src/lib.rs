@@ -78,16 +78,21 @@ impl Service {
     }
 }
 
+use deadpool::unmanaged::Pool;
+
+type ServicePool = Arc<Pool<Arc<Service>>>;
+type ServiceObject = deadpool::unmanaged::Object<Arc<Service>>;
+
 pub fn routes(
-    service: Arc<Service>,
+    service: ServicePool,
 ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     let mint = mint::mint_routes(service.clone());
-    let accounts = accounts_routes(service.clone());
+    //let accounts = accounts_routes(service.clone());
     let health = health_route(service);
 
     health
         .or(mint)
-        .or(accounts)
+        //.or(accounts)
         .with(warp::log::custom(|info| {
             info!(
                 "{} \"{} {} {:?}\" {} \"{}\" \"{}\" {:?}",
@@ -105,7 +110,7 @@ pub fn routes(
 }
 
 fn health_route(
-    service: Arc<Service>,
+    service: ServicePool,
 ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
     warp::path!("health")
         .and(warp::get())
@@ -113,7 +118,8 @@ fn health_route(
         .and_then(handle_health)
 }
 
-async fn handle_health(service: Arc<Service>) -> Result<Box<dyn warp::Reply>, Infallible> {
+async fn handle_health(service: ServicePool) -> Result<Box<dyn warp::Reply>, Infallible> {
+    let service = service.get().await.unwrap();
     let faucet_address = service.faucet_account.lock().await.address();
     let faucet_account = service.client.get_account(faucet_address).await;
 
@@ -218,7 +224,31 @@ pub async fn delegate_account(
             .await
             .unwrap();
     }
+
+    // refresh the seq_no every five seconds, in case we're stuck
+    let s2 = service.clone();
+    tokio::task::spawn(async move {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(5_000));
+        loop {
+            interval.tick().await;
+            refresh_account(s2.clone()).await;
+        }
+    });
+
+    info!(
+        "[faucet]: Minting from account {} via delegation",
+        service.faucet_account.lock().await.address()
+    );
     service
+}
+
+pub async fn refresh_account(service: Arc<Service>) {
+    let mut faucet_account = service.faucet_account.lock().await;
+    let faucet_account_address = faucet_account.address();
+    match service.client.get_account(faucet_account_address).await {
+        Ok(account) => *faucet_account.sequence_number_mut() = account.into_inner().sequence_number,
+        Err(_) => println!("Account {} does not exist!", faucet_account_address),
+    }
 }
 
 #[derive(Deserialize)]
