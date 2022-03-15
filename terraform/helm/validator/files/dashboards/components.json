@@ -2021,7 +2021,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_core_mempool_index_size{role=~\"$role\",owner=~\"$owner\",index=\"system_ttl\"}",
+          "expr": "core_mempool_index_size{role=~\"$role\",owner=~\"$owner\",index=\"system_ttl\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,

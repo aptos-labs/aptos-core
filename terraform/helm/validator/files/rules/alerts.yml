@@ -10,14 +10,14 @@ groups:
       summary: "The block commit rate is low"
     annotations:
   - alert: High local timeout rate
-    expr: rate(libra_consensus_timeout_count{role="validator"}[1m]) > 0.5
+    expr: rate(aptos_consensus_timeout_count{role="validator"}[1m]) > 0.5
     for: 20m
     labels:
       severity: warning
       summary: "Consensus timeout rate is high"
     annotations:
   - alert: High consensus error rate
-    expr: rate(libra_consensus_error_count{role="validator"}[1m]) / on (role) rate(consensus_duration_count{op='main_loop', role="validator"}[1m]) > 0.25
+    expr: rate(aptos_consensus_error_count{role="validator"}[1m]) / on (role) rate(consensus_duration_count{op='main_loop', role="validator"}[1m]) > 0.25
     for: 20m
     labels:
       severity: warning
@@ -42,21 +42,21 @@ groups:
 
     # Mempool alerts
   - alert: Mempool has no active upstream peers
-    expr: (sum by (owner, kubernetes_pod_name) (aptos_mempool_active_upstream_peers_count)) == 0
+    expr: (sum by (owner, kubernetes_pod_name) (mempool_active_upstream_peers_count)) == 0
     for: 3m
     labels:
       severity: error
       summary: "Mempool has no active upstream peers (unable to forward transactions to anyone!)"
     annotations:
   - alert: Mempool is at >80% capacity
-    expr: aptos_core_mempool_index_size{index="system_ttl"} > 800000 # assumes default mempool size 1_000_000
+    expr: core_mempool_index_size{index="system_ttl"} > 800000 # assumes default mempool size 1_000_000
     for: 5m
     labels:
       severity: warning
       summary: "Mempool is at >80% capacity (it may soon become full!)"
     annotations:
   - alert: Mempool is growing at a significant rate
-    expr: rate(aptos_core_mempool_index_size{index="system_ttl"}[1m]) > 30000
+    expr: rate(core_mempool_index_size{index="system_ttl"}[1m]) > 30000
     for: 10m
     labels:
       severity: warning

@@ -95,7 +95,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_core_mempool_index_size{index=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "core_mempool_index_size{index=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -296,7 +296,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_core_mempool_removed_txns_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(core_mempool_removed_txns_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -393,7 +393,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, network) (aptos_mempool_active_upstream_peers_count{owner=~\"$owner\", role=~\"$role\"})",
+          "expr": "sum by (owner, role, network) (mempool_active_upstream_peers_count{owner=~\"$owner\", role=~\"$role\"})",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}  ({{network}} network)",
           "refId": "A"
@@ -601,7 +601,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_mempool_service_latency_ms_count{result=\"fail\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_service_latency_ms_count{result=\"fail\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} - {{type}}",
           "refId": "A"
@@ -698,7 +698,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_mempool_db_error_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_db_error_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -795,7 +795,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_mempool_json_rpc_callback_fail_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_json_rpc_callback_fail_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -892,7 +892,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_mempool_network_send_fail_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_network_send_fail_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -989,7 +989,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_mempool_vm_reconfig_update_fail_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_vm_reconfig_update_fail_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -1086,7 +1086,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_mempool_core_mempool_invariant_violated_count{owner=\"$owner\", role=\"$role\"}[$interval])",
+          "expr": "rate(mempool_core_mempool_invariant_violated_count{owner=\"$owner\", role=\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -1183,7 +1183,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_mempool_unexpected_network_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_unexpected_network_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} <- {{network}}:{{peer}}",
           "refId": "A"
@@ -1294,7 +1294,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_core_mempool_gc_latency_count{type=\"client_expiration\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(core_mempool_gc_latency_count{type=\"client_expiration\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} : {{status}}",
           "refId": "A"
@@ -1391,7 +1391,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_core_mempool_gc_latency_count{type=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(core_mempool_gc_latency_count{type=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} : {{status}}",
           "refId": "A"
@@ -1488,7 +1488,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_core_mempool_index_size{index=\"parking_lot\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "core_mempool_index_size{index=\"parking_lot\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -1585,7 +1585,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_core_mempool_index_size{index=\"timeline\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "core_mempool_index_size{index=\"timeline\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -1682,7 +1682,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_core_mempool_index_size{index=\"priority\", role=\"validator\", owner=~\"$owner\"}",
+          "expr": "core_mempool_index_size{index=\"priority\", role=\"validator\", owner=~\"$owner\"}",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"
@@ -1876,7 +1876,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_core_mempool_gc_event_count{type=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(core_mempool_gc_event_count{type=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -1973,7 +1973,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_core_mempool_gc_latency_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(aptos_core_mempool_gc_latency_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(core_mempool_gc_latency_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(core_mempool_gc_latency_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -2085,7 +2085,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_mempool_service_transactions_sum{type=\"commit_accepted\", owner=~\"$owner\", role=~\"$role\"}[$interval])\n",
+          "expr": "rate(mempool_service_transactions_sum{type=\"commit_accepted\", owner=~\"$owner\", role=~\"$role\"}[$interval])\n",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2186,7 +2186,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_mempool_service_latency_ms_sum{type=\"commit_accepted\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_mempool_service_latency_ms_count{type=\"commit_accepted\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_service_latency_ms_sum{type=\"commit_accepted\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(mempool_service_latency_ms_count{type=\"commit_accepted\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2285,7 +2285,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_mempool_service_transactions_sum{type=\"commit_rejected\", owner=~\"$owner\", role=~\"$role\"}[$interval])\n",
+          "expr": "rate(mempool_service_transactions_sum{type=\"commit_rejected\", owner=~\"$owner\", role=~\"$role\"}[$interval])\n",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"
@@ -2382,7 +2382,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_mempool_service_latency_ms_sum{type=\"commit_rejected\", owner=~\"$owner\"}[$interval])/rate(aptos_mempool_service_latency_ms_count{type=\"commit_rejected\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(mempool_service_latency_ms_sum{type=\"commit_rejected\", owner=~\"$owner\"}[$interval])/rate(mempool_service_latency_ms_count{type=\"commit_rejected\", owner=~\"$owner\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"
@@ -2480,7 +2480,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_mempool_service_transactions_sum{type=\"get_block\", owner=~\"$owner\"}[$interval]) / rate(aptos_mempool_service_transactions_count{type=\"get_block\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(mempool_service_transactions_sum{type=\"get_block\", owner=~\"$owner\"}[$interval]) / rate(mempool_service_transactions_count{type=\"get_block\", owner=~\"$owner\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2580,7 +2580,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_mempool_service_latency_ms_sum{type=\"get_block\", owner=~\"$owner\"}[$interval]) / rate(aptos_mempool_service_latency_ms_count{type=\"get_block\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(mempool_service_latency_ms_sum{type=\"get_block\", owner=~\"$owner\"}[$interval]) / rate(mempool_service_latency_ms_count{type=\"get_block\", owner=~\"$owner\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2793,7 +2793,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_mempool_bounded_executor_spawn_latency_sum{stage=\"start\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_mempool_bounded_executor_spawn_latency_count{stage=\"start\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_bounded_executor_spawn_latency_sum{stage=\"start\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(mempool_bounded_executor_spawn_latency_count{stage=\"start\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} - {{task}}",
           "refId": "A"
@@ -3202,7 +3202,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_mempool_process_txn_breakdown_latency_sum{portion=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_mempool_process_txn_breakdown_latency_count{portion=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_process_txn_breakdown_latency_sum{portion=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(mempool_process_txn_breakdown_latency_count{portion=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -3299,7 +3299,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_mempool_process_txn_breakdown_latency_sum{portion=\"storage_fetch\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_mempool_process_txn_breakdown_latency_count{portion=\"storage_fetch\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_process_txn_breakdown_latency_sum{portion=\"storage_fetch\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(mempool_process_txn_breakdown_latency_count{portion=\"storage_fetch\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
