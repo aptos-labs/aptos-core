@@ -43,7 +43,7 @@ plotters = { version = "0.3.1", default-features = false, features = ["area_seri
 rand = { version = "0.8.4", features = ["alloc", "getrandom", "libc", "rand_chacha", "rand_hc", "small_rng", "std", "std_rng"] }
 regex = { version = "1.4.3", features = ["aho-corasick", "memchr", "perf", "perf-cache", "perf-dfa", "perf-inline", "perf-literal", "std", "thread_local", "unicode", "unicode-age", "unicode-bool", "unicode-case", "unicode-gencat", "unicode-perl", "unicode-script", "unicode-segment"] }
 regex-automata = { version = "0.1.10", features = ["regex-syntax", "std"] }
-reqwest = { version = "0.11.9", features = ["__tls", "blocking", "default-tls", "hyper-tls", "json", "native-tls-crate", "serde_json", "stream", "tokio-native-tls", "tokio-util"] }
+reqwest = { version = "0.11.9", features = ["__tls", "blocking", "cookie_crate", "cookie_store", "cookies", "default-tls", "hyper-tls", "json", "native-tls-crate", "proc-macro-hack", "serde_json", "stream", "tokio-native-tls", "tokio-util"] }
 rusty-fork = { version = "0.3.0", features = ["timeout", "wait-timeout"] }
 serde = { version = "1.0.136", features = ["alloc", "derive", "rc", "serde_derive", "std"] }
 serde_json = { version = "1.0.79", features = ["indexmap", "preserve_order", "std"] }
@@ -91,7 +91,7 @@ plotters = { version = "0.3.1", default-features = false, features = ["area_seri
 rand = { version = "0.8.4", features = ["alloc", "getrandom", "libc", "rand_chacha", "rand_hc", "small_rng", "std", "std_rng"] }
 regex = { version = "1.4.3", features = ["aho-corasick", "memchr", "perf", "perf-cache", "perf-dfa", "perf-inline", "perf-literal", "std", "thread_local", "unicode", "unicode-age", "unicode-bool", "unicode-case", "unicode-gencat", "unicode-perl", "unicode-script", "unicode-segment"] }
 regex-automata = { version = "0.1.10", features = ["regex-syntax", "std"] }
-reqwest = { version = "0.11.9", features = ["__tls", "blocking", "default-tls", "hyper-tls", "json", "native-tls-crate", "serde_json", "stream", "tokio-native-tls", "tokio-util"] }
+reqwest = { version = "0.11.9", features = ["__tls", "blocking", "cookie_crate", "cookie_store", "cookies", "default-tls", "hyper-tls", "json", "native-tls-crate", "proc-macro-hack", "serde_json", "stream", "tokio-native-tls", "tokio-util"] }
 rusty-fork = { version = "0.3.0", features = ["timeout", "wait-timeout"] }
 serde = { version = "1.0.136", features = ["alloc", "derive", "rc", "serde_derive", "std"] }
 serde_json = { version = "1.0.79", features = ["indexmap", "preserve_order", "std"] }
@@ -105,5 +105,17 @@ toml = { version = "0.5.8" }
 tracing = { version = "0.1.31", features = ["attributes", "log", "std", "tracing-attributes"] }
 warp = { version = "0.3.2", features = ["multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
 zeroize = { version = "1.5.3", features = ["alloc", "zeroize_derive"] }
+
+[target.x86_64-unknown-linux-gnu.dependencies]
+hashbrown = { version = "0.11.2", default-features = false, features = ["inline-more", "raw"] }
+
+[target.x86_64-unknown-linux-gnu.build-dependencies]
+hashbrown = { version = "0.11.2", default-features = false, features = ["inline-more", "raw"] }
+
+[target.x86_64-apple-darwin.dependencies]
+hashbrown = { version = "0.11.2", default-features = false, features = ["inline-more", "raw"] }
+
+[target.x86_64-apple-darwin.build-dependencies]
+hashbrown = { version = "0.11.2", default-features = false, features = ["inline-more", "raw"] }
 
 ### END HAKARI SECTION

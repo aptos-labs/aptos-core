@@ -17,7 +17,7 @@ dpn = []
 anyhow = "1.0.52"
 bcs = "0.1.2"
 hex = "0.4.3"
-reqwest = { version = "0.11.2", features = ["json"] }
+reqwest = { version = "0.11.2", features = ["json", "cookies"] }
 serde = { version = "1.0.124", features = ["derive"] }
 serde_json = "1.0.64"
 tokio = { version = "1.8.1", features = ["full"] }

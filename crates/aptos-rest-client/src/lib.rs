@@ -54,6 +54,7 @@ impl Client {
         let inner = ReqwestClient::builder()
             .timeout(Duration::from_secs(10))
             .user_agent(USER_AGENT)
+            .cookie_store(true)
             .build()
             .unwrap();
 
