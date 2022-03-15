@@ -35,7 +35,7 @@ It's dangerous to go alone. Please remember, our community managers will never m
 
 ### 💪 Join our crew
 
-Want to join a great team working on amazing world-scale problems? Take a look at our [active roles](https://boards.greenhouse.io/aptoslabs), and come work for us!
+Want to join a great team working on amazing world-scale problems? Take a look at our [active roles](https://boards.greenhouse.io/aptoslabs), and come build with us!
 
 ### 👾 Have fun!
 
