@@ -40,9 +40,10 @@ jobs:
     machine:
       image: ubuntu-2004:current
     resource_class: 2xlarge
+    parallelism: 2
     steps:
       - dev-setup
-      - run: RUST_BACKTRACE=full cargo nextest --nextest-profile ci --partition hash:1/1 --test-threads 5 --package smoke-test
+      - run: RUST_BACKTRACE=full cargo nextest --nextest-profile ci --partition hash:$CIRCLE_NODE_INDEX/$CIRCLE_NODE_TOTAL --test-threads 5 --package smoke-test
   unit-test:
     machine:
       image: ubuntu-2004:current
