@@ -214,7 +214,21 @@ workflows:
   continuous-push:
     triggers:
       - schedule:
+          # every 4 hours
           cron: "15 0,4,8,12,16,20 * * *"
+          filters:
+            branches:
+              only:
+                - main
+    jobs:
+      - docker-build-push:
+          context: aws-dev
+          addl_tag: main
+  nightly:
+    triggers:
+      - schedule:
+          # weekday 9:31AM PST
+          cron: "31 16 * * 1,2,3,4,5"
           filters:
             branches:
               only:
