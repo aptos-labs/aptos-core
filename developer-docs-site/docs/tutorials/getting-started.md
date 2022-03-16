@@ -10,7 +10,7 @@ This is a guide to kick-start your journey as a developer in the Aptos ecosystem
 
 ## Prepare for Aptos Development
 
-Aptos-core is available on [GitHub](/https://github.com/aptos-labs/aptos-core)
+Aptos-core is available on [GitHub](https://github.com/aptos-labs/aptos-core)
 
 ```bash
 git clone https://github.com/aptos-labs/aptos-core.git
