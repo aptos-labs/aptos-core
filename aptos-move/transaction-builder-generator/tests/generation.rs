@@ -240,6 +240,7 @@ test = false
 }
 
 #[test]
+#[ignore] //TODO(issue 256) abi legacy code used in comparison
 fn test_that_rust_tx_script_code_compiles() {
     test_rust(
         &get_tx_script_abis(),
@@ -249,6 +250,7 @@ fn test_that_rust_tx_script_code_compiles() {
 }
 
 #[test]
+#[ignore] //TODO(issue 256) abi legacy code used in comparison
 fn test_that_rust_script_fun_code_compiles() {
     test_rust(
         &get_script_fun_abis(),
@@ -259,6 +261,7 @@ fn test_that_rust_script_fun_code_compiles() {
 
 #[test]
 #[ignore]
+///TODO(issue 256) abi legacy code used in comparison
 fn test_that_cpp_code_compiles_and_demo_runs() {
     let registry = get_aptos_registry();
     let abis = get_stdlib_script_abis();

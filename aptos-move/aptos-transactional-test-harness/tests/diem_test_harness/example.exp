@@ -1,17 +1,26 @@
 processed 10 tasks
 
+task 2 'publish'. lines 19-30:
+Error: Transaction discarded. VMStatus: status INVALID_AUTH_KEY of type Validation
+
+task 3 'publish'. lines 31-39:
+Error: Transaction discarded. VMStatus: status INVALID_AUTH_KEY of type Validation
+
+task 4 'publish'. lines 40-54:
+Error: Transaction discarded. VMStatus: status INVALID_AUTH_KEY of type Validation
+
 task 5 'run'. lines 55-63:
-Error: Failed to execute transaction. VMStatus: status ABORTED of type Execution with sub status 42
+Error: Transaction discarded. VMStatus: status INVALID_AUTH_KEY of type Validation
 
 task 6 'run'. lines 64-71:
-Error: Failed to execute transaction. VMStatus: status ABORTED of type Execution with sub status 42
+Error: Transaction discarded. VMStatus: status INVALID_AUTH_KEY of type Validation
 
 task 7 'run'. lines 72-79:
-Error: Failed to execute transaction. VMStatus: status ABORTED of type Execution with sub status 42
+Error: Transaction discarded. VMStatus: status INVALID_AUTH_KEY of type Validation
 
 task 8 'view'. lines 80-85:
 key 0x1::DiemAccount::DiemAccount {
-    authentication_key: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
+    authentication_key: 000000000000000000000000000000004777eb94491650dd3f095ce6f778acb6
     withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
         vec: [
             store 0x1::DiemAccount::WithdrawCapability {
@@ -29,7 +38,7 @@ key 0x1::DiemAccount::DiemAccount {
     received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
         counter: 0
         guid: drop store 0x1::Event::GUIDWrapper {
-            len_bytes: 24u8
+            len_bytes: 40u8
             guid: drop store 0x1::GUID::GUID {
                 id: copy drop store 0x1::GUID::ID {
                     creation_num: 0
@@ -41,7 +50,7 @@ key 0x1::DiemAccount::DiemAccount {
     sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
         counter: 0
         guid: drop store 0x1::Event::GUIDWrapper {
-            len_bytes: 24u8
+            len_bytes: 40u8
             guid: drop store 0x1::GUID::GUID {
                 id: copy drop store 0x1::GUID::ID {
                     creation_num: 1
@@ -50,5 +59,5 @@ key 0x1::DiemAccount::DiemAccount {
             }
         }
     }
-    sequence_number: 6
+    sequence_number: 0
 }

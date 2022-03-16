@@ -1,7 +1,7 @@
 import AptosTypes
 
 func demo_peer_to_peer_script() throws {
-    let address = AptosTypes.AccountAddress(value: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
+    let address = AptosTypes.AccountAddress(value: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
     let module = AptosTypes.Identifier(value: "XDX")
     let name = AptosTypes.Identifier(value: "XDX")
     let type_params: [AptosTypes.TypeTag] = []
@@ -38,7 +38,7 @@ func demo_peer_to_peer_script() throws {
 }
 
 func demo_peer_to_peer_script_function() throws {
-    let address = AptosTypes.AccountAddress(value: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
+    let address = AptosTypes.AccountAddress(value: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
     let module = AptosTypes.Identifier(value: "XDX")
     let name = AptosTypes.Identifier(value: "XDX")
     let type_params: [AptosTypes.TypeTag] = []

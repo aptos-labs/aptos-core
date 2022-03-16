@@ -12,8 +12,6 @@ use structopt::{clap::arg_enum, StructOpt};
 mod aptos;
 /// Consensus messages.
 mod consensus;
-/// new file added as a workaround for https://github.com/diem/move/pull/127
-mod language_storage;
 /// Analyze Serde formats to detect certain patterns.
 mod linter;
 /// Move ABI.

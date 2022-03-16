@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{current_function_name, tests::new_test_context};
-
 use serde_json::{json, Value};
 
 #[tokio::test]

@@ -61,13 +61,15 @@ mod tests {
 
     #[test]
     fn test_from_and_to_string() {
-        let hash = "0x00000000000000000000000000000000000000000a550c18";
+        let hash =
+            "0x0000000000000000000000000000000000000000000000000000000000000000000000000a550c18";
         assert_eq!(hash.parse::<EventKey>().unwrap().to_string(), hash);
     }
 
     #[test]
     fn test_from_and_to_json() {
-        let hex = "0x00000000000000000000000000000000000000000a550c18";
+        let hex =
+            "0x0000000000000000000000000000000000000000000000000000000000000000000000000a550c18";
         let hash: EventKey = serde_json::from_value(json!(hex)).unwrap();
         assert_eq!(hash, hex.parse().unwrap());
 

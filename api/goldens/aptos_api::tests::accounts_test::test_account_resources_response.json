@@ -18,7 +18,7 @@
               "creation_num": "5"
             }
           },
-          "len_bytes": 24
+          "len_bytes": 40
         }
       }
     }
@@ -114,7 +114,7 @@
               "creation_num": "1"
             }
           },
-          "len_bytes": 24
+          "len_bytes": 40
         }
       },
       "sent_events": {
@@ -126,7 +126,7 @@
               "creation_num": "0"
             }
           },
-          "len_bytes": 24
+          "len_bytes": 40
         }
       }
     }
@@ -196,7 +196,7 @@
               "creation_num": "4"
             }
           },
-          "len_bytes": 24
+          "len_bytes": 40
         }
       },
       "last_reconfiguration_time": "0"
@@ -214,7 +214,7 @@
       "scheme": 0,
       "validators": [
         {
-          "addr": "0x652f27413456938eaa059f65231647cc",
+          "addr": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
           "config": {
             "consensus_pubkey": "0xcc62332e34bb2d5cd69f60efbb2a36cb916c7eb458301ea36636c4dbb012bd88",
             "fullnode_network_addresses": "0x012d040000000000050c1c07203432fbf5b666fa771269cc7eb227146d3b16858f177a317ae8c349db210feb780800",

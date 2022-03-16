@@ -1,4 +1,7 @@
 processed 4 tasks
 
+task 2 'publish'. lines 14-17:
+Error: Transaction discarded. VMStatus: status INVALID_AUTH_KEY of type Validation
+
 task 3 'run'. lines 20-23:
 Error: Transaction discarded. VMStatus: status INVALID_AUTH_KEY of type Validation

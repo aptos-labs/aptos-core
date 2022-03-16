@@ -1,4 +1,4 @@
 processed 1 task
 
 task 0 'run'. lines 1-3:
-Error: Failed to fetch account resource under address 261BCCC683FB8E9201748DACA6D1D241. Has the account been created?
+Error: Failed to fetch account resource under address 00000000000000000000000000000000261BCCC683FB8E9201748DACA6D1D241. Has the account been created?

@@ -1,7 +1,10 @@
 processed 5 tasks
 
+task 2 'publish'. lines 15-18:
+Error: Transaction discarded. VMStatus: status INVALID_AUTH_KEY of type Validation
+
 task 3 'run'. lines 21-23:
-Error: Failed to execute transaction. VMStatus: status FUNCTION_RESOLUTION_FAILURE of type Verification
+Error: Transaction discarded. VMStatus: status INVALID_AUTH_KEY of type Validation
 
 task 4 'run'. lines 26-28:
-Error: Failed to execute transaction. VMStatus: status LINKER_ERROR of type Verification
+Error: Transaction discarded. VMStatus: status INVALID_AUTH_KEY of type Validation

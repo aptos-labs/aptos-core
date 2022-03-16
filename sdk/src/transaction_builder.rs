@@ -141,7 +141,6 @@ impl TransactionFactory {
         self.payload(TransactionPayload::ScriptFunction(func))
     }
 
-<<<<<<< HEAD
     pub fn create_user_account(&self, public_key: &Ed25519PublicKey) -> TransactionBuilder {
         let preimage = AuthenticationKeyPreimage::ed25519(public_key);
         self.payload(aptos_stdlib::encode_create_account_script_function(

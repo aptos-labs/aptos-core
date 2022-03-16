@@ -4,13 +4,14 @@
 use crate::{current_function_name, tests::new_test_context};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 
+static EVENT_KEY: &str =
+    "0x0000000000000000000000000000000000000000000000000000000000000000000000000a550c18";
+
 #[tokio::test]
 async fn test_get_events() {
     let mut context = new_test_context(current_function_name!());
 
-    let resp = context
-        .get("/events/0x04000000000000000000000000000000000000000a550c18")
-        .await;
+    let resp = context.get(format!("/events/{}", EVENT_KEY).as_str()).await;
 
     context.check_golden_output(resp);
 }
@@ -20,9 +21,8 @@ async fn test_get_events_filter_by_start_sequence_number() {
     let mut context = new_test_context(current_function_name!());
 
     let resp = context
-        .get("/events/0x04000000000000000000000000000000000000000a550c18?start=1")
+        .get(format!("/events/{}?start=1", EVENT_KEY).as_str())
         .await;
-
     context.check_golden_output(resp);
 }
 
@@ -33,12 +33,12 @@ async fn test_get_events_filter_by_limit_page_size() {
     let context = new_test_context(current_function_name!());
 
     let resp = context
-        .get("/events/0x04000000000000000000000000000000000000000a550c18?start=1&limit=1")
+        .get(format!("/events/{}?start=1&limit=1", EVENT_KEY).as_str())
         .await;
     assert_eq!(resp.as_array().unwrap().len(), 1);
 
     let resp = context
-        .get("/events/0x04000000000000000000000000000000000000000a550c18?start=1&limit=2")
+        .get(format!("/events/{}?start=1&limit=2", EVENT_KEY).as_str())
         .await;
     assert_eq!(resp.as_array().unwrap().len(), 2);
 }

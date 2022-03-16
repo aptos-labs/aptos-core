@@ -1,10 +1,1 @@
-[
-  {
-    "key": "0x04000000000000000000000000000000000000000a550c18",
-    "sequence_number": "0",
-    "type": "0x1::Reconfiguration::NewEpochEvent",
-    "data": {
-      "epoch": "1"
-    }
-  }
-]
+[]

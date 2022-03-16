@@ -143,7 +143,10 @@ impl ScriptFunctionCall {
 pub fn encode_claim_mint_capability_script_function() -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("TestCoin").to_owned(),
         ),
         ident_str!("claim_mint_capability").to_owned(),
@@ -159,7 +162,10 @@ pub fn encode_create_account_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AptosAccount").to_owned(),
         ),
         ident_str!("create_account").to_owned(),
@@ -175,7 +181,10 @@ pub fn encode_create_account_script_function(
 pub fn encode_delegate_mint_capability_script_function(to: AccountAddress) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("TestCoin").to_owned(),
         ),
         ident_str!("delegate_mint_capability").to_owned(),
@@ -188,7 +197,10 @@ pub fn encode_delegate_mint_capability_script_function(to: AccountAddress) -> Tr
 pub fn encode_mint_script_function(mint_addr: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("TestCoin").to_owned(),
         ),
         ident_str!("mint").to_owned(),
@@ -206,7 +218,10 @@ pub fn encode_rotate_authentication_key_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AptosAccount").to_owned(),
         ),
         ident_str!("rotate_authentication_key").to_owned(),
@@ -230,7 +245,10 @@ pub fn encode_set_gas_constants_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AptosVMConfig").to_owned(),
         ),
         ident_str!("set_gas_constants").to_owned(),
@@ -255,7 +273,10 @@ pub fn encode_set_gas_constants_script_function(
 pub fn encode_set_version_script_function(major: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AptosVersion").to_owned(),
         ),
         ident_str!("set_version").to_owned(),
@@ -268,7 +289,10 @@ pub fn encode_set_version_script_function(major: u64) -> TransactionPayload {
 pub fn encode_transfer_script_function(to: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("TestCoin").to_owned(),
         ),
         ident_str!("transfer").to_owned(),

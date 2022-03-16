@@ -340,7 +340,10 @@ mod tests {
         let values: Vec<HashValue> = serde_json::from_slice(resp.body()).unwrap();
         assert_eq!(values.len(), 2);
         let reader = accounts.read();
-        let addr = AccountAddress::try_from("25C62C0E0820F422000814CDBA407835".to_owned()).unwrap();
+        let addr = AccountAddress::try_from(
+            "9FF98E82355EB13098F3B1157AC018A725C62C0E0820F422000814CDBA407835".to_owned(),
+        )
+        .unwrap();
         let account = reader.get(&addr).expect("account should be created");
         assert_eq!(account.balance, amount);
     }
@@ -369,7 +372,10 @@ mod tests {
         assert_eq!(txns.len(), 2);
 
         let reader = accounts.read();
-        let addr = AccountAddress::try_from("25C62C0E0820F422000814CDBA407835".to_owned()).unwrap();
+        let addr = AccountAddress::try_from(
+            "9FF98E82355EB13098F3B1157AC018A725C62C0E0820F422000814CDBA407835".to_owned(),
+        )
+        .unwrap();
         let account = reader.get(&addr).expect("account should be created");
         assert_eq!(account.balance, amount);
     }
@@ -442,7 +448,7 @@ mod tests {
             AuthenticationKey::ed25519(&pub_key)
                 .derived_address()
                 .to_string(),
-            "25C62C0E0820F422000814CDBA407835"
+            "9FF98E82355EB13098F3B1157AC018A725C62C0E0820F422000814CDBA407835"
         );
 
         let res = tokio::task::spawn_blocking(move || faucet_client.create_account(pub_key))

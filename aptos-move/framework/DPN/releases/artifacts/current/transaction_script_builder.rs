@@ -3788,7 +3788,10 @@ impl ScriptFunctionCall {
 pub fn encode_add_currency_to_account_script_function(currency: TypeTag) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AccountAdministrationScripts").to_owned(),
         ),
         ident_str!("add_currency_to_account").to_owned(),
@@ -3842,7 +3845,10 @@ pub fn encode_add_recovery_rotation_capability_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AccountAdministrationScripts").to_owned(),
         ),
         ident_str!("add_recovery_rotation_capability").to_owned(),
@@ -3904,7 +3910,10 @@ pub fn encode_add_validator_and_reconfigure_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("ValidatorAdministrationScripts").to_owned(),
         ),
         ident_str!("add_validator_and_reconfigure").to_owned(),
@@ -3947,7 +3956,10 @@ pub fn encode_add_vasp_domain_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("TreasuryComplianceScripts").to_owned(),
         ),
         ident_str!("add_vasp_domain").to_owned(),
@@ -3997,7 +4009,10 @@ pub fn encode_add_vasp_domain_script_function(
 pub fn encode_burn_txn_fees_script_function(coin_type: TypeTag) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("TreasuryComplianceScripts").to_owned(),
         ),
         ident_str!("burn_txn_fees").to_owned(),
@@ -4067,7 +4082,10 @@ pub fn encode_burn_with_amount_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("TreasuryComplianceScripts").to_owned(),
         ),
         ident_str!("burn_with_amount").to_owned(),
@@ -4135,7 +4153,10 @@ pub fn encode_cancel_burn_with_amount_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("TreasuryComplianceScripts").to_owned(),
         ),
         ident_str!("cancel_burn_with_amount").to_owned(),
@@ -4214,7 +4235,10 @@ pub fn encode_create_child_vasp_account_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AccountCreationScripts").to_owned(),
         ),
         ident_str!("create_child_vasp_account").to_owned(),
@@ -4288,7 +4312,10 @@ pub fn encode_create_designated_dealer_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AccountCreationScripts").to_owned(),
         ),
         ident_str!("create_designated_dealer").to_owned(),
@@ -4361,7 +4388,10 @@ pub fn encode_create_parent_vasp_account_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AccountCreationScripts").to_owned(),
         ),
         ident_str!("create_parent_vasp_account").to_owned(),
@@ -4409,7 +4439,10 @@ pub fn encode_create_parent_vasp_account_script_function(
 pub fn encode_create_recovery_address_script_function() -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AccountAdministrationScripts").to_owned(),
         ),
         ident_str!("create_recovery_address").to_owned(),
@@ -4475,7 +4508,10 @@ pub fn encode_create_validator_account_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AccountCreationScripts").to_owned(),
         ),
         ident_str!("create_validator_account").to_owned(),
@@ -4543,7 +4579,10 @@ pub fn encode_create_validator_operator_account_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AccountCreationScripts").to_owned(),
         ),
         ident_str!("create_validator_operator_account").to_owned(),
@@ -4579,7 +4618,10 @@ pub fn encode_create_validator_operator_account_script_function(
 pub fn encode_create_vasp_domains_script_function() -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AccountAdministrationScripts").to_owned(),
         ),
         ident_str!("create_vasp_domains").to_owned(),
@@ -4615,7 +4657,10 @@ pub fn encode_create_vasp_domains_script_function() -> TransactionPayload {
 pub fn encode_force_expire_script_function(shift_amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AccountAdministrationScripts").to_owned(),
         ),
         ident_str!("force_expire").to_owned(),
@@ -4673,7 +4718,10 @@ pub fn encode_freeze_account_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("TreasuryComplianceScripts").to_owned(),
         ),
         ident_str!("freeze_account").to_owned(),
@@ -4712,7 +4760,10 @@ pub fn encode_initialize_diem_consensus_config_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("SystemAdministrationScripts").to_owned(),
         ),
         ident_str!("initialize_diem_consensus_config").to_owned(),
@@ -4747,7 +4798,10 @@ pub fn encode_initialize_diem_consensus_config_script_function(
 pub fn encode_opt_in_to_crsn_script_function(crsn_size: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AccountAdministrationScripts").to_owned(),
         ),
         ident_str!("opt_in_to_crsn").to_owned(),
@@ -4808,7 +4862,10 @@ pub fn encode_peer_to_peer_by_signers_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("PaymentScripts").to_owned(),
         ),
         ident_str!("peer_to_peer_by_signers").to_owned(),
@@ -4884,7 +4941,10 @@ pub fn encode_peer_to_peer_with_metadata_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("PaymentScripts").to_owned(),
         ),
         ident_str!("peer_to_peer_with_metadata").to_owned(),
@@ -4944,7 +5004,10 @@ pub fn encode_peer_to_peer_with_metadata_script_function(
 pub fn encode_preburn_script_function(token: TypeTag, amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("TreasuryComplianceScripts").to_owned(),
         ),
         ident_str!("preburn").to_owned(),
@@ -4985,7 +5048,10 @@ pub fn encode_publish_shared_ed25519_public_key_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AccountAdministrationScripts").to_owned(),
         ),
         ident_str!("publish_shared_ed25519_public_key").to_owned(),
@@ -5038,7 +5104,10 @@ pub fn encode_register_validator_config_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("ValidatorAdministrationScripts").to_owned(),
         ),
         ident_str!("register_validator_config").to_owned(),
@@ -5101,7 +5170,10 @@ pub fn encode_remove_validator_and_reconfigure_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("ValidatorAdministrationScripts").to_owned(),
         ),
         ident_str!("remove_validator_and_reconfigure").to_owned(),
@@ -5144,7 +5216,10 @@ pub fn encode_remove_vasp_domain_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("TreasuryComplianceScripts").to_owned(),
         ),
         ident_str!("remove_vasp_domain").to_owned(),
@@ -5184,7 +5259,10 @@ pub fn encode_remove_vasp_domain_script_function(
 pub fn encode_rotate_authentication_key_script_function(new_key: Vec<u8>) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AccountAdministrationScripts").to_owned(),
         ),
         ident_str!("rotate_authentication_key").to_owned(),
@@ -5231,7 +5309,10 @@ pub fn encode_rotate_authentication_key_with_nonce_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AccountAdministrationScripts").to_owned(),
         ),
         ident_str!("rotate_authentication_key_with_nonce").to_owned(),
@@ -5281,7 +5362,10 @@ pub fn encode_rotate_authentication_key_with_nonce_admin_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AccountAdministrationScripts").to_owned(),
         ),
         ident_str!("rotate_authentication_key_with_nonce_admin").to_owned(),
@@ -5333,7 +5417,10 @@ pub fn encode_rotate_authentication_key_with_recovery_address_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AccountAdministrationScripts").to_owned(),
         ),
         ident_str!("rotate_authentication_key_with_recovery_address").to_owned(),
@@ -5388,7 +5475,10 @@ pub fn encode_rotate_dual_attestation_info_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AccountAdministrationScripts").to_owned(),
         ),
         ident_str!("rotate_dual_attestation_info").to_owned(),
@@ -5431,7 +5521,10 @@ pub fn encode_rotate_shared_ed25519_public_key_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("AccountAdministrationScripts").to_owned(),
         ),
         ident_str!("rotate_shared_ed25519_public_key").to_owned(),
@@ -5490,7 +5583,10 @@ pub fn encode_set_gas_constants_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("SystemAdministrationScripts").to_owned(),
         ),
         ident_str!("set_gas_constants").to_owned(),
@@ -5557,7 +5653,10 @@ pub fn encode_set_validator_config_and_reconfigure_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("ValidatorAdministrationScripts").to_owned(),
         ),
         ident_str!("set_validator_config_and_reconfigure").to_owned(),
@@ -5615,7 +5714,10 @@ pub fn encode_set_validator_operator_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("ValidatorAdministrationScripts").to_owned(),
         ),
         ident_str!("set_validator_operator").to_owned(),
@@ -5679,7 +5781,10 @@ pub fn encode_set_validator_operator_with_nonce_admin_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("ValidatorAdministrationScripts").to_owned(),
         ),
         ident_str!("set_validator_operator_with_nonce_admin").to_owned(),
@@ -5753,7 +5858,10 @@ pub fn encode_tiered_mint_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("TreasuryComplianceScripts").to_owned(),
         ),
         ident_str!("tiered_mint").to_owned(),
@@ -5806,7 +5914,10 @@ pub fn encode_unfreeze_account_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("TreasuryComplianceScripts").to_owned(),
         ),
         ident_str!("unfreeze_account").to_owned(),
@@ -5847,7 +5958,10 @@ pub fn encode_update_diem_consensus_config_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("SystemAdministrationScripts").to_owned(),
         ),
         ident_str!("update_diem_consensus_config").to_owned(),
@@ -5891,7 +6005,10 @@ pub fn encode_update_diem_version_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("SystemAdministrationScripts").to_owned(),
         ),
         ident_str!("update_diem_version").to_owned(),
@@ -5937,7 +6054,10 @@ pub fn encode_update_dual_attestation_limit_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("TreasuryComplianceScripts").to_owned(),
         ),
         ident_str!("update_dual_attestation_limit").to_owned(),
@@ -5992,7 +6112,10 @@ pub fn encode_update_exchange_rate_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("TreasuryComplianceScripts").to_owned(),
         ),
         ident_str!("update_exchange_rate").to_owned(),
@@ -6038,7 +6161,10 @@ pub fn encode_update_minting_ability_script_function(
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
-            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
             ident_str!("TreasuryComplianceScripts").to_owned(),
         ),
         ident_str!("update_minting_ability").to_owned(),

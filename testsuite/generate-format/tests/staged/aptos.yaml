@@ -8,7 +8,7 @@ AccountAddress:
   NEWTYPESTRUCT:
     TUPLEARRAY:
       CONTENT: U8
-      SIZE: 16
+      SIZE: 32
 AccountAuthenticator:
   ENUM:
     0:
@@ -222,7 +222,7 @@ TransactionPayload:
 TypeTag:
   ENUM:
     0:
-      bool: UNIT
+      Bool: UNIT
     1:
       U8: UNIT
     2:

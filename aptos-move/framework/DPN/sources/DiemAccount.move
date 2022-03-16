@@ -1060,6 +1060,7 @@ module DiemFramework::DiemAccount {
         new_account: &signer,
         auth_key_prefix: vector<u8>,
     ) acquires AccountOperationsCapability {
+        auth_key_prefix = Vector::empty<u8>();
         let new_account_addr = Signer::address_of(new_account);
         // cannot create an account at the reserved address 0x0
         assert!(

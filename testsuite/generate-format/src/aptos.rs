@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::language_storage;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     hash::{CryptoHasher as _, TestOnlyHasher},
@@ -10,6 +9,7 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{contract_event, event, transaction, write_set};
+use move_core_types::language_storage;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_reflection::{Registry, Result, Samples, Tracer, TracerConfig};
