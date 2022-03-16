@@ -15,7 +15,7 @@ fullnode_identity:
 rust_log: info
 
 image:
-  repo: aptos/validator
+  repo: aptoslab/validator
   tag: devnet
   pullPolicy: IfNotPresent
 
@@ -56,7 +56,7 @@ logging:
 
 backup:
   image:
-    repo: aptos/tools
+    repo: aptoslab/tools
     tag: devnet
     pullPolicy: IfNotPresent
   resources:
@@ -98,7 +98,7 @@ backup_verify:
 
 restore:
   image:
-    repo: aptos/tools
+    repo: aptoslab/tools
     tag: devnet
     pullPolicy: IfNotPresent
   resources:

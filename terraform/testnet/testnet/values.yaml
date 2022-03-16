@@ -9,7 +9,7 @@ genesis:
   vaultRoleId:
   vaultSecretId:
   image:
-    repo: aptos/init
+    repo: aptoslab/init
     tag:
     pullPolicy: IfNotPresent
   resources:
@@ -57,7 +57,7 @@ serviceAccount:
 faucet:
   enabled: true
   image:
-    repo: aptos/faucet
+    repo: aptoslab/faucet
     tag:
     pullPolicy: IfNotPresent
   resources:

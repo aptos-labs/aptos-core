@@ -8,7 +8,7 @@ imageTag: release-1.5_b0cbf54f
 validator:
   name:
   image:
-    repo: aptos/validator
+    repo: aptoslab/validator
     tag:
     pullPolicy: IfNotPresent
   resources:
@@ -34,7 +34,7 @@ validator:
 
 tools:
   image:
-    repo: aptos/tools
+    repo: aptoslab/tools
     tag:
     pullPolicy: IfNotPresent
   resources:
@@ -50,7 +50,7 @@ tools:
 
 backup:
   image:
-    repo: aptos/tools
+    repo: aptoslab/tools
     tag:
     pullPolicy: IfNotPresent
   resources:
@@ -100,7 +100,7 @@ backup_verify:
 
 restore:
   image:
-    repo: aptos/tools
+    repo: aptoslab/tools
     tag:
     pullPolicy: IfNotPresent
   resources:
@@ -129,7 +129,7 @@ restore:
 
 safetyrules:
   image:
-    repo: aptos/validator_tcb
+    repo: aptoslab/validator_tcb
     tag:
     pullPolicy: IfNotPresent
   resources:
@@ -170,7 +170,7 @@ fullnode:
 
 keymanager:
   image:
-    repo: aptos/validator_tcb
+    repo: aptoslab/validator_tcb
     tag:
     pullPolicy: IfNotPresent
   resources:
