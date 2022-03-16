@@ -11,7 +11,7 @@ use aptos_config::config::{Peer, PeerRole, PeerSet, HANDSHAKE_VERSION};
 use aptos_crypto::{test_utils::TEST_SEED, x25519, Uniform};
 use aptos_logger::info;
 use aptos_time_service::{MockTimeService, TimeService};
-use aptos_types::network_address::NetworkAddress;
+use aptos_types::{account_address::AccountAddress, network_address::NetworkAddress};
 use channel::{aptos_channel, message_queues::QueueStyle};
 use futures::{executor::block_on, future, SinkExt};
 use maplit::{hashmap, hashset};
@@ -41,19 +41,14 @@ fn network_address_with_pubkey(
     network_address(addr_str).append_prod_protos(pubkey, HANDSHAKE_VERSION)
 }
 
-fn peer_id(index: usize) -> PeerId {
-    PeerId::new((index as u128).to_be_bytes())
-}
-
-fn test_peer(index: usize) -> (PeerId, Peer, x25519::PublicKey, NetworkAddress) {
+fn test_peer(index: AccountAddress) -> (PeerId, Peer, x25519::PublicKey, NetworkAddress) {
     test_peer_with_address(index, DEFAULT_BASE_ADDR)
 }
 
 fn test_peer_with_address(
-    index: usize,
+    peer_id: AccountAddress,
     addr_str: &'static str,
 ) -> (PeerId, Peer, x25519::PublicKey, NetworkAddress) {
-    let peer_id = peer_id(index);
     let pubkey = x25519::PrivateKey::generate_for_testing().public_key();
     let pubkeys = hashset! { pubkey };
     let addr = network_address_with_pubkey(addr_str, pubkey);
@@ -313,8 +308,8 @@ impl TestHarness {
 
 #[test]
 fn connect_to_seeds_on_startup() {
-    let (seed_peer_id, seed_peer, _, seed_addr) = test_peer(1);
-    let seeds = hashmap! {seed_peer_id => seed_peer.clone()};
+    let (seed_peer_id, seed_peer, _, seed_addr) = test_peer(AccountAddress::ONE);
+    let seeds: PeerSet = hashmap! {seed_peer_id => seed_peer.clone()};
     let (mut mock, conn_mgr) = TestHarness::new(seeds.clone());
 
     let test = async move {
@@ -357,7 +352,7 @@ fn connect_to_seeds_on_startup() {
 
 #[test]
 fn addr_change() {
-    let (other_peer_id, other_peer, _, other_addr) = test_peer(0);
+    let (other_peer_id, other_peer, _, other_addr) = test_peer(AccountAddress::ZERO);
     let (mut mock, conn_mgr) = TestHarness::new(HashMap::new());
 
     let test = async move {
@@ -404,7 +399,7 @@ fn addr_change() {
 
 #[test]
 fn lost_connection() {
-    let (other_peer_id, other_peer, _, other_addr) = test_peer(0);
+    let (other_peer_id, other_peer, _, other_addr) = test_peer(AccountAddress::ZERO);
     let (mut mock, conn_mgr) = TestHarness::new(HashMap::new());
 
     let test = async move {
@@ -435,7 +430,7 @@ fn lost_connection() {
 
 #[test]
 fn disconnect() {
-    let (other_peer_id, other_peer, _, other_addr) = test_peer(0);
+    let (other_peer_id, other_peer, _, other_addr) = test_peer(AccountAddress::ZERO);
     let (mut mock, conn_mgr) = TestHarness::new(HashMap::new());
 
     let test = async move {
@@ -470,7 +465,7 @@ fn disconnect() {
 // Tests that connectivity manager retries dials and disconnects on failure.
 #[test]
 fn retry_on_failure() {
-    let (other_peer_id, peer, _, other_addr) = test_peer(0);
+    let (other_peer_id, peer, _, other_addr) = test_peer(AccountAddress::ZERO);
     let (mut mock, conn_mgr) = TestHarness::new(HashMap::new());
 
     let test = async move {
@@ -517,7 +512,7 @@ fn retry_on_failure() {
 // peer, connectivity manager does not send any additional dial or disconnect requests.
 #[test]
 fn no_op_requests() {
-    let (other_peer_id, peer, _, other_addr) = test_peer(0);
+    let (other_peer_id, peer, _, other_addr) = test_peer(AccountAddress::ZERO);
     let (mut mock, conn_mgr) = TestHarness::new(HashMap::new());
 
     let test = async move {
@@ -563,14 +558,19 @@ fn no_op_requests() {
     };
     block_on(future::join(conn_mgr.start(), test));
 }
-
+fn generate_account_address(val: usize) -> AccountAddress {
+    let mut addr = [0u8; AccountAddress::LENGTH];
+    let array = val.to_be_bytes();
+    addr[AccountAddress::LENGTH - array.len()..].copy_from_slice(&array);
+    AccountAddress::new(addr)
+}
 #[test]
 fn backoff_on_failure() {
     let (mut mock, conn_mgr) = TestHarness::new(HashMap::new());
 
     let test = async move {
-        let (peer_id_a, peer_a, _, peer_a_addr) = test_peer(1);
-        let (peer_id_b, peer_b, _, peer_b_addr) = test_peer(2);
+        let (peer_id_a, peer_a, _, peer_a_addr) = test_peer(AccountAddress::ONE);
+        let (peer_id_b, peer_b, _, peer_b_addr) = test_peer(generate_account_address(2));
 
         // Sending pubkey set and addr of peers
         let peers = hashmap! {peer_id_a => peer_a, peer_id_b => peer_b};
@@ -602,7 +602,7 @@ fn backoff_on_failure() {
 // multiple listen addresses and some of them don't work.
 #[test]
 fn multiple_addrs_basic() {
-    let (other_peer_id, mut peer, pubkey, _) = test_peer(0);
+    let (other_peer_id, mut peer, pubkey, _) = test_peer(AccountAddress::ZERO);
     let (mut mock, conn_mgr) = TestHarness::new(HashMap::new());
 
     let test = async move {
@@ -637,7 +637,7 @@ fn multiple_addrs_basic() {
 // retry more times than there are addresses.
 #[test]
 fn multiple_addrs_wrapping() {
-    let (other_peer_id, mut peer, pubkey, _) = test_peer(0);
+    let (other_peer_id, mut peer, pubkey, _) = test_peer(AccountAddress::ZERO);
     let (mut mock, conn_mgr) = TestHarness::new(HashMap::new());
 
     let test = async move {
@@ -674,7 +674,7 @@ fn multiple_addrs_wrapping() {
 // multiple listen addrs and then that peer advertises a smaller number of addrs.
 #[test]
 fn multiple_addrs_shrinking() {
-    let (other_peer_id, mut peer, pubkey, _) = test_peer(0);
+    let (other_peer_id, mut peer, pubkey, _) = test_peer(AccountAddress::ZERO);
     let (mut mock, conn_mgr) = TestHarness::new(HashMap::new());
 
     let test = async move {
@@ -717,7 +717,7 @@ fn public_connection_limit() {
     let mut seeds = HashMap::new();
 
     for i in 0..=MAX_TEST_CONNECTIONS {
-        let (peer_id, peer, _, _) = test_peer(i);
+        let (peer_id, peer, _, _) = test_peer(generate_account_address(i));
         seeds.insert(peer_id, peer);
     }
 
@@ -746,8 +746,8 @@ fn basic_update_discovered_peers() {
     let trusted_peers = mock.trusted_peers;
 
     // sample some example data
-    let peer_id_a = peer_id(0);
-    let peer_id_b = peer_id(1);
+    let peer_id_a = AccountAddress::ZERO;
+    let peer_id_b = AccountAddress::ONE;
     let addr_a = network_address("/ip4/127.0.0.1/tcp/9090");
     let addr_b = network_address("/ip4/127.0.0.1/tcp/9091");
     let pubkey_1 = x25519::PrivateKey::generate(&mut rng).public_key();

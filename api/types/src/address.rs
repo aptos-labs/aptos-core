@@ -84,7 +84,7 @@ mod tests {
 
     #[test]
     fn test_from_and_to_string() {
-        let valid_addresses = vec!["0x1", "0x001", "00000000000000000000000000000001"];
+        let valid_addresses = vec!["0x1", "0x001", "0x00000000000000000000000000000001"];
         for address in valid_addresses {
             assert_eq!(address.parse::<Address>().unwrap().to_string(), "0x1");
         }
@@ -114,7 +114,7 @@ mod tests {
         let account_address: AccountAddress = address.into();
         assert_eq!(
             account_address.to_string(),
-            "00000000000000000000000000000001"
+            AccountAddress::ONE.to_hex().as_str()
         );
 
         let new_address: Address = account_address.into();
@@ -128,7 +128,7 @@ mod tests {
         let account_address: AccountAddress = (&address).into();
         assert_eq!(
             account_address.to_string(),
-            "00000000000000000000000000000001"
+            AccountAddress::ONE.to_hex().as_str()
         );
 
         let new_address: Address = account_address.into();

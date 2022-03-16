@@ -4,8 +4,6 @@
 use crate::account_address::AccountAddress;
 use hex::FromHex;
 #[cfg(any(test, feature = "fuzzing"))]
-use proptest_derive::Arbitrary;
-#[cfg(any(test, feature = "fuzzing"))]
 use rand::{rngs::OsRng, RngCore};
 use serde::{de, ser, Deserialize, Serialize};
 use std::{
@@ -17,7 +15,6 @@ use std::{
 /// A struct that represents a globally unique id for an Event stream that a user can listen to.
 /// By design, the lower part of EventKey is the same as account address.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct EventKey([u8; EventKey::LENGTH]);
 
 impl EventKey {
@@ -238,7 +235,8 @@ mod tests {
 
     #[test]
     fn test_display_impls() {
-        let hex = "1000000000000000ca843279e3427144cead5e4d5999a3d0";
+        let hex =
+            "000000000000000000000000000000001000000000000000ca843279e3427144cead5e4d5999a3d0";
 
         let key = EventKey::from_hex(hex).unwrap();
 
@@ -264,8 +262,10 @@ mod tests {
 
     #[test]
     fn test_serde_json() {
-        let hex = "1000000000000000ca843279e3427144cead5e4d5999a3d0";
-        let json_hex = "\"1000000000000000ca843279e3427144cead5e4d5999a3d0\"";
+        let hex =
+            "000000000000000000000000000000001000000000000000ca843279e3427144cead5e4d5999a3d0";
+        let json_hex =
+            "\"000000000000000000000000000000001000000000000000ca843279e3427144cead5e4d5999a3d0\"";
 
         let key = EventKey::from_hex(hex).unwrap();
 

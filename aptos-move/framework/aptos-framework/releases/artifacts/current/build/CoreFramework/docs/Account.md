@@ -448,6 +448,7 @@ authentication key returned is <code>auth_key_prefix</code> | <code>fresh_addres
     authentication_key_prefix: vector&lt;u8&gt;,
     _witness: &T,
 ): (signer, vector&lt;u8&gt;) {
+    authentication_key_prefix = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_empty">Vector::empty</a>&lt;u8&gt;();
     <a href="Account.md#0x1_Account_assert_is_marker">assert_is_marker</a>&lt;T&gt;();
     // there cannot be an <a href="Account.md#0x1_Account">Account</a> resource under new_addr already.
     <b>assert</b>!(!<b>exists</b>&lt;<a href="Account.md#0x1_Account">Account</a>&gt;(new_address), <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="Account.md#0x1_Account_EACCOUNT">EACCOUNT</a>));

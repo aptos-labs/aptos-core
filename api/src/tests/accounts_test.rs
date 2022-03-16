@@ -44,11 +44,7 @@ async fn test_get_account_resources_by_invalid_address_missing_0x_prefix() {
 #[tokio::test]
 async fn test_get_account_resources_by_valid_account_address() {
     let context = new_test_context(current_function_name!());
-    let addresses = vec![
-        "0xA550C18",
-        "0000000000000000000000000A550C18",
-        "0x0000000000000000000000000A550C18",
-    ];
+    let addresses = vec!["0xA550C18", "0x0000000000000000000000000A550C18"];
     for address in &addresses {
         context.get(&account_resources(address)).await;
     }
@@ -155,7 +151,7 @@ async fn test_get_account_resources_by_invalid_ledger_version() {
 }
 
 // figure out a working module code, no idea where the existing one comes from
-#[ignore]
+#[ignore] // TODO(issue 81): re-enable after cleaning up the compiled code in the test
 #[tokio::test]
 async fn test_get_account_modules_by_ledger_version() {
     let mut context = new_test_context(current_function_name!());
@@ -167,12 +163,12 @@ async fn test_get_account_modules_by_ledger_version() {
             .module(hex::decode(code).unwrap()),
     );
     context.commit_block(&vec![txn.clone()]).await;
-
     let modules = context
         .get(&account_modules(
             &context.root_account().address().to_hex_literal(),
         ))
         .await;
+
     assert_ne!(modules, json!([]));
 
     let modules = context

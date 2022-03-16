@@ -8,7 +8,7 @@ AccountAddress:
   NEWTYPESTRUCT:
     TUPLEARRAY:
       CONTENT: U8
-      SIZE: 16
+      SIZE: 32
 AccountAuthenticator:
   ENUM:
     0:

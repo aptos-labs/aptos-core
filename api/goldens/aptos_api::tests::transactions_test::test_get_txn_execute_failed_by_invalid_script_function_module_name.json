@@ -1,13 +1,13 @@
 {
   "type": "user_transaction",
   "version": "2",
-  "hash": "0x068b7171b72a144c0dda8460ab7c14b95308a33f6a1b71dff8076bbf63ede87c",
-  "state_root_hash": "0x57bca4f1a7008c139699a2391570a289c4a0b317daf1639a67e08514953efc4a",
+  "hash": "0x7e7cce0816c8893b387ee9df6639b76057b451fa2ee7fad79b150d1e5ab39972",
+  "state_root_hash": "0xa8c0cc35de6613e7eb0cd2310607b71e91ff9d4e0c8b3a8c42e15b8c7dca8de1",
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "1",
   "success": false,
   "vm_status": "Move bytecode deserialization / verification failed, including script function not found or invalid arguments",
-  "accumulator_root_hash": "0x18e048381413700912f753e3c6fd68b409ef64ffc89138768c5c4665851ad79a",
+  "accumulator_root_hash": "0xe2506f664203c7b385af343b1765000fe33047146f01baa5d52eccd7be7a826d",
   "sender": "0xa550c18",
   "sequence_number": "0",
   "max_gas_amount": "1000",
@@ -19,14 +19,14 @@
     "function": "0x1::TestCoinInvalid::transfer",
     "type_arguments": [],
     "arguments": [
-      "0x000000000000000000000000000000dd",
+      "0x00000000000000000000000000000000000000000000000000000000000000dd",
       "0x0100000000000000"
     ]
   },
   "signature": {
     "type": "ed25519_signature",
     "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-    "signature": "0x7500425461b97f791cd2c51144c0808818be0112f02cf40dd0e1d5e9108d61b02009bb5d13b1d3d8c956c9ca50b8cd6769a616e9430c935d04cd17ca04b75103"
+    "signature": "0xeaee467894acc7b18eb3614430176a8254a986fcb47077a5535ae3b019ce895084487df1b0ef5062a6139b891792e2c1c4538d582b2a553b0f86951b9c76db0e"
   },
   "events": [],
   "timestamp": "1"

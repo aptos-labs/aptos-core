@@ -42,7 +42,7 @@ aptos-types = { path = "../../types", features = ["fuzzing"] }
 aptos-vault-client = { path = "../../secure/storage/vault", features = ["fuzzing"] }
 aptosdb = { path = "../../storage/aptosdb", features = ["fuzzing"] }
 move-vm-types = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e", features = ["fuzzing"] }
-move-core-types = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e", features = ["fuzzing"] }
+move-core-types = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e", features = ["fuzzing", "address32"] }
 network = { path = "../../network", features = ["fuzzing"] }
 safety-rules = { path = "../../consensus/safety-rules", features = ["fuzzing", "testing"]  }
 scratchpad = { path = "../../storage/scratchpad", features = ["fuzzing"]}

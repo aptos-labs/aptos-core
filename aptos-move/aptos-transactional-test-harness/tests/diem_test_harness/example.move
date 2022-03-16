@@ -1,4 +1,4 @@
-//# init --addresses A=0x4777eb94491650dd3f095ce6f778acb6
+//# init --addresses A=0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
 //#      --private-keys A=56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f
 
 
@@ -8,7 +8,7 @@
 //
 //# run --signers DiemRoot
 //#     --private-key DiemRoot
-//#     --args 0 0x4777eb94491650dd3f095ce6f778acb6 x"f75daa73fc071f93593335eb9033da80" x"40"
+//#     --args 0 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6 x"f75daa73fc071f93593335eb9033da80" x"40"
 //#     -- 0x1::AccountCreationScripts::create_validator_operator_account
 
 
@@ -54,7 +54,7 @@ module A::O {
 //
 //# run --signers A
 //#     --private-key A
-//#     -- 0x4777eb94491650dd3f095ce6f778acb6::M::foo
+//#     -- 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::M::foo
 
 
 
@@ -62,16 +62,16 @@ module A::O {
 // private key mapping set by the init command.
 //
 //# run --signers A
-//#     -- 0x4777eb94491650dd3f095ce6f778acb6::M::foo
+//#     -- 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::M::foo
 
 
 
 // Literal signer addresses and private keys can be used, but again, this is often repetitive and
 // not recommended.
 //
-//# run --signers 0x4777eb94491650dd3f095ce6f778acb6
+//# run --signers 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
 //#     --private-key 56a26140eb233750cd14fb168c3eb4bd0782b099cde626ec8aff7f3cceb6364f
-//#     -- 0x4777eb94491650dd3f095ce6f778acb6::M::foo
+//#     -- 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::M::foo
 
 
 

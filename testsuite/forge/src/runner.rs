@@ -160,9 +160,7 @@ impl<'cfg> ForgeConfig<'cfg> {
     }
 
     pub fn number_of_tests(&self) -> usize {
-        self.admin_tests.len()
-            + self.network_tests.len()
-            + self.aptos_tests.len()
+        self.admin_tests.len() + self.network_tests.len() + self.aptos_tests.len()
     }
 
     pub fn all_tests(&self) -> impl Iterator<Item = &'cfg dyn Test> + 'cfg {

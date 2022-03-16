@@ -15,25 +15,25 @@ key 0x1::DiemAccount::DiemAccount {
     withdraw_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::WithdrawCapability> {
         vec: [
             store 0x1::DiemAccount::WithdrawCapability {
-                account_address: 4777eb94491650dd3f095ce6f778acb6
+                account_address: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
             },
         ]
     }
     key_rotation_capability: copy drop store 0x1::Option::Option<0x1::DiemAccount::KeyRotationCapability> {
         vec: [
             store 0x1::DiemAccount::KeyRotationCapability {
-                account_address: 4777eb94491650dd3f095ce6f778acb6
+                account_address: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
             },
         ]
     }
     received_events: store 0x1::Event::EventHandle<0x1::DiemAccount::ReceivedPaymentEvent> {
         counter: 0
         guid: drop store 0x1::Event::GUIDWrapper {
-            len_bytes: 24u8
+            len_bytes: 40u8
             guid: drop store 0x1::GUID::GUID {
                 id: copy drop store 0x1::GUID::ID {
                     creation_num: 0
-                    addr: 4777eb94491650dd3f095ce6f778acb6
+                    addr: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
                 }
             }
         }
@@ -41,11 +41,11 @@ key 0x1::DiemAccount::DiemAccount {
     sent_events: store 0x1::Event::EventHandle<0x1::DiemAccount::SentPaymentEvent> {
         counter: 0
         guid: drop store 0x1::Event::GUIDWrapper {
-            len_bytes: 24u8
+            len_bytes: 40u8
             guid: drop store 0x1::GUID::GUID {
                 id: copy drop store 0x1::GUID::ID {
                     creation_num: 1
-                    addr: 4777eb94491650dd3f095ce6f778acb6
+                    addr: f75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6
                 }
             }
         }

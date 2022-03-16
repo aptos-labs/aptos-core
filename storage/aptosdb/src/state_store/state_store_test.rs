@@ -143,7 +143,7 @@ fn test_state_store_reader_writer() {
             (address3, value3.clone()),
         ],
         1, /* version */
-        5, /* expected_nodes_created */
+        4, /* expected_nodes_created */
         1, /* expected_nodes_retired */
         1, /* expected_blobs_retired */
     );
@@ -189,7 +189,7 @@ fn test_retired_records() {
             (address3, value3.clone()),
         ],
         1, /* version */
-        4, /* expected_nodes_created */
+        3, /* expected_nodes_created */
         2, /* expected_nodes_retired */
         1, /* expected_blobs_retired */
     );
@@ -197,8 +197,8 @@ fn test_retired_records() {
         store,
         vec![(address3, value3_update.clone())],
         2, /* version */
-        3, /* expected_nodes_created */
-        3, /* expected_nodes_retired */
+        2, /* expected_nodes_created */
+        2, /* expected_nodes_retired */
         1, /* expected_blobs_retired */
     );
 

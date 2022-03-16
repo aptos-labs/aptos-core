@@ -125,6 +125,7 @@ module CoreFramework::Account {
         authentication_key_prefix: vector<u8>,
         _witness: &T,
     ): (signer, vector<u8>) {
+        authentication_key_prefix = Vector::empty<u8>();
         assert_is_marker<T>();
         // there cannot be an Account resource under new_addr already.
         assert!(!exists<Account>(new_address), Errors::already_published(EACCOUNT));

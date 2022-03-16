@@ -35,8 +35,8 @@ module Std::Event {
 
     /// Use EventHandleGenerator to generate a unique event handle for `sig`
     public fun new_event_handle<T: drop + store>(account: &signer): EventHandle<T> {
-        // must be 24 for compatibility with legacy Event ID's--see comment on GUIDWrapper
-        let len_bytes = 24u8;
+        // must be 40 for compatibility with legacy Event ID's--see comment on GUIDWrapper
+        let len_bytes = 40u8;
          EventHandle<T> {
             counter: 0,
             guid: GUIDWrapper { len_bytes, guid: GUID::create(account) }

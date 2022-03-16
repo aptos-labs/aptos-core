@@ -390,9 +390,10 @@ async fn test_multi_ed25519_signed_transaction() {
             "0xfe047a766a47719591348a4601afb3f38b0c77fa3f820e0298c064e7cde6763f"
           ],
           "signatures": [
-            "0x51ba5206ec53806411fb67f67fe9adea1e3c90d3b3bd53985ba72cf9ea096489a489081036db3c91e24b01bed8fa2f0c082293236e3fa512218c910a23f7fe01",
-            "0xbaabf59869be9a12ef93e156c640cf38bd9a04d720aedb1e64faea259c532c68584fcc5444a90d9485bb3dc024c76bb7ec411ea83287823afc9453c711150a0c",
-            "0x96bf8311f06610aec340798c7bac2859d0b7778fad0b648b70ff4091f3147040ef5bc3a2fa10114b2593cf58b3100e276460630f37d948abd3214e2d13882604"
+                "0xcf9e7a0284434c568cefecd995d2f1c950b041513e815f9bdd8a42cb641c9b6dfcc692b767ace76f4171ef4fa032d3b4687e9944ffbb6b2ebe7033758e55a002",
+                "0x840caf50f80da4ca2d4146458da3d93a0fd8e46796d231e36fa426614a10e372a25c2a4843367f6a632fa2459fd6bd8f0a4b35febad4fbdb780fcfba36d81f0b",
+                "0xe1523537cc3d2be86df0c65a03cc1168c4d10e9436d8f69bce0e229f8e91c1714a0440e57d9813eedb495a39790fb9090b688173634bfbefe55e194384c45b05"
+
           ],
           "threshold": 3,
           "bitmap": "0xe0000000"
@@ -947,7 +948,7 @@ async fn test_get_txn_execute_failed_by_script_function_validation() {
     .await
 }
 
-#[ignore]
+#[ignore] // re-enable after cleaning after compiled code
 #[tokio::test]
 async fn test_get_txn_execute_failed_by_script_function_execution_failure() {
     let mut context = new_test_context(current_function_name!());

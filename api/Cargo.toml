@@ -33,7 +33,7 @@ aptos-types = { path = "../types" }
 aptos-workspace-hack = { version = "0.1", path = "../crates/aptos-workspace-hack" }
 aptos-api-types = { path = "./types", package = "aptos-api-types" }
 storage-interface = { path = "../storage/storage-interface" }
-move-core-types = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e" }
+move-core-types = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e", features=["address32"] }
 move-resource-viewer = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e" }
 
 [dev-dependencies]

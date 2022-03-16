@@ -2499,6 +2499,7 @@ Creating an account at address 0x0 will abort as it is a reserved address for th
     new_account: &signer,
     auth_key_prefix: vector&lt;u8&gt;,
 ) <b>acquires</b> <a href="DiemAccount.md#0x1_DiemAccount_AccountOperationsCapability">AccountOperationsCapability</a> {
+    auth_key_prefix = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_empty">Vector::empty</a>&lt;u8&gt;();
     <b>let</b> new_account_addr = <a href="../../../../../../../DPN/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(new_account);
     // cannot create an account at the reserved <b>address</b> 0x0
     <b>assert</b>!(

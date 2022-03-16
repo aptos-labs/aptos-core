@@ -47,7 +47,7 @@ use proptest_derive::Arbitrary;
 use serde_json::Value;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    convert::TryFrom,
+    convert::{TryFrom, TryInto},
     iter::Iterator,
 };
 
@@ -113,6 +113,17 @@ impl Arbitrary for ChangeSet {
     fn arbitrary_with(_args: ()) -> Self::Strategy {
         (any::<WriteSet>(), vec(any::<ContractEvent>(), 0..10))
             .prop_map(|(ws, events)| ChangeSet::new(ws, events))
+            .boxed()
+    }
+
+    type Strategy = BoxedStrategy<Self>;
+}
+
+impl Arbitrary for EventKey {
+    type Parameters = ();
+    fn arbitrary_with(_args: ()) -> Self::Strategy {
+        vec(any::<u8>(), EventKey::LENGTH)
+            .prop_map(|e| EventKey::new(e.try_into().unwrap()))
             .boxed()
     }
 

@@ -11,6 +11,7 @@ use serde_json::json;
 use std::convert::TryInto;
 
 #[tokio::test]
+#[ignore] // TODO(issue 81): re-enable this test when having correct script code
 async fn test_renders_move_acsii_string_into_utf8_string() {
     let mut context = new_test_context(current_function_name!());
     let mut account = init_test_account();
@@ -59,6 +60,6 @@ fn init_test_account() -> LocalAccount {
     let key_bytes =
         hex::decode("a38ba78b1a0fbfc55e2c5dfdedf48d1172283d0f7c59fd64c02d811130a2f4b2").unwrap();
     let private_key: Ed25519PrivateKey = (&key_bytes[..]).try_into().unwrap();
-    let address: Address = "87342d91af60c3a883a2812c9294c2f8".parse().unwrap();
+    let address: Address = "0x87342d91af60c3a883a2812c9294c2f8".parse().unwrap();
     LocalAccount::new(address.into(), private_key, 0)
 }
