@@ -1750,9 +1750,9 @@ dependencies = [
 
 [[package]]
 name = "cfg-expr"
-version = "0.9.1"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3431df59f28accaf4cb4eed4a9acc66bea3f3c3753aa6cdc2f024174ef232af7"
+checksum = "5e068cb2806bbc15b439846dc16c5f89f8599f2c3e4d73d4449d38f9b2f0b6c5"
 dependencies = [
  "smallvec",
  "target-lexicon",
@@ -2413,9 +2413,9 @@ dependencies = [
 
 [[package]]
 name = "debug-ignore"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "223089cd5a4e4491f0a0dddd9933f9575123160cf96ca2bb56a690046ecf1745"
+checksum = "7e51694c5f8b91baf933e6429a3df4ff3e9f1160386d150790b97bef73337d1b"
 
 [[package]]
 name = "debug-interface"
@@ -2447,14 +2447,14 @@ dependencies = [
 
 [[package]]
 name = "determinator"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d6cd961d655fa64c18f515cf6c2e4bd38deaeaa1a8c7d0142c18d750ef73d18"
+checksum = "d8d79c522bf6d953c41da626c46ad0c82d22859e0601d8a4f442b8d25f80e0f8"
 dependencies = [
  "camino",
  "globset",
  "guppy",
- "itertools",
+ "guppy-workspace-hack",
  "once_cell",
  "petgraph 0.6.0",
  "rayon",
@@ -3538,9 +3538,9 @@ dependencies = [
 
 [[package]]
 name = "guppy"
-version = "0.12.6"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d2086fdcefd1a3dc6f4ba4568147648231e2211be1fcc4d1063601c6baadd2e"
+checksum = "6570bfb78ea4e0c039bd212e353a3de840f5ef0fa5439356b5451f6e0df7678d"
 dependencies = [
  "camino",
  "cargo_metadata",
@@ -3605,9 +3605,9 @@ dependencies = [
 
 [[package]]
 name = "hakari"
-version = "0.8.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f48905a7968260802691e8b6cc2e9426822b79eaf9164d07f2212e9327181b3e"
+checksum = "b338af81b25e5e8a7a02b574d94cf043b7851f27cac9159fbca612390332e6c8"
 dependencies = [
  "atomicwrites",
  "bimap",
@@ -3624,7 +3624,7 @@ dependencies = [
  "pathdiff",
  "rayon",
  "serde 1.0.136",
- "strip-ansi-escapes",
+ "tabular",
  "target-spec",
  "toml",
  "toml_edit",
@@ -3748,6 +3748,15 @@ checksum = "c1441c6b1e930e2817404b5046f1f989899143a12bf92de603b69f4e0aee1e15"
 dependencies = [
  "crypto-mac",
  "digest 0.9.0",
+]
+
+[[package]]
+name = "home"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2456aef2e6b6a9784192ae780c0f15bc57df0e918585282325e8c8ac27737654"
+dependencies = [
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -5398,34 +5407,36 @@ dependencies = [
 ]
 
 [[package]]
-name = "nextest-config"
-version = "0.1.0"
-source = "git+https://github.com/diem/diem-devtools?rev=f99a204e3d3f8e503d51d7df42e55c8282b59154#f99a204e3d3f8e503d51d7df42e55c8282b59154"
+name = "nextest-metadata"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e37186bfe40f2b45c40ca0a5d0fccd9d818ff0b893e3352fdd970cf366d11f79"
 dependencies = [
  "camino",
- "config",
- "humantime-serde",
  "serde 1.0.136",
- "toml",
+ "serde_json",
 ]
 
 [[package]]
 name = "nextest-runner"
-version = "0.1.0"
-source = "git+https://github.com/diem/diem-devtools?rev=f99a204e3d3f8e503d51d7df42e55c8282b59154#f99a204e3d3f8e503d51d7df42e55c8282b59154"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e6d422e5e4a9ec48d70cae317bf623580a3e70defcc558b0a150bbb01b4000b"
 dependencies = [
  "aho-corasick",
  "camino",
  "cargo_metadata",
  "chrono",
+ "config",
  "crossbeam-channel",
  "ctrlc",
  "debug-ignore",
  "duct",
  "guppy",
+ "home",
+ "humantime-serde",
  "indent_write",
- "nextest-config",
- "nextest-summaries",
+ "nextest-metadata",
  "num_cpus",
  "once_cell",
  "owo-colors",
@@ -5434,16 +5445,9 @@ dependencies = [
  "serde 1.0.136",
  "serde_json",
  "strip-ansi-escapes",
+ "target-spec",
+ "toml",
  "twox-hash",
-]
-
-[[package]]
-name = "nextest-summaries"
-version = "0.1.0"
-source = "git+https://github.com/diem/diem-devtools?rev=f99a204e3d3f8e503d51d7df42e55c8282b59154#f99a204e3d3f8e503d51d7df42e55c8282b59154"
-dependencies = [
- "camino",
- "serde 1.0.136",
 ]
 
 [[package]]
@@ -6256,8 +6260,9 @@ checksum = "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3"
 
 [[package]]
 name = "quick-junit"
-version = "0.1.0"
-source = "git+https://github.com/diem/diem-devtools?rev=f99a204e3d3f8e503d51d7df42e55c8282b59154#f99a204e3d3f8e503d51d7df42e55c8282b59154"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b67e2983c3a1c129640a674165ab8127066cfcecd3095befa182a77ffd93e00"
 dependencies = [
  "chrono",
  "indexmap",
@@ -7865,6 +7870,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tabular"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9a2882c514780a1973df90de9d68adcd8871bacc9a6331c3f28e6d2ff91a3d1"
+dependencies = [
+ "strip-ansi-escapes",
+ "unicode-width",
+]
+
+[[package]]
 name = "tap"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7878,11 +7893,12 @@ checksum = "d7fa7e55043acb85fca6b3c01485a2eeb6b69c5d21002e273c79e465f43b7ac1"
 
 [[package]]
 name = "target-spec"
-version = "0.9.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fdc03d14ed79a75163d3509ebf1970a2ec67945c5cac68d947d1dddace43cec0"
+checksum = "6a479a83ee0f97d90b2ba593c696968c94d781835117362d9fcd42ca34faa5f1"
 dependencies = [
  "cfg-expr",
+ "guppy-workspace-hack",
  "serde 1.0.136",
  "target-lexicon",
 ]
@@ -8261,9 +8277,9 @@ dependencies = [
 
 [[package]]
 name = "toml_edit"
-version = "0.10.1"
+version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2782eb01c48f7f6f66d63bebe64dd8302dbf6bc0be0d65a85a1854d472e2dfa8"
+checksum = "744e9ed5b352340aa47ce033716991b5589e23781acb97cad37d4ea70560f55b"
 dependencies = [
  "combine",
  "indexmap",
@@ -9123,7 +9139,6 @@ dependencies = [
  "indexmap",
  "indoc",
  "log",
- "nextest-config",
  "nextest-runner",
  "rayon",
  "regex",

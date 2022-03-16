@@ -50,7 +50,7 @@ serde_json = { version = "1.0.79", features = ["indexmap", "preserve_order", "st
 sha-1 = { version = "0.9.8", features = ["std"] }
 standback = { version = "0.2.17", default-features = false, features = ["std"] }
 subtle = { version = "2.4.1", default-features = false, features = ["std"] }
-tokio = { version = "1.17.0", features = ["bytes", "fs", "full", "io-std", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "socket2", "sync", "test-util", "time", "tokio-macros", "winapi"] }
+tokio = { version = "1.17.0", features = ["bytes", "fs", "full", "io-std", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "socket2", "sync", "test-util", "time", "tokio-macros"] }
 tokio-util = { version = "0.6.9", features = ["codec", "compat", "futures-io", "io"] }
 toml = { version = "0.5.8" }
 tracing = { version = "0.1.32", features = ["attributes", "log", "std", "tracing-attributes"] }
@@ -99,7 +99,7 @@ sha-1 = { version = "0.9.8", features = ["std"] }
 standback = { version = "0.2.17", default-features = false, features = ["std"] }
 subtle = { version = "2.4.1", default-features = false, features = ["std"] }
 syn = { version = "1.0.86", features = ["clone-impls", "derive", "extra-traits", "fold", "full", "parsing", "printing", "proc-macro", "quote", "visit", "visit-mut"] }
-tokio = { version = "1.17.0", features = ["bytes", "fs", "full", "io-std", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "socket2", "sync", "test-util", "time", "tokio-macros", "winapi"] }
+tokio = { version = "1.17.0", features = ["bytes", "fs", "full", "io-std", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "socket2", "sync", "test-util", "time", "tokio-macros"] }
 tokio-util = { version = "0.6.9", features = ["codec", "compat", "futures-io", "io"] }
 toml = { version = "0.5.8" }
 tracing = { version = "0.1.32", features = ["attributes", "log", "std", "tracing-attributes"] }

@@ -8,14 +8,15 @@ use crate::{
 };
 use anyhow::{bail, Context};
 use camino::Utf8PathBuf;
-use nextest_config::{NextestConfig, StatusLevel, TestOutputDisplay};
 use nextest_runner::{
+    config::NextestConfig,
     partition::PartitionerBuilder,
-    reporter::TestReporterBuilder,
+    reporter::{StatusLevel, TestOutputDisplay, TestReporterBuilder},
     runner::TestRunnerBuilder,
+    signal::SignalHandler,
+    target_runner::TargetRunner,
     test_filter::{RunIgnored, TestFilterBuilder},
-    test_list::{TestBinary, TestList},
-    SignalHandler,
+    test_list::{BinaryList, RustTestArtifact, TestList},
 };
 use std::{ffi::OsString, io::Cursor};
 use structopt::StructOpt;
@@ -164,16 +165,18 @@ pub fn run(args: Args, xctx: XContext) -> Result<()> {
             .unwrap_or(NextestConfig::DEFAULT_PROFILE),
     )?;
 
-    let test_binaries = TestBinary::from_messages(package_graph, Cursor::new(stdout))?;
+    let test_binaries = BinaryList::from_messages(Cursor::new(stdout), package_graph)?;
 
     let test_filter = TestFilterBuilder::new(args.run_ignored, args.partition, &args.filters);
-    let test_list = TestList::new(test_binaries, &test_filter)?;
+    let test_artifacts =
+        RustTestArtifact::from_binary_list(package_graph, test_binaries, None, None)?;
+    let test_list = TestList::new(test_artifacts, &test_filter, &TargetRunner::empty())?;
 
     let handler = SignalHandler::new().context("failed to install nextest signal handler")?;
-    let runner = args
-        .runner_opts
-        .to_builder()
-        .build(&test_list, &profile, handler);
+    let runner =
+        args.runner_opts
+            .to_builder()
+            .build(&test_list, &profile, handler, TargetRunner::empty());
 
     let mut reporter = args.reporter_opts.to_builder().build(&test_list, &profile);
     if args.build_args.color.should_colorize(Stream::Stderr) {
