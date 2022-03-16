@@ -4,7 +4,7 @@ slug: "basics-validator-nodes"
 ---
 import BlockQuote from "@site/src/components/BlockQuote";
 
-An Aptos node is a peer entity of the Aptos ecosystem that tracks the [state](/reference/glossary#state) of the Aptos Blockchain. Clients interact with the blockchain via Aptos nodes. There are two types of nodes:
+An Aptos node is an entity of the Aptos ecosystem that tracks the state of the Aptos Blockchain. Clients interact with the blockchain via Aptos nodes. There are two types of nodes:
 * Validator nodes
 * [FullNodes](basics-fullnodes.md)
 
@@ -23,9 +23,9 @@ The [Aptos-core](/reference/glossary#aptos-core) software can be configured to r
 
 When a transaction is submitted to the Aptos Blockchain, validator nodes run a distributed [consensus protocol](/reference/glossary#consensus-protocol), execute the transaction, and store the transaction and the execution results on the blockchain. Validator nodes decide which transactions will be added to the blockchain and in which order.
 
-The Aptos Payment Network uses a Byzantine Fault Tolerance (BFT) consensus protocol for validator nodes to agree on the ledger of finalized transactions and their execution. Validator nodes process these transactions to include them in the blockchain’s database, which they maintain. This means that validator nodes always have the current [state](/reference/glossary#state) of the blockchain.
+The Aptos Blockchain uses a Byzantine Fault Tolerance (BFT) consensus protocol for validator nodes to agree on the ledger of finalized transactions and their execution results. Validator nodes process these transactions and include them in their local copy of the blockchain database. This means that up-to-date validator nodes always maintain a copy of the current [state](/reference/glossary#state) of the blockchain, locally.
 
-A validator node communicates directly with other validator nodes over a private network. [FullNodes](basics-fullnodes.md) are an external validation resource for finalized transaction history. They receive transactions from upstream nodes and then re-execute them locally (the same way a validator node executes transactions). FullNodes store the results of the re-execution to local storage. In doing so, they will notice and can provide evidence if there is any attempt to rewrite history. This helps to ensure that the validator nodes are not colluding on arbitrary transaction execution.
+Validator nodes communicate directly with other validator nodes over a private network. [FullNodes](basics-fullnodes.md) are an external validation and/or dissemination resource for the finalized transaction history. They receive transactions from peers and may re-execute them locally (the same way a validator executes transactions). FullNodes store the results of re-executed transactions to local storage. In doing so, they can challenge any foul-play by validators and provide evidence if there is any attempt to re-write or modify the blockchain history. This helps to mitigate against validator corruption and/or collusion.
 
 <BlockQuote type="info">
 The AptosBFT consensus protocol provides fault tolerance of up to one-third of malicious validator nodes.
@@ -36,11 +36,11 @@ The AptosBFT consensus protocol provides fault tolerance of up to one-third of m
 ![validator.svg](/img/docs/validator.svg)
 ### Mempool
 
-Mempool is a validator node component that holds an in-memory buffer of transactions that have been submitted but not yet agreed upon and executed. This buffer is replicated between validator nodes.
+Mempool is a component within each node that holds an in-memory buffer of transactions that have been submitted to the blockchain, but not yet agreed upon or executed. This buffer is replicated between validator nodes and FullNodes.
 
-The JSON-RPC service of a FullNode sends transactions to a validator node's mempool. Mempool performs initial checks on the requests to protect the other parts of the validator node from corrupt or high volume input. When a new transaction passes the initial checks and is added to the mempool, it is then shared to the mempools of other validator nodes in the Aptos Payment Network.
+The JSON-RPC service of a FullNode sends transactions to a validator node's mempool. Mempool performs various checks on the transactions to ensure transaction validity and protect against DOS attacks. When a new transaction passes initial verification and is added to mempool, it is then distributed to the mempools of other validator nodes in the network.
 
-When a validator node is the leader, its consensus component pulls the transactions from its mempool and proposes the order of the transactions that form a block by broadcasting it to other validators. The validators then execute and submit votes on the proposal.
+When a validator node temporarily becomes a leader in the consensus protocol, consensus pulls the transactions from mempool and proposes a new transaction block. This block is broadcasted to other validators and contains a total ordering over all transactions in the block. Each validator then executes the block and submits votes on whether or not to accept the new block proposal.
 
 ### Consensus
 
@@ -48,16 +48,16 @@ Consensus is the component that is responsible for ordering blocks of transactio
 
 ### Execution
 
-Execution is the component that coordinates the execution of a block of transactions and maintains a transient state. The consensus component votes on this transient state. The execution component maintains an in-memory representation of the execution results until the consensus component commits the block to the distributed database. The execution component uses the virtual machine to execute transactions. Execution acts as the glue layer between the input of the system represented by transactions, storage providing a persistency layer, and the virtual machine for execution.
+Execution is the component that coordinates the execution of a block of transactions and maintains a transient state. Consensus votes on this transient state. Execution maintains an in-memory representation of the execution results until consensus commits the block to the distributed database. Execution uses the virtual machine to execute transactions. Execution acts as the glue layer between the inputs of the system (represented by transactions), storage (providing a persistency layer), and the virtual machine (for execution).
 
-### Virtual machine
+### Virtual machine (VM)
 
-The virtual machine component is used to run the Move program included in a submitted transaction and determine the results.  A node's mempool uses the virtual machine component to perform validation checks on transactions, while its execution component uses it to execute transactions.
+The virtual machine (VM) is used to run the Move program within each transaction and determine execution results. A node's mempool uses the VM to perform verification checks on transactions, while execution uses the VM to execute transactions.
 
 ### Storage
 
-The storage component is used to persist agreed upon blocks of transactions and their execution results.
+The storage component is used to persist agreed upon blocks of transactions and their execution results to the local database.
 
 ### State synchronizer
 
-Nodes use their state synchronizer component to “catch up” to the latest state of the blockchain.
+Nodes use their state synchronizer component to “catch up” to the latest state of the blockchain and stay up-to-date.
