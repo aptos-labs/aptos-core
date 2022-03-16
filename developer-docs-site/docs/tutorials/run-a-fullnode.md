@@ -94,8 +94,107 @@ During the initial synchronization of your FullNode, there may be a lot of data 
   du -cs -BM /opt/aptos/data
   ```
 
+## Advanced Guide
+
+If you want to dive into more customization of your node confg. This advanced guide will show you how to:
+* Create a static network identity for your new Fullnode
+* Retrieve the public network identity for other nodes allowlist
+* Start a node with or without a static network identity
+
+### Create a static identity for a fullnode
+
+Fullnodes will automatically start up with a randomly generated network identity (a PeerId and a Public Key pair).  This works great for regular fullnodes, but if you need another node to allowlist you or provide specific permissions, or if you want to run your fullnode always with a same identity, creating a static network identity can help.
+
+1. Build the `aptos-operational-tool` using the [aptos-labs/aptos-core][] repo, we can build using cargo to run these tools. e.g.
+    ```
+    $ git clone https://github.com/aptos-labs/aptos-core.git
+    $ cd aptos-core
+    $ ./scripts/dev_setup.sh
+    $ source ~/.cargo/env
+    $ cargo run -p aptos-operational-tool -- <command> <args>
+    ```
+
+    Alternatively, you can use our docker image. Start a docker container with the latest tools version e.g.
+
+    ```
+    $ docker run -i aptoslab/tools:devnet sh -x
+    $ aptos-operational-tool <command> <arg>
+    ```
+
+2. Run the key generator, to output a hex encoded static x25519 PrivateKey.  This will be your private key for your network identity.
+   ```
+    $ cargo run -p aptos-operational-tool -- generate-key --encoding hex --key-type x25519 --key-file /path/to/private-key.txt
+   ```
+
+   Or inside aptoslab/tools docker container:
+
+    ```
+    $ aptos-operational-tool generate-key --encoding hex --key-type x25519 --key-file /path/to/private-key.txt
+    ```
+
+    Example key file:
+
+    ```
+    $ cat /path/to/private-key.txt
+    B8BD811A91D8E6E0C6DAC991009F189337378760B55F3AD05580235325615C74
+    ```
+
+### Retrieve public network identity
+
+1. Run the peer generator on the previous key file
+   ```
+    $ cargo run -p aptos-operational-tool -- extract-peer-from-file --encoding hex --key-file /path/to/private-key.txt --output-file /path/to/peer-info.yaml
+   ```
+
+   Or inside aptoslab/tools docker container:
+
+    ```
+    $ aptos-operational-tool extract-peer-from-file --encoding hex --key-file /path/to/private-key.txt --output-file /path/to/peer-info.yaml
+    ```
+
+   Example output yaml:
+
+   ```
+    ---
+    14fd60f81a2f8eedb0244ec07a26e575:
+      addresses: []
+      keys:
+        - ca3579457555c80fc7bb39964eb298c414fd60f81a2f8eedb0244ec07a26e575
+      role: Downstream
+    ```
+
+    In this example, `14fd60f81a2f8eedb0244ec07a26e575` is the peer id, and `ca3579457555c80fc7bb39964eb298c414fd60f81a2f8eedb0244ec07a26e575` is the public key derived from the private key you generated from previous step.
+
+2. This will create a yaml file, that will have your public identity in it for providing to an upstream full node. This is useful if you want to connect your fullnode through a specific upstream full node, and that full node only allows known identity to connect to them. 
+
+### Start a node with the static network identity
+
+Once we have the static identity, we can startup a node with it.
+```
+full_node_networks:
+- network_id: "public"
+  discovery_method: "onchain"
+  identity:
+    type: "from_config"
+    key: "<PRIVATE_KEY>"
+    peer_id: "<PEER_ID>"
+```
+
+Example:
+
+```
+full_node_networks:
+- network_id: "public"
+  discovery_method: "onchain"
+  identity:
+    type: "from_config"
+    key: "B8BD811A91D8E6E0C6DAC991009F189337378760B55F3AD05580235325615C74"
+    peer_id: "14fd60f81a2f8eedb0244ec07a26e575"
+```
+
 [pfn_config_file]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/public_full_node.yaml
 [pfn_docker_compose]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/docker-compose.yaml
 [rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api
 [devnet_genesis]: https://devnet.aptoslabs.com/genesis.blob
 [devnet_waypoint]: https://devnet.aptoslabs.com/waypoint.txt
+[aptos-labs/aptos-core]: https://github.com/aptos-labs/aptos-core.git
