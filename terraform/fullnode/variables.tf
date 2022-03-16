@@ -90,6 +90,11 @@ variable "workspace_dns" {
   default     = true
 }
 
+variable "dns_prefix_name" {
+  description = "DNS prefix for fullnode url"
+  default     = "fullnode"
+}
+
 variable "enable_pfn_logger" {
   description = "Enable separate public fullnode logger pod"
   default     = false
