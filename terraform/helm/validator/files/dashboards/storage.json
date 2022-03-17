@@ -19263,7 +19263,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum by (owner, kubernetes_pod_name) (aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=~\"$cf_name\"})",
+              "expr": "sum by (owner, kubernetes_pod_name) (aptos_rocksdb_properties{property_name=\"aptos_rocksdb_total-sst-files-size\", owner=~\"$owner\", role=~\"$role\", cf_name=~\"$cf_name\"})",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -19373,7 +19373,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_total-sst-files-size\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -19483,7 +19483,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_total-sst-files-size\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -19592,7 +19592,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_total-sst-files-size\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -19702,7 +19702,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_total-sst-files-size\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -19812,7 +19812,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_total-sst-files-size\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -19922,7 +19922,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_total-sst-files-size\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -20032,7 +20032,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_total-sst-files-size\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -20142,7 +20142,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_total-sst-files-size\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -20252,7 +20252,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_total-sst-files-size\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -20362,7 +20362,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_total-sst-files-size\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -20472,7 +20472,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_total-sst-files-size\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -20582,7 +20582,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_total-sst-files-size\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -20692,7 +20692,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_total-sst-files-size\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -20802,7 +20802,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_total-sst-files-size\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -20912,7 +20912,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_total-sst-files-size\", owner=~\"$owner\", role=~\"$role\", cf_name=\"$cf_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -21231,7 +21231,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\", cf_name=\"jellyfish_merkle_node\"}",
+              "expr": "aptos_rocksdb_properties{property_name=\"aptos_rocksdb_total-sst-files-size\", owner=~\"$owner\", role=~\"$role\", cf_name=\"jellyfish_merkle_node\"}",
               "interval": "",
               "legendFormat": "{{owner}} {{kubernetes_pod_name}} rocksdb",
               "refId": "A"
@@ -21438,7 +21438,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "avg by(cf_name)(aptos_rocksdb_properties{property_name=\"aptos_rocksdb_cf_size_bytes\", owner=~\"$owner\", role=~\"$role\"})",
+              "expr": "avg by(cf_name)(aptos_rocksdb_properties{property_name=\"aptos_rocksdb_total-sst-files-size\", owner=~\"$owner\", role=~\"$role\"})",
               "format": "time_series",
               "hide": false,
               "instant": false,
