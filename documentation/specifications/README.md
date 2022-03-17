@@ -19,7 +19,7 @@ latency, and an efficient, high-capacity storage system.
 * Highly secure to ensure the safety of funds and financial data.
 * Flexible, so that it can power future innovation in financial services.
 
-The Aptos Blockchain is designed from the ground up to holistically address these requirements and builds on the learnings from existing projects and research — a combination of innovative approaches and well-understood techniques. The [Aptos whitepaper](https://aptos.dev/docs/assets/papers/the-diem-blockchain/2019-09-26.pdf) provides much of the rationale behind the overall design.  More details on the Aptos Labs and its mission are available on [aptoslabs.com](https://aptoslabs.com)
+The Aptos Blockchain is designed from the ground up to holistically address these requirements and builds on the learnings from existing projects and research — a combination of innovative approaches and well-understood techniques. The [Aptos whitepaper](https://aptos.dev/) provides much of the rationale behind the overall design.  More details on the Aptos Labs and its mission are available on [aptoslabs.com](https://aptoslabs.com)
 
 ## Architecture
 

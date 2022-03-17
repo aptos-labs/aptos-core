@@ -10,7 +10,7 @@ We do not specify any of one of these algorithms from first principles, but
 leverage and refer to existing specifications, while laying out exhastively
 where our implementation choices differ from the existant standards. Our
 implementation choices as described are expected to undergo future improvement
-through [Aptos Improvement Processes](https://github.com/diem/dip) (DIPs).
+through [Aptos Improvement Processes](https://github.com/aptos/dip) (DIPs).
 
 ## Algorithms
 
@@ -134,7 +134,7 @@ prefix](https://github.com/aptos-labs/aptos-core/blob/ca14568db9df8c7008dfc66983
 defined as an ASCII-encoded byte-string:
 
 ```rust
-"DIEM::"
+"APTOS::"
 ```
 
 This is concatenated with the

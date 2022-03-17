@@ -56,7 +56,7 @@ Identifier information
 ### Intent identifiers
 
 The Intent Identifier consists of
-* A prefix: `diem://` to explicitly specify how the identifier should be interpreted
+* A prefix: `aptos://` to explicitly specify how the identifier should be interpreted
 * A base URI: *account identifier*
 * Query parameters
   * Provides details for how the request should be fulfilled
@@ -68,29 +68,29 @@ The Intent Identifier consists of
 
 This intent represents a request to receive funds at a given address. Since neither the amount nor currency are prefilled, the sender will define these fields.
 
-* Prefix: `diem://`
+* Prefix: `aptos://`
 * Base URI: Account Identifier: `dm1p7ujcndcl7nudzwt8fglhx6wxn08kgs5tm6mz4us2vfufk`
 * Query parameters: none
 
-**Intent identifier**: `diem://dm1p7ujcndcl7nudzwt8fglhx6wxn08kgs5tm6mz4us2vfufk`
+**Intent identifier**: `aptos://dm1p7ujcndcl7nudzwt8fglhx6wxn08kgs5tm6mz4us2vfufk`
 
 #### Example:  Request Intent with Currency
 This intent represents a request to receive funds in a specific currency at a given address. The amount is defined by the sender.
 
-* Prefix: `diem://`
+* Prefix: `aptos://`
 * Base URI: Account Identifier: `dm1p7ujcndcl7nudzwt8fglhx6wxn08kgs5tm6mz4us2vfufk`
 * Query parameters: `c=XDX` (currency preference is XDX composite token)
 
-**Intent identifier**: `diem://dm1p7ujcndcl7nudzwt8fglhx6wxn08kgs5tm6mz4us2vfufk?c=XDX`
+**Intent identifier**: `aptos://dm1p7ujcndcl7nudzwt8fglhx6wxn08kgs5tm6mz4us2vfufk?c=XDX`
 
 ### Example: Request Intent with Currency and Amount
 This intent represents a request to receive a specific amount in a specific currency for a given address.
 
 Identifier information
-* Prefix: `diem://`
+* Prefix: `aptos://`
 * Base URI: Account Identifier: `dm1p7ujcndcl7nudzwt8fglhx6wxn08kgs5tm6mz4us2vfufk`
 * Query parameters
   * `c=XDX` (currency preference is XDX composite token)
   * `am=1000000` (for 1 XDX, amount is 1000000 µ-units)
 
-**Intent identifier**: `diem://dm1p7ujcndcl7nudzwt8fglhx6wxn08kgs5tm6mz4us2vfufk?c=XDX&am=1000000`
+**Intent identifier**: `aptos://dm1p7ujcndcl7nudzwt8fglhx6wxn08kgs5tm6mz4us2vfufk?c=XDX&am=1000000`

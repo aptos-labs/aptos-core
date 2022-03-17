@@ -145,13 +145,13 @@ Since the Noise layer limits frame sizes to at-most `65535` bytes, of which `16`
 ```rust
 const MAX_NOISE_FRAME_LEN: u16 = 65519; // u16::MAX - AES_GCM_TAG_LEN
 
-const MAX_DIEMNET_FRAME_LEN: u32 = 8388608; // 8 MiB
+const MAX_APTOSNET_FRAME_LEN: u32 = 8388608; // 8 MiB
 
 fn send_one_msg_and_flush(socket: TcpStream, msg: NetworkMsg) {
     // Serialize the message using BCS
     let msg_bytes = bcs::to_bytes(msg);
 
-    if msg_bytes.len() > MAX_DIEMNET_FRAME_LEN {
+    if msg_bytes.len() > MAX_APTOSNET_FRAME_LEN {
         abort("serialized message is too large!");
     }
 

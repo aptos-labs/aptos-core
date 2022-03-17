@@ -125,13 +125,13 @@ Each `serialized-message-bytes` MUST be less than or equal to 8 MiB in size (838
 As an example, basic pseudocode for reading a single AptosNet message might look like:
 
 ```rust
-const MAX_DIEMNET_FRAME_LEN: u32 = 8388608; // 8 MiB
+const MAX_APTOSNET_FRAME_LEN: u32 = 8388608; // 8 MiB
 
 // read the 4-byte length prefix first
 let length_prefix: u32 = noise_socket.read(4).to_host_endian();
 
 // reject messages that are too large
-if length_prefix > MAX_DIEMNET_FRAME_LEN {
+if length_prefix > MAX_APTOSNET_FRAME_LEN {
     reject;
 }
 
