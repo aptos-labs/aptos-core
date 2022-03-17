@@ -25,6 +25,8 @@ ingress:
   acm_certificate:
   wafAclArn:
   loadBalancerSourceRanges:
+  enableStickyness: true
+  cookieDurationSeconds: 86400
 
 monitoring:
   prometheus:

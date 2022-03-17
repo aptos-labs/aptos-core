@@ -22,6 +22,10 @@ metadata:
     {{- if .Values.ingress.wafAclArn }}
     alb.ingress.kubernetes.io/wafv2-acl-arn: {{ .Values.ingress.wafAclArn }}
     {{- end }}
+    {{- if .Values.ingress.enableStickyness }}
+    alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds={{ .Values.ingress.cookieDurationSeconds }}
+    alb.ingress.kubernetes.io/target-type: ip
+    {{- end }}
 spec:
   rules:
   - http:
