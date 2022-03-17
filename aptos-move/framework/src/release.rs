@@ -1,4 +1,4 @@
-// Copyright (c) The Diem Core Contributors
+// Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::{compatibility::Compatibility, normalized::Module, CompiledModule};
@@ -21,7 +21,7 @@ use structopt::*;
 #[structopt(
     name = "Diem Frameworks",
     about = "Release CLI for Diem frameworks",
-    author = "The Diem Core Contributors",
+    author = "Aptos",
     rename_all = "kebab-case"
 )]
 pub struct ReleaseOptions {

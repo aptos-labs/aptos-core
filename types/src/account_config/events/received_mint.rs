@@ -1,4 +1,4 @@
-// Copyright (c) The Diem Core Contributors
+// Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{account_address::AccountAddress, account_config::DESIGNATED_DEALER_MODULE_IDENTIFIER};

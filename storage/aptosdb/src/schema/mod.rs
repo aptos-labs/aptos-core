@@ -1,4 +1,4 @@
-// Copyright (c) The Diem Core Contributors
+// Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module defines representation of Diem core data structures at physical level via schemas

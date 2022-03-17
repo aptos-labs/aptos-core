@@ -1,4 +1,4 @@
-// Copyright (c) The Diem Core Contributors
+// Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::{assert_json, new_test_context};

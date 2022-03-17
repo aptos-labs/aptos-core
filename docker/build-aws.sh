@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) The Diem Core Contributors
+# Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 # build-aws-base.sh is a common script shared by mutiple build-aws.sh scripts
 

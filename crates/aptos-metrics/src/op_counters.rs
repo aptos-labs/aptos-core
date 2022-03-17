@@ -1,4 +1,4 @@
-// Copyright (c) The Diem Core Contributors
+// Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
 //! `OpCounters` is a collection of convenience methods to add arbitrary counters to modules.

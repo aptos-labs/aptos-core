@@ -1,4 +1,4 @@
-# Copyright (c) The Diem Core Contributors
+# Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
 test: clean lint test-code-gen test-api-spec clean

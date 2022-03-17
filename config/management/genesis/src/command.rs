@@ -1,4 +1,4 @@
-// Copyright (c) The Diem Core Contributors
+// Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_management::{error::Error, execute_command};

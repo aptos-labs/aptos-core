@@ -1,4 +1,4 @@
-// Copyright (c) The Diem Core Contributors
+// Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
 /// A wrapper around `std::num::NonZeroUsize` to no longer worry about `unwrap()`

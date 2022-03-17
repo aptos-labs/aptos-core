@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (c) The Diem Core Contributors
+# Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
 from nacl.signing import SigningKey

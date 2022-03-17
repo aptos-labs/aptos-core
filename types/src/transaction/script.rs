@@ -1,4 +1,4 @@
-// Copyright (c) The Diem Core Contributors
+// Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{serde_helper::vec_bytes, transaction::transaction_argument::TransactionArgument};

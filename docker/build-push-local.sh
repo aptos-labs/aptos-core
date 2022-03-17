@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) The Diem Core Contributors
+# Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 set -e
 REPO=853397791086.dkr.ecr.us-west-2.amazonaws.com

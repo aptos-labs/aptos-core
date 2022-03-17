@@ -1,4 +1,4 @@
-// Copyright (c) The Diem Core Contributors
+// Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_logger::info;
@@ -12,7 +12,7 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "Aptos Faucet",
-    author = "The Diem Core Contributors",
+    author = "Aptos",
     about = "Aptos Testnet utility service for creating test accounts and minting test coins"
 )]
 struct Args {

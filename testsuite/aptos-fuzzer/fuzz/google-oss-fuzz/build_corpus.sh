@@ -1,5 +1,5 @@
 #!/bin/bash -eux
-# Copyright (c) The Diem Core Contributors
+# Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
 # this file generates 128 corpus files for a target, zips it all, and move zipfile to an outdir

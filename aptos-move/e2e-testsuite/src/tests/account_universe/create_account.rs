@@ -1,4 +1,4 @@
-// Copyright (c) The Diem Core Contributors
+// Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
 // TODO: all of these tests rely on a symmetric account creation mechanism; that is, an account of
