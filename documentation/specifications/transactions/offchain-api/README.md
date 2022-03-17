@@ -1,5 +1,5 @@
 # Aptos Off-Chain Protocol
-As defined in [DIP-1](https://dip.aptoslabs.com/dip-1), the Aptos Off-Chain Protocol defines an API and payload specification to privately exchange information between two parties that cannot (easily) be achieved directly on a blockchain. This information includes the sensitive details of the parties involved in a payment that should remain off-chain. The information is exchanged within an authenticated and encrypted channel and only made available to the parties that are directly involved.
+As defined in [AIP-1](https://github.com/aptos-labs/aip), the Aptos Off-Chain Protocol defines an API and payload specification to privately exchange information between two parties that cannot (easily) be achieved directly on a blockchain. This information includes the sensitive details of the parties involved in a payment that should remain off-chain. The information is exchanged within an authenticated and encrypted channel and only made available to the parties that are directly involved.
 
 ## Overview
 The two parties that participate in the off-chain protocol communicate through HTTP requests and responses within a TLS channel. Each request and response is signed via [JSON Web Signature (JWS)](https://tools.ietf.org/html/rfc7515) to ensure authenticity and integrity. Consider an example in which VASP A sends a command to VASP B:
@@ -19,7 +19,7 @@ The two parties that participate in the off-chain protocol communicate through H
 ## Specification
 ### On-Chain Account Setup
 
-In order to participate in the an off-chain protocol exchange, a VASP must have a valid Parent VASP account, as defined in [DIP-2](https://dip.aptoslabs.com/dip-2). In addition, the VASP must specify a valid [DualAttestation::Credential](https://github.com/aptos-labs/aptos-core/blob/release-1.1/language/stdlib/modules/DualAttestation.move)’s `compliance_public_key` and `base_url`.
+In order to participate in the an off-chain protocol exchange, a VASP must have a valid Parent VASP account, as defined in [AIP-2](https://github.com/aptos-labs/aip). In addition, the VASP must specify a valid [DualAttestation::Credential](https://github.com/aptos-labs/aptos-core/blob/release-1.1/language/stdlib/modules/DualAttestation.move)’s `compliance_public_key` and `base_url`.
 
 The `compliance_public_key` maps to an Ed25519 private key with which the VASP uses to authenticate all off-chain requests and responses.
 
@@ -36,7 +36,7 @@ The base url value must be the url without the path `/<protocol_version>/command
 All HTTP requests must contain:
 
 * A header `X-REQUEST-ID` with a unique UUID (according to [RFC4122](https://tools.ietf.org/html/rfc4122) with “-”'s included) for the request, used for tracking requests and debugging. Responses to requests must have the same value as the request's `X-REQUEST-ID` header.
-* A header `X-REQUEST-SENDER-ADDRESS` with the HTTP request sender’s VASP [DIP-5](https://dip.aptoslabs.com/dip-5/) address used in the command object.
+* A header `X-REQUEST-SENDER-ADDRESS` with the HTTP request sender’s VASP [AIP-5](https://github.com/aptos-labs/aip) address used in the command object.
 
 The HTTP request sender must use the compliance key of the VASP account linked with the sender's address to sign the request JWS body. The request receiver uses this address to find the appropriate compliance key to verify the signed request. For example: VASP A transfers funds to VASP B. The HTTP request A sends to B contains `X-REQUEST-SENDER-ADDRESS` as VASP A’s address.
 

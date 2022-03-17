@@ -4,7 +4,7 @@ Aptos Payment Network wallets benefit from consistent standards for naming and a
 
 ## Subaddresses
 
-Each account on-chain is represented by a 16-byte value called an **account address**. To allow multiplexing of a single address into distinct off-chain identities, or wallets, a participant may use a **subaddress**. For convenience, Aptos defines a standard format for representing the combination of the an account address and a subaddress as an **account identifier**. Account identifiers have a dedicated URI representation including parameters called an **intent identifier**. Subaddresses, account identifiers, and intent identifiers are defined in [DIP-5](https://dip.aptoslabs.com/dip-5/).
+Each account on-chain is represented by a 16-byte value called an **account address**. To allow multiplexing of a single address into distinct off-chain identities, or wallets, a participant may use a **subaddress**. For convenience, Aptos defines a standard format for representing the combination of the an account address and a subaddress as an **account identifier**. Account identifiers have a dedicated URI representation including parameters called an **intent identifier**. Subaddresses, account identifiers, and intent identifiers are defined in [AIP-5](https://github.com/aptos-labs/aip).
 
 ### Subaddresses
 

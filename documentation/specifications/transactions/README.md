@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Aptos Payment network supports transactions between VASPs (Virtual Asset Service Providers) and between VASPs and DDs (Designated Dealers). This document covers the end-to-end flow for these transactions derived from the DIPs.
+The Aptos Payment network supports transactions between VASPs (Virtual Asset Service Providers) and between VASPs and DDs (Designated Dealers). This document covers the end-to-end flow for these transactions derived from the AIP.
 
 Aptos supports two methods for transacting on-chain:
 * Subaddresses that can be exchanged directly between two parties off-chain
