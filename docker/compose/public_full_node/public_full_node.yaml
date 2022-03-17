@@ -18,6 +18,9 @@ full_node_networks:
       # The network must have a listen address to specify protocols. This runs it locally to
       # prevent remote, incoming connections.
       listen_address: "/ip4/127.0.0.1/tcp/6180"
+      # Define the upstream peers to connect to
+      seeds:
+        {}
 
 api:
     # This specifies your REST API endpoint. Intentionally on public so that Docker can export it.
