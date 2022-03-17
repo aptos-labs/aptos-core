@@ -1,6 +1,6 @@
 # Off-Chain Travel Rule Exchange
 
-This protocol is used to exchange KYC information about a potential transaction between to parties that will be resolved on-chain upon its completion. This is a dual attestation, preflight protocol. At the end of the protocol, the sender will receive a signature from the recipient so that the Diem Payment Network can verify that the transfer has been signed off by both the sender and recipient. Some considerations:
+This protocol is used to exchange KYC information about a potential transaction between to parties that will be resolved on-chain upon its completion. This is a dual attestation, preflight protocol. At the end of the protocol, the sender will receive a signature from the recipient so that the Aptos Payment Network can verify that the transfer has been signed off by both the sender and recipient. Some considerations:
 * Participants that do not implement a dual attestation, preflight protocol cannot transfer amounts above the travel rule limit. This is one such protocol.
 * Participants may reject travel rule requests for transfers below the travel rule limit.
 
@@ -118,7 +118,7 @@ A `PaymentActorObject` represents a participant in a payment - either sender or 
 
 | Field                 | Type            | Required | Mutable | Description |
 |-------                |------           |----------|---------|-------------|
-| `address`             | `str`           | Y        | N       | Address of the sender/receiver account. Addresses may be single use or valid for a limited time, and therefore VASPs should not rely on them remaining stable across time or different VASP addresses. The addresses are encoded using bech32. The bech32 address encodes both the address of the VASP as well as the specific user’s subaddress. They should be no longer than 80 characters. For Diem addresses, refer to the "account identifier". |
+| `address`             | `str`           | Y        | N       | Address of the sender/receiver account. Addresses may be single use or valid for a limited time, and therefore VASPs should not rely on them remaining stable across time or different VASP addresses. The addresses are encoded using bech32. The bech32 address encodes both the address of the VASP as well as the specific user’s subaddress. They should be no longer than 80 characters. For Aptos addresses, refer to the "account identifier". |
 | `kyc_data`            | `KycDataObject` | N        | N       | The KYC data for this account. Immutable once set. |
 | `status`              | `StatusObject`  | Y        | Y       | Status of the payment from the perspective of this actor. This field can only be set by the respective sender/receiver VASP and represents the status on the sender/receiver VASP side. This field is mandatory by this respective actor (either sender or receiver side) and mutable. Note that in the first request (which is initiated by the sender), the receiver status should be set to None. |
 | `metadata`            | list of `str`   | N        | Y       | Can be specified by the respective VASP to hold metadata that the sender/receiver VASP wishes to associate with this payment. It may be set to an empty list (i.e. []). New metadata elements may be appended to the metadata list via subsequent commands on an object. |

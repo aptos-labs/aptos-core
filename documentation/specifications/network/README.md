@@ -6,7 +6,7 @@
 
 ## Introduction
 
-This document describes **AptosNet**, the primary network protocol used for communication between any two nodes in the Diem ecosystem. The protocol only describes the structure and order of messages on the wire, while relying on an underlying transport (TCP) for the actual message delivery. In addition, all communication between peers MUST be encrypted and authenticated using [Noise protocol](noise.md). AptosNet supports multiplexing several application protocols concurrently over a single connection. For each application protocol, AptosNet provides two kinds of messaging semantics: (1) a fire-and-forget DirectSend and (2) a unary RPC.
+This document describes **AptosNet**, the primary network protocol used for communication between any two nodes in the Aptos ecosystem. The protocol only describes the structure and order of messages on the wire, while relying on an underlying transport (TCP) for the actual message delivery. In addition, all communication between peers MUST be encrypted and authenticated using [Noise protocol](noise.md). AptosNet supports multiplexing several application protocols concurrently over a single connection. For each application protocol, AptosNet provides two kinds of messaging semantics: (1) a fire-and-forget DirectSend and (2) a unary RPC.
 
 ## Terminology
 
@@ -20,13 +20,13 @@ This document describes **AptosNet**, the primary network protocol used for comm
 
 ## Standard Network Topology
 
-While AptosNet does not assume a specific network topology, we will frame the specification in terms of the standard Diem network topology for clarity.
+While AptosNet does not assume a specific network topology, we will frame the specification in terms of the standard Aptos network topology for clarity.
 
 ### Node Types
 
-* **Validator Node (V)**: A validator node is a core node type in the Diem network. The validator network is comprised of all validator nodes registered for the current epoch, as defined by the `ValidatorSet` in the [`OnChainConfig`](../consensus/README.md#onchainconfig). For DDoS resistance and defense-in-depth purposes, a validator node SHOULD be isolated from all other node types except for other validators and the VFNs it controls.
-* **Validator Full Node (VFN)**: VFNs are full nodes owned and operated by one of the Diem validators. VFNs will typically connect to their validator over an internal VPC to maintain isolation of the validator node. VFNs can also service all node types on public-facing endpoints.
-* **Public Full Node (PFN)**: In contrast, PFNs are any non-validator operated full nodes that primarily interface with Diem by communicating with VFNs.
+* **Validator Node (V)**: A validator node is a core node type in the Aptos network. The validator network is comprised of all validator nodes registered for the current epoch, as defined by the `ValidatorSet` in the [`OnChainConfig`](../consensus/README.md#onchainconfig). For DDoS resistance and defense-in-depth purposes, a validator node SHOULD be isolated from all other node types except for other validators and the VFNs it controls.
+* **Validator Full Node (VFN)**: VFNs are full nodes owned and operated by one of the Aptos validators. VFNs will typically connect to their validator over an internal VPC to maintain isolation of the validator node. VFNs can also service all node types on public-facing endpoints.
+* **Public Full Node (PFN)**: In contrast, PFNs are any non-validator operated full nodes that primarily interface with Aptos by communicating with VFNs.
 * **Client Node (C)**: Client nodes are effectively PFNs that do not store ledger history.
 
 ### Authentication Modes
@@ -38,12 +38,12 @@ While AptosNet does not assume a specific network topology, we will frame the sp
 
 * **Validator Network (VN)**: The validator network is a fully-connected, mutually authenticated network consisting only of validator nodes. Non-validators (i.e., any peer without a keypair in the current epoch's validator set) are explicitly not allowed to join the validator network and other validators will reject any unauthenticated inbound connections. Validators in the Validator Network [synchronize mempools](../mempool/README.md) of transactions, order and execute transactions with [consensus](../consensus/README.md), and synchronize ledger states with [state sync](../state_sync/README.md).
 * **Validator-internal Full Node Network (VFNN)**: Each validator operates a logically private network consisting of only a validator and its operated VFNs. For operational simplicity, the v1 version of each VFNN operates in a server-only authentication mode, with the Validator as the server and the VFNs as the clients. VFNs will typically forward transactions to their upstream validator via [mempool](../mempool/README.md) and synchronize their ledger state with their upstream validator via [state sync](../state_sync/README.md).
-* **Public Validator Full Node Network (PVFNN)**: A publicly accessible network of VFNs that services transaction submission and state queries for all node types. For instance, public clients may submit transactions to the Diem Network and synchronize their ledger states over the PVFNN.
-* **Public Full Node Network (PFNN)**: There is no public network of PFNs in Diem v1.
+* **Public Validator Full Node Network (PVFNN)**: A publicly accessible network of VFNs that services transaction submission and state queries for all node types. For instance, public clients may submit transactions to the Aptos Network and synchronize their ledger states over the PVFNN.
+* **Public Full Node Network (PFNN)**: There is no public network of PFNs in Aptos v1.
 
-Below is a diagram that illustrates the set of standard Diem node types, the different network configurations, and the different connection authentication modes.
+Below is a diagram that illustrates the set of standard Aptos node types, the different network configurations, and the different connection authentication modes.
 
-![Standard Diem Network Topology](../images/aptosnet_network_topology.png)
+![Standard Aptos Network Topology](../images/aptosnet_network_topology.png)
 
 ## Base Transport
 
@@ -62,7 +62,7 @@ All communication between nodes MUST be encrypted and authenticated using the [A
 
 By virtue of using the Noise IK handshake, the client always authenticates the server, as the initial noise handshake message is encrypted so only a server with the intended keypair can decrypt it and respond to it. This pattern is analogous to the client using TLS certificate pinning, pinned to a specific public key, for every connection.
 
-In contrast, the server may or may not authenticate the client, depending on the specific network configuration. In Diem v1, only the Validator Network uses mutual authentication, where validators will only allow inbound connections from other current validators.
+In contrast, the server may or may not authenticate the client, depending on the specific network configuration. In Aptos v1, only the Validator Network uses mutual authentication, where validators will only allow inbound connections from other current validators.
 
 ## AptosNet Versioning Scheme
 
@@ -140,7 +140,7 @@ After establishing and negotiating a complete connection, peers may begin exchan
 
 Since the Noise layer limits frame sizes to at-most `65535` bytes, of which `16` bytes are always reserved for the AES GCM authentication tag, sending a serialized `NetworkMsg` (include the big-endian 4-byte length prefix) over-the-write first requires splitting it into chunks of size at most `65535 - 16 = 65519` bytes.
 
-#### Sending a single `NetworkMsg` over a negotiated Diem Transport, in simplified pseudo-rust:
+#### Sending a single `NetworkMsg` over a negotiated Aptos Transport, in simplified pseudo-rust:
 
 ```rust
 const MAX_NOISE_FRAME_LEN: u16 = 65519; // u16::MAX - AES_GCM_TAG_LEN

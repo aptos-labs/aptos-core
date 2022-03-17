@@ -1,9 +1,9 @@
 # AptosDB Backup
 
-Diem nodes runs on top of [AptosDB](../../storage/aptosdb) that serves the [core data stucture](../data_structure/spec.md) to other parts of the system. While the AptosDB is designed to provide efficient access to the recent history of the block chain, and append data to it, the AptosDB Backup is a concise data format to archive the full history of the chain, away from the running Diem validator network. It's useful in at least these situations:
+Aptos nodes runs on top of [AptosDB](../../storage/aptosdb) that serves the [core data stucture](../data_structure/spec.md) to other parts of the system. While the AptosDB is designed to provide efficient access to the recent history of the block chain, and append data to it, the AptosDB Backup is a concise data format to archive the full history of the chain, away from the running Aptos validator network. It's useful in at least these situations:
 
 * In case a validator lost its AptosDB, restoring the full transaction history from a backup is supposed to be 10x or more faster than replying on synchronizing from a peer.
-* In case of a fatal bug in the software destroying the DB on every single Diem Node, we can recover the network using the backups. The backups are not likely to be corrupt at the same time because the format is 1. Different; 2. Simple.
+* In case of a fatal bug in the software destroying the DB on every single Aptos Node, we can recover the network using the backups. The backups are not likely to be corrupt at the same time because the format is 1. Different; 2. Simple.
 * If a fork ever happens, and we plan to make resolve and converge the branches,  this piece of history can still be archived in the form of backups.
 
 
@@ -141,7 +141,7 @@ pub struct StateSnapshotBackup {
 }
 ```
 
-With a state tree at a certain version, transactions can be executed on top of that version. This is essential for a Diem node to start synchronizing new transactions from other nodes, as well as a Validator to proposal and commit blocks.
+With a state tree at a certain version, transactions can be executed on top of that version. This is essential for a Aptos node to start synchronizing new transactions from other nodes, as well as a Validator to proposal and commit blocks.
 
 Note that it's possible to restore a DB from empty by applying all transactions from the beginning, without the need for a state snapshot, but it can be extremely painful when the blockchain grows big.
 
@@ -179,7 +179,7 @@ pub struct TransactionBackupMeta {
 
 ![Restore](../images/db_backup_restore_flow.png)
 
-It's shown above the intended structure of the Diem backup and restore workflow, discussed in detail by components below.
+It's shown above the intended structure of the Aptos backup and restore workflow, discussed in detail by components below.
 
 ## Backup Storage interface
 
@@ -333,9 +333,9 @@ s3://aptos-backup/backup1/
   ...
 ```
 
-## Backup service inside of a Diem Validator/Full node
+## Backup service inside of a Aptos Validator/Full node
 
-Since the DB we are backing up from is likely to be already open (and actively operated on) by a Diem Validator / Full Node, access to the DB by the backup system is done in the same process, as the Backup Service. The service is open to localhost only, as a preliminary security measure, and is supposed to be accessed only by the `BackupController` described below. The protocol between them is deemed private to the Diem implementation and in reality its in BCS over HTTP.
+Since the DB we are backing up from is likely to be already open (and actively operated on) by a Aptos Validator / Full Node, access to the DB by the backup system is done in the same process, as the Backup Service. The service is open to localhost only, as a preliminary security measure, and is supposed to be accessed only by the `BackupController` described below. The protocol between them is deemed private to the Aptos implementation and in reality its in BCS over HTTP.
 
 ## Backup Controllers
 
@@ -350,7 +350,7 @@ Similar to the Backup controller, a RestoreController glues the functionality of
 To create a AptosDB from scratch, on top of which a validator can boot and join the network, one usually needs to pick a state snapshot at version V, and a target version T and do the following:
 
 1. Recover EpochEnding backup from epoch 0 all the way to the one which right precedes version T.
-3. (Optional, but supposed to do in Diem V1, since Diem nodes doesn't work on partial transaction history in V1.) Restore transactions from 0 to V to DB.
+3. (Optional, but supposed to do in Aptos V1, since Aptos nodes doesn't work on partial transaction history in V1.) Restore transactions from 0 to V to DB.
 2. Recover the state snapshot at version V.
 4. Replay transactions from version V+1 to T to recreate state at version T.
 

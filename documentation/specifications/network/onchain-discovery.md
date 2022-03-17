@@ -2,19 +2,19 @@
 
 ## Overview
 
-The [AptosNet](README.md) On-chain Discovery Protocol is an authenticated discovery protocol for nodes to learn validator and VFN network addresses and network identity public keys. On-chain discovery leverages the Move language and Diem blockchain to serve as a central authenticated data-store for distributing advertised validator and VFN discovery information in the form of [`NetworkAddress`](network-address.md)es for validators and [`NetworkAddress`](network-address.md)es for VFNs.
+The [AptosNet](README.md) On-chain Discovery Protocol is an authenticated discovery protocol for nodes to learn validator and VFN network addresses and network identity public keys. On-chain discovery leverages the Move language and Aptos blockchain to serve as a central authenticated data-store for distributing advertised validator and VFN discovery information in the form of [`NetworkAddress`](network-address.md)es for validators and [`NetworkAddress`](network-address.md)es for VFNs.
 
 ## Design Principles
 
 * All communication between peers _MUST_ be authenticated and encrypted.
-* All authentication is rooted in the Diem blockchain. In the same way that the chain is the source-of-truth for the `ValidatorSet`, the chain is also the source of truth for validator and VFN network addresses and network identity public keys.
+* All authentication is rooted in the Aptos blockchain. In the same way that the chain is the source-of-truth for the `ValidatorSet`, the chain is also the source of truth for validator and VFN network addresses and network identity public keys.
 * Uniform discovery interface for both validators and VFNs.
 * Unify key rotation and address rotation procedures. The protocol for adding/removing a validator or rotating the consensus key is effectively the same as rotating the network key or network addresses.
 * Support network protocol upgradability.
 
 ## Use cases
 
-There are four separate discovery problems in Diem:
+There are four separate discovery problems in Aptos:
 
 1. Validators discovering other validators.
 2. All node types discovering public-facing VFNs.

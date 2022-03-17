@@ -1,29 +1,29 @@
 # Protocol Specification
 
-This document describes the protocol specifications for the Diem Payment Network (LPN). The intended audience for this document are as follows:
+This document describes the protocol specifications for the Aptos Payment Network (LPN). The intended audience for this document are as follows:
 
 * Virtual Asset Service Providers (VASPs), designated dealers (DDs), and other [ecosystem developers](https://aptoslabs.com/en-US/white-paper/) who build software that can interface with the LPN.
 * Developers who work on supporting transaction validation and interface with the validation protocols.
 * Those interested in improving the protocol specifications and/or understanding the LPN in more detail.
 
-The reference implementations for all LPN specifications is [Aptos Core](https://github.com/aptos-core/aptos-labs). Aptos Core is maintained by the open-source developer community on behalf of the [Aptos Labs](https://aptoslabs.com/en-US/association/). After the initial launch of the LPN, all specification changes will be proposed via the Diem Improvement Proposals (DIP) process - which is not yet finalized and public. For expedience prior to the launch of the LPN, changes to the specification will be made directly in the documentation and code.
+The reference implementations for all LPN specifications is [Aptos Core](https://github.com/aptos-core/aptos-labs). Aptos Core is maintained by the open-source developer community on behalf of the [Aptos Labs](https://aptoslabs.com/en-US/association/). After the initial launch of the LPN, all specification changes will be proposed via the Aptos Improvement Proposals (DIP) process - which is not yet finalized and public. For expedience prior to the launch of the LPN, changes to the specification will be made directly in the documentation and code.
 
 ## Overview
 
-Aptos is an independent membership organization headquartered in Geneva, Switzerland. The Association's purpose is to coordinate and provide a framework of governance decision-making for the Diem network and Reserve; to oversee the operation of the Diem payment system; to facilitate the provision of services on top of the Diem Blockchain in a safe and compliant manner; and to establish social impact grant-making in support of financial inclusion.
+Aptos is an independent membership organization headquartered in Geneva, Switzerland. The Association's purpose is to coordinate and provide a framework of governance decision-making for the Aptos network and Reserve; to oversee the operation of the Aptos payment system; to facilitate the provision of services on top of the Aptos Blockchain in a safe and compliant manner; and to establish social impact grant-making in support of financial inclusion.
 
-The LPN is backed by the Diem Blockchain that serves as a solid foundation for financial services, including a new global payment system that meets the daily financial needs of billions of people. The Diem blockchain was created to meet the following three requirements:
+The LPN is backed by the Aptos Blockchain that serves as a solid foundation for financial services, including a new global payment system that meets the daily financial needs of billions of people. The Aptos blockchain was created to meet the following three requirements:
 
 * Able to scale to billions of accounts, which requires high transaction throughput, low
 latency, and an efficient, high-capacity storage system.
 * Highly secure to ensure the safety of funds and financial data.
 * Flexible, so that it can power future innovation in financial services.
 
-The Diem Blockchain is designed from the ground up to holistically address these requirements and builds on the learnings from existing projects and research — a combination of innovative approaches and well-understood techniques. The [Diem whitepaper](https://aptos.dev/docs/assets/papers/the-diem-blockchain/2019-09-26.pdf) provides much of the rationale behind the overall design.  More details on the Aptos Labs and its mission are available on [aptoslabs.com](https://aptoslabs.com)
+The Aptos Blockchain is designed from the ground up to holistically address these requirements and builds on the learnings from existing projects and research — a combination of innovative approaches and well-understood techniques. The [Aptos whitepaper](https://aptos.dev/docs/assets/papers/the-diem-blockchain/2019-09-26.pdf) provides much of the rationale behind the overall design.  More details on the Aptos Labs and its mission are available on [aptoslabs.com](https://aptoslabs.com)
 
 ## Architecture
 
-The Diem network consists of different types of actors:
+The Aptos network consists of different types of actors:
 
 * **Validators**. These are run by the association members to form a network (the validator network) enabling them to share transactions between each other, synchronize blockchain state and run a consensus protocol that agrees on transaction ordering and execution.
 * **Full Nodes**. These can be run by anyone who wants to verify the state of the blockchain and synchronize to it. Full nodes replicate the full state of the blockchain by querying each other or by querying the validators directly, they can also forward transactions to the validators.
@@ -32,11 +32,11 @@ The Diem network consists of different types of actors:
   * **Verifying clients**. By default, clients are bootstrapped with a state and a set of validator, and can thus be epoch-aware by syncing this state with the blockchain. This way, a verifying client can verify the proofs carried in every response they obtain from full nodes they query. A full node, for instance, is a verifying client. A developer could develop a custom verifying client with the LPN specifications for specific applications, for instance, a light weight client that only keeps the more recent subset of account state.
   * **Non-verifying clients**. A client might query a third-party to access the state of the blockchain without verifying the signatures from the validators. The optional JSON-RPC protocol supports this mode of operation, and developers are also free to build other systems that accomplish this task. This specification does not define how a client should find such a service. As an example, some clients could run their own full nodes that expose the JSON-RPC protocol and access these endpoints under secure channels. In this setup, a non-verifying client delegates proof verification to the full node.
 
-Below is a recapixusating diagram of the Diem network. The arrow tail signifies the sender of a network request and the arrow head is the receiver of the network request.
+Below is a recapixusating diagram of the Aptos network. The arrow tail signifies the sender of a network request and the arrow head is the receiver of the network request.
 
-## The Diem network
+## The Aptos network
 
-![Diem network](images/aptos_network.png)
+![Aptos network](images/aptos_network.png)
 
 While a validator has a public endpoint and a validator endpoint, in order to support additional features and properties, such as the principle of least privilege, key rotation, monitoring, DoS protection, scalability, etc., it can be composed of a number of internal components. Below is an example validator architecture that addresses many of these aspects.
 
@@ -44,7 +44,7 @@ While a validator has a public endpoint and a validator endpoint, in order to su
 
 ## Specifications
 
-As [depicted](#The-Diem-network), there are 4 network protocol specifications:
+As [depicted](#The-Aptos-network), there are 4 network protocol specifications:
 
 * **[Consensus protocol](consensus/)**. This is how agreement is reached between a known set of validators assuming byzantine fault-tolerant (BFT) conditions.
 * **Mempool protocol**. The protocol is used between validators, between full nodes, and between validators and full nodes to quickly re-share user transactions. This is how transactions are passed upstream, eventually intending to reach a validator that proposes a block that includes these transactions.
@@ -58,15 +58,15 @@ In addition, these specifications build on top of a common set of specifications
 * **[AptosNet](network/)**. This describes a handshake and wire protocol for all networking protocols. This relies on the [Noise protocol framework](https://noiseprotocol.org/) for integrity and confidentiality.
 * **[On-chain discovery](network/onchain-discovery.md)**. This defines how clients can safely find the endpoints of the LPN validators.
 * **[Authenticated data structures](common/authenticated_data_structures.md)**. This describes the ledger history, ledger state, and events data structures.
-* **[Move adapter and Move virtual machine (VM)](move_adapter/)**. Diem transactions are implemented as scripts in the Move programming language, and this specification defines how transactions are validated and executed using the Move VM.
+* **[Move adapter and Move virtual machine (VM)](move_adapter/)**. Aptos transactions are implemented as scripts in the Move programming language, and this specification defines how transactions are validated and executed using the Move VM.
 
 ## Specification upgrades
 
-The LPN specifications are designed to support upgrades over time via the Diem Improvement Proposal (DIP) process. Unlike many other blockchains that determine when upgrades are live in mainnet through community organization and coordination, the timing for LPN specification upgrades is directed by the Aptos Labs. The full LPN specifications are split into smaller specifications in order to limit the affected parties. For example, the JSON-RPC client specification can be upgraded without affecting the validating service specifications and correspondingly the validating nodes (validators). Each specification is versioned sequentially beginning with 1\. Over time, the specifications may be divided or merged to balance the size of the affected parties against the overhead of maintaining and versioning separate specifications.
+The LPN specifications are designed to support upgrades over time via the Aptos Improvement Proposal (DIP) process. Unlike many other blockchains that determine when upgrades are live in mainnet through community organization and coordination, the timing for LPN specification upgrades is directed by the Aptos Labs. The full LPN specifications are split into smaller specifications in order to limit the affected parties. For example, the JSON-RPC client specification can be upgraded without affecting the validating service specifications and correspondingly the validating nodes (validators). Each specification is versioned sequentially beginning with 1\. Over time, the specifications may be divided or merged to balance the size of the affected parties against the overhead of maintaining and versioning separate specifications.
 
 The process for upgrading the LPN specifications is as follows:
 
-1. **Seed an idea**. A Contributor should socialize their idea with the Diem developer community and Maintainers. They might create a [GitHub issue](https://github.com/aptos-labs/aptos-core/issues) or use another means of gathering feedback.
+1. **Seed an idea**. A Contributor should socialize their idea with the Aptos developer community and Maintainers. They might create a [GitHub issue](https://github.com/aptos-labs/aptos-core/issues) or use another means of gathering feedback.
 
 2. **[Standard DIP](https://dip.aptoslabs.com/overview)**. A Contributor proposes a new standard DIP that modifies an existing specification(s) or proposes a new specification. If the standard DIP reaches the "Accepted" status, the proposed changes will be set in the new specification version as well as implemented in the Aptos Core master branch. Other implementations of the protocol must follow these changes as well.
 
@@ -75,7 +75,7 @@ The process for upgrading the LPN specifications is as follows:
     * Binary canonical serialization
     * Authenticated data structures
     * Move virtual machine
-    * Diem adapter
+    * Aptos adapter
 
     In order to describe the LPN upgrade process, we will define specification S with current in-production version V and next accepted version V+1.
 

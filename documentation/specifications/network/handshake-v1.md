@@ -30,7 +30,7 @@ pub struct BitVec {
     inner: Vec<u8>,
 }
 
-/// Enum representing different versions of the Diem network protocol. These should be
+/// Enum representing different versions of the Aptos network protocol. These should be
 /// listed from old to new, old having the smallest value.
 /// We derive `PartialOrd` since nodes need to find highest intersecting protocol version.
 pub enum MessagingProtocolVersion {

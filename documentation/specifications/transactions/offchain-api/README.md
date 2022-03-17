@@ -1,5 +1,5 @@
-# Diem Off-Chain Protocol
-As defined in [DIP-1](https://dip.aptoslabs.com/dip-1), the Diem Off-Chain Protocol defines an API and payload specification to privately exchange information between two parties that cannot (easily) be achieved directly on a blockchain. This information includes the sensitive details of the parties involved in a payment that should remain off-chain. The information is exchanged within an authenticated and encrypted channel and only made available to the parties that are directly involved.
+# Aptos Off-Chain Protocol
+As defined in [DIP-1](https://dip.aptoslabs.com/dip-1), the Aptos Off-Chain Protocol defines an API and payload specification to privately exchange information between two parties that cannot (easily) be achieved directly on a blockchain. This information includes the sensitive details of the parties involved in a payment that should remain off-chain. The information is exchanged within an authenticated and encrypted channel and only made available to the parties that are directly involved.
 
 ## Overview
 The two parties that participate in the off-chain protocol communicate through HTTP requests and responses within a TLS channel. Each request and response is signed via [JSON Web Signature (JWS)](https://tools.ietf.org/html/rfc7515) to ensure authenticity and integrity. Consider an example in which VASP A sends a command to VASP B:
@@ -166,7 +166,7 @@ Use the type command_error when:
 * When a validation error occurs, the HTTP response status code should be 400.
 * When a server internal error occurs, HTTP response status code should be 500.
 
-For example, if an off-chain service cannot access its Diem service, it should respond with a 500 status code along with the JWS ecndoed CommandResponseObject.
+For example, if an off-chain service cannot access its Aptos service, it should respond with a 500 status code along with the JWS ecndoed CommandResponseObject.
 
 ##### List of Error Codes
 
@@ -219,7 +219,7 @@ JWK key:
 {"crv":"Ed25519","d":"vLtWeB7kt7fcMPlk01GhGmpWYTHYqnGRZUUN72AT1K4","kty":"OKP","x":"vUfj56-5Teu9guEKt9QQqIW1idtJE4YoVirC7IVyYSk"}
 ```
 
-Corresponding verification key (hex, bytes), as the 32 bytes stored on the Diem blockchain:
+Corresponding verification key (hex, bytes), as the 32 bytes stored on the Aptos blockchain:
 
 `"bd47e3e7afb94debbd82e10ab7d410a885b589db49138628562ac2ec85726129"` (len=64)
 
