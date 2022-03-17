@@ -50,6 +50,7 @@ spec:
         - name: tmp
           mountPath: /tmp
         ports:
+        - containerPort: 6182
         - containerPort: 6186
         - containerPort: 8080
         - containerPort: 8081
