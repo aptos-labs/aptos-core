@@ -32,7 +32,7 @@ To report a security issue, please email security@aptoslabs.com. -->
 ## System information
 
 **Please complete the following information:**
-- <!-- Diem Version -->
+- <!-- Aptos Core Version -->
 - <!-- Rust Version -->
 - <!-- Computer OS -->
 

@@ -1,5 +1,5 @@
 <!--
-Thank you for sending a PR. We appreciate you spending time to help improve the Diem project.
+Thank you for sending a PR. We appreciate you spending time to help improve the Aptos Core project.
 
 The project is undergoing daily changes. Pull Requests will be reviewed and responded to as time permits.
 -->
@@ -24,5 +24,5 @@ The project is undergoing daily changes. Pull Requests will be reviewed and resp
 
  * Justification and breaking nature (who does it affect? validators, full nodes, tooling, operators, AOS, etc.)
  * Comprehensive test results that demonstrate the fix working and not breaking existing workflows.
- * Why we must have it for V1 launch.
+ * Why we must have it for the release.
  * What workarounds and alternative we have if we do not push the PR.
