@@ -237,6 +237,10 @@ monitoring:
   fullKubernetesScrape: false
   useKubeStateMetrics: false
   prometheus:
+    remote_write:
+      enabled: false
+      url:
+      region:
     image:
       repo: prom/prometheus
       tag: v2.27.1@sha256:ca9e612ba1b6382ccf3642e21c9ee328ed4baa49fe84600ead7b7790c139aab4
@@ -310,6 +314,8 @@ monitoring:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  serviceAccount:
+    annotations: {}
 
 logging:
   vector:

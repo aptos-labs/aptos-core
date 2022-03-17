@@ -118,6 +118,8 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: {{ include "aptos-validator.fullname" . }}-prometheus
+  annotations:
+{{- toYaml .Values.monitoring.serviceAccount.annotations | nindent 4 }}
   labels:
     {{- include "aptos-validator.labels" . | nindent 4 }}
 

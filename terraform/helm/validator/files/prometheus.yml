@@ -147,3 +147,17 @@ scrape_configs:
   tls_config:
     insecure_skip_verify: true
 {{ end }}
+
+{{ if .Values.monitoring.prometheus.remote_write.enabled }}
+{{ with .Values.monitoring.prometheus.remote_write }}
+remote_write:
+  - url: {{ .url }}
+    sigv4:
+      region: {{ .region }}
+    queue_config:
+      max_samples_per_send: 1000
+      max_shards: 200
+      capacity: 2500
+{{ end }}
+{{ end }}
+
