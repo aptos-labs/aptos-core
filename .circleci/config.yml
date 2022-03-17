@@ -184,12 +184,12 @@ jobs:
             "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/issues/${PR_NUMBER}/comments"
             exit 0
 
-  # a dummy job so that we can require auto or canary branches
-  require-bors:
+  # a dummy job so that we can require a certain branch
+  require-branch:
     machine:
       image: ubuntu-2004:current
     steps:
-      - run: echo "hello from bors"
+      - run: echo "hello from branch ${CIRCLE_BRANCH}"
 workflows:
   build-test-deploy:
     jobs:
@@ -199,7 +199,7 @@ workflows:
       - lint
       - unit-test
       ### bors-controlled workflows ###
-      - require-bors:
+      - require-branch:
           filters:
             branches:
               only:
@@ -208,9 +208,26 @@ workflows:
       - docker-build-push:
           context: aws-dev
           requires:
-            - require-bors
+            - require-branch
       - forge-k8s:
           context: aws-dev
+          requires:
+            - docker-build-push
+  devnet-branch-cut:
+    jobs:
+      - require-branch:
+          filters:
+            branches:
+              only:
+                - devnet
+      - docker-build-push:
+          context: aws-dev
+          addl_tag: devnet
+      - ecr-dockerhub-mirror:
+          context:
+            - aws-dev
+            - docker-aptoslabsbots
+          addl_tag: devnet
           requires:
             - docker-build-push
   ### Automated workflows
