@@ -83,6 +83,8 @@ During the initial synchronization of your FullNode, there may be a lot of data 
 
 * At the same time, the StateSync component will output similar information but show the destination.
 
+* The number of connections should be more than 0, `curl 127.0.0.1:9101/metrics 2> /dev/null | grep aptos_connections`. If it's not, see the next section for potential fix.
+
 * The blockchain (devnet) ledger’s volume can be monitored by entering the container:
 
   ```
@@ -93,6 +95,24 @@ During the initial synchronization of your FullNode, there may be a lot of data 
   # Observe the volume (ledger) size:
   du -cs -BM /opt/aptos/data
   ```
+
+#### Add upstream seed peers
+Devnet validator fullnode will only accept maximum of 1000 connections, if our network is experiencing high volume, your fullnode might not able to connect. You might see "NoAvailablePeers" in your node error message. If this happens, you can set `seeds` in the fullnode configuration file to add new upstream peers for connection. We prepared some extra fullnode address for you to use:
+```
+seeds:
+  4d6a710365a2d95ac6ffbd9b9198a86a:
+      addresses:
+      - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/ln-handshake/0"
+      role: "Upstream"
+  52173b436ae1809df4a5fcfc67f8fc61:
+      addresses:
+      - "/dns4/pfn1.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/7fe8523388084607cdf78ff40e3e717652173b436ae1809df4a5fcfc67f8fc61/ln-handshake/0"
+      role: "Upstream"
+  476222516fdc55869d2b649c614d965b:
+      addresses:
+      - "/dns4/pfn2.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/f6b135a59591677afc98168791551a0a476222516fdc55869d2b649c614d965b/ln-handshake/0"
+      role: "Upstream"
+```
 
 ## Advanced Guide
 
