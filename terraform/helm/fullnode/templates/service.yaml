@@ -36,6 +36,8 @@ spec:
     {{- include "aptos-fullnode.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/name: fullnode
   ports:
+  - name: aptosnet
+    port: 6182
   - name: backup
     port: 6186
   - name: metrics
