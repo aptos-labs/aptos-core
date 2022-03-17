@@ -114,7 +114,6 @@ resource "helm_release" "fullnode" {
   wait        = false
 
   values = [
-    jsonencode(var.fullnode_helm_values),
     jsonencode({
       chain = {
         era  = var.era
@@ -132,6 +131,8 @@ resource "helm_release" "fullnode" {
         class = "gp2"
       }
     }),
+    jsonencode(var.fullnode_helm_values),
+    jsonencode(var.fullnode_helm_values_list == {} ? {} : var.fullnode_helm_values_list[count.index]),
   ]
 
   set {
@@ -149,7 +150,6 @@ resource "helm_release" "pfn-logger" {
   wait        = false
 
   values = [
-    jsonencode(var.pfn_logger_helm_values),
     jsonencode({
       logger = {
         name = "pfn"
@@ -158,6 +158,7 @@ resource "helm_release" "pfn-logger" {
         name = "aptos-${terraform.workspace}"
       }
     }),
+    jsonencode(var.pfn_logger_helm_values),
   ]
 
   set {

@@ -74,6 +74,12 @@ variable "fullnode_helm_values" {
   default     = {}
 }
 
+variable "fullnode_helm_values_list" {
+  description = "List of values to pass to public fullnode, for setting different value per node. length(fullnode_helm_values_list) must equal var.num_fullnodes"
+  type        = any
+  default     = {}
+}
+
 variable "zone_id" {
   description = "Route53 Zone ID to create records in"
   default     = ""

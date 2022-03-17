@@ -16,6 +16,7 @@ service:
   fullnode:
     numFullnodes:
     exposeApi: true
+    enableOnchainDiscovery: false
     loadBalancerSourceRanges:
   domain:
   aws_tags:
