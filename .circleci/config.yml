@@ -82,7 +82,10 @@ jobs:
               for img in "${imgs[@]}"
               do
                 MANIFEST=$(aws ecr batch-get-image --repository-name aptos/${img} --image-ids imageTag=$IMAGE_TAG --query 'images[].imageManifest' --output text)
-                aws ecr put-image --repository-name aptos/${img} --image-tag main --image-manifest "$MANIFEST" || ret=$?
+                put_img_out=$(aws ecr put-image --repository-name aptos/${img} --image-tag main --image-manifest "$MANIFEST" 2>&1)
+                ret=$?
+                # ok if image tag exists and cannot overwrite
+                echo $put_img_out | grep 'ImageAlreadyExistsException' && ret=0
               done
               exit $ret
             fi
