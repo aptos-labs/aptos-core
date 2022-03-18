@@ -53,12 +53,17 @@ num-variants = { path = "../crates/num-variants" }
 short-hex-str = { path = "../crates/short-hex-str" }
 
 [dev-dependencies]
-criterion = "0.3.4"
+aptos-config = { path = "../config", features = ["testing"] }
 aptos-proptest-helpers = { path = "../crates/aptos-proptest-helpers" }
+aptos-time-service = { path = "../crates/aptos-time-service", features = ["async", "testing"] }
 aptos-types = { path = "../types", features = ["fuzzing"] }
-maplit = "1.0.2"
+bitvec = { path = "../crates/aptos-bitvec", package = "aptos-bitvec", features = ["fuzzing"] }
 memsocket = { path = "./memsocket" }
+netcore = { path = "./netcore", features = ["testing"] }
 network-builder = {path = "./builder"}
+
+criterion = "0.3.4"
+maplit = "1.0.2"
 proptest = { version = "1.0.0", default-features = true }
 proptest-derive = { version = "0.3.0" }
 rand_core = "0.6.2"
