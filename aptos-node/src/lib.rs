@@ -286,7 +286,7 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
         state_sync_network_handles,
         mempool_notifier,
         consensus_listener,
-        db_rw.reader,
+        db_rw,
         chunk_executor,
         node_config,
         waypoint,

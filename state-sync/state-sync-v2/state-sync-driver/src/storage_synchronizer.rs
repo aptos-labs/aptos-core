@@ -21,6 +21,7 @@ use std::{
         Arc,
     },
 };
+use storage_interface::DbWriter;
 use tokio::runtime::Runtime;
 
 // TODO(joshlind): add structured logging support!
@@ -72,6 +73,9 @@ pub struct StorageSynchronizer {
 
     // The number of transaction data chunks pending execute/apply, or commit
     pending_transaction_chunks: Arc<AtomicU64>,
+
+    // The writer to storage (required for account state syncing)
+    storage: Arc<dyn DbWriter>,
 }
 
 impl StorageSynchronizer {
@@ -79,6 +83,7 @@ impl StorageSynchronizer {
         chunk_executor: Arc<ChunkExecutor>,
         commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
         error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
+        storage: Arc<dyn DbWriter>,
         runtime: Option<&Runtime>,
     ) -> Self {
         // Create a channel to notify the executor when transaction data chunks are ready
@@ -113,6 +118,7 @@ impl StorageSynchronizer {
         Self {
             executor_notifier,
             pending_transaction_chunks,
+            storage,
         }
     }
 
