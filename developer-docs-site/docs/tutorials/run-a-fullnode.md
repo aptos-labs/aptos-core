@@ -97,7 +97,7 @@ During the initial synchronization of your FullNode, there may be a lot of data 
   ```
 
 #### Add upstream seed peers
-Devnet validator fullnode will only accept maximum of 1000 connections, if our network is experiencing high volume, your fullnode might not able to connect. You might see "NoAvailablePeers" in your node error message. If this happens, you can set `seeds` in the fullnode configuration file to add new upstream peers for connection. We prepared some extra fullnode address for you to use:
+Devnet validator fullnode will only accept maximum of 1000 connections, if our network is experiencing high volume, your fullnode might not able to connect. You might see "NoAvailablePeers" in your node error message. If this happens, you can set `seeds` in the fullnode configuration file to add new upstream peers for connection. We prepared some extra fullnode address for you to use here, also feel free to use the ones provided by the community (anyone already running a fullnode can potentially provide their address for you to connect). 
 ```
 seeds:
   4d6a710365a2d95ac6ffbd9b9198a86a:
@@ -210,6 +210,36 @@ full_node_networks:
     type: "from_config"
     key: "B8BD811A91D8E6E0C6DAC991009F189337378760B55F3AD05580235325615C74"
     peer_id: "14fd60f81a2f8eedb0244ec07a26e575"
+```
+
+### Allow other fullnode to connect
+
+Once you started your fullnode with a static identity, you can open your node to allow others conneting to devnet through your node. Make sure you open the port 6180 (or 6182, depends on which port your node is listening to, can be configured in the fullnode config yaml file) on your firewall, and share your node info for others to use as `seeds`.
+
+```
+<Peer_ID>:
+  addresses:
+  # with DNS
+  - "/dns4/<DNS_Name>/tcp/<Port_Number>/ln-noise-ik/<Public_Key>/ln-handshake/0"
+  role: Upstream
+<Peer_ID>:
+  addresses:
+  # with IP
+  - "/ip4/<IP_Address>/tcp/<Port_Number>/ln-noise-ik/<Public_Key>/ln-handshake/0"
+  role: Upstream
+```
+
+Make sure the port number you put in the address matches the one you have in the fullnode config (6180 or 6182). Example:
+
+```
+4d6a710365a2d95ac6ffbd9b9198a86a:
+  addresses:
+  - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/ln-handshake/0"
+  role: "Upstream"
+4d6a710365a2d95ac6ffbd9b9198a86a:
+  addresses:
+  - "/ip4/100.20.221.187/tcp/6182/ln-noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/ln-handshake/0"
+  role: "Upstream"
 ```
 
 [pfn_config_file]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/public_full_node.yaml
