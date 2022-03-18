@@ -320,7 +320,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
         if self.active_data_stream.is_some() {
             // We have an active data stream. Process any notifications!
             self.process_active_stream_notifications().await?;
-        } else if !self.storage_synchronizer.pending_transaction_data() {
+        } else if !self.storage_synchronizer.pending_storage_data() {
             // Fetch a new data stream to start streaming data
             self.initialize_active_data_stream(global_data_summary)
                 .await?;

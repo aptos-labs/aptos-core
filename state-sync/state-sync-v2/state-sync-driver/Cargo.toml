@@ -19,6 +19,7 @@ tokio-stream = "0.1.4"
 consensus-notifications = { path = "../../inter-component/consensus-notifications" }
 data-streaming-service = { path = "../data-streaming-service" }
 aptos-config = { path = "../../../config" }
+aptos-crypto = { path = "../../../crates/aptos-crypto" }
 aptos-data-client = { path = "../../aptos-data-client" }
 aptos-infallible = { path = "../../../crates/aptos-infallible" }
 aptos-logger = { path = "../../../crates/aptos-logger" }
