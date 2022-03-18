@@ -36,6 +36,6 @@ source ~/.cargo/env
 
 * Faucet endpoint: [https://faucet.devnet.aptoslabs.com](https://faucet.devnet.aptoslabs.com)
 * REST interface endpoint: [https://fullnode.devnet.aptoslabs.com](https://fullnode.devnet.aptoslabs.com)
-* [Genesis](https://devnet.aptos.com/genesis.blob)
-* [Waypoint](https://devnet.aptos.com/waypoint.txt)
-* [ChainID](https://devnet.aptos.com/chainid.txt)
+* [Genesis](https://devnet.aptoslabs.com/genesis.blob)
+* [Waypoint](https://devnet.aptoslabs.com/waypoint.txt)
+* [ChainID](https://devnet.aptoslabs.com/chainid.txt)
