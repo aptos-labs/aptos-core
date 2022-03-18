@@ -3,7 +3,7 @@
 ## Abstract
 
 This specification outlines the design and implementation of Aptos Execution Correctness (LEC): a secured service
-dedicated for executing transactions correctly (with the MOVE VM) and used by Consensus in the Aptos payment network.
+dedicated for executing transactions correctly (with the MOVE VM) and used by Consensus in the Aptos Blockchain.
 
 For those unfamiliar with the execution flow of TCB, we recommend reading the architecture of [Trusted Computing Base (TCB)](../README.md).
 

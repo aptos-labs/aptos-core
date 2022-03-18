@@ -4,7 +4,7 @@
 
 This document describes the spec of a Aptos node's state synchronizer component,
 which is responsible for synchronizing a node's local ledger to the latest state in
-the Aptos Payment Network.
+the Aptos Blockchain.
 
 This document is organized as follows:
 
@@ -20,7 +20,7 @@ as a node in the Aptos Network
 ## Overview
 
 State Synchronizer is a system component that is responsible for syncing ledger
-state among peers in the Aptos Payment Network. Using state sync, a Aptos node
+state among peers in the Aptos Blockchain. Using state sync, a Aptos node
 can discover and update to a more recent ledger state if available with the following
 general flow:
 1. A node sends a [`GetChunkRequest`](#getchunkrequest) to a remote peer

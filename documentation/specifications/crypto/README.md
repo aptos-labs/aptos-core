@@ -3,7 +3,7 @@
 ## Overview
 
 The consensus specification describes the cryptographic operations used for
-hashing, signing and verifying throughout the Aptos Payment Network, as well as
+hashing, signing and verifying throughout the Aptos Blockchain, as well as
 on transactions submitted to this network.
 
 We do not specify any of one of these algorithms from first principles, but

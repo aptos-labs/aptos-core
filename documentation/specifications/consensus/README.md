@@ -2,7 +2,7 @@
 
 ## Overview
 
-The consensus specification describes the mechanism used by the Aptos Payment Network (LPN) validators to agree on both ordering and transaction execution output under byzantine fault-tolerant (BFT) conditions - at most _f_ validators (where _f_ < (_all validators_)/3) are faulty or malicious. Currently, the consensus specification is an implementation of _AptosBFT_, a BFT consensus protocol that ensures liveness and safety under partial synchrony. The [AptosBFT whitepaper](https://aptos.dev/docs/state-machine-replication-paper) describes a high level overview of the protocol, the liveness and safety proofs, and a rationale on why AptosBFT was adopted for the LPN. This document specifies how to implement the AptosBFT protocol in order to participate as a validating node in the LPN.
+The consensus specification describes the mechanism used by the Aptos validators to agree on both ordering and transaction execution output under byzantine fault-tolerant (BFT) conditions - at most _f_ validators (where _f_ < (_all validators_)/3) are faulty or malicious. Currently, the consensus specification is an implementation of _AptosBFT_, a BFT consensus protocol that ensures liveness and safety under partial synchrony. The [AptosBFT whitepaper](https://aptos.dev/docs/state-machine-replication-paper) describes a high level overview of the protocol, the liveness and safety proofs, and a rationale on why AptosBFT was adopted for the LPN. This document specifies how to implement the AptosBFT protocol in order to participate as a validating node in the LPN.
 
 This document is organized as follows:
 

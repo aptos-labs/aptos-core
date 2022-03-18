@@ -1,6 +1,6 @@
 # Key Manager specification
 
-This specification outlines the design and execution of the Key Manager (KM): the primary service responsible for managing and rotating cryptographic keys used by validator nodes and validator full nodes in the Aptos payment network.
+This specification outlines the design and execution of the Key Manager (KM): the primary service responsible for managing and rotating cryptographic keys used by validator nodes and validator full nodes in the Aptos Blockchain.
 
 ## Table of Contents
 

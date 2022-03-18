@@ -1,6 +1,6 @@
 # Protocol Specification
 
-This document describes the protocol specifications for the Aptos Payment Network (LPN). The intended audience for this document are as follows:
+This document describes the protocol specifications for the Aptos Blockchain. The intended audience for this document are as follows:
 
 * Virtual Asset Service Providers (VASPs), designated dealers (DDs), and other [ecosystem developers](https://aptoslabs.com/en-US/white-paper/) who build software that can interface with the LPN.
 * Developers who work on supporting transaction validation and interface with the validation protocols.
