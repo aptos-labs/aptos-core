@@ -278,7 +278,7 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     // Commit the executed chunk
                     match chunk_executor.commit_chunk() {
                         Ok((events, transactions)) => {
-                            let commit_notification = CommitNotification::new(events, transactions);
+                            let commit_notification = CommitNotification::new_committed_transactions(events, transactions);
                             if let Err(error) = commit_notification_sender.send(commit_notification).await {
                                 let error = format!("Failed to send commit notification! Error: {:?}", error);
                                 send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
