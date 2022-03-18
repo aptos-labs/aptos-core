@@ -101,7 +101,7 @@ const config = {
                         <a class="social-link" href="https://github.com/aptoslabs" target="_blank" rel="noopener noreferrer" title="Git">
                          <img class="icon" src="/img/socials/git.svg" alt="Git Icon" />
                         </a>
-                        <a class="social-link" href="https://discord.gg/zTDYBEud7U" target="_blank" rel="noopener noreferrer" title="Discord">
+                        <a class="social-link" href="https://discord.gg/aptoslabs" target="_blank" rel="noopener noreferrer" title="Discord">
                           <img class="icon" src="/img/socials/discord.svg" alt="Discord Icon" />
                         </a>
                         <a class="social-link" href="https://twitter.com/aptoslabs/" target="_blank" rel="noopener noreferrer" title="Twitter">

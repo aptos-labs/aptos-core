@@ -31,7 +31,7 @@ Join our [Developer Network][typeform] to get notified and see the latest update
 
 ### ⚔️ Be safe out there
 
-It's dangerous to go alone. Please remember, our community managers will never message or DM you first, and they will never ask you to send them money or share any sensitive, private, or personal information. If this happens to you, please report it to us in our [Discord](https://discord.gg/zTDYBEud7U), or by sending an email to [security@aptoslabs.com](mailto:security@aptoslabs.com)
+It's dangerous to go alone. Please remember, our community managers will never message or DM you first, and they will never ask you to send them money or share any sensitive, private, or personal information. If this happens to you, please report it to us in our [Discord][discord], or by sending an email to [security@aptoslabs.com](mailto:security@aptoslabs.com)
 
 ### 💪 Join our crew
 
@@ -45,4 +45,4 @@ Welcome to the Aptos community!
 
 
 [typeform]: https://www.aptoslabs.com/developers
-[discord]: https://discord.gg/zTDYBEud7U
+[discord]: https://discord.gg/aptoslabs

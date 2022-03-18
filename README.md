@@ -10,7 +10,7 @@
 [![grcov](https://img.shields.io/badge/Coverage-grcov-green)](https://ci-artifacts.aptoslabs.com/coverage/unit-coverage/latest/index.html)
 [![test history](https://img.shields.io/badge/Test-History-green)](https://ci-artifacts.aptoslabs.com/testhistory/aptos/aptos/auto/ci-test.yml/index.html)
 [![Automated Issues](https://img.shields.io/github/issues-search?color=orange&label=Automated%20Issues&query=repo%3Aaptos%2Faptos%20is%3Aopen%20author%3Aapp%2Fgithub-actions)](https://github.com/aptos-labs/aptos-core/issues/created_by/app/github-actions)
-[![Discord chat](https://img.shields.io/discord/945856774056083548?style=flat-square)](https://discord.gg/gEV3C5jSnw)
+[![Discord chat](https://img.shields.io/discord/945856774056083548?style=flat-square)](https://discord.gg/aptoslabs)
 
 
 Aptos-core strives towards being the safest and most scalable layer one blockchain solution. Today, this powers the Aptos Devnet, tomorrow Mainnet in order to create universal and fair access to decentralized assets for billions of people.
@@ -21,7 +21,7 @@ Aptos-core strives towards being the safest and most scalable layer one blockcha
 * [Aptos Developer Network](https://aptos.dev)
 * [Getting Started](https://aptos.dev/tutorials/getting-started)
 * [Life of a Transaction](https://aptos.dev/transactions/basics-life-of-txn)
-* Join us on the [Aptos Discord](https://discord.gg/gEV3C5jSnw).
+* Join us on the [Aptos Discord](https://discord.gg/aptoslabs).
 
 ## Contributing
 
