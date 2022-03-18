@@ -130,7 +130,7 @@ impl TreeState {
     }
 }
 
-pub trait StateSnapshotReceiver<V> {
+pub trait StateSnapshotReceiver<V>: Send {
     fn add_chunk(
         &mut self,
         chunk: Vec<(HashValue, V)>,
