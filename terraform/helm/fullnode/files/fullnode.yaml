@@ -17,15 +17,9 @@ full_node_networks:
   seeds:
     {{- (get .Values.aptos_chains .Values.chain.name).seeds | default dict | toYaml | nindent 6 }}
   inbound_rate_limit_config:
-    ip_byte_bucket_rate: 1048576
-    ip_byte_bucket_size: 1048576
-    initial_bucket_fill_percentage: 25
-    enabled: true
+    {{- .Values.fullnode_inbound_rate_limit | toYaml | nindent 6 }}
   outbound_rate_limit_config:
-    ip_byte_bucket_rate: 1048576
-    ip_byte_bucket_size: 1048576
-    initial_bucket_fill_percentage: 25
-    enabled: true
+    {{- .Values.fullnode_outbound_rate_limit | toYaml | nindent 6 }}
 
 storage:
   backup_service_address: "0.0.0.0:6186"
