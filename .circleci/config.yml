@@ -223,6 +223,8 @@ workflows:
       - docker-build-push:
           context: aws-dev
           addl_tag: devnet
+          requires:
+            - require-branch
       - ecr-dockerhub-mirror:
           context:
             - aws-dev
