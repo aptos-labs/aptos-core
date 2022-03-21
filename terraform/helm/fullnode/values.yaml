@@ -22,6 +22,7 @@ fullnode_outbound_rate_limit:
   ip_byte_bucket_rate: 1048576
   ip_byte_bucket_size: 1048576
   initial_bucket_fill_percentage: 25
+fullnode_max_inbound_connections: 1000
 
 rust_log: info
 

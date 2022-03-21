@@ -20,7 +20,7 @@ full_node_networks:
     {{- .Values.fullnode_inbound_rate_limit | toYaml | nindent 6 }}
   outbound_rate_limit_config:
     {{- .Values.fullnode_outbound_rate_limit | toYaml | nindent 6 }}
-
+  max_inbound_connections: {{ .Values.fullnode_max_inbound_connections }}
 storage:
   backup_service_address: "0.0.0.0:6186"
 
