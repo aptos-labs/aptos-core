@@ -5,7 +5,7 @@ sidebar_position: 1
 ---
 import BlockQuote from "@site/src/components/BlockQuote";
 
-To get a deeper understanding of the lifecycle of an Aptos transaction (from an operational perspective), we will follow a transaction on its journey from being submitted to an Aptos node to being committed to the Aptos Blockchain. We will then “zoom-in” on the logical components of Aptos nodes and take a look at its interactions with other components.
+To get a deeper understanding of the lifecycle of an Aptos transaction (from an operational perspective), we will follow a transaction on its journey, from being submitted to an Aptos FullNode, to being committed to the Aptos Blockchain. We will then *zoom-in* on the logical components of Aptos nodes and take a look how the transaction interacts with these components.
 
 # Assumptions
 
@@ -21,7 +21,7 @@ For the purpose of this doc, we will assume that:
 
 # Client submits a transaction
 
-An Aptos **client constructs a raw transaction** (let's call it T<sub>5</sub>raw) to transfer 10 Aptos Coins from Alice’s account to Bob’s account. The Aptos client signs the transaction with Alice's private key. The signed transaction T<sub>5</sub> includes the following:
+An Aptos **client constructs a raw transaction** (let's call it Traw<sub>5</sub>) to transfer 10 Aptos Coins from Alice’s account to Bob’s account. The Aptos client signs the transaction with Alice's private key. The signed transaction T<sub>5</sub> includes the following:
 
 * The raw transaction.
 * Alice's public key.
@@ -31,13 +31,13 @@ The raw transaction includes the following fields:
 
 | Fields | Description |
 | ------ | ----------- |
-| [account address](/reference/glossary#account-address) | Alice's account address |
+| [Account address](/reference/glossary#account-address) | Alice's account address |
 | Move Module | A module (or program) that indicates the actions to be performed on Alice's behalf. In this case, it contains:  <br />- A Move bytecode peer-to-peer [transaction script](/reference/glossary#transaction-script) <br />- A list of inputs to the script (for this example the list would contain Bob's account address and the payment amount in Aptos Coins). |
-| [maximum gas amount](/reference/glossary#maximum-gas-amount) | The maximum gas amount Alice is willing to pay for this transaction. Gas is a way to pay for computation and storage. A gas unit is an abstract measurement of computation. |
-| [gas price](/reference/glossary#gas-price) (in microaptos/gas units) | The amount in Aptos Coins Alice is willing to pay per unit of gas, to execute the transaction. |
-| [expiration time](/reference/glossary#expiration-time) | Expiration time of the transaction. |
-| [sequence number](/reference/glossary#sequence-number)  | The sequence number (5 for this example) for an account indicates the number of transactions that have been submitted and commited on chain from that account. In this case, 5 transactions have been submitted from Alice’s account, including T<sub>5</sub>raw). A transaction with sequence number 5 can only be committed on-chain if the account sequence number is 5. |
-| [Chain ID](https://github.com/aptos/aptos/blob/main/types/src/chain_id.rs) | An identifier that distinguishes the various Aptos deployments. |
+| [Maximum gas amount](/reference/glossary#maximum-gas-amount) | The maximum gas amount Alice is willing to pay for this transaction. Gas is a way to pay for computation and storage. A gas unit is an abstract measurement of computation. |
+| [Gas price](/reference/glossary#gas-price) | The amount (in Aptos Coins) Alice is willing to pay per unit of gas, to execute the transaction. |
+| [Expiration time](/reference/glossary#expiration-time) | Expiration time of the transaction. |
+| [Sequence number](/reference/glossary#sequence-number)  | The sequence number (5, in this example) for an account indicates the number of transactions that have been submitted and commited on-chain from that account. In this case, 5 transactions have been submitted from Alice’s account, including Traw<sub>5</sub>. Note: a transaction with sequence number 5 can only be committed on-chain if the account sequence number is 5. |
+| [Chain ID](https://github.com/aptos/aptos/blob/main/types/src/chain_id.rs) | An identifier that distinguishes the Aptos network deployments (to prevent cross-network attacks). |
 
 # Lifecycle of the transaction
 
@@ -53,11 +53,11 @@ For the relevant steps, we've included a link to the corresponding inter-compone
 
 The lifecycle of a transaction has five stages:
 
-* Accepting: [Accepting the transaction](#accepting-the-transaction)
-* Sharing: [Sharing the transaction with other validator nodes](#sharing-the-transaction-with-other-validator-nodes)
-* Proposing: [Proposing the block](#proposing-the-block)
-* Executing and Consensus: [Executing the block and reaching consensus](#executing-the-block-and-reaching-consensus)
-* Committing: [Committing the block](#committing-the-block)
+* **Accepting**: [Accepting the transaction](#accepting-the-transaction)
+* **Sharing**: [Sharing the transaction with other validator nodes](#sharing-the-transaction-with-other-validator-nodes)
+* **Proposing**: [Proposing the block](#proposing-the-block)
+* **Executing and Consensus**: [Executing the block and reaching consensus](#executing-the-block-and-reaching-consensus)
+* **Committing**: [Committing the block](#committing-the-block)
 
 We've described what happens in each stage below, along with links to the corresponding Aptos node component interactions.
 
@@ -65,9 +65,9 @@ We've described what happens in each stage below, along with links to the corres
 
 | Description                                                  | Aptos Node Component Interactions                           |
 | ------------------------------------------------------------ | ---------------------------------------------------------- |
-| 1. **Client → REST service**: The client submits transaction T<sub>5</sub> to the REST service of an Aptos FullNode. FullNodes use the REST service to forward the transaction to their own mempools which forward the transaction to upstream mempool services running on validator FullNodes which in turn forward to the validator node V<sub>1</sub>. | [1. REST Service](#1-client-→-rest-service)                  |
-| 2. **REST service → Mempool**: The FullNode's REST service transmits transaction T<sub>5</sub> to validator V<sub>1</sub>'s mempool. | [2. REST Service](#2-rest-service-→-mempool), [1. Mempool](#1-rest-service-→-mempool) |
-| 3. **Mempool → Virtual Machine**: Mempool will use the virtual machine (VM) component to perform validation checks, such as signature verification, checking that Alice's account has sufficient balance, checking that transaction T<sub>5</sub> is not being replayed using the sequence number, and so on. | [4. Mempool](#4-mempool-→-vm), [3. Virtual Machine](#3-mempool-→-virtual-machine) |
+| 1. **Client → REST service**: The client submits transaction T<sub>5</sub> to the REST service of an Aptos FullNode. The FullNode uses the REST service to forward the transaction to its own mempool, which then forwards the transaction to mempools running on other nodes in the network. The transaction will eventually be forwarded to a mempool running on a validator FullNode, which will send it to a validator node (V<sub>1</sub> in this case). | [1. REST Service](#1-client--rest-service)                  |
+| 2. **REST service → Mempool**: The FullNode's REST service transmits transaction T<sub>5</sub> to validator V<sub>1</sub>'s mempool. | [2. REST Service](#2-rest-service--mempool), [1. Mempool](#1-rest-service--mempool) |
+| 3. **Mempool → Virtual Machine (VM)**: Mempool will use the virtual machine (VM) component to perform transaction validation, such as signature verification, account balance verification and replay resistance using the sequence number. | [4. Mempool](#4-mempool--vm), [3. Virtual Machine](#3-mempool--virtual-machine) |
 
 
 ## Sharing the transaction with other validator nodes
@@ -75,38 +75,38 @@ We've described what happens in each stage below, along with links to the corres
 | Description                                                  | Aptos Node Component Interactions |
 | ------------------------------------------------------------ | -------------------------------- |
 | 4. **Mempool**: The mempool will hold T<sub>5</sub> in an in-memory buffer. Mempool may already contain multiple transactions sent from Alice's address. | [Mempool](#mempool)                  |
-| 5. **Mempool → Other Validators**: Using the shared-mempool protocol, V<sub>1</sub> will share the transactions (including T<sub>5</sub>) in its mempool with other validator nodes and place transactions received from them into its own (V<sub>1</sub>) mempool. | [2. Mempool](#2-mempool-→-other-validator-nodes)               |
+| 5. **Mempool → Other Validators**: Using the shared-mempool protocol, V<sub>1</sub> will share the transactions (including T<sub>5</sub>) in its mempool with other validator nodes and place transactions received from them into its own (V<sub>1</sub>) mempool. | [2. Mempool](#2-mempool--other-validator-nodes)               |
 
 ## Proposing the block
 
 | Description                                                  | Aptos Node Component Interactions         |
 | ------------------------------------------------------------ | ---------------------------------------- |
-| 6. **Consensus → Mempool**: &mdash; As validator V<sub>1</sub> is a proposer/leader for this transaction, it will pull a block of transactions from its mempool and replicate this block as a proposal to other validator nodes via its consensus component. | [1. Consensus](#1-consensus-→-mempool), [3. Mempool](#3-consensus-→-mempool) |
-| 7. **Consensus → Other Validators**: The consensus component of V<sub>1</sub> is responsible for coordinating agreement among all validators on the order of transactions in the proposed block. | [2. Consensus](#2-consensus-→-other-validators)                     |
+| 6. **Consensus → Mempool**: &mdash; As validator V<sub>1</sub> is a proposer/leader for this transaction, it will pull a block of transactions from its mempool and replicate this block as a proposal to other validator nodes via its consensus component. | [1. Consensus](#1-consensus--mempool), [3. Mempool](#3-consensus--mempool) |
+| 7. **Consensus → Other Validators**: The consensus component of V<sub>1</sub> is responsible for coordinating agreement among all validators on the order of transactions in the proposed block. | [2. Consensus](#2-consensus--other-validators)                     |
 
 ## Executing the block and reaching consensus
 
 | Description                                                  | Aptos Node Component Interactions                 |
 | ------------------------------------------------------------ | ------------------------------------------------ |
-| 8. **Consensus → Execution**: As part of reaching agreement, the block of transactions (containing T<sub>5</sub>) is shared with the execution component. | [3. Consensus](#3-consensus-→-execution-consensus-→-other-validators), [1. Execution](#1-consensus-→-execution)       |
-| 9. **Execution → Virtual Machine**: The execution component manages the execution of transactions in the virtual machine (VM). Note that this execution happens speculatively before the transactions in the block have been agreed upon. | [2. Execution](#2-execution-→-vm), [3. Virtual Machine](#3-mempool-→-virtual-machine) |
-| 10. **Consensus → Execution**: After executing the transactions in the block, the execution component appends the transactions in the block (including T<sub>5</sub>) to the [Merkle accumulator](/reference/glossary#merkle-accumulator) (of the ledger history). This is an in-memory/temporary version of the Merkle accumulator. The necessary part of the proposed/speculative result of executing these transactions is returned to the consensus component to agree on. The arrow from "consensus" to "execution" indicates that the request to execute transactions was made by the consensus component. (For consistent use of arrows throughout this article, the arrows do not represent the flow of data). | [3. Consensus](#3-consensus-→-execution-consensus-→-other-validators), [1. Execution](#1-consensus-→-execution)       |
-| 11. **Consensus → Other Validators**: V<sub>1</sub> (the consensus leader) attempts to reach consensus on the proposed block's execution result with the other validator nodes participating in consensus. | [3. Consensus](#3-consensus-→-execution-consensus-→-other-validators)                             |
+| 8. **Consensus → Execution**: As part of reaching agreement, the block of transactions (containing T<sub>5</sub>) is shared with the execution component. | [3. Consensus](#3-consensus--execution-consensus--other-validators), [1. Execution](#1-consensus--execution)       |
+| 9. **Execution → Virtual Machine**: The execution component manages the execution of transactions in the VM. Note that this execution happens speculatively before the transactions in the block have been agreed upon. | [2. Execution](#2-execution--vm), [3. Virtual Machine](#3-mempool--virtual-machine) |
+| 10. **Consensus → Execution**: After executing the transactions in the block, the execution component appends the transactions in the block (including T<sub>5</sub>) to the [Merkle accumulator](/reference/glossary#merkle-accumulator) (of the ledger history). This is an in-memory/temporary version of the Merkle accumulator. The necessary part of the proposed/speculative result of executing these transactions is returned to the consensus component to agree on. The arrow from "consensus" to "execution" indicates that the request to execute transactions was made by the consensus component. | [3. Consensus](#3-consensus--execution-consensus--other-validators), [1. Execution](#1-consensus--execution)       |
+| 11. **Consensus → Other Validators**: V<sub>1</sub> (the consensus leader) attempts to reach consensus on the proposed block's execution result with the other validator nodes participating in consensus. | [3. Consensus](#3-consensus--execution-consensus--other-validators)                             |
 
 ## Committing the block
 
 | Description                                                  | Aptos Node Component Interactions                             |
 | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| 12. **Consensus → Execution**, **Execution → Storage **:If the proposed block's execution result is agreed upon and signed by a set of validators that have the quorum of votes, validator V<sub>1</sub>'s execution component reads the full result of the proposed block execution from the speculative execution cache and commits all the transactions in the proposed block to persistent storage with their results. | [4. Consensus](#4-consensus-→-execution), [3. Execution](#3-consensus-→-execution), [4. Execution](#4-execution-→-storage), [3. Storage](#3-execution-→-storage) |
+| 12. **Consensus → Execution**, **Execution → Storage**: If the proposed block's execution result is agreed upon and signed by a set of validators that have the quorum of votes, validator V<sub>1</sub>'s execution component reads the full result of the proposed block execution from the speculative execution cache and commits all the transactions in the proposed block to persistent storage with their results. | [4. Consensus](#4-consensus--execution), [3. Execution](#3-consensus--execution), [4. Execution](#4-execution--storage), [3. Storage](#3-execution--storage) |
 
 Alice's account will now have 100 Aptos Coins, and its sequence number will be 6. If T<sub>5</sub> is replayed by Bob, it will be rejected as the sequence number of Alice's account (6) is greater than the sequence number of the replayed transaction (5).
 
 # Aptos node component interactions
 
-In the [previous section](#lifecycle-of-the-transaction), we described the typical lifecycle of a sample transaction from being submitted to being committed to the Aptos Blockchain's distributed database. Now let's look in more depth at the inter-component interactions of Aptos nodes as the blockchain processes transactions and responds to queries. This information will be most useful to those who:
+In the [previous section](#lifecycle-of-the-transaction), we described the typical lifecycle of a transaction (from transaction submission to transaction commit). Now let's look at the inter-component interactions of Aptos nodes as the blockchain processes transactions and responds to queries. This information will be most useful to those who:
 
-* Would like to get an overall idea of how the system works under the covers.
-* Are interested in eventually contributing to the Aptos-core software.
+* Would like to get an idea of how the system works under the covers.
+* Are interested in eventually contributing to the Aptos Blockchain.
 
 You can learn more about the different types of Aptos nodes here:
 * [Validator nodes](/basics/basics-validator-nodes)
@@ -114,7 +114,7 @@ You can learn more about the different types of Aptos nodes here:
 
 For our narrative, we will assume that a client submits a transaction T<sub>N</sub> to a validator V<sub>X</sub>. For each validator component, we will describe each of its inter-component interactions in subsections under the respective component's section. Note that subsections describing the inter-component interactions are not listed strictly in the order in which they are performed. Most of the interactions are relevant to the processing of a transaction, and some are relevant to clients querying the blockchain (queries for existing information on the blockchain).
 
-The following are the core logical components of an Aptos node used in the lifecycle of a transaction:
+The following are the core components of an Aptos node used in the lifecycle of a transaction:
 
 **FullNode**
 
@@ -140,7 +140,7 @@ A client submits a transaction to the REST service of an Aptos FullNode.
 
 ### 2. REST Service → Mempool
 
-The REST service forwards the transaction to validator FullNode, which then sends it to validator node V<sub>X</sub>'s mempool. The mempool will accept the transaction T<sub>N</sub> only if the sequence number of T<sub>N</sub> is greater than or equal to the current sequence number of the sender's account (note that the transaction will not be passed to consensus until the sequence number matches the sequence number of the sender’s account).
+The REST service forwards the transaction to a validator FullNode, which then sends it to validator node V<sub>X</sub>'s mempool. The mempool will accept the transaction T<sub>N</sub> only if the sequence number of T<sub>N</sub> is greater than or equal to the current sequence number of the sender's account (note that the transaction will not be passed to consensus until the sequence number matches the sequence number of the sender’s account).
 
 ### 3. REST Service → Storage
 
@@ -151,7 +151,7 @@ When a client performs a read query on the Aptos Blockchain (for example, to get
 ![Figure 1.2 Virtual machine](/img/docs/virtual-machine.svg)
 <small className="figure">Figure 1.2 Virtual machine</small>
 
-The Move virtual machine (VM) verifies and executes transaction scripts written in Move bytecode.
+The Move VM verifies and executes transaction scripts written in Move bytecode.
 
 ### 1. Virtual Machine → Storage
 
@@ -210,7 +210,7 @@ For implementation details refer to the [Mempool README](https://github.com/apto
 ![Figure 1.4 Consensus](/img/docs/consensus.svg)
 <small className="figure">Figure 1.4 Consensus</small>
 
-The consensus component (consensus) is responsible for ordering blocks of transactions and agreeing on the results of execution by participating in the [consensus protocol](/reference/glossary/#consensus-protocol) with other validators in the network.
+The consensus component is responsible for ordering blocks of transactions and agreeing on the results of execution by participating in the [consensus protocol](/reference/glossary/#consensus-protocol) with other validators in the network.
 
 
 ### 1. Consensus → Mempool
@@ -223,10 +223,9 @@ If V<sub>X</sub> is a proposer/leader, its consensus component replicates the pr
 
 ### 3. Consensus → Execution, Consensus → Other Validators
 
-* To execute a block of transactions, consensus interacts with the execution component. Consensus executes a block of transactions via `Execution:ExecuteBlock()` (Refer to [Consensus → execution](#1-consensus-→-execution)
+* To execute a block of transactions, consensus interacts with the execution component. Consensus executes a block of transactions via `Execution:ExecuteBlock()` (Refer to [Consensus → execution](#1-consensus--execution))
 * After executing the transactions in the proposed block, the execution component responds to the consensus component with the result of executing these transactions.
-* The consensus component signs the execution results and attempts to reach agreement on this result with other validators participating in consensus.
-*
+* The consensus component signs the execution result and attempts to reach agreement on this result with other validators.
 
 ## 4. Consensus → Execution
 
@@ -254,7 +253,7 @@ When consensus requests execution to execute a block of transactions via `Execut
 
 ### 3. Consensus → Execution
 
-If a quorum of validators agrees on the block execution results, the consensus component of each validator informs its execution component via `Execution::CommitBlock()` that this block is ready to be committed. This call to the execution component will include the signatures of the agreeing validators to provide proof of their agreement.
+If a quorum of validators agrees on the block execution results, the consensus component of each validator informs its execution component via `Execution::CommitBlock()` that this block is ready to be committed. This call to the execution component will include the signatures of the validators to provide proof of their agreement.
 
 ### 4. Execution → Storage
 
@@ -266,18 +265,16 @@ For implementation details refer to the [Execution README](https://github.com/ap
 ![Figure 1.6 Storage](/img/docs/storage.svg)
 <small className="figure">Figure 1.6 Storage</small>
 
-The storage component persists agreed upon blocks of transactions and their execution results to the Aptos Blockchain. A block of transactions (which includes transaction T<sub>N</sub>) will be saved via storage when:
-
-* There is agreement between more than a quorum (2f+1) of the validators participating in consensus on all of the following:
-* The transactions to include in a block
+The storage component persists agreed upon blocks of transactions and their execution results to the Aptos Blockchain. A block of transactions (which includes transaction T<sub>N</sub>) will be saved via storage when there is agreement between more than a quorum (2f+1) of the validators participating in consensus. Agreement must include all of the following:
+* The transactions to include in the block
 * The order of the transactions
-* The execution results of the transactions to be included in the block
+* The execution results of the transactions in the block
 
 Refer to [Merkle accumulator](/reference/glossary#merkle-accumulator) for information on how a transaction is appended to the data structure representing the Aptos Blockchain.
 
 ### 1. VM → Storage
 
-When AC or mempool invokes `VM::ValidateTransaction()` to validate a transaction, `VM::ValidateTransaction()` loads the sender's account from storage and performs the read-only validity checks on the transaction.
+When mempool invokes `VM::ValidateTransaction()` to validate a transaction, `VM::ValidateTransaction()` loads the sender's account from storage and performs read-only validity checks on the transaction.
 
 ### 2. Execution → Storage
 
@@ -285,10 +282,9 @@ When the consensus component calls `Execution::ExecuteBlock()`, execution reads 
 
 ### 3. Execution → Storage
 
-* Once consensus is reached on a block of transactions, execution calls storage via `Storage::SaveTransactions()` to save the block of transactions and permanently record them. This will also store the signatures from the validator nodes that agreed on this block of transactions.
-* The in-memory data in “scratchpad” for this block is passed to update storage and persist the transactions.
-* When the storage is updated, every account that was modified by these transactions will have its sequence number incremented by one.
-* Note: The sequence number of an account on the Aptos Blockchain increments by one for each committed transaction originating from that account.
+Once consensus is reached on a block of transactions, execution calls storage via `Storage::SaveTransactions()` to save the block of transactions and permanently record them. This will also store the signatures from the validator nodes that agreed on this block of transactions. The in-memory data in “scratchpad” for this block is passed to update storage and persist the transactions. When the storage is updated, every account that was modified by these transactions will have its sequence number incremented by one.
+
+Note: The sequence number of an account on the Aptos Blockchain increments by one for each committed transaction originating from that account.
 
 ### 4. REST Service → Storage
 
