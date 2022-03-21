@@ -23,34 +23,32 @@ impl DBPruner for TransactionStorePruner {
         TRANSACTION_STORE_PRUNER_NAME
     }
 
-    fn prune(&self, max_versions: u64) -> anyhow::Result<Version> {
+    fn prune(&self, db_batch: &mut SchemaBatch, max_versions: u64) -> anyhow::Result<Version> {
         let least_readable_version = self.least_readable_version();
         // Current target version  might be less than the target version to ensure we don't prune
         // more than max_version in one go.
         let current_target_version = self.get_currrent_batch_target(max_versions);
         let candidate_transactions = self
             .get_pruning_candidate_transactions(least_readable_version, current_target_version)?;
-        let mut db_batch = SchemaBatch::new();
         self.transaction_store
-            .prune_transaction_by_hash(&candidate_transactions, &mut db_batch)?;
+            .prune_transaction_by_hash(&candidate_transactions, db_batch)?;
         self.transaction_store
-            .prune_transaction_by_account(&candidate_transactions, &mut db_batch)?;
+            .prune_transaction_by_account(&candidate_transactions, db_batch)?;
         self.transaction_store.prune_transaction_schema(
             self.least_readable_version(),
             current_target_version,
-            &mut db_batch,
+            db_batch,
         )?;
         self.transaction_store.prune_transaction_info_schema(
             self.least_readable_version(),
             current_target_version,
-            &mut db_batch,
+            db_batch,
         )?;
         self.transaction_store.prune_transaction_accumulator(
             self.least_readable_version(),
             current_target_version,
-            &mut db_batch,
+            db_batch,
         )?;
-        self.db.write_schemas(db_batch)?;
 
         self.record_progress(current_target_version);
         Ok(current_target_version)

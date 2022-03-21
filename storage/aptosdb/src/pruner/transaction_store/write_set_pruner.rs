@@ -23,17 +23,15 @@ impl DBPruner for WriteSetPruner {
         TRANSACTION_STORE_PRUNER_NAME
     }
 
-    fn prune(&self, max_versions: u64) -> anyhow::Result<Version> {
+    fn prune(&self, db_batch: &mut SchemaBatch, max_versions: u64) -> anyhow::Result<Version> {
         // Current target version  might be less than the target version to ensure we don't prune
         // more than max_version in one go.
-        let mut db_batch = SchemaBatch::new();
         let current_target_version = self.get_currrent_batch_target(max_versions);
         self.transaction_store.prune_write_set(
             self.least_readable_version(),
             current_target_version,
-            &mut db_batch,
+            db_batch,
         )?;
-        self.db.write_schemas(db_batch)?;
 
         self.record_progress(current_target_version);
         Ok(current_target_version)

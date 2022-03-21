@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use aptos_types::transaction::Version;
-use schemadb::DB;
+use schemadb::{SchemaBatch, DB};
 
 use crate::pruner::db_pruner::DBPruner;
 use aptos_infallible::Mutex;
@@ -28,6 +28,7 @@ use std::{
 /// Maintains all the DBPruners and periodically calls the db_pruner's prune method to prune the DB.
 /// This also exposes API to report the progress to the parent thread.
 pub struct Worker {
+    db: Arc<DB>,
     command_receiver: Receiver<Command>,
     /// Keeps tracks of all the DB pruners
     db_pruners: Vec<Mutex<Arc<dyn DBPruner + Send + Sync>>>,
@@ -52,6 +53,7 @@ impl Worker {
         least_readable_versions: Arc<Mutex<Vec<Version>>>,
     ) -> Self {
         Self {
+            db: Arc::clone(&db),
             db_pruners: vec![
                 Mutex::new(Arc::new(StateStorePruner::new(
                     Arc::clone(&db),
@@ -93,17 +95,16 @@ impl Worker {
             // Process a reasonably small batch of work before trying to receive commands again,
             // in case `Command::Quit` is received (that's when we should quit.)
             let mut error_in_pruning = false;
+            let mut db_batch = SchemaBatch::new();
             for db_pruner in &self.db_pruners {
                 let result = db_pruner
                     .lock()
-                    .prune(Self::MAX_VERSIONS_TO_PRUNE_PER_BATCH);
-                match result {
-                    Ok(_) => {}
-                    Err(_) => {
-                        error_in_pruning = true;
-                    }
-                }
+                    .prune(&mut db_batch, Self::MAX_VERSIONS_TO_PRUNE_PER_BATCH);
+                result.map_err(|_| error_in_pruning = true).ok();
             }
+            // Commit all the changes to DB atomically
+            let result = self.db.write_schemas(db_batch);
+            result.map_err(|_| error_in_pruning = true).ok();
             let mut pruning_pending = false;
             for db_pruner in &self.db_pruners {
                 // if any of the pruner has pending pruning, then we don't block on receive

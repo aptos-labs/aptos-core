@@ -23,15 +23,13 @@ impl DBPruner for LedgerStorePruner {
         LEDGER_STORE_PRUNER_NAME
     }
 
-    fn prune(&self, max_versions: u64) -> anyhow::Result<Version> {
+    fn prune(&self, db_batch: &mut SchemaBatch, max_versions: u64) -> anyhow::Result<Version> {
         let current_target_version = self.get_currrent_batch_target(max_versions);
-        let mut db_batch = SchemaBatch::new();
         self.ledger_store.prune_ledger_couners(
             self.least_readable_version(),
             current_target_version,
-            &mut db_batch,
+            db_batch,
         )?;
-        self.db.write_schemas(db_batch)?;
         self.record_progress(current_target_version);
         Ok(current_target_version)
     }
