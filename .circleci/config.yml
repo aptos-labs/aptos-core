@@ -194,10 +194,14 @@ workflows:
   build-test-deploy:
     jobs:
 #      - build-benchmarks
-      - crypto
-      - e2e-test
-      - lint
-      - unit-test
+      - crypto:
+          context: committers
+      - e2e-test:
+          context: committers
+      - lint:
+          context: committers
+      - unit-test:
+          context: committers
       ### bors-controlled workflows ###
       - require-branch:
           filters:
