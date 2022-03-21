@@ -70,7 +70,7 @@ pub async fn transfer_and_reconfig(
     for _ in 0..num_transfers {
         // Reconfigurations have a 20% chance of being executed
         if random::<u16>() % 5 == 0 {
-            let diem_version = client.get_aptos_version().await.unwrap();
+            let diem_version = client.get_dpn_version().await.unwrap();
             let current_version = *diem_version.into_inner().payload.major.inner();
             let txn = root_account.sign_with_transaction_builder(
                 transaction_factory.update_diem_version(0, current_version + 1),
@@ -86,7 +86,7 @@ pub async fn transfer_and_reconfig(
 
 pub async fn assert_balance(client: &RestClient, account: &LocalAccount, balance: u64) {
     let balances = client
-        .get_account_balances(account.address())
+        .get_dpn_account_balances(account.address())
         .await
         .unwrap()
         .into_inner();

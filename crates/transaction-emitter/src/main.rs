@@ -3,10 +3,7 @@
 
 use anyhow::{bail, format_err, Result};
 use aptos_config::config::DEFAULT_PORT;
-use aptos_sdk::{
-    transaction_builder::TransactionFactory,
-    types::{chain_id::ChainId, LocalAccount},
-};
+use aptos_sdk::{transaction_builder::TransactionFactory, types::chain_id::ChainId};
 use futures::future::join_all;
 use itertools::zip;
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -89,25 +86,11 @@ async fn emit_tx(cluster: &Cluster, args: &Args) -> Result<()> {
     };
     let duration = Duration::from_secs(args.duration);
     let client = cluster.random_instance().rest_client();
-    let (mut treasury_compliance_account, mut designated_dealer_account) = if args.vasp {
-        (
-            LocalAccount::generate(&mut rand::rngs::OsRng),
-            cluster
-                .load_dd_account(&client)
-                .await
-                .map_err(|e| format_err!("Failed to get dd account: {}", e))?,
-        )
-    } else {
-        (
-            cluster.load_tc_account(&client).await?,
-            cluster.load_faucet_account(&client).await?,
-        )
-    };
+    let mut root_account = cluster.load_aptos_root_account(&client).await?;
     let mut emitter = TxnEmitter::new(
-        &mut treasury_compliance_account,
-        &mut designated_dealer_account,
+        &mut root_account,
         client,
-        TransactionFactory::new(cluster.chain_id),
+        TransactionFactory::new(cluster.chain_id).with_gas_unit_price(1),
         StdRng::from_seed(OsRng.gen()),
     );
     let mut emit_job_request =
@@ -170,63 +153,18 @@ impl BasicSwarmUtil {
         Self { cluster }
     }
 
-    pub async fn diag(&self, vasp: bool) -> Result<()> {
+    pub async fn diag(&self, _vasp: bool) -> Result<()> {
         let client = self.cluster.random_instance().rest_client();
-        let (mut treasury_compliance_account, mut designated_dealer_account) = if vasp {
-            (
-                LocalAccount::generate(&mut rand::rngs::OsRng),
-                self.cluster
-                    .load_dd_account(&client)
-                    .await
-                    .map_err(|e| format_err!("Failed to get dd account: {}", e))?,
-            )
-        } else {
-            (
-                self.cluster.load_tc_account(&client).await?,
-                self.cluster.load_faucet_account(&client).await?,
-            )
-        };
+        let mut root_account = self.cluster.load_aptos_root_account(&client).await?;
+        let mut faucet_account = self.cluster.load_aptos_root_account(&client).await?;
         let emitter = TxnEmitter::new(
-            &mut treasury_compliance_account,
-            &mut designated_dealer_account,
+            &mut root_account,
             client,
-            TransactionFactory::new(self.cluster.chain_id),
+            TransactionFactory::new(self.cluster.chain_id).with_gas_unit_price(1),
             StdRng::from_seed(OsRng.gen()),
         );
-        let mut faucet_account: Option<LocalAccount> = None;
-        let instances: Vec<_> = self.cluster.all_instances().collect();
-        for instance in &instances {
-            let client = instance.rest_client();
-            print!("Getting faucet account sequence number on {}...", instance);
-            let account = if vasp {
-                self.cluster
-                    .load_dd_account(&client)
-                    .await
-                    .map_err(|e| format_err!("Failed to get dd account: {}", e))?
-            } else {
-                self.cluster
-                    .load_faucet_account(&client)
-                    .await
-                    .map_err(|e| {
-                        format_err!("Failed to get faucet account sequence number: {}", e)
-                    })?
-            };
-            println!("seq={}", account.sequence_number());
-            if let Some(faucet_account) = &faucet_account {
-                if account.sequence_number() != faucet_account.sequence_number() {
-                    bail!(
-                        "Loaded sequence number {}, which is different from seen before {}",
-                        account.sequence_number(),
-                        faucet_account.sequence_number()
-                    );
-                }
-            } else {
-                faucet_account = Some(account);
-            }
-        }
-        let mut faucet_account =
-            faucet_account.expect("There is no faucet account set (not expected)");
         let faucet_account_address = faucet_account.address();
+        let instances: Vec<_> = self.cluster.all_instances().collect();
         for instance in &instances {
             print!("Submitting txn through {}...", instance);
             let deadline = emitter

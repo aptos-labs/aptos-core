@@ -68,7 +68,7 @@ impl LaunchFullnode {
 
         client.submit_and_wait(&txn).await?;
         let balances = client
-            .get_account_balances(account1.address())
+            .get_dpn_account_balances(account1.address())
             .await?
             .into_inner();
 

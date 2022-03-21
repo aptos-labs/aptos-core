@@ -3165,9 +3165,11 @@ name = "forge-cli"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "aptos-framework-releases",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-workspace-hack",
+ "async-trait",
  "forge",
  "itertools",
  "rand_core 0.6.3",
@@ -8405,6 +8407,7 @@ dependencies = [
  "aptos-logger",
  "aptos-rest-client",
  "aptos-sdk",
+ "aptos-transaction-builder",
  "aptos-workspace-hack",
  "futures",
  "generate-key",

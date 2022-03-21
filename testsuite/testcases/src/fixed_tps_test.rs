@@ -23,7 +23,7 @@ impl NetworkTest for FixedTpsTest {
             .collect::<Vec<_>>();
 
         // Generate some traffic with fixed tps 10
-        let txn_stat = generate_traffic(ctx, &all_validators, duration, 0, Some(10))?;
+        let txn_stat = generate_traffic(ctx, &all_validators, duration, 1, Some(10))?;
         ctx.report
             .report_txn_stats(self.name().to_string(), txn_stat, duration);
 

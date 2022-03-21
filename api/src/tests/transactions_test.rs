@@ -319,7 +319,7 @@ async fn test_get_transactions_output_user_transaction_with_script_function_payl
             "vm_status": "Executed successfully",
             "sender": "0xb1e55ed",
             "sequence_number": "0",
-            "max_gas_amount": "1000000",
+            "max_gas_amount": "1000",
             "gas_unit_price": "0",
             "gas_currency_code": "XUS",
             "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
@@ -547,7 +547,7 @@ async fn test_post_bcs_format_transaction() {
             "hash": hash.to_hex_literal(),
             "sender": "0xb1e55ed",
             "sequence_number": "0",
-            "max_gas_amount": "1000000",
+            "max_gas_amount": "1000",
             "gas_unit_price": "0",
             "gas_currency_code": "XUS",
             "expiration_timestamp_secs": expiration_timestamp.to_string(),
@@ -754,9 +754,9 @@ async fn test_multi_ed25519_signed_transaction() {
             "0xfe047a766a47719591348a4601afb3f38b0c77fa3f820e0298c064e7cde6763f"
           ],
           "signatures": [
-            "0xab0ffa0926dd765979c422572b4429d11161a2df6975e223ad4d75c87a117e6c790558e8286caf95550ab97515d2cfa8654365f54524688df91b3b4e91b69d0e",
-            "0x300774b6dd50658d4b693ad5cc1842944465a92b31f1652b445d36b911d4ca625260c451ab7d998534b61253f3bfcdd6bcb03adf4c048b03bd18678d56cd5a03",
-            "0x4bac0f0d9dde41196efae43849f8e4427ee142e04e57e7291ecdfb225528b0fe31eff8e17461a220430daea94a14f750a37b5e0360aa1c72cb956c402743c202"
+            "0x51ba5206ec53806411fb67f67fe9adea1e3c90d3b3bd53985ba72cf9ea096489a489081036db3c91e24b01bed8fa2f0c082293236e3fa512218c910a23f7fe01",
+            "0xbaabf59869be9a12ef93e156c640cf38bd9a04d720aedb1e64faea259c532c68584fcc5444a90d9485bb3dc024c76bb7ec411ea83287823afc9453c711150a0c",
+            "0x96bf8311f06610aec340798c7bac2859d0b7778fad0b648b70ff4091f3147040ef5bc3a2fa10114b2593cf58b3100e276460630f37d948abd3214e2d13882604"
           ],
           "threshold": 3,
           "bitmap": "0xe0000000"

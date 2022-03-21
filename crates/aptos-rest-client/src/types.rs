@@ -58,7 +58,7 @@ where
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct DiemAccount {
+pub struct Account {
     #[serde(deserialize_with = "deserialize_from_prefixed_hex_string")]
     pub authentication_key: AuthenticationKey,
     #[serde(deserialize_with = "deserialize_from_string")]

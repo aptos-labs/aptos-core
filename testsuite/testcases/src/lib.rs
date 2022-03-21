@@ -9,6 +9,7 @@ pub mod performance_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
 
+use anyhow::ensure;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use forge::{NetworkContext, NodeExt, Result, TxnEmitter, TxnStats, Version};
 use rand::SeedableRng;
@@ -47,6 +48,7 @@ pub fn generate_traffic<'t>(
     gas_price: u64,
     fixed_tps: Option<u64>,
 ) -> Result<TxnStats> {
+    ensure!(gas_price > 0, "gas_price is required to be non zero");
     let rt = Runtime::new()?;
     let rng = SeedableRng::from_rng(ctx.core().rng())?;
     let validator_clients = ctx
@@ -57,10 +59,9 @@ pub fn generate_traffic<'t>(
         .collect::<Vec<_>>();
     let mut emit_job_request = ctx.global_job.clone();
     let chain_info = ctx.swarm().chain_info();
-    let transaction_factory = TransactionFactory::new(chain_info.chain_id);
+    let transaction_factory = TransactionFactory::new(chain_info.chain_id).with_gas_unit_price(1);
     let mut emitter = TxnEmitter::new(
-        chain_info.treasury_compliance_account,
-        chain_info.designated_dealer_account,
+        chain_info.root_account,
         validator_clients[0].clone(),
         transaction_factory,
         rng,

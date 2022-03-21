@@ -29,3 +29,4 @@ aptos-crypto = { path = "../aptos-crypto" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-sdk = { path = "../../sdk" }
 aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
+aptos-transaction-builder = { path = "../../sdk/transaction-builder" }

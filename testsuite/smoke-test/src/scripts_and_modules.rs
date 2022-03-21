@@ -122,7 +122,7 @@ impl ExecuteCustomModuleAndScript {
             .await?;
 
         let balances = client
-            .get_account_balances(account1.address())
+            .get_dpn_account_balances(account1.address())
             .await?
             .into_inner();
         assert_eq!(balances.len(), 1);
@@ -197,7 +197,7 @@ impl ExecuteCustomModuleAndScript {
         assert_eq!(
             vec![(90, "XUS".to_string())],
             client
-                .get_account_balances(account1.address())
+                .get_dpn_account_balances(account1.address())
                 .await?
                 .into_inner()
                 .into_iter()
@@ -208,7 +208,7 @@ impl ExecuteCustomModuleAndScript {
         assert_eq!(
             vec![(11, "XUS".to_string())],
             client
-                .get_account_balances(account2.address())
+                .get_dpn_account_balances(account2.address())
                 .await?
                 .into_inner()
                 .into_iter()

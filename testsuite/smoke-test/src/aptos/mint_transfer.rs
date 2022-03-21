@@ -27,6 +27,14 @@ impl AptosTest for MintTransfer {
                 aptos_stdlib::encode_transfer_script_function(account2.address(), 400),
             ));
         ctx.client().submit_and_wait(&transfer_txn).await?;
+        assert_eq!(
+            ctx.client()
+                .get_account_balance(account2.address())
+                .await?
+                .into_inner()
+                .get(),
+            400
+        );
 
         // test delegation
         let txn_factory = ctx.aptos_transaction_factory();

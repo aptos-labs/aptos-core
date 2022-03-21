@@ -41,7 +41,7 @@ impl NetworkTest for StateSyncPerformance {
         ctx.swarm().full_node_mut(*fullnode_id).unwrap().stop()?;
 
         // 2. emit txn to validators
-        generate_traffic(ctx, &all_validators, duration, 0, None)?;
+        generate_traffic(ctx, &all_validators, duration, 1, None)?;
 
         // 3. read the validator synced version
         let validator_id = all_validators.iter().choose(&mut rng).unwrap();

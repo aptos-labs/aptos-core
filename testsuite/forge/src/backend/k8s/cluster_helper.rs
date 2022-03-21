@@ -39,8 +39,7 @@ const VALIDATOR_SCALING_FACTOR: i64 = 3;
 const UTILITIES_SCALING_FACTOR: i64 = 3;
 const TRUSTED_SCALING_FACTOR: i64 = 1;
 
-// XXX: swap this out for aptos-framework eventually
-const GENESIS_MODULES_DIR: &str = "/aptos/move/modules";
+const GENESIS_MODULES_DIR: &str = "/aptos-framework/move/modules";
 
 async fn wait_genesis_job(kube_client: &K8sClient, era: &str) -> Result<()> {
     aptos_retrier::retry_async(k8s_retry_strategy(), || {

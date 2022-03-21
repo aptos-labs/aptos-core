@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_rest_client::Client as RestClient;
-use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::Currency};
+use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
 use forge::{ForgeConfig, Options, Result, *};
 use std::{env, num::NonZeroUsize, process, time::Duration};
 use structopt::StructOpt;
@@ -337,15 +337,16 @@ fn get_test_suite(suite_name: &str) -> ForgeConfig<'static> {
 
 fn local_test_suite() -> ForgeConfig<'static> {
     ForgeConfig::default()
-        .with_public_usage_tests(&[&FundAccount, &TransferCoins])
+        .with_aptos_tests(&[&FundAccount, &TransferCoins])
         .with_admin_tests(&[&GetMetadata])
         .with_network_tests(&[&RestartValidator, &EmitTransaction])
+        .with_genesis_modules_bytes(aptos_framework_releases::current_module_blobs().to_vec())
 }
 
 fn k8s_test_suite() -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
-        .with_public_usage_tests(&[&FundAccount, &TransferCoins])
+        .with_aptos_tests(&[&FundAccount, &TransferCoins])
         .with_admin_tests(&[&GetMetadata])
         .with_network_tests(&[&EmitTransaction, &SimpleValidatorUpgrade])
 }
@@ -415,19 +416,14 @@ impl AdminTest for GetMetadata {
 
 pub async fn check_account_balance(
     client: &RestClient,
-    currency: Currency,
     account_address: AccountAddress,
     expected: u64,
 ) -> Result<()> {
-    let balances = client
-        .get_account_balances(account_address)
+    let balance = client
+        .get_account_balance(account_address)
         .await?
         .into_inner();
-    let balance = balances
-        .iter()
-        .find(|b| b.currency_code() == currency)
-        .unwrap();
-    assert_eq!(balance.amount, expected);
+    assert_eq!(balance.get(), expected);
 
     Ok(())
 }
@@ -441,24 +437,16 @@ impl Test for FundAccount {
     }
 }
 
-impl PublicUsageTest for FundAccount {
-    fn run<'t>(&self, ctx: &mut PublicUsageContext<'t>) -> Result<()> {
-        let runtime = Runtime::new().unwrap();
-        runtime.block_on(self.async_run(ctx))
-    }
-}
-
-impl FundAccount {
-    async fn async_run(&self, ctx: &mut PublicUsageContext<'_>) -> Result<()> {
-        let client = ctx.rest_client();
+#[async_trait::async_trait]
+impl AptosTest for FundAccount {
+    async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
+        let client = ctx.client();
 
         let account = ctx.random_account();
         let amount = 1000;
-        let currency = Currency::XUS;
-        ctx.create_parent_vasp_account(account.authentication_key())
-            .await?;
-        ctx.fund(account.address(), amount).await?;
-        check_account_balance(&client, currency, account.address(), amount).await?;
+        ctx.create_user_account(account.public_key()).await?;
+        ctx.mint(account.address(), amount).await?;
+        check_account_balance(&client, account.address(), amount).await?;
 
         Ok(())
     }
@@ -473,51 +461,23 @@ impl Test for TransferCoins {
     }
 }
 
-impl PublicUsageTest for TransferCoins {
-    fn run<'t>(&self, ctx: &mut PublicUsageContext<'t>) -> Result<()> {
-        let runtime = Runtime::new().unwrap();
-        runtime.block_on(self.async_run(ctx))
-    }
-}
-
-impl TransferCoins {
-    async fn async_run(&self, ctx: &mut PublicUsageContext<'_>) -> Result<()> {
-        let mut account = ctx.random_account();
-        let amount = 1000;
-        let currency = Currency::XUS;
-        let client = ctx.rest_client();
-        ctx.create_parent_vasp_account(account.authentication_key())
-            .await?;
-        ctx.fund(account.address(), amount).await?;
-
+#[async_trait::async_trait]
+impl AptosTest for TransferCoins {
+    async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
+        let client = ctx.client();
         let mut payer = ctx.random_account();
         let payee = ctx.random_account();
-        let create_payer = account.sign_with_transaction_builder(
-            ctx.transaction_factory().create_child_vasp_account(
-                currency,
-                payer.authentication_key(),
-                false,
-                100,
-            ),
-        );
-        let create_payee = account.sign_with_transaction_builder(
-            ctx.transaction_factory().create_child_vasp_account(
-                currency,
-                payee.authentication_key(),
-                false,
-                0,
-            ),
-        );
-        client.submit(&create_payer).await?;
-        client.submit(&create_payee).await?;
-        client.wait_for_signed_transaction(&create_payer).await?;
-        client.wait_for_signed_transaction(&create_payee).await?;
-        check_account_balance(&client, currency, payer.address(), 100).await?;
+        ctx.create_user_account(payer.public_key()).await?;
+        ctx.create_user_account(payee.public_key()).await?;
+        ctx.mint(payer.address(), 10000).await?;
+        check_account_balance(&client, payer.address(), 10000).await?;
 
-        ctx.transfer_coins(currency, &mut payer, payee.address(), 10)
-            .await?;
-        check_account_balance(&client, currency, payer.address(), 90).await?;
-        check_account_balance(&client, currency, payee.address(), 10).await?;
+        let transfer_txn =
+            payer.sign_with_transaction_builder(ctx.aptos_transaction_factory().payload(
+                aptos_stdlib::encode_transfer_script_function(payee.address(), 10),
+            ));
+        client.submit_and_wait(&transfer_txn).await?;
+        check_account_balance(&client, payee.address(), 10).await?;
 
         Ok(())
     }
@@ -541,6 +501,7 @@ impl NetworkTest for RestartValidator {
             node.stop().unwrap();
             println!("Restarting node {}", node.peer_id());
             node.start().await.unwrap();
+            tokio::time::sleep(Duration::from_secs(1)).await;
             node.health_check().await.expect("node health check failed");
         });
         Ok(())
@@ -564,7 +525,7 @@ impl NetworkTest for EmitTransaction {
             .validators()
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
-        let stats = generate_traffic(ctx, &all_validators, duration, 0, None).unwrap();
+        let stats = generate_traffic(ctx, &all_validators, duration, 1, None).unwrap();
         ctx.report
             .report_txn_stats(self.name().to_string(), stats, duration);
 

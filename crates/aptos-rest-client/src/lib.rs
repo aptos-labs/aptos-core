@@ -6,8 +6,9 @@ pub use aptos_api_types::{MoveModuleBytecode, PendingTransaction, Transaction};
 use aptos_crypto::HashValue;
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use move_core_types::{
+    ident_str,
     identifier::Identifier,
-    language_storage::{StructTag, TypeTag},
+    language_storage::{StructTag, TypeTag, CORE_CODE_ADDRESS},
     move_resource::MoveStructType,
 };
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
@@ -16,6 +17,8 @@ use std::time::Duration;
 use url::Url;
 
 pub use aptos_api_types;
+use aptos_types::account_config::aptos_root_address;
+
 pub mod error;
 pub mod faucet;
 pub use faucet::FaucetClient;
@@ -24,7 +27,10 @@ pub use response::Response;
 mod state;
 use state::State;
 pub mod types;
-pub use types::{DiemAccount, Resource, RestError};
+use crate::aptos::{AptosVersion, Balance};
+pub use types::{Account, Resource, RestError};
+
+pub mod aptos;
 
 macro_rules! cfg_dpn {
     ($($item:item)*) => {
@@ -62,7 +68,7 @@ impl Client {
     }
 
     cfg_dpn! {
-        pub async fn get_account_balances(
+        pub async fn get_dpn_account_balances(
             &self,
             address: AccountAddress,
         ) -> Result<Response<Vec<dpn::AccountBalance>>> {
@@ -95,7 +101,7 @@ impl Client {
         }
 
         // Returns root account DiemAccount::Config<Version> resource
-        pub async fn get_aptos_version(&self) -> Result<Response<dpn::Reconfiguration<dpn::Version>>> {
+        pub async fn get_dpn_version(&self) -> Result<Response<dpn::Reconfiguration<dpn::Version>>> {
             self.get_resource::<dpn::Reconfiguration<dpn::Version>>(dpn::aptos_root_address(), &dpn::diem_config_struct_tag(dpn::diem_version_identifier())).await
         }
 
@@ -104,6 +110,41 @@ impl Client {
             self.get_resource::<dpn::Configuration>(dpn::aptos_root_address(), &dpn::ConfigurationResource::struct_tag()).await
         }
 
+    }
+
+    pub async fn get_aptos_version(&self) -> Result<Response<AptosVersion>> {
+        self.get_resource::<AptosVersion>(
+            aptos_root_address(),
+            &StructTag {
+                address: CORE_CODE_ADDRESS,
+                name: ident_str!("Version").to_owned(),
+                module: ident_str!("Version").to_owned(),
+                type_params: vec![],
+            },
+        )
+        .await
+    }
+
+    pub async fn get_account_balance(&self, address: AccountAddress) -> Result<Response<Balance>> {
+        let resp = self
+            .get_account_resources_by_type(
+                address,
+                aptos_types::account_config::CORE_CODE_ADDRESS,
+                &ident_str!("TestCoin").to_owned(),
+                &ident_str!("Balance").to_owned(),
+            )
+            .await?;
+        resp.and_then(|mut resources| {
+            let resource = resources.pop();
+            if !resources.is_empty() {
+                return Err(anyhow!("More than one data returned"));
+            }
+            if let Some(res) = resource {
+                Ok(serde_json::from_value::<Balance>(res.data)?)
+            } else {
+                Err(anyhow!("No data returned"))
+            }
+        })
     }
 
     pub async fn get_ledger_information(&self) -> Result<Response<State>> {
@@ -377,7 +418,7 @@ impl Client {
         self.json(response).await
     }
 
-    pub async fn get_account(&self, address: AccountAddress) -> Result<Response<DiemAccount>> {
+    pub async fn get_account(&self, address: AccountAddress) -> Result<Response<Account>> {
         let url = self.base_url.join(&format!("accounts/{}", address))?;
         let response = self.inner.get(url).send().await?;
         self.json(response).await

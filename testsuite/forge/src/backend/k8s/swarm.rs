@@ -74,29 +74,12 @@ impl K8sSwarm {
         let key = load_tc_key(treasury_compliance_key);
         let account_key = AccountKey::from_private_key(key);
         let address = aptos_sdk::types::account_config::treasury_compliance_account_address();
-        let sequence_number = query_sequence_numbers(&client, &[address])
-            .await
-            .map_err(|e| {
-                format_err!(
-                    "query_sequence_numbers on {:?} for dd account failed: {}",
-                    client,
-                    e
-                )
-            })?[0];
+        let sequence_number = 0;
         let treasury_compliance_account = LocalAccount::new(address, account_key, sequence_number);
 
         let key = load_tc_key(treasury_compliance_key);
         let account_key = AccountKey::from_private_key(key);
         let address = aptos_sdk::types::account_config::testnet_dd_account_address();
-        let sequence_number = query_sequence_numbers(&client, &[address])
-            .await
-            .map_err(|e| {
-                format_err!(
-                    "query_sequence_numbers on {:?} for dd account failed: {}",
-                    client,
-                    e
-                )
-            })?[0];
         let designated_dealer_account = LocalAccount::new(address, account_key, sequence_number);
 
         let mut versions = HashMap::new();
@@ -395,8 +378,6 @@ pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
     if !unhealthy_nodes.is_empty() {
         debug!("Unhealthy validators after cleanup: {:?}", unhealthy_nodes);
     }
-    println!("Wait for the instance to sync up with peers");
-    tokio::time::sleep(Duration::from_secs(20)).await;
 
     Ok(unhealthy_nodes)
 }
