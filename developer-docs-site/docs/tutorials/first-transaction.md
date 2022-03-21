@@ -9,12 +9,12 @@ import TabItem from '@theme/TabItem';
 
 # Your first transaction
 
-This tutorial details how to generate, submit, and verify transactions submitted to the Aptos Blockchain. The steps to doing so:
+This tutorial outlines how to generate, submit, and verify transactions submitted to the Aptos Blockchain. The steps for doing so are:
 
-* Create a representation of an account
-* Prepare a wrapper around the REST interfaces
-* Prepare a wrapper around the Faucet interface
-* Combine them into an application, execute and verify
+1. Create a representation of an account
+2. Prepare a wrapper around the REST interfaces
+3. Prepare a wrapper around the Faucet interface
+4. Combine them into an application, execute and verify
 
 The following tutorial contains example code that can be downloaded from our github below:
 
@@ -44,7 +44,7 @@ You can find the typescript project [here](https://github.com/aptos-labs/aptos-c
 
 ## Step 1) Create a representation of an account
 
-Each Aptos account has a unique account address.  The owner of that account holds the public, private key-pair that maps to the Aptos account address and, in turn, the authentication key stored in that account.  See more in [account basics][account_basics]. The following snippets demonstrate what's described in that section.
+Each Aptos account has a unique account address. The owner of that account holds the public, private key-pair that maps to the Aptos account address and, in turn, the authentication key stored in that account.  See more in [account basics][account_basics]. The following snippets demonstrate what's described in that section.
 
 <Tabs>
   <TabItem value="python" label="Python" default>
@@ -72,7 +72,7 @@ Each Aptos account has a unique account address.  The owner of that account hold
 
 ## Step 2) REST interface
 
-Aptos exposes a [REST interface][rest_spec] for interacting with the blockchain. While the data from the REST interface can be read directly, the following snippets of code demonstrate a more ergonomic approach. This next set of code snippets demonstrates how to use the REST interface to retrieve ledger data from the FullNode including account and account resource data. It also demonstrates how to use the REST interface for constructing a signed transactions represented by JSON formatting.
+Aptos exposes a [REST interface][rest_spec] for interacting with the blockchain. While the data from the REST interface can be read directly, the following snippets of code demonstrate a more ergonomic approach. This next set of code snippets demonstrates how to use the REST interface to retrieve ledger data from the FullNode including account and account resource data. It also demonstrates how to use the REST interface for constructing signed transactions represented by JSON formatting.
 
 <Tabs>
   <TabItem value="python" label="Python" default>
@@ -183,7 +183,7 @@ The following demonstrate how to read data from the blockchain and how to write 
 
 ## Step 3) Faucet interface
 
-A blockchain faucet provides an account some amount of tokens that can be used for paying gas fees or transferring of tokens betwen users. The Aptos faucet additionally can create an account if one does not exist yet. The Aptos faucet interface requires a public key represented in a hex-encoded string.
+Blockchain faucets issue test tokens to accounts. These can be used for testing, e.g., paying gas fees or transferring tokens between users. The Aptos faucet can also create accounts if they do not exist yet. The Aptos faucet interface requires a public key represented in a hex-encoded string.
 
 <Tabs>
 <TabItem value="python" label="Python" default>
@@ -210,6 +210,8 @@ A blockchain faucet provides an account some amount of tokens that can be used f
 </Tabs>
 
 ## Step 4) Execute the application and verify
+
+Finally, we can execute the application and verify the output.
 
 <Tabs>
 <TabItem value="python" label="Python" default>
@@ -250,14 +252,14 @@ Alice: 999998957
 Bob: 1000
 ```
 
-The outcome shows that Bob received 1000 coins from Alice. Alice paid 43 coins for gas.
+The output shows that Bob received 1000 coins from Alice. Alice paid 43 coins for gas.
 
 The data can be verified by visiting either a REST interface or the explorer:
 * Alice's account via the [REST interface][alice_account_rest]
 * Bob's account via the [explorer][bob_account_explorer]
 
 :::info
-The devnet gets cleared out from time to time, so the above links may not work.<br/> Try the tutorial yourself and check their accounts in the explorer after!
+The devnet gets reset from time to time, so the above links may not work.<br/> Try the tutorial yourself and check the accounts in the explorer afterwards!
 
 [account_basics]: /basics/basics-accounts
 [alice_account_rest]: https://fullnode.devnet.aptoslabs.com/accounts/e26d69b8d3ff12874358da6a4082a2ac/resources
