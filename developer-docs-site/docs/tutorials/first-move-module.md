@@ -9,13 +9,13 @@ import TabItem from '@theme/TabItem';
 
 # Your first Move Module
 
-This tutorial details how to write, compile, test, publish, and interact with Move Modules on the Aptos Blockchain. The steps to doing so:
+This tutorial details how to write, compile, test, publish and interact with Move Modules on the Aptos Blockchain. The steps are:
 
-* Write, compile, and test the Move Module
-* Publish the Move Module to the Aptos Blockchain
-* Initialize and interact with resources of the Move Module
+1. Write, compile, and test the Move Module
+2. Publish the Move Module to the Aptos Blockchain
+3. Initialize and interact with resources of the Move Module
 
-This tutorial builds on "[Your first transaction](/tutorials/your-first-transaction)" and borrows that code as a library for this example. The following tutorial contains example code that can be downloaded in its entirety below:
+This tutorial builds on [Your first transaction](/tutorials/your-first-transaction) and borrows the code as a library for this example. The following tutorial contains example code that can be downloaded in its entirety below:
 
 <Tabs>
   <TabItem value="python" label="Python" default>
@@ -88,7 +88,7 @@ module HelloBlockchain::Message {
 }
 ```
 
-In the previous code, the two important sections are the struct `MessageHolder` and the function `set_message`. `set_message` is a `script` function allowing it to be called directly by transactions. Upon calling it, the function will determine if the current account has a `MessageHolder` resource and creates and stores the `message` it if it does not exist. If the resource exists, the `message` in the `MessageHolder` is overwritten.
+In the code above, the two important sections are the struct `MessageHolder` and the function `set_message`. `set_message` is a `script` function allowing it to be called directly by transactions. Upon calling it, the function will determine if the current account has a `MessageHolder` resource and creates and stores the `message` if it does not exist. If the resource exists, the `message` in the `MessageHolder` is overwritten.
 
 ### Step 1.3) Testing the Module
 
@@ -276,7 +276,7 @@ The outcome shows that Alice and Bob went from having no resource to one with a 
 
 The data can be verified by visiting either a REST interface or the explorer:
 * Alice's account via the [REST interface][alice_account_rest]
-* Bob's account via the [explorer][bob_account_explorer]
+* Bob's account on the [explorer][bob_account_explorer]
 
 [account_basics]: /basics/basics-accounts
 [alice_account_rest]: https://fullnode.devnet.aptoslabs.com/accounts/a52671f10dc3479b09d0a11ce47694c0/
