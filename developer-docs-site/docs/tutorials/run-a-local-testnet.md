@@ -7,19 +7,23 @@ import BlockQuote from "@site/src/components/BlockQuote";
 
 # Run a Local Testnet
 
-You can run a local testnet to test and develop against an Aptos Blockchain. This network runs independently of the Aptos ecosystem and is for testing and development purposes only.
+You can run a local testnet of the Aptos Blockchain. This network runs independently of the Aptos ecosystem and is for testing and development purposes.
 
 <BlockQuote type="info">
-Your local testnet will not be connected Aptos devnet.
+Note: your local testnet will not be connected to the Aptos devnet. It will run on your local machine and be contained there.
 </BlockQuote>
 
 ## Getting Started
 
-You can run a local testnet in two ways: using the Aptos-core source code or Docker. The Aptos-core source code is useful when testing modifications to the Aptos-core code base or Aptos Framework. Docker is particularly useful when building services on top of the Aptos Blockchain or applications on top of the Aptos Framework as there is no build overhead and the ledger state persists across restarts of the network by default.
+You can run a local testnet in two ways either using the Aptos-core source code or using Docker:
+1. The Aptos-core source code is useful for testing modifications to the Aptos-core codebase or the Aptos Framework.
+2. Docker is particularly useful for building services on top of the Aptos Blockchain or the Aptos Framework, as there is no build overhead and the ledger persists across network restarts (by default).
 
-### Using Aptos-core source code
+We describe each method below.
 
-1. Download and clone the Aptos-core repository from GitHub and prepare your developer environment by running the following commands:
+### Using the Aptos-core source code
+
+1. Clone the Aptos-core repository from GitHub and prepare your developer environment by running the following commands:
 
     ```
     git clone https://github.com/aptos-labs/aptos-core.git
@@ -64,17 +68,17 @@ validator_1  | 	ChainId: TESTING
 ```
 
 This output contains information required for starting the Aptos CLI tool:
-* Aptos root key path - The root (also known as a mint or faucet) key controls the account that can mint. Available in the docker compose folder under `aptos_root_key`.
-* Waypoint - a verifiable checkpoint into the blockchain (available in the docker compose folder under waypoint.txt)
-* REST endpoint - `http://127.0.0.1:8080`.
-* ChainId - uniquely distinguishes this chain from other chains.
+* `Aptos root key path`: The root key (also known as the mint or faucet key) controls the account that can mint tokens. Available in the docker compose folder under `aptos_root_key`.
+* `Waypoint`: A verifiable checkpoint of the blockchain (available in the docker compose folder under waypoint.txt)
+* `REST endpoint`: The endpoint for the REST service, e.g., `http://127.0.0.1:8080`.
+* `ChainId`: The chain id uniquely distinguishes this network from other blockchain networks.
 
 ## Next Steps
 
-At this point, you will have a special root account at `0x1` that can perform the mint operation. Follow up with 
+At this point, you will have a special root account at `0x1` that can perform the mint operation. Follow up with: 
 
-* [Your first transaction](/tutorials/your-first-transaction) for how to submit transactions
-* [Your first Move module](/tutorials/your-first-move-module) for how to create Move modules
-* [Interacting with the Aptos Blockchain](/transactions/interacting-with-the-aptos-blockchain) to mint coins
+* [Your first transaction](/tutorials/your-first-transaction) to learn how to submit transactions.
+* [Your first Move module](/tutorials/your-first-move-module) to learn how to create Move modules.
+* [Interacting with the Aptos Blockchain](/transactions/interacting-with-the-aptos-blockchain) to learn how to mint coins.
 
-It is important to note, that this solution does not include a Faucet. That is left as an exercise to the reader.
+It is important to note that this guide does not include creating a faucet. That is left as an exercise for the reader.
