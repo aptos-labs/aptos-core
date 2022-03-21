@@ -6,34 +6,34 @@ sidebar_position: 10
 
 # Run a FullNode
 
-You can run [FullNodes](/basics/basics-fullnodes) to verify the state and synchronize to the Aptos Blockchain. FullNodes can be run by anyone. FullNodes replicate the full state of the blockchain by querying each other or the validators directly.
+You can run [FullNodes](/basics/basics-fullnodes) to synchronize the state of the Aptos Blockchain and stay up-to-date. FullNodes can be run by anyone. FullNodes replicate the entire state of the blockchain by querying other Aptos FullNodes or validators.
 
-This tutorial details how to configure a public FullNode to connect to the Aptos devnet. The FullNodes provided by Aptos Labs have rate limits that can impede development on Testnet. This will provide you with the data directly to avoid such rate limiting.
+This tutorial explains how to configure a public FullNode to connect to the Aptos devnet. The FullNodes provided by Aptos Labs have rate limits that can impede development. This will provide you with the data directly to avoid such rate limiting.
 
 > **Note:** Your public FullNode will be connected to devnet with a REST endpoint accessible on your computer at localhost:8080.
 >
 
-#### Prerequisites
+## Prerequisites
 Before you get started with this tutorial, we recommend you familiarize yourself with the following:
 * [Validator node concepts](/basics/basics-validator-nodes) 
 * [FullNode concepts](/basics/basics-fullnodes) 
 * [REST specifications][rest_spec]
 
-
-## Getting started
-You can configure a public FullNode in two ways: using the Aptos-core source code or Docker.
-
-### Hardware requirement
-For running a production grade Fullnode we recommend using hardware with:
-* CPU: Intel Xeon Skylake or newer, 4 cores
+## Hardware requirements
+For running a production grade Fullnode we recommend the following:
+* CPU: 4 cores (Intel Xeon Skylake or newer)
 * Memory: 8GiB RAM
 
 If running the Fullnode for development or testing purpose:
 * CPU: 2 cores
 * Memory: 4GiB RAM
 
+## Getting started
+
+You can configure a public FullNode in two ways: using the Aptos-core source code or using Docker.
+
 ### Using Aptos-core source code
-1. Download and clone the Aptos-core repository from GitHub and prepare your developer environment by running the following commands:
+1. Download the Aptos-core repository from GitHub and prepare your developer environment by running the following commands:
      ```
      git clone https://github.com/aptos-labs/aptos-core.git
      cd aptos
@@ -43,30 +43,30 @@ If running the Fullnode for development or testing purpose:
 2. Checkout the branch for devnet using `git checkout origin/devnet`.
 3. To prepare your configuration file:
      * Copy `config/src/config/test_data/public_full_node.yaml` to your current working directory.
-     * Download [genesis][devnet_genesis] and [waypoint][devnet_waypoint] files for devnet.
-     * Update the public_full_node.yaml file in your current working directory by:
-       * Specifying the directory where you want devnet to store its database next to `base:data_dir`; for example, `./data`.
+     * Download the [genesis][devnet_genesis] and [waypoint][devnet_waypoint] files for devnet.
+     * Update the `public_full_node.yaml` file in your current working directory by:
+       * Specifying the directory where you want to store the devnet database. Specify this next to `base:data_dir` (for example, `./data`).
        * Copying and pasting the contents of the waypoint file to the `waypoint` field.
        * Reading through the config and making any other desired changes. You can see what configurations the `public_full_node.yaml` file should have by checking the following file as an example: `docker/compose/public_full_node/public_full_node.yaml`
-4. Run the aptos-node using `cargo run -p aptos-node --release -- -f ./public_full_node.yaml`
+4. Start the Aptos FullNode using `cargo run -p aptos-node --release -- -f ./public_full_node.yaml`
 
 You have now successfully configured and started running a FullNode connected to Aptos devnet.
 
 Note: This will build a release binary under `target/release/aptos-node`. The release binaries tend to be substantially faster than debug binaries but lack debugging information useful for development. Simply omit the `--release` flag to build a debug binary.
 
-## Using Docker
+### Using Docker
 
 You can also use Docker to configure and run your FullNode.
 
 1. Install Docker and Docker-Compose.
 2. Create a directory for your public FullNode composition.
 3. Download the public FullNode [docker compose][pfn_docker_compose] and [aptos-core][pfn_config_file] configuration files into this directory.
-4. Download [genesis][devnet_genesis] and [waypoint][devnet_waypoint] files for devnet into that directory.
+4. Download the devenet [genesis][devnet_genesis] and [waypoint][devnet_waypoint] files into that directory.
 5. Run docker-compose: `docker-compose up`.
 
-### Understand and verify the correctness of your FullNode
+## Understand and verify the correctness of your FullNode
 
-#### Initial synchronization
+### Initial synchronization
 During the initial synchronization of your FullNode, there may be a lot of data to transfer.
 
 * Progress can be monitored by querying the metrics port `curl 127.0.0.1:9101/metrics 2> /dev/null | grep aptos_state_sync_version | grep type`, which will print out several counters:
@@ -81,11 +81,11 @@ During the initial synchronization of your FullNode, there may be a lot of data 
   fullnode_1  | INFO 2020-09-28T23:16:04.508902Z execution/executor/src/lib.rs:580 sync_finished {"committed_with_ledger_info":false,"name":"chunk_executor","synced_to_version":634000}
   ```
 
-* At the same time, the StateSync component will output similar information but show the destination.
+* At the same time, the state sync component will output similar information.
 
-* The number of connections should be more than 0, `curl 127.0.0.1:9101/metrics 2> /dev/null | grep aptos_connections`. If it's not, see the next section for potential fix.
+* The number of connections should be more than 0, `curl 127.0.0.1:9101/metrics 2> /dev/null | grep aptos_connections`. If it's not, see the next section for potential solutions.
 
-* The blockchain (devnet) ledger’s volume can be monitored by entering the container:
+* The blockchain (devnet) ledger’s volume can be monitored by entering the Docker container:
 
   ```
   # Obtain the container id:
@@ -96,8 +96,8 @@ During the initial synchronization of your FullNode, there may be a lot of data 
   du -cs -BM /opt/aptos/data
   ```
 
-#### Add upstream seed peers
-Devnet validator fullnode will only accept maximum of 1000 connections, if our network is experiencing high volume, your fullnode might not able to connect. You might see "NoAvailablePeers" in your node error message. If this happens, you can set `seeds` in the fullnode configuration file to add new upstream peers for connection. We prepared some extra fullnode address for you to use here, also feel free to use the ones provided by the community (anyone already running a fullnode can potentially provide their address for you to connect). 
+### Add upstream seed peers
+Devnet validator fullnodes will only accept a maximum of 1000 connections. If our network is experiencing high volume, your fullnode might not able to connect. You might see "NoAvailablePeers" in your node's error messages. If this happens, you can set `seeds` in the FullNode configuration file to add new  peers to connect to. We prepared some FullNodes addresses for you to use, here. Also. feel free to use the ones provided by the community (anyone already running a fullnode can provide their address for you to connect). Add these to your configuration file:
 ```
 seeds:
   4d6a710365a2d95ac6ffbd9b9198a86a:
@@ -116,16 +116,16 @@ seeds:
 
 ## Advanced Guide
 
-If you want to dive into more customization of your node confg. This advanced guide will show you how to:
-* Create a static network identity for your new Fullnode
-* Retrieve the public network identity for other nodes allowlist
-* Start a node with or without a static network identity
+If you want to explore additional customizations for your FullNode configurations, this guide will show you how to:
+* Create a static network identity for your FullNode
+* Retrieve the public network identity
+* Start a node with (or without) a static network identity
 
-### Create a static identity for a fullnode
+### Create a static identity for a FullNode
 
-Fullnodes will automatically start up with a randomly generated network identity (a PeerId and a Public Key pair).  This works great for regular fullnodes, but if you need another node to allowlist you or provide specific permissions, or if you want to run your fullnode always with a same identity, creating a static network identity can help.
+FullNodes will automatically start up with a randomly generated network identity (a `PeerId` and a public key pair). This works well for regular FullNodes, but you may wish to be added to another node's allowlist, provide specific permissions or run your FullNode with the same identity. In this case, creating a static network identity can help.
 
-1. Build the `aptos-operational-tool` using the [aptos-labs/aptos-core][] repo, we can build using cargo to run these tools. e.g.
+1. Build the `aptos-operational-tool` using the [aptos-labs/aptos-core][] repo. We can use cargo to build and run these tools, e.g.,
     ```
     $ git clone https://github.com/aptos-labs/aptos-core.git
     $ cd aptos-core
@@ -134,19 +134,19 @@ Fullnodes will automatically start up with a randomly generated network identity
     $ cargo run -p aptos-operational-tool -- <command> <args>
     ```
 
-    Alternatively, you can use our docker image. Start a docker container with the latest tools version e.g.
+    Alternatively, you can use our docker image. Start a docker container with the latest tools, e.g.,
 
     ```
     $ docker run -i aptoslab/tools:devnet sh -x
     $ aptos-operational-tool <command> <arg>
     ```
 
-2. Run the key generator, to output a hex encoded static x25519 PrivateKey.  This will be your private key for your network identity.
+2. Run the key generator, to produce a hex encoded static x25519 private key. This will be the private key for your network identity.
    ```
     $ cargo run -p aptos-operational-tool -- generate-key --encoding hex --key-type x25519 --key-file /path/to/private-key.txt
    ```
 
-   Or inside aptoslab/tools docker container:
+   Or inside the `aptoslab/tools` docker container:
 
     ```
     $ aptos-operational-tool generate-key --encoding hex --key-type x25519 --key-file /path/to/private-key.txt
@@ -159,14 +159,14 @@ Fullnodes will automatically start up with a randomly generated network identity
     B8BD811A91D8E6E0C6DAC991009F189337378760B55F3AD05580235325615C74
     ```
 
-### Retrieve public network identity
+### Retrieve the public network identity
 
 1. Run the peer generator on the previous key file
    ```
     $ cargo run -p aptos-operational-tool -- extract-peer-from-file --encoding hex --key-file /path/to/private-key.txt --output-file /path/to/peer-info.yaml
    ```
 
-   Or inside aptoslab/tools docker container:
+   Or inside the `aptoslab/tools` docker container:
 
     ```
     $ aptos-operational-tool extract-peer-from-file --encoding hex --key-file /path/to/private-key.txt --output-file /path/to/peer-info.yaml
@@ -183,13 +183,13 @@ Fullnodes will automatically start up with a randomly generated network identity
       role: Downstream
     ```
 
-    In this example, `14fd60f81a2f8eedb0244ec07a26e575` is the peer id, and `ca3579457555c80fc7bb39964eb298c414fd60f81a2f8eedb0244ec07a26e575` is the public key derived from the private key you generated from previous step.
+    In this example, `14fd60f81a2f8eedb0244ec07a26e575` is the peer id, and `ca3579457555c80fc7bb39964eb298c414fd60f81a2f8eedb0244ec07a26e575` is the public key derived from the private key you generated from the previous step.
 
-2. This will create a yaml file, that will have your public identity in it for providing to an upstream full node. This is useful if you want to connect your fullnode through a specific upstream full node, and that full node only allows known identity to connect to them. 
+2. This will create a yaml file that will have your public identity in it. This is useful if you want to connect your FullNode to a specific upstream FullNode, and that FullNode only allows known identities to connect to them. 
 
-### Start a node with the static network identity
+### Start a node with a static network identity
 
-Once we have the static identity, we can startup a node with it.
+Once we have the static identity we can startup the node by modifying the configuration file:
 ```
 full_node_networks:
 - network_id: "public"
@@ -200,7 +200,7 @@ full_node_networks:
     peer_id: "<PEER_ID>"
 ```
 
-Example:
+In our example, we'd specify:
 
 ```
 full_node_networks:
@@ -212,9 +212,9 @@ full_node_networks:
     peer_id: "14fd60f81a2f8eedb0244ec07a26e575"
 ```
 
-### Allow other fullnode to connect
+### Allowing other FullNodes to connect
 
-Once you started your fullnode with a static identity, you can open your node to allow others conneting to devnet through your node. Make sure you open the port 6180 (or 6182, depends on which port your node is listening to, can be configured in the fullnode config yaml file) on your firewall, and share your node info for others to use as `seeds`.
+Once you start your FullNode with a static identity you can allow others to connect to devnet through your node. Make sure you open port `6180` (or `6182`, depending on which port your node is listening to) and that you open your firewall. You'll need to share your FullNode info for others to use as `seeds` in their configurations:
 
 ```
 <Peer_ID>:
@@ -229,7 +229,7 @@ Once you started your fullnode with a static identity, you can open your node to
   role: Upstream
 ```
 
-Make sure the port number you put in the address matches the one you have in the fullnode config (6180 or 6182). Example:
+Make sure the port number you put in the address matches the one you have in the fullnode config (`6180` or `6182`). For example:
 
 ```
 4d6a710365a2d95ac6ffbd9b9198a86a:
