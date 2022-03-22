@@ -14,7 +14,7 @@ use std::{
 const GENESIS_DEFAULT: &str = "genesis.blob";
 
 #[derive(Clone, Deserialize, PartialEq, Serialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct ExecutionConfig {
     #[serde(skip)]
     pub genesis: Option<Transaction>,
@@ -113,6 +113,7 @@ pub enum ExecutionCorrectnessService {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct RemoteExecutionService {
     pub server_address: SocketAddr,
 }

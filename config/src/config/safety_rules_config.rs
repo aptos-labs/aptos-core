@@ -15,7 +15,7 @@ use std::{
 };
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct SafetyRulesConfig {
     pub backend: SecureBackend,
     pub logger: LoggerConfig,
@@ -68,6 +68,7 @@ pub enum SafetyRulesService {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct RemoteService {
     pub server_address: NetworkAddress,
 }

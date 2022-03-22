@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct StateSyncConfig {
     // Size of chunk to request for state synchronization
     pub chunk_limit: u64,
@@ -96,7 +96,7 @@ impl Default for StateSyncDriverConfig {
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct StorageServiceConfig {
     pub max_account_states_chunk_sizes: u64, // Max num of accounts per chunk
     pub max_concurrent_requests: u64,        // Max num of concurrent storage server tasks
@@ -118,7 +118,7 @@ impl Default for StorageServiceConfig {
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct DataStreamingServiceConfig {
     // The interval (milliseconds) at which to refresh the global data summary.
     pub global_summary_refresh_interval_ms: u64,
@@ -157,7 +157,7 @@ impl Default for DataStreamingServiceConfig {
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct AptosDataClientConfig {
     pub response_timeout_ms: u64, // Timeout (in milliseconds) when waiting for a response
     pub summary_poll_interval_ms: u64, // Interval (in milliseconds) between data summary polls
