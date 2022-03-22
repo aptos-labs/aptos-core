@@ -45,16 +45,16 @@ mod state;
 #[cfg(test)]
 mod tests;
 
-// Useful constants for the Diem Data Client
+// Useful constants for the Aptos Data Client
 const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 5;
 const POLLER_ERROR_LOG_FREQ_SECS: u64 = 1;
 
-/// A [`AptosDataClient`] that fulfills requests from remote peers' Storage Service
+/// An [`AptosDataClient`] that fulfills requests from remote peers' Storage Service
 /// over AptosNet.
 ///
 /// The `AptosNetDataClient`:
 ///
-/// 1. Sends requests to connected AptosNet peers.
+/// 1. Sends requests to connected Aptos peers.
 /// 2. Does basic type conversions and error handling on the responses.
 /// 3. Routes requests to peers that advertise availability for that data.
 /// 4. Maintains peer scores based on each peer's observed quality of service
@@ -444,7 +444,7 @@ impl DataSummaryPoller {
     pub async fn start(self) {
         info!(
             (LogSchema::new(LogEntry::DataSummaryPollerStart)
-                .message("Starting the diem data poller!"))
+                .message("Starting the Aptos data poller!"))
         );
         let ticker = self.time_service.interval(self.poll_interval);
         futures::pin_mut!(ticker);
