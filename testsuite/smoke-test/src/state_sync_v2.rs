@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::new_local_swarm,
+    smoke_test_environment::new_local_swarm_with_aptos,
     test_utils::{create_and_fund_account, transfer_and_reconfig, transfer_coins},
 };
 use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
@@ -20,7 +20,7 @@ const MAX_CATCH_UP_SECS: u64 = 60; // The max time we'll wait for nodes to catch
 #[tokio::test]
 async fn test_full_node_bootstrap_accounts() {
     // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm(1).await;
+    let mut swarm = new_local_swarm_with_aptos(1).await;
 
     // Create a fullnode config that uses account state syncing
     let mut vfn_config = NodeConfig::default_for_validator_full_node();
@@ -55,7 +55,7 @@ async fn test_full_node_bootstrap_accounts() {
 #[tokio::test]
 async fn test_full_node_bootstrap_outputs() {
     // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm(1).await;
+    let mut swarm = new_local_swarm_with_aptos(1).await;
 
     // Create a fullnode config that uses transaction outputs to sync
     let mut vfn_config = NodeConfig::default_for_validator_full_node();
@@ -77,7 +77,7 @@ async fn test_full_node_bootstrap_outputs() {
 #[tokio::test]
 async fn test_full_node_bootstrap_transactions() {
     // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm(1).await;
+    let mut swarm = new_local_swarm_with_aptos(1).await;
 
     // Create a fullnode config that uses transactions to sync
     let mut vfn_config = NodeConfig::default_for_validator_full_node();
@@ -99,7 +99,7 @@ async fn test_full_node_bootstrap_transactions() {
 #[tokio::test]
 async fn test_full_node_continuous_sync_outputs() {
     // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm(1).await;
+    let mut swarm = new_local_swarm_with_aptos(1).await;
 
     // Create a fullnode config that uses transaction outputs to sync
     let mut vfn_config = NodeConfig::default_for_validator_full_node();
@@ -119,7 +119,7 @@ async fn test_full_node_continuous_sync_outputs() {
 #[tokio::test]
 async fn test_full_node_continuous_sync_transactions() {
     // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm(1).await;
+    let mut swarm = new_local_swarm_with_aptos(1).await;
 
     // Create a fullnode config that uses transactions to sync
     let mut vfn_config = NodeConfig::default_for_validator_full_node();
@@ -211,7 +211,7 @@ async fn test_full_node_sync(vfn_peer_id: PeerId, mut swarm: LocalSwarm, epoch_c
 #[tokio::test]
 async fn test_validator_bootstrap_outputs() {
     // Create a swarm of 4 validators with state sync v2 enabled (output syncing)
-    let mut swarm = new_local_swarm(4).await;
+    let mut swarm = new_local_swarm_with_aptos(4).await;
     for validator in swarm.validators_mut() {
         let mut config = validator.config().clone();
         config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
@@ -230,7 +230,7 @@ async fn test_validator_bootstrap_outputs() {
 #[tokio::test]
 async fn test_validator_bootstrap_transactions() {
     // Create a swarm of 4 validators with state sync v2 enabled (transaction syncing)
-    let mut swarm = new_local_swarm(4).await;
+    let mut swarm = new_local_swarm_with_aptos(4).await;
     for validator in swarm.validators_mut() {
         let mut config = validator.config().clone();
         config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
@@ -320,7 +320,7 @@ async fn test_validator_sync(mut swarm: LocalSwarm) {
 #[tokio::test]
 async fn test_single_validator_failure() {
     // Create a swarm of 1 validator
-    let mut swarm = new_local_swarm(1).await;
+    let mut swarm = new_local_swarm_with_aptos(1).await;
     swarm.launch().await.unwrap();
 
     // Enable state sync v2 and reboot the node

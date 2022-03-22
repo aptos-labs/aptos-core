@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::new_local_swarm,
+    smoke_test_environment::new_local_swarm_with_aptos,
     test_utils::{assert_balance, create_and_fund_account, transfer_coins},
 };
 use forge::{NodeExt, Swarm, SwarmExt};
@@ -20,7 +20,7 @@ async fn test_basic_state_synchronization() {
     // - Verify that the restarted node has synced up with the submitted transactions.
 
     // we set a smaller chunk limit (=5) here to properly test multi-chunk state sync
-    let mut swarm = new_local_swarm(4).await;
+    let mut swarm = new_local_swarm_with_aptos(4).await;
     for validator in swarm.validators_mut() {
         let mut config = validator.config().clone();
         config.state_sync.chunk_limit = 5;
@@ -128,7 +128,7 @@ async fn test_basic_state_synchronization() {
 
 #[tokio::test]
 async fn test_startup_sync_state() {
-    let mut swarm = new_local_swarm(4).await;
+    let mut swarm = new_local_swarm_with_aptos(4).await;
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
     let client_1 = swarm
         .validator(validator_peer_ids[1])

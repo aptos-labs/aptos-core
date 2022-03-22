@@ -6,7 +6,7 @@
 
 
 -  [Function `initialize`](#0x1_AptosVersion_initialize)
--  [Function `set`](#0x1_AptosVersion_set)
+-  [Function `set_version`](#0x1_AptosVersion_set_version)
 
 
 <pre><code><b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability">0x1::Capability</a>;
@@ -41,14 +41,14 @@ Publishes the Version config.
 
 </details>
 
-<a name="0x1_AptosVersion_set"></a>
+<a name="0x1_AptosVersion_set_version"></a>
 
-## Function `set`
+## Function `set_version`
 
 Updates the major version to a larger version.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AptosVersion.md#0x1_AptosVersion_set">set</a>(account: &signer, major: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AptosVersion.md#0x1_AptosVersion_set_version">set_version</a>(account: signer, major: u64)
 </code></pre>
 
 
@@ -57,10 +57,10 @@ Updates the major version to a larger version.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AptosVersion.md#0x1_AptosVersion_set">set</a>(account: &signer, major: u64) {
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AptosVersion.md#0x1_AptosVersion_set_version">set_version</a>(account: signer, major: u64) {
     <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Version.md#0x1_Version_set">Version::set</a>&lt;<a href="Marker.md#0x1_Marker_ChainMarker">Marker::ChainMarker</a>&gt;(
         major,
-        &<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_acquire">Capability::acquire</a>(account, &<a href="Marker.md#0x1_Marker_get">Marker::get</a>()),
+        &<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Capability.md#0x1_Capability_acquire">Capability::acquire</a>(&account, &<a href="Marker.md#0x1_Marker_get">Marker::get</a>()),
     );
 }
 </code></pre>

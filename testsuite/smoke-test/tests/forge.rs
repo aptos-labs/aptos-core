@@ -5,16 +5,11 @@ use forge::{forge_main, ForgeConfig, LocalFactory, Options, Result};
 use smoke_test::{
     fullnode::LaunchFullnode,
     rest_api::{self, GetIndex},
-    transaction::ExternalTransactionSigner,
 };
 
 fn main() -> Result<()> {
     let tests = ForgeConfig::default()
-        .with_public_usage_tests(&[
-            &ExternalTransactionSigner,
-            &GetIndex,
-            &rest_api::BasicClient,
-        ])
+        .with_public_usage_tests(&[&GetIndex, &rest_api::BasicClient])
         //TODO Re-enable these tests once we fix how the move compiler is invoked
         // .with_admin_tests(&[&MalformedScript, &ExecuteCustomModuleAndScript])
         .with_network_tests(&[&LaunchFullnode]);

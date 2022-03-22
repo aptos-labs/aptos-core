@@ -66,6 +66,7 @@ pub fn encode_genesis_transaction(
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     enable_parallel_execution: bool,
+    min_price_per_gas_unit: u64,
 ) -> Transaction {
     Transaction::GenesisTransaction(WriteSetPayload::Direct(encode_genesis_change_set(
         &aptos_root_key,
@@ -77,6 +78,7 @@ pub fn encode_genesis_transaction(
         consensus_config,
         chain_id,
         enable_parallel_execution,
+        min_price_per_gas_unit,
     )))
 }
 
@@ -89,6 +91,7 @@ pub fn encode_genesis_change_set(
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     enable_parallel_execution: bool,
+    min_price_per_gas_unit: u64,
 ) -> ChangeSet {
     let mut stdlib_modules = Vec::new();
     // create a data view for move_vm
@@ -114,6 +117,7 @@ pub fn encode_genesis_change_set(
         vm_publishing_option,
         consensus_config,
         chain_id,
+        min_price_per_gas_unit,
     );
     // generate the genesis WriteSet
     create_and_initialize_owners_operators(&mut session, validators);
@@ -224,6 +228,7 @@ fn create_and_initialize_main_accounts(
     publishing_option: VMPublishingOption,
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
+    min_price_per_gas_unit: u64,
 ) {
     let aptos_root_auth_key = AuthenticationKey::ed25519(aptos_root_key);
     let treasury_compliance_auth_key = AuthenticationKey::ed25519(treasury_compliance_key);
@@ -265,6 +270,7 @@ fn create_and_initialize_main_accounts(
             MoveValue::U8(chain_id.id()),
             MoveValue::U64(DIEM_MAX_KNOWN_VERSION.major),
             MoveValue::vector_u8(consensus_config_bytes),
+            MoveValue::U64(min_price_per_gas_unit),
         ]),
     );
 }
@@ -556,6 +562,7 @@ pub fn generate_test_genesis(
         OnChainConsensusConfig::V1(ConsensusConfigV1 { two_chain: true }),
         ChainId::test(),
         enable_parallel_execution,
+        0,
     );
     (genesis, test_validators)
 }

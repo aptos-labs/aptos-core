@@ -70,6 +70,9 @@ pub enum ScriptFunctionCall {
         default_account_size: u64,
     },
 
+    /// Updates the major version to a larger version.
+    SetVersion { major: u64 },
+
     /// Transfers `amount` of tokens from `from` to `to`.
     Transfer { to: AccountAddress, amount: u64 },
 }
@@ -114,6 +117,7 @@ impl ScriptFunctionCall {
                 gas_unit_scaling_factor,
                 default_account_size,
             ),
+            SetVersion { major } => encode_set_version_script_function(major),
             Transfer { to, amount } => encode_transfer_script_function(to, amount),
         }
     }
@@ -247,6 +251,19 @@ pub fn encode_set_gas_constants_script_function(
     ))
 }
 
+/// Updates the major version to a larger version.
+pub fn encode_set_version_script_function(major: u64) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+            ident_str!("AptosVersion").to_owned(),
+        ),
+        ident_str!("set_version").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&major).unwrap()],
+    ))
+}
+
 /// Transfers `amount` of tokens from `from` to `to`.
 pub fn encode_transfer_script_function(to: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
@@ -340,6 +357,16 @@ fn decode_set_gas_constants_script_function(
     }
 }
 
+fn decode_set_version_script_function(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
+    if let TransactionPayload::ScriptFunction(script) = payload {
+        Some(ScriptFunctionCall::SetVersion {
+            major: bcs::from_bytes(script.args().get(0)?).ok()?,
+        })
+    } else {
+        None
+    }
+}
+
 fn decode_transfer_script_function(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
     if let TransactionPayload::ScriptFunction(script) = payload {
         Some(ScriptFunctionCall::Transfer {
@@ -386,6 +413,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "AptosVMConfigset_gas_constants".to_string(),
             Box::new(decode_set_gas_constants_script_function),
+        );
+        map.insert(
+            "AptosVersionset_version".to_string(),
+            Box::new(decode_set_version_script_function),
         );
         map.insert(
             "TestCointransfer".to_string(),

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::new_local_swarm;
+use crate::smoke_test_environment::new_local_swarm_with_aptos;
 use aptos::op::key::GenerateKey;
 use aptos_config::{
     config::{DiscoveryMethod, Identity, NetworkConfig, NodeConfig, PeerSet, PersistableConfig},
@@ -21,7 +21,7 @@ use std::{
 
 #[tokio::test]
 async fn test_connection_limiting() {
-    let mut swarm = new_local_swarm(1).await;
+    let mut swarm = new_local_swarm_with_aptos(1).await;
     let version = swarm.versions().max().unwrap();
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
     let vfn_peer_id = swarm
@@ -140,7 +140,7 @@ async fn test_connection_limiting() {
 
 #[tokio::test]
 async fn test_file_discovery() {
-    let mut swarm = new_local_swarm(1).await;
+    let mut swarm = new_local_swarm_with_aptos(1).await;
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
     let op_tool = OperationalTool::test();
     let (private_key, peer_set) = generate_private_key_and_peer(&op_tool).await;

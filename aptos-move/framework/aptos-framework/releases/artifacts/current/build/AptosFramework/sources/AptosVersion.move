@@ -9,10 +9,10 @@ module AptosFramework::AptosVersion {
     }
 
     /// Updates the major version to a larger version.
-    public fun set(account: &signer, major: u64) {
+    public(script) fun set_version(account: signer, major: u64) {
         Version::set<Marker::ChainMarker>(
             major,
-            &Capability::acquire(account, &Marker::get()),
+            &Capability::acquire(&account, &Marker::get()),
         );
     }
 }

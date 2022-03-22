@@ -34,7 +34,7 @@
 
 
 
-<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize">initialize</a>(dr_account: signer, _tc_account: signer, dr_auth_key: vector&lt;u8&gt;, _tc_auth_key: vector&lt;u8&gt;, _initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, _is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_diem_version: u64, consensus_config: vector&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize">initialize</a>(dr_account: signer, _tc_account: signer, dr_auth_key: vector&lt;u8&gt;, _tc_auth_key: vector&lt;u8&gt;, _initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, _is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_diem_version: u64, consensus_config: vector&lt;u8&gt;, _min_price_per_gas_unit: u64)
 </code></pre>
 
 
@@ -55,6 +55,7 @@
     chain_id: u8,
     initial_diem_version: u64,
     consensus_config: vector&lt;u8&gt;,
+    _min_price_per_gas_unit: u64,
 ) {
     <a href="Genesis.md#0x1_Genesis_initialize_internal">initialize_internal</a>(
         &dr_account,

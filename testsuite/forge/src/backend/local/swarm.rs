@@ -80,6 +80,7 @@ pub struct LocalSwarmBuilder {
     number_of_validators: NonZeroUsize,
     dir: Option<PathBuf>,
     genesis_modules: Option<Vec<Vec<u8>>>,
+    min_price_per_gas_unit: u64,
 }
 
 impl LocalSwarmBuilder {
@@ -91,6 +92,7 @@ impl LocalSwarmBuilder {
             number_of_validators: NonZeroUsize::new(1).unwrap(),
             dir: None,
             genesis_modules: None,
+            min_price_per_gas_unit: 1,
         }
     }
 
@@ -116,6 +118,11 @@ impl LocalSwarmBuilder {
 
     pub fn genesis_modules(mut self, genesis_modules: Vec<Vec<u8>>) -> Self {
         self.genesis_modules = Some(genesis_modules);
+        self
+    }
+
+    pub fn min_price_per_gas_unit(mut self, min_price_per_gas_unit: u64) -> Self {
+        self.min_price_per_gas_unit = min_price_per_gas_unit;
         self
     }
 
@@ -147,6 +154,7 @@ impl LocalSwarmBuilder {
         )
         .num_validators(self.number_of_validators)
         .template(self.template)
+        .min_price_per_gas_unit(self.min_price_per_gas_unit)
         .build(rng)?;
 
         // Get the initial version to start the nodes with, either the one provided or fallback to

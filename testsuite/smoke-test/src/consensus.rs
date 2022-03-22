@@ -12,6 +12,7 @@ use aptos_types::network_address::NetworkAddress;
 use forge::{NodeExt, Swarm};
 use std::{convert::TryInto, str::FromStr};
 
+#[ignore]
 #[tokio::test]
 async fn test_consensus_observer_mode_storage_error() {
     let num_nodes = 4;

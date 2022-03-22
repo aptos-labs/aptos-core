@@ -24,4 +24,5 @@ pub const VALIDATOR_NETWORK_KEY: &str = "validator_network";
 pub const SAFETY_DATA: &str = "safety_data";
 pub const WAYPOINT: &str = "waypoint";
 pub const GENESIS_WAYPOINT: &str = "genesis-waypoint";
-pub const MOVE_MODULES: &str = "move-modules";
+pub const MOVE_MODULES: &str = "move_modules";
+pub const MIN_PRICE_PER_GAS_UNIT: &str = "min_price_per_gas_unit";

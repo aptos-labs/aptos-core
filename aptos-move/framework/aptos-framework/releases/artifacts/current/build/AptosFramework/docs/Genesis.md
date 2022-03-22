@@ -36,7 +36,7 @@
 
 
 
-<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize">initialize</a>(core_resource_account: signer, _tc_account: signer, core_resource_account_auth_key: vector&lt;u8&gt;, _tc_auth_key: vector&lt;u8&gt;, initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_version: u64, consensus_config: vector&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize">initialize</a>(core_resource_account: signer, _tc_account: signer, core_resource_account_auth_key: vector&lt;u8&gt;, _tc_auth_key: vector&lt;u8&gt;, initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_version: u64, consensus_config: vector&lt;u8&gt;, min_price_per_gas_unit: u64)
 </code></pre>
 
 
@@ -57,6 +57,7 @@
     chain_id: u8,
     initial_version: u64,
     consensus_config: vector&lt;u8&gt;,
+    min_price_per_gas_unit: u64,
 ) {
     <a href="Genesis.md#0x1_Genesis_initialize_internal">initialize_internal</a>(
         &core_resource_account,
@@ -68,6 +69,7 @@
         chain_id,
         initial_version,
         consensus_config,
+        min_price_per_gas_unit,
     )
 }
 </code></pre>
@@ -82,7 +84,7 @@
 
 
 
-<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize_internal">initialize_internal</a>(core_resource_account: &signer, core_resource_account_auth_key: vector&lt;u8&gt;, initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_version: u64, consensus_config: vector&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="Genesis.md#0x1_Genesis_initialize_internal">initialize_internal</a>(core_resource_account: &signer, core_resource_account_auth_key: vector&lt;u8&gt;, initial_script_allow_list: vector&lt;vector&lt;u8&gt;&gt;, is_open_module: bool, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, chain_id: u8, initial_version: u64, consensus_config: vector&lt;u8&gt;, min_price_per_gas_unit: u64)
 </code></pre>
 
 
@@ -101,6 +103,7 @@
     chain_id: u8,
     initial_version: u64,
     consensus_config: vector&lt;u8&gt;,
+    min_price_per_gas_unit: u64,
 ) {
     // initialize the chain marker first
     <a href="Marker.md#0x1_Marker_initialize">Marker::initialize</a>(core_resource_account);
@@ -122,6 +125,7 @@
         core_resource_account,
         instruction_schedule,
         native_schedule,
+        min_price_per_gas_unit,
     );
 
     <a href="AptosConsensusConfig.md#0x1_AptosConsensusConfig_set">AptosConsensusConfig::set</a>(core_resource_account, consensus_config);

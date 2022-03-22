@@ -31,6 +31,7 @@ module AptosFramework::Genesis {
         chain_id: u8,
         initial_version: u64,
         consensus_config: vector<u8>,
+        min_price_per_gas_unit: u64,
     ) {
         initialize_internal(
             &core_resource_account,
@@ -42,6 +43,7 @@ module AptosFramework::Genesis {
             chain_id,
             initial_version,
             consensus_config,
+            min_price_per_gas_unit,
         )
     }
 
@@ -55,6 +57,7 @@ module AptosFramework::Genesis {
         chain_id: u8,
         initial_version: u64,
         consensus_config: vector<u8>,
+        min_price_per_gas_unit: u64,
     ) {
         // initialize the chain marker first
         Marker::initialize(core_resource_account);
@@ -76,6 +79,7 @@ module AptosFramework::Genesis {
             core_resource_account,
             instruction_schedule,
             native_schedule,
+            min_price_per_gas_unit,
         );
 
         AptosConsensusConfig::set(core_resource_account, consensus_config);
@@ -194,7 +198,8 @@ module AptosFramework::Genesis {
             x"", // native schedule not needed for unit tests
             4u8, // TESTING chain ID
             0,
-            x""
+            x"",
+            1,
         )
     }
 

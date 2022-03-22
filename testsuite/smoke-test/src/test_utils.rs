@@ -5,25 +5,22 @@ use aptos_config::config::{Identity, NodeConfig, SecureBackend};
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
-    transaction_builder::{Currency, TransactionFactory},
+    transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
+use aptos_transaction_builder::aptos_stdlib;
 use forge::{LocalSwarm, NodeExt, Swarm};
 use rand::random;
 use std::{fs::File, io::Write, path::PathBuf};
 
-pub async fn create_and_fund_account(swarm: &mut LocalSwarm, amount: u64) -> LocalAccount {
+pub async fn create_and_fund_account(swarm: &'_ mut dyn Swarm, amount: u64) -> LocalAccount {
     let account = LocalAccount::generate(&mut rand::rngs::OsRng);
-    swarm
-        .chain_info()
-        .create_parent_vasp_account(Currency::XUS, account.authentication_key())
+    let mut chain_info = swarm.chain_info().into_aptos_public_info();
+    chain_info
+        .create_user_account(account.public_key())
         .await
         .unwrap();
-    swarm
-        .chain_info()
-        .fund(Currency::XUS, account.address(), amount)
-        .await
-        .unwrap();
+    chain_info.mint(account.address(), amount).await.unwrap();
     account
 }
 
@@ -34,10 +31,8 @@ pub async fn transfer_coins_non_blocking(
     receiver: &LocalAccount,
     amount: u64,
 ) -> SignedTransaction {
-    let txn = sender.sign_with_transaction_builder(transaction_factory.peer_to_peer(
-        Currency::XUS,
-        receiver.address(),
-        amount,
+    let txn = sender.sign_with_transaction_builder(transaction_factory.payload(
+        aptos_stdlib::encode_transfer_script_function(receiver.address(), amount),
     ));
 
     client.submit(&txn).await.unwrap();
@@ -70,14 +65,14 @@ pub async fn transfer_and_reconfig(
     for _ in 0..num_transfers {
         // Reconfigurations have a 20% chance of being executed
         if random::<u16>() % 5 == 0 {
-            let diem_version = client.get_dpn_version().await.unwrap();
-            let current_version = *diem_version.into_inner().payload.major.inner();
-            let txn = root_account.sign_with_transaction_builder(
-                transaction_factory.update_diem_version(0, current_version + 1),
-            );
+            let aptos_version = client.get_aptos_version().await.unwrap();
+            let current_version = *aptos_version.into_inner().major.inner();
+            let txn = root_account.sign_with_transaction_builder(transaction_factory.payload(
+                aptos_stdlib::encode_set_version_script_function(current_version + 1),
+            ));
             client.submit_and_wait(&txn).await.unwrap();
 
-            println!("Changing diem version to {}", current_version + 1,);
+            println!("Changing aptos version to {}", current_version + 1,);
         }
 
         transfer_coins(client, transaction_factory, sender, receiver, 1).await;
@@ -85,17 +80,13 @@ pub async fn transfer_and_reconfig(
 }
 
 pub async fn assert_balance(client: &RestClient, account: &LocalAccount, balance: u64) {
-    let balances = client
-        .get_dpn_account_balances(account.address())
+    let on_chain_balance = client
+        .get_account_balance(account.address())
         .await
         .unwrap()
         .into_inner();
 
-    let onchain_balance = balances
-        .into_iter()
-        .find(|amount_view| amount_view.currency_code() == Currency::XUS)
-        .unwrap();
-    assert_eq!(onchain_balance.amount, balance);
+    assert_eq!(on_chain_balance.get(), balance);
 }
 
 /// This module provides useful functions for operating, handling and managing
@@ -204,7 +195,6 @@ pub fn write_key_to_file_bcs_format(key: &Ed25519PublicKey, key_file_path: PathB
 /// between the accounts and verifies that these operations succeed.
 pub async fn check_create_mint_transfer(swarm: &mut LocalSwarm) {
     let client = swarm.validators().next().unwrap().rest_client();
-    let transaction_factory = swarm.chain_info().transaction_factory();
 
     // Create account 0, mint 10 coins and check balance
     let mut account_0 = create_and_fund_account(swarm, 10).await;
@@ -212,7 +202,14 @@ pub async fn check_create_mint_transfer(swarm: &mut LocalSwarm) {
 
     // Create account 1, mint 1 coin, transfer 3 coins from account 0 to 1, check balances
     let account_1 = create_and_fund_account(swarm, 1).await;
-    transfer_coins(&client, &transaction_factory, &mut account_0, &account_1, 3).await;
+    transfer_coins(
+        &client,
+        &swarm.chain_info().transaction_factory(),
+        &mut account_0,
+        &account_1,
+        3,
+    )
+    .await;
 
     assert_balance(&client, &account_0, 7).await;
     assert_balance(&client, &account_1, 4).await;

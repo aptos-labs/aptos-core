@@ -23,7 +23,7 @@
 Publishes the VM config.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AptosVMConfig.md#0x1_AptosVMConfig_initialize">initialize</a>(account: &signer, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="AptosVMConfig.md#0x1_AptosVMConfig_initialize">initialize</a>(account: &signer, instruction_schedule: vector&lt;u8&gt;, native_schedule: vector&lt;u8&gt;, min_price_per_gas_unit: u64)
 </code></pre>
 
 
@@ -36,9 +36,9 @@ Publishes the VM config.
     account: &signer,
     instruction_schedule: vector&lt;u8&gt;,
     native_schedule: vector&lt;u8&gt;,
+    min_price_per_gas_unit: u64,
 ) {
-    // require <b>min</b> price per gas unit &gt; 0
-    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/VMConfig.md#0x1_VMConfig_initialize">VMConfig::initialize</a>&lt;<a href="Marker.md#0x1_Marker_ChainMarker">Marker::ChainMarker</a>&gt;(account, instruction_schedule, native_schedule, 1);
+    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/VMConfig.md#0x1_VMConfig_initialize">VMConfig::initialize</a>&lt;<a href="Marker.md#0x1_Marker_ChainMarker">Marker::ChainMarker</a>&gt;(account, instruction_schedule, native_schedule, min_price_per_gas_unit);
 }
 </code></pre>
 

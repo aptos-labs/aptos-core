@@ -72,62 +72,19 @@ impl<'t> AptosContext<'t> {
     }
 
     pub fn aptos_transaction_factory(&self) -> TransactionFactory {
-        TransactionFactory::new(self.chain_id())
-            .with_gas_unit_price(1)
-            .with_max_gas_amount(1000)
+        self.public_info.transaction_factory()
     }
 
     pub async fn create_user_account(&mut self, pubkey: &Ed25519PublicKey) -> Result<()> {
-        let preimage = AuthenticationKeyPreimage::ed25519(pubkey);
-        let auth_key = AuthenticationKey::from_preimage(&preimage);
-        let create_account_txn = self.public_info.root_account.sign_with_transaction_builder(
-            self.transaction_factory()
-                .payload(aptos_stdlib::encode_create_account_script_function(
-                    auth_key.derived_address(),
-                    preimage.into_vec(),
-                ))
-                .gas_unit_price(1),
-        );
-        self.public_info
-            .rest_client
-            .submit_and_wait(&create_account_txn)
-            .await?;
-        Ok(())
+        self.public_info.create_user_account(pubkey).await
     }
 
     pub async fn mint(&mut self, addr: AccountAddress, amount: u64) -> Result<()> {
-        let mint_txn = self.public_info.root_account.sign_with_transaction_builder(
-            self.transaction_factory()
-                .payload(aptos_stdlib::encode_mint_script_function(addr, amount))
-                .gas_unit_price(1),
-        );
-        self.public_info
-            .rest_client
-            .submit_and_wait(&mint_txn)
-            .await?;
-        Ok(())
+        self.public_info.mint(addr, amount).await
     }
 
     pub async fn get_balance(&self, address: AccountAddress) -> Option<u64> {
-        let module = Identifier::new("TestCoin".to_string()).unwrap();
-        let name = Identifier::new("Balance".to_string()).unwrap();
-        self.public_info
-            .rest_client
-            .get_account_resources(address)
-            .await
-            .unwrap()
-            .into_inner()
-            .into_iter()
-            .find(|r| r.resource_type.name == name && r.resource_type.module == module)
-            .and_then(|coin| {
-                coin.data
-                    .get("coin")
-                    .unwrap()
-                    .get("value")
-                    .unwrap()
-                    .as_str()
-                    .and_then(|s| s.parse::<u64>().ok())
-            })
+        self.public_info.get_balance(address).await
     }
 
     pub fn root_account(&mut self) -> &mut LocalAccount {
@@ -155,5 +112,58 @@ impl<'t> AptosPublicInfo<'t> {
             chain_id,
             root_account,
         }
+    }
+
+    pub async fn create_user_account(&mut self, pubkey: &Ed25519PublicKey) -> Result<()> {
+        let preimage = AuthenticationKeyPreimage::ed25519(pubkey);
+        let auth_key = AuthenticationKey::from_preimage(&preimage);
+        let create_account_txn =
+            self.root_account
+                .sign_with_transaction_builder(self.transaction_factory().payload(
+                    aptos_stdlib::encode_create_account_script_function(
+                        auth_key.derived_address(),
+                        preimage.into_vec(),
+                    ),
+                ));
+        self.rest_client
+            .submit_and_wait(&create_account_txn)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn mint(&mut self, addr: AccountAddress, amount: u64) -> Result<()> {
+        let mint_txn = self.root_account.sign_with_transaction_builder(
+            self.transaction_factory()
+                .payload(aptos_stdlib::encode_mint_script_function(addr, amount)),
+        );
+        self.rest_client.submit_and_wait(&mint_txn).await?;
+        Ok(())
+    }
+
+    pub fn transaction_factory(&self) -> TransactionFactory {
+        TransactionFactory::new(self.chain_id)
+            .with_gas_unit_price(1)
+            .with_max_gas_amount(1000)
+    }
+
+    pub async fn get_balance(&self, address: AccountAddress) -> Option<u64> {
+        let module = Identifier::new("TestCoin".to_string()).unwrap();
+        let name = Identifier::new("Balance".to_string()).unwrap();
+        self.rest_client
+            .get_account_resources(address)
+            .await
+            .unwrap()
+            .into_inner()
+            .into_iter()
+            .find(|r| r.resource_type.name == name && r.resource_type.module == module)
+            .and_then(|coin| {
+                coin.data
+                    .get("coin")
+                    .unwrap()
+                    .get("value")
+                    .unwrap()
+                    .as_str()
+                    .and_then(|s| s.parse::<u64>().ok())
+            })
     }
 }

@@ -22,5 +22,5 @@ impl Balance {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AptosVersion {
-    major: U64,
+    pub major: U64,
 }

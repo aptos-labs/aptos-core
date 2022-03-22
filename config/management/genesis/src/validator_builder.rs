@@ -157,6 +157,7 @@ pub struct ValidatorBuilder {
     randomize_first_validator_ports: bool,
     publishing_option: Option<VMPublishingOption>,
     template: NodeConfig,
+    min_price_per_gas_unit: u64,
 }
 
 impl ValidatorBuilder {
@@ -168,6 +169,7 @@ impl ValidatorBuilder {
             randomize_first_validator_ports: true,
             publishing_option: Some(VMPublishingOption::open()),
             template: NodeConfig::default_for_validator(),
+            min_price_per_gas_unit: 1,
         }
     }
 
@@ -188,6 +190,11 @@ impl ValidatorBuilder {
 
     pub fn template(mut self, template: NodeConfig) -> Self {
         self.template = template;
+        self
+    }
+
+    pub fn min_price_per_gas_unit(mut self, min_price_per_gas_unit: u64) -> Self {
+        self.min_price_per_gas_unit = min_price_per_gas_unit;
         self
     }
 
@@ -218,6 +225,7 @@ impl ValidatorBuilder {
             &validators,
             self.publishing_option,
             self.move_modules,
+            self.min_price_per_gas_unit,
         )?;
 
         // Insert Genesis and Waypoint into each validator
@@ -374,6 +382,7 @@ impl ValidatorBuilder {
         validators: &[ValidatorConfig],
         publishing_option: Option<VMPublishingOption>,
         move_modules: Vec<Vec<u8>>,
+        min_price_per_gas_unit: u64,
     ) -> Result<(Transaction, Waypoint)> {
         let mut genesis_builder = GenesisBuilder::new(genesis_storage);
 
@@ -421,6 +430,7 @@ impl ValidatorBuilder {
             )?;
             genesis_builder.set_validator_config(&validator.operator(), &validator_config)?;
         }
+        genesis_builder.set_min_price_per_gas_unit(min_price_per_gas_unit)?;
 
         // Create Genesis and Genesis Waypoint
         let genesis = genesis_builder.build(

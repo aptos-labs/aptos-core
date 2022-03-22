@@ -6,7 +6,6 @@ pub mod aptos;
 pub mod fullnode;
 pub mod nft_transaction;
 pub mod rest_api;
-pub mod scripts_and_modules;
 pub mod transaction;
 
 // Converted to local Forge backend
@@ -16,8 +15,6 @@ mod client;
 mod consensus;
 #[cfg(test)]
 mod full_nodes;
-#[cfg(test)]
-mod genesis;
 #[cfg(test)]
 mod network;
 #[cfg(test)]

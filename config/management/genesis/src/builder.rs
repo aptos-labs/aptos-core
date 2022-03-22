@@ -5,7 +5,8 @@ use crate::layout::Layout;
 use anyhow::Result;
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_global_constants::{
-    APTOS_ROOT_KEY, MOVE_MODULES, OPERATOR_KEY, OWNER_KEY, TREASURY_COMPLIANCE_KEY,
+    APTOS_ROOT_KEY, MIN_PRICE_PER_GAS_UNIT, MOVE_MODULES, OPERATOR_KEY, OWNER_KEY,
+    TREASURY_COMPLIANCE_KEY,
 };
 use aptos_management::constants::{self, VALIDATOR_CONFIG, VALIDATOR_OPERATOR};
 use aptos_secure_storage::{KVStorage, Namespaced};
@@ -211,6 +212,19 @@ impl<S: KVStorage> GenesisBuilder<S> {
         .ok_or_else(|| anyhow::anyhow!("Invalid Validator Config"))
     }
 
+    pub fn set_min_price_per_gas_unit(&mut self, min_price_per_gas_unit: u64) -> Result<()> {
+        self.with_namespace_mut(constants::COMMON_NS)
+            .set(MIN_PRICE_PER_GAS_UNIT, min_price_per_gas_unit)
+            .map_err(Into::into)
+    }
+
+    pub fn min_price_per_gas_unit(&self) -> Result<u64> {
+        self.with_namespace(constants::COMMON_NS)
+            .get::<u64>(MIN_PRICE_PER_GAS_UNIT)
+            .map(|r| r.value)
+            .map_err(Into::into)
+    }
+
     pub fn build(
         &self,
         chain_id: ChainId,
@@ -221,6 +235,7 @@ impl<S: KVStorage> GenesisBuilder<S> {
         let treasury_compliance_key = self.treasury_compliance_key()?;
         let validators = self.validators()?;
         let move_modules = self.move_modules()?;
+        let min_price_per_gas_unit = self.min_price_per_gas_unit().unwrap_or(1);
 
         let genesis = vm_genesis::encode_genesis_transaction(
             aptos_root_key,
@@ -232,6 +247,7 @@ impl<S: KVStorage> GenesisBuilder<S> {
             chain_id,
             // TODO: Make this flag configurable via cli command.
             false,
+            min_price_per_gas_unit,
         );
 
         Ok(genesis)

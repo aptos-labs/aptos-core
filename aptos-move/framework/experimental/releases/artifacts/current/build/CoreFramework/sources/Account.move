@@ -49,8 +49,8 @@ module CoreFramework::Account {
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD: u64 = 1002;
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW: u64 = 1003;
     const PROLOGUE_EACCOUNT_DNE: u64 = 1004;
-    const PROLOGUE_EBAD_CHAIN_ID: u64 = 1005;
-    const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1006;
+    const PROLOGUE_EBAD_CHAIN_ID: u64 = 1007;
+    const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1011;
 
     native fun create_signer(addr: address): signer;
 

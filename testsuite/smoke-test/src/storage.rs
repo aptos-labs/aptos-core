@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::new_local_swarm,
+    smoke_test_environment::new_local_swarm_with_aptos,
     test_utils::{
         assert_balance, create_and_fund_account, swarm_utils::insert_waypoint,
         transfer_and_reconfig, transfer_coins,
@@ -29,7 +29,7 @@ async fn test_db_restore() {
     workspace_builder::get_bin("db-restore");
     workspace_builder::get_bin("db-backup-verify");
 
-    let mut swarm = new_local_swarm(4).await;
+    let mut swarm = new_local_swarm_with_aptos(4).await;
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
     let client_1 = swarm
         .validator(validator_peer_ids[1])

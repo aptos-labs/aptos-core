@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::new_local_swarm,
+    smoke_test_environment::new_local_swarm_with_aptos,
     test_utils::{
         assert_balance, create_and_fund_account, transfer_coins, transfer_coins_non_blocking,
     },
@@ -21,9 +21,8 @@ use std::{
 
 #[tokio::test]
 async fn test_full_node_basic_flow() {
-    let mut swarm = new_local_swarm(1).await;
+    let mut swarm = new_local_swarm_with_aptos(1).await;
 
-    let transaction_factory = swarm.chain_info().transaction_factory();
     let version = swarm.versions().max().unwrap();
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
     let vfn_peer_id = swarm
@@ -49,6 +48,7 @@ async fn test_full_node_basic_flow() {
             .await
             .unwrap();
     }
+    let transaction_factory = swarm.chain_info().transaction_factory();
 
     // create clients for all nodes
     let validator_client = swarm.validator(validator_peer_id).unwrap().rest_client();
@@ -123,7 +123,7 @@ async fn test_full_node_basic_flow() {
 
 #[tokio::test]
 async fn test_vfn_failover() {
-    let mut swarm = new_local_swarm(4).await;
+    let mut swarm = new_local_swarm_with_aptos(4).await;
     let transaction_factory = swarm.chain_info().transaction_factory();
     let version = swarm.versions().max().unwrap();
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
@@ -202,7 +202,7 @@ async fn test_vfn_failover() {
 
 #[tokio::test]
 async fn test_private_full_node() {
-    let mut swarm = new_local_swarm(4).await;
+    let mut swarm = new_local_swarm_with_aptos(4).await;
     let transaction_factory = swarm.chain_info().transaction_factory();
     let version = swarm.versions().max().unwrap();
 
