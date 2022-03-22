@@ -407,17 +407,10 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
         let highest_known_ledger_version = highest_known_ledger_info.ledger_info().version();
 
         // Check if we've already fetched the required data for bootstrapping
-        if highest_synced_version == highest_known_ledger_version
+        if highest_synced_version >= highest_known_ledger_version
             || self.account_state_syncer.is_sync_complete
         {
             return self.bootstrapping_complete();
-        }
-
-        // Verify we haven't synced beyond the highest ledger info
-        if highest_synced_version > highest_known_ledger_version {
-            unreachable!(
-                "Synced beyond the highest ledger info! Synced version: {:?}, highest ledger version: {:?}", highest_synced_version, highest_known_ledger_version
-            );
         }
 
         // Bootstrap according to the mode
