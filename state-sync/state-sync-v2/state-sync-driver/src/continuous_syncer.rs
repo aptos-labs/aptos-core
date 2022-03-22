@@ -131,8 +131,12 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
     ) -> Result<(), Error> {
         loop {
             // Fetch and process any data notifications
-            let data_notification =
-                utils::get_data_notification(self.active_data_stream.as_mut()).await?;
+            let max_stream_wait_time_ms = self.driver_configuration.config.max_stream_wait_time_ms;
+            let data_notification = utils::get_data_notification(
+                max_stream_wait_time_ms,
+                self.active_data_stream.as_mut(),
+            )
+            .await?;
             match data_notification.data_payload {
                 DataPayload::ContinuousTransactionOutputsWithProof(
                     ledger_info_with_sigs,

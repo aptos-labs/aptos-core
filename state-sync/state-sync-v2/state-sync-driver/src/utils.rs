@@ -17,9 +17,6 @@ use std::{sync::Arc, time::Duration};
 use storage_interface::{DbReader, StartupInfo};
 use tokio::time::timeout;
 
-// TODO(joshlind): make this configurable
-const MAX_NOTIFICATION_WAIT_TIME_MS: u64 = 500;
-
 /// The speculative state that tracks a data stream of transactions or outputs.
 /// This assumes all data is valid and allows the driver to speculatively verify
 /// payloads flowing along the stream without having to block on the executor or
@@ -84,13 +81,14 @@ impl SpeculativeStreamState {
 
 /// Fetches a data notification from the given data stream listener. Note: this
 /// helper assumes the `active_data_stream` exists and throws an error if a
-/// notification is not found within the timeout.
+/// notification is not found within the `max_stream_wait_time_ms`.
 pub async fn get_data_notification(
+    max_stream_wait_time_ms: u64,
     active_data_stream: Option<&mut DataStreamListener>,
 ) -> Result<DataNotification, Error> {
     let active_data_stream = active_data_stream.expect("The active data stream should exist!");
 
-    let timeout_ms = Duration::from_millis(MAX_NOTIFICATION_WAIT_TIME_MS);
+    let timeout_ms = Duration::from_millis(max_stream_wait_time_ms);
     if let Ok(data_notification) = timeout(timeout_ms, active_data_stream.select_next_some()).await
     {
         Ok(data_notification)

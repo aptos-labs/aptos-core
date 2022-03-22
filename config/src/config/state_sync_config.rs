@@ -80,6 +80,7 @@ pub struct StateSyncDriverConfig {
     pub enable_state_sync_v2: bool,            // If the node should sync with state sync v2
     pub continuous_syncing_mode: ContinuousSyncingMode, // The mode by which to sync after bootstrapping
     pub progress_check_interval_ms: u64, // The interval (ms) at which to check state sync progress
+    pub max_stream_wait_time_ms: u64,    // The max time (ms) to wait for a data stream notification
 }
 
 /// The default state sync driver config will be the one that gets (and keeps)
@@ -91,6 +92,7 @@ impl Default for StateSyncDriverConfig {
             enable_state_sync_v2: false,
             continuous_syncing_mode: ContinuousSyncingMode::ApplyTransactionOutputs,
             progress_check_interval_ms: 100,
+            max_stream_wait_time_ms: 2000,
         }
     }
 }
