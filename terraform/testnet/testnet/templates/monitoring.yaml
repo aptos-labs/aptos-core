@@ -13,6 +13,16 @@ data:
         isDefault: true
         access: proxy
         url: http://localhost:9090
+      {{- range .Values.monitoring.grafana.datasources }}
+      - name: {{ .name }}
+        {{- range $k, $v := .config }}
+        {{ $k }}: {{ toYaml $v }}
+        {{- end }}
+        {{- if .jsonData }}
+        jsonData:
+          {{ toYaml .jsonData | nindent 10 }}
+        {{- end }}
+      {{- end }}
 
   dashboards.yml: |-
     apiVersion: 1
@@ -230,6 +240,9 @@ spec:
       - name: grafana
         image: {{ .grafana.image.repo }}:{{ .grafana.image.tag }}
         imagePullPolicy: {{ .grafana.image.pullPolicy }}
+        env:
+        - name: GF_AUTH_SIGV4_AUTH_ENABLED
+          value: "true"
         command: ["/bin/sh", "-c"]
         args: ["cp /dashboards/* /etc/grafana/dashboards/aptos && gunzip -f /etc/grafana/dashboards/aptos/*.json.gz && exec /run.sh"]
         resources:

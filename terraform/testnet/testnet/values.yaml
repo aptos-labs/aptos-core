@@ -145,6 +145,7 @@ monitoring:
         memory: 128Mi
     googleAuth:
     config:
+    datasources: []
 
 # if enabled, faucet_test is synchronized with cluster_test traffic
 # to prevent race on mint account
