@@ -33,8 +33,6 @@ use tokio_stream::wrappers::IntervalStream;
 
 // TODO(joshlind): use structured logging!
 
-const MAX_CONNECTION_DEADLINE_SECS: u64 = 10;
-
 /// The configuration of the state sync driver
 #[derive(Clone)]
 pub struct DriverConfiguration {
@@ -471,9 +469,11 @@ impl<
             && self.driver_configuration.waypoint.version() == 0
         {
             if let Some(start_time) = self.start_time {
-                if let Some(connection_deadline) =
-                    start_time.checked_add(Duration::from_secs(MAX_CONNECTION_DEADLINE_SECS))
-                {
+                if let Some(connection_deadline) = start_time.checked_add(Duration::from_secs(
+                    self.driver_configuration
+                        .config
+                        .max_connection_deadline_secs,
+                )) {
                     if SystemTime::now()
                         .duration_since(connection_deadline)
                         .is_ok()
