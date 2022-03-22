@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::smoke_test_environment::new_local_swarm;
+use aptos::op::key::GenerateKey;
 use aptos_config::{
     config::{DiscoveryMethod, Identity, NetworkConfig, NodeConfig, PeerSet, PersistableConfig},
     network_id::NetworkId,
 };
 use aptos_crypto::{x25519, x25519::PrivateKey};
-use aptos_operational_tool::{
-    keys::{EncodingType, KeyType},
-    test_helper::OperationalTool,
-};
+use aptos_operational_tool::{keys::EncodingType, test_helper::OperationalTool};
 use aptos_temppath::TempPath;
 use aptos_types::network_address::{NetworkAddress, Protocol};
 use forge::{FullNode, LocalNode, NodeExt, Swarm};
@@ -208,10 +206,9 @@ fn create_discovery_file(peer_set: PeerSet) -> TempPath {
 async fn generate_private_key_and_peer(op_tool: &OperationalTool) -> (PrivateKey, PeerSet) {
     let key_file = TempPath::new();
     key_file.create_as_file().unwrap();
-    let private_key = op_tool
-        .generate_key(KeyType::X25519, key_file.as_ref(), EncodingType::BCS)
-        .await
-        .unwrap();
+    let (private_key, _) =
+        GenerateKey::generate_x25519(aptos::common::types::EncodingType::BCS, key_file.as_ref())
+            .unwrap();
     let peer_set = op_tool
         .extract_peer_from_file(key_file.as_ref(), EncodingType::BCS)
         .await

@@ -4,11 +4,14 @@
 use crate::{
     common::{
         types::{EncodingOptions, EncodingType, Error, KeyType, PromptOptions},
-        utils::{prompt_yes, to_common_success_result},
+        utils::{append_file_extension, prompt_yes, to_common_success_result},
     },
     CliResult,
 };
-use aptos_crypto::{ed25519::Ed25519PrivateKey, x25519, PrivateKey, Uniform, ValidCryptoMaterial};
+use aptos_crypto::{
+    ed25519, ed25519::Ed25519PrivateKey, x25519, PrivateKey, Uniform, ValidCryptoMaterial,
+    ValidCryptoMaterialStringExt,
+};
 use rand::SeedableRng;
 use std::{
     fs::File,
@@ -62,6 +65,44 @@ impl GenerateKey {
             KeyType::Ed25519 => self.save_params.save_key(&ed25519_key, "ed22519"),
         }
     }
+
+    /// A test friendly typed key generation for x25519 keys.
+    pub fn generate_x25519(
+        encoding_type: EncodingType,
+        key_file: &Path,
+    ) -> Result<(x25519::PrivateKey, x25519::PublicKey), Error> {
+        let args = format!(
+            "generate --key-type {key_type:?} --key-file {key_file} --encoding {encoding_type:?} --assume-yes",
+            key_type = KeyType::X25519,
+            key_file = key_file.to_str().unwrap(),
+            encoding_type = encoding_type,
+        );
+        let command = GenerateKey::from_iter(args.split_whitespace());
+        command.execute()?;
+        Ok((
+            load_key(key_file, encoding_type)?,
+            load_key(&append_file_extension(key_file, ".pub")?, encoding_type)?,
+        ))
+    }
+
+    /// A test friendly typed key generation for e25519 keys.
+    pub fn generate_ed25519(
+        encoding_type: EncodingType,
+        key_file: &Path,
+    ) -> Result<(ed25519::Ed25519PrivateKey, ed25519::Ed25519PublicKey), Error> {
+        let args = format!(
+            "generate --key-type {key_type:?} --key-file {key_file} --encoding {encoding_type:?} --assume-yes",
+            key_type = KeyType::Ed25519,
+            key_file = key_file.to_str().unwrap(),
+            encoding_type = encoding_type,
+        );
+        let command = GenerateKey::from_iter(args.split_whitespace());
+        command.execute()?;
+        Ok((
+            load_key(key_file, encoding_type)?,
+            load_key(&append_file_extension(key_file, ".pub")?, encoding_type)?,
+        ))
+    }
 }
 
 #[derive(Debug, StructOpt)]
@@ -78,14 +119,7 @@ pub struct SaveKey {
 impl SaveKey {
     /// Public key file name
     fn public_key_file(&self) -> Result<PathBuf, Error> {
-        let extension = self.key_file.extension().unwrap_or_default().to_str();
-        if let Some(extension) = extension {
-            Ok(self.key_file.with_extension(extension.to_owned() + ".pub"))
-        } else {
-            Err(Error::UnexpectedError(
-                "Failed to parse key file path".to_string(),
-            ))
-        }
+        append_file_extension(&self.key_file, ".pub")
     }
 
     /// Check if the key file exists already
@@ -148,5 +182,33 @@ fn check_if_file_exists(file: &Path, assume_yes: bool) -> Result<(), Error> {
         Err(Error::AbortedError)
     } else {
         Ok(())
+    }
+}
+
+/// Loads a key to a file hex string encoded
+pub fn load_key<Key: ValidCryptoMaterial>(
+    path: &Path,
+    encoding: EncodingType,
+) -> Result<Key, Error> {
+    let data = std::fs::read(&path).map_err(|err| {
+        Error::UnableToReadFile(path.to_str().unwrap().to_string(), err.to_string())
+    })?;
+
+    match encoding {
+        EncodingType::BCS => {
+            bcs::from_bytes(&data).map_err(|err| Error::BCS("Key".to_string(), err))
+        }
+        EncodingType::Hex => {
+            let hex_string = String::from_utf8(data).unwrap();
+            Key::from_encoded_string(hex_string.trim())
+                .map_err(|err| Error::UnableToParse("Key", err.to_string()))
+        }
+        EncodingType::Base64 => {
+            let string = String::from_utf8(data).unwrap();
+            let bytes = base64::decode(string.trim())
+                .map_err(|err| Error::UnableToParse("Key", err.to_string()))?;
+            Key::try_from(bytes.as_slice())
+                .map_err(|err| Error::UnexpectedError(format!("Failed to parse key {}", err)))
+        }
     }
 }

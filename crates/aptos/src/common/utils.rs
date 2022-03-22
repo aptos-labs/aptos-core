@@ -3,6 +3,7 @@
 
 use crate::{CliResult, Error};
 use serde::Serialize;
+use std::path::{Path, PathBuf};
 
 /// Prompts for confirmation until a yes or no is given explicitly
 /// TODO: Capture interrupts
@@ -68,5 +69,20 @@ impl<T> From<Result<T, Error>> for ResultWrapper<T> {
             Ok(inner) => ResultWrapper::Result(inner),
             Err(inner) => ResultWrapper::Error(inner.to_string()),
         }
+    }
+}
+
+/// Appends a file extension to a `Path` without overwriting the original extension.
+pub fn append_file_extension(
+    file: &Path,
+    appended_extension: &'static str,
+) -> Result<PathBuf, Error> {
+    let extension = file.extension().unwrap_or_default().to_str();
+    if let Some(extension) = extension {
+        Ok(file.with_extension(extension.to_owned() + appended_extension))
+    } else {
+        Err(Error::UnexpectedError(
+            "Failed to parse file path extension".to_string(),
+        ))
     }
 }

@@ -9,6 +9,7 @@ use crate::{
     },
 };
 use anyhow::{bail, Result};
+use aptos::{common::utils::append_file_extension, op::key::GenerateKey};
 use aptos_config::{
     config::{PeerRole, SecureBackend},
     network_id::NetworkId,
@@ -45,7 +46,7 @@ use std::{
     collections::HashSet,
     convert::{TryFrom, TryInto},
     fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr,
     time::{Duration, Instant},
 };
@@ -553,10 +554,7 @@ async fn test_extract_peer_from_file() {
     let op_tool = OperationalTool::test();
     let path = TempPath::new();
     path.create_as_file().unwrap();
-    let key = op_tool
-        .generate_key(KeyType::X25519, path.as_ref(), EncodingType::Hex)
-        .await
-        .unwrap();
+    let key = generate_x25519_key(path.as_ref());
 
     let peer = op_tool
         .extract_peer_from_file(path.as_ref(), EncodingType::Hex)
@@ -579,13 +577,8 @@ async fn test_extract_peers_from_keys() {
     for _ in 1..10 {
         let key_path = TempPath::new();
         key_path.create_as_file().unwrap();
-        keys.insert(
-            op_tool
-                .generate_key(KeyType::X25519, key_path.as_ref(), EncodingType::Hex)
-                .await
-                .unwrap()
-                .public_key(),
-        );
+        let key = generate_x25519_key(key_path.as_ref());
+        keys.insert(key.public_key());
     }
     let peers = op_tool
         .extract_peers_from_keys(keys.clone(), output_path.as_ref())
@@ -606,47 +599,65 @@ async fn test_extract_peers_from_keys() {
 
 #[tokio::test]
 async fn test_generate_key() {
-    let op_tool = OperationalTool::test();
     let path = TempPath::new();
     path.create_as_file().unwrap();
+    let pub_path = append_file_extension(path.as_ref(), ".pub").unwrap();
 
     // Base64
-    let expected_key = op_tool
-        .generate_key(KeyType::X25519, path.as_ref(), EncodingType::Base64)
-        .await
-        .unwrap();
-    assert_eq!(
-        expected_key,
-        x25519::PrivateKey::try_from(
-            base64::decode(fs::read(path.as_ref()).unwrap())
-                .unwrap()
-                .as_slice()
-        )
-        .unwrap(),
-    );
+    let (priv_key, pub_key) =
+        GenerateKey::generate_x25519(aptos::common::types::EncodingType::Base64, path.as_ref())
+            .unwrap();
+    let read_priv_key = x25519::PrivateKey::try_from(
+        base64::decode(fs::read(path.as_ref()).unwrap())
+            .unwrap()
+            .as_slice(),
+    )
+    .unwrap();
+    let read_pub_key = x25519::PublicKey::try_from(
+        base64::decode(fs::read(&pub_path).unwrap())
+            .unwrap()
+            .as_slice(),
+    )
+    .unwrap();
+    assert_eq!(priv_key, read_priv_key);
+    assert_eq!(pub_key, read_priv_key.public_key());
+    assert_eq!(pub_key, read_pub_key);
 
     // Hex
-    let expected_key = op_tool
-        .generate_key(KeyType::X25519, path.as_ref(), EncodingType::Hex)
-        .await
-        .unwrap();
-    assert_eq!(
-        expected_key,
-        x25519::PrivateKey::from_encoded_string(
-            &String::from_utf8(fs::read(path.as_ref()).unwrap()).unwrap()
-        )
-        .unwrap()
-    );
+    let (priv_key, pub_key) =
+        GenerateKey::generate_x25519(aptos::common::types::EncodingType::Hex, path.as_ref())
+            .unwrap();
+    let read_priv_key = x25519::PrivateKey::from_encoded_string(
+        &String::from_utf8(fs::read(path.as_ref()).unwrap()).unwrap(),
+    )
+    .unwrap();
+    let read_pub_key = x25519::PublicKey::from_encoded_string(
+        &String::from_utf8(fs::read(&pub_path).unwrap()).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(priv_key, read_priv_key);
+    assert_eq!(pub_key, read_priv_key.public_key());
+    assert_eq!(pub_key, read_pub_key);
 
     // BCS
-    let expected_key = op_tool
-        .generate_key(KeyType::X25519, path.as_ref(), EncodingType::BCS)
-        .await
-        .unwrap();
-    assert_eq!(
-        expected_key,
-        bcs::from_bytes(&fs::read(path.as_ref()).unwrap()).unwrap()
-    );
+    let (priv_key, pub_key) =
+        GenerateKey::generate_x25519(aptos::common::types::EncodingType::BCS, path.as_ref())
+            .unwrap();
+    let read_priv_key = bcs::from_bytes(&fs::read(path.as_ref()).unwrap()).unwrap();
+    let read_pub_key = bcs::from_bytes(&fs::read(&pub_path).unwrap()).unwrap();
+    assert_eq!(priv_key, read_priv_key);
+    assert_eq!(pub_key, read_priv_key.public_key());
+    assert_eq!(pub_key, read_pub_key);
+
+    // BCS ed25519
+    let (priv_key, pub_key) =
+        GenerateKey::generate_ed25519(aptos::common::types::EncodingType::BCS, path.as_ref())
+            .unwrap();
+    let read_priv_key = bcs::from_bytes(&fs::read(path.as_ref()).unwrap()).unwrap();
+    let read_pub_key = bcs::from_bytes(&fs::read(&pub_path).unwrap()).unwrap();
+    assert_eq!(priv_key, read_priv_key);
+    assert_eq!(pub_key, read_priv_key.public_key());
+    assert_eq!(pub_key, read_pub_key);
 }
 
 async fn test_insert_waypoint(
@@ -1287,4 +1298,10 @@ pub async fn wait_for_transaction_on_all_nodes(
             .await
             .unwrap();
     }
+}
+
+fn generate_x25519_key(path: &Path) -> x25519::PrivateKey {
+    let (priv_key, _pub_key) =
+        GenerateKey::generate_x25519(aptos::common::types::EncodingType::Hex, path).unwrap();
+    priv_key
 }

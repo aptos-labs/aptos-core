@@ -7441,6 +7441,7 @@ name = "smoke-test"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos",
  "aptos-config",
  "aptos-crypto",
  "aptos-framework-releases",

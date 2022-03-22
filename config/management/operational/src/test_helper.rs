@@ -4,7 +4,7 @@
 use crate::{
     account_resource::SimplifiedAccountResource,
     command::{Command, CommandName},
-    keys::{load_key, EncodingType, KeyType},
+    keys::{EncodingType, KeyType},
     validator_config::DecodedValidatorConfig,
     validator_set::DecryptedValidatorInfo,
     validator_state::VerifyValidatorStateResult,
@@ -302,29 +302,6 @@ impl OperationalTool {
 
         let command = Command::from_iter(args.split_whitespace());
         command.extract_peers_from_keys().await
-    }
-
-    pub async fn generate_key(
-        &self,
-        key_type: KeyType,
-        key_file: &Path,
-        encoding: EncodingType,
-    ) -> Result<x25519::PrivateKey, Error> {
-        let args = format!(
-            "
-                {command}
-                --key-type {key_type:?}
-                --key-file {key_file}
-                --encoding {encoding:?}
-            ",
-            command = command(TOOL_NAME, CommandName::GenerateKey),
-            key_type = key_type,
-            key_file = key_file.to_str().unwrap(),
-            encoding = encoding,
-        );
-        let command = Command::from_iter(args.split_whitespace());
-        command.generate_key().await?;
-        load_key(key_file.to_path_buf(), encoding)
     }
 
     pub async fn insert_waypoint(
