@@ -154,7 +154,7 @@ pub fn signing_message<T: CryptoHash + Serialize>(message: &T) -> Vec<u8> {
 /// reference.
 /// This convertibility requirement ensures the existence of a
 /// deterministic, canonical public key construction from a private key.
-pub trait PublicKey: Sized + Clone + Eq + Hash +
+pub trait PublicKey: Sized + Clone + Eq + Hash + ValidCryptoMaterial +
     // This unsightly turbofish type parameter is the precise constraint
     // needed to require that there exists an
     //
