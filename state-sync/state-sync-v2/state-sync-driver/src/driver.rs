@@ -403,7 +403,7 @@ impl<
 
     /// Handles an error notification sent by the storage synchronizer
     async fn handle_error_notification(&mut self, error_notification: ErrorNotification) {
-        debug!(
+        info!(
             "Received an error notification from the storage synchronizer! Error: {:?}",
             error_notification.clone(),
         );

@@ -28,7 +28,7 @@ use tokio::runtime::Runtime;
 // TODO(joshlind): add structured logging support!
 
 // The maximum number of chunks that are pending execution or commit
-const MAX_PENDING_CHUNKS: usize = 50;
+const MAX_PENDING_CHUNKS: usize = 1000;
 
 /// Synchronizes the storage of the node by verifying and storing new data
 /// (e.g., transactions and outputs).
