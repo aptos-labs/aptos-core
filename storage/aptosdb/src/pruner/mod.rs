@@ -73,7 +73,7 @@ impl Pruner {
     ) -> Self {
         let (command_sender, command_receiver) = channel();
 
-        let least_readable_version = Arc::new(Mutex::new(vec![0, 0, 0, 0, 0, 0]));
+        let least_readable_version = Arc::new(Mutex::new(vec![0, 0, 0, 0, 0]));
         let worker_progress_clone = Arc::clone(&least_readable_version);
 
         DIEM_STORAGE_PRUNE_WINDOW.set(
@@ -126,7 +126,6 @@ impl Pruner {
             .send(Command::Prune {
                 target_db_versions: vec![
                     least_readable_state_store_version,
-                    least_readable_default_store_version,
                     least_readable_default_store_version,
                     least_readable_default_store_version,
                     least_readable_default_store_version,
