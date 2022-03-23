@@ -5,7 +5,9 @@
 
 use crate::{instance::Instance, query_sequence_numbers};
 use anyhow::{format_err, Result};
+use aptos::{common::types::EncodingType, op::key::load_key};
 use aptos_crypto::{
+    ed25519,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
     Uniform,
@@ -23,7 +25,7 @@ use aptos_sdk::{
 };
 use rand::seq::SliceRandom;
 use reqwest::Client;
-use std::convert::TryFrom;
+use std::{convert::TryFrom, path::Path};
 
 const DD_KEY: &str = "dd.key";
 
@@ -62,7 +64,10 @@ impl Cluster {
         let mint_key_pair = if vasp {
             dummy_key_pair()
         } else {
-            KeyPair::from(generate_key::load_key(mint_file))
+            KeyPair::from(
+                load_key::<ed25519::Ed25519PrivateKey>(Path::new(mint_file), EncodingType::BCS)
+                    .unwrap(),
+            )
         };
 
         Self {
@@ -114,7 +119,7 @@ impl Cluster {
     }
 
     pub async fn load_dd_account(&self, client: &RestClient) -> Result<LocalAccount> {
-        let mint_key: Ed25519PrivateKey = generate_key::load_key(DD_KEY);
+        let mint_key: Ed25519PrivateKey = load_key(Path::new(DD_KEY), EncodingType::BCS).unwrap();
         let account_key = AccountKey::from_private_key(mint_key);
         let address = account_key.authentication_key().derived_address();
         let sequence_number = query_sequence_numbers(client, &[address])

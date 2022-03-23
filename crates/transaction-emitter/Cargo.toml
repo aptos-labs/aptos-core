@@ -12,7 +12,6 @@ edition = "2018"
 [dependencies]
 anyhow = { version = "1.0.52", features = ["backtrace"] }
 futures = "0.3.12"
-generate-key = { path = "../../config/generate-key" }
 itertools = "0.10.0"
 rand = "0.8.3"
 rand_core = "0.6.2"
@@ -23,6 +22,7 @@ structopt = "0.3.21"
 termion = "1.5.6"
 tokio = { version = "1.8.1", features = ["full"] }
 
+aptos = { path = "../aptos" }
 aptos-rest-client = { path = "../aptos-rest-client"}
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto" }

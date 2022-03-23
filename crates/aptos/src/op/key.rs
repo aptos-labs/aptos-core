@@ -20,6 +20,8 @@ use std::{
 };
 use structopt::StructOpt;
 
+pub const PUBLIC_KEY_EXTENSION: &str = ".pub";
+
 /// CLI tool for generating, inspecting, and interacting with keys.
 #[derive(Debug, StructOpt)]
 pub enum KeyTool {
@@ -51,8 +53,7 @@ impl GenerateKey {
         self.save_params.check_key_file()?;
 
         // Generate a ed25519 key
-        let mut rng = rand::rngs::StdRng::from_entropy();
-        let ed25519_key = Ed25519PrivateKey::generate(&mut rng);
+        let ed25519_key = Self::generate_ed25519_in_memory();
 
         // Convert it to the appropriate type and save it
         match self.key_type {
@@ -81,7 +82,10 @@ impl GenerateKey {
         command.execute()?;
         Ok((
             load_key(key_file, encoding_type)?,
-            load_key(&append_file_extension(key_file, ".pub")?, encoding_type)?,
+            load_key(
+                &append_file_extension(key_file, PUBLIC_KEY_EXTENSION)?,
+                encoding_type,
+            )?,
         ))
     }
 
@@ -100,8 +104,17 @@ impl GenerateKey {
         command.execute()?;
         Ok((
             load_key(key_file, encoding_type)?,
-            load_key(&append_file_extension(key_file, ".pub")?, encoding_type)?,
+            load_key(
+                &append_file_extension(key_file, PUBLIC_KEY_EXTENSION)?,
+                encoding_type,
+            )?,
         ))
+    }
+
+    /// Generates an `Ed25519PrivateKey` without saving it to disk
+    pub fn generate_ed25519_in_memory() -> ed25519::Ed25519PrivateKey {
+        let mut rng = rand::rngs::StdRng::from_entropy();
+        Ed25519PrivateKey::generate(&mut rng)
     }
 }
 
@@ -119,7 +132,7 @@ pub struct SaveKey {
 impl SaveKey {
     /// Public key file name
     fn public_key_file(&self) -> Result<PathBuf, Error> {
-        append_file_extension(&self.key_file, ".pub")
+        append_file_extension(&self.key_file, PUBLIC_KEY_EXTENSION)
     }
 
     /// Check if the key file exists already
@@ -185,7 +198,7 @@ fn check_if_file_exists(file: &Path, assume_yes: bool) -> Result<(), Error> {
     }
 }
 
-/// Loads a key to a file hex string encoded
+/// Loads a key from a file
 pub fn load_key<Key: ValidCryptoMaterial>(
     path: &Path,
     encoding: EncodingType,

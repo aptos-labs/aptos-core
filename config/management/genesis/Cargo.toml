@@ -19,7 +19,6 @@ toml = { version = "0.5.8", default-features = false }
 
 consensus-types = { path = "../../../consensus/consensus-types" }
 executor = { path = "../../../execution/executor" }
-generate-key = { path = "../../generate-key" }
 bcs = "0.1.2"
 aptos-config = { path = "../.."}
 aptos-crypto = { path = "../../../crates/aptos-crypto" }

@@ -1,12 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos::{common::types::EncodingType, op::key::load_key};
+use aptos_crypto::ed25519;
 use aptos_logger::info;
 use aptos_sdk::types::{
     account_address::AccountAddress, account_config::aptos_root_address, chain_id::ChainId,
     LocalAccount,
 };
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -65,7 +67,8 @@ async fn main() {
         args.maximum_amount,
     );
 
-    let key = generate_key::load_key(&args.mint_key_file_path);
+    let key: ed25519::Ed25519PrivateKey =
+        load_key(Path::new(&args.mint_key_file_path), EncodingType::BCS).unwrap();
 
     let faucet_address: AccountAddress =
         args.mint_account_address.unwrap_or_else(aptos_root_address);
@@ -110,6 +113,7 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
+    use aptos::op::key::GenerateKey;
     use aptos_crypto::{ed25519::Ed25519PublicKey, hash::HashValue, PrivateKey};
     use aptos_faucet::{routes, Service};
     use aptos_infallible::RwLock;
@@ -160,12 +164,7 @@ mod tests {
     }
 
     fn setup(maximum_amount: Option<u64>) -> (AccountStates, Arc<Service>) {
-        let f = tempfile::NamedTempFile::new()
-            .unwrap()
-            .into_temp_path()
-            .to_path_buf();
-        generate_key::generate_and_save_key(&f);
-        let key = generate_key::load_key(&f);
+        let key = GenerateKey::generate_ed25519_in_memory();
         let account_address = AuthenticationKey::ed25519(&key.public_key()).derived_address();
 
         let faucet_account = LocalAccount::new(account_address, key, 0);

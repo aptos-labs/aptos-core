@@ -28,8 +28,6 @@ Configuration is broken up into many utilities:
 - `src/keys.rs` wraps keys within the configuration files for testing purposes
 - `config-builder` extends `src/generator.rs` with a command-line utility
   and also provides support for generating genesis
-- `generate-key` generates an Ed25519 private key in Binary Canonical
-  Serialization (BCS) format. This is used by the mint.
 
 The separation of the `config-builder` into its own crate was dictated by the
 need for `config-builder` to be able to generate genesis. Genesis requires the

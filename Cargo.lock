@@ -364,6 +364,7 @@ name = "aptos-faucet"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos",
  "aptos-config",
  "aptos-crypto",
  "aptos-infallible",
@@ -374,7 +375,6 @@ dependencies = [
  "bcs",
  "bytes",
  "futures",
- "generate-key",
  "hex",
  "rand 0.8.4",
  "reqwest",
@@ -475,7 +475,6 @@ dependencies = [
  "consensus-types",
  "diem-framework-releases",
  "executor",
- "generate-key",
  "rand 0.8.4",
  "serde 1.0.136",
  "storage-interface",
@@ -3419,17 +3418,6 @@ dependencies = [
  "serde-reflection",
  "serde_yaml",
  "structopt",
-]
-
-[[package]]
-name = "generate-key"
-version = "0.1.0"
-dependencies = [
- "aptos-crypto",
- "aptos-temppath",
- "aptos-workspace-hack",
- "bcs",
- "rand 0.8.4",
 ]
 
 [[package]]
@@ -7471,7 +7459,6 @@ dependencies = [
  "forge",
  "framework",
  "futures",
- "generate-key",
  "hex",
  "move-command-line-common",
  "move-ir-compiler",
@@ -8432,6 +8419,7 @@ name = "transaction-emitter"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "aptos",
  "aptos-config",
  "aptos-crypto",
  "aptos-logger",
@@ -8440,7 +8428,6 @@ dependencies = [
  "aptos-transaction-builder",
  "aptos-workspace-hack",
  "futures",
- "generate-key",
  "itertools",
  "rand 0.8.4",
  "rand_core 0.6.3",

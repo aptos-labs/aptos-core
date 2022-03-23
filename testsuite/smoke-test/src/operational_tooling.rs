@@ -9,7 +9,10 @@ use crate::{
     },
 };
 use anyhow::{bail, Result};
-use aptos::{common::utils::append_file_extension, op::key::GenerateKey};
+use aptos::{
+    common::utils::append_file_extension,
+    op::key::{GenerateKey, PUBLIC_KEY_EXTENSION},
+};
 use aptos_config::{
     config::{PeerRole, SecureBackend},
     network_id::NetworkId,
@@ -601,7 +604,7 @@ async fn test_extract_peers_from_keys() {
 async fn test_generate_key() {
     let path = TempPath::new();
     path.create_as_file().unwrap();
-    let pub_path = append_file_extension(path.as_ref(), ".pub").unwrap();
+    let pub_path = append_file_extension(path.as_ref(), PUBLIC_KEY_EXTENSION).unwrap();
 
     // Base64
     let (priv_key, pub_key) =
