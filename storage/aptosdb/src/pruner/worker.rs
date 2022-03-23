@@ -9,9 +9,7 @@ use aptos_infallible::Mutex;
 use crate::{
     pruner::{
         event_store::event_store_pruner::EventStorePruner,
-        ledger_store::{
-            epoch_info_pruner::EpochInfoPruner, ledger_store_pruner::LedgerStorePruner,
-        },
+        ledger_store::ledger_store_pruner::LedgerStorePruner,
         state_store::StateStorePruner,
         transaction_store::{
             transaction_store_pruner::TransactionStorePruner, write_set_pruner::WriteSetPruner,
@@ -39,11 +37,10 @@ pub struct Worker {
     /// Indicates if there's NOT any pending work to do currently, to hint
     /// `Self::receive_commands()` to `recv()` blocking-ly.
     blocking_recv: bool,
+    max_version_to_prune_per_batch: u64,
 }
 
 impl Worker {
-    const MAX_VERSIONS_TO_PRUNE_PER_BATCH: u64 = 100;
-
     pub(crate) fn new(
         db: Arc<DB>,
         transaction_store: Arc<TransactionStore>,
@@ -51,6 +48,7 @@ impl Worker {
         event_store: Arc<EventStore>,
         command_receiver: Receiver<Command>,
         least_readable_versions: Arc<Mutex<Vec<Version>>>,
+        max_version_to_prune_per_batch: u64,
     ) -> Self {
         Self {
             db: Arc::clone(&db),
@@ -72,10 +70,6 @@ impl Worker {
                     Arc::clone(&db),
                     Arc::clone(&event_store),
                 ))),
-                Mutex::new(Arc::new(EpochInfoPruner::new(
-                    Arc::clone(&db),
-                    Arc::clone(&ledger_store),
-                ))),
                 Mutex::new(Arc::new(WriteSetPruner::new(
                     Arc::clone(&db),
                     Arc::clone(&transaction_store),
@@ -84,6 +78,7 @@ impl Worker {
             command_receiver,
             least_readable_versions,
             blocking_recv: true,
+            max_version_to_prune_per_batch,
         }
     }
 
@@ -99,7 +94,7 @@ impl Worker {
             for db_pruner in &self.db_pruners {
                 let result = db_pruner
                     .lock()
-                    .prune(&mut db_batch, Self::MAX_VERSIONS_TO_PRUNE_PER_BATCH);
+                    .prune(&mut db_batch, self.max_version_to_prune_per_batch);
                 result.map_err(|_| error_in_pruning = true).ok();
             }
             // Commit all the changes to DB atomically

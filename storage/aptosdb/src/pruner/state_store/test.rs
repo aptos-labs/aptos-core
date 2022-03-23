@@ -56,6 +56,7 @@ fn test_state_store_pruner() {
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
             default_prune_window: Some(0),
+            max_version_to_prune_per_batch: Some(100),
         },
         Arc::clone(transaction_store),
         Arc::clone(&aptos_db.ledger_store),
@@ -166,6 +167,7 @@ fn test_worker_quit_eagerly() {
             Arc::clone(&aptos_db.event_store),
             command_receiver,
             Arc::new(Mutex::new(vec![0, 0])), /* progress */
+            100,
         );
         command_sender
             .send(Command::Prune {

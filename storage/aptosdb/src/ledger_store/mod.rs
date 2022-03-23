@@ -379,17 +379,6 @@ impl LedgerStore {
         db_batch.delete_range::<LedgerCountersSchema>(&begin, &end)?;
         Ok(())
     }
-
-    /// Prune the epoch by version stored in DB in the range [being, end)
-    pub fn prune_epoch_by_version(
-        &self,
-        begin: Version,
-        end: Version,
-        db_batch: &mut SchemaBatch,
-    ) -> anyhow::Result<()> {
-        db_batch.delete_range::<EpochByVersionSchema>(&begin, &end)?;
-        Ok(())
-    }
 }
 
 pub(crate) type Accumulator = MerkleAccumulator<LedgerStore, TransactionAccumulatorHasher>;

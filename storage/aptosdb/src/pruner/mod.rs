@@ -59,7 +59,6 @@ pub enum PrunerIndex {
     TransactionStorePrunerIndex,
     _LedgerStorePrunerIndex,
     EventStorePrunerIndex,
-    EpochStorePrunerIndex,
     WriteSetPrunerIndex,
 }
 
@@ -77,8 +76,11 @@ impl Pruner {
         let least_readable_version = Arc::new(Mutex::new(vec![0, 0, 0, 0, 0, 0]));
         let worker_progress_clone = Arc::clone(&least_readable_version);
 
-        DIEM_STORAGE_PRUNE_WINDOW
-            .set(storage_pruner_config.state_store_prune_window.unwrap() as i64);
+        DIEM_STORAGE_PRUNE_WINDOW.set(
+            storage_pruner_config
+                .state_store_prune_window
+                .expect("State store pruner window is required") as i64,
+        );
         let worker = Worker::new(
             db,
             transaction_store,
@@ -86,6 +88,9 @@ impl Pruner {
             event_store,
             command_receiver,
             least_readable_version,
+            storage_pruner_config
+                .max_version_to_prune_per_batch
+                .expect("Max version to prune per batch is expected"),
         );
         let worker_thread = std::thread::Builder::new()
             .name("aptosdb_pruner".into())

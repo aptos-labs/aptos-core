@@ -58,6 +58,7 @@ pub struct StorageConfig {
 pub const NO_OP_STORAGE_PRUNER_CONFIG: StoragePrunerConfig = StoragePrunerConfig {
     state_store_prune_window: None,
     default_prune_window: None,
+    max_version_to_prune_per_batch: Some(100),
 };
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -70,16 +71,22 @@ pub struct StoragePrunerConfig {
     /// being big in size, we might want to configure a smaller window for state store vs other
     /// store.
     pub default_prune_window: Option<u64>,
+
+    /// Maximum version to prune per batch, should not be too large to avoid spike in disk IO caused
+    /// by large batches in the pruner.
+    pub max_version_to_prune_per_batch: Option<u64>,
 }
 
 impl StoragePrunerConfig {
     pub fn new(
         state_store_prune_window: Option<u64>,
         default_store_prune_window: Option<u64>,
+        max_version_to_prune_per_batch: Option<u64>,
     ) -> Self {
         StoragePrunerConfig {
             state_store_prune_window,
             default_prune_window: default_store_prune_window,
+            max_version_to_prune_per_batch,
         }
     }
 }
@@ -100,6 +107,7 @@ impl Default for StorageConfig {
             storage_pruner_config: StoragePrunerConfig {
                 state_store_prune_window: Some(1_000_000),
                 default_prune_window: Some(10_000_000),
+                max_version_to_prune_per_batch: Some(100),
             },
             data_dir: PathBuf::from("/opt/aptos/data"),
             // Default read/write/connection timeout, in milliseconds
