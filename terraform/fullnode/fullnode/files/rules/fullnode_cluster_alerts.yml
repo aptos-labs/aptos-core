@@ -10,7 +10,7 @@ groups:
       summary: "Fullnode pod is crashing or not returning cAdvisor metrics"
   # high severity alert resources utilization
   - alert: Fullnode CPU usage over 80%
-    expr: rate(container_cpu_usage_seconds_total{pod=~"pfn.*", container="fullnode"}[1m]) > 0.8
+    expr: sum (rate (container_cpu_usage_seconds_total{container="fullnode", pod=~"pfn.*"}[1m])) by (pod, container) / sum (container_spec_cpu_quota{container="fullnode", pod=~"pfn.*"}) by (pod, container) * 100000 > 0.8
     for: 5m
     labels:
       severity: error
