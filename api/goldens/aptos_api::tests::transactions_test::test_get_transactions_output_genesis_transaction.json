@@ -2,13 +2,13 @@
   {
     "type": "genesis_transaction",
     "version": "0",
-    "hash": "0x2f3234ca268787211bff124cf62a40e439a73a970113d0e2c7b5374233495644",
-    "state_root_hash": "0xd918550de35ca6c555358d22b875a8a03e5835b7cf1d27fe0470c8cc9200514d",
+    "hash": "0x28982817f8ec66bc8ab8cac784a41862b4ebb67428bbbe1acb5925f84c4aa1b0",
+    "state_root_hash": "0xf51a7b35e1d05fc527eea843aad88bae23dbf9ed556d2697d9ab5153a36ba01d",
     "event_root_hash": "0xdc52e4d65bc1d4bcc915eddd4afe5210466932431da4ca1e2f6076f24ff334c9",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xd82e12aa6db129a4c2c0751e7517ef0b93debf1c9ca9fea8ba75ba525e2576bc",
+    "accumulator_root_hash": "0xd04abee1faa4a27b6856f023bc71fe84a3a4b3ef366126a4d9a937d3eef7580a",
     "payload": {
       "type": "write_set_payload",
       "write_set": {
@@ -2675,6 +2675,257 @@
                   }
                 ],
                 "structs": []
+              }
+            }
+          },
+          {
+            "type": "write_module",
+            "address": "0x1",
+            "data": {
+              "bytecode": "0xa11ceb0b040000000d010008020816031e8c0104aa011a05c401d101079503d20108e7041006f704140a8b05150ba005040ca405e9020d8d08060e9308060000000100020003000004020400040000040402040004000202070100000005000102040400060203020404000700040204040008050602040400090708020404000a0807020404000b0009020404000c0a07020404000d020b02040402110d040100011206060002050d0e01000305100e0100030612130100031314060100031407150100030a1507010002151819010002160719010002170d04010003181b070100031912180100060b09060b060c0f0d0f0e0f0f0f100f110612061306140f150f02060b0002090009010609000106090102070b00020900090106090001070901010101060b000209000901010300010b000209000901010b02010303070b00020900090109000901020900090102030b02010301060b0201090001060900010b01020900090102060a09000304070b000209000901060900030b02010302070a0900030107090001060a0900010a0900010a0b010209000901020303010900010b0201090003070b0002090009010609000b02010302070a0900090006070b0002090009010609000309000b0201030901055461626c65064572726f7273064f7074696f6e06566563746f720c5461626c65456c656d656e7406626f72726f770a626f72726f775f6d75740c636f6e7461696e735f6b657905636f756e74066372656174650d64657374726f795f656d7074790466696e6406696e736572740672656d6f76650464617461036b65790576616c75650769735f736f6d6510696e76616c69645f617267756d656e74066c656e67746805656d70747904736f6d65046e6f6e650769735f6e6f6e6509707573685f6261636b0b737761705f72656d6f76650000000000000000000000000000000103080000000000000000030801000000000000000002010e0a0b0102090009010102020f0900100901000b010b000100000c160a000b0138000c030e033801030c0b00010701110a270e033802140c020b0037000b02380337010201010000111b0a000b010c030c020b022e0b0338000c050e05380103110b00010701110a270e053802140c040b0036000b0438043601020201000009070b000b0138000c020e023801020301000007040b00370038050204010000070338063900020501000016060b003a000c010b013807020600000017260a00370038050c030600000000000000000c020a020a0323030b05200a0037000a02380337020a01210314051b0b00010b01010b023808020b02060100000000000000160c0205060b00010b0101380902070100001a180a000e010c040c030b032e0b0438000c050e05380a03110b00010700110a270b0036000b010b023901380b02080100001c1f0a000b010c030c020b022e0b0338000c060e06380103110b00010701110a270e063802140c040b0036000b04380c3a010c070c050b050b0702000001010100000b010b020b00",
+              "abi": {
+                "address": "0x1",
+                "name": "Table",
+                "friends": [],
+                "exposed_functions": [
+                  {
+                    "name": "borrow",
+                    "visibility": "public",
+                    "generic_type_params": [
+                      {
+                        "constraints": [
+                          "store"
+                        ]
+                      },
+                      {
+                        "constraints": [
+                          "store"
+                        ]
+                      }
+                    ],
+                    "params": [
+                      "&0x1::Table::Table<T0, T1>",
+                      "&T0"
+                    ],
+                    "return": [
+                      "&T1"
+                    ]
+                  },
+                  {
+                    "name": "borrow_mut",
+                    "visibility": "public",
+                    "generic_type_params": [
+                      {
+                        "constraints": [
+                          "store"
+                        ]
+                      },
+                      {
+                        "constraints": [
+                          "store"
+                        ]
+                      }
+                    ],
+                    "params": [
+                      "&mut 0x1::Table::Table<T0, T1>",
+                      "&T0"
+                    ],
+                    "return": [
+                      "&mut T1"
+                    ]
+                  },
+                  {
+                    "name": "contains_key",
+                    "visibility": "public",
+                    "generic_type_params": [
+                      {
+                        "constraints": [
+                          "store"
+                        ]
+                      },
+                      {
+                        "constraints": [
+                          "store"
+                        ]
+                      }
+                    ],
+                    "params": [
+                      "&0x1::Table::Table<T0, T1>",
+                      "&T0"
+                    ],
+                    "return": [
+                      "bool"
+                    ]
+                  },
+                  {
+                    "name": "count",
+                    "visibility": "public",
+                    "generic_type_params": [
+                      {
+                        "constraints": [
+                          "store"
+                        ]
+                      },
+                      {
+                        "constraints": [
+                          "store"
+                        ]
+                      }
+                    ],
+                    "params": [
+                      "&0x1::Table::Table<T0, T1>"
+                    ],
+                    "return": [
+                      "u64"
+                    ]
+                  },
+                  {
+                    "name": "create",
+                    "visibility": "public",
+                    "generic_type_params": [
+                      {
+                        "constraints": [
+                          "store"
+                        ]
+                      },
+                      {
+                        "constraints": [
+                          "store"
+                        ]
+                      }
+                    ],
+                    "params": [],
+                    "return": [
+                      "0x1::Table::Table<T0, T1>"
+                    ]
+                  },
+                  {
+                    "name": "destroy_empty",
+                    "visibility": "public",
+                    "generic_type_params": [
+                      {
+                        "constraints": [
+                          "store"
+                        ]
+                      },
+                      {
+                        "constraints": [
+                          "store"
+                        ]
+                      }
+                    ],
+                    "params": [
+                      "0x1::Table::Table<T0, T1>"
+                    ],
+                    "return": []
+                  },
+                  {
+                    "name": "insert",
+                    "visibility": "public",
+                    "generic_type_params": [
+                      {
+                        "constraints": [
+                          "store"
+                        ]
+                      },
+                      {
+                        "constraints": [
+                          "store"
+                        ]
+                      }
+                    ],
+                    "params": [
+                      "&mut 0x1::Table::Table<T0, T1>",
+                      "T0",
+                      "T1"
+                    ],
+                    "return": []
+                  },
+                  {
+                    "name": "remove",
+                    "visibility": "public",
+                    "generic_type_params": [
+                      {
+                        "constraints": [
+                          "store"
+                        ]
+                      },
+                      {
+                        "constraints": [
+                          "store"
+                        ]
+                      }
+                    ],
+                    "params": [
+                      "&mut 0x1::Table::Table<T0, T1>",
+                      "&T0"
+                    ],
+                    "return": [
+                      "T0",
+                      "T1"
+                    ]
+                  }
+                ],
+                "structs": [
+                  {
+                    "name": "Table",
+                    "is_native": false,
+                    "abilities": [
+                      "store"
+                    ],
+                    "generic_type_params": [
+                      {
+                        "constraints": [
+                          "store"
+                        ],
+                        "is_phantom": false
+                      },
+                      {
+                        "constraints": [
+                          "store"
+                        ],
+                        "is_phantom": false
+                      }
+                    ],
+                    "fields": [
+                      {
+                        "name": "data",
+                        "type": "vector<0x1::Table::TableElement<T0, T1>>"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "TableElement",
+                    "is_native": false,
+                    "abilities": [
+                      "store"
+                    ],
+                    "generic_type_params": [
+                      {
+                        "constraints": [
+                          "store"
+                        ],
+                        "is_phantom": false
+                      },
+                      {
+                        "constraints": [
+                          "store"
+                        ],
+                        "is_phantom": false
+                      }
+                    ],
+                    "fields": [
+                      {
+                        "name": "key",
+                        "type": "T0"
+                      },
+                      {
+                        "name": "value",
+                        "type": "T1"
+                      }
+                    ]
+                  }
+                ]
               }
             }
           },
