@@ -97,7 +97,8 @@ async fn emit_tx(cluster: &Cluster, args: &Args) -> Result<()> {
         EmitJobRequest::new(cluster.all_instances().map(Instance::rest_client).collect())
             .accounts_per_client(args.accounts_per_client)
             .thread_params(thread_params)
-            .invalid_transaction_ratio(args.invalid_tx);
+            .invalid_transaction_ratio(args.invalid_tx)
+            .gas_price(1);
     if let Some(workers_per_endpoint) = args.workers_per_ac {
         emit_job_request = emit_job_request.workers_per_endpoint(workers_per_endpoint);
     }
