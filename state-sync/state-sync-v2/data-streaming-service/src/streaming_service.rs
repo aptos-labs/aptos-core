@@ -21,7 +21,7 @@ use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
 
 // Useful constants for the Data Streaming Service
-const REFRESH_ERROR_LOG_FREQ_SECS: u64 = 1;
+const GLOBAL_DATA_REFRESH_LOG_FREQ_SECS: u64 = 1;
 
 /// The data streaming service that responds to data stream requests.
 pub struct DataStreamingService<T> {
@@ -212,7 +212,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
                 error.get_label().into(),
             );
             sample!(
-                SampleRate::Duration(Duration::from_secs(REFRESH_ERROR_LOG_FREQ_SECS)),
+                SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_REFRESH_LOG_FREQ_SECS)),
                 error!(LogSchema::new(LogEntry::RefreshGlobalData)
                     .event(LogEvent::Error)
                     .error(&error))
@@ -222,8 +222,17 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
 
     fn fetch_global_data_summary(&mut self) -> Result<(), Error> {
         let global_data_summary = self.aptos_data_client.get_global_data_summary();
-        verify_optimal_chunk_sizes(&global_data_summary.optimal_chunk_sizes)?;
-        self.global_data_summary = global_data_summary;
+        if global_data_summary.is_empty() {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_REFRESH_LOG_FREQ_SECS)),
+                info!(LogSchema::new(LogEntry::RefreshGlobalData)
+                    .message("Latest global data summary is empty."))
+            );
+        } else {
+            verify_optimal_chunk_sizes(&global_data_summary.optimal_chunk_sizes)?;
+            self.global_data_summary = global_data_summary;
+        }
+
         Ok(())
     }
 
