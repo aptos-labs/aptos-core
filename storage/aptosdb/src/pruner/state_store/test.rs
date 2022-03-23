@@ -171,12 +171,12 @@ fn test_worker_quit_eagerly() {
         );
         command_sender
             .send(Command::Prune {
-                target_db_versions: vec![1, 0, 0, 0, 0, 0],
+                target_db_versions: vec![1, 0, 0, 0, 0],
             })
             .unwrap();
         command_sender
             .send(Command::Prune {
-                target_db_versions: vec![2, 0, 0, 0, 0, 0],
+                target_db_versions: vec![2, 0, 0, 0, 0],
             })
             .unwrap();
         command_sender.send(Command::Quit).unwrap();
