@@ -94,6 +94,8 @@ In the previous code, the two important sections are the struct `MessageHolder` 
 
 Move allows for inline tests, so we add `get_message` to make retrieving the `message` convenient and a test function `sender_can_set_message` to validate an end-to-end flow. This can be validated by running `cargo test`. There is another test under `sources/HelloBlockchainTest.move` that demonstrates another method for writing tests.
 
+Tests are initiated with the command `move package test`.
+
 Note: `sender_can_set_message` is a `script` function in order to call the `script` function `set_message`.
 
 ```rust
