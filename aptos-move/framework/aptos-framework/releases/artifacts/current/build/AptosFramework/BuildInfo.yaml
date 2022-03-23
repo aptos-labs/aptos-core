@@ -108,6 +108,9 @@ compiled_package_info:
       name: Timestamp
     : CoreFramework
     ? address: "00000000000000000000000000000001"
+      name: Token
+    : AptosFramework
+    ? address: "00000000000000000000000000000001"
       name: TransactionFee
     : AptosFramework
     ? address: "00000000000000000000000000000001"
@@ -131,7 +134,7 @@ compiled_package_info:
     ? address: "00000000000000000000000000000001"
       name: Version
     : CoreFramework
-  source_digest: F1B192A69CD7E322C0A9B6260732FD5E974DA95B70352BC41D23088238803900
+  source_digest: F4F6A74AF856099D44EBF1E4E5BD79FC196DE1627114F83C4C9761FDCCF575DE
   build_flags:
     dev_mode: false
     test_mode: false
