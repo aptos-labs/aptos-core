@@ -146,6 +146,7 @@ monitoring:
     googleAuth:
     config:
     datasources: []
+    env:
 
 # if enabled, faucet_test is synchronized with cluster_test traffic
 # to prevent race on mint account
