@@ -52,7 +52,6 @@ pub fn run(
             false,                 /* readonly */
             storage_pruner_config, /* pruner */
             RocksdbConfig::default(),
-            true, /* account_count_migration */
         )
         .expect("DB should open."),
     );

@@ -172,7 +172,6 @@ fn main() {
         true,                        /* readonly */
         NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
         RocksdbConfig::default(),
-        true, /* account_count_migration, ignored anyway */
     )
     .expect("Unable to open AptosDB");
     info!("DB opened successfully.");

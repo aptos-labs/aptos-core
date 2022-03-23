@@ -207,10 +207,7 @@ where
 
         let mut current_node_key = NodeKey::new_empty_path(version);
         let mut current_node = reader.get_node(&current_node_key)?;
-        let total_leaves = current_node
-            .leaf_count()
-            .ok_or_else(|| format_err!("Leaf counts not available."))?;
-        if start_idx >= total_leaves {
+        if start_idx >= current_node.leaf_count() {
             return Ok(Self {
                 reader,
                 version,
@@ -263,7 +260,7 @@ where
         target_leaf_idx: usize,
     ) -> Result<(Nibble, &'a Child)> {
         for (nibble, child) in internal_node.children_sorted() {
-            let child_leaf_count = child.leaf_count().expect("Leaf count available.");
+            let child_leaf_count = child.leaf_count();
             // n.b. The index is 0-based, so to reach leaf at N, N previous ones need to be skipped.
             if *leaves_skipped + child_leaf_count <= target_leaf_idx {
                 *leaves_skipped += child_leaf_count;

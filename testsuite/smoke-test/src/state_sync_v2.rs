@@ -36,7 +36,6 @@ async fn test_full_node_bootstrap_accounts() {
     // per storage request).
     let validator = swarm.validators_mut().next().unwrap();
     let mut config = validator.config().clone();
-    config.storage.account_count_migration = true;
     config
         .state_sync
         .storage_service

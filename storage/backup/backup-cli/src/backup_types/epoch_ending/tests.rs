@@ -83,7 +83,6 @@ fn end_to_end() {
                 trusted_waypoints: TrustedWaypointOpt::default(),
                 rocksdb_opt: RocksdbOpt::default(),
                 concurernt_downloads: ConcurrentDownloadsOpt::default(),
-                account_count_migration: true,
             }
             .try_into()
             .unwrap(),
@@ -215,7 +214,6 @@ async fn test_trusted_waypoints_impl(
             trusted_waypoints: TrustedWaypointOpt::default(),
             rocksdb_opt: RocksdbOpt::default(),
             concurernt_downloads: ConcurrentDownloadsOpt::default(),
-            account_count_migration: true,
         }
         .try_into()
         .unwrap(),
@@ -236,7 +234,6 @@ async fn test_trusted_waypoints_impl(
             },
             rocksdb_opt: RocksdbOpt::default(),
             concurernt_downloads: ConcurrentDownloadsOpt::default(),
-            account_count_migration: true,
         }
         .try_into()
         .unwrap(),

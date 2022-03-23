@@ -24,7 +24,6 @@ impl DBDebuggerInterface {
             true,
             NO_OP_STORAGE_PRUNER_CONFIG,
             RocksdbConfig::default(),
-            true, /* account_count_migration, ignored anyway */
         )?)))
     }
 }

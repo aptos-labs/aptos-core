@@ -49,17 +49,6 @@ fn gen_leaf_keys(
     (NodeKey::new(version, np), account_key)
 }
 
-fn to_legacy_internal(node: InternalNode) -> InternalNode {
-    let mut children = node.children;
-    children.iter_mut().for_each(|(_, mut child)| {
-        if matches!(child.node_type, NodeType::Internal { .. }) {
-            child.node_type = NodeType::InternalLegacy
-        }
-    });
-
-    InternalNode::new_migration(children, false /* leaf_count_migration */)
-}
-
 #[test]
 fn test_encode_decode() {
     let internal_node_key = random_63nibbles_node_key();
@@ -114,13 +103,8 @@ proptest! {
     #[test]
     fn test_internal_node_roundtrip(input in any::<InternalNode>()) {
         let mut vec = vec![];
-        input.serialize(&mut vec, false /* persist_leaf_count */).unwrap();
-        let deserialized = InternalNode::deserialize(&vec, false /* read_leaf_count */).unwrap();
-        assert_eq!(deserialized, to_legacy_internal(input.clone()));
-
-        let mut vec = vec![];
-        input.serialize(&mut vec, true /* persist_leaf_count */).unwrap();
-        let deserialized = InternalNode::deserialize(&vec, true /* read_leaf_count */).unwrap();
+        input.serialize(&mut vec).unwrap();
+        let deserialized = InternalNode::deserialize(&vec).unwrap();
         assert_eq!(deserialized, input);
     }
 }
@@ -339,8 +323,8 @@ proptest! {
         let hash3 = HashValue::random();
         let hash4 = HashValue::random();
         children.insert(index1, Child::new(hash1, 0, NodeType::Leaf));
-        children.insert(2.into(), Child::new(hash2, 1, NodeType::InternalLegacy));
-        children.insert(7.into(), Child::new(hash3, 2, NodeType::InternalLegacy));
+        children.insert(2.into(), Child::new(hash2, 1, NodeType::Internal {leaf_count: 2}));
+        children.insert(7.into(), Child::new(hash3, 2, NodeType::Internal {leaf_count: 3}));
         children.insert(index2, Child::new(hash4, 3, NodeType::Leaf));
         let internal_node = InternalNode::new(children);
         // Internal node (B) will have a structure below
@@ -469,11 +453,19 @@ fn test_internal_hash_and_proof() {
         .0;
         children.insert(
             index1,
-            Child::new(hash1, 0 /* version */, NodeType::InternalLegacy),
+            Child::new(
+                hash1,
+                0, /* version */
+                NodeType::Internal { leaf_count: 1 },
+            ),
         );
         children.insert(
             index2,
-            Child::new(hash2, 1 /* version */, NodeType::InternalLegacy),
+            Child::new(
+                hash2,
+                1, /* version */
+                NodeType::Internal { leaf_count: 1 },
+            ),
         );
         let internal_node = InternalNode::new(children);
         // Internal node (B) will have a structure below
@@ -609,11 +601,19 @@ fn test_internal_hash_and_proof() {
 
         children.insert(
             index1,
-            Child::new(hash1, 0 /* version */, NodeType::InternalLegacy),
+            Child::new(
+                hash1,
+                0, /* version */
+                NodeType::Internal { leaf_count: 1 },
+            ),
         );
         children.insert(
             index2,
-            Child::new(hash2, 1 /* version */, NodeType::InternalLegacy),
+            Child::new(
+                hash2,
+                1, /* version */
+                NodeType::Internal { leaf_count: 1 },
+            ),
         );
         let internal_node = InternalNode::new(children);
         // Internal node will have a structure below

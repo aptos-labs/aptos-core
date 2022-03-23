@@ -249,11 +249,7 @@ impl AptosDB {
         ]
     }
 
-    fn new_with_db(
-        db: DB,
-        storage_pruner_config: StoragePrunerConfig,
-        account_count_migration: bool,
-    ) -> Self {
+    fn new_with_db(db: DB, storage_pruner_config: StoragePrunerConfig) -> Self {
         let db = Arc::new(db);
         let transaction_store = Arc::new(TransactionStore::new(Arc::clone(&db)));
         let event_store = Arc::new(EventStore::new(Arc::clone(&db)));
@@ -264,7 +260,7 @@ impl AptosDB {
             db: Arc::clone(&db),
             event_store: Arc::clone(&event_store),
             ledger_store: Arc::clone(&ledger_store),
-            state_store: Arc::new(StateStore::new(Arc::clone(&db), account_count_migration)),
+            state_store: Arc::new(StateStore::new(Arc::clone(&db))),
             transaction_store: Arc::clone(&transaction_store),
             system_store: Arc::clone(&system_store),
             rocksdb_property_reporter: RocksdbPropertyReporter::new(Arc::clone(&db)),
@@ -286,7 +282,6 @@ impl AptosDB {
         readonly: bool,
         storage_pruner_config: StoragePrunerConfig,
         rocksdb_config: RocksdbConfig,
-        account_count_migration: bool, // ignored when opening readonly
     ) -> Result<Self> {
         ensure!(
             storage_pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
@@ -298,31 +293,25 @@ impl AptosDB {
 
         let mut rocksdb_opts = gen_rocksdb_options(&rocksdb_config);
 
-        let (db, account_count_migration) = if readonly {
-            (
-                DB::open_readonly(
-                    path.clone(),
-                    "aptosdb_ro",
-                    Self::column_families(),
-                    &rocksdb_opts,
-                )?,
-                true,
-            )
+        let db = if readonly {
+            DB::open_readonly(
+                path.clone(),
+                "aptosdb_ro",
+                Self::column_families(),
+                &rocksdb_opts,
+            )?
         } else {
             rocksdb_opts.create_if_missing(true);
             rocksdb_opts.create_missing_column_families(true);
-            (
-                DB::open(
-                    path.clone(),
-                    "aptosdb",
-                    Self::column_families(),
-                    &rocksdb_opts,
-                )?,
-                account_count_migration,
-            )
+            DB::open(
+                path.clone(),
+                "aptosdb",
+                Self::column_families(),
+                &rocksdb_opts,
+            )?
         };
 
-        let ret = Self::new_with_db(db, storage_pruner_config, account_count_migration);
+        let ret = Self::new_with_db(db, storage_pruner_config);
         info!(
             path = path,
             time_ms = %instant.elapsed().as_millis(),
@@ -351,7 +340,6 @@ impl AptosDB {
                 &rocksdb_opts,
             )?,
             NO_OP_STORAGE_PRUNER_CONFIG,
-            true, // account_count_migration
         ))
     }
 
@@ -363,7 +351,6 @@ impl AptosDB {
             false,                       /* readonly */
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
             RocksdbConfig::default(),
-            true, /* account_count_migration */
         )
         .expect("Unable to open AptosDB")
     }
@@ -1198,14 +1185,7 @@ impl DbReader for AptosDB {
 
     fn get_account_count(&self, version: Version) -> Result<usize> {
         gauged_api("get_account_count", || {
-            self.state_store
-                .get_account_count(version)
-                .and_then(|count| {
-                    count.ok_or_else(|| {
-                        AptosDbError::NotFound(format!("Account count at version {}", version))
-                            .into()
-                    })
-                })
+            self.state_store.get_account_count(version)
         })
     }
 
@@ -1343,8 +1323,7 @@ impl DbWriter for AptosDB {
                 DIEM_STORAGE_LATEST_ACCOUNT_COUNT.set(
                     self.state_store
                         .get_account_count(last_version)
-                        .map(|opt| opt.map_or(-1, |n| n as i64))
-                        .unwrap_or(-2),
+                        .map_or(-1, |c| c as i64),
                 );
 
                 self.wake_pruner(last_version);

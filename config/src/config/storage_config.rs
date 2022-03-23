@@ -46,13 +46,6 @@ pub struct StorageConfig {
     pub timeout_ms: u64,
     /// Rocksdb-specific configurations
     pub rocksdb_config: RocksdbConfig,
-    /// If enabled, leaf counts of the children of a JellyfishMerkelTree internal node are written
-    /// down.
-    /// This is supposed to be enabled after other aspects of the new release has been confirmed
-    /// safe. And once enabled, an older node won't be able to read the state DB, unless the DB is
-    /// wiped and re-synced.
-    #[serde(default)]
-    pub account_count_migration: bool,
 }
 
 pub const NO_OP_STORAGE_PRUNER_CONFIG: StoragePrunerConfig = StoragePrunerConfig {
@@ -113,7 +106,6 @@ impl Default for StorageConfig {
             // Default read/write/connection timeout, in milliseconds
             timeout_ms: 30_000,
             rocksdb_config: RocksdbConfig::default(),
-            account_count_migration: false,
         }
     }
 }

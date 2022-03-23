@@ -201,7 +201,6 @@ mod tests {
             false,
             NO_OP_STORAGE_PRUNER_CONFIG,
             RocksdbConfig::default(),
-            true,
         )
         .unwrap();
         let (_, db_rw) = DbReaderWriter::wrap(db);

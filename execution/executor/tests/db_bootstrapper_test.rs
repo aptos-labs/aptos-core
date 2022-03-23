@@ -251,9 +251,7 @@ fn restore_state_to_db(
     version: Version,
 ) {
     let rh = db.get_restore_handler();
-    let mut receiver = rh
-        .get_state_restore_receiver(version, root_hash, true /* account_count_migration */)
-        .unwrap();
+    let mut receiver = rh.get_state_restore_receiver(version, root_hash).unwrap();
     for (chunk, proof) in vec![(accounts, proof)].into_iter() {
         receiver.add_chunk(chunk, proof).unwrap();
     }

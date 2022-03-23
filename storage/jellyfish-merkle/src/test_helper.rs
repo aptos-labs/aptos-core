@@ -353,5 +353,5 @@ pub fn test_get_leaf_count(keys: HashSet<HashValue>) {
     let kvs = keys.into_iter().map(|k| (k, ValueBlob(vec![]))).collect();
     let (db, version) = init_mock_db(&kvs);
     let tree = JellyfishMerkleTree::new(&db);
-    assert_eq!(tree.get_leaf_count(version).unwrap().unwrap(), kvs.len())
+    assert_eq!(tree.get_leaf_count(version).unwrap(), kvs.len())
 }

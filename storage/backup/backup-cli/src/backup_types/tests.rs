@@ -113,7 +113,6 @@ fn test_end_to_end_impl(d: TestData) {
         trusted_waypoints: TrustedWaypointOpt::default(),
         rocksdb_opt: RocksdbOpt::default(),
         concurernt_downloads: ConcurrentDownloadsOpt::default(),
-        account_count_migration: true,
     }
     .try_into()
     .unwrap();

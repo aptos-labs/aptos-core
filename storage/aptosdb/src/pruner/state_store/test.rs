@@ -49,7 +49,7 @@ fn test_state_store_pruner() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let db = aptos_db.db;
-    let state_store = &StateStore::new(Arc::clone(&db), true /* account_count_migration */);
+    let state_store = &StateStore::new(Arc::clone(&db));
     let transaction_store = &aptos_db.transaction_store;
     let pruner = Pruner::new(
         Arc::clone(&db),
@@ -137,7 +137,7 @@ fn test_worker_quit_eagerly() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let db = aptos_db.db;
-    let state_store = &StateStore::new(Arc::clone(&db), true /* account_count_migration */);
+    let state_store = &StateStore::new(Arc::clone(&db));
 
     let _root0 = put_account_state_set(
         &db,

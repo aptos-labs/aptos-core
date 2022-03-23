@@ -230,7 +230,6 @@ impl<'a, V> std::iter::Iterator for NibbleRangeIterator<'a, V> {
 /// The Jellyfish Merkle tree data structure. See [`crate`] for description.
 pub struct JellyfishMerkleTree<'a, R, V> {
     reader: &'a R,
-    leaf_count_migration: bool,
     phantom_value: PhantomData<V>,
 }
 
@@ -240,19 +239,9 @@ where
     V: Value,
 {
     /// Creates a `JellyfishMerkleTree` backed by the given [`TreeReader`](trait.TreeReader.html).
-    #[cfg(any(test, feature = "fuzzing"))]
     pub fn new(reader: &'a R) -> Self {
         Self {
             reader,
-            leaf_count_migration: true,
-            phantom_value: PhantomData,
-        }
-    }
-
-    pub fn new_migration(reader: &'a R, leaf_count_migration: bool) -> Self {
-        Self {
-            reader,
-            leaf_count_migration,
             phantom_value: PhantomData,
         }
     }
@@ -381,8 +370,7 @@ where
                         ),
                     );
                 }
-                let new_internal_node =
-                    InternalNode::new_migration(children, self.leaf_count_migration);
+                let new_internal_node = InternalNode::new(children);
 
                 node_key.set_version(version);
 
@@ -487,8 +475,7 @@ where
                 tree_cache.put_node(existing_leaf_node_key, existing_leaf_node.into())?;
             }
 
-            let new_internal_node =
-                InternalNode::new_migration(children, self.leaf_count_migration);
+            let new_internal_node = InternalNode::new(children);
 
             tree_cache.put_node(node_key.clone(), new_internal_node.clone().into())?;
             Ok((node_key, new_internal_node.into()))
@@ -530,8 +517,7 @@ where
                     ),
                 );
             }
-            let new_internal_node =
-                InternalNode::new_migration(children, self.leaf_count_migration);
+            let new_internal_node = InternalNode::new(children);
 
             tree_cache.put_node(node_key.clone(), new_internal_node.clone().into())?;
             Ok((node_key, new_internal_node.into()))
@@ -736,7 +722,7 @@ where
             child_index,
             Child::new(new_child_node.hash(), version, new_child_node.node_type()),
         );
-        let new_internal_node = InternalNode::new_migration(children, self.leaf_count_migration);
+        let new_internal_node = InternalNode::new(children);
 
         node_key.set_version(version);
 
@@ -830,7 +816,7 @@ where
             Child::new(new_leaf_node.hash(), version, NodeType::Leaf),
         );
 
-        let internal_node = InternalNode::new_migration(children, self.leaf_count_migration);
+        let internal_node = InternalNode::new(children);
         let mut next_internal_node: Node<V> = internal_node.clone().into();
         tree_cache.put_node(node_key.clone(), internal_node.into())?;
 
@@ -848,7 +834,7 @@ where
                     next_internal_node.node_type(),
                 ),
             );
-            let internal_node = InternalNode::new_migration(children, self.leaf_count_migration);
+            let internal_node = InternalNode::new(children);
             next_internal_node = internal_node.clone().into();
             tree_cache.put_node(node_key.clone(), internal_node.into())?;
         }
@@ -996,16 +982,8 @@ where
         Ok(self.get_root_node_option(version)?.map(|n| n.hash()))
     }
 
-    pub fn get_leaf_count(&self, version: Version) -> Result<Option<usize>> {
-        if self.leaf_count_migration {
-            self.get_root_node(version).map(|n| n.leaf_count())
-        } else {
-            // When all children of an internal node are leaves, the leaf count is accessible
-            // even if the migration haven't started. In fact, in such a case, there's no difference
-            // in the old and new serialization format. Forcing it None here just to make the tests
-            // straightforward.
-            Ok(None)
-        }
+    pub fn get_leaf_count(&self, version: Version) -> Result<usize> {
+        self.get_root_node(version).map(|n| n.leaf_count())
     }
 }
 

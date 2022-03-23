@@ -31,7 +31,6 @@ pub fn init_db_and_executor(config: &NodeConfig) -> (Arc<dyn DbReader>, BlockExe
             false,                       /* readonly */
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
             RocksdbConfig::default(),
-            true, /* account_count_migration */
         )
         .expect("DB should open."),
     );
@@ -60,7 +59,6 @@ pub fn run_benchmark(
         true,                        /* readonly */
         NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
         RocksdbConfig::default(),
-        true, /* account_count_migration */
     )
     .expect("db open failure.")
     .create_checkpoint(checkpoint_dir.as_ref().join("aptosdb"))

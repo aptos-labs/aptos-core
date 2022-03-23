@@ -25,7 +25,6 @@ impl Aptossum {
             true,                        /* read only */
             NO_OP_STORAGE_PRUNER_CONFIG, /* no prune_window */
             RocksdbConfig::default(),
-            true, /* account_count_migration, ignored anyway */
         )?;
         Ok(Aptossum { db })
     }

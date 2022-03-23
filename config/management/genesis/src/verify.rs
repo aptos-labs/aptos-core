@@ -214,7 +214,6 @@ fn compute_genesis(
         false,
         NO_OP_STORAGE_PRUNER_CONFIG,
         RocksdbConfig::default(),
-        true, /* account_count_migration */
     )
     .map_err(|e| Error::UnexpectedError(e.to_string()))?;
     let db_rw = DbReaderWriter::new(aptosdb);
