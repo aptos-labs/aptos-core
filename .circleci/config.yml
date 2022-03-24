@@ -184,42 +184,34 @@ jobs:
             "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/issues/${PR_NUMBER}/comments"
             exit 0
 
-  # a dummy job so that we can require a certain branch
-  require-branch:
-    machine:
-      image: ubuntu-2004:current
-    steps:
-      - run: echo "hello from branch ${CIRCLE_BRANCH}"
 workflows:
+  ### on bors action ###
+  # Build the PR binaries and run various tests
+  # Build the Docker images and run Forge tests
   build-test-deploy:
+    when:
+      condition:
+        or:
+        - equal: [ auto, << pipeline.git.branch >> ]
+        - equal: [ canary, << pipeline.git.branch >> ]
     jobs:
 #      - build-benchmarks
       - crypto
       - e2e-test
       - lint
       - unit-test
-      ### bors-controlled workflows ###
-      - require-branch:
-          filters:
-            branches:
-              only:
-                - auto
-                - canary
       - docker-build-push:
           context: aws-dev
-          requires:
-            - require-branch
       - forge-k8s:
           context: aws-dev
           requires:
             - docker-build-push
+  ### on devnet branch update ###
+  # Ensure the latest is built on the "devnet" branch, and mirror from ECR to Dockerhub
   devnet-branch-cut:
+    when:
+      equal: [ devnet, << pipeline.git.branch >> ]
     jobs:
-      - require-branch:
-          filters:
-            branches:
-              only:
-                - devnet
       - docker-build-push:
           context: aws-dev
           addl_tag: devnet
@@ -232,29 +224,24 @@ workflows:
           addl_tag: devnet
           requires:
             - docker-build-push
-  ### Automated workflows
+  ### on continuous_push scheduled pipeline ###
+  # Build the latest on "main" branch
   continuous-push:
-    triggers:
-      - schedule:
-          # every 4 hours
-          cron: "15 0,4,8,12,16,20 * * *"
-          filters:
-            branches:
-              only:
-                - main
+    when:
+      and:
+      - equal: [ scheduled_pipeline, << pipeline.trigger_source >> ]
+      - equal: [ "continuous_push", << pipeline.schedule.name >> ]
     jobs:
       - docker-build-push:
           context: aws-dev
           addl_tag: main
+  ### on nightly scheduled pipeline ###
+  # Ensure the latest on "main" branch is built, and mirror from ECR to Dockerhub
   nightly:
-    triggers:
-      - schedule:
-          # weekday 9:31AM PST
-          cron: "31 16 * * 1,2,3,4,5"
-          filters:
-            branches:
-              only:
-                - main
+    when:
+      and:
+      - equal: [ scheduled_pipeline, << pipeline.trigger_source >> ]
+      - equal: [ "nightly", << pipeline.schedule.name >> ]
     jobs:
       - docker-build-push:
           context: aws-dev
@@ -274,11 +261,13 @@ commands:
       - run: sudo apt-get install build-essential ca-certificates clang curl git libssl-dev pkg-config --no-install-recommends --assume-yes
       - run: curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
       - run: cat $HOME/.cargo/env >> $BASH_ENV
+  ### Sets up the permissions required for accessing AWS resources
   aws-setup:
     steps:
       - aws-cli/install
-      # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
+      # uses envs AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
       - aws-cli/setup
+  ### Sets up the permissions for using AWS ECR from Docker
   aws-ecr-setup:
     steps:
       - run:
@@ -286,6 +275,7 @@ commands:
           command: |
             echo 'export AWS_ECR_ACCOUNT_URL="${AWS_ECR_ACCOUNT_NUM}.dkr.ecr.${AWS_REGION}.amazonaws.com"' >> $BASH_ENV
       - aws-ecr/ecr-login
+  ### Sets up the permissions for using Dockerhub
   dockerhub-setup:
     steps:
       - run:
