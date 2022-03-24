@@ -242,9 +242,27 @@ Make sure the port number you put in the address matches the one you have in the
   role: "Upstream"
 ```
 
+## Update Fullnode With New Release
+
+When `devnet` is wiped and released with newer version, you will need to update fullnode as well, to ensure it can keep syncing with the new network. General steps to take:
+1. Shutdown your fullnode
+
+2. Delete the data folder (the directory path is what you specified in the `public_full_node.yaml` file), default is `/opt/aptos/data`
+
+3. Delete the `genesis.blob` file
+
+4. Get the new [genesis][devnet_genesis] and [waypoint][devnet_waypoint]
+
+5. Update the `public_full_node.yaml` with new waypoint
+
+6. Restart the fullnode
+
+7. See the "Initial synchronization" section above for checking if the node is state syncing again. You can compare your version with the [status dashboard]. A few versions different is okay, since our dashboard updates every minute.
+
 [pfn_config_file]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/public_full_node.yaml
 [pfn_docker_compose]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/docker-compose.yaml
 [rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api
 [devnet_genesis]: https://devnet.aptoslabs.com/genesis.blob
 [devnet_waypoint]: https://devnet.aptoslabs.com/waypoint.txt
 [aptos-labs/aptos-core]: https://github.com/aptos-labs/aptos-core.git
+[status dashboard]: https://status.devnet.aptos.dev
