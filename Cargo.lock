@@ -3150,6 +3150,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "aptos-config",
+ "aptos-framework-releases",
  "aptos-genesis-tool",
  "aptos-logger",
  "aptos-rest-client",
@@ -3161,7 +3162,6 @@ dependencies = [
  "async-trait",
  "base64",
  "debug-interface",
- "diem-framework-releases",
  "futures",
  "hyper",
  "hyper-proxy",

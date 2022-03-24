@@ -9,8 +9,6 @@ mod network;
 pub use network::*;
 mod test;
 pub use test::*;
-mod public;
-pub use public::*;
 mod factory;
 pub use factory::*;
 mod swarm;

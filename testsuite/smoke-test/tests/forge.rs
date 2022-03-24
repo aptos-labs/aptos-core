@@ -9,7 +9,7 @@ use smoke_test::{
 
 fn main() -> Result<()> {
     let tests = ForgeConfig::default()
-        .with_public_usage_tests(&[&GetIndex, &rest_api::BasicClient])
+        .with_aptos_tests(&[&GetIndex, &rest_api::BasicClient])
         //TODO Re-enable these tests once we fix how the move compiler is invoked
         // .with_admin_tests(&[&MalformedScript, &ExecuteCustomModuleAndScript])
         .with_network_tests(&[&LaunchFullnode]);

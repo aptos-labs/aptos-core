@@ -39,7 +39,7 @@ url = "2.2.2"
 
 debug-interface = { path = "../../crates/debug-interface" }
 aptos-config = { path = "../../config" }
-diem-framework-releases = { path = "../../aptos-move/framework/DPN/releases" }
+aptos-framework-releases = { path = "../../aptos-move/framework/aptos-framework/releases" }
 aptos-genesis-tool = { path = "../../config/management/genesis" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-retrier = { path = "../../crates/aptos-retrier" }

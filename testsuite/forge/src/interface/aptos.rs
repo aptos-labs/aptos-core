@@ -68,7 +68,7 @@ impl<'t> AptosContext<'t> {
     }
 
     pub fn transaction_factory(&self) -> TransactionFactory {
-        TransactionFactory::new(self.chain_id())
+        TransactionFactory::new(self.chain_id()).with_gas_unit_price(1)
     }
 
     pub fn aptos_transaction_factory(&self) -> TransactionFactory {

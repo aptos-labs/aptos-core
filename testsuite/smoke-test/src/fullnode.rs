@@ -6,7 +6,8 @@ use std::time::{Duration, Instant};
 use anyhow::bail;
 use aptos_config::config::NodeConfig;
 use aptos_rest_client::Client as RestClient;
-use aptos_sdk::{transaction_builder::Currency, types::LocalAccount};
+use aptos_sdk::types::LocalAccount;
+use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
 use forge::{NetworkContext, NetworkTest, NodeExt, Result, Test};
 use tokio::runtime::Runtime;
@@ -41,44 +42,32 @@ impl LaunchFullnode {
 
         let client = fullnode.rest_client();
 
-        let factory = ctx.swarm().chain_info().transaction_factory();
         let mut account1 = LocalAccount::generate(ctx.core().rng());
         let account2 = LocalAccount::generate(ctx.core().rng());
 
-        ctx.swarm()
-            .chain_info()
-            .create_parent_vasp_account(Currency::XUS, account1.authentication_key())
+        let mut chain_info = ctx.swarm().chain_info().into_aptos_public_info();
+        let factory = chain_info.transaction_factory();
+        chain_info
+            .create_user_account(account1.public_key())
             .await?;
-        ctx.swarm()
-            .chain_info()
-            .fund(Currency::XUS, account1.address(), 100)
-            .await?;
-        ctx.swarm()
-            .chain_info()
-            .create_parent_vasp_account(Currency::XUS, account2.authentication_key())
+        chain_info.mint(account1.address(), 1000).await?;
+        chain_info
+            .create_user_account(account2.public_key())
             .await?;
 
         wait_for_account(&client, account1.address()).await?;
 
-        let txn = account1.sign_with_transaction_builder(factory.peer_to_peer(
-            Currency::XUS,
-            account2.address(),
-            10,
+        let txn = account1.sign_with_transaction_builder(factory.payload(
+            aptos_stdlib::encode_transfer_script_function(account2.address(), 10),
         ));
 
         client.submit_and_wait(&txn).await?;
-        let balances = client
-            .get_dpn_account_balances(account1.address())
+        let balance = client
+            .get_account_balance(account2.address())
             .await?
             .into_inner();
 
-        assert_eq!(
-            vec![(90, "XUS".to_string())],
-            balances
-                .into_iter()
-                .map(|b| (b.amount, b.currency_code()))
-                .collect::<Vec<(u64, String)>>()
-        );
+        assert_eq!(balance.get(), 10);
 
         Ok(())
     }

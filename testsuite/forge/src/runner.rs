@@ -106,7 +106,6 @@ pub enum InitialVersion {
 
 pub struct ForgeConfig<'cfg> {
     aptos_tests: &'cfg [&'cfg dyn AptosTest],
-    public_usage_tests: &'cfg [&'cfg dyn PublicUsageTest],
     nft_public_usage_tests: &'cfg [&'cfg dyn NFTPublicUsageTest],
     admin_tests: &'cfg [&'cfg dyn AdminTest],
     network_tests: &'cfg [&'cfg dyn NetworkTest],
@@ -124,14 +123,6 @@ pub struct ForgeConfig<'cfg> {
 impl<'cfg> ForgeConfig<'cfg> {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn with_public_usage_tests(
-        mut self,
-        public_usage_tests: &'cfg [&'cfg dyn PublicUsageTest],
-    ) -> Self {
-        self.public_usage_tests = public_usage_tests;
-        self
     }
 
     pub fn with_nft_public_usage_tests(
@@ -178,18 +169,16 @@ impl<'cfg> ForgeConfig<'cfg> {
     }
 
     pub fn number_of_tests(&self) -> usize {
-        self.public_usage_tests.len()
-            + self.admin_tests.len()
+        self.admin_tests.len()
             + self.network_tests.len()
             + self.nft_public_usage_tests.len()
             + self.aptos_tests.len()
     }
 
     pub fn all_tests(&self) -> impl Iterator<Item = &'cfg dyn Test> + 'cfg {
-        self.public_usage_tests
+        self.admin_tests
             .iter()
             .map(|t| t as &dyn Test)
-            .chain(self.admin_tests.iter().map(|t| t as &dyn Test))
             .chain(self.network_tests.iter().map(|t| t as &dyn Test))
             .chain(self.nft_public_usage_tests.iter().map(|t| t as &dyn Test))
             .chain(self.aptos_tests.iter().map(|t| t as &dyn Test))
@@ -200,7 +189,6 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
     fn default() -> Self {
         Self {
             aptos_tests: &[],
-            public_usage_tests: &[],
             nft_public_usage_tests: &[],
             admin_tests: &[],
             network_tests: &[],
@@ -292,17 +280,6 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 &genesis_version,
                 self.tests.genesis_config.as_ref(),
             ))?;
-
-            // Run PublicUsageTests
-            for test in self.filter_tests(self.tests.public_usage_tests.iter()) {
-                let mut public_ctx = PublicUsageContext::new(
-                    CoreContext::from_rng(&mut rng),
-                    swarm.chain_info().into_public_info(),
-                    &mut report,
-                );
-                let result = run_test(|| test.run(&mut public_ctx));
-                summary.handle_result(test.name().to_owned(), result)?;
-            }
 
             // Run NFTPublicUsageTests
             if !self.tests.nft_public_usage_tests.is_empty() {

@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_rest_client::Client;
-use aptos_sdk::types::account_config::testnet_dd_account_address;
-use forge::{PublicUsageContext, PublicUsageTest, Result, Test};
+use aptos_transaction_builder::aptos_stdlib;
+use aptos_types::account_config::aptos_root_address;
+use forge::{AptosContext, AptosTest, Result, Test};
 
 pub struct GetIndex;
 
@@ -13,9 +13,10 @@ impl Test for GetIndex {
     }
 }
 
-impl PublicUsageTest for GetIndex {
-    fn run<'t>(&self, ctx: &mut PublicUsageContext<'t>) -> Result<()> {
-        let resp = reqwest::blocking::get(ctx.rest_api_url().to_owned())?;
+#[async_trait::async_trait]
+impl AptosTest for GetIndex {
+    async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
+        let resp = reqwest::get(ctx.url().to_owned()).await?;
         assert_eq!(reqwest::StatusCode::OK, resp.status());
 
         Ok(())
@@ -30,33 +31,21 @@ impl Test for BasicClient {
     }
 }
 
-impl PublicUsageTest for BasicClient {
-    fn run<'t>(&self, ctx: &mut PublicUsageContext<'t>) -> Result<()> {
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()?;
-        runtime.block_on(self.async_run(ctx))
-    }
-}
-
-impl BasicClient {
-    async fn async_run(&self, ctx: &mut PublicUsageContext<'_>) -> Result<()> {
-        let client = Client::new(reqwest::Url::parse(ctx.rest_api_url()).unwrap());
+#[async_trait::async_trait]
+impl AptosTest for BasicClient {
+    async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
+        let client = ctx.client();
         client.get_ledger_information().await?;
 
         let mut account1 = ctx.random_account();
-        ctx.create_parent_vasp_account(account1.authentication_key())
-            .await?;
-        ctx.fund(account1.address(), 10).await?;
+        ctx.create_user_account(account1.public_key()).await?;
+        ctx.mint(account1.address(), 1000).await?;
         let account2 = ctx.random_account();
-        ctx.create_parent_vasp_account(account2.authentication_key())
-            .await?;
-        ctx.fund(account2.address(), 10).await?;
+        ctx.create_user_account(account2.public_key()).await?;
+        ctx.mint(account2.address(), 1000).await?;
 
-        let tx = account1.sign_with_transaction_builder(ctx.transaction_factory().peer_to_peer(
-            aptos_sdk::transaction_builder::Currency::XUS,
-            account2.address(),
-            1,
+        let tx = account1.sign_with_transaction_builder(ctx.transaction_factory().payload(
+            aptos_stdlib::encode_transfer_script_function(account2.address(), 1),
         ));
         let pending_txn = client.submit(&tx).await.unwrap().into_inner();
 
@@ -68,7 +57,7 @@ impl BasicClient {
             .unwrap();
 
         client
-            .get_account_resources(testnet_dd_account_address())
+            .get_account_resources(aptos_root_address())
             .await
             .unwrap();
 
