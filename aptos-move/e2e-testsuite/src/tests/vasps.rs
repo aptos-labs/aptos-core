@@ -28,7 +28,7 @@ fn valid_creator_already_vasp() {
         executor.execute_and_apply(
             treasury_compliance
                 .transaction()
-                .script(encode_create_parent_vasp_account_script(
+                .payload(encode_create_parent_vasp_account_script_function(
                     account_config::xus_tag(),
                     0,
                     *account.address(),
@@ -74,7 +74,7 @@ fn max_child_accounts_for_vasp_recovery_address() {
         executor.execute_and_apply(
             treasury_compliance
                 .transaction()
-                .script(encode_create_parent_vasp_account_script(
+                .payload(encode_create_parent_vasp_account_script_function(
                     account_config::xus_tag(),
                     0,
                     *account.address(),
@@ -97,7 +97,7 @@ fn max_child_accounts_for_vasp_recovery_address() {
             block.push(
                 account
                     .transaction()
-                    .script(encode_create_child_vasp_account_script(
+                    .payload(encode_create_child_vasp_account_script_function(
                         account_config::xus_tag(),
                         *child.address(),
                         child.auth_key_prefix(),
@@ -120,7 +120,7 @@ fn max_child_accounts_for_vasp_recovery_address() {
         executor.execute_and_apply(
             recovery_account
                 .transaction()
-                .script(encode_create_recovery_address_script())
+                .payload(encode_create_recovery_address_script_function())
                 .sequence_number(0)
                 .sign(),
         );
@@ -131,7 +131,7 @@ fn max_child_accounts_for_vasp_recovery_address() {
             .map(|account| {
                 account
                     .transaction()
-                    .script(encode_add_recovery_rotation_capability_script(
+                    .payload(encode_add_recovery_rotation_capability_script_function(
                         *recovery_account.address(),
                     ))
                     .sequence_number(0)
@@ -149,7 +149,7 @@ fn max_child_accounts_for_vasp_recovery_address() {
         let output = executor.execute_transaction(
             one_account_too_many
                 .transaction()
-                .script(encode_add_recovery_rotation_capability_script(
+                .payload(encode_add_recovery_rotation_capability_script_function(
                     *recovery_account.address(),
                 ))
                 .sequence_number(0)
@@ -171,8 +171,8 @@ fn max_child_accounts_for_vasp_recovery_address() {
                 let new_key_hash = AuthenticationKey::ed25519(&pubkey).to_vec();
                 account
                     .transaction()
-                    .script(
-                        encode_rotate_authentication_key_with_recovery_address_script(
+                    .payload(
+                        encode_rotate_authentication_key_with_recovery_address_script_function(
                             *recovery_account.address(),
                             *account.address(),
                             new_key_hash,

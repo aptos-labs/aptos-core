@@ -11,7 +11,7 @@ use aptos_crypto::{
 use aptos_infallible::RwLock;
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_time_service::TimeService;
-use aptos_transaction_builder::stdlib::encode_peer_to_peer_with_metadata_script;
+use aptos_transaction_builder::stdlib::encode_peer_to_peer_with_metadata_script_function;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::xus_tag,
@@ -26,7 +26,6 @@ use aptos_types::{
     test_helpers::transaction_test_helpers::get_test_signed_txn,
     transaction::{
         authenticator::AuthenticationKey, SignedTransaction, Transaction, TransactionListWithProof,
-        TransactionPayload,
     },
     validator_config::ValidatorConfig,
     validator_info::ValidatorInfo,
@@ -726,7 +725,7 @@ impl MockStorage {
     fn gen_mock_user_txn() -> Transaction {
         let sender = AccountAddress::random();
         let receiver = AuthenticationKey::random();
-        let program = encode_peer_to_peer_with_metadata_script(
+        let program = encode_peer_to_peer_with_metadata_script_function(
             xus_tag(),
             receiver.derived_address(),
             1,
@@ -738,7 +737,7 @@ impl MockStorage {
             0, // sequence number
             &GENESIS_KEYPAIR.0,
             GENESIS_KEYPAIR.1.clone(),
-            Some(TransactionPayload::Script(program)),
+            Some(program),
         ))
     }
 

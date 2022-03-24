@@ -218,9 +218,10 @@ mod tests {
     use aptos_crypto::{ed25519::*, PrivateKey, Uniform};
     use aptos_infallible::RwLock;
     use aptos_transaction_builder::stdlib::{
-        encode_peer_to_peer_with_metadata_script,
-        encode_set_validator_config_and_reconfigure_script,
-        encode_update_diem_consensus_config_script_function, encode_update_diem_version_script,
+        encode_peer_to_peer_with_metadata_script_function,
+        encode_set_validator_config_and_reconfigure_script_function,
+        encode_update_diem_consensus_config_script_function,
+        encode_update_diem_version_script_function,
     };
     use aptos_types::{
         account_address::AccountAddress,
@@ -234,7 +235,7 @@ mod tests {
             ConsensusConfigV1, OnChainConfig, OnChainConsensusConfig, Version,
             ON_CHAIN_CONFIG_REGISTRY,
         },
-        transaction::{Transaction, TransactionPayload, WriteSetPayload},
+        transaction::{Transaction, WriteSetPayload},
     };
     use aptos_vm::AptosVM;
     use aptosdb::AptosDB;
@@ -694,13 +695,11 @@ mod tests {
             sequence_number,
             operator_key,
             operator_public_key,
-            Some(TransactionPayload::Script(
-                encode_set_validator_config_and_reconfigure_script(
-                    validator.data.address,
-                    new_consensus_key.to_bytes().to_vec(),
-                    Vec::new(),
-                    Vec::new(),
-                ),
+            Some(encode_set_validator_config_and_reconfigure_script_function(
+                validator.data.address,
+                new_consensus_key.to_bytes().to_vec(),
+                Vec::new(),
+                Vec::new(),
             )),
         )
     }
@@ -724,10 +723,8 @@ mod tests {
             sequence_number,
             genesis_key.clone(),
             genesis_key.public_key(),
-            Some(TransactionPayload::Script(
-                encode_update_diem_version_script(
-                    0, 7, // version
-                ),
+            Some(encode_update_diem_version_script_function(
+                0, 7, // version
             )),
         )
     }
@@ -760,14 +757,12 @@ mod tests {
             sequence_number,
             genesis_key.clone(),
             genesis_key.public_key(),
-            Some(TransactionPayload::Script(
-                encode_peer_to_peer_with_metadata_script(
-                    xus_tag(),
-                    validator_account,
-                    1_000_000,
-                    vec![],
-                    vec![],
-                ),
+            Some(encode_peer_to_peer_with_metadata_script_function(
+                xus_tag(),
+                validator_account,
+                1_000_000,
+                vec![],
+                vec![],
             )),
         )
     }

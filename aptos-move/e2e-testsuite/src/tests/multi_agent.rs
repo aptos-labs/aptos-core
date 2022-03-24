@@ -28,7 +28,7 @@ fn multi_agent_mint() {
     let dd = executor.create_raw_account();
     executor.execute_and_apply(
         tc.transaction()
-            .script(encode_create_designated_dealer_script(
+            .payload(encode_create_designated_dealer_script_function(
                 account_config::xus_tag(),
                 0,
                 *dd.address(),
@@ -44,7 +44,7 @@ fn multi_agent_mint() {
     let vasp = executor.create_raw_account();
     executor.execute_and_apply(
         tc.transaction()
-            .script(encode_create_parent_vasp_account_script(
+            .payload(encode_create_parent_vasp_account_script_function(
                 account_config::xus_tag(),
                 0,
                 *vasp.address(),

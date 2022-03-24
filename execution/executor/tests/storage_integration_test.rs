@@ -3,7 +3,8 @@
 
 use aptos_crypto::{ed25519::*, PrivateKey, Uniform};
 use aptos_transaction_builder::stdlib::{
-    encode_peer_to_peer_with_metadata_script, encode_set_validator_config_and_reconfigure_script,
+    encode_peer_to_peer_with_metadata_script_function,
+    encode_set_validator_config_and_reconfigure_script_function,
 };
 use aptos_types::{
     account_config::{aptos_root_address, treasury_compliance_account_address, xus_tag},
@@ -102,14 +103,12 @@ fn test_reconfiguration() {
         /* sequence_number = */ 0,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(TransactionPayload::Script(
-            encode_peer_to_peer_with_metadata_script(
-                xus_tag(),
-                validator_account,
-                1_000_000,
-                vec![],
-                vec![],
-            ),
+        Some(encode_peer_to_peer_with_metadata_script_function(
+            xus_tag(),
+            validator_account,
+            1_000_000,
+            vec![],
+            vec![],
         )),
     );
     // txn2 = a dummy block prologue to bump the timer.
@@ -131,13 +130,11 @@ fn test_reconfiguration() {
         /* sequence_number = */ 0,
         operator_key.clone(),
         operator_key.public_key(),
-        Some(TransactionPayload::Script(
-            encode_set_validator_config_and_reconfigure_script(
-                validator_account,
-                new_pubkey.to_bytes().to_vec(),
-                Vec::new(),
-                Vec::new(),
-            ),
+        Some(encode_set_validator_config_and_reconfigure_script_function(
+            validator_account,
+            new_pubkey.to_bytes().to_vec(),
+            Vec::new(),
+            Vec::new(),
         )),
     );
 
@@ -254,14 +251,12 @@ fn test_change_publishing_option_to_custom() {
         /* sequence_number = */ 0,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(TransactionPayload::Script(
-            encode_peer_to_peer_with_metadata_script(
-                xus_tag(),
-                validator_account,
-                1_000_000,
-                vec![],
-                vec![],
-            ),
+        Some(encode_peer_to_peer_with_metadata_script_function(
+            xus_tag(),
+            validator_account,
+            1_000_000,
+            vec![],
+            vec![],
         )),
     );
 

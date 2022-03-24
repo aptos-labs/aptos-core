@@ -88,7 +88,7 @@ pub fn get_test_unchecked_transaction(
     sequence_number: u64,
     private_key: &Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
-    script: Option<Script>,
+    payload: TransactionPayload,
     expiration_time: u64,
     gas_unit_price: u64,
     gas_currency_code: String,
@@ -99,7 +99,7 @@ pub fn get_test_unchecked_transaction(
         sequence_number,
         private_key,
         public_key,
-        script,
+        payload,
         expiration_time,
         gas_unit_price,
         gas_currency_code,
@@ -114,17 +114,17 @@ fn get_test_unchecked_transaction_(
     sequence_number: u64,
     private_key: &Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
-    script: Option<Script>,
+    payload: TransactionPayload,
     expiration_timestamp_secs: u64,
     gas_unit_price: u64,
     gas_currency_code: String,
     max_gas_amount: Option<u64>,
     chain_id: ChainId,
 ) -> SignedTransaction {
-    let raw_txn = RawTransaction::new_script(
+    let raw_txn = RawTransaction::new(
         sender,
         sequence_number,
-        script.unwrap_or_else(|| Script::new(EMPTY_SCRIPT.to_vec(), vec![], Vec::new())),
+        payload,
         max_gas_amount.unwrap_or(MAX_GAS_AMOUNT),
         gas_unit_price,
         gas_currency_code,
@@ -165,7 +165,7 @@ pub fn get_test_unchecked_txn(
     sequence_number: u64,
     private_key: &Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
-    script: Option<Script>,
+    payload: TransactionPayload,
 ) -> SignedTransaction {
     let expiration_time = expiration_time(10);
     get_test_unchecked_transaction(
@@ -173,7 +173,7 @@ pub fn get_test_unchecked_txn(
         sequence_number,
         private_key,
         public_key,
-        script,
+        payload,
         expiration_time,
         TEST_GAS_PRICE,
         XUS_NAME.to_owned(),
@@ -235,18 +235,20 @@ pub fn get_test_txn_with_chain_id(
     chain_id: ChainId,
 ) -> SignedTransaction {
     let expiration_time = expiration_time(10);
-    get_test_unchecked_transaction_(
+    let raw_txn = RawTransaction::new_script(
         sender,
         sequence_number,
-        private_key,
-        public_key,
-        None,
-        expiration_time,
+        Script::new(EMPTY_SCRIPT.to_vec(), vec![], Vec::new()),
+        MAX_GAS_AMOUNT,
         TEST_GAS_PRICE,
         XUS_NAME.to_owned(),
-        None,
+        expiration_time,
         chain_id,
-    )
+    );
+
+    let signature = private_key.sign(&raw_txn);
+
+    SignedTransaction::new(raw_txn, public_key, signature)
 }
 
 pub fn get_write_set_txn(

@@ -170,7 +170,7 @@ fn account_limits() {
     executor.execute_and_apply(
         blessed
             .transaction()
-            .script(encode_create_parent_vasp_account_script(
+            .payload(encode_create_parent_vasp_account_script_function(
                 account_config::xus_tag(),
                 0,
                 *vasp_a.address(),
@@ -185,7 +185,7 @@ fn account_limits() {
     executor.execute_and_apply(
         blessed
             .transaction()
-            .script(encode_create_parent_vasp_account_script(
+            .payload(encode_create_parent_vasp_account_script_function(
                 account_config::xus_tag(),
                 0,
                 *vasp_b.address(),
@@ -202,7 +202,7 @@ fn account_limits() {
     executor.execute_and_apply(
         vasp_a
             .transaction()
-            .script(encode_create_child_vasp_account_script(
+            .payload(encode_create_child_vasp_account_script_function(
                 account_config::xus_tag(),
                 *vasp_a_child.address(),
                 vasp_a_child.auth_key_prefix(),
@@ -216,7 +216,7 @@ fn account_limits() {
     executor.execute_and_apply(
         vasp_b
             .transaction()
-            .script(encode_create_child_vasp_account_script(
+            .payload(encode_create_child_vasp_account_script_function(
                 account_config::xus_tag(),
                 *vasp_b_child.address(),
                 vasp_b_child.auth_key_prefix(),
@@ -247,7 +247,7 @@ fn account_limits() {
     // mint money to both vasp A & B
     executor.execute_and_apply(
         dd.transaction()
-            .script(encode_peer_to_peer_with_metadata_script(
+            .payload(encode_peer_to_peer_with_metadata_script_function(
                 account_config::xus_tag(),
                 *vasp_a.address(),
                 2 * mint_amount,
@@ -260,7 +260,7 @@ fn account_limits() {
     );
     executor.execute_and_apply(
         dd.transaction()
-            .script(encode_peer_to_peer_with_metadata_script(
+            .payload(encode_peer_to_peer_with_metadata_script_function(
                 account_config::xus_tag(),
                 *vasp_b.address(),
                 2 * mint_amount,
@@ -310,7 +310,7 @@ fn account_limits() {
         let output = executor.execute_transaction(
             vasp_b
                 .transaction()
-                .script(encode_peer_to_peer_with_metadata_script(
+                .payload(encode_peer_to_peer_with_metadata_script_function(
                     account_config::xus_tag(),
                     *vasp_a.address(),
                     mint_amount + 1,
@@ -329,7 +329,7 @@ fn account_limits() {
         let output = executor.execute_transaction(
             vasp_b
                 .transaction()
-                .script(encode_peer_to_peer_with_metadata_script(
+                .payload(encode_peer_to_peer_with_metadata_script_function(
                     account_config::xus_tag(),
                     *vasp_a_child.address(),
                     mint_amount + 1,
@@ -347,7 +347,7 @@ fn account_limits() {
     executor.execute_and_apply(
         vasp_a
             .transaction()
-            .script(encode_peer_to_peer_with_metadata_script(
+            .payload(encode_peer_to_peer_with_metadata_script_function(
                 account_config::xus_tag(),
                 *vasp_a_child.address(),
                 mint_amount + 1,
@@ -363,7 +363,7 @@ fn account_limits() {
     executor.execute_and_apply(
         vasp_a_child
             .transaction()
-            .script(encode_peer_to_peer_with_metadata_script(
+            .payload(encode_peer_to_peer_with_metadata_script_function(
                 account_config::xus_tag(),
                 *vasp_b_child.address(),
                 mint_amount + 1,
@@ -379,7 +379,7 @@ fn account_limits() {
     executor.execute_and_apply(
         vasp_b_child
             .transaction()
-            .script(encode_peer_to_peer_with_metadata_script(
+            .payload(encode_peer_to_peer_with_metadata_script_function(
                 account_config::xus_tag(),
                 *vasp_a_child.address(),
                 mint_amount,
@@ -395,7 +395,7 @@ fn account_limits() {
         // DD deposit fails since vasp A is at inflow limit
         let output = executor.execute_transaction(
             dd.transaction()
-                .script(encode_peer_to_peer_with_metadata_script(
+                .payload(encode_peer_to_peer_with_metadata_script_function(
                     account_config::xus_tag(),
                     *vasp_a_child.address(),
                     1,
@@ -416,7 +416,7 @@ fn account_limits() {
         // DD deposit now succeeds since window is reset
         let output = executor.execute_transaction(
             dd.transaction()
-                .script(encode_peer_to_peer_with_metadata_script(
+                .payload(encode_peer_to_peer_with_metadata_script_function(
                     account_config::xus_tag(),
                     *vasp_a_child.address(),
                     1,
@@ -454,7 +454,7 @@ fn account_limits() {
     executor.execute_and_apply(
         vasp_a
             .transaction()
-            .script(encode_peer_to_peer_with_metadata_script(
+            .payload(encode_peer_to_peer_with_metadata_script_function(
                 account_config::xus_tag(),
                 *vasp_a_child.address(),
                 1001,
@@ -470,7 +470,7 @@ fn account_limits() {
     executor.execute_and_apply(
         vasp_a_child
             .transaction()
-            .script(encode_peer_to_peer_with_metadata_script(
+            .payload(encode_peer_to_peer_with_metadata_script_function(
                 account_config::xus_tag(),
                 *vasp_b_child.address(),
                 1000,
@@ -487,7 +487,7 @@ fn account_limits() {
         let output = executor.execute_transaction(
             vasp_a
                 .transaction()
-                .script(encode_peer_to_peer_with_metadata_script(
+                .payload(encode_peer_to_peer_with_metadata_script_function(
                     account_config::xus_tag(),
                     *vasp_b.address(),
                     1,
@@ -506,7 +506,7 @@ fn account_limits() {
         let output = executor.execute_transaction(
             vasp_a_child
                 .transaction()
-                .script(encode_peer_to_peer_with_metadata_script(
+                .payload(encode_peer_to_peer_with_metadata_script_function(
                     account_config::xus_tag(),
                     *vasp_b_child.address(),
                     1,
@@ -525,7 +525,7 @@ fn account_limits() {
         let output = executor.execute_transaction(
             vasp_a_child
                 .transaction()
-                .script(encode_peer_to_peer_with_metadata_script(
+                .payload(encode_peer_to_peer_with_metadata_script_function(
                     account_config::xus_tag(),
                     *dd.address(),
                     1,
@@ -546,7 +546,7 @@ fn account_limits() {
         let output = executor.execute_transaction(
             vasp_a_child
                 .transaction()
-                .script(encode_peer_to_peer_with_metadata_script(
+                .payload(encode_peer_to_peer_with_metadata_script_function(
                     account_config::xus_tag(),
                     *dd.address(),
                     1,
@@ -610,7 +610,7 @@ fn account_limits() {
         let output = executor.execute_transaction(
             vasp_b
                 .transaction()
-                .script(encode_peer_to_peer_with_metadata_script(
+                .payload(encode_peer_to_peer_with_metadata_script_function(
                     account_config::xus_tag(),
                     *vasp_a_child.address(),
                     1,
@@ -628,7 +628,7 @@ fn account_limits() {
     executor.execute_and_apply(
         vasp_a
             .transaction()
-            .script(encode_peer_to_peer_with_metadata_script(
+            .payload(encode_peer_to_peer_with_metadata_script_function(
                 account_config::xus_tag(),
                 *vasp_b_child.address(),
                 10,
@@ -644,7 +644,7 @@ fn account_limits() {
     executor.execute_and_apply(
         vasp_b
             .transaction()
-            .script(encode_peer_to_peer_with_metadata_script(
+            .payload(encode_peer_to_peer_with_metadata_script_function(
                 account_config::xus_tag(),
                 *vasp_a_child.address(),
                 10,
@@ -661,7 +661,7 @@ fn account_limits() {
         let output = executor.execute_transaction(
             vasp_b
                 .transaction()
-                .script(encode_peer_to_peer_with_metadata_script(
+                .payload(encode_peer_to_peer_with_metadata_script_function(
                     account_config::xus_tag(),
                     *vasp_a_child.address(),
                     1,
@@ -679,7 +679,7 @@ fn account_limits() {
     executor.execute_and_apply(
         vasp_a_child
             .transaction()
-            .script(encode_peer_to_peer_with_metadata_script(
+            .payload(encode_peer_to_peer_with_metadata_script_function(
                 account_config::xus_tag(),
                 *vasp_a.address(),
                 1100,
@@ -695,7 +695,7 @@ fn account_limits() {
         // DD deposit fails since vasp A is at holding limit
         let output = executor.execute_transaction(
             dd.transaction()
-                .script(encode_peer_to_peer_with_metadata_script(
+                .payload(encode_peer_to_peer_with_metadata_script_function(
                     account_config::xus_tag(),
                     *vasp_a_child.address(),
                     1,
@@ -717,7 +717,7 @@ fn account_limits() {
         // and because holdings are not reset from one window to the next.
         let output = executor.execute_transaction(
             dd.transaction()
-                .script(encode_peer_to_peer_with_metadata_script(
+                .payload(encode_peer_to_peer_with_metadata_script_function(
                     account_config::xus_tag(),
                     *vasp_a_child.address(),
                     1,
