@@ -36,7 +36,7 @@ You can configure a public FullNode in two ways: using the Aptos-core source cod
 1. Download the Aptos-core repository from GitHub and prepare your developer environment by running the following commands:
      ```
      git clone https://github.com/aptos-labs/aptos-core.git
-     cd aptos
+     cd aptos-core
      ./scripts/dev_setup.sh
      source ~/.cargo/env
      ```
