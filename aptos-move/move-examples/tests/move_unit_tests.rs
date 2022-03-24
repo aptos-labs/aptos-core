@@ -19,8 +19,8 @@ fn move_unit_tests() {
 
     move_unit_test::cargo_runner::run_tests_with_config_and_filter(
         config,
-        ".",
-        r"sources/.*\.move$",
+        "sources",
+        r".*\.move$",
         Some(&move_stdlib::move_stdlib_modules_full_path()),
         Some(aptos_natives()),
     );
