@@ -189,7 +189,7 @@ FullNodes will automatically start up with a randomly generated network identity
 
 ### Start a node with a static network identity
 
-Once we have the static identity we can startup the node by modifying the configuration file:
+Once we have the static identity we can startup the node by modifying the configuration file (public_full_node.yaml):
 ```
 full_node_networks:
 - network_id: "public"
