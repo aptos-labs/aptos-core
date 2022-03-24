@@ -34,7 +34,7 @@ fn validator_batch_remove() {
         executor.execute_and_apply(
             aptos_root_account
                 .transaction()
-                .script(encode_create_validator_account_script(
+                .payload(encode_create_validator_account_script_function(
                     0,
                     *validator_account_0.address(),
                     validator_account_0.auth_key_prefix(),
@@ -47,7 +47,7 @@ fn validator_batch_remove() {
         executor.execute_and_apply(
             aptos_root_account
                 .transaction()
-                .script(encode_create_validator_operator_account_script(
+                .payload(encode_create_validator_operator_account_script_function(
                     0,
                     *operator_account.address(),
                     operator_account.auth_key_prefix(),
@@ -60,7 +60,7 @@ fn validator_batch_remove() {
         executor.execute_and_apply(
             validator_account_0
                 .transaction()
-                .script(encode_set_validator_operator_script(
+                .payload(encode_set_validator_operator_script_function(
                     b"operator".to_vec(),
                     *operator_account.address(),
                 ))
@@ -74,7 +74,7 @@ fn validator_batch_remove() {
         executor.execute_and_apply(
             operator_account
                 .transaction()
-                .script(encode_register_validator_config_script(
+                .payload(encode_register_validator_config_script_function(
                     *validator_account_0.address(),
                     [
                         0xd7, 0x5a, 0x98, 0x01, 0x82, 0xb1, 0x0a, 0xb7, 0xd5, 0x4b, 0xfe, 0xd3, 0xc9,
@@ -93,7 +93,7 @@ fn validator_batch_remove() {
         executor.execute_and_apply(
             aptos_root_account
                 .transaction()
-                .script(encode_add_validator_and_reconfigure_script(
+                .payload(encode_add_validator_and_reconfigure_script_function(
                     2,
                     b"validator_0".to_vec(),
                     *validator_account_0.address(),
@@ -107,7 +107,7 @@ fn validator_batch_remove() {
         executor.execute_and_apply(
             aptos_root_account
                 .transaction()
-                .script(encode_create_validator_account_script(
+                .payload(encode_create_validator_account_script_function(
                     0,
                     *validator_account_1.address(),
                     validator_account_1.auth_key_prefix(),
@@ -120,7 +120,7 @@ fn validator_batch_remove() {
         executor.execute_and_apply(
             validator_account_1
                 .transaction()
-                .script(encode_set_validator_operator_script(
+                .payload(encode_set_validator_operator_script_function(
                     b"operator".to_vec(),
                     *operator_account.address(),
                 ))
@@ -133,7 +133,7 @@ fn validator_batch_remove() {
         executor.execute_and_apply(
             operator_account
                 .transaction()
-                .script(encode_register_validator_config_script(
+                .payload(encode_register_validator_config_script_function(
                     *validator_account_1.address(),
                     [
                         0xd7, 0x5a, 0x98, 0x01, 0x82, 0xb1, 0x0a, 0xb7, 0xd5, 0x4b, 0xfe, 0xd3, 0xc9,
@@ -152,7 +152,7 @@ fn validator_batch_remove() {
         executor.execute_and_apply(
             aptos_root_account
                 .transaction()
-                .script(encode_add_validator_and_reconfigure_script(
+                .payload(encode_add_validator_and_reconfigure_script_function(
                     3,
                     b"validator_1".to_vec(),
                     *validator_account_1.address(),
@@ -258,7 +258,7 @@ fn halt_network() {
         executor.execute_and_apply(
             aptos_root_account
                 .transaction()
-                .script(encode_rotate_authentication_key_script(auth_key))
+                .payload(encode_rotate_authentication_key_script_function(auth_key))
                 .sequence_number(test_env.dr_sequence_number)
                 .sign(),
         );

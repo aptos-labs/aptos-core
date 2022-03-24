@@ -71,7 +71,10 @@ pub fn upgrade_df(
         executor.execute_and_apply(
             dr_account
                 .transaction()
-                .script(encode_update_diem_version_script(0, version_number))
+                .payload(encode_update_diem_version_script_function(
+                    0,
+                    version_number,
+                ))
                 .sequence_number(*dr_seqno)
                 .sign(),
         );

@@ -28,7 +28,7 @@ fn burn_txn_fees() {
         executor.execute_and_apply(
             blessed
                 .transaction()
-                .script(encode_create_parent_vasp_account_script(
+                .payload(encode_create_parent_vasp_account_script_function(
                     account_config::xus_tag(),
                     0,
                     *sender.address(),
@@ -42,7 +42,7 @@ fn burn_txn_fees() {
 
         executor.execute_and_apply(
             dd.transaction()
-                .script(encode_peer_to_peer_with_metadata_script(
+                .payload(encode_peer_to_peer_with_metadata_script_function(
                     account_config::xus_tag(),
                     *sender.address(),
                     10_000_000,
@@ -87,7 +87,7 @@ fn burn_txn_fees() {
         let output = executor.execute_and_apply(
             blessed
                 .transaction()
-                .script(encode_burn_txn_fees_script(xus_ty))
+                .payload(encode_burn_txn_fees_script_function(xus_ty))
                 .sequence_number(test_env.tc_sequence_number.checked_add(1).unwrap())
                 .sign(),
         );

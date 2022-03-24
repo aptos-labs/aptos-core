@@ -3,13 +3,13 @@
 
 use crate::vm_validator::{TransactionValidation, VMValidator};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
-use aptos_transaction_builder::stdlib::encode_peer_to_peer_with_metadata_script;
+use aptos_transaction_builder::stdlib::encode_peer_to_peer_with_metadata_script_function;
 use aptos_types::{
     account_address, account_config,
     account_config::{xus_tag, XUS_NAME},
     chain_id::ChainId,
     test_helpers::transaction_test_helpers,
-    transaction::{Module, Script, TransactionArgument, TransactionPayload},
+    transaction::{Module, Script, TransactionPayload},
     vm_status::StatusCode,
 };
 use aptos_vm::AptosVM;
@@ -78,13 +78,14 @@ fn test_validate_transaction() {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_root_address();
-    let program = encode_peer_to_peer_with_metadata_script(xus_tag(), address, 100, vec![], vec![]);
+    let program =
+        encode_peer_to_peer_with_metadata_script_function(xus_tag(), address, 100, vec![], vec![]);
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
         1,
         &vm_genesis::GENESIS_KEYPAIR.0,
         vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        Some(TransactionPayload::Script(program)),
+        Some(program),
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status(), None);
@@ -99,13 +100,14 @@ fn test_validate_invalid_signature() {
     // Submit with an account using an different private/public keypair
 
     let address = account_config::aptos_root_address();
-    let program = encode_peer_to_peer_with_metadata_script(xus_tag(), address, 100, vec![], vec![]);
+    let program =
+        encode_peer_to_peer_with_metadata_script_function(xus_tag(), address, 100, vec![], vec![]);
     let transaction = transaction_test_helpers::get_test_unchecked_txn(
         address,
         1,
         &other_private_key,
         vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        Some(program),
+        program,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status().unwrap(), StatusCode::INVALID_SIGNATURE);
@@ -229,13 +231,14 @@ fn test_validate_max_gas_price_below_bounds() {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_root_address();
-    let program = encode_peer_to_peer_with_metadata_script(xus_tag(), address, 100, vec![], vec![]);
+    let program =
+        encode_peer_to_peer_with_metadata_script_function(xus_tag(), address, 100, vec![], vec![]);
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         address,
         1,
         &vm_genesis::GENESIS_KEYPAIR.0,
         vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        Some(TransactionPayload::Script(program)),
+        Some(program),
         // Initial Time was set to 0 with a TTL 86400 secs.
         40000,
         0,                   /* max gas price */
@@ -248,27 +251,6 @@ fn test_validate_max_gas_price_below_bounds() {
     //    ret.status().unwrap().major_status,
     //    StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND
     //);
-}
-
-#[test]
-fn test_validate_unknown_script() {
-    let vm_validator = TestValidator::new();
-
-    let address = account_config::testnet_dd_account_address();
-    let transaction = transaction_test_helpers::get_test_signed_txn(
-        address,
-        1,
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        Some(TransactionPayload::Script(Script::new(
-            vec![],
-            vec![],
-            vec![],
-        ))),
-    );
-    let ret = vm_validator.validate_transaction(transaction).unwrap();
-    println!("{:?}", ret);
-    assert_eq!(ret.status().unwrap(), StatusCode::UNKNOWN_SCRIPT);
 }
 
 // Make sure that we can publish non-allowlisted modules from the association address
@@ -314,13 +296,14 @@ fn test_validate_invalid_auth_key() {
     // Submit with an account using an different private/public keypair
 
     let address = account_config::aptos_root_address();
-    let program = encode_peer_to_peer_with_metadata_script(xus_tag(), address, 100, vec![], vec![]);
+    let program =
+        encode_peer_to_peer_with_metadata_script_function(xus_tag(), address, 100, vec![], vec![]);
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
         1,
         &other_private_key,
         other_private_key.public_key(),
-        Some(TransactionPayload::Script(program)),
+        Some(program),
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status().unwrap(), StatusCode::INVALID_AUTH_KEY);
@@ -332,13 +315,14 @@ fn test_validate_account_doesnt_exist() {
 
     let address = account_config::aptos_root_address();
     let random_account_addr = account_address::AccountAddress::random();
-    let program = encode_peer_to_peer_with_metadata_script(xus_tag(), address, 100, vec![], vec![]);
+    let program =
+        encode_peer_to_peer_with_metadata_script_function(xus_tag(), address, 100, vec![], vec![]);
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         random_account_addr,
         1,
         &vm_genesis::GENESIS_KEYPAIR.0,
         vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        Some(TransactionPayload::Script(program)),
+        Some(program),
         0,
         1,                   /* max gas price */
         XUS_NAME.to_owned(), /* gas currency code */
@@ -356,13 +340,14 @@ fn test_validate_sequence_number_too_new() {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_root_address();
-    let program = encode_peer_to_peer_with_metadata_script(xus_tag(), address, 100, vec![], vec![]);
+    let program =
+        encode_peer_to_peer_with_metadata_script_function(xus_tag(), address, 100, vec![], vec![]);
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
         1,
         &vm_genesis::GENESIS_KEYPAIR.0,
         vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        Some(TransactionPayload::Script(program)),
+        Some(program),
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status(), None);
@@ -373,16 +358,19 @@ fn test_validate_invalid_arguments() {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_root_address();
-    let (program_script, _, _) =
-        encode_peer_to_peer_with_metadata_script(xus_tag(), address, 100, vec![], vec![])
-            .into_inner();
-    let program = Script::new(program_script, vec![], vec![TransactionArgument::U64(42)]);
+    let program = encode_peer_to_peer_with_metadata_script_function(
+        xus_tag(),
+        address,
+        100,
+        vec![],
+        vec![42u8],
+    );
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
         1,
         &vm_genesis::GENESIS_KEYPAIR.0,
         vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        Some(TransactionPayload::Script(program)),
+        Some(program),
     );
     let _ret = vm_validator.validate_transaction(transaction).unwrap();
     // TODO: Script arguement types are now checked at execution time. Is this an idea behavior?

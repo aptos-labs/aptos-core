@@ -7,7 +7,8 @@ use crate::{
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_transaction_builder::stdlib::{
-    encode_create_parent_vasp_account_script, encode_peer_to_peer_with_metadata_script,
+    encode_create_parent_vasp_account_script_function,
+    encode_peer_to_peer_with_metadata_script_function,
 };
 use aptos_types::{
     account_config::{
@@ -19,7 +20,7 @@ use aptos_types::{
     event::EventKey,
     transaction::{
         authenticator::AuthenticationKey, Transaction, TransactionListWithProof,
-        TransactionPayload, TransactionWithProof, WriteSetPayload,
+        TransactionWithProof, WriteSetPayload,
     },
     trusted_state::{TrustedState, TrustedStateChange},
     waypoint::Waypoint,
@@ -76,15 +77,13 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 0,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(TransactionPayload::Script(
-            encode_create_parent_vasp_account_script(
-                xus_tag(),
-                0,
-                account1,
-                account1_auth_key.prefix().to_vec(),
-                vec![],
-                false, /* add all currencies */
-            ),
+        Some(encode_create_parent_vasp_account_script_function(
+            xus_tag(),
+            0,
+            account1,
+            account1_auth_key.prefix().to_vec(),
+            vec![],
+            false, /* add all currencies */
         )),
     );
 
@@ -93,15 +92,13 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 1,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(TransactionPayload::Script(
-            encode_create_parent_vasp_account_script(
-                xus_tag(),
-                0,
-                account2,
-                account2_auth_key.prefix().to_vec(),
-                vec![],
-                false, /* add all currencies */
-            ),
+        Some(encode_create_parent_vasp_account_script_function(
+            xus_tag(),
+            0,
+            account2,
+            account2_auth_key.prefix().to_vec(),
+            vec![],
+            false, /* add all currencies */
         )),
     );
 
@@ -110,15 +107,13 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 2,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(TransactionPayload::Script(
-            encode_create_parent_vasp_account_script(
-                xus_tag(),
-                0,
-                account3,
-                account3_auth_key.prefix().to_vec(),
-                vec![],
-                false, /* add all currencies */
-            ),
+        Some(encode_create_parent_vasp_account_script_function(
+            xus_tag(),
+            0,
+            account3,
+            account3_auth_key.prefix().to_vec(),
+            vec![],
+            false, /* add all currencies */
         )),
     );
 
@@ -128,14 +123,12 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 0,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(TransactionPayload::Script(
-            encode_peer_to_peer_with_metadata_script(
-                xus_tag(),
-                account1,
-                2_000_000,
-                vec![],
-                vec![],
-            ),
+        Some(encode_peer_to_peer_with_metadata_script_function(
+            xus_tag(),
+            account1,
+            2_000_000,
+            vec![],
+            vec![],
         )),
     );
 
@@ -145,14 +138,12 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 1,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(TransactionPayload::Script(
-            encode_peer_to_peer_with_metadata_script(
-                xus_tag(),
-                account2,
-                1_200_000,
-                vec![],
-                vec![],
-            ),
+        Some(encode_peer_to_peer_with_metadata_script_function(
+            xus_tag(),
+            account2,
+            1_200_000,
+            vec![],
+            vec![],
         )),
     );
 
@@ -162,14 +153,12 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 2,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(TransactionPayload::Script(
-            encode_peer_to_peer_with_metadata_script(
-                xus_tag(),
-                account3,
-                1_000_000,
-                vec![],
-                vec![],
-            ),
+        Some(encode_peer_to_peer_with_metadata_script_function(
+            xus_tag(),
+            account3,
+            1_000_000,
+            vec![],
+            vec![],
         )),
     );
 
@@ -180,8 +169,12 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 0,
         privkey1.clone(),
         pubkey1.clone(),
-        Some(TransactionPayload::Script(
-            encode_peer_to_peer_with_metadata_script(xus_tag(), account2, 20_000, vec![], vec![]),
+        Some(encode_peer_to_peer_with_metadata_script_function(
+            xus_tag(),
+            account2,
+            20_000,
+            vec![],
+            vec![],
         )),
     );
 
@@ -192,8 +185,12 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 0,
         privkey2,
         pubkey2,
-        Some(TransactionPayload::Script(
-            encode_peer_to_peer_with_metadata_script(xus_tag(), account3, 10_000, vec![], vec![]),
+        Some(encode_peer_to_peer_with_metadata_script_function(
+            xus_tag(),
+            account3,
+            10_000,
+            vec![],
+            vec![],
         )),
     );
 
@@ -204,8 +201,12 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 1,
         privkey1.clone(),
         pubkey1.clone(),
-        Some(TransactionPayload::Script(
-            encode_peer_to_peer_with_metadata_script(xus_tag(), account3, 70_000, vec![], vec![]),
+        Some(encode_peer_to_peer_with_metadata_script_function(
+            xus_tag(),
+            account3,
+            70_000,
+            vec![],
+            vec![],
         )),
     );
 
@@ -222,14 +223,12 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             /* sequence_number = */ i,
             privkey1.clone(),
             pubkey1.clone(),
-            Some(TransactionPayload::Script(
-                encode_peer_to_peer_with_metadata_script(
-                    xus_tag(),
-                    account3,
-                    10_000,
-                    vec![],
-                    vec![],
-                ),
+            Some(encode_peer_to_peer_with_metadata_script_function(
+                xus_tag(),
+                account3,
+                10_000,
+                vec![],
+                vec![],
             )),
         ));
     }

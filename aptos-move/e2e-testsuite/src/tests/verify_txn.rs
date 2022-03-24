@@ -8,7 +8,7 @@ use aptos_crypto::{
 };
 use aptos_keygen::KeyGen;
 use aptos_transaction_builder::{
-    stdlib as transaction_builder, stdlib::encode_peer_to_peer_with_metadata_script,
+    stdlib as transaction_builder, stdlib::encode_peer_to_peer_with_metadata_script_function,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -18,8 +18,8 @@ use aptos_types::{
     test_helpers::transaction_test_helpers,
     transaction::{
         authenticator::{AccountAuthenticator, AuthenticationKey, MAX_NUM_OF_SIGS},
-        RawTransactionWithData, Script, SignedTransaction, TransactionArgument, TransactionPayload,
-        TransactionStatus, WriteSetPayload,
+        RawTransactionWithData, Script, SignedTransaction, TransactionArgument, TransactionStatus,
+        WriteSetPayload,
     },
     vm_status::{KeptVMStatus, StatusCode},
 };
@@ -53,7 +53,7 @@ fn verify_signature() {
         executor.add_account_data(&sender);
         // Generate a new key pair to try and sign things with.
         let private_key = Ed25519PrivateKey::generate_for_testing();
-        let program = encode_peer_to_peer_with_metadata_script(
+        let program = encode_peer_to_peer_with_metadata_script_function(
             account_config::xus_tag(),
             *sender.address(),
             100,
@@ -65,7 +65,7 @@ fn verify_signature() {
             0,
             &private_key,
             sender.account().pubkey.clone(),
-            Some(program),
+            program,
         );
 
         assert_prologue_parity!(
@@ -414,7 +414,7 @@ fn verify_reserved_sender() {
         executor.add_account_data(&sender);
         // Generate a new key pair to try and sign things with.
         let private_key = Ed25519PrivateKey::generate_for_testing();
-        let program = encode_peer_to_peer_with_metadata_script(
+        let program = encode_peer_to_peer_with_metadata_script_function(
             account_config::xus_tag(),
             *sender.address(),
             100,
@@ -426,7 +426,7 @@ fn verify_reserved_sender() {
             0,
             &private_key,
             private_key.public_key(),
-            Some(TransactionPayload::Script(program)),
+            Some(program),
         );
 
         assert_prologue_parity!(
@@ -1605,14 +1605,16 @@ pub fn publish_and_register_new_currency() {
 
     let txn = tc_account
         .transaction()
-        .script(transaction_builder::encode_create_designated_dealer_script(
-            coin_tag.clone(),
-            0,
-            *dd.address(),
-            dd.auth_key_prefix(),
-            b"".to_vec(),
-            true,
-        ))
+        .payload(
+            transaction_builder::encode_create_designated_dealer_script_function(
+                coin_tag.clone(),
+                0,
+                *dd.address(),
+                dd.auth_key_prefix(),
+                b"".to_vec(),
+                true,
+            ),
+        )
         .sequence_number(0)
         .sign();
 
@@ -1630,7 +1632,7 @@ pub fn publish_and_register_new_currency() {
 
     let txn = tc_account
         .transaction()
-        .script(transaction_builder::encode_tiered_mint_script(
+        .payload(transaction_builder::encode_tiered_mint_script_function(
             coin_tag.clone(),
             0,
             *dd.address(),
@@ -1644,15 +1646,13 @@ pub fn publish_and_register_new_currency() {
 
     let txn = dd
         .transaction()
-        .script(
-            transaction_builder::encode_peer_to_peer_with_metadata_script(
-                coin_tag.clone(),
-                *dd.address(),
-                1,
-                b"".to_vec(),
-                b"".to_vec(),
-            ),
-        )
+        .payload(encode_peer_to_peer_with_metadata_script_function(
+            coin_tag.clone(),
+            *dd.address(),
+            1,
+            b"".to_vec(),
+            b"".to_vec(),
+        ))
         .gas_unit_price(1)
         .max_gas_amount(800)
         .gas_currency_code("COIN")

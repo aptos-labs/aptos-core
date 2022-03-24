@@ -7,7 +7,8 @@ use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
 use aptos_temppath::TempPath;
 use aptos_transaction_builder::stdlib::{
-    encode_create_parent_vasp_account_script, encode_peer_to_peer_with_metadata_script,
+    encode_create_parent_vasp_account_script_function,
+    encode_peer_to_peer_with_metadata_script_function,
 };
 use aptos_types::{
     access_path::AccessPath,
@@ -26,8 +27,8 @@ use aptos_types::{
     },
     proof::SparseMerkleRangeProof,
     transaction::{
-        authenticator::AuthenticationKey, ChangeSet, Transaction, TransactionPayload, Version,
-        WriteSetPayload, PRE_GENESIS_VERSION,
+        authenticator::AuthenticationKey, ChangeSet, Transaction, Version, WriteSetPayload,
+        PRE_GENESIS_VERSION,
     },
     trusted_state::TrustedState,
     validator_signer::ValidatorSigner,
@@ -142,8 +143,12 @@ fn get_mint_transaction(
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
-        Some(TransactionPayload::Script(
-            encode_peer_to_peer_with_metadata_script(xus_tag(), *account, amount, vec![], vec![]),
+        Some(encode_peer_to_peer_with_metadata_script_function(
+            xus_tag(),
+            *account,
+            amount,
+            vec![],
+            vec![],
         )),
     )
 }
@@ -160,15 +165,13 @@ fn get_account_transaction(
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
-        Some(TransactionPayload::Script(
-            encode_create_parent_vasp_account_script(
-                xus_tag(),
-                0,
-                *account,
-                account_auth_key.prefix().to_vec(),
-                vec![],
-                false,
-            ),
+        Some(encode_create_parent_vasp_account_script_function(
+            xus_tag(),
+            0,
+            *account,
+            account_auth_key.prefix().to_vec(),
+            vec![],
+            false,
         )),
     )
 }
@@ -185,8 +188,12 @@ fn get_transfer_transaction(
         sender_seq_number,
         sender_key.clone(),
         sender_key.public_key(),
-        Some(TransactionPayload::Script(
-            encode_peer_to_peer_with_metadata_script(xus_tag(), recipient, amount, vec![], vec![]),
+        Some(encode_peer_to_peer_with_metadata_script_function(
+            xus_tag(),
+            recipient,
+            amount,
+            vec![],
+            vec![],
         )),
     )
 }

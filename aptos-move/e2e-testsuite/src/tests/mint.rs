@@ -24,7 +24,7 @@ fn tiered_mint_designated_dealer() {
         executor.execute_and_apply(
             blessed
                 .transaction()
-                .script(encode_create_designated_dealer_script(
+                .payload(encode_create_designated_dealer_script_function(
                     account_config::xus_tag(),
                     0,
                     *dd.address(),
@@ -40,7 +40,7 @@ fn tiered_mint_designated_dealer() {
         executor.execute_and_apply(
             blessed
                 .transaction()
-                .script(encode_tiered_mint_script(
+                .payload(encode_tiered_mint_script_function(
                     account_config::xus_tag(),
                     1,
                     *dd.address(),
@@ -65,7 +65,7 @@ fn tiered_mint_designated_dealer() {
         executor.execute_and_apply(
             blessed
                 .transaction()
-                .script(encode_tiered_mint_script(
+                .payload(encode_tiered_mint_script_function(
                     account_config::xus_tag(),
                     2,
                     *dd.address(),
@@ -98,7 +98,7 @@ fn mint_to_existing_not_dd() {
         executor.execute_and_apply(
             blessed
                 .transaction()
-                .script(encode_create_parent_vasp_account_script(
+                .payload(encode_create_parent_vasp_account_script_function(
                     account_config::xus_tag(),
                     0,
                     *receiver.address(),
@@ -114,7 +114,7 @@ fn mint_to_existing_not_dd() {
         let output = executor.execute_transaction(
             blessed
                 .transaction()
-                .script(encode_tiered_mint_script(
+                .payload(encode_tiered_mint_script_function(
                     account_config::xus_tag(),
                     0,
                     *receiver.address(),
@@ -151,7 +151,7 @@ fn mint_to_new_account() {
         let mint_amount = TXN_RESERVED;
         let output = executor.execute_transaction(
             tc.transaction()
-                .script(encode_tiered_mint_script(
+                .payload(encode_tiered_mint_script_function(
                     account_config::xus_tag(),
                     0,
                     *new_account.address(),
@@ -184,7 +184,7 @@ fn tiered_update_exchange_rate() {
         executor.execute_and_apply(
             blessed
                 .transaction()
-                .script(encode_update_exchange_rate_script(
+                .payload(encode_update_exchange_rate_script_function(
                     account_config::xus_tag(),
                     0,
                     123,

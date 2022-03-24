@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_transaction_builder::stdlib::encode_update_dual_attestation_limit_script;
+use aptos_transaction_builder::stdlib::encode_update_dual_attestation_limit_script_function;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::Version,
@@ -110,7 +110,7 @@ fn updated_limit_allows_txn() {
         let output = executor.execute_and_apply(
             blessed
                 .transaction()
-                .script(encode_update_dual_attestation_limit_script(
+                .payload(encode_update_dual_attestation_limit_script_function(
                     3,
                     new_micro_xdx_limit,
                 ))
