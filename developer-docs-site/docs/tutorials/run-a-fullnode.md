@@ -214,7 +214,7 @@ full_node_networks:
 
 ### Allowing other FullNodes to connect
 
-Once you start your FullNode with a static identity you can allow others to connect to devnet through your node. Make sure you open port `6180` (or `6182`, depending on which port your node is listening to) and that you open your firewall. You'll need to share your FullNode info for others to use as `seeds` in their configurations:
+Once you start your FullNode with a static identity you can allow others to connect to devnet through your node. Make sure you open port `6180` (or `6182`, depending on which port your node is listening to) and that you open your firewall. You'll need to share your FullNode info for others to use as `seeds` in their configurations (peer-info.yaml):
 
 ```
 <Peer_ID>:
