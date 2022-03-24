@@ -145,7 +145,7 @@ resource "helm_release" "fullnode" {
 resource "helm_release" "pfn-logger" {
   count       = var.enable_pfn_logger ? 1 : 0
   name        = "pfn-logger"
-  chart       = "${path.module}/../../helm/logger"
+  chart       = "${path.module}/../helm/logger"
   max_history = 10
   wait        = false
 
