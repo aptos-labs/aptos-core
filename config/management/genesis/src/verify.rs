@@ -14,7 +14,7 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::AccountAddress, account_config, account_state::AccountState,
     network_address::NetworkAddress, on_chain_config::ValidatorSet,
-    validator_config::ValidatorConfig, waypoint::Waypoint,
+    state_store::state_key::StateKey, validator_config::ValidatorConfig, waypoint::Waypoint,
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
@@ -240,7 +240,9 @@ fn validator_config(
     reader: Arc<dyn DbReader>,
 ) -> Result<ValidatorConfig, Error> {
     let blob = reader
-        .get_latest_account_state(account_config::validator_set_address())
+        .get_latest_state_value(StateKey::AccountAddressKey(
+            account_config::validator_set_address(),
+        ))
         .map_err(|e| {
             Error::UnexpectedError(format!("ValidatorSet Account issue {}", e.to_string()))
         })?

@@ -6,7 +6,7 @@
 mod sparse_merkle;
 
 pub use crate::sparse_merkle::{
-    AccountStatus, FrozenSparseMerkleTree, ProofRead, SparseMerkleTree,
+    FrozenSparseMerkleTree, ProofRead, SparseMerkleTree, StateStoreStatus,
 };
 
 #[cfg(any(test, feature = "bench", feature = "fuzzing"))]

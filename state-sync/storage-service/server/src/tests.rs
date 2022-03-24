@@ -10,7 +10,6 @@ use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey
 use aptos_logger::Level;
 use aptos_types::{
     account_address::AccountAddress,
-    account_state_blob::AccountStatesChunkWithProof,
     block_info::BlockInfo,
     chain_id::ChainId,
     contract_event::ContractEvent,
@@ -18,6 +17,7 @@ use aptos_types::{
     event::EventKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::{SparseMerkleRangeProof, TransactionInfoListWithProof},
+    state_store::state_value::StateValueChunkWithProof,
     transaction::{
         RawTransaction, Script, SignedTransaction, Transaction, TransactionListWithProof,
         TransactionOutput, TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
@@ -98,12 +98,12 @@ async fn test_get_account_states_chunk_with_proof() {
         account_blobs.push((HashValue::zero(), vec![].into()));
     }
     let expected_response =
-        StorageServiceResponse::AccountStatesChunkWithProof(AccountStatesChunkWithProof {
+        StorageServiceResponse::AccountStatesChunkWithProof(StateValueChunkWithProof {
             first_index: start_account_index,
             last_index: end_account_index,
             first_key: HashValue::zero(),
             last_key: HashValue::zero(),
-            account_blobs,
+            raw_values: account_blobs,
             proof: SparseMerkleRangeProof::new(vec![]),
             root_hash: HashValue::zero(),
         });
@@ -518,16 +518,16 @@ impl DbReader for MockDbReader {
         ))
     }
 
-    fn get_account_count(&self, _version: Version) -> Result<usize> {
+    fn get_state_leaf_count(&self, _version: Version) -> Result<usize> {
         Ok(NUM_ACCOUNTS_AT_VERSION as usize)
     }
 
-    fn get_account_chunk_with_proof(
+    fn get_state_value_chunk_with_proof(
         &self,
         _version: Version,
         start_idx: usize,
         chunk_size: usize,
-    ) -> Result<AccountStatesChunkWithProof> {
+    ) -> Result<StateValueChunkWithProof> {
         // Create empty account blobs
         let mut account_blobs = vec![];
         for _ in 0..chunk_size {
@@ -535,12 +535,12 @@ impl DbReader for MockDbReader {
         }
 
         // Create an account states chunk with proof
-        let account_states_chunk_with_proof = AccountStatesChunkWithProof {
+        let account_states_chunk_with_proof = StateValueChunkWithProof {
             first_index: start_idx as u64,
             last_index: (start_idx + chunk_size - 1) as u64,
             first_key: HashValue::zero(),
             last_key: HashValue::zero(),
-            account_blobs,
+            raw_values: account_blobs,
             proof: SparseMerkleRangeProof::new(vec![]),
             root_hash: HashValue::zero(),
         };

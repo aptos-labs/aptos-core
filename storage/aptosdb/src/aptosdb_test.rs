@@ -10,6 +10,8 @@ use aptos_crypto::hash::CryptoHash;
 #[allow(unused_imports)]
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 use aptos_temppath::TempPath;
+#[allow(unused_imports)]
+use aptos_types::account_state_blob::AccountStateBlob;
 use aptos_types::transaction::Transaction;
 #[allow(unused_imports)]
 use aptos_types::{
@@ -538,13 +540,13 @@ fn verify_committed_transactions(
         assert_eq!(txn_output_list_with_proof.transactions_and_outputs.len(), 1);
 
         // Fetch and verify account states.
-        for (addr, expected_blob) in txn_to_commit.account_states() {
-            let account_state_with_proof = db
-                .get_account_state_with_proof(*addr, cur_ver, ledger_version)
+        for (state_key, state_value) in txn_to_commit.state_updates() {
+            let state_value_with_proof = db
+                .get_state_value_with_proof(state_key.clone(), cur_ver, ledger_version)
                 .unwrap();
-            assert_eq!(account_state_with_proof.blob, Some(expected_blob.clone()));
-            account_state_with_proof
-                .verify(ledger_info, cur_ver, *addr)
+            assert_eq!(state_value_with_proof.value, Some(state_value.clone()));
+            state_value_with_proof
+                .verify(ledger_info, cur_ver, state_key.clone())
                 .unwrap();
         }
 
@@ -637,10 +639,17 @@ fn test_get_latest_tree_state() {
     db.db
         .put::<JellyfishMerkleNodeSchema>(
             &NodeKey::new_empty_path(PRE_GENESIS_VERSION),
-            &Node::new_leaf(address.hash(), blob.clone()),
+            &Node::new_leaf(
+                StateKey::AccountAddressKey(address).hash(),
+                StateValue::from(blob.clone()),
+            ),
         )
         .unwrap();
-    let hash = SparseMerkleLeafNode::new(address.hash(), blob.hash()).hash();
+    let hash = SparseMerkleLeafNode::new(
+        StateKey::AccountAddressKey(address).hash(),
+        StateValue::from(blob).hash(),
+    )
+    .hash();
     let pre_genesis = db.get_latest_tree_state().unwrap();
     assert_eq!(pre_genesis, TreeState::new(0, vec![], hash));
 

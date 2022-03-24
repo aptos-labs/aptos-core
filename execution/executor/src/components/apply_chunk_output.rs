@@ -11,7 +11,7 @@ use aptos_crypto::{
 };
 use aptos_logger::error;
 use aptos_types::{
-    account_address::{AccountAddress, HashAccountAddress},
+    account_address::AccountAddress,
     account_state::AccountState,
     account_state_blob::AccountStateBlob,
     contract_event::ContractEvent,
@@ -20,6 +20,7 @@ use aptos_types::{
     nibble::nibble_path::NibblePath,
     on_chain_config,
     proof::accumulator::InMemoryAccumulator,
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         Transaction, TransactionInfo, TransactionOutput, TransactionPayload, TransactionStatus,
     },
@@ -56,12 +57,12 @@ impl ApplyChunkOutput {
             Self::sort_transactions(transactions, transaction_outputs)?;
 
         // Apply the write set, get the latest state.
-        let (account_blobs, roots_with_node_hashes, result_state, next_epoch_state) =
+        let (state_store_update, roots_with_node_hashes, result_state, next_epoch_state) =
             Self::apply_write_set(state_cache, new_epoch, &to_keep)?;
 
         // Calculate TransactionData and TransactionInfo, i.e. the ledger history diff.
         let (to_commit, transaction_info_hashes) =
-            Self::assemble_ledger_diff(to_keep, account_blobs, roots_with_node_hashes);
+            Self::assemble_ledger_diff(to_keep, state_store_update, roots_with_node_hashes);
 
         Ok((
             ExecutedChunk {
@@ -158,9 +159,9 @@ impl ApplyChunkOutput {
         new_epoch: bool,
         to_keep: &[(Transaction, ParsedTransactionOutput)],
     ) -> Result<(
-        Vec<HashMap<AccountAddress, AccountStateBlob>>,
+        Vec<HashMap<StateKey, StateValue>>,
         Vec<(HashValue, HashMap<NibblePath, HashValue>)>,
-        SparseMerkleTree<AccountStateBlob>,
+        SparseMerkleTree<StateValue>,
         Option<EpochState>,
     )> {
         let StateCache {
@@ -174,13 +175,18 @@ impl ApplyChunkOutput {
             .iter()
             .map(|(t, o)| process_write_set(t, &mut accounts, o.write_set().clone()))
             .collect::<Result<Vec<_>>>()?;
-        let account_blobs = account_states
+        let state_store_updates = account_states
             .par_iter()
             .with_min_len(100)
             .map(|account_to_state| {
                 account_to_state
                     .iter()
-                    .map(|(addr, state)| Ok((*addr, AccountStateBlob::try_from(state)?)))
+                    .map(|(addr, state)| {
+                        Ok((
+                            StateKey::AccountAddressKey(*addr),
+                            StateValue::from(AccountStateBlob::try_from(state)?),
+                        ))
+                    })
                     .collect::<Result<HashMap<_, _>>>()
             })
             .collect::<Result<Vec<_>>>()?;
@@ -188,7 +194,7 @@ impl ApplyChunkOutput {
         // Apply new account states to the base state tree, resulting in updated state tree.
         let (roots_with_node_hashes, result_state) = frozen_base
             .serial_update(
-                Self::account_blobs_to_smt_updates(&account_blobs),
+                Self::state_store_updates_to_smt_updates(&state_store_updates),
                 &ProofReader::new(proofs),
             )
             .map_err(|e| anyhow!("Failed to update state tree. err: {:?}", e))?;
@@ -204,21 +210,21 @@ impl ApplyChunkOutput {
         };
 
         Ok((
-            account_blobs,
+            state_store_updates,
             roots_with_node_hashes,
             result_state,
             next_epoch_state,
         ))
     }
 
-    fn account_blobs_to_smt_updates(
-        account_blobs: &[HashMap<AccountAddress, AccountStateBlob>],
-    ) -> Vec<Vec<(HashValue, &AccountStateBlob)>> {
+    fn state_store_updates_to_smt_updates(
+        account_blobs: &[HashMap<StateKey, StateValue>],
+    ) -> Vec<Vec<(HashValue, &StateValue)>> {
         account_blobs
             .iter()
             .map(|m| {
                 m.iter()
-                    .map(|(account, blob)| (HashAccountAddress::hash(account), blob))
+                    .map(|(key, value)| (key.hash(), value))
                     .collect::<Vec<_>>()
             })
             .collect()
@@ -250,15 +256,17 @@ impl ApplyChunkOutput {
 
     fn assemble_ledger_diff(
         to_keep: Vec<(Transaction, ParsedTransactionOutput)>,
-        account_blobs: Vec<HashMap<AccountAddress, AccountStateBlob>>,
+        state_updates: Vec<HashMap<StateKey, StateValue>>,
         roots_with_node_hashes: Vec<(HashValue, HashMap<NibblePath, HashValue>)>,
     ) -> (Vec<(Transaction, TransactionData)>, Vec<HashValue>) {
         let mut to_commit = vec![];
         let mut txn_info_hashes = vec![];
-        for ((txn, txn_output), ((state_tree_hash, new_node_hashes), blobs)) in itertools::zip_eq(
-            to_keep,
-            itertools::zip_eq(roots_with_node_hashes, account_blobs),
-        ) {
+        for ((txn, txn_output), ((state_tree_hash, new_node_hashes), state_store_update)) in
+            itertools::zip_eq(
+                to_keep,
+                itertools::zip_eq(roots_with_node_hashes, state_updates),
+            )
+        {
             let (write_set, events, reconfig_events, gas_used, status) = txn_output.unpack();
             let event_tree = {
                 let event_hashes: Vec<_> = events.iter().map(CryptoHash::hash).collect();
@@ -281,7 +289,7 @@ impl ApplyChunkOutput {
             to_commit.push((
                 txn,
                 TransactionData::new(
-                    blobs,
+                    state_store_update,
                     new_node_hashes,
                     write_set,
                     events,

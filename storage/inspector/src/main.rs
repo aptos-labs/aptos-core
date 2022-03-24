@@ -12,6 +12,7 @@ use storage_interface::DbReader;
 
 use aptos_types::{
     account_address::AccountAddress, account_config::AccountResource, account_state::AccountState,
+    account_state_blob::AccountStateBlob, state_store::state_key::StateKey,
 };
 use std::convert::TryFrom;
 use structopt::StructOpt;
@@ -83,10 +84,10 @@ fn print_txn(db: &AptosDB, version: u64) {
 
 fn print_account(db: &AptosDB, addr: AccountAddress) {
     let maybe_blob = db
-        .get_latest_account_state(addr)
+        .get_latest_state_value(StateKey::AccountAddressKey(addr))
         .expect("Unable to read AccountState");
     if let Some(blob) = maybe_blob {
-        match AccountResource::try_from(&blob) {
+        match AccountResource::try_from(&AccountStateBlob::from(blob)) {
             Ok(r) => {
                 println!("Account {}: {:?}", addr, r);
             }

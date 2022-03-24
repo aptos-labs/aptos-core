@@ -19,13 +19,12 @@ use aptos_crypto::{
 };
 use aptos_state_view::StateViewId;
 use aptos_types::{
-    account_address::AccountAddress,
-    account_state_blob::AccountStateBlob,
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     nibble::nibble_path::NibblePath,
     proof::{accumulator::InMemoryAccumulator, AccumulatorExtensionProof},
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         Transaction, TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
         TransactionStatus, Version,
@@ -40,8 +39,8 @@ use storage_interface::DbReader;
 pub use executed_chunk::ExecutedChunk;
 use storage_interface::state_view::VerifiedStateView;
 
-type SparseMerkleProof = aptos_types::proof::SparseMerkleProof<AccountStateBlob>;
-type SparseMerkleTree = scratchpad::SparseMerkleTree<AccountStateBlob>;
+type SparseMerkleProof = aptos_types::proof::SparseMerkleProof<StateValue>;
+type SparseMerkleTree = scratchpad::SparseMerkleTree<StateValue>;
 
 pub trait ChunkExecutorTrait: Send + Sync {
     /// Verifies the transactions based on the provided proofs and ledger info. If the transactions
@@ -387,7 +386,7 @@ impl ProofReader {
     }
 }
 
-impl ProofRead<AccountStateBlob> for ProofReader {
+impl ProofRead<StateValue> for ProofReader {
     fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProof> {
         self.account_to_proof.get(&key)
     }
@@ -397,11 +396,9 @@ impl ProofRead<AccountStateBlob> for ProofReader {
 /// which includes the write set and events, this also has the in-memory trees.
 #[derive(Clone, Debug)]
 pub struct TransactionData {
-    /// Each entry in this map represents the new blob value of an account touched by this
-    /// transaction. The blob is obtained by deserializing the previous blob into a BTreeMap,
-    /// applying relevant portion of write set on the map and serializing the updated map into a
-    /// new blob.
-    account_blobs: HashMap<AccountAddress, AccountStateBlob>,
+    /// Each entry in this map represents the new value of a store store object touched by this
+    /// transaction.
+    state_updates: HashMap<StateKey, StateValue>,
 
     /// Each entry in this map represents the the hash of a newly generated jellyfish node
     /// and its corresponding nibble path.
@@ -434,7 +431,7 @@ pub struct TransactionData {
 
 impl TransactionData {
     pub fn new(
-        account_blobs: HashMap<AccountAddress, AccountStateBlob>,
+        state_updates: HashMap<StateKey, StateValue>,
         jf_node_hashes: HashMap<NibblePath, HashValue>,
         write_set: WriteSet,
         events: Vec<ContractEvent>,
@@ -446,7 +443,7 @@ impl TransactionData {
         txn_info_hash: HashValue,
     ) -> Self {
         TransactionData {
-            account_blobs,
+            state_updates,
             jf_node_hashes,
             write_set,
             events,
@@ -459,8 +456,8 @@ impl TransactionData {
         }
     }
 
-    pub fn account_blobs(&self) -> &HashMap<AccountAddress, AccountStateBlob> {
-        &self.account_blobs
+    pub fn state_updates(&self) -> &HashMap<StateKey, StateValue> {
+        &self.state_updates
     }
 
     pub fn jf_node_hashes(&self) -> &HashMap<NibblePath, HashValue> {

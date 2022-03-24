@@ -5,7 +5,6 @@
 use super::*;
 use aptos_crypto::hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher};
 use aptos_types::{
-    account_address::HashAccountAddress,
     ledger_info::LedgerInfoWithSignatures,
     proof::accumulator::InMemoryAccumulator,
     proptest_types::{AccountInfoUniverse, BlockGen},
@@ -32,7 +31,7 @@ prop_compose! {
         type EventAccumulator = InMemoryAccumulator<EventAccumulatorHasher>;
         type TxnAccumulator = InMemoryAccumulator<TransactionAccumulatorHasher>;
 
-        let mut smt = SparseMerkleTree::<AccountStateBlob>::default().freeze();
+        let mut smt = SparseMerkleTree::<StateValue>::default().freeze();
         let mut txn_accumulator = TxnAccumulator::new_empty();
         let mut result = Vec::new();
 
@@ -48,13 +47,10 @@ prop_compose! {
                 let event_root_hash = EventAccumulator::from_leaves(&event_hashes).root_hash();
 
                 // calcualte state checkpoint hash
-                let state_checkpoint_hash = if txn.account_states().is_empty() {
+                let state_checkpoint_hash = if txn.state_updates().is_empty() {
                     None
                 } else {
-                    let updates: Vec<_> = txn.account_states().iter().map(|(addr, blob)| {
-                            ( HashAccountAddress::hash(addr), blob )
-                    }).collect();
-
+                    let updates = txn.state_updates().iter().map(|(key, value)| {(key.hash(), value)}).collect();
                     smt = smt.batch_update(updates, &ProofReader::new_empty()).unwrap();
 
                     Some(smt.root_hash())

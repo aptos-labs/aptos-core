@@ -212,9 +212,9 @@ fn test_update_256_siblings_in_proof() {
 
     assert_eq!(
         new_smt.get(key1),
-        AccountStatus::ExistsInScratchPad(new_blob1)
+        StateStoreStatus::ExistsInScratchPad(new_blob1)
     );
-    assert_eq!(new_smt.get(key2), AccountStatus::Unknown);
+    assert_eq!(new_smt.get(key2), StateStoreStatus::Unknown);
 }
 
 #[test]
@@ -282,17 +282,17 @@ fn test_update() {
     //           y      key3 (unknown)
     //          / \
     //         x   key4
-    assert_eq!(smt1.get(key1), AccountStatus::Unknown);
-    assert_eq!(smt1.get(key2), AccountStatus::Unknown);
-    assert_eq!(smt1.get(key3), AccountStatus::Unknown);
+    assert_eq!(smt1.get(key1), StateStoreStatus::Unknown);
+    assert_eq!(smt1.get(key2), StateStoreStatus::Unknown);
+    assert_eq!(smt1.get(key3), StateStoreStatus::Unknown);
     assert_eq!(
         smt1.get(key4),
-        AccountStatus::ExistsInScratchPad(value4.clone())
+        StateStoreStatus::ExistsInScratchPad(value4.clone())
     );
 
     let non_existing_key = b"foo".test_only_hash();
     assert_eq!(non_existing_key[0], 0b0111_0110);
-    assert_eq!(smt1.get(non_existing_key), AccountStatus::DoesNotExist);
+    assert_eq!(smt1.get(non_existing_key), StateStoreStatus::DoesNotExist);
 
     // Verify root hash.
     let value4_hash = value4.hash();
@@ -327,11 +327,11 @@ fn test_update() {
     //     key1    key2 (unknown)
     assert_eq!(
         smt2.get(key1),
-        AccountStatus::ExistsInScratchPad(value1.clone())
+        StateStoreStatus::ExistsInScratchPad(value1.clone())
     );
-    assert_eq!(smt2.get(key2), AccountStatus::Unknown);
-    assert_eq!(smt2.get(key3), AccountStatus::Unknown);
-    assert_eq!(smt2.get(key4), AccountStatus::ExistsInScratchPad(value4));
+    assert_eq!(smt2.get(key2), StateStoreStatus::Unknown);
+    assert_eq!(smt2.get(key3), StateStoreStatus::Unknown);
+    assert_eq!(smt2.get(key4), StateStoreStatus::ExistsInScratchPad(value4));
 
     // Verify root hash.
     let value1_hash = value1.hash();
@@ -358,12 +358,12 @@ fn test_update() {
     //           y'      key3 (unknown, weak)
     //          / \
     // (weak) x   key4
-    assert_eq!(smt22.get(key1), AccountStatus::Unknown);
-    assert_eq!(smt22.get(key2), AccountStatus::Unknown);
-    assert_eq!(smt22.get(key3), AccountStatus::Unknown);
+    assert_eq!(smt22.get(key1), StateStoreStatus::Unknown);
+    assert_eq!(smt22.get(key2), StateStoreStatus::Unknown);
+    assert_eq!(smt22.get(key3), StateStoreStatus::Unknown);
     assert_eq!(
         smt22.get(key4),
-        AccountStatus::ExistsInScratchPad(value4.clone())
+        StateStoreStatus::ExistsInScratchPad(value4.clone())
     );
 
     // Verify oldest ancestor
@@ -378,17 +378,20 @@ fn test_update() {
 
     // For smt2, only key1 should be available since smt2 was constructed by updating smt1 with
     // key1.
-    assert_eq!(smt2.get(key1), AccountStatus::ExistsInScratchPad(value1));
-    assert_eq!(smt2.get(key2), AccountStatus::Unknown);
-    assert_eq!(smt2.get(key3), AccountStatus::Unknown);
-    assert_eq!(smt2.get(key4), AccountStatus::ExistsInDB);
+    assert_eq!(smt2.get(key1), StateStoreStatus::ExistsInScratchPad(value1));
+    assert_eq!(smt2.get(key2), StateStoreStatus::Unknown);
+    assert_eq!(smt2.get(key3), StateStoreStatus::Unknown);
+    assert_eq!(smt2.get(key4), StateStoreStatus::ExistsInDB);
 
     // For smt22, only key4 should be available since smt22 was constructed by updating smt1 with
     // key4.
-    assert_eq!(smt22.get(key1), AccountStatus::Unknown);
-    assert_eq!(smt22.get(key2), AccountStatus::Unknown);
-    assert_eq!(smt22.get(key3), AccountStatus::Unknown);
-    assert_eq!(smt22.get(key4), AccountStatus::ExistsInScratchPad(value4));
+    assert_eq!(smt22.get(key1), StateStoreStatus::Unknown);
+    assert_eq!(smt22.get(key2), StateStoreStatus::Unknown);
+    assert_eq!(smt22.get(key3), StateStoreStatus::Unknown);
+    assert_eq!(
+        smt22.get(key4),
+        StateStoreStatus::ExistsInScratchPad(value4)
+    );
 }
 
 #[test]

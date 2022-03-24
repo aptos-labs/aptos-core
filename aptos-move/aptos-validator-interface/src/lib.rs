@@ -19,6 +19,8 @@ use aptos_types::{
 };
 use move_binary_format::file_format::CompiledModule;
 
+// TODO(skedia) Clean up this interfact to remove account specific logic and move to state store
+// key-value interface with fine grained storage project
 pub trait AptosValidatorInterface: Sync {
     fn get_account_state_by_version(
         &self,

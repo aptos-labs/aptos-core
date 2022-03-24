@@ -8,9 +8,10 @@ use aptos_types::{
     account_state_blob::AccountStateBlob,
     ledger_info::LedgerInfo,
     proof::{
-        AccountStateProof, EventProof, SparseMerkleProof, TestAccumulatorProof,
+        EventProof, SparseMerkleProof, StateStoreValueProof, TestAccumulatorProof,
         TestAccumulatorRangeProof, TransactionInfoListWithProof, TransactionInfoWithProof,
     },
+    state_store::state_value::StateValue,
     transaction::Version,
 };
 use proptest::prelude::*;
@@ -144,7 +145,7 @@ pub struct AccountStateProofFuzzer;
 
 #[derive(Debug, Arbitrary)]
 struct AccountStateProofFuzzerInput {
-    proof: AccountStateProof,
+    proof: StateStoreValueProof,
     ledger_info: LedgerInfo,
     state_version: Version,
     account_address_hash: HashValue,
@@ -166,7 +167,7 @@ impl FuzzTargetImpl for AccountStateProofFuzzer {
             &input.ledger_info,
             input.state_version,
             input.account_address_hash,
-            input.account_state_blob.as_ref(),
+            input.account_state_blob.map(StateValue::from).as_ref(),
         );
     }
 }

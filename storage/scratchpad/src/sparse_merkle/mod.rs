@@ -372,7 +372,7 @@ where
             .map(FrozenSparseMerkleTree::unfreeze)
     }
 
-    pub fn get(&self, key: HashValue) -> AccountStatus<V> {
+    pub fn get(&self, key: HashValue) -> StateStoreStatus<V> {
         self.clone().freeze().get(key)
     }
 }
@@ -388,22 +388,22 @@ where
 
 /// `AccountStatus` describes the result of querying an account from this SparseMerkleTree.
 #[derive(Debug, Eq, PartialEq)]
-pub enum AccountStatus<V> {
-    /// The account exists in the tree, therefore we can give its value.
+pub enum StateStoreStatus<V> {
+    /// The entry exists in the tree, therefore we can give its value.
     ExistsInScratchPad(V),
 
-    /// The account does not exist in the tree, but exists in DB. This happens when the search
+    /// The entry does not exist in the tree, but exists in DB. This happens when the search
     /// reaches a leaf node that has the requested account, but the node has only the value hash
     /// because it was loaded into memory as part of a non-inclusion proof. When we go to DB we
     /// don't need to traverse the tree to find the same leaf, instead we can use the value hash to
-    /// look up the account content directly.
+    /// look up the entry content directly.
     ExistsInDB,
 
-    /// The account does not exist in either the tree or DB. This happens when the search reaches
+    /// The entry does not exist in either the tree or DB. This happens when the search reaches
     /// an empty node, or a leaf node that has a different account.
     DoesNotExist,
 
-    /// We do not know if this account exists or not and need to go to DB to find out. This happens
+    /// We do not know if this entry exists or not and need to go to DB to find out. This happens
     /// when the search reaches a subtree node.
     Unknown,
 }
@@ -597,16 +597,16 @@ where
     }
 
     /// Queries a `key` in this `SparseMerkleTree`.
-    pub fn get(&self, key: HashValue) -> AccountStatus<V> {
+    pub fn get(&self, key: HashValue) -> StateStoreStatus<V> {
         let mut subtree = self.smt.root_weak();
         let mut bits = key.iter_bits();
 
         loop {
             match subtree {
-                SubTree::Empty => return AccountStatus::DoesNotExist,
+                SubTree::Empty => return StateStoreStatus::DoesNotExist,
                 SubTree::NonEmpty { .. } => {
                     match subtree.get_node_if_in_mem(self.base_generation) {
-                        None => return AccountStatus::Unknown,
+                        None => return StateStoreStatus::Unknown,
                         Some(node) => match node.inner() {
                             NodeInner::Internal(internal_node) => {
                                 subtree = if bits.next().expect("Tree is too deep.") {
@@ -619,13 +619,13 @@ where
                             NodeInner::Leaf(leaf_node) => {
                                 return if leaf_node.key == key {
                                     match &leaf_node.value.data.get_if_in_mem() {
-                                        Some(value) => AccountStatus::ExistsInScratchPad(
+                                        Some(value) => StateStoreStatus::ExistsInScratchPad(
                                             value.as_ref().clone(),
                                         ),
-                                        None => AccountStatus::ExistsInDB,
+                                        None => StateStoreStatus::ExistsInDB,
                                     }
                                 } else {
-                                    AccountStatus::DoesNotExist
+                                    StateStoreStatus::DoesNotExist
                                 }
                             } // end NodeInner::Leaf
                         }, // end Some(node) got from mem

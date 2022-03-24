@@ -46,14 +46,14 @@ async fn test_notifications_accounts() {
                 assert_eq!(accounts_with_proof.first_index, next_expected_index);
 
                 // Verify the last account index matches the account list length
-                let num_accounts = accounts_with_proof.account_blobs.len() as u64;
+                let num_accounts = accounts_with_proof.raw_values.len() as u64;
                 assert_eq!(
                     accounts_with_proof.last_index,
                     next_expected_index + num_accounts - 1,
                 );
 
                 // Verify the number of account blobs is as expected
-                assert_eq!(accounts_with_proof.account_blobs.len() as u64, num_accounts);
+                assert_eq!(accounts_with_proof.raw_values.len() as u64, num_accounts);
 
                 next_expected_index += num_accounts;
             }
@@ -82,7 +82,7 @@ async fn test_notifications_accounts_multiple_streams() {
             DataPayload::AccountStatesWithProof(accounts_with_proof) => {
                 // Verify the indices
                 assert_eq!(accounts_with_proof.first_index, next_expected_index);
-                next_expected_index += accounts_with_proof.account_blobs.len() as u64;
+                next_expected_index += accounts_with_proof.raw_values.len() as u64;
 
                 if next_expected_index < TOTAL_NUM_ACCOUNTS {
                     // Terminate the stream

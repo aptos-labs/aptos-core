@@ -18,7 +18,6 @@ use aptos_types::{
         xus_tag, BalanceResource, XUS_NAME,
     },
     account_state::AccountState,
-    account_state_blob::AccountStateBlob,
     contract_event::ContractEvent,
     on_chain_config,
     on_chain_config::{
@@ -26,6 +25,7 @@ use aptos_types::{
         ValidatorSet,
     },
     proof::SparseMerkleRangeProof,
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         authenticator::AuthenticationKey, ChangeSet, Transaction, Version, WriteSetPayload,
         PRE_GENESIS_VERSION,
@@ -201,7 +201,7 @@ fn get_transfer_transaction(
 fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
     let account_state_blob = db
         .reader
-        .get_latest_account_state(*account)
+        .get_latest_state_value(StateKey::AccountAddressKey(*account))
         .unwrap()
         .unwrap();
     let account_state = AccountState::try_from(&account_state_blob).unwrap();
@@ -216,7 +216,7 @@ fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
 fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
     let config_blob = db
         .reader
-        .get_latest_account_state(config_address())
+        .get_latest_state_value(StateKey::AccountAddressKey(config_address()))
         .unwrap()
         .unwrap();
     let config_state = AccountState::try_from(&config_blob).unwrap();
@@ -226,7 +226,7 @@ fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
 fn get_state_backup(
     db: &Arc<AptosDB>,
 ) -> (
-    Vec<(HashValue, AccountStateBlob)>,
+    Vec<(HashValue, StateValue)>,
     SparseMerkleRangeProof,
     HashValue,
 ) {
@@ -252,7 +252,7 @@ fn get_state_backup(
 
 fn restore_state_to_db(
     db: &Arc<AptosDB>,
-    accounts: Vec<(HashValue, AccountStateBlob)>,
+    accounts: Vec<(HashValue, StateValue)>,
     proof: SparseMerkleRangeProof,
     root_hash: HashValue,
     version: Version,

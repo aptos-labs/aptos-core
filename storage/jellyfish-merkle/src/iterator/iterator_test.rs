@@ -35,18 +35,25 @@ fn test_n_leaves_same_version(n: usize) {
     let tree = JellyfishMerkleTree::new(&*db);
 
     let mut rng = StdRng::from_seed([1; 32]);
+    let values: Vec<ValueBlob> = (0..n)
+        .map(|i| ValueBlob::from(i.to_be_bytes().to_vec()))
+        .collect();
 
     let mut btree = BTreeMap::new();
-    for i in 0..n {
+    for (index, _) in values.iter().enumerate() {
         let key = HashValue::random_with_rng(&mut rng);
-        let value = ValueBlob::from(i.to_be_bytes().to_vec());
-        assert_eq!(btree.insert(key, value), None);
+        assert_eq!(btree.insert(key, &values[index]), None);
     }
 
     let (_root_hash, batch) = tree
         .put_value_set(btree.clone().into_iter().collect(), 0 /* version */)
         .unwrap();
     db.write_tree_update_batch(batch).unwrap();
+    let btree: BTreeMap<_, _> = btree
+        .clone()
+        .into_iter()
+        .map(|(x, y)| (x, y.clone()))
+        .collect();
 
     run_tests(db, &btree, 0 /* version */);
 }
@@ -60,7 +67,7 @@ fn test_n_leaves_multiple_versions(n: usize) {
     let mut btree = BTreeMap::new();
     for i in 0..n {
         let key = HashValue::random_with_rng(&mut rng);
-        let value = ValueBlob::from(i.to_be_bytes().to_vec());
+        let value = &ValueBlob::from(i.to_be_bytes().to_vec());
         assert_eq!(btree.insert(key, value.clone()), None);
         let (_root_hash, batch) = tree
             .put_value_set(vec![(key, value)], i as Version)
@@ -73,20 +80,23 @@ fn test_n_leaves_multiple_versions(n: usize) {
 fn test_n_consecutive_addresses(n: usize) {
     let db = Arc::new(MockTreeStore::default());
     let tree = JellyfishMerkleTree::new(&*db);
+    let values: Vec<ValueBlob> = (0..n)
+        .map(|i| ValueBlob::from(i.to_be_bytes().to_vec()))
+        .collect();
 
     let btree: BTreeMap<_, _> = (0..n)
-        .map(|i| {
-            (
-                HashValue::from_u64(i as u64),
-                ValueBlob::from(i.to_be_bytes().to_vec()),
-            )
-        })
+        .map(|i| (HashValue::from_u64(i as u64), &values[i]))
         .collect();
 
     let (_root_hash, batch) = tree
         .put_value_set(btree.clone().into_iter().collect(), 0 /* version */)
         .unwrap();
     db.write_tree_update_batch(batch).unwrap();
+    let btree: BTreeMap<_, _> = btree
+        .clone()
+        .into_iter()
+        .map(|(x, y)| (x, y.clone()))
+        .collect();
 
     run_tests(db, &btree, 0 /* version */);
 }

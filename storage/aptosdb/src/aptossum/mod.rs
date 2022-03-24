@@ -5,15 +5,13 @@ use crate::{AptosDB, Order, MAX_LIMIT};
 use anyhow::{ensure, format_err, Result};
 use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_types::{
-    account_address::AccountAddress,
-    account_state_blob::AccountStateBlob,
     contract_event::ContractEvent,
     event::EventKey,
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, Version},
 };
 use std::{convert::AsRef, path::Path};
 use storage_interface::{DbReader, StartupInfo};
-
 pub struct Aptossum {
     db: AptosDB,
 }
@@ -69,14 +67,14 @@ impl Aptossum {
         self.db.transaction_store.get_transaction(version)
     }
 
-    pub fn get_account_state_by_version(
+    pub fn get_state_value_by_version(
         &self,
-        address: AccountAddress,
+        state_key: StateKey,
         version: Version,
-    ) -> Result<Option<AccountStateBlob>> {
+    ) -> Result<Option<StateValue>> {
         self.db
             .state_store
-            .get_account_state_with_proof_by_version(address, version)
+            .get_value_with_proof_by_version(state_key, version)
             .map(|blob_and_proof| blob_and_proof.0)
     }
 

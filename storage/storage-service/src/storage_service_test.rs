@@ -3,7 +3,7 @@
 
 use super::*;
 use aptos_config::{config::NodeConfig, utils};
-use aptos_types::account_address::HashAccountAddress;
+use aptos_crypto::hash::CryptoHash;
 #[cfg(test)]
 use aptosdb::test_helper::arb_blocks_to_commit;
 use itertools::zip_eq;
@@ -51,7 +51,7 @@ proptest! {
             let mut account_states = HashMap::new();
             // Get the ground truth of account states.
             txns_to_commit.iter().for_each(|txn_to_commit| {
-                account_states.extend(txn_to_commit.account_states().clone())
+                account_states.extend(txn_to_commit.state_updates().clone())
             });
 
             // Record all account states.
@@ -68,7 +68,7 @@ proptest! {
 
             let account_states_returned = account_states
                 .keys()
-                .map(|address| client.get_account_state_with_proof_by_version(*address, version - 1).unwrap())
+                .map(|address| client.get_state_value_with_proof_by_version(address.clone(), version - 1).unwrap())
                 .collect::<Vec<_>>();
             let startup_info = client.get_startup_info().unwrap().unwrap();
             for ((address, blob), state_with_proof) in zip_eq(account_states, account_states_returned) {

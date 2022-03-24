@@ -10,6 +10,7 @@ use aptos_types::{
     account_config::{aptos_root_address, treasury_compliance_account_address, xus_tag},
     account_state::AccountState,
     block_metadata::BlockMetadata,
+    state_store::state_key::StateKey,
     transaction::{Script, Transaction, TransactionPayload, WriteSetPayload},
     trusted_state::TrustedState,
     validator_signer::ValidatorSigner,
@@ -46,10 +47,10 @@ fn test_genesis() {
 
     let aptos_root_account = db
         .reader
-        .get_account_state_with_proof(aptos_root_address(), 0, 0)
+        .get_state_value_with_proof(StateKey::AccountAddressKey(aptos_root_address()), 0, 0)
         .unwrap();
     aptos_root_account
-        .verify(li, 0, aptos_root_address())
+        .verify(li, 0, StateKey::AccountAddressKey(aptos_root_address()))
         .unwrap();
 }
 
@@ -73,21 +74,29 @@ fn test_reconfiguration() {
     let current_version = state_proof.latest_ledger_info().version();
     let validator_account_state_with_proof = db
         .reader
-        .get_account_state_with_proof(validator_account, current_version, current_version)
+        .get_state_value_with_proof(
+            StateKey::AccountAddressKey(validator_account),
+            current_version,
+            current_version,
+        )
         .unwrap();
     let aptos_root_account_state_with_proof = db
         .reader
-        .get_account_state_with_proof(aptos_root_address(), current_version, current_version)
+        .get_state_value_with_proof(
+            StateKey::AccountAddressKey(aptos_root_address()),
+            current_version,
+            current_version,
+        )
         .unwrap();
     assert_eq!(
-        AccountState::try_from(&aptos_root_account_state_with_proof.blob.unwrap())
+        AccountState::try_from(&aptos_root_account_state_with_proof.value.unwrap())
             .unwrap()
             .get_validator_set()
             .unwrap()
             .unwrap()
             .payload()[0]
             .consensus_public_key(),
-        &AccountState::try_from(&validator_account_state_with_proof.blob.unwrap())
+        &AccountState::try_from(&validator_account_state_with_proof.value.unwrap())
             .unwrap()
             .get_validator_config_resource()
             .unwrap()
@@ -166,10 +175,14 @@ fn test_reconfiguration() {
     // test validator's key under validator_account is as expected
     let validator_account_state_with_proof = db
         .reader
-        .get_account_state_with_proof(validator_account, current_version, current_version)
+        .get_state_value_with_proof(
+            StateKey::AccountAddressKey(validator_account),
+            current_version,
+            current_version,
+        )
         .unwrap();
     assert_eq!(
-        AccountState::try_from(&validator_account_state_with_proof.blob.unwrap())
+        AccountState::try_from(&validator_account_state_with_proof.value.unwrap())
             .unwrap()
             .get_validator_config_resource()
             .unwrap()
@@ -184,21 +197,29 @@ fn test_reconfiguration() {
     // validator set since the reconfiguration was invoked
     let validator_account_state_with_proof = db
         .reader
-        .get_account_state_with_proof(validator_account, current_version, current_version)
+        .get_state_value_with_proof(
+            StateKey::AccountAddressKey(validator_account),
+            current_version,
+            current_version,
+        )
         .unwrap();
     let aptos_root_account_state_with_proof = db
         .reader
-        .get_account_state_with_proof(aptos_root_address(), current_version, current_version)
+        .get_state_value_with_proof(
+            StateKey::AccountAddressKey(aptos_root_address()),
+            current_version,
+            current_version,
+        )
         .unwrap();
     assert_eq!(
-        AccountState::try_from(&aptos_root_account_state_with_proof.blob.unwrap())
+        AccountState::try_from(&aptos_root_account_state_with_proof.value.unwrap())
             .unwrap()
             .get_validator_set()
             .unwrap()
             .unwrap()
             .payload()[0]
             .consensus_public_key(),
-        &AccountState::try_from(&validator_account_state_with_proof.blob.unwrap())
+        &AccountState::try_from(&validator_account_state_with_proof.value.unwrap())
             .unwrap()
             .get_validator_config_resource()
             .unwrap()
@@ -211,9 +232,13 @@ fn test_reconfiguration() {
     // test validator's key in the validator set is as expected
     let aptos_root_account_state_with_proof = db
         .reader
-        .get_account_state_with_proof(aptos_root_address(), current_version, current_version)
+        .get_state_value_with_proof(
+            StateKey::AccountAddressKey(aptos_root_address()),
+            current_version,
+            current_version,
+        )
         .unwrap();
-    let blob = &aptos_root_account_state_with_proof.blob.unwrap();
+    let blob = &aptos_root_account_state_with_proof.value.unwrap();
     assert_eq!(
         AccountState::try_from(blob)
             .unwrap()

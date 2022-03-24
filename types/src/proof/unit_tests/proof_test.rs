@@ -4,7 +4,6 @@
 use crate::{
     account_address::AccountAddress,
     account_config::XUS_NAME,
-    account_state_blob::AccountStateBlob,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -12,12 +11,13 @@ use crate::{
     event::EventKey,
     ledger_info::LedgerInfo,
     proof::{
-        definition::{AccountStateProof, EventProof, MAX_ACCUMULATOR_PROOF_DEPTH},
+        definition::{EventProof, StateStoreValueProof, MAX_ACCUMULATOR_PROOF_DEPTH},
         AccumulatorExtensionProof, AccumulatorRangeProof, EventAccumulatorInternalNode,
         EventAccumulatorProof, SparseMerkleInternalNode, SparseMerkleLeafNode,
         TestAccumulatorInternalNode, TestAccumulatorProof, TransactionAccumulatorInternalNode,
         TransactionAccumulatorProof, TransactionInfoListWithProof, TransactionInfoWithProof,
     },
+    state_store::state_value::StateValue,
     transaction::{
         RawTransaction, Script, Transaction, TransactionInfo, TransactionListWithProof,
         TransactionOutput, TransactionOutputListWithProof, TransactionStatus,
@@ -35,7 +35,7 @@ use aptos_crypto::{
 };
 use move_core_types::language_storage::TypeTag;
 
-type SparseMerkleProof = crate::proof::SparseMerkleProof<AccountStateBlob>;
+type SparseMerkleProof = crate::proof::SparseMerkleProof<StateValue>;
 
 #[test]
 fn test_verify_empty_accumulator() {
@@ -160,9 +160,9 @@ fn test_verify_empty_sparse_merkle() {
 #[test]
 fn test_verify_single_element_sparse_merkle() {
     let key = b"hello".test_only_hash();
-    let blob: AccountStateBlob = b"world".to_vec().into();
+    let blob: StateValue = b"world".to_vec().into();
     let blob_hash = blob.hash();
-    let non_existing_blob = b"world?".to_vec().into();
+    let non_existing_blob: StateValue = b"world?".to_vec().into();
     let root_node = SparseMerkleLeafNode::new(key, blob_hash);
     let root_hash = root_node.hash();
     let proof = SparseMerkleProof::new(Some(root_node), vec![]);
@@ -202,9 +202,9 @@ fn test_verify_three_element_sparse_merkle() {
     assert_eq!(key2[0], 0b0100_0010);
     assert_eq!(key3[0], 0b0110_1001);
 
-    let blob1 = AccountStateBlob::from(b"1".to_vec());
-    let blob2 = AccountStateBlob::from(b"2".to_vec());
-    let blob3 = AccountStateBlob::from(b"3".to_vec());
+    let blob1 = StateValue::from(b"1".to_vec());
+    let blob2 = StateValue::from(b"2".to_vec());
+    let blob3 = StateValue::from(b"3".to_vec());
 
     let leaf1 = SparseMerkleLeafNode::new(key1, blob1.hash());
     let leaf1_hash = leaf1.hash();
@@ -314,7 +314,7 @@ fn test_verify_transaction() {
 }
 
 #[test]
-fn test_verify_account_state_and_event() {
+fn test_verify_state_store_resource_and_event() {
     //                  root
     //                 /     \
     //               /         \
@@ -342,9 +342,9 @@ fn test_verify_account_state_and_event() {
     assert_eq!(key3[0], 0b0110_1001);
     assert_eq!(non_existing_key[0], 0b0100_0001);
 
-    let blob1 = AccountStateBlob::from(b"value1".to_vec());
-    let blob2 = AccountStateBlob::from(b"value2".to_vec());
-    let blob3 = AccountStateBlob::from(b"value3".to_vec());
+    let blob1 = StateValue::from(b"value1".to_vec());
+    let blob2 = StateValue::from(b"value2".to_vec());
+    let blob3 = StateValue::from(b"value3".to_vec());
 
     let leaf1_hash = SparseMerkleLeafNode::new(key1, blob1.hash()).hash();
     let leaf2 = SparseMerkleLeafNode::new(key2, blob2.hash());
@@ -411,7 +411,7 @@ fn test_verify_account_state_and_event() {
         Some(leaf2),
         vec![leaf3_hash, leaf1_hash, *SPARSE_MERKLE_PLACEHOLDER_HASH],
     );
-    let account_state_proof = AccountStateProof::new(
+    let account_state_proof = StateStoreValueProof::new(
         TransactionInfoWithProof::new(
             ledger_info_to_transaction_info_proof.clone(),
             txn_info2.clone(),

@@ -10,11 +10,13 @@ use crate::{
         DesignatedDealerPreburns, DiemAccountResource, FreezingBit, ParentVASP,
         PreburnQueueResource, PreburnResource,
     },
+    account_state_blob::AccountStateBlob,
     block_metadata::BlockResource,
     on_chain_config::{
         access_path_for_config, dpn_access_path_for_config, ConfigurationResource, OnChainConfig,
         RegisteredCurrencies, VMPublishingOption, ValidatorSet, Version,
     },
+    state_store::state_value::StateValue,
     timestamp::TimestampResource,
     validator_config::{ValidatorConfigResource, ValidatorOperatorConfigResource},
 };
@@ -334,6 +336,30 @@ impl fmt::Debug for AccountState {
              }}",
             account_resource_str, timestamp_str, validator_config_str, validator_set_str,
         )
+    }
+}
+
+impl TryFrom<&StateValue> for AccountState {
+    type Error = Error;
+
+    fn try_from(state_store_value: &StateValue) -> Result<Self> {
+        AccountState::try_from(&state_store_value.bytes)
+    }
+}
+
+impl TryFrom<&AccountStateBlob> for AccountState {
+    type Error = Error;
+
+    fn try_from(account_state_blob: &AccountStateBlob) -> Result<Self> {
+        bcs::from_bytes(&account_state_blob.blob).map_err(Into::into)
+    }
+}
+
+impl TryFrom<&Vec<u8>> for AccountState {
+    type Error = Error;
+
+    fn try_from(blob: &Vec<u8>) -> Result<Self> {
+        bcs::from_bytes(blob).map_err(Into::into)
     }
 }
 

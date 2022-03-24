@@ -12,7 +12,7 @@ use anyhow::Result;
 use aptos_config::config::NodeConfig;
 use aptos_logger::prelude::*;
 use aptos_secure_net::NetworkServer;
-use aptos_types::{account_state_blob::AccountStateBlob, proof::SparseMerkleProof};
+use aptos_types::{proof::SparseMerkleProof, state_store::state_value::StateValue};
 use aptosdb::AptosDB;
 use std::{
     sync::Arc,
@@ -38,7 +38,7 @@ impl StorageService {
     fn handle_message(&self, input_message: Vec<u8>) -> Result<Vec<u8>, Error> {
         let input = bcs::from_bytes(&input_message)?;
         let output = match input {
-            storage_interface::StorageRequest::GetAccountStateWithProofByVersionRequest(req) => {
+            storage_interface::StorageRequest::GetStateValueWithProofByVersionRequest(req) => {
                 bcs::to_bytes(&self.get_account_state_with_proof_by_version(&req))
             }
             storage_interface::StorageRequest::GetStartupInfoRequest => {
@@ -53,17 +53,11 @@ impl StorageService {
 
     fn get_account_state_with_proof_by_version(
         &self,
-        req: &storage_interface::GetAccountStateWithProofByVersionRequest,
-    ) -> Result<
-        (
-            Option<AccountStateBlob>,
-            SparseMerkleProof<AccountStateBlob>,
-        ),
-        Error,
-    > {
+        req: &storage_interface::GetStateValueWithProofByVersionRequest,
+    ) -> Result<(Option<StateValue>, SparseMerkleProof<StateValue>), Error> {
         Ok(self
             .db
-            .get_account_state_with_proof_by_version(req.address, req.version)?)
+            .get_state_value_with_proof_by_version(req.state_store_key.clone(), req.version)?)
     }
 
     fn get_startup_info(&self) -> Result<Option<StartupInfo>, Error> {

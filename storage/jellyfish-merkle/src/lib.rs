@@ -88,6 +88,7 @@ use aptos_types::{
         Nibble, ROOT_NIBBLE_HEIGHT,
     },
     proof::{SparseMerkleProof, SparseMerkleRangeProof},
+    state_store::state_value::StateValue,
     transaction::Version,
 };
 use node_type::{Child, Children, InternalNode, LeafNode, Node, NodeKey, NodeType};
@@ -144,6 +145,8 @@ pub trait TestValue: Value + Arbitrary + std::fmt::Debug + Eq + PartialEq + 'sta
 // `TestValue` for `AccountStateBlob` here. Ideally the module that defines the specific value like
 // `AccountStateBlob` should import the `Value` trait and implement it there.
 impl Value for aptos_types::account_state_blob::AccountStateBlob {}
+
+impl Value for StateValue {}
 #[cfg(any(test, feature = "fuzzing"))]
 impl TestValue for aptos_types::account_state_blob::AccountStateBlob {}
 
@@ -265,7 +268,7 @@ where
     /// The batch version of `put_value_sets`.
     pub fn batch_put_value_sets(
         &self,
-        value_sets: Vec<Vec<(HashValue, V)>>,
+        value_sets: Vec<Vec<(HashValue, &V)>>,
         node_hashes: Option<Vec<&HashMap<NibblePath, HashValue>>>,
         first_version: Version,
     ) -> Result<(Vec<HashValue>, TreeUpdateBatch<V>)> {
@@ -310,7 +313,7 @@ where
         &self,
         mut node_key: NodeKey,
         version: Version,
-        kvs: &[(HashValue, V)],
+        kvs: &[(HashValue, &V)],
         depth: usize,
         hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
         tree_cache: &mut TreeCache<R, V>,
@@ -416,7 +419,7 @@ where
         node_key: NodeKey,
         version: Version,
         existing_leaf_node: LeafNode<V>,
-        kvs: &[(HashValue, V)],
+        kvs: &[(HashValue, &V)],
         depth: usize,
         hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
         tree_cache: &mut TreeCache<R, V>,
@@ -486,7 +489,7 @@ where
         &self,
         node_key: NodeKey,
         version: Version,
-        kvs: &[(HashValue, V)],
+        kvs: &[(HashValue, &V)],
         depth: usize,
         hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
         tree_cache: &mut TreeCache<R, V>,
@@ -530,7 +533,7 @@ where
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn put_value_set(
         &self,
-        value_set: Vec<(HashValue, V)>,
+        value_set: Vec<(HashValue, &V)>,
         version: Version,
     ) -> Result<(HashValue, TreeUpdateBatch<V>)> {
         let (root_hashes, tree_update_batch) =

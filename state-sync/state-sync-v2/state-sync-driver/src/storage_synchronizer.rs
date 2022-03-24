@@ -8,8 +8,8 @@ use crate::{
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    account_state_blob::AccountStatesChunkWithProof,
     ledger_info::LedgerInfoWithSignatures,
+    state_store::state_value::StateValueChunkWithProof,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
 use data_streaming_service::data_notification::NotificationId;
@@ -78,7 +78,7 @@ pub trait StorageSynchronizerInterface {
     fn save_account_states(
         &mut self,
         notification_id: NotificationId,
-        account_states_with_proof: AccountStatesChunkWithProof,
+        account_states_with_proof: StateValueChunkWithProof,
     ) -> Result<(), Error>;
 }
 
@@ -230,7 +230,7 @@ impl StorageSynchronizerInterface for StorageSynchronizer {
     fn save_account_states(
         &mut self,
         notification_id: NotificationId,
-        account_states_with_proof: AccountStatesChunkWithProof,
+        account_states_with_proof: StateValueChunkWithProof,
     ) -> Result<(), Error> {
         let state_snapshot_notifier = &mut self
             .state_snapshot_notifier
@@ -255,7 +255,7 @@ impl StorageSynchronizerInterface for StorageSynchronizer {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 enum StorageDataChunk {
-    Accounts(NotificationId, AccountStatesChunkWithProof),
+    Accounts(NotificationId, StateValueChunkWithProof),
     Transactions(
         NotificationId,
         TransactionListWithProof,
@@ -399,7 +399,7 @@ fn spawn_state_snapshot_receiver(
 
                             // Attempt to the commit the chunk
                             let commit_result = state_snapshot_receiver.add_chunk(
-                                account_states_with_proof.account_blobs,
+                                account_states_with_proof.raw_values,
                                 account_states_with_proof.proof.clone(),
                             );
                             match commit_result {

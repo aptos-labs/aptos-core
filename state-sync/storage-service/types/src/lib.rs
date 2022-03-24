@@ -5,9 +5,9 @@
 
 use aptos_config::config::StorageServiceConfig;
 use aptos_types::{
-    account_state_blob::AccountStatesChunkWithProof,
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
+    state_store::state_value::StateValueChunkWithProof,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
 use num_traits::{int::PrimInt, Zero};
@@ -84,7 +84,7 @@ impl StorageServiceRequest {
 // TODO(philiphayes): do something about this without making it ugly :(
 #[allow(clippy::large_enum_variant)]
 pub enum StorageServiceResponse {
-    AccountStatesChunkWithProof(AccountStatesChunkWithProof),
+    AccountStatesChunkWithProof(StateValueChunkWithProof),
     EpochEndingLedgerInfos(EpochChangeProof),
     NumberOfAccountsAtVersion(u64),
     ServerProtocolVersion(ServerProtocolVersion),
@@ -134,7 +134,7 @@ pub struct UnexpectedResponseError(pub String);
 // Conversions from the outer StorageServiceResponse enum to the inner types.
 // TODO(philiphayes): is there a proc-macro for this?
 
-impl TryFrom<StorageServiceResponse> for AccountStatesChunkWithProof {
+impl TryFrom<StorageServiceResponse> for StateValueChunkWithProof {
     type Error = UnexpectedResponseError;
     fn try_from(response: StorageServiceResponse) -> Result<Self, Self::Error> {
         match response {

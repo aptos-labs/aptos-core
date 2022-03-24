@@ -18,6 +18,7 @@ use crate::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,
     proof::TransactionInfoListWithProof,
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         ChangeSet, Module, ModuleBundle, RawTransaction, Script, SignatureCheckedTransaction,
         SignedTransaction, Transaction, TransactionArgument, TransactionInfo,
@@ -844,8 +845,8 @@ impl TransactionToCommitGen {
             .into_iter()
             .map(|(index, blob_gen)| {
                 (
-                    universe.get_account_info(index).address,
-                    blob_gen.materialize(index, universe),
+                    StateKey::AccountAddressKey(universe.get_account_info(index).address),
+                    StateValue::from(blob_gen.materialize(index, universe)),
                 )
             })
             .collect();

@@ -10,7 +10,9 @@ use aptos_sdk::transaction_builder::TransactionFactory;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{aptos_root_address, AccountResource},
+    account_state_blob::AccountStateBlob,
     chain_id::ChainId,
+    state_store::state_key::StateKey,
     transaction::{RawTransaction, SignedTransaction, Transaction, Version},
 };
 use chrono::Local;
@@ -338,11 +340,12 @@ impl TransactionGenerator {
         let bar = get_progress_bar(self.accounts_cache.len());
         for account in &self.accounts_cache {
             let address = account.address;
-            let blob = db
-                .get_latest_account_state(address)
+            let state_store_value = db
+                .get_latest_state_value(StateKey::AccountAddressKey(address))
                 .expect("Failed to query storage.")
                 .expect("Account must exist.");
-            let account_resource = AccountResource::try_from(&blob).unwrap();
+            let account_resource =
+                AccountResource::try_from(&AccountStateBlob::from(state_store_value)).unwrap();
             assert_eq!(account_resource.sequence_number(), account.sequence_number);
             bar.inc(1);
         }

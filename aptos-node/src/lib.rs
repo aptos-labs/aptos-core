@@ -21,6 +21,7 @@ use aptos_types::{
     chain_id::ChainId,
     move_resource::MoveStorage,
     on_chain_config::{VMPublishingOption, ON_CHAIN_CONFIG_REGISTRY},
+    state_store::state_key::StateKey,
     waypoint::Waypoint,
 };
 use aptos_vm::AptosVM;
@@ -210,8 +211,8 @@ pub fn print_api_config(config: &NodeConfig, lazy: bool) {
 fn fetch_chain_id(db: &DbReaderWriter) -> ChainId {
     let blob = db
         .reader
-        .get_account_state_with_proof_by_version(
-            aptos_root_address(),
+        .get_state_value_with_proof_by_version(
+            StateKey::AccountAddressKey(aptos_root_address()),
             (&*db.reader)
                 .fetch_synced_version()
                 .expect("[aptos-node] failed fetching synced version."),
