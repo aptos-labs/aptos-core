@@ -14,7 +14,7 @@ use std::convert::TryInto;
 async fn test_renders_move_acsii_string_into_utf8_string() {
     let context = new_test_context();
     let mut account = init_test_account();
-    let txn = context.create_parent_vasp(&account);
+    let txn = context.create_user_account(&account);
     context.commit_block(&vec![txn]).await;
 
     // module 0x87342d91af60c3a883a2812c9294c2f8::Message {

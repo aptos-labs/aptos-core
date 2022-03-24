@@ -474,12 +474,12 @@ async fn test_account_modules_structs() {
 async fn test_get_account_resources_by_ledger_version() {
     let mut context = new_test_context();
     let account = context.gen_account();
-    let txn = context.create_parent_vasp(&account);
+    let txn = context.create_user_account(&account);
     context.commit_block(&vec![txn.clone()]).await;
 
     let ledger_version_1_resources = context
         .get(&account_resources(
-            &context.tc_account().address().to_hex_literal(),
+            &context.root_account().address().to_hex_literal(),
         ))
         .await;
     let tc_account = find_value(&ledger_version_1_resources, |f| {
@@ -489,7 +489,7 @@ async fn test_get_account_resources_by_ledger_version() {
 
     let ledger_version_0_resources = context
         .get(&account_resources_with_ledger_version(
-            &context.tc_account().address().to_hex_literal(),
+            &context.root_account().address().to_hex_literal(),
             0,
         ))
         .await;
@@ -505,7 +505,7 @@ async fn test_get_account_resources_by_ledger_version_is_too_large() {
     let resp = context
         .expect_status_code(404)
         .get(&account_resources_with_ledger_version(
-            &context.tc_account().address().to_hex_literal(),
+            &context.root_account().address().to_hex_literal(),
             1000000000000000000,
         ))
         .await;
@@ -525,7 +525,7 @@ async fn test_get_account_resources_by_invalid_ledger_version() {
     let resp = context
         .expect_status_code(400)
         .get(&account_resources_with_ledger_version(
-            &context.tc_account().address().to_hex_literal(),
+            &context.root_account().address().to_hex_literal(),
             -1,
         ))
         .await;
@@ -542,7 +542,7 @@ async fn test_get_account_resources_by_invalid_ledger_version() {
 async fn test_get_account_modules_by_ledger_version() {
     let context = new_test_context();
     let code = "a11ceb0b0300000006010002030205050703070a0c0816100c260900000001000100000102084d794d6f64756c650269640000000000000000000000000b1e55ed00010000000231010200";
-    let mut tc_account = context.tc_account();
+    let mut tc_account = context.root_account();
     let txn = tc_account.sign_with_transaction_builder(
         context
             .transaction_factory()
@@ -552,14 +552,14 @@ async fn test_get_account_modules_by_ledger_version() {
 
     let modules = context
         .get(&account_modules(
-            &context.tc_account().address().to_hex_literal(),
+            &context.root_account().address().to_hex_literal(),
         ))
         .await;
     assert_ne!(modules, json!([]));
 
     let modules = context
         .get(&account_modules_with_ledger_version(
-            &context.tc_account().address().to_hex_literal(),
+            &context.root_account().address().to_hex_literal(),
             0,
         ))
         .await;
@@ -569,7 +569,7 @@ async fn test_get_account_modules_by_ledger_version() {
 #[tokio::test]
 async fn test_get_core_account_data() {
     let context = new_test_context();
-    let auth_key = context.dd_account().authentication_key();
+    let auth_key = context.root_account().authentication_key();
     let resp = context.get("/accounts/0xdd").await;
     assert_eq!(
         json!({

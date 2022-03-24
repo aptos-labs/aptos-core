@@ -7,9 +7,9 @@ use aptos_api_types::{HashValue, HexEncodedBytes};
 use aptos_crypto::{
     hash::CryptoHash,
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
-    SigningKey, Uniform,
+    PrivateKey, SigningKey, Uniform,
 };
-use aptos_sdk::{transaction_builder::Currency, types::LocalAccount};
+use aptos_sdk::types::LocalAccount;
 use aptos_types::{
     access_path::{AccessPath, Path},
     account_address::AccountAddress,
@@ -21,6 +21,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSetMut},
 };
 
+use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag, CORE_CODE_ADDRESS},
@@ -159,10 +160,10 @@ async fn test_get_transactions_output_genesis_transaction() {
 async fn test_get_transactions_returns_last_page_when_start_version_is_not_specified() {
     let mut context = new_test_context();
 
-    let mut tc = context.tc_account();
+    let mut root_account = context.root_account();
     for _i in 0..20 {
         let account = context.gen_account();
-        let txn = context.create_parent_vasp_by_account(&mut tc, &account);
+        let txn = context.create_user_account_by(&mut root_account, &account);
         context.commit_block(&vec![txn.clone()]).await;
     }
 
@@ -259,7 +260,7 @@ async fn test_get_transactions_param_limit_exceeds_limit() {
 async fn test_get_transactions_output_user_transaction_with_script_function_payload() {
     let mut context = new_test_context();
     let account = context.gen_account();
-    let txn = context.create_parent_vasp(&account);
+    let txn = context.create_user_account(&account);
     context.commit_block(&vec![txn.clone()]).await;
 
     let txns = context.get("/transactions?start=1").await;
@@ -360,57 +361,11 @@ async fn test_get_transactions_output_user_transaction_with_script_function_payl
 }
 
 #[tokio::test]
-async fn test_get_transactions_output_user_transaction_with_script_payload() {
-    let context = new_test_context();
-    let new_key = "717d1d400311ff8797c2441ea9c2d2da1120ce38f66afb079c2bad0919d93a09"
-        .parse()
-        .unwrap();
-
-    let mut tc_account = context.tc_account();
-    let txn = tc_account.sign_with_transaction_builder(
-        context
-            .transaction_factory()
-            .rotate_authentication_key_by_script(new_key),
-    );
-    context.commit_block(&vec![txn.clone()]).await;
-
-    let txns = context.get("/transactions?start=2").await;
-    assert_eq!(1, txns.as_array().unwrap().len());
-
-    let expected_txns = context.get_transactions(2, 1);
-    assert_eq!(1, expected_txns.len());
-
-    assert_json(
-        txns[0]["payload"].clone(),
-        json!({
-            "type": "script_payload",
-            "code": {
-                "bytecode": "0xa11ceb0b010000000601000202020403060f05151207277c08a3011000000001010000020001000003010200000403020001060c01080000020608000a0202060c0a020b4469656d4163636f756e74154b6579526f746174696f6e4361706162696c6974791f657874726163745f6b65795f726f746174696f6e5f6361706162696c6974791f726573746f72655f6b65795f726f746174696f6e5f6361706162696c69747919726f746174655f61757468656e7469636174696f6e5f6b657900000000000000000000000000000001000401090b0011000c020e020b0111020b02110102",
-                "abi": {
-                    "name": "main",
-                    "visibility": "script",
-                    "generic_type_params": [],
-                    "params": [
-                        "&signer",
-                        "vector<u8>"
-                    ],
-                    "return": []
-                }
-            },
-            "type_arguments": [],
-            "arguments": [
-                "0x717d1d400311ff8797c2441ea9c2d2da1120ce38f66afb079c2bad0919d93a09"
-            ]
-        }),
-    )
-}
-
-#[tokio::test]
 async fn test_get_transactions_output_user_transaction_with_module_payload() {
     let context = new_test_context();
     let code = "a11ceb0b0300000006010002030205050703070a0c0816100c260900000001000100000102084d794d6f64756c650269640000000000000000000000000b1e55ed00010000000231010200";
-    let mut tc_account = context.tc_account();
-    let txn = tc_account.sign_with_transaction_builder(
+    let mut root_account = context.root_account();
+    let txn = root_account.sign_with_transaction_builder(
         context
             .transaction_factory()
             .module(hex::decode(code).unwrap()),
@@ -472,7 +427,7 @@ async fn test_get_transactions_output_user_transaction_with_write_set_payload() 
                 ),
                 (
                     AccessPath::new(
-                        context.tc_account().address(),
+                        context.root_account().address(),
                         bcs::to_bytes(&Path::Resource(StructTag {
                             address: code_address,
                             module: Identifier::new("AccountFreezing").unwrap(),
@@ -522,7 +477,7 @@ async fn test_get_transactions_output_user_transaction_with_write_set_payload() 
 async fn test_post_bcs_format_transaction() {
     let mut context = new_test_context();
     let account = context.gen_account();
-    let txn = context.create_parent_vasp(&account);
+    let txn = context.create_user_account(&account);
     let body = bcs::to_bytes(&txn).unwrap();
     let resp = context
         .expect_status_code(202)
@@ -620,8 +575,8 @@ async fn test_post_transaction_rejected_by_mempool() {
     let mut context = new_test_context();
     let account1 = context.gen_account();
     let account2 = context.gen_account();
-    let txn1 = context.create_parent_vasp(&account1);
-    let txn2 = context.create_parent_vasp(&account2);
+    let txn1 = context.create_user_account(&account1);
+    let txn2 = context.create_user_account(&account2);
 
     context
         .expect_status_code(202)
@@ -641,22 +596,17 @@ async fn test_post_transaction_rejected_by_mempool() {
     );
 }
 
+#[ignore]
 #[tokio::test]
 async fn test_multi_agent_signed_transaction() {
     let mut context = new_test_context();
     let account = context.gen_account();
     let factory = context.transaction_factory();
-    let mut tc_account = context.tc_account();
+    let mut root_account = context.root_account();
     let secondary = context.root_account();
-    let txn = tc_account.sign_multi_agent_with_transaction_builder(
+    let txn = root_account.sign_multi_agent_with_transaction_builder(
         vec![&secondary],
-        factory.create_parent_vasp_account(
-            Currency::XUS,
-            0,
-            account.authentication_key(),
-            "vasp",
-            true,
-        ),
+        factory.create_user_account(account.public_key()),
     );
 
     let body = bcs::to_bytes(&txn).unwrap();
@@ -705,6 +655,7 @@ async fn test_multi_agent_signed_transaction() {
         .await;
 }
 
+#[ignore]
 #[tokio::test]
 async fn test_multi_ed25519_signed_transaction() {
     let context = new_test_context();
@@ -714,14 +665,15 @@ async fn test_multi_ed25519_signed_transaction() {
     let auth_key = AuthenticationKey::multi_ed25519(&public_key);
 
     let factory = context.transaction_factory();
-    let mut tc_account = context.tc_account();
-    let create_account_txn = tc_account.sign_with_transaction_builder(
-        factory.create_parent_vasp_account(Currency::XUS, 0, auth_key, "vasp", true),
+    let mut root_account = context.root_account();
+    // TODO: migrate once multi-ed25519 is supported
+    let create_account_txn = root_account.sign_with_transaction_builder(
+        factory.create_user_account(&Ed25519PrivateKey::generate_for_testing().public_key()),
     );
     context.commit_block(&vec![create_account_txn]).await;
 
     let raw_txn = factory
-        .create_recovery_address()
+        .mint(auth_key.derived_address(), 1000)
         .sender(auth_key.derived_address())
         .sequence_number(0)
         .expiration_timestamp_secs(u64::MAX) // set timestamp to max to ensure static raw transaction
@@ -774,7 +726,7 @@ async fn test_multi_ed25519_signed_transaction() {
 async fn test_get_transaction_by_hash() {
     let mut context = new_test_context();
     let account = context.gen_account();
-    let txn = context.create_parent_vasp(&account);
+    let txn = context.create_user_account(&account);
     context.commit_block(&vec![txn.clone()]).await;
 
     let txns = context.get("/transactions?start=2").await;
@@ -846,7 +798,7 @@ async fn test_get_transaction_by_version_not_found() {
 async fn test_get_transaction_by_version() {
     let mut context = new_test_context();
     let account = context.gen_account();
-    let txn = context.create_parent_vasp(&account);
+    let txn = context.create_user_account(&account);
     context.commit_block(&vec![txn.clone()]).await;
 
     let txns = context.get("/transactions?start=2").await;
@@ -860,7 +812,7 @@ async fn test_get_transaction_by_version() {
 async fn test_get_pending_transaction_by_hash() {
     let mut context = new_test_context();
     let account = context.gen_account();
-    let txn = context.create_parent_vasp(&account);
+    let txn = context.create_user_account(&account);
     let body = bcs::to_bytes(&txn).unwrap();
     let pending_txn = context
         .expect_status_code(202)
@@ -890,7 +842,7 @@ async fn test_get_pending_transaction_by_hash() {
 async fn test_signing_message_with_script_function_payload() {
     let mut context = new_test_context();
     let account = context.gen_account();
-    let txn = context.create_parent_vasp(&account);
+    let txn = context.create_user_account(&account);
 
     let payload = json!({
         "type": "script_function_payload",
@@ -913,8 +865,8 @@ async fn test_signing_message_with_script_function_payload() {
 async fn test_signing_message_with_module_payload() {
     let context = new_test_context();
     let code = "a11ceb0b0300000006010002030205050703070a0c0816100c260900000001000100000102084d794d6f64756c650269640000000000000000000000000b1e55ed00010000000231010200";
-    let mut tc_account = context.tc_account();
-    let txn = tc_account.sign_with_transaction_builder(
+    let mut root_account = context.root_account();
+    let txn = root_account.sign_with_transaction_builder(
         context
             .transaction_factory()
             .module(hex::decode(code).unwrap()),
@@ -924,35 +876,6 @@ async fn test_signing_message_with_module_payload() {
             "modules" : [
                 {"bytecode": format!("0x{}", code)},
             ],
-    });
-
-    test_signing_message_with_payload(context, txn, payload).await;
-}
-
-#[tokio::test]
-async fn test_signing_message_with_script_payload() {
-    let context = new_test_context();
-    let new_key = "717d1d400311ff8797c2441ea9c2d2da1120ce38f66afb079c2bad0919d93a09"
-        .parse()
-        .unwrap();
-
-    let mut tc_account = context.tc_account();
-    let txn = tc_account.sign_with_transaction_builder(
-        context
-            .transaction_factory()
-            .rotate_authentication_key_by_script(new_key),
-    );
-
-    let code = "a11ceb0b010000000601000202020403060f05151207277c08a3011000000001010000020001000003010200000403020001060c01080000020608000a0202060c0a020b4469656d4163636f756e74154b6579526f746174696f6e4361706162696c6974791f657874726163745f6b65795f726f746174696f6e5f6361706162696c6974791f726573746f72655f6b65795f726f746174696f6e5f6361706162696c69747919726f746174655f61757468656e7469636174696f6e5f6b657900000000000000000000000000000001000401090b0011000c020e020b0111020b02110102";
-    let payload = json!({
-            "type": "script_payload",
-            "code": {
-                "bytecode": format!("0x{}", code)
-            },
-            "type_arguments": [],
-            "arguments": [
-                "0x717d1d400311ff8797c2441ea9c2d2da1120ce38f66afb079c2bad0919d93a09"
-            ]
     });
 
     test_signing_message_with_payload(context, txn, payload).await;
@@ -981,7 +904,7 @@ async fn test_signing_message_with_write_set_payload() {
                 ),
                 (
                     AccessPath::new(
-                        context.tc_account().address(),
+                        context.root_account().address(),
                         bcs::to_bytes(&Path::Resource(StructTag {
                             address: code_address,
                             module: Identifier::new("AccountFreezing").unwrap(),
@@ -1018,7 +941,7 @@ async fn test_signing_message_with_write_set_payload() {
         }
     });
 
-    let sender = context.tc_account();
+    let sender = context.root_account();
     let body = json!({
         "sender": sender.address().to_hex_literal(),
         "sequence_number": sender.sequence_number().to_string(),
@@ -1040,7 +963,7 @@ async fn test_signing_message_with_payload(
     txn: SignedTransaction,
     payload: serde_json::Value,
 ) {
-    let sender = context.tc_account();
+    let sender = context.root_account();
     let mut body = json!({
         "sender": sender.address().to_hex_literal(),
         "sequence_number": sender.sequence_number().to_string(),
@@ -1066,7 +989,7 @@ async fn test_signing_message_with_payload(
 
     let hex_bytes: HexEncodedBytes = signing_msg.parse().unwrap();
     let sig = context
-        .tc_account()
+        .root_account()
         .private_key()
         .sign_arbitrary_message(hex_bytes.inner());
     let expected_sig = match txn.authenticator() {
@@ -1100,11 +1023,17 @@ async fn test_signing_message_with_payload(
 async fn test_get_account_transactions() {
     let mut context = new_test_context();
     let account = context.gen_account();
-    let txn = context.create_parent_vasp(&account);
+    let txn = context.create_user_account(&account);
     context.commit_block(&vec![txn]).await;
 
     let txns = context
-        .get(format!("/accounts/{}/transactions", context.tc_account().address()).as_str())
+        .get(
+            format!(
+                "/accounts/{}/transactions",
+                context.root_account().address()
+            )
+            .as_str(),
+        )
         .await;
     assert_eq!(1, txns.as_array().unwrap().len());
     let expected_txns = context.get("/transactions?start=2&limit=1").await;
@@ -1115,14 +1044,14 @@ async fn test_get_account_transactions() {
 async fn test_get_account_transactions_filter_transactions_by_start_sequence_number() {
     let mut context = new_test_context();
     let account = context.gen_account();
-    let txn = context.create_parent_vasp(&account);
+    let txn = context.create_user_account(&account);
     context.commit_block(&vec![txn]).await;
 
     let txns = context
         .get(
             format!(
                 "/accounts/{}/transactions?start=1",
-                context.tc_account().address()
+                context.root_account().address()
             )
             .as_str(),
         )
@@ -1134,14 +1063,14 @@ async fn test_get_account_transactions_filter_transactions_by_start_sequence_num
 async fn test_get_account_transactions_filter_transactions_by_start_sequence_number_is_too_large() {
     let mut context = new_test_context();
     let account = context.gen_account();
-    let txn = context.create_parent_vasp(&account);
+    let txn = context.create_user_account(&account);
     context.commit_block(&vec![txn]).await;
 
     let txns = context
         .get(
             format!(
                 "/accounts/{}/transactions?start=1000",
-                context.tc_account().address()
+                context.root_account().address()
             )
             .as_str(),
         )
@@ -1152,18 +1081,18 @@ async fn test_get_account_transactions_filter_transactions_by_start_sequence_num
 #[tokio::test]
 async fn test_get_account_transactions_filter_transactions_by_limit() {
     let mut context = new_test_context();
-    let mut tc_account = context.tc_account();
+    let mut root_account = context.root_account();
     let account1 = context.gen_account();
-    let txn1 = context.create_parent_vasp_by_account(&mut tc_account, &account1);
+    let txn1 = context.create_user_account_by(&mut root_account, &account1);
     let account2 = context.gen_account();
-    let txn2 = context.create_parent_vasp_by_account(&mut tc_account, &account2);
+    let txn2 = context.create_user_account_by(&mut root_account, &account2);
     context.commit_block(&vec![txn1, txn2]).await;
 
     let txns = context
         .get(
             format!(
                 "/accounts/{}/transactions?start=0&limit=1",
-                context.tc_account().address()
+                context.root_account().address()
             )
             .as_str(),
         )
@@ -1174,7 +1103,7 @@ async fn test_get_account_transactions_filter_transactions_by_limit() {
         .get(
             format!(
                 "/accounts/{}/transactions?start=0&limit=2",
-                context.tc_account().address()
+                context.root_account().address()
             )
             .as_str(),
         )
@@ -1188,8 +1117,8 @@ const MISC_ERROR: &str = "Move bytecode deserialization / verification failed, i
 async fn test_get_txn_execute_failed_by_invalid_module_payload_bytecode() {
     let context = new_test_context();
     let invalid_bytecode = hex::decode("a11ceb0b030000").unwrap();
-    let mut tc_account = context.tc_account();
-    let txn = tc_account
+    let mut root_account = context.root_account();
+    let txn = root_account
         .sign_with_transaction_builder(context.transaction_factory().module(invalid_bytecode));
     test_transaction_vm_status(context, txn, false, MISC_ERROR).await
 }
@@ -1197,9 +1126,9 @@ async fn test_get_txn_execute_failed_by_invalid_module_payload_bytecode() {
 #[tokio::test]
 async fn test_get_txn_execute_failed_by_invalid_script_payload_bytecode() {
     let context = new_test_context();
-    let mut tc_account = context.tc_account();
+    let mut root_account = context.root_account();
     let invalid_bytecode = hex::decode("a11ceb0b030000").unwrap();
-    let txn = tc_account.sign_with_transaction_builder(
+    let txn = root_account.sign_with_transaction_builder(
         context
             .transaction_factory()
             .script(Script::new(invalid_bytecode, vec![], vec![])),
@@ -1240,7 +1169,7 @@ async fn test_get_txn_execute_failed_by_invalid_write_set_payload() {
 #[tokio::test]
 async fn test_get_txn_execute_failed_by_invalid_script_function_address() {
     let context = new_test_context();
-    let account = context.dd_account();
+    let account = context.root_account();
     test_get_txn_execute_failed_by_invalid_script_function(
         context,
         account,
@@ -1262,7 +1191,7 @@ async fn test_get_txn_execute_failed_by_invalid_script_function_address() {
 #[tokio::test]
 async fn test_get_txn_execute_failed_by_invalid_script_function_module_name() {
     let context = new_test_context();
-    let account = context.dd_account();
+    let account = context.root_account();
     test_get_txn_execute_failed_by_invalid_script_function(
         context,
         account,
@@ -1284,7 +1213,7 @@ async fn test_get_txn_execute_failed_by_invalid_script_function_module_name() {
 #[tokio::test]
 async fn test_get_txn_execute_failed_by_invalid_script_function_name() {
     let context = new_test_context();
-    let account = context.dd_account();
+    let account = context.root_account();
     test_get_txn_execute_failed_by_invalid_script_function(
         context,
         account,
@@ -1306,7 +1235,7 @@ async fn test_get_txn_execute_failed_by_invalid_script_function_name() {
 #[tokio::test]
 async fn test_get_txn_execute_failed_by_invalid_script_function_type_arguments() {
     let context = new_test_context();
-    let account = context.dd_account();
+    let account = context.root_account();
     test_get_txn_execute_failed_by_invalid_script_function(
         context,
         account,
@@ -1333,7 +1262,7 @@ async fn test_get_txn_execute_failed_by_invalid_script_function_type_arguments()
 #[tokio::test]
 async fn test_get_txn_execute_failed_by_invalid_script_function_arguments() {
     let context = new_test_context();
-    let account = context.dd_account();
+    let account = context.root_account();
     test_get_txn_execute_failed_by_invalid_script_function(
         context,
         account,
@@ -1355,7 +1284,7 @@ async fn test_get_txn_execute_failed_by_invalid_script_function_arguments() {
 #[tokio::test]
 async fn test_get_txn_execute_failed_by_missing_script_function_arguments() {
     let context = new_test_context();
-    let account = context.dd_account();
+    let account = context.root_account();
     test_get_txn_execute_failed_by_invalid_script_function(
         context,
         account,
@@ -1377,7 +1306,7 @@ async fn test_get_txn_execute_failed_by_script_function_validation() {
     let mut context = new_test_context();
     let account = context.gen_account();
     context
-        .commit_block(&vec![context.create_parent_vasp(&account)])
+        .commit_block(&vec![context.create_user_account(&account)])
         .await;
 
     test_get_txn_execute_failed_by_invalid_script_function(

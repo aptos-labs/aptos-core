@@ -12,11 +12,10 @@ use aptos_genesis_tool::validator_builder::{RootKeys, ValidatorBuilder};
 use aptos_global_constants::OWNER_ACCOUNT;
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_sdk::{
-    transaction_builder::{Currency, TransactionFactory},
+    transaction_builder::TransactionFactory,
     types::{
-        account_config::{aptos_root_address, treasury_compliance_account_address},
-        transaction::SignedTransaction,
-        AccountKey, LocalAccount,
+        account_config::aptos_root_address, transaction::SignedTransaction, AccountKey,
+        LocalAccount,
     },
 };
 use aptos_secure_storage::KVStorage;
@@ -54,9 +53,10 @@ pub fn new_test_context() -> TestContext {
     let mut rng = ::rand::rngs::StdRng::from_seed(rand::rngs::OsRng.gen());
     let builder = ValidatorBuilder::new(
         &tmp_dir,
-        diem_framework_releases::current_module_blobs().to_vec(),
+        aptos_framework_releases::current_module_blobs().to_vec(),
     )
-    .publishing_option(VMPublishingOption::open());
+    .publishing_option(VMPublishingOption::open())
+    .min_price_per_gas_unit(0);
 
     let (root_keys, genesis, genesis_waypoint, validators) = builder.build(&mut rng).unwrap();
     let validator_owner = validators[0].storage().get(OWNER_ACCOUNT).unwrap().value;
@@ -127,22 +127,6 @@ impl TestContext {
         TransactionFactory::new(self.context.chain_id())
     }
 
-    pub fn tc_account(&self) -> LocalAccount {
-        LocalAccount::new(
-            treasury_compliance_account_address(),
-            self.root_keys.root_key.clone(),
-            0,
-        )
-    }
-
-    pub fn dd_account(&self) -> LocalAccount {
-        LocalAccount::new(
-            testnet_dd_account_address(),
-            self.root_keys.root_key.clone(),
-            0,
-        )
-    }
-
     pub fn root_account(&self) -> LocalAccount {
         LocalAccount::new(aptos_root_address(), self.root_keys.root_key.clone(), 0)
     }
@@ -151,36 +135,30 @@ impl TestContext {
         LocalAccount::generate(self.rng())
     }
 
-    pub fn create_parent_vasp(&self, account: &LocalAccount) -> SignedTransaction {
-        let mut tc = self.tc_account();
-        self.create_parent_vasp_by_account(&mut tc, account)
+    pub fn create_user_account(&self, account: &LocalAccount) -> SignedTransaction {
+        let mut tc = self.root_account();
+        self.create_user_account_by(&mut tc, account)
     }
 
-    pub fn create_parent_vasp_by_account(
+    pub fn create_user_account_by(
         &self,
         creator: &mut LocalAccount,
         account: &LocalAccount,
     ) -> SignedTransaction {
         let factory = self.transaction_factory();
-        creator.sign_with_transaction_builder(factory.create_parent_vasp_account(
-            Currency::XUS,
-            0,
-            account.authentication_key(),
-            "vasp",
-            true,
-        ))
+        creator.sign_with_transaction_builder(factory.create_user_account(account.public_key()))
     }
 
     pub fn create_invalid_signature_transaction(&mut self) -> SignedTransaction {
         let factory = self.transaction_factory();
-        let tc_account = self.tc_account();
+        let root_account = self.root_account();
         let txn = factory
-            .create_recovery_address()
-            .sender(tc_account.address())
-            .sequence_number(tc_account.sequence_number())
+            .transfer(root_account.address(), 1)
+            .sender(root_account.address())
+            .sequence_number(root_account.sequence_number())
             .build();
         let invalid_key = AccountKey::generate(self.rng());
-        txn.sign(invalid_key.private_key(), tc_account.public_key().clone())
+        txn.sign(invalid_key.private_key(), root_account.public_key().clone())
             .unwrap()
             .into_inner()
     }

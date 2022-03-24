@@ -9,10 +9,12 @@ use crate::{
         transaction::{authenticator::AuthenticationKey, RawTransaction, TransactionPayload},
     },
 };
+use aptos_crypto::ed25519::Ed25519PublicKey;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
 pub use aptos_transaction_builder::{aptos_stdlib, experimental_stdlib, stdlib};
+use aptos_types::transaction::authenticator::AuthenticationKeyPreimage;
 use aptos_types::transaction::{ChangeSet, ModuleBundle, Script, ScriptFunction, WriteSetPayload};
 
 pub struct TransactionBuilder {
@@ -107,11 +109,6 @@ impl TransactionFactory {
         self
     }
 
-    pub fn with_gas_currency(mut self, gas_currency: Currency) -> Self {
-        self.gas_currency = gas_currency;
-        self
-    }
-
     pub fn with_transaction_expiration_time(mut self, transaction_expiration_time: u64) -> Self {
         self.transaction_expiration_time = transaction_expiration_time;
         self
@@ -142,270 +139,20 @@ impl TransactionFactory {
         self.payload(TransactionPayload::ScriptFunction(func))
     }
 
-    pub fn add_currency_to_account(&self, currency: Currency) -> TransactionBuilder {
-        let currency = currency.type_tag();
-
-        self.payload(stdlib::encode_add_currency_to_account_script_function(
-            currency,
+    pub fn create_user_account(&self, public_key: &Ed25519PublicKey) -> TransactionBuilder {
+        let preimage = AuthenticationKeyPreimage::ed25519(public_key);
+        self.payload(aptos_stdlib::encode_create_account_script_function(
+            AuthenticationKey::from_preimage(&preimage).derived_address(),
+            preimage.into_vec(),
         ))
     }
 
-    pub fn add_recovery_rotation_capability(
-        &self,
-        recovery_address: AccountAddress,
-    ) -> TransactionBuilder {
-        self.payload(
-            stdlib::encode_add_recovery_rotation_capability_script_function(recovery_address),
-        )
+    pub fn transfer(&self, to: AccountAddress, amount: u64) -> TransactionBuilder {
+        self.payload(aptos_stdlib::encode_transfer_script_function(to, amount))
     }
 
-    pub fn add_validator_and_reconfigure(
-        &self,
-        sliding_nonce: u64,
-        validator_name: Vec<u8>,
-        validator_address: AccountAddress,
-    ) -> TransactionBuilder {
-        self.payload(
-            stdlib::encode_add_validator_and_reconfigure_script_function(
-                sliding_nonce,
-                validator_name,
-                validator_address,
-            ),
-        )
-    }
-
-    pub fn burn_txn_fees(&self, coin_type: Currency) -> TransactionBuilder {
-        let coin_type = coin_type.type_tag();
-        self.payload(stdlib::encode_burn_txn_fees_script_function(coin_type))
-    }
-
-    pub fn burn_with_amount(
-        &self,
-        token: Currency,
-        sliding_nonce: u64,
-        preburn_address: AccountAddress,
-        amount: u64,
-    ) -> TransactionBuilder {
-        self.payload(stdlib::encode_burn_with_amount_script_function(
-            token.type_tag(),
-            sliding_nonce,
-            preburn_address,
-            amount,
-        ))
-    }
-
-    pub fn cancel_burn_with_amount(
-        &self,
-        token: Currency,
-        preburn_address: AccountAddress,
-        amount: u64,
-    ) -> TransactionBuilder {
-        self.payload(stdlib::encode_cancel_burn_with_amount_script_function(
-            token.type_tag(),
-            preburn_address,
-            amount,
-        ))
-    }
-
-    pub fn peer_to_peer(
-        &self,
-        currency: Currency,
-        payee: AccountAddress,
-        amount: u64,
-    ) -> TransactionBuilder {
-        self.peer_to_peer_with_metadata(currency, payee, amount, Vec::new(), Vec::new())
-    }
-
-    pub fn peer_to_peer_with_metadata(
-        &self,
-        currency: Currency,
-        payee: AccountAddress,
-        amount: u64,
-        metadata: Vec<u8>,
-        metadata_signature: Vec<u8>,
-    ) -> TransactionBuilder {
-        self.payload(stdlib::encode_peer_to_peer_with_metadata_script_function(
-            currency.type_tag(),
-            payee,
-            amount,
-            metadata,
-            metadata_signature,
-        ))
-    }
-
-    pub fn preburn(&self, currency: Currency, amount: u64) -> TransactionBuilder {
-        self.payload(stdlib::encode_preburn_script_function(
-            currency.type_tag(),
-            amount,
-        ))
-    }
-
-    pub fn create_child_vasp_account(
-        &self,
-        coin_type: Currency,
-        child_auth_key: AuthenticationKey,
-        add_all_currencies: bool,
-        child_initial_balance: u64,
-    ) -> TransactionBuilder {
-        self.payload(stdlib::encode_create_child_vasp_account_script_function(
-            coin_type.type_tag(),
-            child_auth_key.derived_address(),
-            child_auth_key.prefix().to_vec(),
-            add_all_currencies,
-            child_initial_balance,
-        ))
-    }
-
-    pub fn create_designated_dealer(
-        &self,
-        coin_type: Currency,
-        sliding_nonce: u64,
-        auth_key: AuthenticationKey,
-        human_name: &str,
-        add_all_currencies: bool,
-    ) -> TransactionBuilder {
-        self.payload(stdlib::encode_create_designated_dealer_script_function(
-            coin_type.type_tag(),
-            sliding_nonce,
-            auth_key.derived_address(),
-            auth_key.prefix().to_vec(),
-            human_name.as_bytes().into(),
-            add_all_currencies,
-        ))
-    }
-
-    pub fn create_parent_vasp_account(
-        &self,
-        coin_type: Currency,
-        sliding_nonce: u64,
-        parent_auth_key: AuthenticationKey,
-        human_name: &str,
-        add_all_currencies: bool,
-    ) -> TransactionBuilder {
-        self.payload(stdlib::encode_create_parent_vasp_account_script_function(
-            coin_type.type_tag(),
-            sliding_nonce,
-            parent_auth_key.derived_address(),
-            parent_auth_key.prefix().to_vec(),
-            human_name.as_bytes().into(),
-            add_all_currencies,
-        ))
-    }
-
-    pub fn create_recovery_address(&self) -> TransactionBuilder {
-        self.payload(stdlib::encode_create_recovery_address_script_function())
-    }
-
-    pub fn rotate_authentication_key(&self, new_key: AuthenticationKey) -> TransactionBuilder {
-        self.payload(stdlib::encode_rotate_authentication_key_script_function(
-            new_key.to_vec(),
-        ))
-    }
-
-    pub fn rotate_authentication_key_by_script(
-        &self,
-        new_key: AuthenticationKey,
-    ) -> TransactionBuilder {
-        self.script(stdlib::encode_rotate_authentication_key_script(
-            new_key.to_vec(),
-        ))
-    }
-
-    pub fn rotate_authentication_key_with_recovery_address(
-        &self,
-        recovery_address: AccountAddress,
-        to_recover: AccountAddress,
-        new_key: AuthenticationKey,
-    ) -> TransactionBuilder {
-        self.payload(
-            stdlib::encode_rotate_authentication_key_with_recovery_address_script_function(
-                recovery_address,
-                to_recover,
-                new_key.to_vec(),
-            ),
-        )
-    }
-
-    pub fn rotate_dual_attestation_info(
-        &self,
-        new_url: Vec<u8>,
-        new_key: Vec<u8>,
-    ) -> TransactionBuilder {
-        self.payload(stdlib::encode_rotate_dual_attestation_info_script_function(
-            new_url, new_key,
-        ))
-    }
-
-    pub fn publish_shared_ed25519_public_key(&self, public_key: Vec<u8>) -> TransactionBuilder {
-        self.payload(stdlib::encode_publish_shared_ed25519_public_key_script_function(public_key))
-    }
-
-    pub fn publish_rotate_ed25519_public_key(&self, public_key: Vec<u8>) -> TransactionBuilder {
-        self.payload(stdlib::encode_rotate_shared_ed25519_public_key_script_function(public_key))
-    }
-
-    pub fn update_diem_consensus_config(
-        &self,
-        sliding_nonce: u64,
-        config: Vec<u8>,
-    ) -> TransactionBuilder {
-        self.payload(stdlib::encode_update_diem_consensus_config_script_function(
-            sliding_nonce,
-            config,
-        ))
-    }
-
-    pub fn update_diem_version(&self, sliding_nonce: u64, major: u64) -> TransactionBuilder {
-        self.payload(stdlib::encode_update_diem_version_script_function(
-            sliding_nonce,
-            major,
-        ))
-    }
-
-    pub fn update_exchange_rate(
-        &self,
-        currency: Currency,
-        sliding_nonce: u64,
-        exchange_rate_numerator: u64,
-        exchange_rate_denominator: u64,
-    ) -> TransactionBuilder {
-        self.payload(stdlib::encode_update_exchange_rate_script_function(
-            currency.type_tag(),
-            sliding_nonce,
-            exchange_rate_numerator,
-            exchange_rate_denominator,
-        ))
-    }
-
-    pub fn remove_validator_and_reconfigure(
-        &self,
-        sliding_nonce: u64,
-        validator_name: Vec<u8>,
-        validator_address: AccountAddress,
-    ) -> TransactionBuilder {
-        self.payload(
-            stdlib::encode_remove_validator_and_reconfigure_script_function(
-                sliding_nonce,
-                validator_name,
-                validator_address,
-            ),
-        )
-    }
-
-    pub fn add_vasp_domain(&self, address: AccountAddress, domain: Vec<u8>) -> TransactionBuilder {
-        self.payload(stdlib::encode_add_vasp_domain_script_function(
-            address, domain,
-        ))
-    }
-
-    pub fn remove_vasp_domain(
-        &self,
-        address: AccountAddress,
-        domain: Vec<u8>,
-    ) -> TransactionBuilder {
-        self.payload(stdlib::encode_remove_vasp_domain_script_function(
-            address, domain,
-        ))
+    pub fn mint(&self, to: AccountAddress, amount: u64) -> TransactionBuilder {
+        self.payload(aptos_stdlib::encode_mint_script_function(to, amount))
     }
 
     //

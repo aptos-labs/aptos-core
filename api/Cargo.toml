@@ -48,7 +48,7 @@ aptos-mempool = { path = "../mempool", features = ["fuzzing"] }
 aptos-secure-storage = { path = "../secure/storage" }
 aptos-temppath = { path = "../crates/aptos-temppath" }
 aptos-genesis-tool = {path = "../config/management/genesis", features = ["testing"] }
-diem-framework-releases = { path = "../aptos-move/framework/DPN/releases" }
+aptos-framework-releases = { path = "../aptos-move/framework/aptos-framework/releases" }
 aptos-sdk = { path = "../sdk" }
 vm-validator = { path = "../vm-validator" }
 aptos-vm = { path = "../aptos-move/aptos-vm" }
