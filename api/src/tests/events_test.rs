@@ -1,216 +1,129 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::{assert_json, new_test_context};
+use crate::{current_function_name, tests::new_test_context};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
-use serde_json::json;
 
 #[tokio::test]
 async fn test_get_events() {
-    let context = new_test_context();
+    let mut context = new_test_context(current_function_name!());
 
     let resp = context
-        .get("/events/0x00000000000000000000000000000000000000000a550c18")
+        .get("/events/0x04000000000000000000000000000000000000000a550c18")
         .await;
 
-    assert_json(
-        resp[0].clone(),
-        json!({
-          "key": "0x00000000000000000000000000000000000000000a550c18",
-          "sequence_number": "0",
-          "type": "0x1::DiemAccount::CreateAccountEvent",
-          "data": {
-            "created": "0xa550c18",
-            "role_id": "0"
-          }
-        }),
-    );
+    context.check_golden_output(resp);
 }
 
 #[tokio::test]
 async fn test_get_events_filter_by_start_sequence_number() {
-    let context = new_test_context();
+    let mut context = new_test_context(current_function_name!());
 
     let resp = context
-        .get("/events/0x00000000000000000000000000000000000000000a550c18?start=1")
+        .get("/events/0x04000000000000000000000000000000000000000a550c18?start=1")
         .await;
 
-    assert_json(
-        resp[0].clone(),
-        json!({
-          "key": "0x00000000000000000000000000000000000000000a550c18",
-          "sequence_number": "1",
-          "type": "0x1::DiemAccount::CreateAccountEvent",
-          "data": {
-            "created": "0xb1e55ed",
-            "role_id": "1"
-          }
-        }),
-    );
+    context.check_golden_output(resp);
 }
 
+// turn it back until we have multiple events in genesis
+#[ignore]
 #[tokio::test]
 async fn test_get_events_filter_by_limit_page_size() {
-    let context = new_test_context();
+    let context = new_test_context(current_function_name!());
 
     let resp = context
-        .get("/events/0x00000000000000000000000000000000000000000a550c18?start=1&limit=1")
+        .get("/events/0x04000000000000000000000000000000000000000a550c18?start=1&limit=1")
         .await;
     assert_eq!(resp.as_array().unwrap().len(), 1);
 
     let resp = context
-        .get("/events/0x00000000000000000000000000000000000000000a550c18?start=1&limit=2")
+        .get("/events/0x04000000000000000000000000000000000000000a550c18?start=1&limit=2")
         .await;
     assert_eq!(resp.as_array().unwrap().len(), 2);
 }
 
 #[tokio::test]
 async fn test_get_events_by_invalid_key() {
-    let context = new_test_context();
+    let mut context = new_test_context(current_function_name!());
 
     let resp = context.expect_status_code(400).get("/events/invalid").await;
-
-    assert_json(
-        resp,
-        json!({
-            "code": 400,
-            "message": "invalid parameter event key: invalid"
-        }),
-    );
+    context.check_golden_output(resp);
 }
 
 #[tokio::test]
 async fn test_get_events_by_account_event_handle() {
-    let context = new_test_context();
+    let mut context = new_test_context(current_function_name!());
     let resp = context
-        .get("/accounts/0xa550c18/events/0x1::DiemAccount::AccountOperationsCapability/creation_events")
+        .get("/accounts/0xa550c18/events/0x1::Reconfiguration::Configuration/events")
         .await;
-
-    assert_json(
-        resp[0].clone(),
-        json!({
-          "key": "0x00000000000000000000000000000000000000000a550c18",
-          "sequence_number": "0",
-          "type": "0x1::DiemAccount::CreateAccountEvent",
-          "data": {
-            "created": "0xa550c18",
-            "role_id": "0"
-          }
-        }),
-    );
+    context.check_golden_output(resp);
 }
 
 #[tokio::test]
 async fn test_get_events_by_invalid_account_event_handle_struct_address() {
-    let context = new_test_context();
+    let mut context = new_test_context(current_function_name!());
     let resp = context
         .expect_status_code(404)
-        .get("/accounts/0xa550c18/events/0x9::DiemAccount::AccountOperationsCapability/creation_events")
+        .get("/accounts/0xa550c18/events/0x9::Reconfiguration::Configuration/events")
         .await;
-
-    assert_json(
-        resp,
-        json!({
-          "code": 404,
-          "message": "resource not found by address(0xa550c18), struct tag(0x9::DiemAccount::AccountOperationsCapability) and ledger version(0)",
-          "aptos_ledger_version": "0"
-        }),
-    );
+    context.check_golden_output(resp);
 }
 
 #[tokio::test]
 async fn test_get_events_by_invalid_account_event_handle_struct_module() {
-    let context = new_test_context();
+    let mut context = new_test_context(current_function_name!());
     let resp = context
         .expect_status_code(404)
-        .get(
-            "/accounts/0xa550c18/events/0x1::NotFound::AccountOperationsCapability/creation_events",
-        )
+        .get("/accounts/0xa550c18/events/0x1::NotFound::Configuration/events")
         .await;
-
-    assert_json(
-        resp,
-        json!({
-          "code": 404,
-          "message": "resource not found by address(0xa550c18), struct tag(0x1::NotFound::AccountOperationsCapability) and ledger version(0)",
-          "aptos_ledger_version": "0"
-        }),
-    );
+    context.check_golden_output(resp);
 }
 
 #[tokio::test]
 async fn test_get_events_by_invalid_account_event_handle_struct_name() {
-    let context = new_test_context();
+    let mut context = new_test_context(current_function_name!());
     let resp = context
         .expect_status_code(404)
-        .get("/accounts/0xa550c18/events/0x1::DiemAccount::NotFound/creation_events")
+        .get("/accounts/0xa550c18/events/0x1::Reconfiguration::NotFound/events")
         .await;
-
-    assert_json(
-        resp,
-        json!({
-          "code": 404,
-          "message": "resource not found by address(0xa550c18), struct tag(0x1::DiemAccount::NotFound) and ledger version(0)",
-          "aptos_ledger_version": "0"
-        }),
-    );
+    context.check_golden_output(resp);
 }
 
 #[tokio::test]
 async fn test_get_events_by_invalid_account_event_handle_field_name() {
-    let context = new_test_context();
+    let mut context = new_test_context(current_function_name!());
     let resp = context
         .expect_status_code(404)
-        .get("/accounts/0xa550c18/events/0x1::DiemAccount::AccountOperationsCapability/not_found")
+        .get("/accounts/0xa550c18/events/0x1::Reconfiguration::Configuration/not_found")
         .await;
-
-    assert_json(
-        resp,
-        json!({
-          "code": 404,
-          "message": "resource not found by address(0xa550c18), struct tag(0x1::DiemAccount::AccountOperationsCapability), field name(not_found) and ledger version(0)",
-          "aptos_ledger_version": "0"
-        }),
-    );
+    context.check_golden_output(resp);
 }
 
 #[tokio::test]
 async fn test_get_events_by_invalid_account_event_handle_field_type() {
-    let context = new_test_context();
+    let mut context = new_test_context(current_function_name!());
 
     let resp = context
         .expect_status_code(400)
-        .get("/accounts/0xa550c18/events/0x1::DiemAccount::AccountOperationsCapability/limits_cap")
+        .get("/accounts/0xa550c18/events/0x1::Reconfiguration::Configuration/epoch")
         .await;
-    assert_json(
-        resp,
-        json!({
-          "code": 400,
-          "message": "field(limits_cap) type is not EventHandle struct, deserialize error: unexpected end of input"
-        }),
-    );
+    context.check_golden_output(resp);
 }
 
+// until we have generics in the genesis
+#[ignore]
 #[tokio::test]
 async fn test_get_events_by_struct_type_has_generic_type_parameter() {
-    let context = new_test_context();
+    let mut context = new_test_context(current_function_name!());
 
     // This test is for making sure we can look up right struct with generic
     // type specified in the URL path.
     // Instead of creating the example, we just look up an event handle that does not exist.
     let path = format!(
         "/accounts/0x1/events/{}/coin",
-        utf8_percent_encode("0x1::DiemAccount::Balance<0x1::ABC::ABC>", NON_ALPHANUMERIC)
-            .to_string()
+        utf8_percent_encode("0x1::TestCoin::Balance<0x1::ABC::ABC>", NON_ALPHANUMERIC).to_string()
     );
     let resp = context.expect_status_code(404).get(path.as_str()).await;
-
-    assert_json(
-        resp,
-        json!({
-          "code": 404,
-          "message": "resource not found by address(0x1), struct tag(0x1::DiemAccount::Balance<0x1::ABC::ABC>) and ledger version(0)",
-          "aptos_ledger_version": "0"
-        }),
-    );
+    context.check_golden_output(resp);
 }

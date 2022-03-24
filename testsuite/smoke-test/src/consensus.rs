@@ -1,15 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    operational_tooling::launch_swarm_with_op_tool_and_backend,
-    test_utils::check_create_mint_transfer,
-};
+use crate::operational_tooling::launch_swarm_with_op_tool_and_backend;
 use aptos_config::config::SecureBackend;
-use aptos_sdk::types::on_chain_config::OnChainConsensusConfig;
 use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::network_address::NetworkAddress;
-use forge::{NodeExt, Swarm};
+use forge::NodeExt;
 use std::{convert::TryInto, str::FromStr};
 
 #[ignore]
@@ -64,26 +60,26 @@ async fn test_consensus_observer_mode_storage_error() {
     assert_eq!(sequence_number_0, sequence_number_1);
 }
 
-#[allow(dead_code)]
-async fn test_onchain_upgrade(new_onfig: OnChainConsensusConfig) {
-    let num_nodes = 4;
-    let (mut swarm, _, _, _) = launch_swarm_with_op_tool_and_backend(num_nodes).await;
-
-    // should work before upgrade.
-    check_create_mint_transfer(&mut swarm).await;
-
-    // send upgrade txn
-    let transaction_factory = swarm.chain_info().transaction_factory();
-    let upgrade_txn = swarm
-        .chain_info()
-        .root_account
-        .sign_with_transaction_builder(
-            transaction_factory.update_diem_consensus_config(0, bcs::to_bytes(&new_onfig).unwrap()),
-        );
-
-    let client = swarm.validators().next().unwrap().rest_client();
-    client.submit_and_wait(&upgrade_txn).await.unwrap();
-
-    // should work after upgrade.
-    check_create_mint_transfer(&mut swarm).await;
-}
+// #[allow(dead_code)]
+// async fn test_onchain_upgrade(new_onfig: OnChainConsensusConfig) {
+//     let num_nodes = 4;
+//     let (mut swarm, _, _, _) = launch_swarm_with_op_tool_and_backend(num_nodes).await;
+//
+//     // should work before upgrade.
+//     check_create_mint_transfer(&mut swarm).await;
+//
+//     // send upgrade txn
+//     let transaction_factory = swarm.chain_info().transaction_factory();
+//     let upgrade_txn = swarm
+//         .chain_info()
+//         .root_account
+//         .sign_with_transaction_builder(
+//             transaction_factory.update_diem_consensus_config(0, bcs::to_bytes(&new_onfig).unwrap()),
+//         );
+//
+//     let client = swarm.validators().next().unwrap().rest_client();
+//     client.submit_and_wait(&upgrade_txn).await.unwrap();
+//
+//     // should work after upgrade.
+//     check_create_mint_transfer(&mut swarm).await;
+// }

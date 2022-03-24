@@ -1,0 +1,10 @@
+[
+  {
+    "type": "0x1::Account::Account",
+    "data": {
+      "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
+      "self_address": "0x1",
+      "sequence_number": "0"
+    }
+  }
+]

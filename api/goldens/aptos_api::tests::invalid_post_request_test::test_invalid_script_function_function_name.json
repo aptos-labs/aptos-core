@@ -1,0 +1,4 @@
+{
+  "code": 400,
+  "message": "invalid request body: invalid UserTransactionRequest: could not find script function by 0x1::AptosAccount::invalid"
+}

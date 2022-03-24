@@ -1,0 +1,24 @@
+{
+  "type": "pending_transaction",
+  "hash": "0xe5cfb5b362c05ff993d5104d157ae3108a5760d43eab7bbbb9dd0aa42d9945c6",
+  "sender": "0xa550c18",
+  "sequence_number": "0",
+  "max_gas_amount": "1000",
+  "gas_unit_price": "0",
+  "gas_currency_code": "XUS",
+  "expiration_timestamp_secs": "18446744073709551615",
+  "payload": {
+    "type": "script_function_payload",
+    "function": "0x1::AptosAccount::create_account",
+    "type_arguments": [],
+    "arguments": [
+      "0x62f8f9148c207643864d7ed4a2b23159",
+      "0xafb4905e9550cf462a82007824a055d975ae934470c477d9ddbb6d2b264c36fa00"
+    ]
+  },
+  "signature": {
+    "type": "ed25519_signature",
+    "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
+    "signature": "0x3ee3912934c3137e9a46f27c3f74b6dec910eec2f2ff566951ac989b01470635dcde0b063fb7777b5a52f5e66dc78e9f12303f0d249cfed92c30cdcf89ef0509"
+  }
+}

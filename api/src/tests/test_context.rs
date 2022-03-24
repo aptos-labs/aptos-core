@@ -22,7 +22,6 @@ use aptos_secure_storage::KVStorage;
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::testnet_dd_account_address,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -39,24 +38,26 @@ use hyper::Response;
 use mempool_notifications::MempoolNotificationSender;
 use storage_interface::DbReaderWriter;
 
+use crate::tests::golden_output::GoldenOutputs;
 use executor::block_executor::BlockExecutor;
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{boxed::Box, collections::BTreeMap, sync::Arc, time::SystemTime};
+use std::{boxed::Box, collections::BTreeMap, sync::Arc};
 use vm_validator::vm_validator::VMValidator;
 use warp::http::header::CONTENT_TYPE;
 
-pub fn new_test_context() -> TestContext {
+pub fn new_test_context(test_name: &'static str) -> TestContext {
     let tmp_dir = TempPath::new();
     tmp_dir.create_as_dir().unwrap();
 
-    let mut rng = ::rand::rngs::StdRng::from_seed(rand::rngs::OsRng.gen());
+    let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
     let builder = ValidatorBuilder::new(
         &tmp_dir,
         aptos_framework_releases::current_module_blobs().to_vec(),
     )
     .publishing_option(VMPublishingOption::open())
-    .min_price_per_gas_unit(0);
+    .min_price_per_gas_unit(0)
+    .randomize_first_validator_ports(false);
 
     let (root_keys, genesis, genesis_waypoint, validators) = builder.build(&mut rng).unwrap();
     let validator_owner = validators[0].storage().get(OWNER_ACCOUNT).unwrap().value;
@@ -82,6 +83,7 @@ pub fn new_test_context() -> TestContext {
         Box::new(BlockExecutor::<AptosVM>::new(db_rw)),
         mempool,
         db,
+        test_name,
     )
 }
 
@@ -95,6 +97,9 @@ pub struct TestContext {
     root_keys: Arc<RootKeys>,
     executor: Arc<dyn BlockExecutorTrait>,
     expect_status_code: u16,
+    test_name: &'static str,
+    golden_output: Option<GoldenOutputs>,
+    fake_time: u64,
 }
 
 impl TestContext {
@@ -106,6 +111,7 @@ impl TestContext {
         executor: Box<dyn BlockExecutorTrait>,
         mempool: MockSharedMempool,
         db: Arc<AptosDB>,
+        test_name: &'static str,
     ) -> Self {
         Self {
             context,
@@ -116,7 +122,17 @@ impl TestContext {
             mempool: Arc::new(mempool),
             expect_status_code: 200,
             db,
+            test_name,
+            golden_output: None,
+            fake_time: 0,
         }
+    }
+
+    pub fn check_golden_output(&mut self, msg: Value) {
+        if self.golden_output.is_none() {
+            self.golden_output = Some(GoldenOutputs::new(self.test_name));
+        }
+        self.golden_output.as_ref().unwrap().log(&pretty(&msg));
     }
 
     pub fn rng(&mut self) -> &mut rand::rngs::StdRng {
@@ -146,7 +162,11 @@ impl TestContext {
         account: &LocalAccount,
     ) -> SignedTransaction {
         let factory = self.transaction_factory();
-        creator.sign_with_transaction_builder(factory.create_user_account(account.public_key()))
+        creator.sign_with_transaction_builder(
+            factory
+                .create_user_account(account.public_key())
+                .expiration_timestamp_secs(u64::MAX),
+        )
     }
 
     pub fn create_invalid_signature_transaction(&mut self) -> SignedTransaction {
@@ -179,7 +199,7 @@ impl TestContext {
         ret
     }
 
-    pub async fn commit_mempool_txns(&self, size: u64) {
+    pub async fn commit_mempool_txns(&mut self, size: u64) {
         let txns = self.mempool.get_txns(size);
         self.commit_block(&txns).await;
         for txn in txns {
@@ -187,7 +207,7 @@ impl TestContext {
         }
     }
 
-    pub async fn commit_block(&self, signed_txns: &[SignedTransaction]) {
+    pub async fn commit_block(&mut self, signed_txns: &[SignedTransaction]) {
         let metadata = self.new_block_metadata();
         let timestamp = metadata.timestamp_usec();
         let txns: Vec<Transaction> = std::iter::once(Transaction::BlockMetadata(metadata.clone()))
@@ -243,7 +263,7 @@ impl TestContext {
     }
 
     pub async fn api_execute_script_function(
-        &self,
+        &mut self,
         account: &mut LocalAccount,
         func_id: &str,
         type_args: serde_json::Value,
@@ -261,7 +281,7 @@ impl TestContext {
         .await;
     }
 
-    pub async fn api_publish_module(&self, account: &mut LocalAccount, code: HexEncodedBytes) {
+    pub async fn api_publish_module(&mut self, account: &mut LocalAccount, code: HexEncodedBytes) {
         self.api_execute_txn(
             account,
             json!({
@@ -274,7 +294,7 @@ impl TestContext {
         .await;
     }
 
-    pub async fn api_execute_txn(&self, account: &mut LocalAccount, payload: Value) {
+    pub async fn api_execute_txn(&mut self, account: &mut LocalAccount, payload: Value) {
         let mut request = json!({
             "sender": account.address(),
             "sequence_number": account.sequence_number().to_string(),
@@ -362,13 +382,11 @@ impl TestContext {
         body
     }
 
-    fn new_block_metadata(&self) -> BlockMetadata {
+    fn new_block_metadata(&mut self) -> BlockMetadata {
         let round = 1;
-        let id = HashValue::random();
-        let timestamp = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_micros() as u64;
+        let id = HashValue::random_with_rng(&mut self.rng);
+        self.fake_time += 1;
+        let timestamp = self.fake_time;
         BlockMetadata::new(id, round, timestamp, vec![], self.validator_owner)
     }
 
@@ -394,7 +412,7 @@ impl TestContext {
                 metadata.timestamp_usec(),
                 None,
             ),
-            HashValue::random(),
+            HashValue::zero(),
         );
         LedgerInfoWithSignatures::new(info, BTreeMap::new())
     }

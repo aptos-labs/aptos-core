@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::new_test_context;
+use crate::{current_function_name, tests::new_test_context};
 
 use aptos_api_types::Address;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
@@ -12,7 +12,7 @@ use std::convert::TryInto;
 
 #[tokio::test]
 async fn test_renders_move_acsii_string_into_utf8_string() {
-    let context = new_test_context();
+    let mut context = new_test_context(current_function_name!());
     let mut account = init_test_account();
     let txn = context.create_user_account(&account);
     context.commit_block(&vec![txn]).await;

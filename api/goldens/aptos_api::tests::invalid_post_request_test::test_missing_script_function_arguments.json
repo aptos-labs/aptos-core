@@ -1,0 +1,4 @@
+{
+  "code": 400,
+  "message": "invalid request body: invalid UserTransactionRequest: expected 2 arguments [string<address>, string<hex>], but got 1 ([String(\"0\")])"
+}

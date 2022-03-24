@@ -1,0 +1,4 @@
+{
+  "code": 400,
+  "message": "invalid request body: invalid UserTransactionRequest: parse arguments[1] failed, expect string<hex>, caused by error: invalid type: map, expected a string"
+}

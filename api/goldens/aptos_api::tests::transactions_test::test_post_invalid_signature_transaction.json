@@ -1,0 +1,4 @@
+{
+  "code": 400,
+  "message": "invalid transaction: INVALID_SIGNATURE"
+}

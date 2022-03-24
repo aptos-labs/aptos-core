@@ -1,0 +1,4 @@
+{
+  "code": 400,
+  "message": "invalid request body: invalid UserTransactionRequest: parse arguments[0] failed, expect string<address>, caused by error: invalid type: boolean `true`, expected a string"
+}

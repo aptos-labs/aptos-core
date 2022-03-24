@@ -113,7 +113,9 @@ mod tests {
 
     pub fn bootstrap_with_config(cfg: NodeConfig) {
         let runtime = tokio::runtime::Runtime::new().unwrap();
-        let context = runtime.block_on(new_test_context_async());
+        let context = runtime.block_on(new_test_context_async(
+            "test_bootstrap_jsonprc_and_api_configured_at_different_port",
+        ));
         let ret = bootstrap(
             &cfg,
             ChainId::test(),
@@ -155,7 +157,7 @@ mod tests {
         }
     }
 
-    pub async fn new_test_context_async() -> TestContext {
-        new_test_context()
+    pub async fn new_test_context_async(test_name: &'static str) -> TestContext {
+        new_test_context(test_name)
     }
 }

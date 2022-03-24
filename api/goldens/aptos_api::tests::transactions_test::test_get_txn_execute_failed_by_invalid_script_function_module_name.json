@@ -1,0 +1,33 @@
+{
+  "type": "user_transaction",
+  "version": "2",
+  "hash": "0x068b7171b72a144c0dda8460ab7c14b95308a33f6a1b71dff8076bbf63ede87c",
+  "state_root_hash": "0x6d9da6d228f9b366573a83caf8eb97115cc34eb863cebe2079fbfef6ef94acb6",
+  "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
+  "gas_used": "1",
+  "success": false,
+  "vm_status": "Move bytecode deserialization / verification failed, including script function not found or invalid arguments",
+  "accumulator_root_hash": "0x84c719cbb906e48c6987fba7d606db89429e39f8995baf5ee24b73372df00f49",
+  "sender": "0xa550c18",
+  "sequence_number": "0",
+  "max_gas_amount": "1000",
+  "gas_unit_price": "0",
+  "gas_currency_code": "XUS",
+  "expiration_timestamp_secs": "18446744073709551615",
+  "payload": {
+    "type": "script_function_payload",
+    "function": "0x1::TestCoinInvalid::transfer",
+    "type_arguments": [],
+    "arguments": [
+      "0x000000000000000000000000000000dd",
+      "0x0100000000000000"
+    ]
+  },
+  "signature": {
+    "type": "ed25519_signature",
+    "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
+    "signature": "0x7500425461b97f791cd2c51144c0808818be0112f02cf40dd0e1d5e9108d61b02009bb5d13b1d3d8c956c9ca50b8cd6769a616e9430c935d04cd17ca04b75103"
+  },
+  "events": [],
+  "timestamp": "1"
+}

@@ -1,0 +1,4 @@
+{
+  "code": 415,
+  "message": "The request's content-type is not supported"
+}

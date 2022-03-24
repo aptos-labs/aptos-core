@@ -1,0 +1,5 @@
+{
+  "code": 404,
+  "message": "ledger not found by version(1000000000000000000)",
+  "aptos_ledger_version": "0"
+}

@@ -1,0 +1,4 @@
+{
+  "code": 400,
+  "message": "invalid request body: invalid UserTransactionRequest: parse arguments[1] failed, expect string<hex>, caused by error: decode hex-encoded string(\"0xZZZ\") failed, caused by error: Odd number of digits"
+}

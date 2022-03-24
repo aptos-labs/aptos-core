@@ -1,0 +1,4 @@
+{
+  "code": 400,
+  "message": "Request body deserialize error: unknown variant `invalid`, expected one of `script_function_payload`, `script_payload`, `module_bundle_payload`, `write_set_payload` at line 1 column 184"
+}

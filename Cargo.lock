@@ -188,6 +188,7 @@ dependencies = [
  "executor-types",
  "fail",
  "futures",
+ "goldenfile",
  "hex",
  "hyper",
  "mempool-notifications",

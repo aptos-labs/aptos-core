@@ -1,0 +1,4 @@
+{
+  "code": 400,
+  "message": "invalid parameter transaction hash or version: 0x1"
+}
