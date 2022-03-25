@@ -13,7 +13,7 @@ anyhow = "1.0.52"
 structopt = "0.3.21"
 tempfile = "3.2.0"
 
-diem-framework-releases = { path = "../../aptos-move/framework/DPN/releases" }
+aptos-framework-releases = { path = "../../aptos-move/framework/aptos-framework/releases" }
 aptosdb = { path = "../aptosdb" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }

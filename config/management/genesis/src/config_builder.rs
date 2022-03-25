@@ -13,7 +13,7 @@ pub fn test_config() -> (NodeConfig, Ed25519PrivateKey) {
     path.create_as_dir().unwrap();
     let (root_keys, _genesis, _genesis_waypoint, validators) = ValidatorBuilder::new(
         path.path(),
-        diem_framework_releases::current_module_blobs().to_vec(),
+        aptos_framework_releases::current_module_blobs().to_vec(),
     )
     .template(NodeConfig::default_for_validator())
     .build(StdRng::from_seed([0; 32]))

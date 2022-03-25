@@ -42,7 +42,6 @@ consensus = { path = "../consensus" }
 consensus-notifications = { path = "../state-sync/inter-component/consensus-notifications" }
 crash-handler = { path = "../crates/crash-handler" }
 data-streaming-service = { path = "../state-sync/state-sync-v2/data-streaming-service" }
-diem-framework-releases = { path = "../aptos-move/framework/DPN/releases" }
 debug-interface = { path = "../crates/debug-interface" }
 event-notifications = { path = "../state-sync/inter-component/event-notifications" }
 executor = { path = "../execution/executor" }

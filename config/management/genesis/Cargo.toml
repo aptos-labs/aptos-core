@@ -22,7 +22,7 @@ executor = { path = "../../../execution/executor" }
 bcs = "0.1.2"
 aptos-config = { path = "../.."}
 aptos-crypto = { path = "../../../crates/aptos-crypto" }
-diem-framework-releases = { path = "../../../aptos-move/framework/DPN/releases" }
+aptos-framework-releases = { path = "../../../aptos-move/framework/aptos-framework/releases" }
 aptos-global-constants = { path = "../../global-constants" }
 aptos-management = { path = ".." }
 aptos-secure-storage = { path = "../../../secure/storage" }

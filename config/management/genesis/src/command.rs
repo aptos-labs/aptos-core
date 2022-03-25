@@ -226,7 +226,7 @@ pub mod tests {
         // Step 2) Upload the Move modules
         let tempdir = aptos_temppath::TempPath::new();
         tempdir.create_as_dir().unwrap();
-        for b in diem_framework_releases::current_module_blobs() {
+        for b in aptos_framework_releases::current_module_blobs() {
             let mut temppath =
                 aptos_temppath::TempPath::new_with_temp_dir(tempdir.path().to_path_buf());
             temppath.create_as_file().unwrap();

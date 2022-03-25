@@ -6,20 +6,12 @@ use aptos_crypto::{
     PrivateKey, SigningKey, Uniform,
 };
 use aptos_logger::info;
-use aptos_transaction_builder::stdlib::{
-    encode_create_parent_vasp_account_script, encode_peer_to_peer_with_metadata_script,
-};
+use aptos_sdk::transaction_builder::TransactionFactory;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{
-        testnet_dd_account_address, treasury_compliance_account_address, xus_tag, AccountResource,
-        XUS_NAME,
-    },
+    account_config::{aptos_root_address, AccountResource},
     chain_id::ChainId,
-    transaction::{
-        authenticator::AuthenticationKey, RawTransaction, Script, SignedTransaction, Transaction,
-        Version,
-    },
+    transaction::{RawTransaction, SignedTransaction, Transaction, Version},
 };
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -64,20 +56,13 @@ struct P2pTestCase {
     num_accounts: usize,
 }
 
+// TODO: use LocalAccount instead
 #[derive(Deserialize, Serialize)]
 struct AccountData {
     private_key: Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
     address: AccountAddress,
     sequence_number: u64,
-}
-
-impl AccountData {
-    pub fn auth_key_prefix(&self) -> Vec<u8> {
-        AuthenticationKey::ed25519(&self.public_key)
-            .prefix()
-            .to_vec()
-    }
 }
 
 pub struct TransactionGenerator {
@@ -219,8 +204,15 @@ impl TransactionGenerator {
         self.gen_transfer_transactions(block_size, num_transfer_blocks);
     }
 
+    pub fn transaction_factory() -> TransactionFactory {
+        TransactionFactory::new(ChainId::test())
+            .with_transaction_expiration_time(300)
+            .with_gas_unit_price(1)
+            .with_max_gas_amount(1000)
+    }
+
     pub fn gen_account_creations(&mut self, block_size: usize) -> Vec<Vec<Transaction>> {
-        let tc_account = treasury_compliance_account_address();
+        let root_address = aptos_root_address();
         let mut txn_block = vec![];
 
         println!(
@@ -233,18 +225,13 @@ impl TransactionGenerator {
             let mut transactions = Vec::with_capacity(block_size);
             for (j, account) in block.iter().enumerate() {
                 let txn = create_transaction(
-                    tc_account,
-                    (i * block_size + j) as u64,
                     &self.genesis_key,
                     self.genesis_key.public_key(),
-                    encode_create_parent_vasp_account_script(
-                        xus_tag(),
-                        0,
-                        account.address,
-                        account.auth_key_prefix(),
-                        vec![],
-                        false, /* add all currencies */
-                    ),
+                    Self::transaction_factory()
+                        .create_user_account(&account.public_key)
+                        .sender(root_address)
+                        .sequence_number((i * block_size + j) as u64)
+                        .build(),
                 );
                 transactions.push(txn);
             }
@@ -267,30 +254,23 @@ impl TransactionGenerator {
         init_account_balance: u64,
         block_size: usize,
     ) -> Vec<Vec<Transaction>> {
-        let testnet_dd_account = testnet_dd_account_address();
+        let root_address = aptos_root_address();
         let mut txn_block = vec![];
 
-        println!(
-            "[{}] Generating {} mint txns.",
-            now_fmt!(),
-            self.accounts_cache.len(),
-        );
-        let bar = get_progress_bar(self.accounts_cache.len());
+        let total_accounts = self.accounts_cache.len();
+        println!("[{}] Generating {} mint txns.", now_fmt!(), total_accounts,);
+        let bar = get_progress_bar(total_accounts);
         for (i, block) in self.accounts_cache.chunks(block_size).enumerate() {
             let mut transactions = Vec::with_capacity(block_size);
             for (j, account) in block.iter().enumerate() {
                 let txn = create_transaction(
-                    testnet_dd_account,
-                    (i * block_size + j) as u64,
                     &self.genesis_key,
                     self.genesis_key.public_key(),
-                    encode_peer_to_peer_with_metadata_script(
-                        xus_tag(),
-                        account.address,
-                        init_account_balance,
-                        vec![],
-                        vec![],
-                    ),
+                    Self::transaction_factory()
+                        .mint(account.address, init_account_balance)
+                        .sender(root_address)
+                        .sequence_number((total_accounts + i * block_size + j) as u64)
+                        .build(),
                 );
                 transactions.push(txn);
             }
@@ -326,17 +306,13 @@ impl TransactionGenerator {
                 let sender = &self.accounts_cache[sender_idx];
                 let receiver = &self.accounts_cache[receiver_idx];
                 let txn = create_transaction(
-                    sender.address,
-                    sender.sequence_number,
                     &sender.private_key,
                     sender.public_key.clone(),
-                    encode_peer_to_peer_with_metadata_script(
-                        xus_tag(),
-                        receiver.address,
-                        1, /* amount */
-                        vec![],
-                        vec![],
-                    ),
+                    Self::transaction_factory()
+                        .transfer(receiver.address, 1)
+                        .sender(sender.address)
+                        .sequence_number(sender.sequence_number)
+                        .build(),
                 );
                 transactions.push(txn);
                 self.accounts_cache[sender_idx].sequence_number += 1;
@@ -381,26 +357,10 @@ impl TransactionGenerator {
 }
 
 fn create_transaction(
-    sender: AccountAddress,
-    sequence_number: u64,
     private_key: &Ed25519PrivateKey,
     public_key: Ed25519PublicKey,
-    program: Script,
+    raw_txn: RawTransaction,
 ) -> Transaction {
-    let now = aptos_infallible::duration_since_epoch();
-    let expiration_time = now.as_secs() + 3600;
-
-    let raw_txn = RawTransaction::new_script(
-        sender,
-        sequence_number,
-        program,
-        1_000_000,           /* max_gas_amount */
-        0,                   /* gas_unit_price */
-        XUS_NAME.to_owned(), /* gas_currency_code */
-        expiration_time,
-        ChainId::test(),
-    );
-
     let signature = private_key.sign(&raw_txn);
     let signed_txn = SignedTransaction::new(raw_txn, public_key, signature);
     Transaction::UserTransaction(signed_txn)

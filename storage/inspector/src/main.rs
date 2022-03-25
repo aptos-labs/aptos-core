@@ -7,7 +7,6 @@ use anyhow::Result;
 use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_logger::info;
 use aptosdb::AptosDB;
-use diem_framework_releases::name_for_script;
 use std::path::PathBuf;
 use storage_interface::DbReader;
 
@@ -78,7 +77,7 @@ fn print_txn(db: &AptosDB, version: u64) {
     println!(
         "Transaction {}: {}",
         version,
-        tx.format_for_client(|bytes| name_for_script(bytes).unwrap())
+        tx.format_for_client(|_| "Unexpected script in aptos-framework".to_string())
     );
 }
 
@@ -117,7 +116,7 @@ fn list_txns(db: &AptosDB) {
             v,
             tx.expect("Unable to read TX")
                 .0
-                .format_for_client(|bytes| name_for_script(bytes).unwrap())
+                .format_for_client(|_| "Unexpected script in aptos-framework".to_string())
         );
     }
 }
