@@ -32,8 +32,7 @@ async fn test_full_node_bootstrap_accounts() {
     let vfn_peer_id = create_full_node(vfn_config, &mut swarm).await;
     swarm.fullnode_mut(vfn_peer_id).unwrap().stop();
 
-    // Enable account count support for the validator (with at most 2 accounts
-    // per storage request).
+    // Set at most 2 accounts per storage request for the validator
     let validator = swarm.validators_mut().next().unwrap();
     let mut config = validator.config().clone();
     config

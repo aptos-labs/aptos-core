@@ -81,9 +81,14 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
         &mut self,
         consensus_sync_request: Arc<Mutex<Option<ConsensusSyncRequest>>>,
     ) -> Result<(), Error> {
-        // Fetch transactions or outputs starting at highest_synced_version + 1
+        // Fetch the highest synced version and epoch (in storage)
         let (highest_synced_version, highest_synced_epoch) =
             self.get_highest_synced_version_and_epoch()?;
+
+        // Fetch the highest epoch state (in storage)
+        let highest_epoch_state = utils::fetch_latest_epoch_state(self.storage.clone())?;
+
+        // Start fetching data at highest_synced_version + 1
         let next_version = highest_synced_version
             .checked_add(1)
             .ok_or_else(|| Error::IntegerOverflow("The next version has overflown!".into()))?;
@@ -115,7 +120,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
             }
         };
         self.speculative_stream_state = Some(SpeculativeStreamState::new(
-            utils::fetch_latest_epoch_state(self.storage.clone())?,
+            highest_epoch_state,
             None,
             highest_synced_version,
         ));

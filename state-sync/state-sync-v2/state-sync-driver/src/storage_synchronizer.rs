@@ -5,12 +5,11 @@ use crate::{
     error::Error,
     notification_handlers::{CommitNotification, ErrorNotification},
 };
-use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    transaction::{TransactionListWithProof, TransactionOutputListWithProof},
 };
 use data_streaming_service::data_notification::NotificationId;
 use executor_types::ChunkExecutorTrait;
@@ -23,7 +22,7 @@ use std::{
     },
 };
 use storage_interface::DbWriter;
-use tokio::runtime::Runtime;
+use tokio::runtime::{Handle, Runtime};
 
 // TODO(joshlind): add structured logging support!
 
@@ -55,16 +54,17 @@ pub trait StorageSynchronizerInterface {
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     ) -> Result<(), Error>;
 
-    /// Initializes an account synchronizer with the specified version and
-    /// expected root hash and spawns the synchronizer on the given `runtime`.
-    /// If `runtime` is None, uses the current runtime.
+    /// Initializes an account synchronizer with the specified
+    /// `target_ledger_info` and `target_output_with_proof` at the target
+    /// syncing version. Also, writes all `epoch_change_proofs` to storage.
     ///
-    /// Note: this assumes `expected_root_hash` has already been verified.
+    /// Note: this assumes that `epoch_change_proofs`, `target_ledger_info`,
+    /// and `target_output_with_proof` have already been verified.
     fn initialize_account_synchronizer(
         &mut self,
-        expected_root_hash: HashValue,
-        version: Version,
-        runtime: Option<&Runtime>,
+        epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
+        target_ledger_info: LedgerInfoWithSignatures,
+        target_output_with_proof: TransactionOutputListWithProof,
     ) -> Result<(), Error>;
 
     /// Returns true iff there is storage data that is still waiting
@@ -83,8 +83,10 @@ pub trait StorageSynchronizerInterface {
 }
 
 /// The implementation of the `StorageSynchronizerInterface` used by state sync
-#[derive(Clone)]
-pub struct StorageSynchronizer {
+pub struct StorageSynchronizer<ChunkExecutor> {
+    // The executor for transaction and transaction output chunks
+    chunk_executor: Arc<ChunkExecutor>,
+
     // A channel through which to notify the driver of committed data
     commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
 
@@ -97,6 +99,9 @@ pub struct StorageSynchronizer {
     // The number of storage data chunks pending execute/apply, or commit
     pending_data_chunks: Arc<AtomicU64>,
 
+    // An optional runtime on which to spawn the storage synchronizer threads
+    runtime: Option<Handle>,
+
     // The channel through which to notify the state snapshot receiver of new data chunks
     state_snapshot_notifier: Option<mpsc::Sender<StorageDataChunk>>,
 
@@ -104,8 +109,25 @@ pub struct StorageSynchronizer {
     storage: Arc<dyn DbWriter>,
 }
 
-impl StorageSynchronizer {
-    pub fn new<ChunkExecutor: ChunkExecutorTrait + 'static>(
+// TODO(joshlind): this cannot currently be derived because of limitations around
+// how deriving `Clone` works. See: https://github.com/rust-lang/rust/issues/26925.
+impl<ChunkExecutor: ChunkExecutorTrait + 'static> Clone for StorageSynchronizer<ChunkExecutor> {
+    fn clone(&self) -> Self {
+        Self {
+            chunk_executor: self.chunk_executor.clone(),
+            commit_notification_sender: self.commit_notification_sender.clone(),
+            error_notification_sender: self.error_notification_sender.clone(),
+            executor_notifier: self.executor_notifier.clone(),
+            pending_data_chunks: self.pending_data_chunks.clone(),
+            runtime: self.runtime.clone(),
+            state_snapshot_notifier: self.state_snapshot_notifier.clone(),
+            storage: self.storage.clone(),
+        }
+    }
+}
+
+impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecutor> {
+    pub fn new(
         chunk_executor: Arc<ChunkExecutor>,
         commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
         error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
@@ -122,30 +144,33 @@ impl StorageSynchronizer {
         let pending_transaction_chunks = Arc::new(AtomicU64::new(0));
 
         // Spawn the executor that executes/applies storage data chunks
+        let runtime = runtime.map(|runtime| runtime.handle().clone());
         spawn_executor(
             chunk_executor.clone(),
             error_notification_sender.clone(),
             executor_listener,
             committer_notifier,
             pending_transaction_chunks.clone(),
-            runtime,
+            runtime.clone(),
         );
 
         // Spawn the committer that commits executed (but pending) chunks
         spawn_committer(
-            chunk_executor,
+            chunk_executor.clone(),
             committer_listener,
             commit_notification_sender.clone(),
             error_notification_sender.clone(),
             pending_transaction_chunks.clone(),
-            runtime,
+            runtime.clone(),
         );
 
         Self {
+            chunk_executor,
             commit_notification_sender,
             error_notification_sender,
             executor_notifier,
             pending_data_chunks: pending_transaction_chunks,
+            runtime,
             state_snapshot_notifier: None,
             storage,
         }
@@ -165,7 +190,9 @@ impl StorageSynchronizer {
     }
 }
 
-impl StorageSynchronizerInterface for StorageSynchronizer {
+impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizerInterface
+    for StorageSynchronizer<ChunkExecutor>
+{
     fn apply_transaction_outputs(
         &mut self,
         notification_id: NotificationId,
@@ -200,23 +227,25 @@ impl StorageSynchronizerInterface for StorageSynchronizer {
 
     fn initialize_account_synchronizer(
         &mut self,
-        expected_root_hash: HashValue,
-        version: Version,
-        runtime: Option<&Runtime>,
+        epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
+        target_ledger_info: LedgerInfoWithSignatures,
+        target_output_with_proof: TransactionOutputListWithProof,
     ) -> Result<(), Error> {
         // Create a channel to notify the state snapshot receiver when data chunks are ready
         let (state_snapshot_notifier, state_snapshot_listener) = mpsc::channel(MAX_PENDING_CHUNKS);
 
         // Spawn the state snapshot receiver that commits account states
         spawn_state_snapshot_receiver(
+            self.chunk_executor.clone(),
             state_snapshot_listener,
             self.commit_notification_sender.clone(),
-            expected_root_hash,
             self.error_notification_sender.clone(),
             self.pending_data_chunks.clone(),
             self.storage.clone(),
-            version,
-            runtime,
+            epoch_change_proofs,
+            target_ledger_info,
+            target_output_with_proof,
+            self.runtime.clone(),
         );
         self.state_snapshot_notifier = Some(state_snapshot_notifier);
 
@@ -277,7 +306,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
     mut executor_listener: mpsc::Receiver<StorageDataChunk>,
     mut committer_notifier: mpsc::Sender<NotificationId>,
     pending_transaction_chunks: Arc<AtomicU64>,
-    runtime: Option<&Runtime>,
+    runtime: Option<Handle>,
 ) {
     // Create an executor
     let executor = async move {
@@ -340,7 +369,7 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
     mut commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
     pending_transaction_chunks: Arc<AtomicU64>,
-    runtime: Option<&Runtime>,
+    runtime: Option<Handle>,
 ) {
     // Create a committer
     let committer = async move {
@@ -373,21 +402,35 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
 }
 
 /// Spawns a dedicated receiver that commits accounts from a state snapshot
-fn spawn_state_snapshot_receiver(
+fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
+    chunk_executor: Arc<ChunkExecutor>,
     mut state_snapshot_listener: mpsc::Receiver<StorageDataChunk>,
     mut commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
-    expected_root_hash: HashValue,
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
     pending_transaction_chunks: Arc<AtomicU64>,
     storage: Arc<dyn DbWriter>,
-    version: Version,
-    runtime: Option<&Runtime>,
+    epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
+    target_ledger_info: LedgerInfoWithSignatures,
+    target_output_with_proof: TransactionOutputListWithProof,
+    runtime: Option<Handle>,
 ) {
     // Create a state snapshot receiver
     let receiver = async move {
+        // Get the target version and expected root hash
+        let version = target_ledger_info.ledger_info().version();
+        let expected_root_hash = target_output_with_proof
+            .proof
+            .transaction_infos
+            .first()
+            .expect("Target transaction info should exist!")
+            .state_change_hash();
+
+        // Create the snapshot receiver
         let mut state_snapshot_receiver = storage
             .get_state_snapshot_receiver(version, expected_root_hash)
             .expect("Failed to initialize the state snapshot receiver!");
+
+        // Handle account state chunks
         loop {
             ::futures::select! {
                 storage_data_chunk = state_snapshot_listener.select_next_some() => {
@@ -410,11 +453,24 @@ fn spawn_state_snapshot_receiver(
                                         let error = format!("Failed to send account commit notification! Error: {:?}", error);
                                         send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
                                     } else if all_accounts_synced {
-                                        // Update the receiver and return
-                                        if let Err(error) = state_snapshot_receiver.finish_box() {
-                                            let error = format!("Failed to finish the account states synchronization! Error: {:?}", error);
+                                        // We're done synchronizing account states. Finalize storage and reset the executor.
+                                        let finalized_result = if let Err(error) = state_snapshot_receiver.finish_box() {
+                                            Err(format!("Failed to finish the account states synchronization! Error: {:?}", error))
+                                        } else if let Err(error) = storage.finalize_state_snapshot(version, target_output_with_proof) {
+                                            Err(format!("Failed to finalize the state snapshot! Error: {:?}", error))
+                                        } else if let Err(error) = storage.save_ledger_infos(&epoch_change_proofs) {
+                                            Err(format!("Failed to save all epoch ending ledger infos! Error: {:?}", error))
+                                        } else if let Err(error) = chunk_executor.reset() { // Reset the chunk executor (to read the latest db state)
+                                            Err(format!("Failed to reset the chunk executor after account states synchronization! Error: {:?}", error))
+                                        } else {
+                                            Ok(())
+                                        };
+
+                                        // Notify the state sync driver of any errors
+                                        if let Err(error) = finalized_result {
                                             send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
                                         }
+
                                         decrement_atomic(pending_transaction_chunks.clone());
                                         return;
                                     }
@@ -441,7 +497,7 @@ fn spawn_state_snapshot_receiver(
 
 /// Spawns a future on a specified runtime. If no runtime is specified, uses
 /// the current runtime.
-fn spawn(runtime: Option<&Runtime>, future: impl Future<Output = ()> + Send + 'static) {
+fn spawn(runtime: Option<Handle>, future: impl Future<Output = ()> + Send + 'static) {
     if let Some(runtime) = runtime {
         runtime.spawn(future);
     } else {

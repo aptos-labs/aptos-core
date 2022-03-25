@@ -26,7 +26,7 @@ use schemadb::{ReadOptions, SchemaBatch, SchemaIterator, DB};
 use std::sync::Arc;
 
 #[derive(Debug)]
-pub(crate) struct TransactionStore {
+pub struct TransactionStore {
     db: Arc<DB>,
 }
 

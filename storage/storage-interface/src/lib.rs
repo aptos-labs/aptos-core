@@ -572,6 +572,38 @@ impl MoveStorage for &dyn DbReader {
 /// expected of an Aptos DB. This adds write APIs to DbReader.
 #[allow(unused_variables)]
 pub trait DbWriter: Send + Sync {
+    /// Get a (stateful) state snapshot receiver.
+    ///
+    /// Chunk of accounts need to be added via `add_chunk()` before finishing up with `finish_box()`
+    fn get_state_snapshot_receiver(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<Box<dyn StateSnapshotReceiver<StateValue>>> {
+        unimplemented!()
+    }
+
+    /// Finalizes a state snapshot that has already been restored to the database through
+    /// a state snapshot receiver. This is required to bootstrap the transaction accumulator
+    /// and populate transaction and event information.
+    ///
+    /// Note: this assumes that the output with proof has already been verified and that the
+    /// state snapshot was restored at the same version.
+    fn finalize_state_snapshot(
+        &self,
+        version: Version,
+        output_with_proof: TransactionOutputListWithProof,
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
+    /// Persists the specified ledger infos.
+    ///
+    /// Note: this assumes that the ledger infos have already been verified.
+    fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()> {
+        unimplemented!()
+    }
+
     /// Persist transactions. Called by the executor module when either syncing nodes or committing
     /// blocks during normal operation.
     /// See [`AptosDB::save_transactions`].
@@ -583,17 +615,6 @@ pub trait DbWriter: Send + Sync {
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
-        unimplemented!()
-    }
-
-    /// Get a (stateful) state snapshot receiver.
-    ///
-    /// Chunk of accounts need to be added via `add_chunk()` before finishing up with `finish_box()`
-    fn get_state_snapshot_receiver(
-        &self,
-        version: Version,
-        expected_root_hash: HashValue,
-    ) -> Result<Box<dyn StateSnapshotReceiver<StateValue>>> {
         unimplemented!()
     }
 }

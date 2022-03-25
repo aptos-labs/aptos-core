@@ -518,9 +518,12 @@ impl<
 
         // Drive progress depending on if we're bootstrapping or continuously syncing
         if self.bootstrapper.is_bootstrapped() {
+            // Fetch any consensus sync requests
             let consensus_sync_request = self
                 .consensus_notification_handler
                 .get_consensus_sync_request();
+
+            // Attempt to continuously sync
             if let Err(error) = self
                 .continuous_syncer
                 .drive_progress(consensus_sync_request)

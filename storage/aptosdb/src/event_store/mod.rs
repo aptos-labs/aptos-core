@@ -39,7 +39,7 @@ use std::{
 };
 
 #[derive(Debug)]
-pub(crate) struct EventStore {
+pub struct EventStore {
     db: Arc<DB>,
 }
 

@@ -37,7 +37,7 @@ mod aptosdb_test;
 pub use aptosdb_test::test_save_blocks_impl;
 
 use crate::{
-    backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler},
+    backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},
     change_set::{ChangeSet, SealedChangeSet},
     errors::AptosDbError,
     event_store::EventStore,
@@ -76,9 +76,9 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof, StateValueWithProof},
     },
     transaction::{
-        AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof, TransactionOutput,
-        TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
-        PRE_GENESIS_VERSION,
+        AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
+        TransactionOutput, TransactionOutputListWithProof, TransactionToCommit,
+        TransactionWithProof, Version, PRE_GENESIS_VERSION,
     },
 };
 use itertools::zip_eq;
@@ -1242,6 +1242,16 @@ impl ResourceResolver for AptosDB {
 impl MoveDbReader for AptosDB {}
 
 impl DbWriter for AptosDB {
+    fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()> {
+        gauged_api("save_ledger_infos", || {
+            restore_utils::save_ledger_infos(
+                self.db.clone(),
+                self.ledger_store.clone(),
+                ledger_infos,
+            )
+        })
+    }
+
     /// `first_version` is the version of the first transaction in `txns_to_commit`.
     /// When `ledger_info_with_sigs` is provided, verify that the transaction accumulator root hash
     /// it carries is generated after the `txns_to_commit` are applied.
@@ -1340,6 +1350,61 @@ impl DbWriter for AptosDB {
         gauged_api("get_state_snapshot_receiver", || {
             self.state_store
                 .get_snapshot_receiver(version, expected_root_hash)
+        })
+    }
+
+    fn finalize_state_snapshot(
+        &self,
+        version: Version,
+        output_with_proof: TransactionOutputListWithProof,
+    ) -> Result<()> {
+        gauged_api("finalize_state_snapshot", || {
+            // Ensure the output with proof only contains a single transaction output and info
+            let num_transaction_outputs = output_with_proof.transactions_and_outputs.len();
+            let num_transaction_infos = output_with_proof.proof.transaction_infos.len();
+            ensure!(
+                num_transaction_outputs == 1,
+                "Number of transaction outputs should == 1, but got: {}",
+                num_transaction_outputs
+            );
+            ensure!(
+                num_transaction_infos == 1,
+                "Number of transaction infos should == 1, but got: {}",
+                num_transaction_infos
+            );
+
+            // Update the merkle accumulator using the given proof
+            let frozen_subtrees = output_with_proof
+                .proof
+                .ledger_info_to_transaction_infos_proof
+                .left_siblings();
+            restore_utils::confirm_or_save_frozen_subtrees(
+                self.db.clone(),
+                version,
+                frozen_subtrees,
+            )?;
+
+            // Insert the target transactions, infos and events into the database
+            let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
+                output_with_proof
+                    .transactions_and_outputs
+                    .into_iter()
+                    .unzip();
+            let events = outputs
+                .into_iter()
+                .map(|output| output.events().to_vec())
+                .collect::<Vec<_>>();
+            let transaction_infos = output_with_proof.proof.transaction_infos;
+            restore_utils::save_transactions(
+                self.db.clone(),
+                self.ledger_store.clone(),
+                self.transaction_store.clone(),
+                self.event_store.clone(),
+                version,
+                &transactions,
+                &transaction_infos,
+                &events,
+            )
         })
     }
 }
