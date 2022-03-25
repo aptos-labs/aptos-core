@@ -43,4 +43,4 @@ export RUSTFLAGS
 # build
 cargo build --manifest-path fuzz/Cargo.toml --bin fuzzer_builder --target $TARGET
 # move fuzzer to $OUT
-mv $SRC/diem/target/$TARGET/debug/fuzzer_builder $OUT_DIR/$SINGLE_FUZZ_TARGET
+mv $SRC/aptos-core/target/$TARGET/debug/fuzzer_builder $OUT_DIR/$SINGLE_FUZZ_TARGET

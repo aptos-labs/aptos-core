@@ -1,6 +1,6 @@
-## Fuzzing support for Diem
+## Fuzzing support for Aptos
 
-This crate contains support for fuzzing Diem targets. This support sincludes:
+This crate contains support for fuzzing Aptos targets. This support sincludes:
 
 * corpus generation with `proptest`
 * automatically running failing examples with `cargo test`
@@ -108,7 +108,7 @@ For this, build.rs can create a fuzzer binary based on an environement variable.
 Use it as such:
 
 ```sh
-cd diem/testsuite/aptos-fuzzer
+cd aptos-core/testsuite/aptos-fuzzer
 fuzz/google-oss-fuzz/build_fuzzer.sh ConsensusProposal .
 ./ConsensusProposal
 ```
@@ -148,7 +148,7 @@ error: aborting due to previous error
 This is probably due to an issue in core-foundation-rs (https://github.com/servo/core-foundation-rs/pull/357)
 that was fixed in the latest version, but one of our transitive dependencies
 `native-tls` only has the update in its `master` branch. To fix this problem, add
-the following to the end of `diem/Cargo.toml`:
+the following to the end of `aptos-core/Cargo.toml`:
 
 ```toml
 [patch.crates-io]

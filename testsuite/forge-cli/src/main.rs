@@ -298,7 +298,7 @@ pub fn send_changelog_message(perf_msg: &str, from_commit: &Option<String>, to_c
 
 fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String {
     let github_client = GitHub::new();
-    let commits = github_client.get_commits("diem/diem", upstream_commit);
+    let commits = github_client.get_commits("aptos/aptos-core", upstream_commit);
     match commits {
         Err(e) => {
             println!("Failed to get github commits: {:?}", e);

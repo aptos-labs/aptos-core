@@ -8,7 +8,7 @@ use std::{env, ffi::OsString, fs, path::PathBuf};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "fuzzer", about = "Diem fuzzer")]
+#[structopt(name = "fuzzer", about = "Aptos fuzzer")]
 struct Opt {
     /// Print extended debug output
     #[structopt(long = "debug")]

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # This build script is used with Google OSS-Fuzz to build fuzzer with their docker container.
-# It must be called from diem/testsuite/aptos-fuzzer
+# It must be called from aptos-core/testsuite/aptos-fuzzer
 # usage: OUT=out_dir ./build.sh
 
 # recipe:
