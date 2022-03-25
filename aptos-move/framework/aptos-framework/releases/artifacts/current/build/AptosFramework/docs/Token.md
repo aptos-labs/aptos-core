@@ -16,9 +16,11 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 -  [Function `initialize_collections`](#0x1_Token_initialize_collections)
 -  [Function `create_collection`](#0x1_Token_create_collection)
 -  [Function `initialize_gallery`](#0x1_Token_initialize_gallery)
+-  [Function `token_id`](#0x1_Token_token_id)
 -  [Function `create_token`](#0x1_Token_create_token)
 -  [Function `withdraw_token`](#0x1_Token_withdraw_token)
 -  [Function `deposit_token`](#0x1_Token_deposit_token)
+-  [Function `merge_token`](#0x1_Token_merge_token)
 -  [Function `create_collection_and_token`](#0x1_Token_create_collection_and_token)
 
 
@@ -297,6 +299,15 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 
 
+<a name="0x1_Token_EINVALID_TOKEN_MERGE"></a>
+
+
+
+<pre><code><b>const</b> <a href="Token.md#0x1_Token_EINVALID_TOKEN_MERGE">EINVALID_TOKEN_MERGE</a>: u64 = 2;
+</code></pre>
+
+
+
 <a name="0x1_Token_EMISSING_CLAIMED_TOKEN"></a>
 
 
@@ -416,6 +427,30 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 </details>
 
+<a name="0x1_Token_token_id"></a>
+
+## Function `token_id`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_token_id">token_id</a>&lt;TokenType: <b>copy</b>, drop, store&gt;(token: &<a href="Token.md#0x1_Token_Token">Token::Token</a>&lt;TokenType&gt;): &<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_token_id">token_id</a>&lt;TokenType: <b>copy</b> + drop + store&gt;(token: &<a href="Token.md#0x1_Token">Token</a>&lt;TokenType&gt;): &ID {
+    &token.id
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_Token_create_token"></a>
 
 ## Function `create_token`
@@ -492,7 +527,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_withdraw_token">withdraw_token</a>&lt;TokenType: <b>copy</b>, drop, store&gt;(account: &signer, token_id: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>, amount: u64): <a href="Token.md#0x1_Token_Token">Token::Token</a>&lt;TokenType&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_withdraw_token">withdraw_token</a>&lt;TokenType: <b>copy</b>, drop, store&gt;(account: &signer, token_id: &<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>, amount: u64): <a href="Token.md#0x1_Token_Token">Token::Token</a>&lt;TokenType&gt;
 </code></pre>
 
 
@@ -503,20 +538,20 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 <pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_withdraw_token">withdraw_token</a>&lt;TokenType: <b>copy</b> + drop + store&gt;(
     account: &signer,
-    token_id: ID,
+    token_id: &ID,
     amount: u64,
 ): <a href="Token.md#0x1_Token">Token</a>&lt;TokenType&gt; <b>acquires</b> <a href="Token.md#0x1_Token_Gallery">Gallery</a> {
     <b>let</b> account_addr = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
 
     <b>let</b> gallery = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="Token.md#0x1_Token_Gallery">Gallery</a>&lt;TokenType&gt;&gt;(account_addr).gallery;
-    <b>let</b> balance = <a href="Table.md#0x1_Table_borrow">Table::borrow</a>(gallery, &token_id).balance;
+    <b>let</b> balance = <a href="Table.md#0x1_Table_borrow">Table::borrow</a>(gallery, token_id).balance;
     <b>assert</b>!(balance &gt;= amount, <a href="Token.md#0x1_Token_EINSUFFICIENT_BALANCE">EINSUFFICIENT_BALANCE</a>);
 
     <b>if</b> (balance == amount) {
-        <b>let</b> (_key, value) = <a href="Table.md#0x1_Table_remove">Table::remove</a>(gallery, &token_id);
+        <b>let</b> (_key, value) = <a href="Table.md#0x1_Table_remove">Table::remove</a>(gallery, token_id);
         value
     } <b>else</b> {
-        <b>let</b> token = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(gallery, &token_id);
+        <b>let</b> token = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(gallery, token_id);
         token.balance = balance - amount;
         <a href="Token.md#0x1_Token">Token</a> {
             id: *&token.id,
@@ -567,10 +602,38 @@ This module provides the foundation for (collectible) Tokens often called NFTs
     <b>let</b> gallery = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="Token.md#0x1_Token_Gallery">Gallery</a>&lt;TokenType&gt;&gt;(account_addr).gallery;
     <b>if</b> (<a href="Table.md#0x1_Table_contains_key">Table::contains_key</a>(gallery, &token.id)) {
         <b>let</b> current_token = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(gallery, &token.id);
-        current_token.balance = current_token.balance + token.balance
+        <a href="Token.md#0x1_Token_merge_token">merge_token</a>(token, current_token);
     } <b>else</b> {
         <a href="Table.md#0x1_Table_insert">Table::insert</a>(gallery, *&token.id, token)
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_Token_merge_token"></a>
+
+## Function `merge_token`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_merge_token">merge_token</a>&lt;TokenType: <b>copy</b>, drop, store&gt;(source_token: <a href="Token.md#0x1_Token_Token">Token::Token</a>&lt;TokenType&gt;, dst_token: &<b>mut</b> <a href="Token.md#0x1_Token_Token">Token::Token</a>&lt;TokenType&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_merge_token">merge_token</a>&lt;TokenType: <b>copy</b> + drop + store&gt;(
+    source_token: <a href="Token.md#0x1_Token">Token</a>&lt;TokenType&gt;,
+    dst_token: &<b>mut</b> <a href="Token.md#0x1_Token">Token</a>&lt;TokenType&gt;,
+) {
+    <b>assert</b>!(dst_token.id == source_token.id, <a href="Token.md#0x1_Token_EINVALID_TOKEN_MERGE">EINVALID_TOKEN_MERGE</a>);
+    dst_token.balance = dst_token.balance + source_token.balance;
 }
 </code></pre>
 
