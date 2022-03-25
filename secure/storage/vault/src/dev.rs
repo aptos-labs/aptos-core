@@ -8,10 +8,10 @@ use std::{
     process::{Child, Command, Stdio},
 };
 
-static DIEM_VAULT: Lazy<Option<VaultRunner>> = Lazy::new(|| match VaultRunner::run() {
+static APTOS_VAULT: Lazy<Option<VaultRunner>> = Lazy::new(|| match VaultRunner::run() {
     Err(err) => {
         assert!(
-            std::env::var("DIEM_REQUIRE_VAULT_TESTS").is_err(),
+            std::env::var("APTOS_REQUIRE_VAULT_TESTS").is_err(),
             "Vault is not running: {}",
             err
         );
@@ -24,7 +24,7 @@ static DIEM_VAULT: Lazy<Option<VaultRunner>> = Lazy::new(|| match VaultRunner::r
 /// This will return the vault host, if vault was started successfully. If vault is expected to be
 /// available, an assertion will cause this to fail.
 pub fn test_host_safe() -> Option<String> {
-    DIEM_VAULT.as_ref().map(|v| v.host().to_string())
+    APTOS_VAULT.as_ref().map(|v| v.host().to_string())
 }
 
 /// This will return the vault host or panic.
@@ -134,7 +134,7 @@ fn run_vault() {
     let vr = VaultRunner::run();
     if let Err(err) = vr {
         assert!(
-            std::env::var("DIEM_REQUIRE_VAULT_TESTS").is_err(),
+            std::env::var("APTOS_REQUIRE_VAULT_TESTS").is_err(),
             "Vault is not running: {}",
             err
         );

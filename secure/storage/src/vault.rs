@@ -313,7 +313,7 @@ pub mod policy {
     use crate::{Capability, Identity, Policy};
     use aptos_vault_client as vault;
 
-    const DIEM_DEFAULT: &str = "diem_default";
+    const APTOS_DEFAULT: &str = "aptos_default";
 
     /// VaultStorage utilizes Vault for maintaining encrypted, authenticated data. This
     /// version currently matches the behavior of OnDiskStorage and InMemoryStorage. In the future,
@@ -357,7 +357,7 @@ pub mod policy {
 
         /// Creates a token but uses the namespace for policies
         pub fn create_token(&self, mut policies: Vec<&str>) -> Result<String, Error> {
-            policies.push(DIEM_DEFAULT);
+            policies.push(APTOS_DEFAULT);
             let result = if let Some(ns) = &self.namespace {
                 let policies: Vec<_> = policies.iter().map(|p| format!("{}/{}", ns, p)).collect();
                 self.client()
@@ -420,7 +420,7 @@ pub mod policy {
                 match &perm.id {
                     Identity::User(id) => self.set_policy(id, engine, name, &perm.capabilities)?,
                     Identity::Anyone => {
-                        self.set_policy(DIEM_DEFAULT, engine, name, &perm.capabilities)?
+                        self.set_policy(APTOS_DEFAULT, engine, name, &perm.capabilities)?
                     }
                     Identity::NoOne => (),
                 };
