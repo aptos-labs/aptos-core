@@ -2,7 +2,7 @@
 
 ## Web Server Configuration
 
-Diem node generates the following default API configuration:
+Aptos node generates the following default API configuration:
 
 ```
 api:

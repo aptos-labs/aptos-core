@@ -3,9 +3,8 @@
 This module provides REST API for client applications to query the Aptos blockchain.
 
 * [API specification](doc/openapi.yaml)
-* [Documentation](https://diem.github.io/diem/aptos_api/spec.html)
 
-> For a Diem node, you can view the documentation at `/spec.html`.
+> For an Aptos node, you can view the documentation at `/spec.html`.
 
 ## Overview
 
