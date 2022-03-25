@@ -23,7 +23,7 @@ locals {
 }
 
 module "eks" {
-  source                      = "../modules/eks"
+  source                      = "../../modules/eks"
   region                      = var.region
   workspace_name_override     = "pfn-${terraform.workspace}"
   eks_cluster_name            = "aptos-pfn-${terraform.workspace}"
@@ -109,7 +109,7 @@ resource "helm_release" "pfn" {
 resource "helm_release" "fullnode" {
   count       = var.num_fullnodes
   name        = "pfn${count.index}"
-  chart       = "${path.module}/../helm/fullnode"
+  chart       = "${path.module}/../../helm/fullnode"
   max_history = 10
   wait        = false
 
@@ -145,7 +145,7 @@ resource "helm_release" "fullnode" {
 resource "helm_release" "pfn-logger" {
   count       = var.enable_pfn_logger ? 1 : 0
   name        = "pfn-logger"
-  chart       = "${path.module}/../helm/logger"
+  chart       = "${path.module}/../../helm/logger"
   max_history = 10
   wait        = false
 
