@@ -28,7 +28,7 @@ pub struct DataStreamingService<T> {
     // The configuration for this streaming service.
     config: DataStreamingServiceConfig,
 
-    // The data client through which to fetch data from the Diem network
+    // The data client through which to fetch data from the Aptos network
     aptos_data_client: T,
 
     // Cached global data summary
@@ -204,7 +204,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
         Ok(stream_listener)
     }
 
-    /// Refreshes the global data summary by communicating with the Diem data client
+    /// Refreshes the global data summary by communicating with the Aptos data client
     fn refresh_global_data_summary(&mut self) {
         if let Err(error) = self.fetch_global_data_summary() {
             increment_counter(

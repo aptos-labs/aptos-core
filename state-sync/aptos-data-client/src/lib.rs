@@ -23,7 +23,7 @@ pub mod aptosnet;
 pub type Result<T, E = Error> = ::std::result::Result<T, E>;
 
 // TODO(philiphayes): a Error { kind: ErrorKind, inner: BoxError } would be more convenient
-/// An error returned by the Diem Data Client for failed API calls.
+/// An error returned by the Aptos Data Client for failed API calls.
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
 pub enum Error {
     #[error("The requested data is unavailable and cannot be found! Error: {0}")]
@@ -61,7 +61,7 @@ impl From<UnexpectedResponseError> for Error {
     }
 }
 
-/// The API offered by the Diem Data Client.
+/// The API offered by the Aptos Data Client.
 #[async_trait]
 pub trait AptosDataClient {
     /// Returns a global summary of the data currently available in the network.
@@ -117,7 +117,7 @@ pub trait AptosDataClient {
     ) -> Result<Response<TransactionListWithProof>>;
 }
 
-/// A response error that users of the Diem Data Client can use to notify
+/// A response error that users of the Aptos Data Client can use to notify
 /// the Data Client about invalid or malformed responses.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum ResponseError {
@@ -235,7 +235,7 @@ impl From<TransactionListWithProof> for ResponsePayload {
     }
 }
 
-/// A snapshot of the global state of data available in the Diem network.
+/// A snapshot of the global state of data available in the Aptos network.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GlobalDataSummary {
     pub advertised_data: AdvertisedData,

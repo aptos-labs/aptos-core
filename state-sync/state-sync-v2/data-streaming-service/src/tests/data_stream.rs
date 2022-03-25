@@ -375,7 +375,7 @@ fn create_data_stream(
         .unwrap()],
     };
 
-    // Create a diem data client mock and notification generator
+    // Create a aptos data client mock and notification generator
     let aptos_data_client = MockAptosDataClient::new();
     let notification_generator = Arc::new(U64IdGenerator::new());
 

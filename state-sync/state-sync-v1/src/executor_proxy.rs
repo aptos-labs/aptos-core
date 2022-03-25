@@ -261,7 +261,7 @@ mod tests {
         // Create a dummy prologue transaction that will bump the timer, and update the validator set
         let validator_account = validators[0].data.address;
         let dummy_txn = create_dummy_transaction(1, validator_account);
-        let reconfig_txn = create_new_update_diem_version_transaction(0);
+        let reconfig_txn = create_new_update_aptos_version_transaction(0);
 
         // Execute and commit the block
         let block = vec![dummy_txn, reconfig_txn];
@@ -282,10 +282,10 @@ mod tests {
         let (validators, mut block_executor, mut executor_proxy, reconfig_receiver) =
             bootstrap_genesis_and_set_subscription(true);
 
-        // Create a dummy prologue transaction that will bump the timer, and update the Diem version
+        // Create a dummy prologue transaction that will bump the timer, and update the Aptos version
         let validator_account = validators[0].data.address;
         let dummy_txn = create_dummy_transaction(1, validator_account);
-        let reconfig_txn = create_new_update_diem_version_transaction(0);
+        let reconfig_txn = create_new_update_aptos_version_transaction(0);
 
         // Execute and commit the reconfig block
         let block = vec![dummy_txn, reconfig_txn];
@@ -303,10 +303,10 @@ mod tests {
         let (validators, mut block_executor, mut executor_proxy, mut reconfig_receiver) =
             bootstrap_genesis_and_set_subscription(true);
 
-        // Create a dummy prologue transaction that will bump the timer, and update the Diem version
+        // Create a dummy prologue transaction that will bump the timer, and update the Aptos version
         let validator_account = validators[0].data.address;
         let dummy_txn = create_dummy_transaction(1, validator_account);
-        let reconfig_txn = create_new_update_diem_version_transaction(0);
+        let reconfig_txn = create_new_update_aptos_version_transaction(0);
 
         // Give the validator some money so it can send a rotation tx and rotate the validator's consensus key.
         let money_txn = create_transfer_to_validator_transaction(validator_account, 1);
@@ -362,7 +362,7 @@ mod tests {
         // Generate a genesis change set
         let (genesis, _validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
 
-        // Create test diem database
+        // Create test aptos database
         let db_path = aptos_temppath::TempPath::new();
         assert_ok!(db_path.create_as_dir());
         let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));
@@ -403,14 +403,14 @@ mod tests {
     }
 
     #[test]
-    fn test_pub_sub_diem_version() {
+    fn test_pub_sub_apotos_version() {
         let (validators, mut block_executor, mut executor_proxy, mut reconfig_receiver) =
             bootstrap_genesis_and_set_subscription(true);
 
-        // Create a dummy prologue transaction that will bump the timer, and update the Diem version
+        // Create a dummy prologue transaction that will bump the timer, and update the Aptos version
         let validator_account = validators[0].data.address;
         let dummy_txn = create_dummy_transaction(1, validator_account);
-        let allowlist_txn = create_new_update_diem_version_transaction(0);
+        let allowlist_txn = create_new_update_aptos_version_transaction(0);
 
         // Execute and commit the reconfig block
         let block = vec![dummy_txn, allowlist_txn];
@@ -430,10 +430,10 @@ mod tests {
         let (validators, mut block_executor, mut executor_proxy, _reconfig_receiver) =
             bootstrap_genesis_and_set_subscription(true);
 
-        // Create a dummy prologue transaction that will bump the timer and update the Diem version
+        // Create a dummy prologue transaction that will bump the timer and update the Aptos version
         let validator_account = validators[0].data.address;
         let dummy_txn_1 = create_dummy_transaction(1, validator_account);
-        let reconfig_txn = create_new_update_diem_version_transaction(0);
+        let reconfig_txn = create_new_update_aptos_version_transaction(0);
 
         // Execute and commit the reconfig block
         let block = vec![dummy_txn_1.clone(), reconfig_txn.clone()];
@@ -486,10 +486,10 @@ mod tests {
         let (validators, mut block_executor, executor_proxy, _reconfig_receiver) =
             bootstrap_genesis_and_set_subscription(true);
 
-        // Create a dummy prologue transaction that will bump the timer and update the Diem version
+        // Create a dummy prologue transaction that will bump the timer and update the Aptos version
         let validator_account = validators[0].data.address;
         let dummy_txn = create_dummy_transaction(1, validator_account);
-        let reconfig_txn = create_new_update_diem_version_transaction(0);
+        let reconfig_txn = create_new_update_aptos_version_transaction(0);
 
         // Execute and commit the reconfig block
         let block = vec![dummy_txn, reconfig_txn];
@@ -529,7 +529,7 @@ mod tests {
             .on_chain_configs
             .get::<OnChainConsensusConfig>());
 
-        // Create a dummy prologue transaction that will bump the timer, and update the Diem version
+        // Create a dummy prologue transaction that will bump the timer, and update the Aptos version
         let validator_account = validators[0].data.address;
         let dummy_txn = create_dummy_transaction(1, validator_account);
         let update_txn = create_new_update_consensus_config_transaction(0);
@@ -555,7 +555,7 @@ mod tests {
 
     #[test]
     fn test_missing_on_chain_config() {
-        // Create a test diem database
+        // Create a test aptos database
         let db_path = aptos_temppath::TempPath::new();
         db_path.create_as_dir().unwrap();
         let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));
@@ -596,7 +596,7 @@ mod tests {
         assert_ok!(payload.get::<Version>());
         assert_err!(payload.get::<TestOnChainConfig>());
 
-        // Create a dummy prologue transaction that will bump the timer, and update the Diem version
+        // Create a dummy prologue transaction that will bump the timer, and update the Aptos version
         let validator_account = validators[0].data.address;
         let dummy_txn = create_dummy_transaction(1, validator_account);
         let allowlist_txn = create_new_update_consensus_config_transaction(0);
@@ -633,7 +633,7 @@ mod tests {
         // Generate a genesis change set
         let (genesis, validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
 
-        // Create test diem database
+        // Create test aptos database
         let db_path = aptos_temppath::TempPath::new();
         assert_ok!(db_path.create_as_dir());
         let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));
@@ -713,8 +713,8 @@ mod tests {
         ))
     }
 
-    /// Creates a transaction that creates a reconfiguration event by changing the Diem version
-    fn create_new_update_diem_version_transaction(sequence_number: u64) -> Transaction {
+    /// Creates a transaction that creates a reconfiguration event by changing the Aptos version
+    fn create_new_update_aptos_version_transaction(sequence_number: u64) -> Transaction {
         let genesis_key = vm_genesis::GENESIS_KEYPAIR.0.clone();
         get_test_signed_transaction(
             aptos_root_address(),

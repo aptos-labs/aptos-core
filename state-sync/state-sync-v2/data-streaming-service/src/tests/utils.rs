@@ -51,7 +51,7 @@ pub const MAX_ADVERTISED_TRANSACTION_OUTPUT: u64 = 10000;
 /// Test timeout constant
 pub const MAX_NOTIFICATION_TIMEOUT_SECS: u64 = 10;
 
-/// A simple mock of the Diem Data Client
+/// A simple mock of the Aptos Data Client
 #[derive(Clone, Debug)]
 pub struct MockAptosDataClient {
     pub epoch_ending_ledger_infos: HashMap<Epoch, LedgerInfoWithSignatures>,
@@ -366,7 +366,7 @@ fn create_range_random_u64(min_value: u64, max_value: u64) -> u64 {
     rng.gen_range(min_value..max_value)
 }
 
-/// Initializes the Diem logger for tests
+/// Initializes the Aptos logger for tests
 pub fn initialize_logger() {
     aptos_logger::AptosData::builder()
         .is_async(false)

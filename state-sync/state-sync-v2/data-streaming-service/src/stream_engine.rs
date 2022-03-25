@@ -55,7 +55,7 @@ macro_rules! invalid_stream_request {
 #[enum_dispatch]
 pub trait DataStreamEngine {
     /// Creates a batch of data client requests (up to `max_number_of_requests`)
-    /// that can be sent to the diem data client to progress the stream.
+    /// that can be sent to the aptos data client to progress the stream.
     fn create_data_client_requests(
         &mut self,
         max_number_of_requests: u64,

@@ -41,7 +41,7 @@ pub type PendingClientResponse = Arc<Mutex<Box<data_notification::PendingClientR
 
 /// Each data stream holds the original stream request from the client and tracks
 /// the progress of the data stream to satisfy that request (e.g., the data that
-/// has already been sent along the stream to the client and the in-flight diem
+/// has already been sent along the stream to the client and the in-flight Aptos
 /// data client requests that have been sent to the network).
 ///
 /// Note that it is the responsibility of the data stream to send data
@@ -55,7 +55,7 @@ pub struct DataStream<T> {
     // The unique ID for this data stream. This is useful for logging.
     data_stream_id: DataStreamId,
 
-    // The data client through which to fetch data from the Diem network
+    // The data client through which to fetch data from the Aptos network
     aptos_data_client: T,
 
     // The engine for this data stream
@@ -156,7 +156,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
             .is_some()
     }
 
-    /// Notifies the Diem data client of a bad client response
+    /// Notifies the Aptos data client of a bad client response
     pub fn handle_notification_feedback(
         &self,
         notification_id: &NotificationId,
@@ -188,7 +188,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
         Ok(())
     }
 
-    /// Creates and sends a batch of diem data client requests to the network
+    /// Creates and sends a batch of aptos data client requests to the network
     fn create_and_send_client_requests(
         &mut self,
         global_data_summary: &GlobalDataSummary,
@@ -396,7 +396,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
         Ok(())
     }
 
-    /// Notifies the Diem data client of a bad client response
+    /// Notifies the Aptos data client of a bad client response
     fn notify_bad_response(
         &self,
         response_context: &ResponseContext,
@@ -633,7 +633,7 @@ fn sanity_check_client_response(
 }
 
 /// Transforms the notification feedback into a specific response error that
-/// can be sent to the Diem data client.
+/// can be sent to the Aptos data client.
 fn extract_response_error(notification_feedback: &NotificationFeedback) -> ResponseError {
     match notification_feedback {
         NotificationFeedback::InvalidPayloadData => ResponseError::InvalidData,

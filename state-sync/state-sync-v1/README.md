@@ -10,7 +10,7 @@ such, this version (v1) will be deprecated in the near future. See this
 
 # State synchronizer (State sync)
 
-State sync is a component that helps Diem nodes advance local blockchain ledger
+State sync is a component that helps Aptos nodes advance local blockchain ledger
 state by requesting and sharing transactions between peers. This helps nodes
 to synchronize with the most up-to-date state of the blockchain (e.g., if they
 fall behind or are freshly deployed).
@@ -27,9 +27,9 @@ specification mentioned above. The files of note in this crate are:
 - `bootstrapper.rs`: the wrapper struct for creating state sync instances and
 local clients (`client.rs`) to those instances.
 - `chunk_request.rs` & `chunk_response.rs`: the definitions of the messages sent
-between Diem nodes when making state sync requests and responses.
+between Aptos nodes when making state sync requests and responses.
 - `coordinator.rs`: the primary state sync runtime that processes messages (e.g.,
-from other Diem nodes) and reacts appropriately.
+from other Aptos nodes) and reacts appropriately.
 - `executor_proxy.rs`: the interface between the state sync coordinator and
 both storage and execution.
 - `request_manager.rs`: the actor that manages the network requests and responses

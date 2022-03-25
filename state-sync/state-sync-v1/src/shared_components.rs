@@ -18,7 +18,7 @@ use crate::error::Error;
 ///    ledger info (`committed_ledger_info`) is in the middle of the epoch, otherwise, it
 ///    corresponds to the next epoch if the highest committed ledger info ends the epoch.
 ///
-/// Note: `committed_ledger_info` is used for helping other Diem nodes synchronize (i.e.,
+/// Note: `committed_ledger_info` is used for helping other Aptos nodes synchronize (i.e.,
 /// it corresponds to the highest version we have a proof for in storage). `synced_trees`
 /// is used locally for retrieving missing chunks for the local storage.
 #[derive(Clone, Debug)]
@@ -154,7 +154,7 @@ pub(crate) mod test_utils {
         // Generate a genesis change set
         let (genesis, _) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
 
-        // Create test diem database
+        // Create test aptos database
         let db_path = aptos_temppath::TempPath::new();
         db_path.create_as_dir().unwrap();
         let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));

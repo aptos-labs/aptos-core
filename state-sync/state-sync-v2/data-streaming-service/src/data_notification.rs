@@ -33,7 +33,7 @@ pub enum DataPayload {
     TransactionsWithProof(TransactionListWithProof),
 }
 
-/// A request that has been sent to the Diem data client.
+/// A request that has been sent to the Aptos data client.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataClientRequest {
     AccountsWithProof(AccountsWithProofRequest),

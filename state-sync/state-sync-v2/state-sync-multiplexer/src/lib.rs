@@ -225,7 +225,7 @@ mod tests {
         // Create a test streaming service client
         let (streaming_service_client, _) = new_streaming_service_client_listener_pair();
 
-        // Create a test diem data client
+        // Create a test aptos data client
         let network_client = StorageServiceClient::new(
             MultiNetworkSender::new(HashMap::new()),
             PeerMetadataStorage::new(&[]),

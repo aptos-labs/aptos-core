@@ -291,7 +291,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     }
 }
 
-/// The interface into local storage (e.g., the Diem DB) used by the storage
+/// The interface into local storage (e.g., the Aptos DB) used by the storage
 /// server to handle client requests.
 pub trait StorageReaderInterface: Clone + Send + 'static {
     /// Returns a data summary of the underlying storage state.

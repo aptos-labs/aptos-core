@@ -9,9 +9,9 @@ use thiserror::Error;
 pub enum Error {
     #[error("The requested data is unavailable and cannot be found in the network! Error: {0}")]
     DataIsUnavailable(String),
-    #[error("Error returned by the diem data client: {0}")]
+    #[error("Error returned by the aptos data client: {0}")]
     AptosDataClientError(String),
-    #[error("The response from the diem data client is invalid! Error: {0}")]
+    #[error("The response from the aptos data client is invalid! Error: {0}")]
     AptosDataClientResponseIsInvalid(String),
     #[error("An integer overflow has occurred: {0}")]
     IntegerOverflow(String),

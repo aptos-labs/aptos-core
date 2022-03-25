@@ -91,7 +91,7 @@ fn create_driver_for_tests(
     MempoolNotificationListener,
     ReconfigNotificationListener,
 ) {
-    // Create test diem database
+    // Create test aptos database
     let db_path = aptos_temppath::TempPath::new();
     db_path.create_as_dir().unwrap();
     let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));
@@ -127,7 +127,7 @@ fn create_driver_for_tests(
     // Create a streaming service client
     let (streaming_service_client, _) = new_streaming_service_client_listener_pair();
 
-    // Create a test diem data client
+    // Create a test aptos data client
     let network_client = StorageServiceClient::new(
         MultiNetworkSender::new(HashMap::new()),
         PeerMetadataStorage::new(&[]),

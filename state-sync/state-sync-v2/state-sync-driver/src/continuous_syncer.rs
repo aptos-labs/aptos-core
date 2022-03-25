@@ -30,7 +30,7 @@ pub struct ContinuousSyncer<StorageSyncer> {
     // The speculative state tracking the active data stream
     speculative_stream_state: Option<SpeculativeStreamState>,
 
-    // The client through which to stream data from the Diem network
+    // The client through which to stream data from the Aptos network
     streaming_service_client: StreamingServiceClient,
 
     // The interface to read from storage
