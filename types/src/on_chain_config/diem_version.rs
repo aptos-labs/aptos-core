@@ -4,7 +4,7 @@
 use crate::on_chain_config::OnChainConfig;
 use serde::{Deserialize, Serialize};
 
-/// Defines the version of Diem Validator software.
+/// Defines the version of Aptos Validator software.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct Version {
     pub major: u64,

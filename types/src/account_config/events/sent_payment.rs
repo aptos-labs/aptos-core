@@ -22,7 +22,7 @@ pub struct SentPaymentEvent {
 }
 
 impl SentPaymentEvent {
-    // TODO: should only be used for diem client testing and be removed eventually
+    // TODO: should only be used for aptos client testing and be removed eventually
     pub fn new(
         amount: u64,
         currency_code: Identifier,

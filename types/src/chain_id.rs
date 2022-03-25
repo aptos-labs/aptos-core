@@ -13,7 +13,7 @@ use std::{convert::TryFrom, fmt, str::FromStr};
 pub enum NamedChain {
     /// Users might accidentally initialize the ChainId field to 0, hence reserving ChainId 0 for accidental
     /// initialization.
-    /// MAINNET is the Diem mainnet production chain and is reserved for 1
+    /// MAINNET is the Aptos mainnet production chain and is reserved for 1
     MAINNET = 1,
     // Even though these CHAIN IDs do not correspond to MAINNET, changing them should be avoided since they
     // can break test environments for various organisations.
@@ -25,7 +25,7 @@ pub enum NamedChain {
 
 impl NamedChain {
     fn str_to_chain_id(s: &str) -> Result<ChainId> {
-        // TODO implement custom macro that derives FromStr impl for enum (similar to diem/common/num-variants)
+        // TODO implement custom macro that derives FromStr impl for enum (similar to aptos-core/common/num-variants)
         let reserved_chain = match s {
             "MAINNET" => NamedChain::MAINNET,
             "TESTNET" => NamedChain::TESTNET,

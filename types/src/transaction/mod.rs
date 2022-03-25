@@ -92,7 +92,7 @@ pub struct RawTransaction {
     /// in the future to indicate that a transaction does not expire.
     expiration_timestamp_secs: u64,
 
-    /// Chain ID of the Diem network this transaction is intended for.
+    /// Chain ID of the Aptos network this transaction is intended for.
     chain_id: ChainId,
 }
 
