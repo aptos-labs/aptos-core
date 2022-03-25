@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    metrics::DIEM_PRUNER_LEAST_READABLE_VERSION, pruner::db_pruner::DBPruner,
+    metrics::APTOS_PRUNER_LEAST_READABLE_VERSION, pruner::db_pruner::DBPruner,
     schema::ledger_counters::LedgerCountersSchema, LedgerStore,
 };
 use aptos_types::transaction::{AtomicVersion, Version};
@@ -58,7 +58,7 @@ impl DBPruner for LedgerStorePruner {
     fn record_progress(&self, least_readable_version: Version) {
         self.least_readable_version
             .store(least_readable_version, Ordering::Relaxed);
-        DIEM_PRUNER_LEAST_READABLE_VERSION
+        APTOS_PRUNER_LEAST_READABLE_VERSION
             .with_label_values(&["ledger_store"])
             .set(least_readable_version as i64);
     }

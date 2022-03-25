@@ -17,9 +17,9 @@ use std::marker::PhantomData;
 use crate::{
     components::{block_tree::BlockTree, chunk_output::ChunkOutput},
     metrics::{
-        DIEM_EXECUTOR_COMMIT_BLOCKS_SECONDS, DIEM_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        DIEM_EXECUTOR_SAVE_TRANSACTIONS_SECONDS, DIEM_EXECUTOR_TRANSACTIONS_SAVED,
-        DIEM_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
+        APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
+        APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS, APTOS_EXECUTOR_TRANSACTIONS_SAVED,
+        APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
 use storage_interface::DbReaderWriter;
@@ -91,7 +91,7 @@ where
                 LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
                 "execute_block"
             );
-            let _timer = DIEM_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
+            let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
             let state_view = parent_view.state_view(
                 &committed_block.output.result_view,
                 StateViewId::BlockExecution { block_id },
@@ -99,7 +99,7 @@ where
             );
 
             let chunk_output = {
-                let _timer = DIEM_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();
+                let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();
                 fail_point!("executor::vm_execute_block", |_| {
                     Err(Error::from(anyhow::anyhow!(
                         "Injected error in vm_execute_block"
@@ -124,7 +124,7 @@ where
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
     ) -> Result<(), Error> {
-        let _timer = DIEM_EXECUTOR_COMMIT_BLOCKS_SECONDS.start_timer();
+        let _timer = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.start_timer();
         let committed_block = self.block_tree.root_block();
         if committed_block.num_persisted_transactions()
             == ledger_info_with_sigs.ledger_info().version() + 1
@@ -164,8 +164,8 @@ where
         }
 
         {
-            let _timer = DIEM_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
-            DIEM_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
+            let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
+            APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
 
             fail_point!("executor::commit_blocks", |_| {
                 Err(anyhow::anyhow!("Injected error in commit_blocks.").into())

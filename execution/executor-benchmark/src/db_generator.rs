@@ -10,12 +10,12 @@ use aptos_config::{
     utils::get_genesis_txn,
 };
 use aptos_jellyfish_merkle::metrics::{
-    DIEM_JELLYFISH_INTERNAL_ENCODED_BYTES, DIEM_JELLYFISH_LEAF_ENCODED_BYTES,
-    DIEM_JELLYFISH_STORAGE_READS,
+    APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
+    APTOS_JELLYFISH_STORAGE_READS,
 };
 use aptos_vm::AptosVM;
 use aptosdb::{
-    metrics::DIEM_STORAGE_ROCKSDB_PROPERTIES, schema::JELLYFISH_MERKLE_NODE_CF_NAME, AptosDB,
+    metrics::APTOS_STORAGE_ROCKSDB_PROPERTIES, schema::JELLYFISH_MERKLE_NODE_CF_NAME, AptosDB,
 };
 use executor::{
     block_executor::BlockExecutor,
@@ -113,21 +113,21 @@ pub fn run(
     generator.write_meta(&db_dir);
 
     db.update_rocksdb_properties().unwrap();
-    let db_size = DIEM_STORAGE_ROCKSDB_PROPERTIES
+    let db_size = APTOS_STORAGE_ROCKSDB_PROPERTIES
         .with_label_values(&[
             JELLYFISH_MERKLE_NODE_CF_NAME,
             "aptos_rocksdb_live_sst_files_size_bytes",
         ])
         .get();
-    let data_size = DIEM_STORAGE_ROCKSDB_PROPERTIES
+    let data_size = APTOS_STORAGE_ROCKSDB_PROPERTIES
         .with_label_values(&[
             JELLYFISH_MERKLE_NODE_CF_NAME,
             "aptos_rocksdb_total-sst-files-size",
         ])
         .get();
-    let reads = DIEM_JELLYFISH_STORAGE_READS.get();
-    let leaf_bytes = DIEM_JELLYFISH_LEAF_ENCODED_BYTES.get();
-    let internal_bytes = DIEM_JELLYFISH_INTERNAL_ENCODED_BYTES.get();
+    let reads = APTOS_JELLYFISH_STORAGE_READS.get();
+    let leaf_bytes = APTOS_JELLYFISH_LEAF_ENCODED_BYTES.get();
+    let internal_bytes = APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES.get();
     println!("=============FINISHED DB CREATION =============");
     println!(
         "created a AptosDB til version {} with {} accounts.",

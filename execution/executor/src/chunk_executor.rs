@@ -11,8 +11,8 @@ use crate::{
     },
     logging::{LogEntry, LogSchema},
     metrics::{
-        DIEM_EXECUTOR_APPLY_CHUNK_SECONDS, DIEM_EXECUTOR_COMMIT_CHUNK_SECONDS,
-        DIEM_EXECUTOR_EXECUTE_CHUNK_SECONDS, DIEM_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS,
+        APTOS_EXECUTOR_APPLY_CHUNK_SECONDS, APTOS_EXECUTOR_COMMIT_CHUNK_SECONDS,
+        APTOS_EXECUTOR_EXECUTE_CHUNK_SECONDS, APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS,
     },
 };
 use anyhow::Result;
@@ -121,7 +121,7 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
-        let _timer = DIEM_EXECUTOR_EXECUTE_CHUNK_SECONDS.start_timer();
+        let _timer = APTOS_EXECUTOR_EXECUTE_CHUNK_SECONDS.start_timer();
 
         let num_txns = txn_list_with_proof.transactions.len();
         let first_version_in_request = txn_list_with_proof.first_transaction_version;
@@ -148,7 +148,7 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         // Execute transactions.
         let state_view = self.state_view(&latest_view, &persisted_view);
         let chunk_output = {
-            let _timer = DIEM_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS.start_timer();
+            let _timer = APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS.start_timer();
             ChunkOutput::by_transaction_execution::<V>(transactions, state_view)?
         };
         let executed_chunk = Self::apply_chunk_output_for_state_sync(
@@ -179,7 +179,7 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
-        let _timer = DIEM_EXECUTOR_APPLY_CHUNK_SECONDS.start_timer();
+        let _timer = APTOS_EXECUTOR_APPLY_CHUNK_SECONDS.start_timer();
 
         let num_txns = txn_output_list_with_proof.transactions_and_outputs.len();
         let first_version_in_request = txn_output_list_with_proof.first_transaction_output_version;
@@ -224,7 +224,7 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
     }
 
     fn commit_chunk(&self) -> Result<(Vec<ContractEvent>, Vec<Transaction>)> {
-        let _timer = DIEM_EXECUTOR_COMMIT_CHUNK_SECONDS.start_timer();
+        let _timer = APTOS_EXECUTOR_COMMIT_CHUNK_SECONDS.start_timer();
         let executed_chunk = self.commit_chunk_impl()?;
         Ok((
             executed_chunk.events_to_commit(),

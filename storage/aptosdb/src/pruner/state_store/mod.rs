@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    jellyfish_merkle_node::JellyfishMerkleNodeSchema, metrics::DIEM_PRUNER_LEAST_READABLE_VERSION,
+    jellyfish_merkle_node::JellyfishMerkleNodeSchema, metrics::APTOS_PRUNER_LEAST_READABLE_VERSION,
     pruner::db_pruner::DBPruner, stale_node_index::StaleNodeIndexSchema,
-    DIEM_STORAGE_OTHER_TIMERS_SECONDS,
+    APTOS_STORAGE_OTHER_TIMERS_SECONDS,
 };
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::StaleNodeIndex;
@@ -95,7 +95,7 @@ impl DBPruner for StateStorePruner {
     fn record_progress(&self, least_readable_version: Version) {
         self.least_readable_version
             .store(least_readable_version, Ordering::Relaxed);
-        DIEM_PRUNER_LEAST_READABLE_VERSION
+        APTOS_PRUNER_LEAST_READABLE_VERSION
             .with_label_values(&["state_store"])
             .set(least_readable_version as i64);
     }
@@ -174,7 +174,7 @@ pub fn prune_state_store(
     if indices.is_empty() {
         Ok(least_readable_version)
     } else {
-        let _timer = DIEM_STORAGE_OTHER_TIMERS_SECONDS
+        let _timer = APTOS_STORAGE_OTHER_TIMERS_SECONDS
             .with_label_values(&["pruner_commit"])
             .start_timer();
         let new_least_readable_version = indices.last().expect("Should exist.").stale_since_version;

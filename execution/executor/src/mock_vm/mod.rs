@@ -46,7 +46,7 @@ enum MockVMTransaction {
 pub static KEEP_STATUS: Lazy<TransactionStatus> =
     Lazy::new(|| TransactionStatus::Keep(KeptVMStatus::Executed));
 
-// We use 10 as the assertion error code for insufficient balance within the Diem coin contract.
+// We use 10 as the assertion error code for insufficient balance within the Aptos coin contract.
 pub static DISCARD_STATUS: Lazy<TransactionStatus> =
     Lazy::new(|| TransactionStatus::Discard(StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE));
 

@@ -11,7 +11,7 @@ pub(crate) mod state_store;
 pub(crate) mod transaction_store;
 pub(crate) mod worker;
 
-use crate::metrics::DIEM_STORAGE_PRUNE_WINDOW;
+use crate::metrics::APTOS_STORAGE_PRUNE_WINDOW;
 
 use aptos_config::config::StoragePrunerConfig;
 use aptos_infallible::Mutex;
@@ -76,7 +76,7 @@ impl Pruner {
         let least_readable_version = Arc::new(Mutex::new(vec![0, 0, 0, 0, 0]));
         let worker_progress_clone = Arc::clone(&least_readable_version);
 
-        DIEM_STORAGE_PRUNE_WINDOW.set(
+        APTOS_STORAGE_PRUNE_WINDOW.set(
             storage_pruner_config
                 .state_store_prune_window
                 .expect("State store pruner window is required") as i64,

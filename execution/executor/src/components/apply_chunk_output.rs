@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{components::chunk_output::ChunkOutput, metrics::DIEM_EXECUTOR_ERRORS};
+use crate::{components::chunk_output::ChunkOutput, metrics::APTOS_EXECUTOR_ERRORS};
 use anyhow::{anyhow, bail, ensure, Result};
 use aptos_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher},
@@ -138,7 +138,7 @@ impl ApplyChunkOutput {
                         t,
                         o.status(),
                     );
-                    DIEM_EXECUTOR_ERRORS.inc();
+                    APTOS_EXECUTOR_ERRORS.inc();
                 }
                 Ok(t)
             })

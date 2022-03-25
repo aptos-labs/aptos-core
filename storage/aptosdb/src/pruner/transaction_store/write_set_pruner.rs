@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    metrics::DIEM_PRUNER_LEAST_READABLE_VERSION, pruner::db_pruner::DBPruner,
+    metrics::APTOS_PRUNER_LEAST_READABLE_VERSION, pruner::db_pruner::DBPruner,
     write_set::WriteSetSchema, TransactionStore,
 };
 use aptos_types::transaction::{AtomicVersion, Version};
@@ -58,7 +58,7 @@ impl DBPruner for WriteSetPruner {
     fn record_progress(&self, least_readable_version: Version) {
         self.least_readable_version
             .store(least_readable_version, Ordering::Relaxed);
-        DIEM_PRUNER_LEAST_READABLE_VERSION
+        APTOS_PRUNER_LEAST_READABLE_VERSION
             .with_label_values(&["write_set"])
             .set(least_readable_version as i64);
     }

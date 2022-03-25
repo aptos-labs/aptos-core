@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    event::EventSchema, metrics::DIEM_PRUNER_LEAST_READABLE_VERSION, pruner::db_pruner::DBPruner,
+    event::EventSchema, metrics::APTOS_PRUNER_LEAST_READABLE_VERSION, pruner::db_pruner::DBPruner,
     EventStore,
 };
 use aptos_types::{
@@ -89,7 +89,7 @@ impl DBPruner for EventStorePruner {
     fn record_progress(&self, least_readable_version: Version) {
         self.least_readable_version
             .store(least_readable_version, Ordering::Relaxed);
-        DIEM_PRUNER_LEAST_READABLE_VERSION
+        APTOS_PRUNER_LEAST_READABLE_VERSION
             .with_label_values(&["event_store"])
             .set(least_readable_version as i64);
     }

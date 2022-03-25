@@ -12,7 +12,7 @@
 #[cfg(test)]
 mod node_type_test;
 
-use crate::metrics::{DIEM_JELLYFISH_INTERNAL_ENCODED_BYTES, DIEM_JELLYFISH_LEAF_ENCODED_BYTES};
+use crate::metrics::{APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES};
 use anyhow::{ensure, Context, Result};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
@@ -716,12 +716,12 @@ where
             Node::Internal(internal_node) => {
                 out.push(NodeTag::Internal as u8);
                 internal_node.serialize(&mut out)?;
-                DIEM_JELLYFISH_INTERNAL_ENCODED_BYTES.inc_by(out.len() as u64);
+                APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES.inc_by(out.len() as u64);
             }
             Node::Leaf(leaf_node) => {
                 out.push(NodeTag::Leaf as u8);
                 out.extend(bcs::to_bytes(&leaf_node)?);
-                DIEM_JELLYFISH_LEAF_ENCODED_BYTES.inc_by(out.len() as u64);
+                APTOS_JELLYFISH_LEAF_ENCODED_BYTES.inc_by(out.len() as u64);
             }
         }
         Ok(out)
