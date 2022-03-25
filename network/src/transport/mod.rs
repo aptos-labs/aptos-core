@@ -45,11 +45,11 @@ pub const SUPPORTED_MESSAGING_PROTOCOL: MessagingProtocolVersion = MessagingProt
 /// Global connection-id generator.
 static CONNECTION_ID_GENERATOR: ConnectionIdGenerator = ConnectionIdGenerator::new();
 
-/// tcp::Transport with Diem-specific configuration applied.
-pub const DIEM_TCP_TRANSPORT: tcp::TcpTransport = tcp::TcpTransport {
+/// tcp::Transport with Aptos-specific configuration applied.
+pub const APTOS_TCP_TRANSPORT: tcp::TcpTransport = tcp::TcpTransport {
     // Use default options.
     ttl: None,
-    // Use TCP_NODELAY for diem tcp connections.
+    // Use TCP_NODELAY for Aptos tcp connections.
     nodelay: Some(true),
 };
 

@@ -96,7 +96,7 @@ fn setup_network<NetworkSender: NewNetworkSender, NetworkEvents: NewNetworkEvent
     )
 }
 
-/// A generic FIFO diem channel
+/// A generic FIFO Aptos channel
 fn aptos_channel<K: Eq + Hash + Clone, T>() -> (
     channel::aptos_channel::Sender<K, T>,
     channel::aptos_channel::Receiver<K, T>,

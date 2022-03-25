@@ -24,7 +24,7 @@ pub const SENT_LABEL: &str = "sent";
 pub const SUCCEEDED_LABEL: &str = "succeeded";
 pub const FAILED_LABEL: &str = "failed";
 
-pub static DIEM_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static APTOS_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "aptos_connections",
         "Number of current connections and their direction",
@@ -34,7 +34,7 @@ pub static DIEM_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 pub fn connections(network_context: &NetworkContext, origin: ConnectionOrigin) -> IntGauge {
-    DIEM_CONNECTIONS.with_label_values(&[
+    APTOS_CONNECTIONS.with_label_values(&[
         network_context.role().as_str(),
         network_context.network_id().as_str(),
         network_context.peer_id().short_str().as_str(),
@@ -42,7 +42,7 @@ pub fn connections(network_context: &NetworkContext, origin: ConnectionOrigin) -
     ])
 }
 
-pub static DIEM_CONNECTIONS_REJECTED: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static APTOS_CONNECTIONS_REJECTED: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_connections_rejected",
         "Number of connections rejected per interface",
@@ -55,7 +55,7 @@ pub fn connections_rejected(
     network_context: &NetworkContext,
     origin: ConnectionOrigin,
 ) -> IntCounter {
-    DIEM_CONNECTIONS_REJECTED.with_label_values(&[
+    APTOS_CONNECTIONS_REJECTED.with_label_values(&[
         network_context.role().as_str(),
         network_context.network_id().as_str(),
         network_context.peer_id().short_str().as_str(),
@@ -63,7 +63,7 @@ pub fn connections_rejected(
     ])
 }
 
-pub static DIEM_NETWORK_PEER_CONNECTED: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static APTOS_NETWORK_PEER_CONNECTED: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "aptos_network_peer_connected",
         "Indicates if we are connected to a particular peer",
@@ -74,7 +74,7 @@ pub static DIEM_NETWORK_PEER_CONNECTED: Lazy<IntGaugeVec> = Lazy::new(|| {
 
 pub fn peer_connected(network_context: &NetworkContext, remote_peer_id: &PeerId, v: i64) {
     if network_context.network_id().is_validator_network() {
-        DIEM_NETWORK_PEER_CONNECTED
+        APTOS_NETWORK_PEER_CONNECTED
             .with_label_values(&[
                 network_context.role().as_str(),
                 network_context.network_id().as_str(),
@@ -102,7 +102,7 @@ pub fn inc_by_with_context(
         .inc_by(val)
 }
 
-pub static DIEM_NETWORK_PENDING_CONNECTION_UPGRADES: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static APTOS_NETWORK_PENDING_CONNECTION_UPGRADES: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "aptos_network_pending_connection_upgrades",
         "Number of concurrent inbound or outbound connections we're currently negotiating",
@@ -115,7 +115,7 @@ pub fn pending_connection_upgrades(
     network_context: &NetworkContext,
     direction: ConnectionOrigin,
 ) -> IntGauge {
-    DIEM_NETWORK_PENDING_CONNECTION_UPGRADES.with_label_values(&[
+    APTOS_NETWORK_PENDING_CONNECTION_UPGRADES.with_label_values(&[
         network_context.role().as_str(),
         network_context.network_id().as_str(),
         network_context.peer_id().short_str().as_str(),
@@ -123,7 +123,7 @@ pub fn pending_connection_upgrades(
     ])
 }
 
-pub static DIEM_NETWORK_CONNECTION_UPGRADE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+pub static APTOS_NETWORK_CONNECTION_UPGRADE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_network_connection_upgrade_time_seconds",
         "Time to complete a new inbound or outbound connection upgrade",
@@ -137,7 +137,7 @@ pub fn connection_upgrade_time(
     direction: ConnectionOrigin,
     state: &'static str,
 ) -> Histogram {
-    DIEM_NETWORK_CONNECTION_UPGRADE_TIME.with_label_values(&[
+    APTOS_NETWORK_CONNECTION_UPGRADE_TIME.with_label_values(&[
         network_context.role().as_str(),
         network_context.network_id().as_str(),
         network_context.peer_id().short_str().as_str(),
@@ -146,16 +146,16 @@ pub fn connection_upgrade_time(
     ])
 }
 
-pub static DIEM_NETWORK_DISCOVERY_NOTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static APTOS_NETWORK_DISCOVERY_NOTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "aptos_network_discovery_notes",
-        "Diem network discovery notes",
+        "Aptos network discovery notes",
         &["role_type"]
     )
     .unwrap()
 });
 
-pub static DIEM_NETWORK_RPC_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static APTOS_NETWORK_RPC_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_network_rpc_messages",
         "Number of RPC messages",
@@ -169,7 +169,7 @@ pub fn rpc_messages(
     type_label: &'static str,
     state_label: &'static str,
 ) -> IntCounter {
-    DIEM_NETWORK_RPC_MESSAGES.with_label_values(&[
+    APTOS_NETWORK_RPC_MESSAGES.with_label_values(&[
         network_context.role().as_str(),
         network_context.network_id().as_str(),
         network_context.peer_id().short_str().as_str(),
@@ -178,7 +178,7 @@ pub fn rpc_messages(
     ])
 }
 
-pub static DIEM_NETWORK_RPC_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static APTOS_NETWORK_RPC_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_network_rpc_bytes",
         "Number of RPC bytes transferred",
@@ -192,7 +192,7 @@ pub fn rpc_bytes(
     type_label: &'static str,
     state_label: &'static str,
 ) -> IntCounter {
-    DIEM_NETWORK_RPC_BYTES.with_label_values(&[
+    APTOS_NETWORK_RPC_BYTES.with_label_values(&[
         network_context.role().as_str(),
         network_context.network_id().as_str(),
         network_context.peer_id().short_str().as_str(),
@@ -219,7 +219,7 @@ pub static PEER_SEND_FAILURES: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static DIEM_NETWORK_OUTBOUND_RPC_REQUEST_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
+pub static APTOS_NETWORK_OUTBOUND_RPC_REQUEST_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_network_outbound_rpc_request_latency_seconds",
         "Outbound RPC request latency in seconds",
@@ -232,7 +232,7 @@ pub fn outbound_rpc_request_latency(
     network_context: &NetworkContext,
     protocol_id: ProtocolId,
 ) -> Histogram {
-    DIEM_NETWORK_OUTBOUND_RPC_REQUEST_LATENCY.with_label_values(&[
+    APTOS_NETWORK_OUTBOUND_RPC_REQUEST_LATENCY.with_label_values(&[
         network_context.role().as_str(),
         network_context.network_id().as_str(),
         network_context.peer_id().short_str().as_str(),
@@ -240,7 +240,7 @@ pub fn outbound_rpc_request_latency(
     ])
 }
 
-pub static DIEM_NETWORK_INBOUND_RPC_HANDLER_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
+pub static APTOS_NETWORK_INBOUND_RPC_HANDLER_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_network_inbound_rpc_handler_latency_seconds",
         "Inbound RPC request application handler latency in seconds",
@@ -253,7 +253,7 @@ pub fn inbound_rpc_handler_latency(
     network_context: &NetworkContext,
     protocol_id: ProtocolId,
 ) -> Histogram {
-    DIEM_NETWORK_INBOUND_RPC_HANDLER_LATENCY.with_label_values(&[
+    APTOS_NETWORK_INBOUND_RPC_HANDLER_LATENCY.with_label_values(&[
         network_context.role().as_str(),
         network_context.network_id().as_str(),
         network_context.peer_id().short_str().as_str(),
@@ -261,7 +261,7 @@ pub fn inbound_rpc_handler_latency(
     ])
 }
 
-pub static DIEM_NETWORK_DIRECT_SEND_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static APTOS_NETWORK_DIRECT_SEND_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_network_direct_send_messages",
         "Number of direct send messages",
@@ -274,7 +274,7 @@ pub fn direct_send_messages(
     network_context: &NetworkContext,
     state_label: &'static str,
 ) -> IntCounter {
-    DIEM_NETWORK_DIRECT_SEND_MESSAGES.with_label_values(&[
+    APTOS_NETWORK_DIRECT_SEND_MESSAGES.with_label_values(&[
         network_context.role().as_str(),
         network_context.network_id().as_str(),
         network_context.peer_id().short_str().as_str(),
@@ -282,7 +282,7 @@ pub fn direct_send_messages(
     ])
 }
 
-pub static DIEM_NETWORK_DIRECT_SEND_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static APTOS_NETWORK_DIRECT_SEND_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_network_direct_send_bytes",
         "Number of direct send bytes transferred",
@@ -295,7 +295,7 @@ pub fn direct_send_bytes(
     network_context: &NetworkContext,
     state_label: &'static str,
 ) -> IntCounter {
-    DIEM_NETWORK_DIRECT_SEND_BYTES.with_label_values(&[
+    APTOS_NETWORK_DIRECT_SEND_BYTES.with_label_values(&[
         network_context.role().as_str(),
         network_context.network_id().as_str(),
         network_context.peer_id().short_str().as_str(),

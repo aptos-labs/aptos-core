@@ -767,7 +767,7 @@ fn handle_inbound_request(
     };
 
     if let Some(handler) = upstream_handlers.get_mut(&protocol_id) {
-        // Send over diem channel for fairness.
+        // Send over aptos channel for fairness.
         if let Err(err) = handler.push((peer_id, protocol_id), notification) {
             warn!(
                 NetworkSchema::new(&network_context),

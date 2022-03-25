@@ -3,7 +3,7 @@
 
 //! This crate implements wrappers around our [Noise][noise] implementation.
 //! Noise is a protocol framework to encrypt and authentication connections.
-//! We use Noise to secure connections between peers in Diem.
+//! We use Noise to secure connections between peers in Aptos.
 //! Specifically, we use the [Noise IK][ik] handshake which is a one round-trip protocol
 //! (the client sends one message, then the server responds).
 //! For more information about Noise and our implementation, refer to the [crypto] crate.

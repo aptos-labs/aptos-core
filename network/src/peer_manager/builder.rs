@@ -11,7 +11,7 @@ use crate::{
         PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
     },
     protocols::{network::AppConfig, wire::handshake::v1::ProtocolIdSet},
-    transport::{self, AptosNetTransport, Connection, DIEM_TCP_TRANSPORT},
+    transport::{self, AptosNetTransport, Connection, APTOS_TCP_TRANSPORT},
     ProtocolId,
 };
 use aptos_config::{
@@ -277,7 +277,7 @@ impl PeerManagerBuilder {
             [Ip4(_), Tcp(_)] | [Ip6(_), Tcp(_)] => {
                 Some(TransportPeerManager::Tcp(self.build_with_transport(
                     AptosNetTransport::new(
-                        DIEM_TCP_TRANSPORT.clone(),
+                        APTOS_TCP_TRANSPORT.clone(),
                         self.network_context,
                         self.time_service.clone(),
                         key,

@@ -9,7 +9,7 @@ custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/network/READ
 For more detailed info, see the [AptosNet Specification](../specifications/network/README.md).
 
 AptosNet is the primary protocol for communication between any two nodes in the
-Diem ecosystem. It is specifically designed to facilitate the consensus, shared
+Aptos ecosystem. It is specifically designed to facilitate the consensus, shared
 mempool, and state sync protocols. AptosNet tries to maintain at-most one connection
 with each remote peer; the application protocols to that remote peer are then
 multiplexed over the single peer connection.
@@ -86,7 +86,7 @@ protocols: DirectSend and Rpc.
 
 + [`AptosTransport`] &mdash; A secure, reliable transport. It uses [NoiseIK] over
 TCP to negotiate an encrypted and authenticated connection between peers.
-The AptosNet version and any Diem-specific application protocols are negotiated
+The AptosNet version and any Aptos-specific application protocols are negotiated
 afterward using the [AptosNet Handshake Protocol].
 
 * [`ConnectivityManager`] &mdash; Establishes connections to known peers found

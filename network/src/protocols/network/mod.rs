@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! Convenience Network API for Diem
+//! Convenience Network API for Aptos
 
 pub use crate::protocols::rpc::error::RpcError;
 use crate::{

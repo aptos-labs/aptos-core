@@ -208,7 +208,7 @@ impl<'a> FromIterator<&'a ProtocolId> for ProtocolIdSet {
 // MessageProtocolVersion
 //
 
-/// Enum representing different versions of the Diem network protocol. These
+/// Enum representing different versions of the Aptos network protocol. These
 /// should be listed from old to new, old having the smallest value.  We derive
 /// [`PartialOrd`] since nodes need to find highest intersecting protocol version.
 #[derive(Eq, PartialEq, Ord, PartialOrd, Clone, Copy, Hash, Deserialize, Serialize)]
@@ -241,7 +241,7 @@ impl fmt::Display for MessagingProtocolVersion {
 // HandshakeMsg
 //
 
-/// An enum to list the possible errors during the diem handshake negotiation
+/// An enum to list the possible errors during the Atpos handshake negotiation
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum HandshakeError {
     #[error("aptos-handshake: the received message has a different chain id: {0}, expected: {1}")]

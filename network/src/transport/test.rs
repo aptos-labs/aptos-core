@@ -538,7 +538,7 @@ fn test_memory_transport_maybe_mutual() {
 #[test]
 fn test_tcp_transport_mutual_auth() {
     test_transport_success(
-        DIEM_TCP_TRANSPORT.clone(),
+        APTOS_TCP_TRANSPORT.clone(),
         Auth::Mutual,
         "/ip4/127.0.0.1/tcp/0",
         expect_ip4_tcp_noise_addr,
@@ -548,7 +548,7 @@ fn test_tcp_transport_mutual_auth() {
 #[test]
 fn test_tcp_transport_server_only_auth() {
     test_transport_success(
-        DIEM_TCP_TRANSPORT.clone(),
+        APTOS_TCP_TRANSPORT.clone(),
         Auth::ServerOnly,
         "/ip4/127.0.0.1/tcp/0",
         expect_ip4_tcp_noise_addr,
@@ -558,7 +558,7 @@ fn test_tcp_transport_server_only_auth() {
 #[test]
 fn test_tcp_transport_rejects_unauthed_dialer() {
     test_transport_rejects_unauthed_dialer(
-        DIEM_TCP_TRANSPORT.clone(),
+        APTOS_TCP_TRANSPORT.clone(),
         "/ip4/127.0.0.1/tcp/0",
         expect_ip4_tcp_noise_addr,
     );
