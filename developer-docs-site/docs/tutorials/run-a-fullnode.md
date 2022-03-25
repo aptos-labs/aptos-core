@@ -249,11 +249,11 @@ When `devnet` is wiped and released with newer version, you will need to update 
 
 2. Delete the data folder (the directory path is what you specified in the `public_full_node.yaml` file), default is `/opt/aptos/data`
 
-3. Delete the `genesis.blob` file
+3. Delete the `genesis.blob` file and `waypoint.txt` file (depends on how you configured it, you might not have this file)
 
 4. Get the new [genesis][devnet_genesis] and [waypoint][devnet_waypoint]
 
-5. Update the `public_full_node.yaml` with new waypoint
+5. Update the `public_full_node.yaml` with new waypoint (if you configure the waypoint directly here)
 
 6. Restart the fullnode
 
