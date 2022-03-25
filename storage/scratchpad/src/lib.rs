@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! This crate provides in-memory representation of Diem core data structures used by the executor.
+//! This crate provides in-memory representation of Aptos core data structures used by the executor.
 
 mod sparse_merkle;
 

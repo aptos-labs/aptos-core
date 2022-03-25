@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! This module defines representation of Diem core data structures at physical level via schemas
+//! This module defines representation of Aptos core data structures at physical level via schemas
 //! that implement [`schemadb::schema::Schema`].
 //!
 //! All schemas are `pub(crate)` so not shown in rustdoc, refer to the source code to see details.

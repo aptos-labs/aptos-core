@@ -408,7 +408,7 @@ pub trait DbReader: Send + Sync {
     // [`AptosDB::get_account_state_with_proof_by_version`]:
     // ../aptosdb/struct.AptosDB.html#method.get_account_state_with_proof_by_version
     //
-    // This is used by diem core (executor) internally.
+    // This is used by aptos core (executor) internally.
     fn get_account_state_with_proof_by_version(
         &self,
         address: AccountAddress,
@@ -543,7 +543,7 @@ impl MoveStorage for &dyn DbReader {
                 .map_or_else(
                     || {
                         Err(format_err!(
-                            "no config {} found in diem root account state",
+                            "no config {} found in aptos root account state",
                             config_id
                         ))
                     },

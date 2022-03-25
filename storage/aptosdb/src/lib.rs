@@ -3,11 +3,11 @@
 
 #![forbid(unsafe_code)]
 
-//! This crate provides [`AptosDB`] which represents physical storage of the core Diem data
+//! This crate provides [`AptosDB`] which represents physical storage of the core Aptos data
 //! structures.
 //!
 //! It relays read/write operations on the physical storage via [`schemadb`] to the underlying
-//! Key-Value storage system, and implements diem data structures on top of it.
+//! Key-Value storage system, and implements aptos data structures on top of it.
 
 #[cfg(any(feature = "aptossum"))]
 pub mod aptossum;
@@ -215,7 +215,7 @@ impl Drop for RocksdbPropertyReporter {
 }
 
 /// This holds a handle to the underlying DB responsible for physical storage and provides APIs for
-/// access to the core Diem data structures.
+/// access to the core Aptos data structures.
 #[derive(Debug)]
 pub struct AptosDB {
     db: Arc<DB>,

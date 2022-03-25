@@ -6,7 +6,7 @@ custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/storage/READ
 
 
 The storage module provides reliable and efficient persistent storage for the
-entire set of data on the Diem Blockchain, as well as the necessary data used
+entire set of data on the Aptos Blockchain, as well as the necessary data used
 internally by Aptos Core.
 
 ## Overview
@@ -19,7 +19,7 @@ The storage module is designed to serve two primary purposes:
    blockchain data. A client can easily verify the integrity of the response if
    they have obtained the correct root hash.
 
-The Diem Blockchain can be viewed as a Merkle tree consisting of the following
+The Aptos Blockchain can be viewed as a Merkle tree consisting of the following
 components:
 
 ![data](data.png)
@@ -88,7 +88,7 @@ Patricia tree.
           └── accumulator      # Implementation of Merkle accumulator.
           └── aptosdb          # Implementation of AptosDB.
           └── schemadb         # Schematized wrapper on top of RocksDB.
-          └── scratchpad       # In-memory representation of Diem core data structures used by execution.
+          └── scratchpad       # In-memory representation of Aptos core data structures used by execution.
           └── jellyfish-merkle # Implementation of sparse Merkle tree.
           └── state_view       # An abstraction layer representing a snapshot of state where the Move VM reads data.
           └── storage_client   # A Rust wrapper on top of GRPC clients.

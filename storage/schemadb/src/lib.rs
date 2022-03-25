@@ -19,11 +19,11 @@ pub mod schema;
 
 use crate::{
     metrics::{
-        DIEM_SCHEMADB_BATCH_COMMIT_BYTES, DIEM_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS,
-        DIEM_SCHEMADB_BATCH_PUT_LATENCY_SECONDS, DIEM_SCHEMADB_DELETES, DIEM_SCHEMADB_GET_BYTES,
-        DIEM_SCHEMADB_GET_LATENCY_SECONDS, DIEM_SCHEMADB_INCLUSIVE_RANGE_DELETES,
-        DIEM_SCHEMADB_ITER_BYTES, DIEM_SCHEMADB_ITER_LATENCY_SECONDS, DIEM_SCHEMADB_PUT_BYTES,
-        DIEM_SCHEMADB_RANGE_DELETES,
+        APTOS_SCHEMADB_BATCH_COMMIT_BYTES, APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS,
+        APTOS_SCHEMADB_BATCH_PUT_LATENCY_SECONDS, APTOS_SCHEMADB_DELETES, APTOS_SCHEMADB_GET_BYTES,
+        APTOS_SCHEMADB_GET_LATENCY_SECONDS, APTOS_SCHEMADB_INCLUSIVE_RANGE_DELETES,
+        APTOS_SCHEMADB_ITER_BYTES, APTOS_SCHEMADB_ITER_LATENCY_SECONDS, APTOS_SCHEMADB_PUT_BYTES,
+        APTOS_SCHEMADB_RANGE_DELETES,
     },
     schema::{KeyCodec, Schema, SeekKeyCodec, ValueCodec},
 };
@@ -72,7 +72,7 @@ impl SchemaBatch {
 
     /// Adds an insert/update operation to the batch.
     pub fn put<S: Schema>(&mut self, key: &S::Key, value: &S::Value) -> Result<()> {
-        let _timer = DIEM_SCHEMADB_BATCH_PUT_LATENCY_SECONDS
+        let _timer = APTOS_SCHEMADB_BATCH_PUT_LATENCY_SECONDS
             .with_label_values(&["unknown"])
             .start_timer();
         let key = <S::Key as KeyCodec<S>>::encode_key(key)?;
@@ -183,7 +183,7 @@ where
     }
 
     fn next_impl(&mut self) -> Result<Option<(S::Key, S::Value)>> {
-        let _timer = DIEM_SCHEMADB_ITER_LATENCY_SECONDS
+        let _timer = APTOS_SCHEMADB_ITER_LATENCY_SECONDS
             .with_label_values(&[S::COLUMN_FAMILY_NAME])
             .start_timer();
 
@@ -194,7 +194,7 @@ where
 
         let raw_key = self.db_iter.key().expect("Iterator must be valid.");
         let raw_value = self.db_iter.value().expect("Iterator must be valid.");
-        DIEM_SCHEMADB_ITER_BYTES
+        APTOS_SCHEMADB_ITER_BYTES
             .with_label_values(&[S::COLUMN_FAMILY_NAME])
             .observe((raw_key.len() + raw_value.len()) as f64);
 
@@ -348,7 +348,7 @@ impl DB {
 
     /// Reads single record by key.
     pub fn get<S: Schema>(&self, schema_key: &S::Key) -> Result<Option<S::Value>> {
-        let _timer = DIEM_SCHEMADB_GET_LATENCY_SECONDS
+        let _timer = APTOS_SCHEMADB_GET_LATENCY_SECONDS
             .with_label_values(&[S::COLUMN_FAMILY_NAME])
             .start_timer();
 
@@ -356,7 +356,7 @@ impl DB {
         let cf_handle = self.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
 
         let result = self.inner.get_cf(cf_handle, &k)?;
-        DIEM_SCHEMADB_GET_BYTES
+        APTOS_SCHEMADB_GET_BYTES
             .with_label_values(&[S::COLUMN_FAMILY_NAME])
             .observe(result.as_ref().map_or(0.0, |v| v.len() as f64));
 
@@ -416,7 +416,7 @@ impl DB {
 
     /// Writes a group of records wrapped in a [`SchemaBatch`].
     pub fn write_schemas(&self, batch: SchemaBatch) -> Result<()> {
-        let _timer = DIEM_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS
+        let _timer = APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS
             .with_label_values(&[self.name])
             .start_timer();
 
@@ -446,27 +446,27 @@ impl DB {
             for write_op in rows {
                 match write_op {
                     WriteOp::Value { key, value } => {
-                        DIEM_SCHEMADB_PUT_BYTES
+                        APTOS_SCHEMADB_PUT_BYTES
                             .with_label_values(&[cf_name])
                             .observe((key.len() + value.len()) as f64);
                     }
                     WriteOp::Deletion { key: _ } => {
-                        DIEM_SCHEMADB_DELETES.with_label_values(&[cf_name]).inc();
+                        APTOS_SCHEMADB_DELETES.with_label_values(&[cf_name]).inc();
                     }
                     WriteOp::DeletionRange { begin: _, end: _ } => {
-                        DIEM_SCHEMADB_RANGE_DELETES
+                        APTOS_SCHEMADB_RANGE_DELETES
                             .with_label_values(&[cf_name])
                             .inc();
                     }
                     WriteOp::DeletionRangeInclusive { begin: _, end: _ } => {
-                        DIEM_SCHEMADB_INCLUSIVE_RANGE_DELETES
+                        APTOS_SCHEMADB_INCLUSIVE_RANGE_DELETES
                             .with_label_values(&[cf_name])
                             .inc();
                     }
                 }
             }
         }
-        DIEM_SCHEMADB_BATCH_COMMIT_BYTES
+        APTOS_SCHEMADB_BATCH_COMMIT_BYTES
             .with_label_values(&[self.name])
             .observe(serialized_size as f64);
 

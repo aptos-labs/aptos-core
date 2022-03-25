@@ -6,7 +6,7 @@ use aptos_metrics::{
 };
 use once_cell::sync::Lazy;
 
-pub static DIEM_SCHEMADB_ITER_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+pub static APTOS_SCHEMADB_ITER_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
         "aptos_schemadb_iter_latency_seconds",
@@ -18,7 +18,7 @@ pub static DIEM_SCHEMADB_ITER_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(||
     .unwrap()
 });
 
-pub static DIEM_SCHEMADB_ITER_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
+pub static APTOS_SCHEMADB_ITER_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
         "aptos_schemadb_iter_bytes",
@@ -30,7 +30,7 @@ pub static DIEM_SCHEMADB_ITER_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static DIEM_SCHEMADB_GET_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+pub static APTOS_SCHEMADB_GET_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
         "aptos_schemadb_get_latency_seconds",
@@ -42,7 +42,7 @@ pub static DIEM_SCHEMADB_GET_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| 
     .unwrap()
 });
 
-pub static DIEM_SCHEMADB_GET_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
+pub static APTOS_SCHEMADB_GET_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
         "aptos_schemadb_get_bytes",
@@ -54,7 +54,7 @@ pub static DIEM_SCHEMADB_GET_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static DIEM_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+pub static APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
         "aptos_schemadb_batch_commit_latency_seconds",
@@ -66,7 +66,7 @@ pub static DIEM_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy
     .unwrap()
 });
 
-pub static DIEM_SCHEMADB_BATCH_COMMIT_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
+pub static APTOS_SCHEMADB_BATCH_COMMIT_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
         "aptos_schemadb_batch_commit_bytes",
@@ -78,7 +78,7 @@ pub static DIEM_SCHEMADB_BATCH_COMMIT_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static DIEM_SCHEMADB_PUT_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
+pub static APTOS_SCHEMADB_PUT_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
         "aptos_schemadb_put_bytes",
@@ -90,7 +90,7 @@ pub static DIEM_SCHEMADB_PUT_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static DIEM_SCHEMADB_DELETES: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static APTOS_SCHEMADB_DELETES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_storage_deletes",
         "Aptos storage delete calls",
@@ -99,7 +99,7 @@ pub static DIEM_SCHEMADB_DELETES: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static DIEM_SCHEMADB_RANGE_DELETES: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static APTOS_SCHEMADB_RANGE_DELETES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_storage_range_deletes",
         "Aptos storage range delete calls",
@@ -108,7 +108,7 @@ pub static DIEM_SCHEMADB_RANGE_DELETES: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static DIEM_SCHEMADB_INCLUSIVE_RANGE_DELETES: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static APTOS_SCHEMADB_INCLUSIVE_RANGE_DELETES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_storage_range_inclusive_deletes",
         "Aptos storage range inclusive delete calls",
@@ -117,7 +117,7 @@ pub static DIEM_SCHEMADB_INCLUSIVE_RANGE_DELETES: Lazy<IntCounterVec> = Lazy::ne
     .unwrap()
 });
 
-pub static DIEM_SCHEMADB_BATCH_PUT_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+pub static APTOS_SCHEMADB_BATCH_PUT_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
         "aptos_schemadb_batch_put_latency_seconds",

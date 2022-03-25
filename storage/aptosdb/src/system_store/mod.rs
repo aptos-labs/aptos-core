@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! This file defines system store APIs that operates data not part of the Diem core data
+//! This file defines system store APIs that operates data not part of the Aptos core data
 //! structures but information with regard to system running status, statistics, etc.
 
 use crate::{
