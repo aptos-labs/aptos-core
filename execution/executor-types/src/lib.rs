@@ -80,6 +80,9 @@ pub trait ChunkExecutorTrait: Send + Sync {
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<(Vec<ContractEvent>, Vec<Transaction>)>;
+
+    /// Resets the chunk executor by synchronizing state with storage.
+    fn reset(&self) -> Result<()>;
 }
 
 pub trait BlockExecutorTrait: Send + Sync {

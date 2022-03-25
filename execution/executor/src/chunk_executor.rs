@@ -57,11 +57,6 @@ impl<V> ChunkExecutor<V> {
         }
     }
 
-    pub fn reset(&self) -> Result<()> {
-        *self.commit_queue.lock() = ChunkCommitQueue::new_from_db(&self.db.reader)?;
-        Ok(())
-    }
-
     fn state_view(
         &self,
         latest_view: &ExecutedTrees,
@@ -167,7 +162,7 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
                 .local_synced_version(latest_view.version().unwrap_or(0))
                 .first_version_in_request(first_version_in_request)
                 .num_txns_in_request(num_txns),
-            "sync_request_executed",
+            "Executed transaction chunk!",
         );
 
         Ok(())
@@ -217,7 +212,7 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
                 .local_synced_version(latest_view.version().unwrap_or(0))
                 .first_version_in_request(first_version_in_request)
                 .num_txns_in_request(num_txns),
-            "sync_request_applied",
+            "Applied transaction output chunk!",
         );
 
         Ok(())
@@ -260,6 +255,11 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
             epoch_change_li,
         )?;
         self.commit_chunk()
+    }
+
+    fn reset(&self) -> Result<()> {
+        *self.commit_queue.lock() = ChunkCommitQueue::new_from_db(&self.db.reader)?;
+        Ok(())
     }
 }
 
