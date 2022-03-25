@@ -3,7 +3,7 @@ Aptos Public Fullnode Deployment
 
 This Helm chart deploys a public fullnode for the Aptos blockchain network. The
 fullnode connects to Aptos validators and synchronises the blockchain state to
-a persistent volume. It provides a [JSON-RPC interface][] for interacting with
+a persistent volume. It provides a [REST API][] for interacting with
 the blockchain.
 
 
@@ -19,27 +19,25 @@ See [values.yaml][] for the full list of options you can configure.
   - AWS: "gp2"
   - GCP: "standard"
   - Azure: "managed"
-* `service.type`: By default the JSON-RPC endpoint is only exposed within the
+* `service.type`: By default the REST API endpoint is only exposed within the
   Kubernetes cluster. If you want to expose it externally set this to
   "LoadBalancer".
 * `service.loadBalancerSourceRanges`: If you enable the LoadBalancer service you
   can set this to a list of IP ranges to restrict access to.
 * `image.tag`: Select the image tag to deploy. Backup and restore images are specified separately in `backup.image.tag` and `restore.image.tag`. For a full list of image tags, check out the [Aptos dockerhub][]. Some useful tags:
-  - `testnet`: the image Testnet validators are running
-  - `devnet`: nightly build off of main
-  - `release-*`: build off of the corresponding release branch
+  - `devnet`: the image tag devnet currently running
 
 Connecting to Testnet
 -------------
 
-To connect to the Aptos testnet, you must have the correct genesis blob and waypoint. The source of truth for these are hosted here:
-* https://testnet.aptos.com/waypoint.txt
-* https://testnet.aptos.com/genesis.blob
+To connect to the Aptos devnet, you must have the correct genesis blob and waypoint. The source of truth for these are hosted here:
+* https://devnet.aptoslabs.com/waypoint.txt
+* https://devnet.aptoslabs.com/genesis.blob
 
-The waypoint is configured as a helm value in `aptos_chains.testnet.waypoint`, and the genesis blob should be copied to `files/genesis/testnet.blob`
+The waypoint is configured as a helm value in `aptos_chains.devnet.waypoint`, and the genesis blob should be copied to `files/genesis/testnet.blob`
 
 You may also need to change the chain era helm value in `chain.era` to the source of truth hosted at:
-* https://testnet.aptos.com/era.txt
+* https://devnet.aptoslabs.com/era.txt
 
 Deployment
 ----------
@@ -51,6 +49,6 @@ Deployment
        $ helm install fullnode --set storage.class=gp2 .
 
 
-[json-rpc interface]: https://github.com/aptos/aptos/blob/main/json-rpc/json-rpc-spec.md
+[REST API]: https://github.com/aptos-labs/aptos-core/blob/main/api/doc/openapi.yaml
 [values.yaml]: values.yaml
-[Aptos dockerhub]: https://hub.docker.com/r/aptos/validator/tags?page=1&ordering=last_updated
+[Aptos dockerhub]: https://hub.docker.com/r/aptoslab/validator/tags?page=1&ordering=last_updated
