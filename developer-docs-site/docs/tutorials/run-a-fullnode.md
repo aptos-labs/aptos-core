@@ -28,6 +28,14 @@ If running the Fullnode for development or testing purpose:
 * CPU: 2 cores
 * Memory: 4GiB RAM
 
+### Storage requirements
+Note: The amount of data stored by Aptos depends on the ledger history (length) of the blockchain and the number
+of on-chain states (e.g., accounts). This can be affected by many factors, including: the age of the blockchain,
+the average transaction rate and the configuration of the ledger pruner.
+
+Given that DevNet is currently being reset on a weekly basis (see the #devnet-release channel on discord),
+we estimate that Aptos won't require more than several GBs of storage.
+
 ## Getting started
 
 You can configure a public FullNode in two ways: using the Aptos-core source code or using Docker.
@@ -97,21 +105,31 @@ During the initial synchronization of your FullNode, there may be a lot of data 
   ```
 
 ### Add upstream seed peers
-Devnet validator fullnodes will only accept a maximum of 1000 connections. If our network is experiencing high volume, your fullnode might not able to connect. You might see "NoAvailablePeers" in your node's error messages. If this happens, you can set `seeds` in the FullNode configuration file to add new  peers to connect to. We prepared some FullNodes addresses for you to use, here. Also. feel free to use the ones provided by the community (anyone already running a fullnode can provide their address for you to connect). Add these to your configuration file:
+Note: you might see `NoAvailablePeers` in your node's error messages. This is normal when the node is first starting.
+Wait for the node to run for a few minutes to see if it connects to peers. If not, follow the steps below:
+
+Devnet validator fullnodes will only accept a maximum of ~5000 connections. If our network is experiencing high volume, your fullnode might not able to connect. You might see `NoAvailablePeers` continuously in your node's error messages. If this happens, you can set `seeds` in the FullNode configuration file to add new  peers to connect to. We prepared some FullNodes addresses for you to use, below. Also. feel free to use the ones provided by the community (anyone already running a fullnode can provide their address for you to connect). Add these to your configuration file under your `discovery_method`:
 ```
-seeds:
-  4d6a710365a2d95ac6ffbd9b9198a86a:
-      addresses:
-      - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/ln-handshake/0"
-      role: "Upstream"
-  52173b436ae1809df4a5fcfc67f8fc61:
-      addresses:
-      - "/dns4/pfn1.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/7fe8523388084607cdf78ff40e3e717652173b436ae1809df4a5fcfc67f8fc61/ln-handshake/0"
-      role: "Upstream"
-  476222516fdc55869d2b649c614d965b:
-      addresses:
-      - "/dns4/pfn2.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/f6b135a59591677afc98168791551a0a476222516fdc55869d2b649c614d965b/ln-handshake/0"
-      role: "Upstream"
+...
+full_node_networks:
+    - discovery_method: "onchain"
+      # The network must have a listen address to specify protocols. This runs it locally to
+      # prevent remote, incoming connections.
+      listen_address: ...
+      seeds:
+        4d6a710365a2d95ac6ffbd9b9198a86a:
+            addresses:
+            - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/ln-handshake/0"
+            role: "Upstream"
+        52173b436ae1809df4a5fcfc67f8fc61:
+            addresses:
+            - "/dns4/pfn1.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/7fe8523388084607cdf78ff40e3e717652173b436ae1809df4a5fcfc67f8fc61/ln-handshake/0"
+            role: "Upstream"
+        476222516fdc55869d2b649c614d965b:
+            addresses:
+            - "/dns4/pfn2.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/f6b135a59591677afc98168791551a0a476222516fdc55869d2b649c614d965b/ln-handshake/0"
+            role: "Upstream"
+...            
 ```
 
 ## Advanced Guide
