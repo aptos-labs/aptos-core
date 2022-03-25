@@ -60,6 +60,7 @@ async fn test_consensus_observer_mode_storage_error() {
     assert_eq!(sequence_number_0, sequence_number_1);
 }
 
+// TODO(https://github.com/aptos-labs/aptos-core/issues/317): add back after support update consensus config in aptos-framework
 // #[allow(dead_code)]
 // async fn test_onchain_upgrade(new_onfig: OnChainConsensusConfig) {
 //     let num_nodes = 4;

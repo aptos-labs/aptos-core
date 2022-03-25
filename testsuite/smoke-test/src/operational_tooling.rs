@@ -84,6 +84,7 @@ async fn test_account_resource(
     );
 }
 
+// TODO(https://github.com/aptos-labs/aptos-core/issues/317)
 #[ignore]
 #[tokio::test]
 async fn test_auto_validate_options() {
@@ -117,6 +118,7 @@ async fn test_auto_validate_options() {
     assert!(txn_ctx.execution_result.unwrap().success);
 }
 
+// TODO(https://github.com/aptos-labs/aptos-core/issues/317)
 #[ignore]
 #[tokio::test]
 async fn test_consensus_key_rotation() {
@@ -217,6 +219,7 @@ async fn test_create_validator_bcs_file(
     .await;
 }
 
+// TODO(https://github.com/aptos-labs/aptos-core/issues/317)
 #[ignore]
 #[tokio::test]
 async fn test_disable_address_validation() {
@@ -268,6 +271,7 @@ async fn test_disable_address_validation() {
         .unwrap();
 }
 
+// TODO(https://github.com/aptos-labs/aptos-core/issues/317)
 #[ignore]
 #[tokio::test]
 async fn test_set_operator_and_add_new_validator() {
@@ -446,6 +450,7 @@ async fn test_set_operator_and_add_new_validator() {
     assert!(!txn_ctx.execution_result.unwrap().success);
 }
 
+// TODO(https://github.com/aptos-labs/aptos-core/issues/317)
 #[ignore]
 #[tokio::test]
 // Because each test takes non-neglible time to start, streamlining them into a single test
@@ -557,6 +562,7 @@ async fn test_extract_peer_from_storage(
     assert_eq!(expected_peer_id, *peer_id);
 }
 
+// TODO(https://github.com/aptos-labs/aptos-core/issues/317)
 #[ignore]
 #[tokio::test]
 async fn test_extract_peer_from_file() {
@@ -576,6 +582,7 @@ async fn test_extract_peer_from_file() {
     assert_eq!(from_identity_public_key(public_key), *peer_id);
 }
 
+// TODO(https://github.com/aptos-labs/aptos-core/issues/317)
 #[ignore]
 #[tokio::test]
 async fn test_extract_peers_from_keys() {
@@ -607,6 +614,7 @@ async fn test_extract_peers_from_keys() {
     }
 }
 
+// TODO(https://github.com/aptos-labs/aptos-core/issues/317)
 #[ignore]
 #[tokio::test]
 async fn test_generate_key() {
@@ -708,6 +716,7 @@ async fn test_insert_waypoint(
     );
 }
 
+// TODO(https://github.com/aptos-labs/aptos-core/issues/317)
 #[ignore]
 #[tokio::test]
 async fn test_fullnode_network_key_rotation() {
@@ -748,6 +757,7 @@ async fn test_fullnode_network_key_rotation() {
     assert_eq!(new_network_key, info_network_key);
 }
 
+// TODO(https://github.com/aptos-labs/aptos-core/issues/317)
 #[ignore]
 #[tokio::test]
 async fn test_network_key_rotation() {
@@ -797,6 +807,7 @@ async fn test_network_key_rotation() {
         .unwrap();
 }
 
+// TODO(https://github.com/aptos-labs/aptos-core/issues/317)
 #[ignore]
 #[tokio::test]
 async fn test_network_key_rotation_recovery() {
@@ -850,6 +861,7 @@ async fn test_network_key_rotation_recovery() {
         .unwrap();
 }
 
+// TODO(https://github.com/aptos-labs/aptos-core/issues/317)
 #[ignore]
 #[tokio::test]
 async fn test_operator_key_rotation() {
@@ -885,6 +897,7 @@ async fn test_operator_key_rotation() {
     assert_eq!(new_consensus_key, config_consensus_key);
 }
 
+// TODO(https://github.com/aptos-labs/aptos-core/issues/317)
 #[ignore]
 #[tokio::test]
 async fn test_operator_key_rotation_recovery() {
@@ -1009,6 +1022,7 @@ async fn test_print_waypoints(
     assert_eq!(inserted_waypoint, genesis_waypoint);
 }
 
+// TODO(https://github.com/aptos-labs/aptos-core/issues/317)
 #[ignore]
 #[tokio::test]
 async fn test_validator_config() {
@@ -1058,6 +1072,7 @@ async fn test_validator_config() {
     );
 }
 
+// TODO(https://github.com/aptos-labs/aptos-core/issues/317)
 #[ignore]
 #[tokio::test]
 async fn test_validator_set() {

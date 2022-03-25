@@ -16,6 +16,7 @@ impl NetworkTest for ReconfigurationTest {
     fn run<'t>(&self, _ctx: &mut NetworkContext<'t>) -> Result<()> {
         Err(anyhow!("Not supported in aptos-framework yet"))
     }
+    // TODO(https://github.com/aptos-labs/aptos-core/issues/317): add back after support those transactions in aptos-framework
     //     let rt = Runtime::new()?;
     //
     //     let mut rng = StdRng::from_seed(OsRng.gen());
