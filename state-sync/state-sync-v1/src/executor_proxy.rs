@@ -186,8 +186,7 @@ impl<C: ChunkExecutorTrait> ExecutorProxyTrait for ExecutorProxy<C> {
     }
 
     fn publish_event_notifications(&mut self, events: Vec<ContractEvent>) -> Result<(), Error> {
-        info!(LogSchema::new(LogEntry::Reconfig)
-            .count(events.len()));
+        info!(LogSchema::new(LogEntry::Reconfig).count(events.len()));
 
         let synced_version = (&*self.storage).fetch_synced_version().map_err(|error| {
             Error::UnexpectedError(format!("Failed to fetch storage synced version: {}", error))

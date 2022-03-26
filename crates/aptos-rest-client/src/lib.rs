@@ -8,8 +8,7 @@ use aptos_types::{account_address::AccountAddress, transaction::SignedTransactio
 use move_core_types::{
     ident_str,
     identifier::Identifier,
-    language_storage::{StructTag, TypeTag, CORE_CODE_ADDRESS},
-    move_resource::MoveStructType,
+    language_storage::{StructTag, CORE_CODE_ADDRESS},
 };
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize};
@@ -32,20 +31,6 @@ pub use types::{Account, Resource, RestError};
 
 pub mod aptos;
 
-macro_rules! cfg_dpn {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "dpn")]
-            #[cfg_attr(docsrs, doc(cfg(feature = "dpn")))]
-            $item
-        )*
-    }
-}
-
-cfg_dpn! {
-    pub mod dpn;
-}
-
 const BCS_CONTENT_TYPE: &str = "application/x.diem.signed_transaction+bcs";
 const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
 
@@ -65,51 +50,6 @@ impl Client {
             .unwrap();
 
         Self { inner, base_url }
-    }
-
-    cfg_dpn! {
-        pub async fn get_dpn_account_balances(
-            &self,
-            address: AccountAddress,
-        ) -> Result<Response<Vec<dpn::AccountBalance>>> {
-            let resp = self
-                .get_account_resources_by_type(
-                    address,
-                    dpn::CORE_CODE_ADDRESS,
-                    &dpn::BalanceResource::module_identifier(),
-                    &dpn::BalanceResource::struct_identifier(),
-                ).await?;
-            resp.and_then(|resources| {
-                resources
-                    .into_iter()
-                    .map(|res| {
-                        let currency_tag = res.resource_type.type_params.get(0);
-                        if let Some(TypeTag::Struct(currency)) = currency_tag {
-                            Ok(dpn::AccountBalance {
-                                currency: currency.clone(),
-                                amount: serde_json::from_value::<dpn::Balance>(res.data)?
-                                    .coin
-                                    .value
-                                    .0,
-                            })
-                        } else {
-                            Err(anyhow!("invalid account balance resource: {:?}", &res))
-                        }
-                    })
-                    .collect::<Result<Vec<dpn::AccountBalance>>>()
-            })
-        }
-
-        // Returns root account DiemAccount::Config<Version> resource
-        pub async fn get_dpn_version(&self) -> Result<Response<dpn::Reconfiguration<dpn::Version>>> {
-            self.get_resource::<dpn::Reconfiguration<dpn::Version>>(dpn::aptos_root_address(), &dpn::diem_config_struct_tag(dpn::diem_version_identifier())).await
-        }
-
-        // Returns root account DiemAccount::Configuration resource
-        pub async fn get_epoch_configuration(&self) -> Result<Response<dpn::Configuration>> {
-            self.get_resource::<dpn::Configuration>(dpn::aptos_root_address(), &dpn::ConfigurationResource::struct_tag()).await
-        }
-
     }
 
     pub async fn get_aptos_version(&self) -> Result<Response<AptosVersion>> {
