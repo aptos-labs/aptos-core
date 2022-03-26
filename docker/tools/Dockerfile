@@ -53,13 +53,6 @@ COPY --from=builder /aptos/aptos-move/framework/DPN/releases/artifacts/current/b
 RUN mv /diem-framework/move/build/**/bytecode_modules/*.mv /diem-framework/move/modules
 RUN rm -rf /diem-framework/move/build
 
-### Get experimental Move modules bytecodes for genesis ceremony
-RUN mkdir -p /experimental/move/build
-RUN mkdir -p /experimental/move/modules
-COPY --from=builder /aptos/aptos-move/framework/experimental/releases/artifacts/current/build /experimental/move/build
-RUN mv /experimental/move/build/**/bytecode_modules/*.mv /experimental/move/modules
-RUN rm -rf /experimental/move/build
-
 ### Get Aptos Move modules bytecodes for genesis ceremony
 RUN mkdir -p /aptos-framework/move/build
 RUN mkdir -p /aptos-framework/move/modules

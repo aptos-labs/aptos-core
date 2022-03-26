@@ -26,7 +26,6 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
 #[test]
 fn move_unit_tests() {
     run_tests_for_pkg("core");
-    run_tests_for_pkg("experimental");
     run_tests_for_pkg("DPN");
 }
 

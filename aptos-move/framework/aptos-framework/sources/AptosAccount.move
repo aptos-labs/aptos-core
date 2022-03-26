@@ -1,4 +1,4 @@
-/// The `AptosAccount` module manages experimental accounts.
+/// The `AptosAccount` module manages Aptos accounts.
 /// It also defines the prolog and epilog that run before and after every
 /// transaction in addition to the core prologue and epilogue.
 

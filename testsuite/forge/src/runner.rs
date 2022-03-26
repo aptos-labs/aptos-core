@@ -106,7 +106,6 @@ pub enum InitialVersion {
 
 pub struct ForgeConfig<'cfg> {
     aptos_tests: &'cfg [&'cfg dyn AptosTest],
-    nft_public_usage_tests: &'cfg [&'cfg dyn NFTPublicUsageTest],
     admin_tests: &'cfg [&'cfg dyn AdminTest],
     network_tests: &'cfg [&'cfg dyn NetworkTest],
 
@@ -123,14 +122,6 @@ pub struct ForgeConfig<'cfg> {
 impl<'cfg> ForgeConfig<'cfg> {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn with_nft_public_usage_tests(
-        mut self,
-        nft_public_usage_tests: &'cfg [&'cfg dyn NFTPublicUsageTest],
-    ) -> Self {
-        self.nft_public_usage_tests = nft_public_usage_tests;
-        self
     }
 
     pub fn with_aptos_tests(mut self, aptos_tests: &'cfg [&'cfg dyn AptosTest]) -> Self {
@@ -171,7 +162,6 @@ impl<'cfg> ForgeConfig<'cfg> {
     pub fn number_of_tests(&self) -> usize {
         self.admin_tests.len()
             + self.network_tests.len()
-            + self.nft_public_usage_tests.len()
             + self.aptos_tests.len()
     }
 
@@ -180,7 +170,6 @@ impl<'cfg> ForgeConfig<'cfg> {
             .iter()
             .map(|t| t as &dyn Test)
             .chain(self.network_tests.iter().map(|t| t as &dyn Test))
-            .chain(self.nft_public_usage_tests.iter().map(|t| t as &dyn Test))
             .chain(self.aptos_tests.iter().map(|t| t as &dyn Test))
     }
 }
@@ -189,7 +178,6 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
     fn default() -> Self {
         Self {
             aptos_tests: &[],
-            nft_public_usage_tests: &[],
             admin_tests: &[],
             network_tests: &[],
             initial_validator_count: NonZeroUsize::new(1).unwrap(),
@@ -280,25 +268,6 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 &genesis_version,
                 self.tests.genesis_config.as_ref(),
             ))?;
-
-            // Run NFTPublicUsageTests
-            if !self.tests.nft_public_usage_tests.is_empty() {
-                runtime.block_on(
-                    swarm
-                        .chain_info()
-                        .into_nft_public_info()
-                        .init_nft_environment(),
-                )?;
-                for test in self.filter_tests(self.tests.nft_public_usage_tests.iter()) {
-                    let mut nft_public_ctx = NFTPublicUsageContext::new(
-                        CoreContext::from_rng(&mut rng),
-                        swarm.chain_info().into_nft_public_info(),
-                        &mut report,
-                    );
-                    let result = run_test(|| runtime.block_on(test.run(&mut nft_public_ctx)));
-                    summary.handle_result(test.name().to_owned(), result)?;
-                }
-            }
 
             // Run AptosTests
             for test in self.filter_tests(self.tests.aptos_tests.iter()) {

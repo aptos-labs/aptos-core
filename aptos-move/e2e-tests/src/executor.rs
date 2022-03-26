@@ -14,8 +14,7 @@ use std::{
 use crate::{
     account::{Account, AccountData},
     data_store::{
-        FakeDataStore, GENESIS_CHANGE_SET, GENESIS_CHANGE_SET_EXPERIMENTAL,
-        GENESIS_CHANGE_SET_FRESH,
+        FakeDataStore, GENESIS_CHANGE_SET, GENESIS_CHANGE_SET_FRESH,
     },
     golden_outputs::GoldenOutputs,
 };
@@ -112,11 +111,6 @@ impl FakeExecutor {
     /// Creates an executor using the standard genesis.
     pub fn from_fresh_genesis() -> Self {
         Self::from_genesis(GENESIS_CHANGE_SET_FRESH.clone().write_set())
-    }
-
-    /// Creates an executor using the experimental genesis.
-    pub fn from_experimental_genesis() -> Self {
-        Self::from_genesis(GENESIS_CHANGE_SET_EXPERIMENTAL.clone().write_set())
     }
 
     pub fn allowlist_genesis() -> Self {

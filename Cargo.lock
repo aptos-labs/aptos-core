@@ -2563,22 +2563,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "diem-experimental-framework-releases"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-types",
- "aptos-workspace-hack",
- "bcs",
- "framework-releases",
- "include_dir",
- "move-binary-format",
- "move-command-line-common",
- "once_cell",
-]
-
-[[package]]
 name = "diem-framework-releases"
 version = "0.1.0"
 dependencies = [
@@ -7608,7 +7592,6 @@ dependencies = [
  "base64",
  "bcs",
  "debug-interface",
- "diem-experimental-framework-releases",
  "forge",
  "framework",
  "futures",

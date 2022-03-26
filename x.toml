@@ -173,7 +173,6 @@ members = [
     "aptos-transactional-test-harness",
     "aptos-transaction-benchmarks",
     "aptos-writeset-generator",
-    "diem-experimental-framework-releases",
     "executor-benchmark",
     "executor-test-helpers",
     "forge",

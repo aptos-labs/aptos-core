@@ -8,6 +8,5 @@
 fn prove_all() {
     // All prover tests are temporarily disabled
     //    ProverTest::create("core").run();
-    //    ProverTest::create("experimental").run();
     //    ProverTest::create("DPN").run()
 }

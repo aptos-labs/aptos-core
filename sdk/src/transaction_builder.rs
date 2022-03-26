@@ -13,7 +13,7 @@ use aptos_crypto::ed25519::Ed25519PublicKey;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-pub use aptos_transaction_builder::{aptos_stdlib, experimental_stdlib, stdlib};
+pub use aptos_transaction_builder::{aptos_stdlib, stdlib};
 use aptos_types::transaction::{
     authenticator::AuthenticationKeyPreimage, ChangeSet, ModuleBundle, Script, ScriptFunction,
     WriteSetPayload,

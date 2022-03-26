@@ -149,6 +149,12 @@ This module provides the foundation for transferring of Tokens
         &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="TokenTransfers.md#0x1_TokenTransfers">TokenTransfers</a>&lt;TokenType&gt;&gt;(sender).pending_transfers;
     <b>let</b> pending_tokens = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(pending_transfers, &receiver_addr);
     <b>let</b> (_id, token) = <a href="Table.md#0x1_Table_remove">Table::remove</a>(pending_tokens, token_id);
+
+    <b>if</b> (<a href="Table.md#0x1_Table_count">Table::count</a>(pending_tokens) == 0) {
+        <b>let</b> (_id, real_pending_transfers) = <a href="Table.md#0x1_Table_remove">Table::remove</a>(pending_transfers, &receiver_addr);
+        <a href="Table.md#0x1_Table_destroy_empty">Table::destroy_empty</a>(real_pending_transfers)
+    };
+
     <a href="Token.md#0x1_Token_deposit_token">Token::deposit_token</a>(receiver, token)
 }
 </code></pre>
@@ -182,6 +188,12 @@ This module provides the foundation for transferring of Tokens
         &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="TokenTransfers.md#0x1_TokenTransfers">TokenTransfers</a>&lt;TokenType&gt;&gt;(sender_addr).pending_transfers;
     <b>let</b> pending_tokens = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(pending_transfers, &receiver);
     <b>let</b> (_id, token) = <a href="Table.md#0x1_Table_remove">Table::remove</a>(pending_tokens, token_id);
+
+    <b>if</b> (<a href="Table.md#0x1_Table_count">Table::count</a>(pending_tokens) == 0) {
+        <b>let</b> (_id, real_pending_transfers) = <a href="Table.md#0x1_Table_remove">Table::remove</a>(pending_transfers, &receiver);
+        <a href="Table.md#0x1_Table_destroy_empty">Table::destroy_empty</a>(real_pending_transfers)
+    };
+
     <a href="Token.md#0x1_Token_deposit_token">Token::deposit_token</a>(sender, token)
 }
 </code></pre>

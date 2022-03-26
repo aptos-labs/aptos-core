@@ -22,7 +22,6 @@ const DPN_MODULES_DIR: &str = "DPN/sources";
 const APTOS_MODULES_DIR: &str = "aptos-framework/sources";
 
 static DPN_FRAMEWORK_PKG: Lazy<CompiledPackage> = Lazy::new(|| package("DPN"));
-static EXPERIMENTAL_FRAMEWORK_PKG: Lazy<CompiledPackage> = Lazy::new(|| package("experimental"));
 static APTOS_FRAMEWORK_PKG: Lazy<CompiledPackage> = Lazy::new(|| package("aptos-framework"));
 
 pub fn path_in_crate<S>(relative: S) -> PathBuf
@@ -131,10 +130,6 @@ fn module_blobs(pkg: &CompiledPackage) -> Vec<Vec<u8>> {
 
 pub fn dpn_module_blobs() -> Vec<Vec<u8>> {
     module_blobs(&*DPN_FRAMEWORK_PKG)
-}
-
-pub fn experimental_module_blobs() -> Vec<Vec<u8>> {
-    module_blobs(&*EXPERIMENTAL_FRAMEWORK_PKG)
 }
 
 pub fn aptos_module_blobs() -> Vec<Vec<u8>> {

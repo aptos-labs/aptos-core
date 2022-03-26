@@ -54,6 +54,12 @@ module AptosFramework::TokenTransfers {
             &mut borrow_global_mut<TokenTransfers<TokenType>>(sender).pending_transfers;
         let pending_tokens = Table::borrow_mut(pending_transfers, &receiver_addr);
         let (_id, token) = Table::remove(pending_tokens, token_id);
+
+        if (Table::count(pending_tokens) == 0) {
+            let (_id, real_pending_transfers) = Table::remove(pending_transfers, &receiver_addr);
+            Table::destroy_empty(real_pending_transfers)
+        };
+
         Token::deposit_token(receiver, token)
     }
 
@@ -68,6 +74,12 @@ module AptosFramework::TokenTransfers {
             &mut borrow_global_mut<TokenTransfers<TokenType>>(sender_addr).pending_transfers;
         let pending_tokens = Table::borrow_mut(pending_transfers, &receiver);
         let (_id, token) = Table::remove(pending_tokens, token_id);
+
+        if (Table::count(pending_tokens) == 0) {
+            let (_id, real_pending_transfers) = Table::remove(pending_transfers, &receiver);
+            Table::destroy_empty(real_pending_transfers)
+        };
+
         Token::deposit_token(sender, token)
     }
 
@@ -99,10 +111,16 @@ module AptosFramework::TokenTransfers {
         let owner0_addr = Signer::address_of(&owner0);
         let owner1_addr = Signer::address_of(&owner1);
 
+        assert!(Table::count(&borrow_global<TokenTransfers<u64>>(creator_addr).pending_transfers) == 0, 0);
+
         transfer_to<u64>(&creator, owner0_addr, &token_id, 1);
+        assert!(Table::count(&borrow_global<TokenTransfers<u64>>(creator_addr).pending_transfers) == 1, 1);
         transfer_to<u64>(&creator, owner1_addr, &token_id, 1);
+        assert!(Table::count(&borrow_global<TokenTransfers<u64>>(creator_addr).pending_transfers) == 2, 2);
         receive_from<u64>(&owner0, creator_addr, &token_id);
+        assert!(Table::count(&borrow_global<TokenTransfers<u64>>(creator_addr).pending_transfers) == 1, 3);
         receive_from<u64>(&owner1, creator_addr, &token_id);
+        assert!(Table::count(&borrow_global<TokenTransfers<u64>>(creator_addr).pending_transfers) == 0, 4);
 
         initialize_token_transfers<u64>(&owner0);
         transfer_to<u64>(&owner0, owner1_addr, &token_id, 1);

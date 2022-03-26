@@ -22,7 +22,6 @@ aptos = { path = "../../crates/aptos" }
 aptos-framework-releases = { path = "../../aptos-move/framework/aptos-framework/releases" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
-diem-experimental-framework-releases = { path = "../../aptos-move/framework/experimental/releases" }
 framework =  { path = "../../aptos-move/framework" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
@@ -62,10 +61,6 @@ aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 
 [[test]]
 name = "forge"
-harness = false
-
-[[test]]
-name = "forge-nft"
 harness = false
 
 [[test]]

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{AptosPublicInfo, NFTPublicInfo};
+use crate::AptosPublicInfo;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
@@ -61,10 +61,6 @@ impl<'t> ChainInfo<'t> {
 
     pub fn transaction_factory(&self) -> TransactionFactory {
         TransactionFactory::new(self.chain_id())
-    }
-
-    pub fn into_nft_public_info(self) -> NFTPublicInfo<'t> {
-        NFTPublicInfo::new(self.chain_id, self.rest_api_url.clone(), self.root_account)
     }
 
     pub fn into_aptos_public_info(self) -> AptosPublicInfo<'t> {

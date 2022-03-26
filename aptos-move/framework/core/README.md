@@ -1,7 +1,7 @@
 This folder contains a Move package consisting of core Move modules defining functionalities needed by
 any Diem-based blockchains. To start your own Diem-based blockchain, you can create a Move package that
 depends on this core package and write your own wrapper modules for the account module as well as the
-on-chain configuration modules. [`experimental` folder](../experimental) provides an example of such
+on-chain configuration modules. [`aptos-framework` folder](../aptos-framework) provides an example of such
 Move package.
 
 Next we briefly describe how to write the wrapper modules and how Move's powerful type system can provide flexibility

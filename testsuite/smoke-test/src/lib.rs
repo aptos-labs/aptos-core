@@ -4,7 +4,6 @@
 // Defines Forge Tests
 pub mod aptos;
 pub mod fullnode;
-pub mod nft_transaction;
 pub mod rest_api;
 pub mod transaction;
 

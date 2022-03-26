@@ -3,7 +3,7 @@
 
 # Module `0x1::AptosAccount`
 
-The <code><a href="AptosAccount.md#0x1_AptosAccount">AptosAccount</a></code> module manages experimental accounts.
+The <code><a href="AptosAccount.md#0x1_AptosAccount">AptosAccount</a></code> module manages Aptos accounts.
 It also defines the prolog and epilog that run before and after every
 transaction in addition to the core prologue and epilogue.
 
