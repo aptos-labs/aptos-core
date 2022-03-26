@@ -17,3 +17,7 @@ move-compiler = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa7
 move-package = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e" }
 move-stdlib = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e" }
 move-unit-test = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e" }
+
+[dev-dependencies]
+move-cli = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e" }
+tempfile = "3.2.0"

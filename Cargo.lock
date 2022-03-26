@@ -4890,11 +4890,13 @@ dependencies = [
  "aptos-vm",
  "aptos-workspace-hack",
  "framework",
+ "move-cli",
  "move-compiler",
  "move-package",
  "move-stdlib",
  "move-unit-test",
  "structopt",
+ "tempfile",
 ]
 
 [[package]]
