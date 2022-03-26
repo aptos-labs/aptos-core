@@ -72,43 +72,66 @@ You can also use Docker to configure and run your FullNode.
 4. Download the devenet [genesis][devnet_genesis] and [waypoint][devnet_waypoint] files into that directory.
 5. Run docker-compose: `docker-compose up`.
 
-## Understand and verify the correctness of your FullNode
+## Verify the correctness of your FullNode
 
-### Initial synchronization
-During the initial synchronization of your FullNode, there may be a lot of data to transfer.
+### Verify initial synchronization
+During the initial synchronization of your FullNode, there may be a lot of data to transfer. Progress can be monitored
+by querying the metrics port to see what version your node is currently synced to. Run the following command:
 
-* Progress can be monitored by querying the metrics port `curl 127.0.0.1:9101/metrics 2> /dev/null | grep aptos_state_sync_version | grep type`, which will print out several counters:
-  * `aptos_state_sync_version{type="committed"}` -- the latest (blockchain) version that is backed by a signed commitment (ledger info) from the validators
-  * `aptos_state_sync_version{type="highest"}` -- the highest or latest known version, typically the same as target
-  * `aptos_state_sync_version{type="synced"}` -- the latest blockchain version available in storage, it might not be backed by a ledger info
-  * `aptos_state_sync_version{type="target"}` -- the state sync's current target ledger info version
-* The Executor component will update the output log by showing that 1000 blocks are committed at a time:
+```
+curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_state_sync_version{type=\"synced\"}"
+```
 
-  ```
-  fullnode_1  | INFO 2020-09-28T23:16:04.425083Z execution/executor/src/lib.rs:534 sync_request_received {"local_synced_version":633750,"name":"chunk_executor","first_version_in_request":633751,"num_txns_in_request":250}
-  fullnode_1  | INFO 2020-09-28T23:16:04.508902Z execution/executor/src/lib.rs:580 sync_finished {"committed_with_ledger_info":false,"name":"chunk_executor","synced_to_version":634000}
-  ```
+The command will output the current synced version of your node. For example:
+```
+$ curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_state_sync_version{type=\"synced\"}"
+aptos_state_sync_version{type="synced"} 71000
+```
+  
+Compare the synced version returned by this command (e.g., `71000`) with the `Current Version` (latest) shown on the
+[Aptos status page](https://status.devnet.aptos.dev/). If your node is catching up to the current version, it is
+synchronizing correctly. Note: a few versions difference between the node and the status page is fine, as the status
+page does not automatically refresh.
 
-* At the same time, the state sync component will output similar information.
+### (Optional) Verify outbound network connections
+The number of outbound network connections should be more than `0`. Run the following command:
+```
+curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_connections{direction=\"outbound\""
+```
 
-* The number of connections should be more than 0, `curl 127.0.0.1:9101/metrics 2> /dev/null | grep aptos_connections`. If it's not, see the next section for potential solutions.
+The command will output the number of outbound network connections for your node. For example:
+```
+$ curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_connections{direction=\"outbound\""
+aptos_connections{direction="outbound",network_id="Public",peer_id="aabd651f",role_type="full_node"} 3
+```
 
-* The blockchain (devnet) ledger’s volume can be monitored by entering the Docker container:
+If the number of outbound connections returned (e.g., `3`) is not more than `0` it means your node cannot connect to
+the Aptos blockchain. If this happens to you, follow these steps to see if they resolve the issue:
+1. Update your node to the latest release by following the [update instructions](#update-fullnode-with-new-releases).
+2. Remove any `seed` peers you may have added to your configuration file (e.g., `public_full_node.yaml`). The seeds
+may be preventing you from connecting to the network. Seed peers are discussed in the [adding upstream seed peers
+section](#add-upstream-seed-peers).
 
-  ```
-  # Obtain the container id:
-  id=$(docker container ls | grep public_full_node_fullnode_1 | grep -oE "^[0-9a-zA-Z]+")
-  # Enter the container:
-  docker exec -it $id /bin/bash
-  # Observe the volume (ledger) size:
-  du -cs -BM /opt/aptos/data
-  ```
+### (Optional) Examine Docker ledger size
+The blockchain ledger's volume for DevNet can be monitored by entering the Docker container and checking the size.
+This will allow you to see how much storage the blockchain ledger is currently consuming. Run these commands to check:
 
-### Add upstream seed peers
+```
+# Obtain the container id:
+id=$(docker container ls | grep public_full_node_fullnode_1 | grep -oE "^[0-9a-zA-Z]+")
+# Enter the container:
+docker exec -it $id /bin/bash
+# Observe the volume (ledger) size:
+du -cs -BM /opt/aptos/data
+```
+
+## Add upstream seed peers
 Note: you might see `NoAvailablePeers` in your node's error messages. This is normal when the node is first starting.
 Wait for the node to run for a few minutes to see if it connects to peers. If not, follow the steps below:
 
-Devnet validator fullnodes will only accept a maximum of ~5000 connections. If our network is experiencing high volume, your fullnode might not able to connect. You might see `NoAvailablePeers` continuously in your node's error messages. If this happens, you can set `seeds` in the FullNode configuration file to add new  peers to connect to. We prepared some FullNodes addresses for you to use, below. Also. feel free to use the ones provided by the community (anyone already running a fullnode can provide their address for you to connect). Add these to your configuration file under your `discovery_method`:
+Devnet validator fullnodes will only accept a maximum of ~5000 connections. If our network is experiencing high volume, your fullnode might not able to connect. You might see `NoAvailablePeers` continuously in your node's error messages. If this happens, you can set `seeds` in the FullNode configuration file to add new  peers to connect to. We prepared some FullNode addresses for you to use, below.
+
+Also, feel free to use the ones provided by the community (anyone already running a fullnode can provide their address for you to connect). Add these to your configuration file under your `discovery_method`:
 ```
 ...
 full_node_networks:
@@ -207,7 +230,7 @@ FullNodes will automatically start up with a randomly generated network identity
 
 ### Start a node with a static network identity
 
-Once we have the static identity we can startup the node by modifying the configuration file (public_full_node.yaml):
+Once we have the static identity we can startup the node by modifying the configuration file (e.g., public_full_node.yaml):
 ```
 full_node_networks:
 - network_id: "public"
@@ -232,7 +255,7 @@ full_node_networks:
 
 ### Allowing other FullNodes to connect
 
-Once you start your FullNode with a static identity you can allow others to connect to devnet through your node. Make sure you open port `6180` (or `6182`, depending on which port your node is listening to) and that you open your firewall. You'll need to share your FullNode info for others to use as `seeds` in their configurations (peer-info.yaml):
+Once you start your FullNode with a static identity you can allow others to connect to devnet through your node. Make sure you open port `6180` (or `6182`, depending on which port your node is listening to) and that you open your firewall. You'll need to share your FullNode info for others to use as `seeds` in their configurations (e.g., peer-info.yaml):
 
 ```
 <Peer_ID>:
@@ -260,22 +283,27 @@ Make sure the port number you put in the address matches the one you have in the
   role: "Upstream"
 ```
 
-## Update Fullnode With New Release
+## Update Fullnode With New Releases
 
-When `devnet` is wiped and released with newer version, you will need to update fullnode as well, to ensure it can keep syncing with the new network. General steps to take:
-1. Shutdown your fullnode
+When `devnet` is wiped and updated with newer versions, you will need to update your FullNode as well. If you don't,
+it will not continue to synchronize with the network. To do this, follow these steps:
+1. Shutdown your fullnode.
 
-2. Delete the data folder (the directory path is what you specified in the `public_full_node.yaml` file), default is `/opt/aptos/data`
+2. Delete the data folder (the directory path is what you specified in the configuration file, e.g.,
+`public_full_node.yaml`). The default is `/opt/aptos/data`
 
-3. Delete the `genesis.blob` file and `waypoint.txt` file (depends on how you configured it, you might not have this file)
+3. Delete the `genesis.blob` file and `waypoint.txt` file (depending on how you configured it, you might not have this
+file and may instead have a `waypoint` directly in your configuration file).
 
-4. Get the new [genesis][devnet_genesis] and [waypoint][devnet_waypoint]
+4. Download this new [genesis.blob][devnet_genesis] file and the new [waypoint][devnet_waypoint].
 
-5. Update the `public_full_node.yaml` with new waypoint (if you configure the waypoint directly here)
+5. Update the configuration file (e.g., `public_full_node.yaml`) with the new waypoint (if you configure the waypoint 
+directly there).
 
-6. Restart the fullnode
+6. Restart the fullnode.
 
-7. See the "Initial synchronization" section above for checking if the node is state syncing again. You can compare your version with the [status dashboard]. A few versions different is okay, since our dashboard updates every minute.
+7. See the [Verify initial synchronization](#verify-initial-synchronization) section above for checking if the node
+is syncing again.
 
 [pfn_config_file]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/public_full_node.yaml
 [pfn_docker_compose]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/docker-compose.yaml
