@@ -22,6 +22,7 @@ use tokio_stream::wrappers::IntervalStream;
 
 // Useful constants for the Data Streaming Service
 const GLOBAL_DATA_REFRESH_LOG_FREQ_SECS: u64 = 1;
+const NO_DATA_TO_FETCH_LOG_FREQ_SECS: u64 = 5;
 
 /// The data streaming service that responds to data stream requests.
 pub struct DataStreamingService<T> {
@@ -241,14 +242,26 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
         let data_stream_ids = self.get_all_data_stream_ids();
         for data_stream_id in &data_stream_ids {
             if let Err(error) = self.update_progress_of_data_stream(data_stream_id) {
-                increment_counter(
-                    &metrics::CHECK_STREAM_PROGRESS_ERROR,
-                    error.get_label().into(),
-                );
-                error!(LogSchema::new(LogEntry::CheckStreamProgress)
-                    .stream_id(*data_stream_id)
-                    .event(LogEvent::Error)
-                    .error(&error));
+                if matches!(error, Error::NoDataToFetch(_)) {
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(
+                            NO_DATA_TO_FETCH_LOG_FREQ_SECS
+                        )),
+                        info!(LogSchema::new(LogEntry::CheckStreamProgress)
+                            .stream_id(*data_stream_id)
+                            .event(LogEvent::Pending)
+                            .error(&error))
+                    );
+                } else {
+                    increment_counter(
+                        &metrics::CHECK_STREAM_PROGRESS_ERROR,
+                        error.get_label().into(),
+                    );
+                    error!(LogSchema::new(LogEntry::CheckStreamProgress)
+                        .stream_id(*data_stream_id)
+                        .event(LogEvent::Error)
+                        .error(&error));
+                }
             }
         }
     }
