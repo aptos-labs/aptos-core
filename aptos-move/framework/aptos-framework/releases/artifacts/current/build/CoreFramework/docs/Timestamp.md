@@ -269,7 +269,7 @@ Conditions we only check for the implementation, but do not pass to the caller.
         now &gt;= timestamp
      }
     )
-    <b>with</b> Errors::INVALID_ARGUMENT;
+    <b>with</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_INVALID_ARGUMENT">Errors::INVALID_ARGUMENT</a>;
 </code></pre>
 
 
@@ -508,7 +508,7 @@ Helper schema to specify that a function aborts if not operating.
 
 
 <pre><code><b>schema</b> <a href="Timestamp.md#0x1_Timestamp_AbortsIfNotOperating">AbortsIfNotOperating</a> {
-    <b>aborts_if</b> !<a href="Timestamp.md#0x1_Timestamp_is_operating">is_operating</a>() <b>with</b> Errors::INVALID_STATE;
+    <b>aborts_if</b> !<a href="Timestamp.md#0x1_Timestamp_is_operating">is_operating</a>() <b>with</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_INVALID_STATE">Errors::INVALID_STATE</a>;
 }
 </code></pre>
 

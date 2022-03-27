@@ -100,5 +100,6 @@ compiled_package_info:
     install_dir: aptos-framework/releases/artifacts/current
     force_recompilation: false
     additional_named_addresses: {}
+    language_flavor: ~
 dependencies:
   - MoveStdlib

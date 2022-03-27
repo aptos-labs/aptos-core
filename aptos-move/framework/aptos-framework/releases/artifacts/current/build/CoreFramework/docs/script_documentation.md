@@ -127,8 +127,8 @@ e.g.,
 
 | Error Category           | Error Reason                                | Description                                               |
 | ----------------         | --------------                              | -------------                                             |
-| <code>Errors::NOT_PUBLISHED</code>  | <code>DiemAccount::EPAYER_DOESNT_HOLD_CURRENCY</code> | <code>payer</code> doesn't hold a balance in <code>Currency</code>.             |
-| <code>Errors::LIMIT_EXCEEDED</code> | <code>DiemAccount::EINSUFFICIENT_BALANCE</code>       | <code>amount</code> is greater than <code>payer</code>'s balance in <code>Currency</code>. |
+| <code><a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_NOT_PUBLISHED">Errors::NOT_PUBLISHED</a></code>  | <code>DiemAccount::EPAYER_DOESNT_HOLD_CURRENCY</code> | <code>payer</code> doesn't hold a balance in <code>Currency</code>.             |
+| <code><a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_LIMIT_EXCEEDED">Errors::LIMIT_EXCEEDED</a></code> | <code>DiemAccount::EINSUFFICIENT_BALANCE</code>       | <code>amount</code> is greater than <code>payer</code>'s balance in <code>Currency</code>. |
 
 For each of these tables, the **error categories should be considered stable**;
 any changes to these categories will be be well-publicized in advance. On the

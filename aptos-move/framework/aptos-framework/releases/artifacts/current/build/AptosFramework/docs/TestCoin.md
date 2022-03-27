@@ -29,6 +29,7 @@ modified from https://github.com/diem/move/tree/main/language/documentation/tuto
 -  [Function `exists_at`](#0x1_TestCoin_exists_at)
 -  [Function `balance_of`](#0x1_TestCoin_balance_of)
 -  [Function `transfer`](#0x1_TestCoin_transfer)
+-  [Function `transfer_internal`](#0x1_TestCoin_transfer_internal)
 -  [Function `withdraw`](#0x1_TestCoin_withdraw)
 -  [Function `deposit`](#0x1_TestCoin_deposit)
 -  [Function `burn`](#0x1_TestCoin_burn)
@@ -702,7 +703,6 @@ Returns the balance of <code>owner</code>.
 
 ## Function `transfer`
 
-Transfers <code>amount</code> of tokens from <code>from</code> to <code><b>to</b></code>.
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_transfer">transfer</a>(from: signer, <b>to</b>: <b>address</b>, amount: u64)
@@ -715,10 +715,35 @@ Transfers <code>amount</code> of tokens from <code>from</code> to <code><b>to</b
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_transfer">transfer</a>(from: signer, <b>to</b>: <b>address</b>, amount: u64) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>, <a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a> {
-    <b>let</b> check = <a href="TestCoin.md#0x1_TestCoin_withdraw">withdraw</a>(&from, amount);
+		<a href="TestCoin.md#0x1_TestCoin_transfer_internal">transfer_internal</a>(&from, <b>to</b>, amount);
+	}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_TestCoin_transfer_internal"></a>
+
+## Function `transfer_internal`
+
+Transfers <code>amount</code> of tokens from <code>from</code> to <code><b>to</b></code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_transfer_internal">transfer_internal</a>(from: &signer, <b>to</b>: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_transfer_internal">transfer_internal</a>(from: &signer, <b>to</b>: <b>address</b>, amount: u64) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>, <a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a> {
+    <b>let</b> check = <a href="TestCoin.md#0x1_TestCoin_withdraw">withdraw</a>(from, amount);
     <a href="TestCoin.md#0x1_TestCoin_deposit">deposit</a>(<b>to</b>, check);
     // emit events
-    <b>let</b> sender_handle = <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a>&gt;(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(&from));
+    <b>let</b> sender_handle = <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a>&gt;(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(from));
     <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>&lt;<a href="TestCoin.md#0x1_TestCoin_SentEvent">SentEvent</a>&gt;(
         &<b>mut</b> sender_handle.sent_events,
         <a href="TestCoin.md#0x1_TestCoin_SentEvent">SentEvent</a> { amount, <b>to</b> },
@@ -726,7 +751,7 @@ Transfers <code>amount</code> of tokens from <code>from</code> to <code><b>to</b
     <b>let</b> receiver_handle = <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a>&gt;(<b>to</b>);
     <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Event.md#0x1_Event_emit_event">Event::emit_event</a>&lt;<a href="TestCoin.md#0x1_TestCoin_ReceivedEvent">ReceivedEvent</a>&gt;(
         &<b>mut</b> receiver_handle.received_events,
-        <a href="TestCoin.md#0x1_TestCoin_ReceivedEvent">ReceivedEvent</a> { amount, from: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(&from) },
+        <a href="TestCoin.md#0x1_TestCoin_ReceivedEvent">ReceivedEvent</a> { amount, from: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(from) },
     );
 }
 </code></pre>

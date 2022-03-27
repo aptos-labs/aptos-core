@@ -51,7 +51,9 @@ pub enum ScriptFunctionCall {
     },
 
     /// Basic account creation method.
-    CreateAccount { auth_key: AccountAddress },
+    CreateAccount {
+        auth_key: AccountAddress,
+    },
 
     CreateFiniteCollectionScript {
         description: Bytes,
@@ -83,7 +85,9 @@ pub enum ScriptFunctionCall {
     },
 
     /// Create delegated token for the address so the account could claim MintCapability later.
-    DelegateMintCapability { to: AccountAddress },
+    DelegateMintCapability {
+        to: AccountAddress,
+    },
 
     /// Mint coins with capability.
     Mint {
@@ -99,7 +103,9 @@ pub enum ScriptFunctionCall {
     },
 
     /// Rotate the authentication key for the account under cap.account_address
-    RotateAuthenticationKey { new_authentication_key: Bytes },
+    RotateAuthenticationKey {
+        new_authentication_key: Bytes,
+    },
 
     SetGasConstants {
         global_memory_per_byte_cost: u64,
@@ -116,10 +122,14 @@ pub enum ScriptFunctionCall {
     },
 
     /// Updates the major version to a larger version.
-    SetVersion { major: u64 },
+    SetVersion {
+        major: u64,
+    },
 
-    /// Transfers `amount` of tokens from `from` to `to`.
-    Transfer { to: AccountAddress, amount: u64 },
+    Transfer {
+        to: AccountAddress,
+        amount: u64,
+    },
 }
 
 impl ScriptFunctionCall {
@@ -552,7 +562,6 @@ pub fn encode_set_version_script_function(major: u64) -> TransactionPayload {
     ))
 }
 
-/// Transfers `amount` of tokens from `from` to `to`.
 pub fn encode_transfer_script_function(to: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(

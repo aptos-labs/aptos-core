@@ -140,7 +140,7 @@ compiled_package_info:
     ? address: "0000000000000000000000000000000000000000000000000000000000000001"
       name: Version
     : CoreFramework
-  source_digest: 175B3B9A0578049542DD61DEFCC060B736A0480EC0C791AECD31D9FFDD8DB6DF
+  source_digest: DE3CD4D2A6ABF6253B2CB24442D29C5B635AA41A100D9A2F3EBC183F87DB18DF
   build_flags:
     dev_mode: false
     test_mode: false
@@ -149,6 +149,7 @@ compiled_package_info:
     install_dir: aptos-framework/releases/artifacts/current
     force_recompilation: false
     additional_named_addresses: {}
+    language_flavor: ~
 dependencies:
   - MoveStdlib
   - CoreFramework

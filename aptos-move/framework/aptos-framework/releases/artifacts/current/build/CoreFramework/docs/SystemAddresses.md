@@ -122,7 +122,7 @@ Specifies that a function aborts if the account does not have the root address.
 
 <pre><code><b>schema</b> <a href="SystemAddresses.md#0x1_SystemAddresses_AbortsIfNotCoreResource">AbortsIfNotCoreResource</a> {
     addr: <b>address</b>;
-    <b>aborts_if</b> addr != @CoreResources <b>with</b> Errors::REQUIRES_ADDRESS;
+    <b>aborts_if</b> addr != @CoreResources <b>with</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a>;
 }
 </code></pre>
 
@@ -197,7 +197,7 @@ Specifies that a function aborts if the account does not have the VM reserved ad
 
 <pre><code><b>schema</b> <a href="SystemAddresses.md#0x1_SystemAddresses_AbortsIfNotVM">AbortsIfNotVM</a> {
     account: signer;
-    <b>aborts_if</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account) != @VMReserved <b>with</b> Errors::REQUIRES_ADDRESS;
+    <b>aborts_if</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account) != @VMReserved <b>with</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_REQUIRES_ADDRESS">Errors::REQUIRES_ADDRESS</a>;
 }
 </code></pre>
 
