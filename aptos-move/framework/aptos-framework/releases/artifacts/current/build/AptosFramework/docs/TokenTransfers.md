@@ -8,8 +8,11 @@ This module provides the foundation for transferring of Tokens
 
 -  [Resource `TokenTransfers`](#0x1_TokenTransfers_TokenTransfers)
 -  [Function `initialize_token_transfers`](#0x1_TokenTransfers_initialize_token_transfers)
+-  [Function `transfer_to_script`](#0x1_TokenTransfers_transfer_to_script)
 -  [Function `transfer_to`](#0x1_TokenTransfers_transfer_to)
+-  [Function `receive_from_script`](#0x1_TokenTransfers_receive_from_script)
 -  [Function `receive_from`](#0x1_TokenTransfers_receive_from)
+-  [Function `stop_transfer_to_script`](#0x1_TokenTransfers_stop_transfer_to_script)
 -  [Function `stop_transfer_to`](#0x1_TokenTransfers_stop_transfer_to)
 -  [Function `create_token`](#0x1_TokenTransfers_create_token)
 
@@ -80,6 +83,37 @@ This module provides the foundation for transferring of Tokens
 
 </details>
 
+<a name="0x1_TokenTransfers_transfer_to_script"></a>
+
+## Function `transfer_to_script`
+
+
+
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TokenTransfers.md#0x1_TokenTransfers_transfer_to_script">transfer_to_script</a>&lt;TokenType: <b>copy</b>, drop, store&gt;(sender: signer, receiver: <b>address</b>, creator: <b>address</b>, token_creation_num: u64, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TokenTransfers.md#0x1_TokenTransfers_transfer_to_script">transfer_to_script</a>&lt;TokenType: <b>copy</b> + drop + store&gt;(
+    sender: signer,
+    receiver: <b>address</b>,
+    creator: <b>address</b>,
+    token_creation_num: u64,
+    amount: u64,
+) <b>acquires</b> <a href="TokenTransfers.md#0x1_TokenTransfers">TokenTransfers</a> {
+    <b>let</b> token_id = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_create_id">GUID::create_id</a>(creator, token_creation_num);
+    <a href="TokenTransfers.md#0x1_TokenTransfers_transfer_to">transfer_to</a>&lt;TokenType&gt;(&sender, receiver, &token_id, amount);
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_TokenTransfers_transfer_to"></a>
 
 ## Function `transfer_to`
@@ -124,6 +158,36 @@ This module provides the foundation for transferring of Tokens
 
 </details>
 
+<a name="0x1_TokenTransfers_receive_from_script"></a>
+
+## Function `receive_from_script`
+
+
+
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TokenTransfers.md#0x1_TokenTransfers_receive_from_script">receive_from_script</a>&lt;TokenType: <b>copy</b>, drop, store&gt;(receiver: signer, sender: <b>address</b>, creator: <b>address</b>, token_creation_num: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TokenTransfers.md#0x1_TokenTransfers_receive_from_script">receive_from_script</a>&lt;TokenType: <b>copy</b> + drop + store&gt;(
+    receiver: signer,
+    sender: <b>address</b>,
+    creator: <b>address</b>,
+    token_creation_num: u64,
+) <b>acquires</b> <a href="TokenTransfers.md#0x1_TokenTransfers">TokenTransfers</a> {
+    <b>let</b> token_id = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_create_id">GUID::create_id</a>(creator, token_creation_num);
+    <a href="TokenTransfers.md#0x1_TokenTransfers_receive_from">receive_from</a>&lt;TokenType&gt;(&receiver, sender, &token_id);
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_TokenTransfers_receive_from"></a>
 
 ## Function `receive_from`
@@ -156,6 +220,36 @@ This module provides the foundation for transferring of Tokens
     };
 
     <a href="Token.md#0x1_Token_deposit_token">Token::deposit_token</a>(receiver, token)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_TokenTransfers_stop_transfer_to_script"></a>
+
+## Function `stop_transfer_to_script`
+
+
+
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TokenTransfers.md#0x1_TokenTransfers_stop_transfer_to_script">stop_transfer_to_script</a>&lt;TokenType: <b>copy</b>, drop, store&gt;(sender: signer, receiver: <b>address</b>, creator: <b>address</b>, token_creation_num: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TokenTransfers.md#0x1_TokenTransfers_stop_transfer_to_script">stop_transfer_to_script</a>&lt;TokenType: <b>copy</b> + drop + store&gt;(
+    sender: signer,
+    receiver: <b>address</b>,
+    creator: <b>address</b>,
+    token_creation_num: u64,
+) <b>acquires</b> <a href="TokenTransfers.md#0x1_TokenTransfers">TokenTransfers</a> {
+    <b>let</b> token_id = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_create_id">GUID::create_id</a>(creator, token_creation_num);
+    <a href="TokenTransfers.md#0x1_TokenTransfers_stop_transfer_to">stop_transfer_to</a>&lt;TokenType&gt;(&sender, receiver, &token_id);
 }
 </code></pre>
 

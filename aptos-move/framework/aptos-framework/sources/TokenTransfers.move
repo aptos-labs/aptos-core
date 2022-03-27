@@ -1,6 +1,6 @@
 /// This module provides the foundation for transferring of Tokens
 module AptosFramework::TokenTransfers {
-    use Std::GUID::ID;
+    use Std::GUID::{Self, ID};
     use Std::Signer;
     use AptosFramework::Table::{Self, Table};
     use AptosFramework::Token::{Self, Token};
@@ -16,6 +16,17 @@ module AptosFramework::TokenTransfers {
                 pending_transfers: Table::create<address, Table<ID, Token<TokenType>>>(),
             }
         )
+    }
+
+    public(script) fun transfer_to_script<TokenType: copy + drop + store>(
+        sender: signer,
+        receiver: address,
+        creator: address,
+        token_creation_num: u64,
+        amount: u64,
+    ) acquires TokenTransfers {
+        let token_id = GUID::create_id(creator, token_creation_num);
+        transfer_to<TokenType>(&sender, receiver, &token_id, amount);
     }
 
     // Make an entry into pending transfers and extract from gallery
@@ -43,6 +54,16 @@ module AptosFramework::TokenTransfers {
         }
     }
 
+    public(script) fun receive_from_script<TokenType: copy + drop + store>(
+        receiver: signer,
+        sender: address,
+        creator: address,
+        token_creation_num: u64,
+    ) acquires TokenTransfers {
+        let token_id = GUID::create_id(creator, token_creation_num);
+        receive_from<TokenType>(&receiver, sender, &token_id);
+    }
+
     // Pull from someone else's pending transfers and insert into our gallery
     public fun receive_from<TokenType: copy + drop + store>(
         receiver: &signer,
@@ -61,6 +82,16 @@ module AptosFramework::TokenTransfers {
         };
 
         Token::deposit_token(receiver, token)
+    }
+
+    public(script) fun stop_transfer_to_script<TokenType: copy + drop + store>(
+        sender: signer,
+        receiver: address,
+        creator: address,
+        token_creation_num: u64,
+    ) acquires TokenTransfers {
+        let token_id = GUID::create_id(creator, token_creation_num);
+        stop_transfer_to<TokenType>(&sender, receiver, &token_id);
     }
 
     // Extra from our pending_transfers and return to gallery

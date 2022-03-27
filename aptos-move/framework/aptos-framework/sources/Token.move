@@ -43,6 +43,40 @@ module AptosFramework::Token {
         maximum: Option<u64>,
     }
 
+    // Creates a collection with a bounded number of tokens in it
+    public(script) fun create_finite_collection_script<TokenType: copy + drop + store>(
+        account: signer,
+        description: vector<u8>,
+        name: vector<u8>,
+        uri: vector<u8>,
+        maximum: u64,
+    ) acquires Collections {
+        create_collection<TokenType>(
+            &account,
+            ASCII::string(description),
+            ASCII::string(name),
+            ASCII::string(uri),
+            Option::some(maximum),
+        );
+    }
+
+    // Creates a collection with a unbounded number of tokens in it
+    public(script) fun create_unlimited_collection_script<TokenType: copy + drop + store>(
+        account: signer,
+        description: vector<u8>,
+        name: vector<u8>,
+        uri: vector<u8>,
+    ) acquires Collections {
+        create_collection<TokenType>(
+            &account,
+            ASCII::string(description),
+            ASCII::string(name),
+            ASCII::string(uri),
+            Option::none(),
+        );
+    }
+
+
     public fun create_collection<TokenType: copy + drop + store>(
         account: &signer,
         description: ASCII::String,
@@ -128,6 +162,27 @@ module AptosFramework::Token {
 
     public fun token_id<TokenType: copy + drop + store>(token: &Token<TokenType>): &ID {
         &token.id
+    }
+
+    public fun create_token_script<TokenType: copy + drop + store>(
+        account: signer,
+        collection_creation_num: u64,
+        description: vector<u8>,
+        name: vector<u8>,
+        supply: u64,
+        uri: vector<u8>,
+        metadata: TokenType,
+    ) acquires Collections, Gallery {
+      let collection_id = GUID::create_id(Signer::address_of(&account), collection_creation_num);
+      create_token<TokenType>(
+          &account,
+          collection_id,
+          ASCII::string(description),
+          ASCII::string(name),
+          supply,
+          ASCII::string(uri),
+          metadata,
+      );
     }
 
     // Create a new token, place the metadata into the collection and the token into the gallery

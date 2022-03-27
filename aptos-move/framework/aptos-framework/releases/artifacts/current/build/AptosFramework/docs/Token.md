@@ -14,9 +14,12 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 -  [Struct `TokenData`](#0x1_Token_TokenData)
 -  [Constants](#@Constants_0)
 -  [Function `initialize_collections`](#0x1_Token_initialize_collections)
+-  [Function `create_finite_collection_script`](#0x1_Token_create_finite_collection_script)
+-  [Function `create_unlimited_collection_script`](#0x1_Token_create_unlimited_collection_script)
 -  [Function `create_collection`](#0x1_Token_create_collection)
 -  [Function `initialize_gallery`](#0x1_Token_initialize_gallery)
 -  [Function `token_id`](#0x1_Token_token_id)
+-  [Function `create_token_script`](#0x1_Token_create_token_script)
 -  [Function `create_token`](#0x1_Token_create_token)
 -  [Function `withdraw_token`](#0x1_Token_withdraw_token)
 -  [Function `deposit_token`](#0x1_Token_deposit_token)
@@ -346,6 +349,77 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 </details>
 
+<a name="0x1_Token_create_finite_collection_script"></a>
+
+## Function `create_finite_collection_script`
+
+
+
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="Token.md#0x1_Token_create_finite_collection_script">create_finite_collection_script</a>&lt;TokenType: <b>copy</b>, drop, store&gt;(account: signer, description: vector&lt;u8&gt;, name: vector&lt;u8&gt;, uri: vector&lt;u8&gt;, maximum: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="Token.md#0x1_Token_create_finite_collection_script">create_finite_collection_script</a>&lt;TokenType: <b>copy</b> + drop + store&gt;(
+    account: signer,
+    description: vector&lt;u8&gt;,
+    name: vector&lt;u8&gt;,
+    uri: vector&lt;u8&gt;,
+    maximum: u64,
+) <b>acquires</b> <a href="Token.md#0x1_Token_Collections">Collections</a> {
+    <a href="Token.md#0x1_Token_create_collection">create_collection</a>&lt;TokenType&gt;(
+        &account,
+        <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(description),
+        <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(name),
+        <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(uri),
+        <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_some">Option::some</a>(maximum),
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_Token_create_unlimited_collection_script"></a>
+
+## Function `create_unlimited_collection_script`
+
+
+
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="Token.md#0x1_Token_create_unlimited_collection_script">create_unlimited_collection_script</a>&lt;TokenType: <b>copy</b>, drop, store&gt;(account: signer, description: vector&lt;u8&gt;, name: vector&lt;u8&gt;, uri: vector&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="Token.md#0x1_Token_create_unlimited_collection_script">create_unlimited_collection_script</a>&lt;TokenType: <b>copy</b> + drop + store&gt;(
+    account: signer,
+    description: vector&lt;u8&gt;,
+    name: vector&lt;u8&gt;,
+    uri: vector&lt;u8&gt;,
+) <b>acquires</b> <a href="Token.md#0x1_Token_Collections">Collections</a> {
+    <a href="Token.md#0x1_Token_create_collection">create_collection</a>&lt;TokenType&gt;(
+        &account,
+        <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(description),
+        <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(name),
+        <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(uri),
+        <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_none">Option::none</a>(),
+    );
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_Token_create_collection"></a>
 
 ## Function `create_collection`
@@ -444,6 +518,47 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 <pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_token_id">token_id</a>&lt;TokenType: <b>copy</b> + drop + store&gt;(token: &<a href="Token.md#0x1_Token">Token</a>&lt;TokenType&gt;): &ID {
     &token.id
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_Token_create_token_script"></a>
+
+## Function `create_token_script`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_create_token_script">create_token_script</a>&lt;TokenType: <b>copy</b>, drop, store&gt;(account: signer, collection_creation_num: u64, description: vector&lt;u8&gt;, name: vector&lt;u8&gt;, supply: u64, uri: vector&lt;u8&gt;, metadata: TokenType)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_create_token_script">create_token_script</a>&lt;TokenType: <b>copy</b> + drop + store&gt;(
+    account: signer,
+    collection_creation_num: u64,
+    description: vector&lt;u8&gt;,
+    name: vector&lt;u8&gt;,
+    supply: u64,
+    uri: vector&lt;u8&gt;,
+    metadata: TokenType,
+) <b>acquires</b> <a href="Token.md#0x1_Token_Collections">Collections</a>, <a href="Token.md#0x1_Token_Gallery">Gallery</a> {
+  <b>let</b> collection_id = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_create_id">GUID::create_id</a>(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(&account), collection_creation_num);
+  <a href="Token.md#0x1_Token_create_token">create_token</a>&lt;TokenType&gt;(
+      &account,
+      collection_id,
+      <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(description),
+      <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(name),
+      supply,
+      <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(uri),
+      metadata,
+  );
 }
 </code></pre>
 
