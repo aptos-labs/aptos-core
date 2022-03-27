@@ -13,14 +13,14 @@ module AptosFramework::Token {
 
     // A creator may publish multiple collections
     struct Collections<TokenType: copy + drop + store> has key {
-        collections: Table<ID, Collection<TokenType>>,
+        collections: Table<ASCII::String, Collection<TokenType>>,
     }
 
     fun initialize_collections<TokenType: copy + drop + store>(account: &signer) {
         move_to(
             account,
             Collections {
-                collections: Table::create<ID, Collection<TokenType>>(),
+                collections: Table::create<ASCII::String, Collection<TokenType>>(),
             },
         )
     }
@@ -28,12 +28,12 @@ module AptosFramework::Token {
     // The source of Tokens, their collection!
     struct Collection<TokenType: copy + drop + store> has store {
         // Keep track of all Tokens, even if their balance is 0.
-        tokens: Table<ID, TokenMetadata<TokenType>>,
+        tokens: Table<ASCII::String, TokenMetadata<TokenType>>,
         // In the case of NFTs (supply == 1), keep track of where the tokens are
-        claimed_tokens: Table<ID, address>,
-        // Unique identifier for this collection
-        id: ID,
+        claimed_tokens: Table<ASCII::String, address>,
+        // Describes the collection
         description: ASCII::String,
+        // Unique name within this creators account for this collection
         name: ASCII::String,
         // URL for additional information /media
         uri: ASCII::String,
@@ -83,7 +83,7 @@ module AptosFramework::Token {
         name: ASCII::String,
         uri: ASCII::String,
         maximum: Option<u64>,
-    ): ID acquires Collections {
+    ) acquires Collections {
         let account_addr = Signer::address_of(account);
         if (!exists<Collections<TokenType>>(account_addr)) {
             initialize_collections<TokenType>(account)
@@ -96,7 +96,6 @@ module AptosFramework::Token {
         let collection = Collection<TokenType> {
             tokens: Table::create(),
             claimed_tokens: Table::create(),
-            id: GUID::id(&GUID::create(account)),
             description,
             name,
             uri,
@@ -104,9 +103,7 @@ module AptosFramework::Token {
             maximum,
         };
 
-        let id = *&collection.id;
-        Table::insert(collections, *&id, collection);
-        id
+        Table::insert(collections, *&name, collection);
     }
 
     // An account's set of Tokens
@@ -128,7 +125,7 @@ module AptosFramework::Token {
         // Unique identifier for this token
         id: ID,
         // The collection or set of related Tokens
-        collection: ID,
+        collection: ASCII::String,
         // Current store of data at this location
         balance: u64,
         // Token data, left as optional as it can be stored directly with the Token or at the
@@ -166,17 +163,16 @@ module AptosFramework::Token {
 
     public fun create_token_script<TokenType: copy + drop + store>(
         account: signer,
-        collection_creation_num: u64,
+        collection_name: vector<u8>,
         description: vector<u8>,
         name: vector<u8>,
         supply: u64,
         uri: vector<u8>,
         metadata: TokenType,
     ) acquires Collections, Gallery {
-      let collection_id = GUID::create_id(Signer::address_of(&account), collection_creation_num);
       create_token<TokenType>(
           &account,
-          collection_id,
+          ASCII::string(collection_name),
           ASCII::string(description),
           ASCII::string(name),
           supply,
@@ -188,7 +184,7 @@ module AptosFramework::Token {
     // Create a new token, place the metadata into the collection and the token into the gallery
     public fun create_token<TokenType: copy + drop + store>(
         account: &signer,
-        collection_id: ID,
+        collection_name: ASCII::String,
         description: ASCII::String,
         name: ASCII::String,
         supply: u64,
@@ -198,6 +194,7 @@ module AptosFramework::Token {
         let account_addr = Signer::address_of(account);
         let collections = &mut borrow_global_mut<Collections<TokenType>>(account_addr).collections;
         let gallery = &mut borrow_global_mut<Gallery<TokenType>>(account_addr).gallery;
+        let name_for_key = *&name;
 
         let some_data = Option::some(TokenData {
             description,
@@ -219,15 +216,15 @@ module AptosFramework::Token {
         };
 
         let token_id  = *&collection_token.id;
-        let collection = Table::borrow_mut(collections, &collection_id);
+        let collection = Table::borrow_mut(collections, &collection_name);
         if (supply == 1) {
-            Table::insert(&mut collection.claimed_tokens, *&collection_token.id, account_addr)
+            Table::insert(&mut collection.claimed_tokens, *&name_for_key, account_addr)
         };
-        Table::insert(&mut collection.tokens, *&collection_token.id, collection_token);
+        Table::insert(&mut collection.tokens, name_for_key, collection_token);
 
         let gallery_token = Token {
             id: *&token_id,
-            collection: collection_id,
+            collection: collection_name,
             balance: supply,
             data: gallery_data,
         };
@@ -271,12 +268,13 @@ module AptosFramework::Token {
             initialize_gallery<TokenType>(account)
         };
 
-        let creator_addr = GUID::id_creator_address(&token.collection);
+        let creator_addr = GUID::id_creator_address(&token.id);
         let collections = &mut borrow_global_mut<Collections<TokenType>>(creator_addr).collections;
         let collection = Table::borrow_mut(collections, &token.collection);
         if (Option::is_some(&token.data) && Option::borrow(&token.data).supply == 1) {
-          Table::remove(&mut collection.claimed_tokens, &token.id);
-          Table::insert(&mut collection.claimed_tokens, *&token.id, account_addr)
+          let token_name = &Option::borrow(&token.data).name;
+          Table::remove(&mut collection.claimed_tokens, token_name);
+          Table::insert(&mut collection.claimed_tokens, *token_name, account_addr)
         };
 
         let gallery = &mut borrow_global_mut<Gallery<TokenType>>(account_addr).gallery;
@@ -301,13 +299,14 @@ module AptosFramework::Token {
         creator: signer,
         owner: signer,
     ) acquires Collections, Gallery {
-        let (collection_id, token_id) = create_collection_and_token(&creator, 1);
+        let (collection_name, token_id) = create_collection_and_token(&creator, 1);
+        let token_name = ASCII::string(b"Hello, Token");
 
         let creator_addr = Signer::address_of(&creator);
         {
             let collections = &borrow_global<Collections<u64>>(creator_addr).collections;
-            let collection = Table::borrow(collections, &collection_id);
-            assert!(Table::borrow(&collection.claimed_tokens, &token_id) == &creator_addr, 0)
+            let collection = Table::borrow(collections, &collection_name);
+            assert!(Table::borrow(&collection.claimed_tokens, &token_name) == &creator_addr, 0)
         };
 
         let token = withdraw_token<u64>(&creator, &token_id, 1);
@@ -316,8 +315,8 @@ module AptosFramework::Token {
         let owner_addr = Signer::address_of(&owner);
         {
             let collections = &borrow_global<Collections<u64>>(creator_addr).collections;
-            let collection = Table::borrow(collections, &collection_id);
-            assert!(Table::borrow(&collection.claimed_tokens, &token_id) == &owner_addr, 1)
+            let collection = Table::borrow(collections, &collection_name);
+            assert!(Table::borrow(&collection.claimed_tokens, &token_name) == &owner_addr, 1)
         };
     }
 
@@ -326,7 +325,7 @@ module AptosFramework::Token {
         creator: signer,
         owner: signer,
     ) acquires Collections, Gallery {
-        let (_collection_id, token_id) = create_collection_and_token(&creator, 2);
+        let (_collection_name, token_id) = create_collection_and_token(&creator, 2);
 
         let token_0 = withdraw_token<u64>(&creator, &token_id, 1);
         let token_1 = withdraw_token<u64>(&creator, &token_id, 1);
@@ -339,18 +338,19 @@ module AptosFramework::Token {
     fun create_collection_and_token(
         creator: &signer,
         amount: u64,
-    ): (ID, ID) acquires Collections, Gallery {
-        let collection_id = create_collection<u64>(
+    ): (ASCII::String, ID) acquires Collections, Gallery {
+        let collection_name = ASCII::string(b"Hello, World");
+        create_collection<u64>(
             creator,
             ASCII::string(b"Collection: Hello, World"),
-            ASCII::string(b"Hello, World"),
+            *&collection_name,
             ASCII::string(b"https://aptos.dev"),
             Option::none(),
         );
 
         let token_id = create_token<u64>(
             creator,
-            *&collection_id,
+            *&collection_name,
             ASCII::string(b"Token: Hello, Token"),
             ASCII::string(b"Hello, Token"),
             amount,
@@ -358,6 +358,6 @@ module AptosFramework::Token {
             0,
         );
 
-        (collection_id, token_id)
+        (collection_name, token_id)
     }
 }

@@ -140,7 +140,7 @@ compiled_package_info:
     ? address: "00000000000000000000000000000001"
       name: Version
     : CoreFramework
-  source_digest: CED40453C6B396A493B39E9F1625F1795BF6218C67BB9116671E9BE436BE6F18
+  source_digest: F722BCB5B4C8C4730CB775B0D7B0EC4588BF2896CBB1E7E33E215F8A4F535712
   build_flags:
     dev_mode: false
     test_mode: false

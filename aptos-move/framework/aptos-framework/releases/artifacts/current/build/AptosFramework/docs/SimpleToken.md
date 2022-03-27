@@ -55,7 +55,7 @@ additional features within the metadata.
 
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SimpleToken.md#0x1_SimpleToken_create_simple_token">create_simple_token</a>(account: signer, collection_creation_num: u64, description: vector&lt;u8&gt;, name: vector&lt;u8&gt;, supply: u64, uri: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SimpleToken.md#0x1_SimpleToken_create_simple_token">create_simple_token</a>(account: signer, collection_name: vector&lt;u8&gt;, description: vector&lt;u8&gt;, name: vector&lt;u8&gt;, supply: u64, uri: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -66,7 +66,7 @@ additional features within the metadata.
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="SimpleToken.md#0x1_SimpleToken_create_simple_token">create_simple_token</a>(
     account: signer,
-    collection_creation_num: u64,
+    collection_name: vector&lt;u8&gt;,
     description: vector&lt;u8&gt;,
     name: vector&lt;u8&gt;,
     supply: u64,
@@ -74,7 +74,7 @@ additional features within the metadata.
 ) {
   <a href="Token.md#0x1_Token_create_token_script">Token::create_token_script</a>&lt;<a href="SimpleToken.md#0x1_SimpleToken_NoMetadata">NoMetadata</a>&gt;(
       account,
-      collection_creation_num,
+      collection_name,
       description,
       name,
       supply,

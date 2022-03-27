@@ -167,16 +167,17 @@ module AptosFramework::TokenTransfers {
         use Std::ASCII;
         use Std::Option;
 
-        let collection_id = Token::create_collection<u64>(
+        let collection_name = ASCII::string(b"Hello, World");
+        Token::create_collection<u64>(
             creator,
             ASCII::string(b"Collection: Hello, World"),
-            ASCII::string(b"Hello, World"),
+            *&collection_name,
             ASCII::string(b"https://aptos.dev"),
             Option::none(),
         );
         Token::create_token<u64>(
             creator,
-            *&collection_id,
+            collection_name,
             ASCII::string(b"Token: Hello, Token"),
             ASCII::string(b"Hello, Token"),
             amount,

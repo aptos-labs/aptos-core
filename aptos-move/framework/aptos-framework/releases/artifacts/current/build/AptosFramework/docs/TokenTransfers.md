@@ -315,16 +315,17 @@ This module provides the foundation for transferring of Tokens
     <b>use</b> Std::ASCII;
     <b>use</b> Std::Option;
 
-    <b>let</b> collection_id = <a href="Token.md#0x1_Token_create_collection">Token::create_collection</a>&lt;u64&gt;(
+    <b>let</b> collection_name = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(b"Hello, World");
+    <a href="Token.md#0x1_Token_create_collection">Token::create_collection</a>&lt;u64&gt;(
         creator,
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(b"Collection: Hello, World"),
-        <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(b"Hello, World"),
+        *&collection_name,
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(b"https://aptos.dev"),
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_none">Option::none</a>(),
     );
     <a href="Token.md#0x1_Token_create_token">Token::create_token</a>&lt;u64&gt;(
         creator,
-        *&collection_id,
+        collection_name,
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(b"<a href="Token.md#0x1_Token">Token</a>: Hello, <a href="Token.md#0x1_Token">Token</a>"),
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(b"Hello, <a href="Token.md#0x1_Token">Token</a>"),
         amount,

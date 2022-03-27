@@ -60,7 +60,7 @@ pub enum ScriptFunctionCall {
     },
 
     CreateSimpleToken {
-        collection_creation_num: u64,
+        collection_name: Bytes,
         description: Bytes,
         name: Bytes,
         supply: u64,
@@ -189,13 +189,13 @@ impl ScriptFunctionCall {
                 maximum,
             ),
             CreateSimpleToken {
-                collection_creation_num,
+                collection_name,
                 description,
                 name,
                 supply,
                 uri,
             } => encode_create_simple_token_script_function(
-                collection_creation_num,
+                collection_name,
                 description,
                 name,
                 supply,
@@ -411,7 +411,7 @@ pub fn encode_create_finite_simple_collection_script_function(
 }
 
 pub fn encode_create_simple_token_script_function(
-    collection_creation_num: u64,
+    collection_name: Vec<u8>,
     description: Vec<u8>,
     name: Vec<u8>,
     supply: u64,
@@ -425,7 +425,7 @@ pub fn encode_create_simple_token_script_function(
         ident_str!("create_simple_token").to_owned(),
         vec![],
         vec![
-            bcs::to_bytes(&collection_creation_num).unwrap(),
+            bcs::to_bytes(&collection_name).unwrap(),
             bcs::to_bytes(&description).unwrap(),
             bcs::to_bytes(&name).unwrap(),
             bcs::to_bytes(&supply).unwrap(),
@@ -767,7 +767,7 @@ fn decode_create_simple_token_script_function(
 ) -> Option<ScriptFunctionCall> {
     if let TransactionPayload::ScriptFunction(script) = payload {
         Some(ScriptFunctionCall::CreateSimpleToken {
-            collection_creation_num: bcs::from_bytes(script.args().get(0)?).ok()?,
+            collection_name: bcs::from_bytes(script.args().get(0)?).ok()?,
             description: bcs::from_bytes(script.args().get(1)?).ok()?,
             name: bcs::from_bytes(script.args().get(2)?).ok()?,
             supply: bcs::from_bytes(script.args().get(3)?).ok()?,

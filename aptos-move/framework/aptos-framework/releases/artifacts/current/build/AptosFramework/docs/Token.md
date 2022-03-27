@@ -53,7 +53,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 <dl>
 <dt>
-<code>collections: <a href="Table.md#0x1_Table_Table">Table::Table</a>&lt;<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>, <a href="Token.md#0x1_Token_Collection">Token::Collection</a>&lt;TokenType&gt;&gt;</code>
+<code>collections: <a href="Table.md#0x1_Table_Table">Table::Table</a>&lt;<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, <a href="Token.md#0x1_Token_Collection">Token::Collection</a>&lt;TokenType&gt;&gt;</code>
 </dt>
 <dd>
 
@@ -80,19 +80,13 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 <dl>
 <dt>
-<code>tokens: <a href="Table.md#0x1_Table_Table">Table::Table</a>&lt;<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>, <a href="Token.md#0x1_Token_TokenMetadata">Token::TokenMetadata</a>&lt;TokenType&gt;&gt;</code>
+<code>tokens: <a href="Table.md#0x1_Table_Table">Table::Table</a>&lt;<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, <a href="Token.md#0x1_Token_TokenMetadata">Token::TokenMetadata</a>&lt;TokenType&gt;&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>claimed_tokens: <a href="Table.md#0x1_Table_Table">Table::Table</a>&lt;<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>, <b>address</b>&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>id: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a></code>
+<code>claimed_tokens: <a href="Table.md#0x1_Table_Table">Table::Table</a>&lt;<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, <b>address</b>&gt;</code>
 </dt>
 <dd>
 
@@ -182,7 +176,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 </dd>
 <dt>
-<code>collection: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a></code>
+<code>collection: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a></code>
 </dt>
 <dd>
 
@@ -339,7 +333,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
     <b>move_to</b>(
         account,
         <a href="Token.md#0x1_Token_Collections">Collections</a> {
-            collections: <a href="Table.md#0x1_Table_create">Table::create</a>&lt;ID, <a href="Token.md#0x1_Token_Collection">Collection</a>&lt;TokenType&gt;&gt;(),
+            collections: <a href="Table.md#0x1_Table_create">Table::create</a>&lt;<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, <a href="Token.md#0x1_Token_Collection">Collection</a>&lt;TokenType&gt;&gt;(),
         },
     )
 }
@@ -426,7 +420,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_create_collection">create_collection</a>&lt;TokenType: <b>copy</b>, drop, store&gt;(account: &signer, description: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, name: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, uri: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, maximum: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_Option">Option::Option</a>&lt;u64&gt;): <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_create_collection">create_collection</a>&lt;TokenType: <b>copy</b>, drop, store&gt;(account: &signer, description: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, name: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, uri: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, maximum: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_Option">Option::Option</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -441,7 +435,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
     name: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>,
     uri: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>,
     maximum: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option">Option</a>&lt;u64&gt;,
-): ID <b>acquires</b> <a href="Token.md#0x1_Token_Collections">Collections</a> {
+) <b>acquires</b> <a href="Token.md#0x1_Token_Collections">Collections</a> {
     <b>let</b> account_addr = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>if</b> (!<b>exists</b>&lt;<a href="Token.md#0x1_Token_Collections">Collections</a>&lt;TokenType&gt;&gt;(account_addr)) {
         <a href="Token.md#0x1_Token_initialize_collections">initialize_collections</a>&lt;TokenType&gt;(account)
@@ -454,7 +448,6 @@ This module provides the foundation for (collectible) Tokens often called NFTs
     <b>let</b> collection = <a href="Token.md#0x1_Token_Collection">Collection</a>&lt;TokenType&gt; {
         tokens: <a href="Table.md#0x1_Table_create">Table::create</a>(),
         claimed_tokens: <a href="Table.md#0x1_Table_create">Table::create</a>(),
-        id: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_id">GUID::id</a>(&<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_create">GUID::create</a>(account)),
         description,
         name,
         uri,
@@ -462,9 +455,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
         maximum,
     };
 
-    <b>let</b> id = *&collection.id;
-    <a href="Table.md#0x1_Table_insert">Table::insert</a>(collections, *&id, collection);
-    id
+    <a href="Table.md#0x1_Table_insert">Table::insert</a>(collections, *&name, collection);
 }
 </code></pre>
 
@@ -531,7 +522,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_create_token_script">create_token_script</a>&lt;TokenType: <b>copy</b>, drop, store&gt;(account: signer, collection_creation_num: u64, description: vector&lt;u8&gt;, name: vector&lt;u8&gt;, supply: u64, uri: vector&lt;u8&gt;, metadata: TokenType)
+<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_create_token_script">create_token_script</a>&lt;TokenType: <b>copy</b>, drop, store&gt;(account: signer, collection_name: vector&lt;u8&gt;, description: vector&lt;u8&gt;, name: vector&lt;u8&gt;, supply: u64, uri: vector&lt;u8&gt;, metadata: TokenType)
 </code></pre>
 
 
@@ -542,17 +533,16 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 <pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_create_token_script">create_token_script</a>&lt;TokenType: <b>copy</b> + drop + store&gt;(
     account: signer,
-    collection_creation_num: u64,
+    collection_name: vector&lt;u8&gt;,
     description: vector&lt;u8&gt;,
     name: vector&lt;u8&gt;,
     supply: u64,
     uri: vector&lt;u8&gt;,
     metadata: TokenType,
 ) <b>acquires</b> <a href="Token.md#0x1_Token_Collections">Collections</a>, <a href="Token.md#0x1_Token_Gallery">Gallery</a> {
-  <b>let</b> collection_id = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_create_id">GUID::create_id</a>(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(&account), collection_creation_num);
   <a href="Token.md#0x1_Token_create_token">create_token</a>&lt;TokenType&gt;(
       &account,
-      collection_id,
+      <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(collection_name),
       <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(description),
       <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(name),
       supply,
@@ -572,7 +562,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_create_token">create_token</a>&lt;TokenType: <b>copy</b>, drop, store&gt;(account: &signer, collection_id: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>, description: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, name: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, supply: u64, uri: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, metadata: TokenType): <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>
+<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_create_token">create_token</a>&lt;TokenType: <b>copy</b>, drop, store&gt;(account: &signer, collection_name: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, description: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, name: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, supply: u64, uri: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, metadata: TokenType): <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>
 </code></pre>
 
 
@@ -583,7 +573,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 <pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_create_token">create_token</a>&lt;TokenType: <b>copy</b> + drop + store&gt;(
     account: &signer,
-    collection_id: ID,
+    collection_name: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>,
     description: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>,
     name: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>,
     supply: u64,
@@ -593,6 +583,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
     <b>let</b> account_addr = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>let</b> collections = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="Token.md#0x1_Token_Collections">Collections</a>&lt;TokenType&gt;&gt;(account_addr).collections;
     <b>let</b> gallery = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="Token.md#0x1_Token_Gallery">Gallery</a>&lt;TokenType&gt;&gt;(account_addr).gallery;
+    <b>let</b> name_for_key = *&name;
 
     <b>let</b> some_data = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_some">Option::some</a>(<a href="Token.md#0x1_Token_TokenData">TokenData</a> {
         description,
@@ -614,15 +605,15 @@ This module provides the foundation for (collectible) Tokens often called NFTs
     };
 
     <b>let</b> token_id  = *&collection_token.id;
-    <b>let</b> collection = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(collections, &collection_id);
+    <b>let</b> collection = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(collections, &collection_name);
     <b>if</b> (supply == 1) {
-        <a href="Table.md#0x1_Table_insert">Table::insert</a>(&<b>mut</b> collection.claimed_tokens, *&collection_token.id, account_addr)
+        <a href="Table.md#0x1_Table_insert">Table::insert</a>(&<b>mut</b> collection.claimed_tokens, *&name_for_key, account_addr)
     };
-    <a href="Table.md#0x1_Table_insert">Table::insert</a>(&<b>mut</b> collection.tokens, *&collection_token.id, collection_token);
+    <a href="Table.md#0x1_Table_insert">Table::insert</a>(&<b>mut</b> collection.tokens, name_for_key, collection_token);
 
     <b>let</b> gallery_token = <a href="Token.md#0x1_Token">Token</a> {
         id: *&token_id,
-        collection: collection_id,
+        collection: collection_name,
         balance: supply,
         data: gallery_data,
     };
@@ -706,12 +697,13 @@ This module provides the foundation for (collectible) Tokens often called NFTs
         <a href="Token.md#0x1_Token_initialize_gallery">initialize_gallery</a>&lt;TokenType&gt;(account)
     };
 
-    <b>let</b> creator_addr = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_id_creator_address">GUID::id_creator_address</a>(&token.collection);
+    <b>let</b> creator_addr = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_id_creator_address">GUID::id_creator_address</a>(&token.id);
     <b>let</b> collections = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="Token.md#0x1_Token_Collections">Collections</a>&lt;TokenType&gt;&gt;(creator_addr).collections;
     <b>let</b> collection = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(collections, &token.collection);
     <b>if</b> (<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_is_some">Option::is_some</a>(&token.data) && <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_borrow">Option::borrow</a>(&token.data).supply == 1) {
-      <a href="Table.md#0x1_Table_remove">Table::remove</a>(&<b>mut</b> collection.claimed_tokens, &token.id);
-      <a href="Table.md#0x1_Table_insert">Table::insert</a>(&<b>mut</b> collection.claimed_tokens, *&token.id, account_addr)
+      <b>let</b> token_name = &<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_borrow">Option::borrow</a>(&token.data).name;
+      <a href="Table.md#0x1_Table_remove">Table::remove</a>(&<b>mut</b> collection.claimed_tokens, token_name);
+      <a href="Table.md#0x1_Table_insert">Table::insert</a>(&<b>mut</b> collection.claimed_tokens, *token_name, account_addr)
     };
 
     <b>let</b> gallery = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="Token.md#0x1_Token_Gallery">Gallery</a>&lt;TokenType&gt;&gt;(account_addr).gallery;
@@ -762,7 +754,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 
 
-<pre><code><b>fun</b> <a href="Token.md#0x1_Token_create_collection_and_token">create_collection_and_token</a>(creator: &signer, amount: u64): (<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>, <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>)
+<pre><code><b>fun</b> <a href="Token.md#0x1_Token_create_collection_and_token">create_collection_and_token</a>(creator: &signer, amount: u64): (<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>)
 </code></pre>
 
 
@@ -774,18 +766,19 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 <pre><code><b>fun</b> <a href="Token.md#0x1_Token_create_collection_and_token">create_collection_and_token</a>(
     creator: &signer,
     amount: u64,
-): (ID, ID) <b>acquires</b> <a href="Token.md#0x1_Token_Collections">Collections</a>, <a href="Token.md#0x1_Token_Gallery">Gallery</a> {
-    <b>let</b> collection_id = <a href="Token.md#0x1_Token_create_collection">create_collection</a>&lt;u64&gt;(
+): (<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, ID) <b>acquires</b> <a href="Token.md#0x1_Token_Collections">Collections</a>, <a href="Token.md#0x1_Token_Gallery">Gallery</a> {
+    <b>let</b> collection_name = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(b"Hello, World");
+    <a href="Token.md#0x1_Token_create_collection">create_collection</a>&lt;u64&gt;(
         creator,
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(b"<a href="Token.md#0x1_Token_Collection">Collection</a>: Hello, World"),
-        <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(b"Hello, World"),
+        *&collection_name,
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(b"https://aptos.dev"),
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_none">Option::none</a>(),
     );
 
     <b>let</b> token_id = <a href="Token.md#0x1_Token_create_token">create_token</a>&lt;u64&gt;(
         creator,
-        *&collection_id,
+        *&collection_name,
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(b"<a href="Token.md#0x1_Token">Token</a>: Hello, <a href="Token.md#0x1_Token">Token</a>"),
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(b"Hello, <a href="Token.md#0x1_Token">Token</a>"),
         amount,
@@ -793,7 +786,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
         0,
     );
 
-    (collection_id, token_id)
+    (collection_name, token_id)
 }
 </code></pre>
 

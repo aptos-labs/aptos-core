@@ -9,7 +9,7 @@ module AptosFramework::SimpleToken {
     // Create a single Token
     public(script) fun create_simple_token(
         account: signer,
-        collection_creation_num: u64,
+        collection_name: vector<u8>,
         description: vector<u8>,
         name: vector<u8>,
         supply: u64,
@@ -17,7 +17,7 @@ module AptosFramework::SimpleToken {
     ) {
       Token::create_token_script<NoMetadata>(
           account,
-          collection_creation_num,
+          collection_name,
           description,
           name,
           supply,
