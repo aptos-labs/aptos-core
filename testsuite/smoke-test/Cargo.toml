@@ -31,10 +31,10 @@ aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 forge = { path = "../forge" }
-move-command-line-common = { git = "https://github.com/diem/move", rev = "da41c4d9fdf7aeaa4d645004d174fc23c328621c" }
-move-ir-compiler = { git = "https://github.com/diem/move", rev = "da41c4d9fdf7aeaa4d645004d174fc23c328621c" }
-move-stdlib = { git = "https://github.com/diem/move", rev = "da41c4d9fdf7aeaa4d645004d174fc23c328621c" }
-move-package = { git = "https://github.com/diem/move", rev = "da41c4d9fdf7aeaa4d645004d174fc23c328621c" }
+move-command-line-common = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e" }
+move-ir-compiler = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e" }
+move-stdlib = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e" }
+move-package = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e" }
 
 
 [dev-dependencies]

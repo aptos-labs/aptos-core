@@ -35,7 +35,7 @@ aptos-temppath = { path = "../../crates/aptos-temppath", optional = true }
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 executor-types = { path = "../../execution/executor-types", optional = true }
-move-core-types = {git = "https://github.com/diem/move", rev = "da41c4d9fdf7aeaa4d645004d174fc23c328621c", features=["address32"]}
+move-core-types = {git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e", features=["address32"]}
 
 num-variants = { path = "../../crates/num-variants" }
 schemadb = { path = "../schemadb" }

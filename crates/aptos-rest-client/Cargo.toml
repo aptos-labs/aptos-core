@@ -28,4 +28,4 @@ aptos-crypto = { path = "../aptos-crypto" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
-move-core-types = { git = "https://github.com/diem/move", rev = "da41c4d9fdf7aeaa4d645004d174fc23c328621c", features=["address32"] }
+move-core-types = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e", features=["address32"] }

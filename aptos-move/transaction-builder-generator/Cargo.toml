@@ -19,7 +19,7 @@ serde_yaml = "0.8.17"
 
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
-move-core-types = { git = "https://github.com/diem/move", rev = "da41c4d9fdf7aeaa4d645004d174fc23c328621c", features=["address32"] }
+move-core-types = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e", features=["address32"] }
 serde-reflection = "0.3.5"
 serde-generate = "0.20.6"
 bcs = "0.1.2"
