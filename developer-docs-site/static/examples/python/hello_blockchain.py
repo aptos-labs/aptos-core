@@ -10,7 +10,6 @@ from first_transaction import Account, FaucetClient, RestClient, TESTNET_URL, FA
 
 #:!:>section_1
 class HelloBlockchainClient(RestClient):
-
     def publish_module(self, account_from: Account, module_hex: str) -> str:
         """Publish a new module to the blockchain within the specified account"""
 
@@ -24,8 +23,9 @@ class HelloBlockchainClient(RestClient):
         signed_txn = self.sign_transaction(account_from, txn_request)
         res = self.submit_transaction(signed_txn)
         return str(res["hash"])
-    #<:!:section_1
-    #:!:>section_2
+#<:!:section_1
+
+#:!:>section_2
     def get_message(self, contract_address: str, account_address: str) -> Optional[str]:
         """ Retrieve the resource Message::MessageHolder::message """
 
@@ -34,8 +34,9 @@ class HelloBlockchainClient(RestClient):
             if resource["type"] == f"0x{contract_address}::Message::MessageHolder":
                 return resource["data"]["message"]
         return None
-    #<:!:section_2
-    #:!:>section_3
+#<:!:section_2
+
+#:!:>section_3
     def set_message(self, contract_address: str, account_from: Account, message: str) -> str:
         """ Potentially initialize and set the resource Message::MessageHolder::message """
 
@@ -51,7 +52,7 @@ class HelloBlockchainClient(RestClient):
         signed_txn = self.sign_transaction(account_from, txn_request)
         res = self.submit_transaction(signed_txn)
         return str(res["hash"])
-    #<:!:section_3
+#<:!:section_3
 
 if __name__ == "__main__":
     assert len(sys.argv) == 2, "Expecting an argument that points to the helloblockchain module"

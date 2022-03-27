@@ -9,8 +9,8 @@ import requests
 import time
 from typing import Any, Dict, Optional
 
-TESTNET_URL = "https://fullnode.devnet.aptoslabs.com"
-FAUCET_URL = "https://faucet.devnet.aptoslabs.com"
+TESTNET_URL = "http://127.0.0.1:8080"
+FAUCET_URL = "http://127.0.0.1:8081"
 
 #:!:>section_1
 class Account:
@@ -46,8 +46,9 @@ class RestClient:
 
     def __init__(self, url: str) -> None:
         self.url = url
-    #<:!:section_2
-    #:!:>section_3
+#<:!:section_2
+
+#:!:>section_3
     def account(self, account_address: str) -> Dict[str, str]:
         """Returns the sequence number and authentication key for an account"""
 
@@ -61,10 +62,9 @@ class RestClient:
         response = requests.get(f"{self.url}/accounts/{account_address}/resources")
         assert response.status_code == 200, response.text
         return response.json()
+#<:!:section_3
 
-    #<:!:section_3
-
-    #:!:>section_4
+#:!:>section_4
     def generate_transaction(self, sender: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Generates a transaction request that can be submitted to produce a raw transaction that
         can be signed, which upon being signed can be submitted to the blockchain. """
@@ -120,8 +120,9 @@ class RestClient:
             assert count < 10, f"transaction {txn_hash} timed out"
             time.sleep(1)
             count += 1
-    #<:!:section_4
-    #:!:>section_5
+#<:!:section_4
+
+#:!:>section_5
     def account_balance(self, account_address: str) -> Optional[int]:
         """Returns the test coin balance associated with the account"""
 
@@ -148,7 +149,7 @@ class RestClient:
         signed_txn = self.sign_transaction(account_from, txn_request)
         res = self.submit_transaction(signed_txn)
         return str(res["hash"])
-    #<:!:section_5
+#<:!:section_5
 
 #:!:>section_6
 class FaucetClient:
@@ -166,7 +167,7 @@ class FaucetClient:
         assert txns.status_code == 200, txns.text
         for txn_hash in txns.json():
             self.rest_client.wait_for_transaction(txn_hash)
-    #<:!:section_6
+#<:!:section_6
 
 
 #:!:>section_7
