@@ -135,23 +135,23 @@ impl MockNetwork {
 }
 
 #[tokio::test]
-async fn test_request_works_only_when_data_available() {
+async fn request_works_only_when_data_available() {
     ::aptos_logger::Logger::init_for_testing();
     let (mut mock_network, mock_time, client, poller) = MockNetwork::new();
 
     tokio::spawn(poller.start_poller());
 
-    // this request should fail because no peers are currently connected
+    // This request should fail because no peers are currently connected
     let error = client
         .get_transactions_with_proof(100, 50, 100, false)
         .await
         .unwrap_err();
     assert_matches!(error, Error::DataIsUnavailable(_));
 
-    // add a connected peer
+    // Add a connected peer
     let expected_peer = mock_network.add_connected_peer();
 
-    // requesting some txns now will still fail since no peers are advertising
+    // Requesting some txns now will still fail since no peers are advertising
     // availability for the desired range.
     let error = client
         .get_transactions_with_proof(100, 50, 100, false)
@@ -159,11 +159,11 @@ async fn test_request_works_only_when_data_available() {
         .unwrap_err();
     assert_matches!(error, Error::DataIsUnavailable(_));
 
-    // advance time so the poller sends a data summary request
+    // Advance time so the poller sends a data summary request
     tokio::task::yield_now().await;
     mock_time.advance_async(Duration::from_millis(1_000)).await;
 
-    // receive their request and fulfill it
+    // Receive their request and fulfill it
     let (peer, protocol, request, response_sender) = mock_network.next_request().await.unwrap();
     assert_eq!(peer, expected_peer.peer_id());
     assert_eq!(protocol, ProtocolId::StorageServiceRpc);
@@ -172,10 +172,10 @@ async fn test_request_works_only_when_data_available() {
     let summary = mock_storage_summary(200);
     response_sender.send(Ok(StorageServiceResponse::StorageServerSummary(summary)));
 
-    // let the poller finish processing the response
+    // Let the poller finish processing the response
     tokio::task::yield_now().await;
 
-    // handle the client's transactions request
+    // Handle the client's transactions request
     tokio::spawn(async move {
         let (peer, protocol, request, response_sender) = mock_network.next_request().await.unwrap();
 
@@ -196,13 +196,81 @@ async fn test_request_works_only_when_data_available() {
         )));
     });
 
-    // the client's request should succeed since a peer finally has advertised
+    // The client's request should succeed since a peer finally has advertised
     // data for this range.
     let response = client
         .get_transactions_with_proof(100, 50, 100, false)
         .await
         .unwrap();
     assert_eq!(response.payload, TransactionListWithProof::new_empty());
+}
+
+#[tokio::test]
+async fn fetch_peers_to_poll() {
+    ::aptos_logger::Logger::init_for_testing();
+    let (mut mock_network, _, client, _) = MockNetwork::new();
+
+    // Request the next set of peers to poll and verify we have no peers
+    assert_matches!(
+        client.fetch_peers_to_poll(),
+        Err(Error::DataIsUnavailable(_))
+    );
+
+    // Add connected peer 1
+    let connected_peer_1 = mock_network.add_connected_peer();
+
+    // Request the next set of peers to poll and verify the set contains peer 1
+    let peers_to_poll = client.fetch_peers_to_poll().unwrap();
+    assert_eq!(peers_to_poll, vec![connected_peer_1]);
+
+    // Request the next set of peers to poll and verify the set is the same
+    let peers_to_poll = client.fetch_peers_to_poll().unwrap();
+    assert_eq!(peers_to_poll, vec![connected_peer_1]);
+
+    // Add connected peer 2
+    let connected_peer_2 = mock_network.add_connected_peer();
+
+    // Request the next set of peers to poll and verify the set contains both peers
+    let peers_to_poll = client.fetch_peers_to_poll().unwrap();
+    assert_eq!(2, peers_to_poll.len());
+    assert!(peers_to_poll.contains(&connected_peer_1));
+    assert!(peers_to_poll.contains(&connected_peer_2));
+
+    // Request the next set of peers to poll and verify the set returns only one
+    let peers_to_poll = client.fetch_peers_to_poll().unwrap();
+    assert_eq!(1, peers_to_poll.len());
+
+    // Request the next set of peers to poll and verify the set returns the oldest
+    let peers_to_poll = client.fetch_peers_to_poll().unwrap();
+    assert_eq!(1, peers_to_poll.len());
+    let polled_peer = peers_to_poll.first().unwrap();
+
+    // Add connected peer 3
+    let connected_peer_3 = mock_network.add_connected_peer();
+
+    // Request the next set of peers to poll and verify the set
+    let peers_to_poll = client.fetch_peers_to_poll().unwrap();
+    assert_eq!(2, peers_to_poll.len());
+    assert!(peers_to_poll.contains(&connected_peer_3));
+    assert!(!peers_to_poll.contains(polled_peer));
+
+    // Add connected peer 4 and 5
+    let connected_peer_4 = mock_network.add_connected_peer();
+    let connected_peer_5 = mock_network.add_connected_peer();
+
+    // Request the next set of peers to poll and verify the set
+    let peers_to_poll = client.fetch_peers_to_poll().unwrap();
+    assert_eq!(3, peers_to_poll.len());
+    assert!(peers_to_poll.contains(&connected_peer_4));
+    assert!(peers_to_poll.contains(&connected_peer_5));
+    assert!(peers_to_poll.contains(polled_peer));
+
+    // Request the next set of peers to poll and verify the set
+    let peers_to_poll = client.fetch_peers_to_poll().unwrap();
+    assert_eq!(1, peers_to_poll.len());
+    assert!(!peers_to_poll.contains(&connected_peer_4));
+    assert!(!peers_to_poll.contains(&connected_peer_5));
+    assert!(!peers_to_poll.contains(polled_peer));
 }
 
 // 1. 2 peers
@@ -214,7 +282,7 @@ async fn test_request_works_only_when_data_available() {
 #[tokio::test]
 async fn bad_peer_is_eventually_banned_internal() {
     ::aptos_logger::Logger::init_for_testing();
-    let (mut mock_network, _mock_time, client, _poller) = MockNetwork::new();
+    let (mut mock_network, _, client, _) = MockNetwork::new();
 
     let good_peer = mock_network.add_connected_peer();
     let bad_peer = mock_network.add_connected_peer();
@@ -293,7 +361,7 @@ async fn bad_peer_is_eventually_banned_internal() {
 #[tokio::test]
 async fn bad_peer_is_eventually_banned_callback() {
     ::aptos_logger::Logger::init_for_testing();
-    let (mut mock_network, _mock_time, client, _poller) = MockNetwork::new();
+    let (mut mock_network, _, client, _) = MockNetwork::new();
 
     let bad_peer = mock_network.add_connected_peer();
 
