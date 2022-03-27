@@ -160,6 +160,12 @@ fn main() {
         let content =
             std::fs::read_to_string(registry_file).expect("registry file must be readable");
         let mut registry = serde_yaml::from_str::<Registry>(content.as_str()).unwrap();
+        // update the registry to prevent language keyword being used
+        match options.language {
+            Language::TypeScript => buildgen::typescript::replace_keywords(&mut registry),
+            Language::Rust => buildgen::rust::replace_keywords(&mut registry),
+            _ => (),
+        }
         if let Language::TypeScript = options.language {
             buildgen::typescript::replace_keywords(&mut registry);
         };

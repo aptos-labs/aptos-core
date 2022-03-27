@@ -15,6 +15,7 @@ use serde_generate::{
 };
 
 use heck::{CamelCase, ShoutySnakeCase};
+use serde_reflection::ContainerFormat;
 use std::{
     collections::BTreeMap,
     io::{Result, Write},
@@ -939,5 +940,41 @@ aptos-types = {{ path = "../aptos-types", version = "{}" }}
         let mut source = std::fs::File::create(&source_path)?;
         output(&mut source, abis, /* local_types */ false)?;
         Ok(())
+    }
+}
+
+/// Walks through the registry replacing variables known to be named as a
+/// rust keyword, making the resulting codegen invalid.
+/// ie: public function: Identifier => public function_name: Identifier
+pub fn replace_keywords(registry: &mut BTreeMap<String, ContainerFormat>) {
+    swap_keyworded_fields(registry.get_mut("TypeTag"));
+    swap_keyworded_fields(registry.get_mut("StructTag"));
+}
+
+fn swap_keyworded_fields(fields: Option<&mut ContainerFormat>) {
+    match fields {
+        Some(ContainerFormat::Enum(fields)) => {
+            for (_, val) in fields.iter_mut() {
+                match val.name.as_str() {
+                    "struct" => val.name = String::from("Struct"),
+                    "bool" => val.name = String::from("Bool"),
+                    "u8" => val.name = String::from("U8"),
+                    "u64" => val.name = String::from("U64"),
+                    "u128" => val.name = String::from("U128"),
+                    "address" => val.name = String::from("Address"),
+                    "signer" => val.name = String::from("Signer"),
+                    "vector" => val.name = String::from("Vector"),
+                    _ => (),
+                }
+            }
+        }
+        Some(ContainerFormat::Struct(fields)) => {
+            for entry in fields.iter_mut() {
+                if entry.name.as_str() == "type_args" {
+                    entry.name = String::from("type_params")
+                }
+            }
+        }
+        _ => (),
     }
 }

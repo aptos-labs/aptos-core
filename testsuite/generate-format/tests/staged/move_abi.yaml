@@ -47,7 +47,7 @@ StructTag:
         TYPENAME: Identifier
     - name:
         TYPENAME: Identifier
-    - type_params:
+    - type_args:
         SEQ:
           TYPENAME: TypeTag
 TransactionScriptABI:
@@ -69,20 +69,20 @@ TypeTag:
     0:
       bool: UNIT
     1:
-      U8: UNIT
+      u8: UNIT
     2:
-      U64: UNIT
+      u64: UNIT
     3:
-      U128: UNIT
+      u128: UNIT
     4:
-      Address: UNIT
+      address: UNIT
     5:
-      Signer: UNIT
+      signer: UNIT
     6:
-      Vector:
+      vector:
         NEWTYPE:
           TYPENAME: TypeTag
     7:
-      Struct:
+      struct:
         NEWTYPE:
           TYPENAME: StructTag

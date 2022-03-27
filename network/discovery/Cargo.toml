@@ -27,7 +27,7 @@ aptos-time-service = {path = "../../crates/aptos-time-service"}
 aptos-secure-storage = { path = "../../secure/storage" }
 aptos-types = {path = "../../types"}
 aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
-move-core-types = { git = "https://github.com/diem/move", rev = "8a260b82dda8175a98ea848fab5adcce467585b3" }
+move-core-types = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e" }
 network = {path = "../../network"}
 short-hex-str = { path = "../../crates/short-hex-str" }
 

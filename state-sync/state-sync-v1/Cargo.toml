@@ -63,7 +63,7 @@ aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers" }
 aptosdb = { path = "../../storage/aptosdb" }
 executor-test-helpers = { path = "../../execution/executor-test-helpers" }
 memsocket = { path = "../../network/memsocket" }
-move-core-types = { git = "https://github.com/diem/move", rev = "8a260b82dda8175a98ea848fab5adcce467585b3" }
+move-core-types = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e" }
 network = { path = "../../network", features = ["fuzzing", "testing"] }
 network-builder = { path  = "../../network/builder" }
 storage-service = { path = "../../storage/storage-service" }

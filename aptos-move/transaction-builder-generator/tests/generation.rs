@@ -179,7 +179,8 @@ fn test_that_python_code_parses_and_passes_pyre_check() {
 }
 
 fn test_rust(abis: &[ScriptABI], demo_file: &str, expected_output: &str) {
-    let registry = get_aptos_registry();
+    let mut registry = get_aptos_registry();
+    buildgen::rust::replace_keywords(&mut registry);
     let dir = tempdir().unwrap();
 
     let installer = serdegen::rust::Installer::new(dir.path().to_path_buf());

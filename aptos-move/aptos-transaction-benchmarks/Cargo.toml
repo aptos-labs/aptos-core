@@ -19,8 +19,8 @@ language-e2e-tests = { path = "../e2e-tests" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 
-read-write-set = { git = "https://github.com/diem/move", rev = "8a260b82dda8175a98ea848fab5adcce467585b3" }
-read-write-set-dynamic = { git = "https://github.com/diem/move", rev = "8a260b82dda8175a98ea848fab5adcce467585b3" }
+read-write-set = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e" }
+read-write-set-dynamic = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e" }
 aptos-vm = { path = "../aptos-vm" }
 diem-framework-releases = { path = "../framework/DPN/releases" }
 
