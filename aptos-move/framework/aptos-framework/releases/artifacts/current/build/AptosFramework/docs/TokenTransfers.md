@@ -60,7 +60,7 @@ This module provides the foundation for transferring of Tokens
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TokenTransfers.md#0x1_TokenTransfers_initialize_token_transfers">initialize_token_transfers</a>&lt;TokenType: <b>copy</b>, drop, store&gt;(account: &signer)
+<pre><code><b>fun</b> <a href="TokenTransfers.md#0x1_TokenTransfers_initialize_token_transfers">initialize_token_transfers</a>&lt;TokenType: <b>copy</b>, drop, store&gt;(account: &signer)
 </code></pre>
 
 
@@ -69,7 +69,7 @@ This module provides the foundation for transferring of Tokens
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TokenTransfers.md#0x1_TokenTransfers_initialize_token_transfers">initialize_token_transfers</a>&lt;TokenType: <b>copy</b> + drop + store&gt;(account: &signer) {
+<pre><code><b>fun</b> <a href="TokenTransfers.md#0x1_TokenTransfers_initialize_token_transfers">initialize_token_transfers</a>&lt;TokenType: <b>copy</b> + drop + store&gt;(account: &signer) {
     <b>move_to</b>(
         account,
         <a href="TokenTransfers.md#0x1_TokenTransfers">TokenTransfers</a>&lt;TokenType&gt; {
@@ -136,6 +136,10 @@ This module provides the foundation for transferring of Tokens
     amount: u64,
 ) <b>acquires</b> <a href="TokenTransfers.md#0x1_TokenTransfers">TokenTransfers</a> {
     <b>let</b> sender_addr = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(sender);
+    <b>if</b> (!<b>exists</b>&lt;<a href="TokenTransfers.md#0x1_TokenTransfers">TokenTransfers</a>&lt;TokenType&gt;&gt;(sender_addr)) {
+        <a href="TokenTransfers.md#0x1_TokenTransfers_initialize_token_transfers">initialize_token_transfers</a>&lt;TokenType&gt;(sender)
+    };
+
     <b>let</b> pending_transfers =
         &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="TokenTransfers.md#0x1_TokenTransfers">TokenTransfers</a>&lt;TokenType&gt;&gt;(sender_addr).pending_transfers;
     <b>if</b> (!<a href="Table.md#0x1_Table_contains_key">Table::contains_key</a>(pending_transfers, &receiver)) {

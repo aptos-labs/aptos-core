@@ -9,7 +9,7 @@ module AptosFramework::TokenTransfers {
         pending_transfers: Table<address, Table<ID, Token<TokenType>>>,
     }
 
-    public fun initialize_token_transfers<TokenType: copy + drop + store>(account: &signer) {
+    fun initialize_token_transfers<TokenType: copy + drop + store>(account: &signer) {
         move_to(
             account,
             TokenTransfers<TokenType> {
@@ -37,6 +37,10 @@ module AptosFramework::TokenTransfers {
         amount: u64,
     ) acquires TokenTransfers {
         let sender_addr = Signer::address_of(sender);
+        if (!exists<TokenTransfers<TokenType>>(sender_addr)) {
+            initialize_token_transfers<TokenType>(sender)
+        };
+
         let pending_transfers =
             &mut borrow_global_mut<TokenTransfers<TokenType>>(sender_addr).pending_transfers;
         if (!Table::contains_key(pending_transfers, &receiver)) {
@@ -117,14 +121,12 @@ module AptosFramework::TokenTransfers {
     #[test(creator = @0x1, owner = @0x2)]
     public fun test_nft(creator: signer, owner: signer) acquires TokenTransfers {
         let token_id = create_token(&creator, 1);
-        initialize_token_transfers<u64>(&creator);
 
         let creator_addr = Signer::address_of(&creator);
         let owner_addr = Signer::address_of(&owner);
         transfer_to<u64>(&creator, owner_addr, &token_id, 1);
         receive_from<u64>(&owner, creator_addr, &token_id);
 
-        initialize_token_transfers<u64>(&owner);
         transfer_to<u64>(&owner, creator_addr, &token_id, 1);
         stop_transfer_to<u64>(&owner, creator_addr, &token_id);
     }
@@ -136,13 +138,10 @@ module AptosFramework::TokenTransfers {
         owner1: signer,
     ) acquires TokenTransfers {
         let token_id = create_token(&creator, 2);
-        initialize_token_transfers<u64>(&creator);
 
         let creator_addr = Signer::address_of(&creator);
         let owner0_addr = Signer::address_of(&owner0);
         let owner1_addr = Signer::address_of(&owner1);
-
-        assert!(Table::count(&borrow_global<TokenTransfers<u64>>(creator_addr).pending_transfers) == 0, 0);
 
         transfer_to<u64>(&creator, owner0_addr, &token_id, 1);
         assert!(Table::count(&borrow_global<TokenTransfers<u64>>(creator_addr).pending_transfers) == 1, 1);
@@ -153,11 +152,9 @@ module AptosFramework::TokenTransfers {
         receive_from<u64>(&owner1, creator_addr, &token_id);
         assert!(Table::count(&borrow_global<TokenTransfers<u64>>(creator_addr).pending_transfers) == 0, 4);
 
-        initialize_token_transfers<u64>(&owner0);
         transfer_to<u64>(&owner0, owner1_addr, &token_id, 1);
         receive_from<u64>(&owner1, owner0_addr, &token_id);
 
-        initialize_token_transfers<u64>(&owner1);
         transfer_to<u64>(&owner1, creator_addr, &token_id, 1);
         transfer_to<u64>(&owner1, creator_addr, &token_id, 1);
         receive_from<u64>(&creator, owner1_addr, &token_id);
