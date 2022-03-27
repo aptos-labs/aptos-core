@@ -351,7 +351,7 @@ fn setup_aptos_data_client(
         .enable_all()
         .build()
         .expect("Failed to create aptos data client!");
-    aptos_data_client_runtime.spawn(data_summary_poller.start());
+    aptos_data_client_runtime.spawn(data_summary_poller.start_poller());
 
     (aptos_data_client, aptos_data_client_runtime)
 }

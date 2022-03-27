@@ -139,7 +139,7 @@ async fn test_request_works_only_when_data_available() {
     ::aptos_logger::Logger::init_for_testing();
     let (mut mock_network, mock_time, client, poller) = MockNetwork::new();
 
-    tokio::spawn(poller.start());
+    tokio::spawn(poller.start_poller());
 
     // this request should fail because no peers are currently connected
     let error = client
@@ -361,7 +361,7 @@ async fn bad_peer_is_eventually_added_back() {
     // Add a connected peer.
     mock_network.add_connected_peer();
 
-    tokio::spawn(poller.start());
+    tokio::spawn(poller.start_poller());
     tokio::spawn(async move {
         while let Some((_, _, request, response_sender)) = mock_network.next_request().await {
             match request {

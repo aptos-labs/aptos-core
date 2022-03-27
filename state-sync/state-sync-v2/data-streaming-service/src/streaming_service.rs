@@ -244,9 +244,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
             if let Err(error) = self.update_progress_of_data_stream(data_stream_id) {
                 if matches!(error, Error::NoDataToFetch(_)) {
                     sample!(
-                        SampleRate::Duration(Duration::from_secs(
-                            NO_DATA_TO_FETCH_LOG_FREQ_SECS
-                        )),
+                        SampleRate::Duration(Duration::from_secs(NO_DATA_TO_FETCH_LOG_FREQ_SECS)),
                         info!(LogSchema::new(LogEntry::CheckStreamProgress)
                             .stream_id(*data_stream_id)
                             .event(LogEvent::Pending)

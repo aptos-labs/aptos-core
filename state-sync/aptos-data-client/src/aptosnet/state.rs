@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
 use aptos_logger::debug;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use storage_service_types::{StorageServerSummary, StorageServiceRequest};
 
 /// Scores for peer rankings based on preferences and behavior.
@@ -62,6 +62,12 @@ impl Default for PeerState {
 }
 
 impl PeerState {
+    /// Updates the storage summary for the peer
+    fn update_storage_summary(&mut self, storage_summary: StorageServerSummary) {
+        self.storage_summary = Some(storage_summary);
+    }
+
+    /// Returns the storage summary iff the peer is not below the ignore threshold
     fn storage_summary_if_not_ignored(&self) -> Option<&StorageServerSummary> {
         if self.score <= IGNORE_PEER_THRESHOLD {
             None
@@ -70,10 +76,12 @@ impl PeerState {
         }
     }
 
+    /// Updates the score of the peer according to a successful operation
     fn update_score_success(&mut self) {
         self.score = f64::min(self.score + SUCCESSFUL_RESPONSE_DELTA, MAX_SCORE);
     }
 
+    /// Updates the score of the peer according to an error
     fn update_score_error(&mut self, error: ErrorType) {
         let multiplier = match error {
             ErrorType::NotUseful => NOT_USEFUL_MULTIPLIER,
@@ -89,14 +97,18 @@ impl PeerState {
 #[derive(Debug)]
 pub(crate) struct PeerStates {
     config: StorageServiceConfig,
-    inner: HashMap<PeerNetworkId, PeerState>,
+    peer_to_state: HashMap<PeerNetworkId, PeerState>,
+    polled_peers: HashSet<PeerNetworkId>, // The peers already marked as polled
+    polled_peer_queue: VecDeque<PeerNetworkId>, // The order in which peers were polled
 }
 
 impl PeerStates {
     pub fn new(config: StorageServiceConfig) -> Self {
         Self {
             config,
-            inner: HashMap::new(),
+            peer_to_state: HashMap::new(),
+            polled_peers: HashSet::new(),
+            polled_peer_queue: VecDeque::new(),
         }
     }
 
@@ -114,17 +126,21 @@ impl PeerStates {
             return true;
         }
 
-        self.inner
+        self.peer_to_state
             .get(peer)
             .and_then(PeerState::storage_summary_if_not_ignored)
             .map(|summary| summary.can_service(request))
             .unwrap_or(false)
     }
 
+    /// Updates the score of the peer according to a successful operation
     pub fn update_score_success(&mut self, peer: PeerNetworkId) {
-        let old_score = self.inner.entry(peer).or_default().score;
-        self.inner.entry(peer).or_default().update_score_success();
-        let new_score = self.inner.entry(peer).or_default().score;
+        let old_score = self.peer_to_state.entry(peer).or_default().score;
+        self.peer_to_state
+            .entry(peer)
+            .or_default()
+            .update_score_success();
+        let new_score = self.peer_to_state.entry(peer).or_default().score;
         if old_score <= IGNORE_PEER_THRESHOLD && new_score > IGNORE_PEER_THRESHOLD {
             debug!(
                 (LogSchema::new(LogEntry::PeerStates)
@@ -135,13 +151,14 @@ impl PeerStates {
         }
     }
 
+    /// Updates the score of the peer according to an error
     pub fn update_score_error(&mut self, peer: PeerNetworkId, error: ErrorType) {
-        let old_score = self.inner.entry(peer).or_default().score;
-        self.inner
+        let old_score = self.peer_to_state.entry(peer).or_default().score;
+        self.peer_to_state
             .entry(peer)
             .or_default()
             .update_score_error(error);
-        let new_score = self.inner.entry(peer).or_default().score;
+        let new_score = self.peer_to_state.entry(peer).or_default().score;
         if old_score > IGNORE_PEER_THRESHOLD && new_score <= IGNORE_PEER_THRESHOLD {
             debug!(
                 (LogSchema::new(LogEntry::PeerStates)
@@ -152,10 +169,31 @@ impl PeerStates {
         }
     }
 
-    pub fn update_summary(&mut self, peer: PeerNetworkId, summary: StorageServerSummary) {
-        self.inner.entry(peer).or_default().storage_summary = Some(summary);
+    /// Marks the given peer as polled
+    pub fn add_polled_peer(&mut self, peer: PeerNetworkId) {
+        self.polled_peer_queue.push_front(peer);
+        let _ = self.polled_peers.insert(peer);
     }
 
+    /// Returns true iff the given peer has already been polled
+    pub fn already_polled_peer(&self, peer: &PeerNetworkId) -> bool {
+        self.polled_peers.contains(peer)
+    }
+
+    /// Returns the peer that was last polled and contains the oldest data
+    pub fn oldest_polled_peer(&mut self) -> Option<PeerNetworkId> {
+        self.polled_peer_queue.pop_back()
+    }
+
+    /// Updates the storage summary for the given peer
+    pub fn update_summary(&mut self, peer: PeerNetworkId, summary: StorageServerSummary) {
+        self.peer_to_state
+            .entry(peer)
+            .or_default()
+            .update_storage_summary(summary);
+    }
+
+    /// Calculates a global data summary using all known storage summaries
     pub fn aggregate_summary(&self) -> GlobalDataSummary {
         let mut aggregate_data = AdvertisedData::empty();
 
@@ -166,7 +204,7 @@ impl PeerStates {
 
         // only include likely-not-malicious peers in the data summary aggregation.
         let summaries = self
-            .inner
+            .peer_to_state
             .values()
             .filter_map(PeerState::storage_summary_if_not_ignored);
 
