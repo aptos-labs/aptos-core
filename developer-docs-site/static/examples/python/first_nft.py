@@ -41,7 +41,7 @@ class TokenClient(RestClient):
             name: str,
             supply: int,
             uri: str,
-    )
+    ):
         payload = {
             "type": "script_function_payload",
             "function": f"0x1::SimpleToken::create_simple_token",
@@ -107,7 +107,7 @@ class TokenClient(RestClient):
             receiver: str,
             creator: str,
             token_creation_num: int,
-    )
+    ):
         payload = {
             "type": "script_function_payload",
             "function": f"0x1::SimpleToken::stop_simple_token_transfer_to",
