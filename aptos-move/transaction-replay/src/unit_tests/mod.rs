@@ -11,6 +11,7 @@ use aptos_types::{
     account_state_blob::AccountStateBlob,
     contract_event::EventWithProof,
     event::EventKey,
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, Version, WriteSetPayload},
     write_set::WriteOp,
 };
@@ -18,7 +19,7 @@ use std::{collections::HashMap, convert::TryFrom};
 use vm_genesis::{generate_genesis_change_set_for_testing, GenesisOptions};
 
 pub struct TestInterface {
-    state_db: HashMap<(Version, AccountAddress), AccountStateBlob>,
+    state_db: HashMap<(Version, StateKey), StateValue>,
     transaction_store: Vec<Transaction>,
     latest_version: u64,
 }
@@ -26,7 +27,7 @@ pub struct TestInterface {
 impl TestInterface {
     #[allow(dead_code)]
     pub fn new(
-        state_db: HashMap<(Version, AccountAddress), AccountStateBlob>,
+        state_db: HashMap<(Version, StateKey), StateValue>,
         transaction_store: Vec<Transaction>,
         latest_version: u64,
     ) -> Self {
@@ -60,7 +61,12 @@ impl TestInterface {
         Self {
             state_db: state_db
                 .into_iter()
-                .map(|(k, v)| (k, AccountStateBlob::try_from(&v).unwrap()))
+                .map(|((version, address), account_state)| {
+                    (
+                        (version, StateKey::AccountAddressKey(address)),
+                        StateValue::from(AccountStateBlob::try_from(&account_state).unwrap()),
+                    )
+                })
                 .collect(),
             transaction_store: vec![Transaction::GenesisTransaction(WriteSetPayload::Direct(
                 changeset,
@@ -77,9 +83,17 @@ impl AptosValidatorInterface for TestInterface {
         version: Version,
     ) -> Result<Option<AccountState>> {
         self.state_db
-            .get(&(version, account))
+            .get(&(version, StateKey::AccountAddressKey(account)))
             .map(AccountState::try_from)
             .transpose()
+    }
+
+    fn get_state_value_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<StateValue>> {
+        Ok(self.state_db.get(&(version, state_key.clone())).cloned())
     }
 
     fn get_committed_transactions(&self, start: Version, limit: u64) -> Result<Vec<Transaction>> {

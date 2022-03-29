@@ -680,7 +680,7 @@ impl DbReader for AptosDB {
             let version = ledger_info_with_sigs.ledger_info().version();
             let (blob, _proof) = self
                 .state_store
-                .get_value_with_proof_by_version(state_key, version)?;
+                .get_value_with_proof_by_version(&state_key, version)?;
             Ok(blob)
         })
     }
@@ -1006,7 +1006,7 @@ impl DbReader for AptosDB {
                 .get_transaction_info_with_proof(version, ledger_version)?;
             let (state_store_value, sparse_merkle_proof) = self
                 .state_store
-                .get_value_with_proof_by_version(state_store_key, version)?;
+                .get_value_with_proof_by_version(&state_store_key, version)?;
             Ok(StateValueWithProof::new(
                 version,
                 state_store_value,
@@ -1021,7 +1021,7 @@ impl DbReader for AptosDB {
 
     fn get_state_value_with_proof_by_version(
         &self,
-        state_store_key: StateKey,
+        state_store_key: &StateKey,
         version: Version,
     ) -> Result<(Option<StateValue>, SparseMerkleProof<StateValue>)> {
         gauged_api("get_account_state_with_proof_by_version", || {
@@ -1210,7 +1210,7 @@ impl ModuleResolver for AptosDB {
 
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>> {
         let (resource_value_with_proof, _) = self.get_state_value_with_proof_by_version(
-            StateKey::AccountAddressKey(*module_id.address()),
+            &StateKey::AccountAddressKey(*module_id.address()),
             self.get_latest_version()?,
         )?;
         if let Some(account_state_blob) = resource_value_with_proof {
@@ -1227,7 +1227,7 @@ impl ResourceResolver for AptosDB {
 
     fn get_resource(&self, address: &AccountAddress, tag: &StructTag) -> Result<Option<Vec<u8>>> {
         let (resource_value_with_proof, _) = self.get_state_value_with_proof_by_version(
-            StateKey::AccountAddressKey(*address),
+            &StateKey::AccountAddressKey(*address),
             self.get_latest_version()?,
         )?;
         if let Some(account_state_blob) = resource_value_with_proof {

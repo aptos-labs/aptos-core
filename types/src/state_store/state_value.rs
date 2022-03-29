@@ -17,7 +17,17 @@ use aptos_crypto_derive::CryptoHasher;
 use serde::{Deserialize, Serialize};
 
 #[derive(
-    Clone, Debug, CryptoHasher, Eq, PartialEq, Serialize, Deserialize, Ord, PartialOrd, Hash,
+    Clone,
+    Debug,
+    Default,
+    CryptoHasher,
+    Eq,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    Ord,
+    PartialOrd,
+    Hash,
 )]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 pub struct StateValue {

@@ -202,7 +202,7 @@ fn read_seqnum_from_storage(state_view: &impl StateView, seqnum_access_path: &Ac
 
 fn read_u64_from_storage(state_view: &impl StateView, access_path: &AccessPath) -> u64 {
     state_view
-        .get(access_path)
+        .get_by_access_path(access_path)
         .expect("Failed to query storage.")
         .map_or(0, |bytes| decode_bytes(&bytes))
 }

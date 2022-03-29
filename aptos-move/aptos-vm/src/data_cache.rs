@@ -10,6 +10,7 @@ use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     access_path::AccessPath,
     on_chain_config::ConfigStorage,
+    state_store::state_key::StateKey,
     vm_status::StatusCode,
     write_set::{WriteOp, WriteSet},
 };
@@ -70,14 +71,14 @@ impl<'a, S: StateView> StateViewCache<'a, S> {
 
 impl<'block, S: StateView> StateView for StateViewCache<'block, S> {
     // Get some data either through the cache or the `StateView` on a cache miss.
-    fn get(&self, access_path: &AccessPath) -> anyhow::Result<Option<Vec<u8>>> {
+    fn get_by_access_path(&self, access_path: &AccessPath) -> anyhow::Result<Option<Vec<u8>>> {
         fail_point!("move_adapter::data_cache::get", |_| Err(format_err!(
             "Injected failure in data_cache::get"
         )));
 
         match self.data_map.get(access_path) {
             Some(opt_data) => Ok(opt_data.clone()),
-            None => match self.data_view.get(access_path) {
+            None => match self.data_view.get_by_access_path(access_path) {
                 Ok(remote_data) => Ok(remote_data),
                 // TODO: should we forward some error info?
                 Err(e) => {
@@ -95,6 +96,27 @@ impl<'block, S: StateView> StateView for StateViewCache<'block, S> {
                     Err(e)
                 }
             },
+        }
+    }
+
+    fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
+        //TODO: Add a caching layer on this once the VM write set starts populating state_value changes.
+        match self.data_view.get_state_value(state_key) {
+            Ok(remote_data) => Ok(remote_data),
+            Err(e) => {
+                // create an AdapterLogSchema from the `data_view` in scope. This log_context
+                // does not carry proper information about the specific transaction and
+                // context, but this error is related to the given `StateView` rather
+                // than the transaction.
+                // Also this API does not make it easy to plug in a context
+                let log_context = AdapterLogSchema::new(self.data_view.id(), 0);
+                CRITICAL_ERRORS.inc();
+                error!(
+                    log_context,
+                    "[VM, StateView] Error getting data from storage for {:?}", state_key
+                );
+                Err(e)
+            }
         }
     }
 
@@ -129,7 +151,7 @@ impl<'block, S: StateView> ResourceResolver for StateViewCache<'block, S> {
 
 impl<'block, S: StateView> ConfigStorage for StateViewCache<'block, S> {
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
-        self.get(&access_path).ok()?
+        self.get_by_access_path(&access_path).ok()?
     }
 }
 
@@ -143,7 +165,7 @@ impl<'a, S: StateView> RemoteStorage<'a, S> {
 
     pub fn get(&self, access_path: &AccessPath) -> PartialVMResult<Option<Vec<u8>>> {
         self.0
-            .get(access_path)
+            .get_by_access_path(access_path)
             .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 }

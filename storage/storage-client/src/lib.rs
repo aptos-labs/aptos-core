@@ -54,12 +54,13 @@ impl StorageClient {
 
     pub fn get_state_value_with_proof_by_version(
         &self,
-        state_key: StateKey,
+        state_key: &StateKey,
         version: Version,
     ) -> std::result::Result<(Option<StateValue>, SparseMerkleProof<StateValue>), Error> {
         self.request(StorageRequest::GetStateValueWithProofByVersionRequest(
             Box::new(GetStateValueWithProofByVersionRequest::new(
-                state_key, version,
+                state_key.clone(),
+                version,
             )),
         ))
     }
@@ -83,7 +84,7 @@ impl StorageClient {
 impl DbReader for StorageClient {
     fn get_state_value_with_proof_by_version(
         &self,
-        state_key: StateKey,
+        state_key: &StateKey,
         version: u64,
     ) -> Result<(Option<StateValue>, SparseMerkleProof<StateValue>)> {
         Ok(Self::get_state_value_with_proof_by_version(

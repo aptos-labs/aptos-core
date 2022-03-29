@@ -7,7 +7,9 @@
 
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_types::{access_path::AccessPath, transaction::Version};
+use aptos_types::{
+    access_path::AccessPath, state_store::state_key::StateKey, transaction::Version,
+};
 
 /// `StateView` is a trait that defines a read-only snapshot of the global state. It is passed to
 /// the VM for transaction execution, during which the VM is guaranteed to read anything at the
@@ -18,8 +20,11 @@ pub trait StateView: Sync {
         StateViewId::Miscellaneous
     }
 
-    /// Gets the state for a single access path.
-    fn get(&self, access_path: &AccessPath) -> Result<Option<Vec<u8>>>;
+    /// Gets the account resource for a single access path.
+    fn get_by_access_path(&self, access_path: &AccessPath) -> Result<Option<Vec<u8>>>;
+
+    /// Gets the state value for a given state key.
+    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>>;
 
     /// VM needs this method to know whether the current state view is for genesis state creation.
     /// Currently TransactionPayload::WriteSet is only valid for genesis state creation.

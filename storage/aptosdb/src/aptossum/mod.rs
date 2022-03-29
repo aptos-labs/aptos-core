@@ -74,7 +74,7 @@ impl Aptossum {
     ) -> Result<Option<StateValue>> {
         self.db
             .state_store
-            .get_value_with_proof_by_version(state_key, version)
+            .get_value_with_proof_by_version(&state_key, version)
             .map(|blob_and_proof| blob_and_proof.0)
     }
 

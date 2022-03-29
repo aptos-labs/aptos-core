@@ -159,7 +159,11 @@ fn preload_cache(signature_verified_block: &[PreprocessedTransaction], data_view
     // want to fine tune the number of threads launched here in the future.
     addresses_to_preload
         .into_par_iter()
-        .map(|addr| data_view.get(&AccessPath::new(addr, Vec::new())).ok()?)
+        .map(|addr| {
+            data_view
+                .get_by_access_path(&AccessPath::new(addr, Vec::new()))
+                .ok()?
+        })
         .collect::<Vec<Option<Vec<u8>>>>();
 }
 

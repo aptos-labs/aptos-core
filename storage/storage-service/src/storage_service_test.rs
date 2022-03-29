@@ -68,7 +68,7 @@ proptest! {
 
             let account_states_returned = account_states
                 .keys()
-                .map(|address| client.get_state_value_with_proof_by_version(address.clone(), version - 1).unwrap())
+                .map(|address| client.get_state_value_with_proof_by_version(address, version - 1).unwrap())
                 .collect::<Vec<_>>();
             let startup_info = client.get_startup_info().unwrap().unwrap();
             for ((address, blob), state_with_proof) in zip_eq(account_states, account_states_returned) {

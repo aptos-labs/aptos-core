@@ -51,7 +51,7 @@ impl StateStore {
     /// Get the account state blob given account address and root hash of state Merkle tree
     pub fn get_value_with_proof_by_version(
         &self,
-        state_key: StateKey,
+        state_key: &StateKey,
         version: Version,
     ) -> Result<(Option<StateValue>, SparseMerkleProof<StateValue>)> {
         JellyfishMerkleTree::new(self).get_with_proof(state_key.hash(), version)

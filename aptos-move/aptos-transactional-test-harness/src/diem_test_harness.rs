@@ -465,7 +465,7 @@ impl<'a> DiemTestAdapter<'a> {
         ));
         let account_blob = self
             .storage
-            .get(&account_access_path)
+            .get_by_access_path(&account_access_path)
             .unwrap()
             .ok_or_else(|| {
                 format_err!(
@@ -490,7 +490,7 @@ impl<'a> DiemTestAdapter<'a> {
 
         let balance_blob = self
             .storage
-            .get(&balance_access_path)
+            .get_by_access_path(&balance_access_path)
             .unwrap()
             .ok_or_else(|| {
                 format_err!(

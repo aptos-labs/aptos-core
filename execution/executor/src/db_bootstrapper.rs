@@ -177,7 +177,7 @@ pub fn calculate_genesis<V: VMExecutor>(
 
 fn get_state_timestamp(state_view: &VerifiedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
-        .get(&AccessPath::new(
+        .get_by_access_path(&AccessPath::new(
             aptos_root_address(),
             TimestampResource::resource_path(),
         ))?
@@ -188,7 +188,7 @@ fn get_state_timestamp(state_view: &VerifiedStateView) -> Result<u64> {
 
 fn get_state_epoch(state_view: &VerifiedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
-        .get(&AccessPath::new(
+        .get_by_access_path(&AccessPath::new(
             config_address(),
             ConfigurationResource::resource_path(),
         ))?

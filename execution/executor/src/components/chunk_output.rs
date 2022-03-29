@@ -61,7 +61,7 @@ impl ChunkOutput {
         // TODO: add concurrency
         access_paths
             .iter()
-            .map(|(p, _)| state_view.get(p))
+            .map(|(p, _)| state_view.get_by_access_path(p))
             .collect::<Result<Vec<_>>>()?;
 
         Ok(Self {

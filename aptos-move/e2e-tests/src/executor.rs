@@ -277,7 +277,7 @@ impl FakeExecutor {
             *addr,
             DiemAccountResource::struct_tag(),
         ));
-        let data_blob = StateView::get(&self.data_store, &ap)
+        let data_blob = StateView::get_by_access_path(&self.data_store, &ap)
             .expect("account must exist in data store")
             .unwrap_or_else(|| panic!("Can't fetch account resource for {}", addr));
         bcs::from_bytes(data_blob.as_slice()).ok()
@@ -303,7 +303,7 @@ impl FakeExecutor {
         let currency_code_tag = type_tag_for_currency_code(balance_currency_code);
         let balance_resource_tag = BalanceResource::struct_tag_for_currency(currency_code_tag);
         let ap = AccessPath::resource_access_path(ResourceKey::new(*addr, balance_resource_tag));
-        StateView::get(&self.data_store, &ap)
+        StateView::get_by_access_path(&self.data_store, &ap)
             .unwrap_or_else(|_| panic!("account {:?} must exist in data store", addr))
             .map(|data_blob| {
                 bcs::from_bytes(data_blob.as_slice()).expect("Failure decoding balance resource")
@@ -448,7 +448,7 @@ impl FakeExecutor {
 
     /// Get the blob for the associated AccessPath
     pub fn read_from_access_path(&self, path: &AccessPath) -> Option<Vec<u8>> {
-        StateView::get(&self.data_store, path).unwrap()
+        StateView::get_by_access_path(&self.data_store, path).unwrap()
     }
 
     /// Verifies the given transaction by running it through the VM verifier.

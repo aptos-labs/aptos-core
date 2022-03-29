@@ -81,6 +81,10 @@ pub struct VerifiedStateView {
     ///        +---------------------------------------------------------+
     /// ```
     account_to_state_cache: RwLock<HashMap<AccountAddress, AccountState>>,
+    /// Cache of state key to state value, which is used in case of fine grained storage object.
+    /// Eventually this should replace the `account_to_state_cache` as we deprecate account state blob
+    /// completely and migrate to fine grained storage.
+    state_key_value_cache: RwLock<HashMap<StateKey, StateValue>>,
     state_proof_cache: RwLock<HashMap<HashValue, SparseMerkleProof<StateValue>>>,
 }
 
@@ -111,6 +115,7 @@ impl VerifiedStateView {
             latest_persistent_state_root,
             speculative_state: speculative_state.freeze(),
             account_to_state_cache: RwLock::new(HashMap::new()),
+            state_key_value_cache: RwLock::new(HashMap::new()),
             state_proof_cache: RwLock::new(HashMap::new()),
         }
     }
@@ -121,6 +126,46 @@ impl VerifiedStateView {
             accounts: self.account_to_state_cache.into_inner(),
             proofs: self.state_proof_cache.into_inner(),
         }
+    }
+
+    fn get_state_value_internal(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
+        // Do most of the work outside the write lock.
+        let key_hash = state_key.hash();
+        let state_store_value_option = match self.speculative_state.get(key_hash) {
+            StateStoreStatus::ExistsInScratchPad(blob) => Some(blob),
+            StateStoreStatus::DoesNotExist => None,
+            // No matter it is in db or unknown, we have to query from db since even the
+            // former case, we don't have the blob data but only its hash.
+            StateStoreStatus::ExistsInDB | StateStoreStatus::Unknown => {
+                let (state_store_value, proof) = match self.latest_persistent_version {
+                    Some(version) => self
+                        .reader
+                        .get_state_value_with_proof_by_version(state_key, version)?,
+                    None => (None, SparseMerkleProof::new(None, vec![])),
+                };
+                proof
+                    .verify(
+                        self.latest_persistent_state_root,
+                        key_hash,
+                        state_store_value.as_ref(),
+                    )
+                    .map_err(|err| {
+                        format_err!(
+                            "Proof is invalid for key {:?} with state root hash {:?}: {}",
+                            state_key,
+                            self.latest_persistent_state_root,
+                            err
+                        )
+                    })?;
+
+                // multiple threads may enter this code, and another thread might add
+                // an address before this one. Thus the insertion might return a None here.
+                self.state_proof_cache.write().insert(key_hash, proof);
+                state_store_value
+            }
+        };
+
+        Ok(state_store_value_option)
     }
 }
 
@@ -135,58 +180,36 @@ impl StateView for VerifiedStateView {
         self.id
     }
 
-    fn get(&self, access_path: &AccessPath) -> Result<Option<Vec<u8>>> {
+    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+        // First check if the cache has the state value.
+        if let Some(contents) = self.state_key_value_cache.read().get(state_key) {
+            return Ok(Some(contents.bytes.clone()));
+        }
+        let state_store_value_option = self.get_state_value_internal(state_key)?;
+        // Update the cache if still empty
+        let mut cache = self.state_key_value_cache.write();
+        let new_value = cache
+            .entry(state_key.clone())
+            .or_insert_with(|| state_store_value_option.unwrap_or_default());
+
+        Ok(Some(new_value.bytes.clone()))
+    }
+
+    fn get_by_access_path(&self, access_path: &AccessPath) -> Result<Option<Vec<u8>>> {
         let address = access_path.address;
         let path = &access_path.path;
-        let state_store_key = StateKey::AccountAddressKey(address);
 
-        // Lock for read first:
         // Lock for read first:
         if let Some(contents) = self.account_to_state_cache.read().get(&address) {
             return Ok(contents.get(path).cloned());
         }
 
-        // Do most of the work outside the write lock.
-        let key_hash = state_store_key.hash();
-        let state_store_value_option = match self.speculative_state.get(key_hash) {
-            StateStoreStatus::ExistsInScratchPad(blob) => Some(blob),
-            StateStoreStatus::DoesNotExist => None,
-            // No matter it is in db or unknown, we have to query from db since even the
-            // former case, we don't have the blob data but only its hash.
-            StateStoreStatus::ExistsInDB | StateStoreStatus::Unknown => {
-                let (state_store_value, proof) = match self.latest_persistent_version {
-                    Some(version) => self
-                        .reader
-                        .get_state_value_with_proof_by_version(state_store_key, version)?,
-                    None => (None, SparseMerkleProof::new(None, vec![])),
-                };
-                proof
-                    .verify(
-                        self.latest_persistent_state_root,
-                        key_hash,
-                        state_store_value.as_ref(),
-                    )
-                    .map_err(|err| {
-                        format_err!(
-                            "Proof is invalid for address {:?} with state root hash {:?}: {}",
-                            address,
-                            self.latest_persistent_state_root,
-                            err
-                        )
-                    })?;
-
-                // multiple threads may enter this code, and another thread might add
-                // an address before this one. Thus the insertion might return a None here.
-                self.state_proof_cache.write().insert(key_hash, proof);
-                state_store_value
-            }
-        };
+        let state_store_value_option =
+            self.get_state_value_internal(&StateKey::AccountAddressKey(address))?;
 
         // Hack: Convert the state store value to account blob option as that is the
         // only type of state value we support for now. This needs to change once we start
         // supporting tables and other fine grained resources.
-
-        // Now enter the locked region, and write if still empty.
         let new_account_blob = state_store_value_option
             .map(AccountStateBlob::from)
             .as_ref()
@@ -194,6 +217,7 @@ impl StateView for VerifiedStateView {
             .transpose()?
             .unwrap_or_default();
 
+        // Now enter the locked region, and write if still empty.
         match self.account_to_state_cache.write().entry(address) {
             Entry::Occupied(occupied) => Ok(occupied.get().get(path).cloned()),
             Entry::Vacant(vacant) => Ok(vacant.insert(new_account_blob).get(path).cloned()),

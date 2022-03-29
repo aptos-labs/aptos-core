@@ -108,9 +108,10 @@ impl Context {
         account: AccountAddress,
         version: u64,
     ) -> Result<Option<AccountStateBlob>> {
-        let (state_value, _) = self
-            .db
-            .get_state_value_with_proof_by_version(StateKey::AccountAddressKey(account), version)?;
+        let (state_value, _) = self.db.get_state_value_with_proof_by_version(
+            &StateKey::AccountAddressKey(account),
+            version,
+        )?;
         Ok(state_value.map(AccountStateBlob::from))
     }
 

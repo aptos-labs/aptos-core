@@ -289,7 +289,7 @@ impl EventSubscriptionService {
             .read()
             .reader
             .get_state_value_with_proof_by_version(
-                StateKey::AccountAddressKey(config_address()),
+                &StateKey::AccountAddressKey(config_address()),
                 version,
             )
             .map_err(|error| {

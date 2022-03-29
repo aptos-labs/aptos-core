@@ -9,6 +9,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
     on_chain_config::ConfigStorage,
+    state_store::state_key::StateKey,
     transaction::ChangeSet,
     write_set::{WriteOp, WriteSet},
 };
@@ -37,13 +38,17 @@ pub static GENESIS_CHANGE_SET_FRESH: Lazy<ChangeSet> =
 /// `RemoteCache` is needed.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct FakeDataStore {
-    data: HashMap<AccessPath, Vec<u8>>,
+    account_data: HashMap<AccessPath, Vec<u8>>,
+    state_data: HashMap<StateKey, Vec<u8>>,
 }
 
 impl FakeDataStore {
     /// Creates a new `FakeDataStore` with the provided initial data.
     pub fn new(data: HashMap<AccessPath, Vec<u8>>) -> Self {
-        FakeDataStore { data }
+        FakeDataStore {
+            account_data: data,
+            state_data: HashMap::new(),
+        }
     }
 
     /// Adds a [`WriteSet`] to this data store.
@@ -64,14 +69,14 @@ impl FakeDataStore {
     ///
     /// Returns the previous data if the key was occupied.
     pub fn set(&mut self, access_path: AccessPath, data_blob: Vec<u8>) -> Option<Vec<u8>> {
-        self.data.insert(access_path, data_blob)
+        self.account_data.insert(access_path, data_blob)
     }
 
     /// Deletes a key from this data store.
     ///
     /// Returns the previous data if the key was occupied.
     pub fn remove(&mut self, access_path: &AccessPath) -> Option<Vec<u8>> {
-        self.data.remove(access_path)
+        self.account_data.remove(access_path)
     }
 
     /// Adds an [`AccountData`] to this data store.
@@ -90,26 +95,30 @@ impl FakeDataStore {
 
     /// Yields a reference to the internal data structure of the global state
     pub fn inner(&self) -> &HashMap<AccessPath, Vec<u8>> {
-        &self.data
+        &self.account_data
     }
 }
 
 impl ConfigStorage for FakeDataStore {
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
-        StateView::get(self, &access_path).unwrap_or_default()
+        StateView::get_by_access_path(self, &access_path).unwrap_or_default()
     }
 }
 
 // This is used by the `execute_block` API.
 // TODO: only the "sync" get is implemented
 impl StateView for FakeDataStore {
-    fn get(&self, access_path: &AccessPath) -> Result<Option<Vec<u8>>> {
+    fn get_by_access_path(&self, access_path: &AccessPath) -> Result<Option<Vec<u8>>> {
         // Since the data is in-memory, it can't fail.
-        Ok(self.data.get(access_path).cloned())
+        Ok(self.account_data.get(access_path).cloned())
+    }
+
+    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+        Ok(self.state_data.get(state_key).cloned())
     }
 
     fn is_genesis(&self) -> bool {
-        self.data.is_empty()
+        self.account_data.is_empty()
     }
 }
 

@@ -15,6 +15,7 @@ use aptos_types::{
     contract_event::EventWithProof,
     event::EventKey,
     on_chain_config::ValidatorSet,
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, Version},
 };
 use move_binary_format::file_format::CompiledModule;
@@ -27,10 +28,20 @@ pub trait AptosValidatorInterface: Sync {
         account: AccountAddress,
         version: Version,
     ) -> Result<Option<AccountState>>;
+
+    fn get_state_value_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<StateValue>>;
+
     fn get_events(&self, key: &EventKey, start_seq: u64, limit: u64)
         -> Result<Vec<EventWithProof>>;
+
     fn get_committed_transactions(&self, start: Version, limit: u64) -> Result<Vec<Transaction>>;
+
     fn get_latest_version(&self) -> Result<Version>;
+
     fn get_version_by_account_sequence(
         &self,
         account: AccountAddress,
@@ -109,7 +120,7 @@ impl<'a> DebuggerStateView<'a> {
 }
 
 impl<'a> StateView for DebuggerStateView<'a> {
-    fn get(&self, access_path: &AccessPath) -> Result<Option<Vec<u8>>> {
+    fn get_by_access_path(&self, access_path: &AccessPath) -> Result<Option<Vec<u8>>> {
         match self.version {
             None => Ok(None),
             Some(ver) => match self
@@ -119,6 +130,16 @@ impl<'a> StateView for DebuggerStateView<'a> {
                 Some(blob) => Ok(blob.get(&access_path.path).cloned()),
                 None => Ok(None),
             },
+        }
+    }
+
+    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+        match self.version {
+            None => Ok(None),
+            Some(ver) => Ok(self
+                .db
+                .get_state_value_by_version(state_key, ver)?
+                .map(|x| x.bytes)),
         }
     }
 

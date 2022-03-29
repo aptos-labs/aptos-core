@@ -411,7 +411,7 @@ pub trait DbReader: Send + Sync {
     // This is used by aptos core (executor) internally.
     fn get_state_value_with_proof_by_version(
         &self,
-        state_key: StateKey,
+        state_key: &StateKey,
         version: Version,
     ) -> Result<(Option<StateValue>, SparseMerkleProof<StateValue>)> {
         unimplemented!()
@@ -511,7 +511,7 @@ impl MoveStorage for &dyn DbReader {
         version: Version,
     ) -> Result<Vec<u8>> {
         let (state_store_value, _) = self.get_state_value_with_proof_by_version(
-            StateKey::AccountAddressKey(access_path.address),
+            &StateKey::AccountAddressKey(access_path.address),
             version,
         )?;
         let account_state =
@@ -529,7 +529,7 @@ impl MoveStorage for &dyn DbReader {
         let aptos_root_state = AccountState::try_from(
             &self
                 .get_state_value_with_proof_by_version(
-                    StateKey::AccountAddressKey(aptos_root_address()),
+                    &StateKey::AccountAddressKey(aptos_root_address()),
                     version,
                 )?
                 .0

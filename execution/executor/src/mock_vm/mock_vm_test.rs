@@ -4,7 +4,10 @@
 use super::{balance_ap, encode_mint_transaction, encode_transfer_transaction, seqnum_ap, MockVM};
 use anyhow::Result;
 use aptos_state_view::StateView;
-use aptos_types::{access_path::AccessPath, account_address::AccountAddress, write_set::WriteOp};
+use aptos_types::{
+    access_path::AccessPath, account_address::AccountAddress, state_store::state_key::StateKey,
+    write_set::WriteOp,
+};
 use aptos_vm::VMExecutor;
 
 fn gen_address(index: u8) -> AccountAddress {
@@ -14,7 +17,11 @@ fn gen_address(index: u8) -> AccountAddress {
 struct MockStateView;
 
 impl StateView for MockStateView {
-    fn get(&self, _access_path: &AccessPath) -> Result<Option<Vec<u8>>> {
+    fn get_by_access_path(&self, _access_path: &AccessPath) -> Result<Option<Vec<u8>>> {
+        Ok(None)
+    }
+
+    fn get_state_value(&self, _state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         Ok(None)
     }
 

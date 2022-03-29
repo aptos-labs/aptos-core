@@ -478,7 +478,7 @@ impl AptosVM {
         // access path that the write set is going to update.
         for (ap, _) in write_set.iter() {
             state_view
-                .get(ap)
+                .get_by_access_path(ap)
                 .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR))?;
         }
         Ok(())
