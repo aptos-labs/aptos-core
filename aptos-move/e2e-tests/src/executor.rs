@@ -13,9 +13,7 @@ use std::{
 
 use crate::{
     account::{Account, AccountData},
-    data_store::{
-        FakeDataStore, GENESIS_CHANGE_SET, GENESIS_CHANGE_SET_FRESH,
-    },
+    data_store::{FakeDataStore, GENESIS_CHANGE_SET, GENESIS_CHANGE_SET_FRESH},
     golden_outputs::GoldenOutputs,
 };
 use aptos_crypto::HashValue;
