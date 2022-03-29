@@ -35,5 +35,5 @@ claim = "0.5.0"
 
 aptos-crypto = { path = "../../../crates/aptos-crypto" }
 aptos-types = { path = "../../../types" }
-move-core-types = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e", features=["address32"] }
+move-core-types = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa", features=["address32"] }
 storage-interface = { path = "../../../storage/storage-interface" }

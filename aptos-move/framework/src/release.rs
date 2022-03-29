@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use clap::Parser;
 use move_binary_format::{compatibility::Compatibility, normalized::Module, CompiledModule};
 use move_command_line_common::files::{
     extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_ERROR_DESC_EXTENSION,
@@ -14,32 +15,31 @@ use std::{
     io::Read,
     path::{Path, PathBuf},
 };
-use structopt::*;
 
 /// Options to configure the generation of a release.
-#[derive(Debug, StructOpt, Clone)]
-#[structopt(
+#[derive(Debug, Parser, Clone)]
+#[clap(
     name = "Diem Frameworks",
     about = "Release CLI for Diem frameworks",
     author = "Aptos",
     rename_all = "kebab-case"
 )]
 pub struct ReleaseOptions {
-    #[structopt(long = "no-check-linking-layout-compatibility")]
+    #[clap(long = "no-check-linking-layout-compatibility")]
     pub check_layout_compatibility: bool,
-    #[structopt(long = "no-build-docs")]
+    #[clap(long = "no-build-docs")]
     pub build_docs: bool,
-    #[structopt(long = "with-diagram")]
+    #[clap(long = "with-diagram")]
     pub with_diagram: bool,
-    #[structopt(long = "no-script-builder")]
+    #[clap(long = "no-script-builder")]
     pub script_builder: bool,
-    #[structopt(long = "no-script-abi")]
+    #[clap(long = "no-script-abi")]
     pub script_abis: bool,
-    #[structopt(long = "no-errmap")]
+    #[clap(long = "no-errmap")]
     pub errmap: bool,
-    #[structopt(long = "package", default_value = "DPN", parse(from_os_str))]
+    #[clap(long = "package", default_value = "DPN", parse(from_os_str))]
     pub package: PathBuf,
-    #[structopt(long = "output", default_value = "current", parse(from_os_str))]
+    #[clap(long = "output", default_value = "current", parse(from_os_str))]
     pub output: PathBuf,
 }
 

@@ -26,6 +26,7 @@ use aptos_types::{
     vm_status::KeptVMStatus,
 };
 use aptos_vm::AptosVM;
+use clap::Parser;
 use language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_FRESH};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
 use move_command_line_common::files::verify_and_create_named_address_mapping;
@@ -52,7 +53,6 @@ use std::{
     fmt,
     path::Path,
 };
-use structopt::StructOpt;
 use vm_genesis::GENESIS_KEYPAIR;
 
 /*************************************************************************************************
@@ -85,24 +85,24 @@ struct TransactionParameters {
 }
 
 /// Diem-specific arguments for the publish command.
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct DiemPublishArgs {
-    #[structopt(long = "private-key", parse(try_from_str = RawPrivateKey::parse))]
+    #[clap(long = "private-key", parse(try_from_str = RawPrivateKey::parse))]
     private_key: Option<RawPrivateKey>,
 
-    #[structopt(long = "expiration")]
+    #[clap(long = "expiration")]
     expiration_time: Option<u64>,
 
-    #[structopt(long = "sequence-number")]
+    #[clap(long = "sequence-number")]
     sequence_number: Option<u64>,
 
-    #[structopt(long = "gas-price")]
+    #[clap(long = "gas-price")]
     gas_unit_price: Option<u64>,
 
-    #[structopt(long = "gas-currency")]
+    #[clap(long = "gas-currency")]
     gas_currency_code: Option<String>,
 
-    #[structopt(long = "override-signer", parse(try_from_str = RawAddress::parse))]
+    #[clap(long = "override-signer", parse(try_from_str = RawAddress::parse))]
     override_signer: Option<RawAddress>,
 }
 
@@ -113,43 +113,43 @@ struct SignerAndKeyPair {
 }
 
 /// Diem-specifc arguments for the run command.
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct DiemRunArgs {
-    #[structopt(long = "private-key", parse(try_from_str = RawPrivateKey::parse))]
+    #[clap(long = "private-key", parse(try_from_str = RawPrivateKey::parse))]
     private_key: Option<RawPrivateKey>,
 
-    #[structopt(long = "admin-script")]
+    #[clap(long = "admin-script")]
     admin_script: bool,
 
-    #[structopt(long = "expiration")]
+    #[clap(long = "expiration")]
     expiration_time: Option<u64>,
 
-    #[structopt(long = "sequence-number")]
+    #[clap(long = "sequence-number")]
     sequence_number: Option<u64>,
 
-    #[structopt(long = "gas-price")]
+    #[clap(long = "gas-price")]
     gas_unit_price: Option<u64>,
 
-    #[structopt(long = "gas-currency")]
+    #[clap(long = "gas-currency")]
     gas_currency_code: Option<String>,
 
-    #[structopt(long = "show-events")]
+    #[clap(long = "show-events")]
     show_events: bool,
 
-    #[structopt(long = "secondary-signers", parse(try_from_str = SignerAndKeyPair::parse))]
+    #[clap(long = "secondary-signers", parse(try_from_str = SignerAndKeyPair::parse))]
     secondary_signers: Option<Vec<SignerAndKeyPair>>,
 }
 
 /// Diem-specifc arguments for the init command.
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct DiemInitArgs {
-    #[structopt(long = "private-keys", parse(try_from_str = parse_named_private_key))]
+    #[clap(long = "private-keys", parse(try_from_str = parse_named_private_key))]
     private_keys: Option<Vec<(Identifier, Ed25519PrivateKey)>>,
 
-    #[structopt(long = "validators", parse(try_from_str = parse_identifier))]
+    #[clap(long = "validators", parse(try_from_str = parse_identifier))]
     validators: Option<Vec<Identifier>>,
 
-    #[structopt(long = "parent-vasps", parse(try_from_str = ParentVaspInitArgs::parse))]
+    #[clap(long = "parent-vasps", parse(try_from_str = ParentVaspInitArgs::parse))]
     parent_vasps: Option<Vec<ParentVaspInitArgs>>,
 }
 
@@ -176,19 +176,19 @@ struct ParentVaspInitArgs {
 }
 
 /// Command to initiate a block metadata transaction.
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 struct BlockCommand {
-    #[structopt(long = "proposer", parse(try_from_str = RawAddress::parse))]
+    #[clap(long = "proposer", parse(try_from_str = RawAddress::parse))]
     proposer: RawAddress,
 
-    #[structopt(long = "time")]
+    #[clap(long = "time")]
     time: u64,
 }
 
 /// Custom commands for the Diem transactional test flow.
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 enum DiemSubCommand {
-    #[structopt(name = "block")]
+    #[clap(name = "block")]
     BlockCommand(BlockCommand),
 }
 

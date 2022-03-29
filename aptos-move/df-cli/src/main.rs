@@ -2,23 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
+use clap::Parser;
 use move_cli::{Command, Move};
 use move_core_types::errmap::ErrorMapping;
 use move_vm_types::gas_schedule::INITIAL_COST_SCHEDULE;
-use structopt::StructOpt;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub struct DfCli {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     move_args: Move,
 
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     cmd: DfCommands,
 }
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 pub enum DfCommands {
-    #[structopt(flatten)]
+    #[clap(flatten)]
     Command(Command),
     // extra commands available only in df-cli can be added below
 }
@@ -26,7 +26,7 @@ pub enum DfCommands {
 fn main() -> Result<()> {
     let error_descriptions: ErrorMapping =
         bcs::from_bytes(diem_framework_releases::current_error_descriptions())?;
-    let args = DfCli::from_args();
+    let args = DfCli::parse();
     match &args.cmd {
         DfCommands::Command(cmd) => move_cli::run_cli(
             aptos_vm::natives::aptos_natives(),

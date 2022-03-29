@@ -9,6 +9,7 @@ use aptos_types::{
     transaction::ChangeSet,
     write_set::{WriteOp, WriteSet},
 };
+use clap::Parser;
 use move_binary_format::CompiledModule;
 use move_core_types::resolver::MoveResolver;
 use move_vm_test_utils::InMemoryStorage;
@@ -16,10 +17,9 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Debug,
 };
-use structopt::StructOpt;
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "Genesis Viewer")]
+#[derive(Debug, Parser)]
+#[clap(name = "Genesis Viewer")]
 /// Tool to display the content of a genesis blob (genesis transaction).
 ///
 /// Takes a genesis blob transaction that can be produced by the genesis generator tool.
@@ -34,39 +34,39 @@ use structopt::StructOpt;
 /// Printing can be done by the different types of data in a genesis blob. As far as this
 /// tool is concerned the different data types are: Modules, Resources and Events.
 pub struct Args {
-    #[structopt(
-        short = "a",
+    #[clap(
+        short = 'a',
         long,
         help = "[default] Print everything in the most verbose form and sorted, ignore all other options"
     )]
     all: bool,
-    #[structopt(long, help = "Print raw events")]
+    #[clap(long, help = "Print raw events")]
     event_raw: bool,
-    #[structopt(long, help = "Print events key and events type")]
+    #[clap(long, help = "Print events key and events type")]
     event_keys: bool,
-    #[structopt(short = "e", long, help = "Print events only (pretty format)")]
+    #[clap(short = 'e', long, help = "Print events only (pretty format)")]
     type_events: bool,
-    #[structopt(short = "m", long, help = "Print modules only (pretty format)")]
+    #[clap(short = 'm', long, help = "Print modules only (pretty format)")]
     type_modules: bool,
-    #[structopt(short = "r", long, help = "Print resources only (pretty format)")]
+    #[clap(short = 'r', long, help = "Print resources only (pretty format)")]
     type_resources: bool,
-    #[structopt(short = "w", long, help = "Print raw WriteSet only (no events)")]
+    #[clap(short = 'w', long, help = "Print raw WriteSet only (no events)")]
     write_set: bool,
-    #[structopt(
-        short = "t",
+    #[clap(
+        short = 't',
         long,
         help = "Print WriteSet by type (Module/Resource, pretty format)"
     )]
     ws_by_type: bool,
-    #[structopt(
-        short = "k",
+    #[clap(
+        short = 'k',
         long,
         help = "Print WriteSet keys in the order defined in the binary blob"
     )]
     ws_keys: bool,
-    #[structopt(short = "s", long, help = "Print WriteSet keys sorted")]
+    #[clap(short = 's', long, help = "Print WriteSet keys sorted")]
     ws_sorted_keys: bool,
-    #[structopt(short = "c", long, help = "Print the resources under each account")]
+    #[clap(short = 'c', long, help = "Print the resources under each account")]
     print_account_states: bool,
 }
 
@@ -76,7 +76,7 @@ pub fn main() {
     // (program_name, `-f`, file_name) then no args were provided and
     // we default to `all`
     let arg_count = std::env::args().len();
-    let args = Args::from_args();
+    let args = Args::parse();
     let ws = vm_genesis::generate_genesis_change_set_for_testing(vm_genesis::GenesisOptions::Aptos);
 
     let mut storage = InMemoryStorage::new();

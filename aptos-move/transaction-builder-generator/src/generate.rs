@@ -7,14 +7,13 @@
 //! cargo run -p transaction-builder-generator -- --help
 //! '''
 
+use clap::{ArgEnum, Parser};
 use serde_generate as serdegen;
 use serde_reflection::Registry;
-use std::path::PathBuf;
-use structopt::{clap::arg_enum, StructOpt};
+use std::{path::PathBuf, str::FromStr};
 use transaction_builder_generator as buildgen;
 
-arg_enum! {
-#[derive(Debug, StructOpt)]
+#[derive(Clone, Debug, Parser, ArgEnum)]
 enum Language {
     Python3,
     Rust,
@@ -25,10 +24,27 @@ enum Language {
     TypeScript,
     Swift,
 }
+
+impl FromStr for Language {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_lowercase().as_str() {
+            "python3" => Language::Python3,
+            "rust" => Language::Rust,
+            "cpp" => Language::Cpp,
+            "java" => Language::Java,
+            "csharp" => Language::Csharp,
+            "go" => Language::Go,
+            "typescript" => Language::TypeScript,
+            "swift" => Language::Swift,
+            _ => return Err(anyhow::anyhow!("Invalid language: {}", s)),
+        })
+    }
 }
 
-#[derive(Debug, StructOpt)]
-#[structopt(
+#[derive(Debug, Parser)]
+#[clap(
     name = "Transaction builder generator",
     about = "Generate code for Move script builders"
 )]
@@ -37,15 +53,15 @@ struct Options {
     abi_directories: Vec<PathBuf>,
 
     /// Language for code generation.
-    #[structopt(long, possible_values = &Language::variants(), case_insensitive = true, default_value = "Python3")]
+    #[clap(long, default_value = "Python3")]
     language: Language,
 
     /// Directory where to write generated modules (otherwise print code on stdout).
-    #[structopt(long)]
+    #[clap(long)]
     target_source_dir: Option<PathBuf>,
 
     /// Also install the aptos types described by the given YAML file, along with the BCS runtime.
-    #[structopt(long)]
+    #[clap(long)]
     with_aptos_types: Option<PathBuf>,
 
     /// Module name for the transaction builders installed in the `target_source_dir`.
@@ -53,30 +69,30 @@ struct Options {
     /// * In Java, this is expected to be a package name, e.g. "com.test" to create Java files in `com/test`.
     /// * In Go, this is expected to be of the format "go_module/path/go_package_name",
     /// and `aptos_types` is assumed to be in "go_module/path/aptos_types".
-    #[structopt(long)]
+    #[clap(long)]
     module_name: Option<String>,
 
     /// Optional package name (Python) or module path (Go) of the Serde and BCS runtime dependencies.
-    #[structopt(long)]
+    #[clap(long)]
     serde_package_name: Option<String>,
 
     /// Optional version number for the `aptos_types` module (useful in Rust).
     /// If `--with-aptos-types` is passed, this will be the version of the generated `aptos_types` module.
-    #[structopt(long, default_value = "0.1.0")]
+    #[clap(long, default_value = "0.1.0")]
     aptos_version_number: String,
 
     /// Optional package name (Python) or module path (Go) of the `aptos_types` dependency.
-    #[structopt(long)]
+    #[clap(long)]
     package_name: Option<String>,
 
     /// Read custom code for Aptos containers from the given file paths. Containers will be matched with file stems.
     /// (e.g. `AddressAccount` <- `path/to/AddressAccount.py`)
-    #[structopt(long)]
+    #[clap(long)]
     with_custom_aptos_code: Vec<PathBuf>,
 }
 
 fn main() {
-    let options = Options::from_args();
+    let options = Options::parse();
     let abis =
         buildgen::read_abis(&options.abi_directories).expect("Failed to read ABI in directory");
 
