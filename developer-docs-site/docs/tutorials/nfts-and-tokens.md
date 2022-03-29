@@ -298,9 +298,6 @@ TODO
 
 * Add ability for additional mints
 * Ensure that at least a single token is produced at time of mint
-* Remove drop from token and add explicit burn to make sure supply == total balance
-* Move away from token data and toward a notion of an ownership token -- that is the data remains with the collection
-* Add an ability for the owner to register that their claim in the claim_tokens
 * Add events -- needs feedback on what events
 * Provide mutable APIs for tokens
 * Write a smoketest for generics and simple token directly

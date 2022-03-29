@@ -106,6 +106,22 @@ module AptosFramework::Token {
         Table::insert(collections, *&name, collection);
     }
 
+    // Enables storage solutions of Tokens outside of this module to inform the collection the
+    // current hosting address of a token.
+    public fun claim_token_ownership(
+        account: &signer,
+        token: Token,
+    ): Token acquires Collections {
+        let creator_addr = GUID::id_creator_address(&token.id);
+        let collections = &mut borrow_global_mut<Collections>(creator_addr).collections;
+        let collection = Table::borrow_mut(collections, &token.collection);
+        if (Table::borrow(&collection.tokens, &token.name).supply == 1) {
+          Table::remove(&mut collection.claimed_tokens, &token.name);
+          Table::insert(&mut collection.claimed_tokens, *&token.name, Signer::address_of(account))
+        };
+        token
+    }
+
     // An account's set of Tokens
     struct Gallery has key {
         gallery: Table<ID, Token>,
@@ -236,6 +252,7 @@ module AptosFramework::Token {
         };
         Table::insert(&mut collection.tokens, name, token_data);
 
+        let token = claim_token_ownership(account, token);
         Table::insert(gallery, *&token_id, token);
         token_id
     }
@@ -299,13 +316,7 @@ module AptosFramework::Token {
             initialize_gallery(account)
         };
 
-        let creator_addr = GUID::id_creator_address(&token.id);
-        let collections = &mut borrow_global_mut<Collections>(creator_addr).collections;
-        let collection = Table::borrow_mut(collections, &token.collection);
-        if (Table::borrow(&collection.tokens, &token.name).supply == 1) {
-          Table::remove(&mut collection.claimed_tokens, &token.name);
-          Table::insert(&mut collection.claimed_tokens, *&token.name, account_addr)
-        };
+        let token = claim_token_ownership(account, token);
 
         let gallery = &mut borrow_global_mut<Gallery>(account_addr).gallery;
         if (Table::contains_key(gallery, &token.id)) {
