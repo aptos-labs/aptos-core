@@ -8,7 +8,10 @@ import subprocess
 import tempfile
 import time
 
-FORGE_K8S_CLUSTERS = ["forge-1"]
+FORGE_K8S_CLUSTERS = [
+    "forge-0",
+    "forge-1",
+]
 
 WORKSPACE_CHART_BUCKETS = {
     "forge-0": "aptos-testnet-forge-0-helm-312428ba",
