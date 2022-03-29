@@ -162,8 +162,12 @@ module AptosFramework::TestCoin {
         borrow_global<Balance>(owner).coin.value
     }
 
+	public(script) fun transfer(from: signer, to: address, amount: u64) acquires Balance, TransferEvents {
+		transfer_internal(&from, to, amount);
+	}
+
     /// Transfers `amount` of tokens from `from` to `to`.
-    public(script) fun transfer(from: &signer, to: address, amount: u64) acquires Balance, TransferEvents {
+    public fun transfer_internal(from: &signer, to: address, amount: u64) acquires Balance, TransferEvents {
         let check = withdraw(from, amount);
         deposit(to, check);
         // emit events
@@ -325,7 +329,7 @@ module AptosFramework::TestCoin {
         let addr1 = Signer::address_of(&receiver);
         mint_internal(&account, addr, amount);
 
-        transfer(&account, addr1, 400);
+        transfer(account, addr1, 400);
         assert!(balance_of(addr) == 600, 0);
         assert!(balance_of(addr1) == 400, 0);
         assert!(total_supply() == 1000, 0);
