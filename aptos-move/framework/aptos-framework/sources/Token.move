@@ -121,7 +121,7 @@ module AptosFramework::Token {
     }
 
     // Represents ownership of a the data associated with this Token
-    struct Token has drop, store {
+    struct Token has store {
         // Unique identifier for this token
         id: ID,
         // The name of this token
@@ -319,9 +319,22 @@ module AptosFramework::Token {
     public fun merge_token(
         source_token: Token,
         dst_token: &mut Token,
-    ) {
+    ) acquires Collections {
         assert!(dst_token.id == source_token.id, EINVALID_TOKEN_MERGE);
         dst_token.balance = dst_token.balance + source_token.balance;
+        destroy_token(source_token);
+    }
+
+    fun destroy_token(
+        token: Token,
+    ) acquires Collections {
+        let Token { id, name, collection, balance } = token;
+
+        let creator_addr = GUID::id_creator_address(&id);
+        let collections = &mut borrow_global_mut<Collections>(creator_addr).collections;
+        let collection = Table::borrow_mut(collections, &collection);
+        let token_data = Table::borrow_mut(&mut collection.tokens, &name);
+        *&mut token_data.supply = token_data.supply - balance;
     }
 
     #[test(creator = @0x1, owner = @0x2)]

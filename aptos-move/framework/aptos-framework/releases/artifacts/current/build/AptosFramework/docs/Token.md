@@ -27,6 +27,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 -  [Function `withdraw_token`](#0x1_Token_withdraw_token)
 -  [Function `deposit_token`](#0x1_Token_deposit_token)
 -  [Function `merge_token`](#0x1_Token_merge_token)
+-  [Function `destroy_token`](#0x1_Token_destroy_token)
 -  [Function `create_collection_and_token`](#0x1_Token_create_collection_and_token)
 
 
@@ -162,7 +163,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 
 
-<pre><code><b>struct</b> <a href="Token.md#0x1_Token">Token</a> <b>has</b> drop, store
+<pre><code><b>struct</b> <a href="Token.md#0x1_Token">Token</a> <b>has</b> store
 </code></pre>
 
 
@@ -828,9 +829,42 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 <pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_merge_token">merge_token</a>(
     source_token: <a href="Token.md#0x1_Token">Token</a>,
     dst_token: &<b>mut</b> <a href="Token.md#0x1_Token">Token</a>,
-) {
+) <b>acquires</b> <a href="Token.md#0x1_Token_Collections">Collections</a> {
     <b>assert</b>!(dst_token.id == source_token.id, <a href="Token.md#0x1_Token_EINVALID_TOKEN_MERGE">EINVALID_TOKEN_MERGE</a>);
     dst_token.balance = dst_token.balance + source_token.balance;
+    <a href="Token.md#0x1_Token_destroy_token">destroy_token</a>(source_token);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_Token_destroy_token"></a>
+
+## Function `destroy_token`
+
+
+
+<pre><code><b>fun</b> <a href="Token.md#0x1_Token_destroy_token">destroy_token</a>(token: <a href="Token.md#0x1_Token_Token">Token::Token</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="Token.md#0x1_Token_destroy_token">destroy_token</a>(
+    token: <a href="Token.md#0x1_Token">Token</a>,
+) <b>acquires</b> <a href="Token.md#0x1_Token_Collections">Collections</a> {
+    <b>let</b> <a href="Token.md#0x1_Token">Token</a> { id, name, collection, balance } = token;
+
+    <b>let</b> creator_addr = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_id_creator_address">GUID::id_creator_address</a>(&id);
+    <b>let</b> collections = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="Token.md#0x1_Token_Collections">Collections</a>&gt;(creator_addr).collections;
+    <b>let</b> collection = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(collections, &collection);
+    <b>let</b> token_data = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(&<b>mut</b> collection.tokens, &name);
+    *&<b>mut</b> token_data.supply = token_data.supply - balance;
 }
 </code></pre>
 
