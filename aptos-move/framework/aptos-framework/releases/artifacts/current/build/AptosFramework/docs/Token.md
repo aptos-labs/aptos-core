@@ -17,6 +17,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 -  [Function `create_finite_collection_script`](#0x1_Token_create_finite_collection_script)
 -  [Function `create_unlimited_collection_script`](#0x1_Token_create_unlimited_collection_script)
 -  [Function `create_collection`](#0x1_Token_create_collection)
+-  [Function `claim_token_ownership`](#0x1_Token_claim_token_ownership)
 -  [Function `initialize_gallery`](#0x1_Token_initialize_gallery)
 -  [Function `initialize_token_metadata`](#0x1_Token_initialize_token_metadata)
 -  [Function `create_token_script`](#0x1_Token_create_token_script)
@@ -303,6 +304,15 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 
 
+<a name="0x1_Token_EMAXIMUM_NUMBER_OF_TOKENS_FOR_COLLECTION"></a>
+
+
+
+<pre><code><b>const</b> <a href="Token.md#0x1_Token_EMAXIMUM_NUMBER_OF_TOKENS_FOR_COLLECTION">EMAXIMUM_NUMBER_OF_TOKENS_FOR_COLLECTION</a>: u64 = 3;
+</code></pre>
+
+
+
 <a name="0x1_Token_EMISSING_CLAIMED_TOKEN"></a>
 
 
@@ -454,6 +464,40 @@ This module provides the foundation for (collectible) Tokens often called NFTs
     };
 
     <a href="Table.md#0x1_Table_insert">Table::insert</a>(collections, *&name, collection);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_Token_claim_token_ownership"></a>
+
+## Function `claim_token_ownership`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_claim_token_ownership">claim_token_ownership</a>(account: &signer, token: <a href="Token.md#0x1_Token_Token">Token::Token</a>): <a href="Token.md#0x1_Token_Token">Token::Token</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_claim_token_ownership">claim_token_ownership</a>(
+    account: &signer,
+    token: <a href="Token.md#0x1_Token">Token</a>,
+): <a href="Token.md#0x1_Token">Token</a> <b>acquires</b> <a href="Token.md#0x1_Token_Collections">Collections</a> {
+    <b>let</b> creator_addr = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_id_creator_address">GUID::id_creator_address</a>(&token.id);
+    <b>let</b> collections = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="Token.md#0x1_Token_Collections">Collections</a>&gt;(creator_addr).collections;
+    <b>let</b> collection = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(collections, &token.collection);
+    <b>if</b> (<a href="Table.md#0x1_Table_borrow">Table::borrow</a>(&collection.tokens, &token.name).supply == 1) {
+      <a href="Table.md#0x1_Table_remove">Table::remove</a>(&<b>mut</b> collection.claimed_tokens, &token.name);
+      <a href="Table.md#0x1_Table_insert">Table::insert</a>(&<b>mut</b> collection.claimed_tokens, *&token.name, <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account))
+    };
+    token
 }
 </code></pre>
 
@@ -622,6 +666,14 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 ): ID <b>acquires</b> <a href="Token.md#0x1_Token_Collections">Collections</a>, <a href="Token.md#0x1_Token_Gallery">Gallery</a> {
     <b>let</b> account_addr = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>let</b> collections = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="Token.md#0x1_Token_Collections">Collections</a>&gt;(account_addr).collections;
+    <b>let</b> collection = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(collections, &collection_name);
+
+    <b>if</b> (<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_is_some">Option::is_some</a>(&collection.maximum)) {
+        <b>let</b> current = <a href="Table.md#0x1_Table_count">Table::count</a>(&collection.tokens);
+        <b>let</b> maximum = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_borrow">Option::borrow</a>(&collection.maximum);
+        <b>assert</b>!(current != *maximum, <a href="Token.md#0x1_Token_EMAXIMUM_NUMBER_OF_TOKENS_FOR_COLLECTION">EMAXIMUM_NUMBER_OF_TOKENS_FOR_COLLECTION</a>)
+    };
+
     <b>let</b> gallery = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="Token.md#0x1_Token_Gallery">Gallery</a>&gt;(account_addr).gallery;
 
     <b>let</b> token_id = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_id">GUID::id</a>(&<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_create">GUID::create</a>(account));
@@ -640,12 +692,12 @@ This module provides the foundation for (collectible) Tokens often called NFTs
         uri,
     };
 
-    <b>let</b> collection = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(collections, &collection_name);
     <b>if</b> (supply == 1) {
         <a href="Table.md#0x1_Table_insert">Table::insert</a>(&<b>mut</b> collection.claimed_tokens, *&name, account_addr)
     };
     <a href="Table.md#0x1_Table_insert">Table::insert</a>(&<b>mut</b> collection.tokens, name, token_data);
 
+    <b>let</b> token = <a href="Token.md#0x1_Token_claim_token_ownership">claim_token_ownership</a>(account, token);
     <a href="Table.md#0x1_Table_insert">Table::insert</a>(gallery, *&token_id, token);
     token_id
 }
@@ -789,13 +841,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
         <a href="Token.md#0x1_Token_initialize_gallery">initialize_gallery</a>(account)
     };
 
-    <b>let</b> creator_addr = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_id_creator_address">GUID::id_creator_address</a>(&token.id);
-    <b>let</b> collections = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="Token.md#0x1_Token_Collections">Collections</a>&gt;(creator_addr).collections;
-    <b>let</b> collection = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(collections, &token.collection);
-    <b>if</b> (<a href="Table.md#0x1_Table_borrow">Table::borrow</a>(&collection.tokens, &token.name).supply == 1) {
-      <a href="Table.md#0x1_Table_remove">Table::remove</a>(&<b>mut</b> collection.claimed_tokens, &token.name);
-      <a href="Table.md#0x1_Table_insert">Table::insert</a>(&<b>mut</b> collection.claimed_tokens, *&token.name, account_addr)
-    };
+    <b>let</b> token = <a href="Token.md#0x1_Token_claim_token_ownership">claim_token_ownership</a>(account, token);
 
     <b>let</b> gallery = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="Token.md#0x1_Token_Gallery">Gallery</a>&gt;(account_addr).gallery;
     <b>if</b> (<a href="Table.md#0x1_Table_contains_key">Table::contains_key</a>(gallery, &token.id)) {
@@ -897,7 +943,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(b"<a href="Token.md#0x1_Token_Collection">Collection</a>: Hello, World"),
         *&collection_name,
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(b"https://aptos.dev"),
-        <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_none">Option::none</a>(),
+        <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Option.md#0x1_Option_some">Option::some</a>(1),
     );
 
     <b>let</b> token_id = <a href="Token.md#0x1_Token_create_token">create_token</a>(

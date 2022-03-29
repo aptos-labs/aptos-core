@@ -10,6 +10,7 @@ module AptosFramework::Token {
     const EINSUFFICIENT_BALANCE: u64 = 0;
     const EMISSING_CLAIMED_TOKEN: u64 = 1;
     const EINVALID_TOKEN_MERGE: u64 = 2;
+    const EMAXIMUM_NUMBER_OF_TOKENS_FOR_COLLECTION: u64 = 3;
 
     // A creator may publish multiple collections
     struct Collections has key {
@@ -104,6 +105,22 @@ module AptosFramework::Token {
         };
 
         Table::insert(collections, *&name, collection);
+    }
+
+    // Enables storage solutions of Tokens outside of this module to inform the collection the
+    // current hosting address of a token.
+    public fun claim_token_ownership(
+        account: &signer,
+        token: Token,
+    ): Token acquires Collections {
+        let creator_addr = GUID::id_creator_address(&token.id);
+        let collections = &mut borrow_global_mut<Collections>(creator_addr).collections;
+        let collection = Table::borrow_mut(collections, &token.collection);
+        if (Table::borrow(&collection.tokens, &token.name).supply == 1) {
+          Table::remove(&mut collection.claimed_tokens, &token.name);
+          Table::insert(&mut collection.claimed_tokens, *&token.name, Signer::address_of(account))
+        };
+        token
     }
 
     // An account's set of Tokens
@@ -212,6 +229,14 @@ module AptosFramework::Token {
     ): ID acquires Collections, Gallery {
         let account_addr = Signer::address_of(account);
         let collections = &mut borrow_global_mut<Collections>(account_addr).collections;
+        let collection = Table::borrow_mut(collections, &collection_name);
+
+        if (Option::is_some(&collection.maximum)) {
+            let current = Table::count(&collection.tokens);
+            let maximum = Option::borrow(&collection.maximum);
+            assert!(current != *maximum, EMAXIMUM_NUMBER_OF_TOKENS_FOR_COLLECTION)
+        };
+
         let gallery = &mut borrow_global_mut<Gallery>(account_addr).gallery;
 
         let token_id = GUID::id(&GUID::create(account));
@@ -230,12 +255,12 @@ module AptosFramework::Token {
             uri,
         };
 
-        let collection = Table::borrow_mut(collections, &collection_name);
         if (supply == 1) {
             Table::insert(&mut collection.claimed_tokens, *&name, account_addr)
         };
         Table::insert(&mut collection.tokens, name, token_data);
 
+        let token = claim_token_ownership(account, token);
         Table::insert(gallery, *&token_id, token);
         token_id
     }
@@ -299,13 +324,7 @@ module AptosFramework::Token {
             initialize_gallery(account)
         };
 
-        let creator_addr = GUID::id_creator_address(&token.id);
-        let collections = &mut borrow_global_mut<Collections>(creator_addr).collections;
-        let collection = Table::borrow_mut(collections, &token.collection);
-        if (Table::borrow(&collection.tokens, &token.name).supply == 1) {
-          Table::remove(&mut collection.claimed_tokens, &token.name);
-          Table::insert(&mut collection.claimed_tokens, *&token.name, account_addr)
-        };
+        let token = claim_token_ownership(account, token);
 
         let gallery = &mut borrow_global_mut<Gallery>(account_addr).gallery;
         if (Table::contains_key(gallery, &token.id)) {
@@ -378,6 +397,20 @@ module AptosFramework::Token {
         deposit_token(&owner, token_2);
     }
 
+    #[test(creator = @0x1)]
+    #[expected_failure(abort_code = 3)]
+    public fun test_maximum(creator: signer) acquires Collections, Gallery {
+        let (collection_name, _token_id) = create_collection_and_token(&creator, 2);
+        create_token(
+            &creator,
+            collection_name,
+            ASCII::string(b"Token: Hello, Token 2"),
+            ASCII::string(b"Hello, Token 2"),
+            1,
+            ASCII::string(b"https://aptos.dev"),
+        );
+    }
+
     fun create_collection_and_token(
         creator: &signer,
         amount: u64,
@@ -388,7 +421,7 @@ module AptosFramework::Token {
             ASCII::string(b"Collection: Hello, World"),
             *&collection_name,
             ASCII::string(b"https://aptos.dev"),
-            Option::none(),
+            Option::some(1),
         );
 
         let token_id = create_token(
