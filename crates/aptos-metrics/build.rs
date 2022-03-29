@@ -1,10 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{env, process::Command};
+use std::{env, process::Command, path::Path};
+
+const GIT_INDEX: &str = "../../.git/index";
 
 /// Save revision info to environment variable
 fn main() {
+    if Path::new(GIT_INDEX).exists() {
+        println!("cargo:rerun-if-changed={}", GIT_INDEX);
+    }
     if env::var("GIT_REV").is_err() {
         let output = Command::new("git")
             .args(&["rev-parse", "--short", "HEAD"])

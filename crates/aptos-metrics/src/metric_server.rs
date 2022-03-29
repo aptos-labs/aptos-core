@@ -3,7 +3,7 @@
 
 use crate::{
     gather_metrics, json_encoder::JsonEncoder, json_metrics::get_json_metrics,
-    public_metrics::PUBLIC_METRICS, NUM_METRICS,
+    public_metrics::PUBLIC_METRICS, NUM_METRICS, system_metrics::refresh_system_metrics,
 };
 use futures::future;
 use hyper::{
@@ -119,6 +119,9 @@ async fn serve_public_metrics(req: Request<Body>) -> Result<Response<Body>, hype
 }
 
 pub fn start_server(host: String, port: u16, public_metric: bool) {
+    // Collect system metrics
+    refresh_system_metrics();
+
     // Only called from places that guarantee that host is parsable, but this must be assumed.
     let addr: SocketAddr = (host.as_str(), port)
         .to_socket_addrs()
