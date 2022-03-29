@@ -15,7 +15,7 @@ This tutorial details how to write, compile, test, publish and interact with Mov
 2. Publish the Move Module to the Aptos Blockchain
 3. Initialize and interact with resources of the Move Module
 
-This tutorial builds on [Your first transaction](/tutorials/your-first-transaction) and borrows the code as a library for this example. The following tutorial contains example code that can be downloaded in its entirety below:
+This tutorial builds on [Your first transaction](/tutorials/your-first-transaction) as a library for this example. The following tutorial contains example code that can be downloaded in its entirety below:
 
 <Tabs>
   <TabItem value="python" label="Python" default>

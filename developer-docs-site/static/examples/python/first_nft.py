@@ -15,6 +15,7 @@ class TokenClient(RestClient):
         res = self.submit_transaction(signed_txn)
         self.wait_for_transaction(res["hash"])
 
+#:!:>section_1
     def create_collection(self, account: Account, description: str, name: str, uri: str):
         """Creates a new collection within the specified account"""
 
@@ -29,7 +30,9 @@ class TokenClient(RestClient):
             ]
         }
         self.submit_transaction_helper(account, payload)
+#<:!:section_1
 
+#:!:>section_2
     def create_token(
             self,
             account: Account,
@@ -38,7 +41,7 @@ class TokenClient(RestClient):
             name: str,
             supply: int,
             uri: str,
-    ):
+    )
         payload = {
             "type": "script_function_payload",
             "function": f"0x1::SimpleToken::create_simple_token",
@@ -52,7 +55,9 @@ class TokenClient(RestClient):
             ]
         }
         self.submit_transaction_helper(account, payload)
+#<:!:section_2
 
+#:!:>section_4
     def transfer_token_to(
             self,
             account: Account,
@@ -73,7 +78,9 @@ class TokenClient(RestClient):
             ]
         }
         self.submit_transaction_helper(account, payload)
+#<:!:section_4
             
+#:!:>section_5
     def receive_token_from(
             self,
             account: Account,
@@ -92,6 +99,7 @@ class TokenClient(RestClient):
             ]
         }
         self.submit_transaction_helper(account, payload)
+#<:!:section_5
             
     def stop_token_transfer_to(
             self,
@@ -99,7 +107,7 @@ class TokenClient(RestClient):
             receiver: str,
             creator: str,
             token_creation_num: int,
-    ):
+    )
         payload = {
             "type": "script_function_payload",
             "function": f"0x1::SimpleToken::stop_simple_token_transfer_to",
@@ -112,6 +120,7 @@ class TokenClient(RestClient):
         }
         self.submit_transaction_helper(account, payload)
             
+#:!:>section_3
     def get_token_id(self, creator: str, collection_name: str, token_name: str) -> int:
         """ Retrieve the token's creation_num, which is useful for non-creator operations """
 
@@ -129,6 +138,7 @@ class TokenClient(RestClient):
                 return int(token["value"]["id"]["creation_num"])
             
         assert False
+#<:!:section_3
 
 
 if __name__ == "__main__":
