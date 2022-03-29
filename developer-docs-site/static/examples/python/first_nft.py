@@ -21,7 +21,7 @@ class TokenClient(RestClient):
 
         payload = {
             "type": "script_function_payload",
-            "function": f"0x1::SimpleToken::create_unlimited_simple_collection",
+            "function": f"0x1::Token::create_unlimited_collection_script",
             "type_arguments": [],
             "arguments": [
                 description.encode("utf-8").hex(),
@@ -44,7 +44,7 @@ class TokenClient(RestClient):
     ):
         payload = {
             "type": "script_function_payload",
-            "function": f"0x1::SimpleToken::create_simple_token",
+            "function": f"0x1::Token::create_token_script",
             "type_arguments": [],
             "arguments": [
                 collection_name.encode("utf-8").hex(),    
@@ -68,7 +68,7 @@ class TokenClient(RestClient):
     ):
         payload = {
             "type": "script_function_payload",
-            "function": f"0x1::SimpleToken::transfer_simple_token_to",
+            "function": f"0x1::TokenTransfers::transfer_to_script",
             "type_arguments": [],
             "arguments": [
                 receiver,
@@ -90,7 +90,7 @@ class TokenClient(RestClient):
     ):
         payload = {
             "type": "script_function_payload",
-            "function": f"0x1::SimpleToken::receive_simple_token_from",
+            "function": f"0x1::TokenTransfers::receive_from_script",
             "type_arguments": [],
             "arguments": [
                 sender,
@@ -110,7 +110,7 @@ class TokenClient(RestClient):
     ):
         payload = {
             "type": "script_function_payload",
-            "function": f"0x1::SimpleToken::stop_simple_token_transfer_to",
+            "function": f"0x1::TokenTransfers::stop_transfer_to_script",
             "type_arguments": [],
             "arguments": [
                 receiver,
@@ -128,7 +128,7 @@ class TokenClient(RestClient):
         collections = []
         tokens = []
         for resource in resources:
-            if resource["type"] == f"0x1::Token::Collections<0x1::SimpleToken::NoMetadata>":
+            if resource["type"] == f"0x1::Token::Collections":
                 collections = resource["data"]["collections"]["data"]
         for collection in collections:
             if collection["key"] == collection_name:
