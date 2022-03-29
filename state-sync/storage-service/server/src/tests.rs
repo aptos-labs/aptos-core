@@ -319,7 +319,7 @@ impl MockClient {
         initialize_logger();
         let storage = StorageReader::new(Arc::new(MockDbReader));
 
-        let queue_cfg = crate::network::network_endpoint_config()
+        let queue_cfg = crate::network::network_endpoint_config(StorageServiceConfig::default())
             .inbound_queue
             .unwrap();
         let (peer_mgr_notifs_tx, peer_mgr_notifs_rx) = queue_cfg.build();

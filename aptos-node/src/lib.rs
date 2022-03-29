@@ -552,8 +552,10 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         // storage service at all.
 
         // Register the network-facing storage service with Network.
-        let storage_service_events = network_builder
-            .add_service(&storage_service_server::network::network_endpoint_config());
+        let storage_service_events =
+            network_builder.add_service(&storage_service_server::network::network_endpoint_config(
+                node_config.state_sync.storage_service,
+            ));
         storage_service_server_network_handles.push(storage_service_events);
 
         // Register the storage-service clients with Network

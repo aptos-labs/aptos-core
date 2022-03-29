@@ -105,6 +105,7 @@ pub struct StorageServiceConfig {
     pub max_account_states_chunk_sizes: u64, // Max num of accounts per chunk
     pub max_concurrent_requests: u64,        // Max num of concurrent storage server tasks
     pub max_epoch_chunk_size: u64,           // Max num of epoch ending ledger infos per chunk
+    pub max_network_channel_size: u64,       // Max num of pending network messages
     pub max_transaction_chunk_size: u64,     // Max num of transactions per chunk
     pub max_transaction_output_chunk_size: u64, // Max num of transaction outputs per chunk
 }
@@ -115,6 +116,7 @@ impl Default for StorageServiceConfig {
             max_account_states_chunk_sizes: 3000,
             max_concurrent_requests: 50,
             max_epoch_chunk_size: 100,
+            max_network_channel_size: 1000,
             max_transaction_chunk_size: 3000,
             max_transaction_output_chunk_size: 3000,
         }

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics;
+use aptos_config::config::StorageServiceConfig;
 use aptos_types::PeerId;
 use bytes::Bytes;
 use channel::{aptos_channel, message_queues::QueueStyle};
@@ -23,12 +24,11 @@ use storage_service_types::{
     Result, StorageServiceMessage, StorageServiceRequest, StorageServiceResponse,
 };
 
-const INBOUND_CHANNEL_SIZE: usize = 100;
-
-pub fn network_endpoint_config() -> AppConfig {
+pub fn network_endpoint_config(storage_config: StorageServiceConfig) -> AppConfig {
+    let max_network_channel_size = storage_config.max_network_channel_size as usize;
     AppConfig::service(
         [ProtocolId::StorageServiceRpc],
-        aptos_channel::Config::new(INBOUND_CHANNEL_SIZE)
+        aptos_channel::Config::new(max_network_channel_size)
             .queue_style(QueueStyle::FIFO)
             .counters(&metrics::PENDING_STORAGE_SERVER_NETWORK_EVENTS),
     )
