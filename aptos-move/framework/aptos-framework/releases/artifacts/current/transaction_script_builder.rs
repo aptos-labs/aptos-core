@@ -51,6 +51,14 @@ pub enum ScriptFunctionCall {
         maximum: u64,
     },
 
+    CreateSimpleToken {
+        collection_name: Bytes,
+        description: Bytes,
+        name: Bytes,
+        supply: u64,
+        uri: Bytes,
+    },
+
     CreateTokenScript {
         collection_name: Bytes,
         description: Bytes,
@@ -137,6 +145,19 @@ impl ScriptFunctionCall {
                 name,
                 uri,
                 maximum,
+            ),
+            CreateSimpleToken {
+                collection_name,
+                description,
+                name,
+                supply,
+                uri,
+            } => encode_create_simple_token_script_function(
+                collection_name,
+                description,
+                name,
+                supply,
+                uri,
             ),
             CreateTokenScript {
                 collection_name,
@@ -292,6 +313,33 @@ pub fn encode_create_finite_collection_script_script_function(
             bcs::to_bytes(&name).unwrap(),
             bcs::to_bytes(&uri).unwrap(),
             bcs::to_bytes(&maximum).unwrap(),
+        ],
+    ))
+}
+
+pub fn encode_create_simple_token_script_function(
+    collection_name: Vec<u8>,
+    description: Vec<u8>,
+    name: Vec<u8>,
+    supply: u64,
+    uri: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("SimpleToken").to_owned(),
+        ),
+        ident_str!("create_simple_token").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&collection_name).unwrap(),
+            bcs::to_bytes(&description).unwrap(),
+            bcs::to_bytes(&name).unwrap(),
+            bcs::to_bytes(&supply).unwrap(),
+            bcs::to_bytes(&uri).unwrap(),
         ],
     ))
 }
@@ -579,6 +627,22 @@ fn decode_create_finite_collection_script_script_function(
     }
 }
 
+fn decode_create_simple_token_script_function(
+    payload: &TransactionPayload,
+) -> Option<ScriptFunctionCall> {
+    if let TransactionPayload::ScriptFunction(script) = payload {
+        Some(ScriptFunctionCall::CreateSimpleToken {
+            collection_name: bcs::from_bytes(script.args().get(0)?).ok()?,
+            description: bcs::from_bytes(script.args().get(1)?).ok()?,
+            name: bcs::from_bytes(script.args().get(2)?).ok()?,
+            supply: bcs::from_bytes(script.args().get(3)?).ok()?,
+            uri: bcs::from_bytes(script.args().get(4)?).ok()?,
+        })
+    } else {
+        None
+    }
+}
+
 fn decode_create_token_script_script_function(
     payload: &TransactionPayload,
 ) -> Option<ScriptFunctionCall> {
@@ -753,6 +817,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "Tokencreate_finite_collection_script".to_string(),
             Box::new(decode_create_finite_collection_script_script_function),
+        );
+        map.insert(
+            "SimpleTokencreate_simple_token".to_string(),
+            Box::new(decode_create_simple_token_script_function),
         );
         map.insert(
             "Tokencreate_token_script".to_string(),

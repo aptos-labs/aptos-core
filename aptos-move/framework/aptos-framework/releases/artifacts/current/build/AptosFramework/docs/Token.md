@@ -11,14 +11,18 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 -  [Resource `Gallery`](#0x1_Token_Gallery)
 -  [Struct `Token`](#0x1_Token_Token)
 -  [Struct `TokenData`](#0x1_Token_TokenData)
+-  [Resource `TokenMetadata`](#0x1_Token_TokenMetadata)
 -  [Constants](#@Constants_0)
 -  [Function `initialize_collections`](#0x1_Token_initialize_collections)
 -  [Function `create_finite_collection_script`](#0x1_Token_create_finite_collection_script)
 -  [Function `create_unlimited_collection_script`](#0x1_Token_create_unlimited_collection_script)
 -  [Function `create_collection`](#0x1_Token_create_collection)
 -  [Function `initialize_gallery`](#0x1_Token_initialize_gallery)
+-  [Function `initialize_token_metadata`](#0x1_Token_initialize_token_metadata)
 -  [Function `create_token_script`](#0x1_Token_create_token_script)
+-  [Function `create_token_with_metadata_script`](#0x1_Token_create_token_with_metadata_script)
 -  [Function `create_token`](#0x1_Token_create_token)
+-  [Function `create_token_with_metadata`](#0x1_Token_create_token_with_metadata)
 -  [Function `token_id`](#0x1_Token_token_id)
 -  [Function `withdraw_token`](#0x1_Token_withdraw_token)
 -  [Function `deposit_token`](#0x1_Token_deposit_token)
@@ -248,6 +252,33 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 </details>
 
+<a name="0x1_Token_TokenMetadata"></a>
+
+## Resource `TokenMetadata`
+
+
+
+<pre><code><b>struct</b> <a href="Token.md#0x1_Token_TokenMetadata">TokenMetadata</a>&lt;TokenType: store&gt; <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>metadata: <a href="Table.md#0x1_Table_Table">Table::Table</a>&lt;<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>, TokenType&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a name="@Constants_0"></a>
 
 ## Constants
@@ -458,6 +489,35 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
 </details>
 
+<a name="0x1_Token_initialize_token_metadata"></a>
+
+## Function `initialize_token_metadata`
+
+
+
+<pre><code><b>fun</b> <a href="Token.md#0x1_Token_initialize_token_metadata">initialize_token_metadata</a>&lt;TokenType: store&gt;(account: &signer)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="Token.md#0x1_Token_initialize_token_metadata">initialize_token_metadata</a>&lt;TokenType: store&gt;(account: &signer) {
+    <b>move_to</b>(
+        account,
+        <a href="Token.md#0x1_Token_TokenMetadata">TokenMetadata</a> {
+            metadata: <a href="Table.md#0x1_Table_create">Table::create</a>&lt;ID, TokenType&gt;(),
+        },
+    )
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_Token_create_token_script"></a>
 
 ## Function `create_token_script`
@@ -488,6 +548,46 @@ This module provides the foundation for (collectible) Tokens often called NFTs
       <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(name),
       supply,
       <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(uri),
+  );
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_Token_create_token_with_metadata_script"></a>
+
+## Function `create_token_with_metadata_script`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_create_token_with_metadata_script">create_token_with_metadata_script</a>&lt;TokenType: store&gt;(account: signer, collection_name: vector&lt;u8&gt;, description: vector&lt;u8&gt;, name: vector&lt;u8&gt;, supply: u64, uri: vector&lt;u8&gt;, metadata: TokenType)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_create_token_with_metadata_script">create_token_with_metadata_script</a>&lt;TokenType: store&gt;(
+    account: signer,
+    collection_name: vector&lt;u8&gt;,
+    description: vector&lt;u8&gt;,
+    name: vector&lt;u8&gt;,
+    supply: u64,
+    uri: vector&lt;u8&gt;,
+    metadata: TokenType,
+) <b>acquires</b> <a href="Token.md#0x1_Token_Collections">Collections</a>, <a href="Token.md#0x1_Token_Gallery">Gallery</a>, <a href="Token.md#0x1_Token_TokenMetadata">TokenMetadata</a> {
+  <a href="Token.md#0x1_Token_create_token_with_metadata">create_token_with_metadata</a>&lt;TokenType&gt;(
+      &account,
+      <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(collection_name),
+      <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(description),
+      <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(name),
+      supply,
+      <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_string">ASCII::string</a>(uri),
+      metadata,
   );
 }
 </code></pre>
@@ -547,6 +647,46 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
     <a href="Table.md#0x1_Table_insert">Table::insert</a>(gallery, *&token_id, token);
     token_id
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_Token_create_token_with_metadata"></a>
+
+## Function `create_token_with_metadata`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_create_token_with_metadata">create_token_with_metadata</a>&lt;TokenType: store&gt;(account: &signer, collection_name: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, description: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, name: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, supply: u64, uri: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>, metadata: TokenType): <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/GUID.md#0x1_GUID_ID">GUID::ID</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="Token.md#0x1_Token_create_token_with_metadata">create_token_with_metadata</a>&lt;TokenType: store&gt;(
+    account: &signer,
+    collection_name: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>,
+    description: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>,
+    name: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>,
+    supply: u64,
+    uri: <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/ASCII.md#0x1_ASCII_String">ASCII::String</a>,
+    metadata: TokenType,
+): ID <b>acquires</b> <a href="Token.md#0x1_Token_Collections">Collections</a>, <a href="Token.md#0x1_Token_Gallery">Gallery</a>, <a href="Token.md#0x1_Token_TokenMetadata">TokenMetadata</a> {
+    <b>let</b> account_addr = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
+    <b>if</b> (!<b>exists</b>&lt;<a href="Token.md#0x1_Token_TokenMetadata">TokenMetadata</a>&lt;TokenType&gt;&gt;(account_addr)) {
+        <a href="Token.md#0x1_Token_initialize_token_metadata">initialize_token_metadata</a>&lt;TokenType&gt;(account)
+    };
+
+    <b>let</b> id = <a href="Token.md#0x1_Token_create_token">create_token</a>(account, collection_name, description, name, supply, uri);
+    <b>let</b> metadata_table = <b>borrow_global_mut</b>&lt;<a href="Token.md#0x1_Token_TokenMetadata">TokenMetadata</a>&lt;TokenType&gt;&gt;(account_addr);
+    <a href="Table.md#0x1_Table_insert">Table::insert</a>(&<b>mut</b> metadata_table.metadata, *&id, metadata);
+    id
 }
 </code></pre>
 

@@ -146,6 +146,23 @@ module AptosFramework::Token {
         uri: ASCII::String,
     }
 
+    // Some Tokens may want additional fields outside the specification. As the Token itself does
+    // not contain the data, it is easier in Move to have this extra metadata sit on the side so
+    // that only creation and read operations (outside of Move) need to deal with the nuance of
+    // metadata.
+    struct TokenMetadata<TokenType: store> has key {
+        metadata: Table<ID, TokenType>,
+    }
+
+    fun initialize_token_metadata<TokenType: store>(account: &signer) {
+        move_to(
+            account,
+            TokenMetadata {
+                metadata: Table::create<ID, TokenType>(),
+            },
+        )
+    }
+
     public(script) fun create_token_script(
         account: signer,
         collection_name: vector<u8>,
@@ -161,6 +178,26 @@ module AptosFramework::Token {
           ASCII::string(name),
           supply,
           ASCII::string(uri),
+      );
+    }
+
+    public fun create_token_with_metadata_script<TokenType: store>(
+        account: signer,
+        collection_name: vector<u8>,
+        description: vector<u8>,
+        name: vector<u8>,
+        supply: u64,
+        uri: vector<u8>,
+        metadata: TokenType,
+    ) acquires Collections, Gallery, TokenMetadata {
+      create_token_with_metadata<TokenType>(
+          &account,
+          ASCII::string(collection_name),
+          ASCII::string(description),
+          ASCII::string(name),
+          supply,
+          ASCII::string(uri),
+          metadata,
       );
     }
 
@@ -201,6 +238,26 @@ module AptosFramework::Token {
 
         Table::insert(gallery, *&token_id, token);
         token_id
+    }
+
+    public fun create_token_with_metadata<TokenType: store>(
+        account: &signer,
+        collection_name: ASCII::String,
+        description: ASCII::String,
+        name: ASCII::String,
+        supply: u64,
+        uri: ASCII::String,
+        metadata: TokenType,
+    ): ID acquires Collections, Gallery, TokenMetadata {
+        let account_addr = Signer::address_of(account);
+        if (!exists<TokenMetadata<TokenType>>(account_addr)) {
+            initialize_token_metadata<TokenType>(account)
+        };
+
+        let id = create_token(account, collection_name, description, name, supply, uri);
+        let metadata_table = borrow_global_mut<TokenMetadata<TokenType>>(account_addr);
+        Table::insert(&mut metadata_table.metadata, *&id, metadata);
+        id
     }
 
     public fun token_id(token: &Token): &ID {
