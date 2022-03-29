@@ -18,6 +18,7 @@ from kube import (
     get_cluster_context,
     kube_wait_job,
     create_forge_job,
+    push_helm_charts,
 )
 
 TAG = ""
@@ -162,6 +163,7 @@ else:
 context = get_cluster_context(workspace)
 print(f"Running experiments on cluster: {workspace}")
 grafana_url = get_grafana_url(workspace)
+push_helm_charts(workspace)
 print()
 
 job_name, template = create_forge_job(
@@ -200,7 +202,7 @@ print("**********")
 
 print("==========begin-pod-logs==========")
 subprocess.call(
-    f"kubectl --context={context} logs -f -l job-name={job_name} | tee {OUTPUT_TEE}",
+    f"kubectl --context={context} logs -f -l job-name={job_name} | tee -a {OUTPUT_TEE}",
     shell=True,
 )
 print("==========end-pod-logs==========")

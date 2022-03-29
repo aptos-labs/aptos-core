@@ -149,7 +149,7 @@ jobs:
     steps:
       - checkout
       - aws-setup
-      - kubernetes/install-kubectl
+      - deploy-setup
       - run: echo "export IMAGE_TAG=dev_$(git rev-parse --short=8 HEAD)" >> $BASH_ENV
       # since we're running with `--build-all`, assume that if it passes, we have all images required for Forge
       - run: aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG
@@ -259,6 +259,18 @@ commands:
       - run: sudo apt-get install build-essential ca-certificates clang curl git libssl-dev pkg-config --no-install-recommends --assume-yes
       - run: curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
       - run: cat $HOME/.cargo/env >> $BASH_ENV
+  deploy-setup:
+    steps:
+      - kubernetes/install-kubectl
+      - run:
+          name: Install Helm
+          # https://helm.sh/docs/intro/install/#from-apt-debianubuntu
+          command: |
+            curl https://baltocdn.com/helm/signing.asc | sudo apt-key add -
+            sudo apt-get install apt-transport-https --yes
+            echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+            sudo apt-get update
+            sudo apt-get install helm
   ### Sets up the permissions required for accessing AWS resources
   aws-setup:
     steps:

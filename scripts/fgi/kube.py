@@ -1,13 +1,24 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
-import json, os, random, subprocess, time
+import json
+import os
+import random
+import subprocess
+import tempfile
+import time
 
 FORGE_K8S_CLUSTERS = ["forge-1"]
 
+WORKSPACE_CHART_BUCKETS = {
+    "forge-0": "aptos-testnet-forge-0-helm-312428ba",
+    "forge-1": "aptos-testnet-forge-1-helm-a2b65112",
+}
+
 AWS_ACCOUNT = (
     subprocess.check_output(
-        ["aws", "sts", "get-caller-identity", "--query", "Account", "--output", "text"],
+        ["aws", "sts", "get-caller-identity",
+            "--query", "Account", "--output", "text"],
         stderr=subprocess.DEVNULL,
         encoding="UTF-8",
     ).strip()
@@ -109,9 +120,11 @@ def kube_ensure_cluster(clusters):
                     continue
 
             if num_running_pods > 0:
-                print(f"{cluster} has {num_running_pods} running forge pods. Skipping.")
+                print(
+                    f"{cluster} has {num_running_pods} running forge pods. Skipping.")
             elif num_pending_pods > 0:
-                print(f"{cluster} has {num_pending_pods} pending forge pods. Skipping.")
+                print(
+                    f"{cluster} has {num_pending_pods} pending forge pods. Skipping.")
             else:
                 return cluster
 
@@ -127,7 +140,8 @@ def kube_ensure_cluster(clusters):
 # - no other forge pods currently Running or Pending
 # - all monitoring pods are ready
 def kube_select_cluster():
-    shuffled_clusters = random.sample(FORGE_K8S_CLUSTERS, len(FORGE_K8S_CLUSTERS))
+    shuffled_clusters = random.sample(
+        FORGE_K8S_CLUSTERS, len(FORGE_K8S_CLUSTERS))
     return kube_ensure_cluster(shuffled_clusters)
 
 
@@ -168,7 +182,8 @@ def kube_wait_job(job_name, context):
             )
             return 1
 
-        print(f"Waiting for {job_name} to be scheduled. Current phase: {phase}")
+        print(
+            f"Waiting for {job_name} to be scheduled. Current phase: {phase}")
         time.sleep(1)
 
     print(f"Failed to schedule job: {job_name}")
@@ -194,7 +209,8 @@ def kube_init_context(workspace=None):
         print("Failed to access EKS, try awsmfa?")
         raise
     # preserve the kube context by updating kubeconfig for the specified workspace
-    clusters = FORGE_K8S_CLUSTERS + [workspace] if workspace else FORGE_K8S_CLUSTERS
+    clusters = FORGE_K8S_CLUSTERS + \
+        [workspace] if workspace else FORGE_K8S_CLUSTERS
     for cluster in clusters:
         subprocess.run(
             [
@@ -273,3 +289,54 @@ def get_forge_job_jsonpath(job_name, context, jsonpath):
         ],
         encoding="UTF-8",
     )
+
+
+def helm_s3_init(workspace):
+    bucket_url = WORKSPACE_CHART_BUCKETS[workspace]
+    subprocess.run(
+        f"helm plugin install https://github.com/hypnoglow/helm-s3.git || true",
+        shell=True,
+        check=True
+    )
+    subprocess.run(
+        ["helm", "s3", "init", f"s3://{bucket_url}/charts"],
+        check=True
+    )
+    subprocess.run(
+        ["helm", "repo", "add",
+            f"testnet-{workspace}", f"s3://{bucket_url}/charts"],
+        check=True
+    )
+
+
+def helm_package_push(chart_path, chart_name, workspace, dir):
+    subprocess.run(
+        [
+            "helm",
+            "package",
+            chart_path,
+            "-d",
+            dir,
+            "--app-version",
+            "1.0.0",
+            "--version",
+            "1.0.0"
+        ],
+        check=True
+    )
+    subprocess.run(
+        f"helm s3 push --force {dir}/{chart_name}-*.tgz testnet-{workspace}",
+        shell=True,
+        check=True,
+    )
+
+
+def push_helm_charts(workspace):
+    helm_s3_init(workspace)
+    tempdir = tempfile.mkdtemp()
+    helm_package_push("terraform/testnet/testnet",
+                      "testnet", workspace, tempdir)
+    helm_package_push("terraform/helm/validator",
+                      "aptos-validator", workspace, tempdir)
+    helm_package_push("terraform/helm/fullnode",
+                      "aptos-fullnode", workspace, tempdir)
