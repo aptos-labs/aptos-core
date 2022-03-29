@@ -49,7 +49,7 @@ storage:
   size: 350Gi
 
 service:
-  # Change this to LoadBalancer to expose the REST API endpoint externally
+  # Change this to LoadBalancer to expose the REST API, aptosnet endpoint externally
   type: ClusterIP
   externalTrafficPolicy:
   loadBalancerSourceRanges: []
