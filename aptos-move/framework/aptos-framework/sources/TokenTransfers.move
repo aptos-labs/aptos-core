@@ -5,7 +5,7 @@ module AptosFramework::TokenTransfers {
     use AptosFramework::Table::{Self, Table};
     use AptosFramework::Token::{Self, Token};
 
-    struct TokenTransfers<TokenType: copy + drop + store> has key {
+    struct TokenTransfers<phantom TokenType: copy + drop + store> has key {
         pending_transfers: Table<address, Table<ID, Token<TokenType>>>,
     }
 

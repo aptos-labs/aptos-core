@@ -28,7 +28,7 @@ module AptosFramework::Token {
     // The source of Tokens, their collection!
     struct Collection<TokenType: copy + drop + store> has store {
         // Keep track of all Tokens, even if their balance is 0.
-        tokens: Table<ASCII::String, TokenMetadata<TokenType>>,
+        tokens: Table<ASCII::String, TokenData<TokenType>>,
         // In the case of NFTs (supply == 1), keep track of where the tokens are
         claimed_tokens: Table<ASCII::String, address>,
         // Describes the collection
@@ -107,44 +107,35 @@ module AptosFramework::Token {
     }
 
     // An account's set of Tokens
-    struct Gallery<TokenType: copy + drop + store> has key {
+    struct Gallery<phantom TokenType: copy + drop + store> has key {
         gallery: Table<ID, Token<TokenType>>,
     }
 
     fun initialize_gallery<TokenType: copy + drop + store>(signer: &signer) {
         move_to(
             signer,
-            Gallery {
+            Gallery<TokenType> {
                 gallery: Table::create<ID, Token<TokenType>>(),
             },
         )
     }
 
-    // A non-fungible or semi-fungible (edition) token
-    struct Token<TokenType: copy + drop + store> has drop, store {
+    // Represents ownership of a the data associated with this Token
+    struct Token<phantom TokenType: copy + drop + store> has drop, store {
         // Unique identifier for this token
         id: ID,
+        // The name of this token
+        name: ASCII::String,
         // The collection or set of related Tokens
         collection: ASCII::String,
         // Current store of data at this location
         balance: u64,
-        // Token data, left as optional as it can be stored directly with the Token or at the
-        // source, currently the intent is to copy
-        data: Option<TokenData<TokenType>>,
-    }
-
-    // The metadata of a non-fungible or semi-fungible (edition) token -- that is it doesn't
-    // contain a balance or pointer back to the collection.
-    struct TokenMetadata<TokenType: copy + drop + store> has drop, store {
-        // Unique identifier for this token
-        id: ID,
-        // Token data, left as optional as it can be stored directly with the Token or at the
-        // source, currently the intent is to copy
-        data: Option<TokenData<TokenType>>,
     }
 
     // Specific data of a token that can be generalized across an entire edition of an Token
     struct TokenData<TokenType: copy + drop + store> has copy, drop, store {
+        // Unique identifier for this token
+        id: ID,
         // Describes this Token
         description: ASCII::String,
         // Additional data that describes this Token
@@ -155,10 +146,6 @@ module AptosFramework::Token {
         supply: u64,
         /// URL for additional information / media
         uri: ASCII::String,
-    }
-
-    public fun token_id<TokenType: copy + drop + store>(token: &Token<TokenType>): &ID {
-        &token.id
     }
 
     public fun create_token_script<TokenType: copy + drop + store>(
@@ -194,43 +181,36 @@ module AptosFramework::Token {
         let account_addr = Signer::address_of(account);
         let collections = &mut borrow_global_mut<Collections<TokenType>>(account_addr).collections;
         let gallery = &mut borrow_global_mut<Gallery<TokenType>>(account_addr).gallery;
-        let name_for_key = *&name;
 
-        let some_data = Option::some(TokenData {
+        let token_id = GUID::id(&GUID::create(account));
+        let token = Token<TokenType> {
+            id: *&token_id,
+            name: *&name,
+            collection: *&collection_name,
+            balance: supply,
+        };
+
+        let token_data = TokenData {
+            id: *&token_id,
             description,
             metadata,
-            name,
+            name: *&name,
             supply,
             uri,
-        });
-
-        let (collection_data, gallery_data) = if (supply == 1) {
-            (Option::none(), some_data)
-        } else {
-            (some_data, Option::none())
         };
 
-        let collection_token = TokenMetadata {
-            id: GUID::id(&GUID::create(account)),
-            data: collection_data,
-        };
-
-        let token_id  = *&collection_token.id;
         let collection = Table::borrow_mut(collections, &collection_name);
         if (supply == 1) {
-            Table::insert(&mut collection.claimed_tokens, *&name_for_key, account_addr)
+            Table::insert(&mut collection.claimed_tokens, *&name, account_addr)
         };
-        Table::insert(&mut collection.tokens, name_for_key, collection_token);
+        Table::insert(&mut collection.tokens, name, token_data);
 
-        let gallery_token = Token {
-            id: *&token_id,
-            collection: collection_name,
-            balance: supply,
-            data: gallery_data,
-        };
-
-        Table::insert(gallery, *&gallery_token.id, gallery_token);
+        Table::insert(gallery, *&token_id, token);
         token_id
+    }
+
+    public fun token_id<TokenType: copy + drop + store>(token: &Token<TokenType>): &ID {
+        &token.id
     }
 
     public fun withdraw_token<TokenType: copy + drop + store>(
@@ -252,9 +232,9 @@ module AptosFramework::Token {
             token.balance = balance - amount;
             Token {
                 id: *&token.id,
+                name: *&token.name,
                 collection: *&token.collection,
                 balance: amount,
-                data: *&token.data,
             }
         }
     }
@@ -271,10 +251,9 @@ module AptosFramework::Token {
         let creator_addr = GUID::id_creator_address(&token.id);
         let collections = &mut borrow_global_mut<Collections<TokenType>>(creator_addr).collections;
         let collection = Table::borrow_mut(collections, &token.collection);
-        if (Option::is_some(&token.data) && Option::borrow(&token.data).supply == 1) {
-          let token_name = &Option::borrow(&token.data).name;
-          Table::remove(&mut collection.claimed_tokens, token_name);
-          Table::insert(&mut collection.claimed_tokens, *token_name, account_addr)
+        if (Table::borrow(&collection.tokens, &token.name).supply == 1) {
+          Table::remove(&mut collection.claimed_tokens, &token.name);
+          Table::insert(&mut collection.claimed_tokens, *&token.name, account_addr)
         };
 
         let gallery = &mut borrow_global_mut<Gallery<TokenType>>(account_addr).gallery;
