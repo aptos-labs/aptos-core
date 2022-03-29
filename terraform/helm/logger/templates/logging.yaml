@@ -9,7 +9,7 @@ data:
 {{ (tpl (.Files.Get "files/vector.toml") .) | indent 4 }}
 
 ---
-
+{{- if not .Values.loggingToNull }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -21,8 +21,8 @@ data:
   tls.crt: {{.Values.loggingClientCert}}
   tls.key: {{.Values.loggingClientKey}}
   ca.crt: {{.Values.loggingCA}}
-
 ---
+{{- end }}
 
 apiVersion: v1
 kind: Service
@@ -75,9 +75,11 @@ spec:
       - name: vector-config
         configMap:
           name: {{ include "aptos-logger.fullname" . }}-vector
+      {{- if not .Values.loggingToNull }}
       - name: vector-secret
         secret:
           secretName: {{ include "aptos-logger.fullname" . }}-vector
+      {{- end }}
       {{- with .Values.logging }}
       containers:
       - name: vector
@@ -86,6 +88,7 @@ spec:
         - "--watch-config=true"
         resources:
           {{- toYaml .vector.resources | nindent 10 }}
+      {{- end }}
         securityContext:
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
@@ -108,8 +111,11 @@ spec:
         - name: vector-config
           mountPath: /etc/vector
           readOnly: true
+        {{- if not .Values.loggingToNull }}
         - name: vector-secret
           mountPath: /etc/vector/cert
+        {{- end }}
+      {{- with .Values.logging }}
         {{- if .vector.logToFile }}
         - name: vector-logs
           mountPath: /tmp/logs
