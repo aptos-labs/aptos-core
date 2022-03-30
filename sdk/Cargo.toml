@@ -16,6 +16,6 @@ serde = { version = "1.0.124", features = ["derive"] }
 
 aptos-crypto = { path = "../crates/aptos-crypto", version = "0.0.3" }
 aptos-types = { path = "../types", version = "0.0.3"}
-move-core-types = { git = "https://github.com/diem/move", rev = "68b169fd0427ecfa717de5e0376e8127d629bc4e", version = "0.0.3", features=["address32"] }
+move-core-types = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa", version = "0.0.3", features=["address32"] }
 aptos-transaction-builder = { path = "./transaction-builder", version = "0.0.3" }
 aptos-workspace-hack = { version = "0.1", path = "../crates/aptos-workspace-hack" }

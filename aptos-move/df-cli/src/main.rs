@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
+use clap::StructOpt;
 use move_cli::{Command, Move};
 use move_core_types::errmap::ErrorMapping;
 use move_vm_types::gas_schedule::INITIAL_COST_SCHEDULE;
-use structopt::StructOpt;
 
 #[derive(StructOpt)]
 pub struct DfCli {
@@ -26,7 +26,7 @@ pub enum DfCommands {
 fn main() -> Result<()> {
     let error_descriptions: ErrorMapping =
         bcs::from_bytes(diem_framework_releases::current_error_descriptions())?;
-    let args = DfCli::from_args();
+    let args = DfCli::parse();
     match &args.cmd {
         DfCommands::Command(cmd) => move_cli::run_cli(
             aptos_vm::natives::aptos_natives(),

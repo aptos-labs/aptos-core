@@ -92,7 +92,7 @@ pub fn main() -> Result<()> {
         settings.no_expr_check = true;
     }
 
-    let env = run_model_builder(&dpn_files(), &[])?;
+    let env = run_model_builder(vec![(dpn_files(), BTreeMap::<String, _>::new())], vec![])?;
     let interpreter = StacklessBytecodeInterpreter::new(&env, None, settings);
     for trace in args.trace_files {
         aptos_e2e_tests_replay::replay(trace, &interpreter, &flags)?;

@@ -26,6 +26,7 @@ use aptos_types::{
     vm_status::KeptVMStatus,
 };
 use aptos_vm::AptosVM;
+use clap::StructOpt;
 use language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_FRESH};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
 use move_command_line_common::files::verify_and_create_named_address_mapping;
@@ -52,7 +53,6 @@ use std::{
     fmt,
     path::Path,
 };
-use structopt::StructOpt;
 use vm_genesis::GENESIS_KEYPAIR;
 
 /*************************************************************************************************
@@ -136,20 +136,20 @@ struct DiemRunArgs {
     #[structopt(long = "show-events")]
     show_events: bool,
 
-    #[structopt(long = "secondary-signers", parse(try_from_str = SignerAndKeyPair::parse))]
+    #[structopt(long = "secondary-signers", parse(try_from_str = SignerAndKeyPair::parse), multiple_values(true))]
     secondary_signers: Option<Vec<SignerAndKeyPair>>,
 }
 
 /// Diem-specifc arguments for the init command.
 #[derive(StructOpt, Debug)]
 struct DiemInitArgs {
-    #[structopt(long = "private-keys", parse(try_from_str = parse_named_private_key))]
+    #[structopt(long = "private-keys", parse(try_from_str = parse_named_private_key), multiple_values(true))]
     private_keys: Option<Vec<(Identifier, Ed25519PrivateKey)>>,
 
-    #[structopt(long = "validators", parse(try_from_str = parse_identifier))]
+    #[structopt(long = "validators", parse(try_from_str = parse_identifier), multiple_values(true))]
     validators: Option<Vec<Identifier>>,
 
-    #[structopt(long = "parent-vasps", parse(try_from_str = ParentVaspInitArgs::parse))]
+    #[structopt(long = "parent-vasps", parse(try_from_str = ParentVaspInitArgs::parse), multiple_values(true))]
     parent_vasps: Option<Vec<ParentVaspInitArgs>>,
 }
 
