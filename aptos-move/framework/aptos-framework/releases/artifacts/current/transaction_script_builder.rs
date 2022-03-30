@@ -35,8 +35,20 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum ScriptFunctionCall {
+    CancelOfferScript {
+        receiver: AccountAddress,
+        creator: AccountAddress,
+        token_creation_num: u64,
+    },
+
     /// Claim the delegated mint capability and destroy the delegated token.
     ClaimMintCapability {},
+
+    ClaimScript {
+        sender: AccountAddress,
+        creator: AccountAddress,
+        token_creation_num: u64,
+    },
 
     /// Basic account creation method.
     CreateAccount {
@@ -82,10 +94,11 @@ pub enum ScriptFunctionCall {
         amount: u64,
     },
 
-    ReceiveFromScript {
-        sender: AccountAddress,
+    OfferScript {
+        receiver: AccountAddress,
         creator: AccountAddress,
         token_creation_num: u64,
+        amount: u64,
     },
 
     /// Rotate the authentication key for the account under cap.account_address
@@ -108,21 +121,8 @@ pub enum ScriptFunctionCall {
     /// Updates the major version to a larger version.
     SetVersion { major: u64 },
 
-    StopTransferToScript {
-        receiver: AccountAddress,
-        creator: AccountAddress,
-        token_creation_num: u64,
-    },
-
     /// Transfers `amount` of tokens from `from` to `to`.
     Transfer { to: AccountAddress, amount: u64 },
-
-    TransferToScript {
-        receiver: AccountAddress,
-        creator: AccountAddress,
-        token_creation_num: u64,
-        amount: u64,
-    },
 }
 
 impl ScriptFunctionCall {
@@ -130,7 +130,17 @@ impl ScriptFunctionCall {
     pub fn encode(self) -> TransactionPayload {
         use ScriptFunctionCall::*;
         match self {
+            CancelOfferScript {
+                receiver,
+                creator,
+                token_creation_num,
+            } => encode_cancel_offer_script_script_function(receiver, creator, token_creation_num),
             ClaimMintCapability {} => encode_claim_mint_capability_script_function(),
+            ClaimScript {
+                sender,
+                creator,
+                token_creation_num,
+            } => encode_claim_script_script_function(sender, creator, token_creation_num),
             CreateAccount {
                 new_account_address,
                 auth_key_preimage,
@@ -179,11 +189,12 @@ impl ScriptFunctionCall {
             } => encode_create_unlimited_collection_script_script_function(description, name, uri),
             DelegateMintCapability { to } => encode_delegate_mint_capability_script_function(to),
             Mint { mint_addr, amount } => encode_mint_script_function(mint_addr, amount),
-            ReceiveFromScript {
-                sender,
+            OfferScript {
+                receiver,
                 creator,
                 token_creation_num,
-            } => encode_receive_from_script_script_function(sender, creator, token_creation_num),
+                amount,
+            } => encode_offer_script_script_function(receiver, creator, token_creation_num, amount),
             RotateAuthenticationKey {
                 new_authentication_key,
             } => encode_rotate_authentication_key_script_function(new_authentication_key),
@@ -213,27 +224,7 @@ impl ScriptFunctionCall {
                 default_account_size,
             ),
             SetVersion { major } => encode_set_version_script_function(major),
-            StopTransferToScript {
-                receiver,
-                creator,
-                token_creation_num,
-            } => encode_stop_transfer_to_script_script_function(
-                receiver,
-                creator,
-                token_creation_num,
-            ),
             Transfer { to, amount } => encode_transfer_script_function(to, amount),
-            TransferToScript {
-                receiver,
-                creator,
-                token_creation_num,
-                amount,
-            } => encode_transfer_to_script_script_function(
-                receiver,
-                creator,
-                token_creation_num,
-                amount,
-            ),
         }
     }
 
@@ -254,6 +245,29 @@ impl ScriptFunctionCall {
     }
 }
 
+pub fn encode_cancel_offer_script_script_function(
+    receiver: AccountAddress,
+    creator: AccountAddress,
+    token_creation_num: u64,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("TokenTransfers").to_owned(),
+        ),
+        ident_str!("cancel_offer_script").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&receiver).unwrap(),
+            bcs::to_bytes(&creator).unwrap(),
+            bcs::to_bytes(&token_creation_num).unwrap(),
+        ],
+    ))
+}
+
 /// Claim the delegated mint capability and destroy the delegated token.
 pub fn encode_claim_mint_capability_script_function() -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
@@ -267,6 +281,29 @@ pub fn encode_claim_mint_capability_script_function() -> TransactionPayload {
         ident_str!("claim_mint_capability").to_owned(),
         vec![],
         vec![],
+    ))
+}
+
+pub fn encode_claim_script_script_function(
+    sender: AccountAddress,
+    creator: AccountAddress,
+    token_creation_num: u64,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("TokenTransfers").to_owned(),
+        ),
+        ident_str!("claim_script").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&sender).unwrap(),
+            bcs::to_bytes(&creator).unwrap(),
+            bcs::to_bytes(&token_creation_num).unwrap(),
+        ],
     ))
 }
 
@@ -429,10 +466,11 @@ pub fn encode_mint_script_function(mint_addr: AccountAddress, amount: u64) -> Tr
     ))
 }
 
-pub fn encode_receive_from_script_script_function(
-    sender: AccountAddress,
+pub fn encode_offer_script_script_function(
+    receiver: AccountAddress,
     creator: AccountAddress,
     token_creation_num: u64,
+    amount: u64,
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
@@ -442,12 +480,13 @@ pub fn encode_receive_from_script_script_function(
             ]),
             ident_str!("TokenTransfers").to_owned(),
         ),
-        ident_str!("receive_from_script").to_owned(),
+        ident_str!("offer_script").to_owned(),
         vec![],
         vec![
-            bcs::to_bytes(&sender).unwrap(),
+            bcs::to_bytes(&receiver).unwrap(),
             bcs::to_bytes(&creator).unwrap(),
             bcs::to_bytes(&token_creation_num).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
         ],
     ))
 }
@@ -525,29 +564,6 @@ pub fn encode_set_version_script_function(major: u64) -> TransactionPayload {
     ))
 }
 
-pub fn encode_stop_transfer_to_script_script_function(
-    receiver: AccountAddress,
-    creator: AccountAddress,
-    token_creation_num: u64,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("TokenTransfers").to_owned(),
-        ),
-        ident_str!("stop_transfer_to_script").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&receiver).unwrap(),
-            bcs::to_bytes(&creator).unwrap(),
-            bcs::to_bytes(&token_creation_num).unwrap(),
-        ],
-    ))
-}
-
 /// Transfers `amount` of tokens from `from` to `to`.
 pub fn encode_transfer_script_function(to: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
@@ -564,29 +580,18 @@ pub fn encode_transfer_script_function(to: AccountAddress, amount: u64) -> Trans
     ))
 }
 
-pub fn encode_transfer_to_script_script_function(
-    receiver: AccountAddress,
-    creator: AccountAddress,
-    token_creation_num: u64,
-    amount: u64,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("TokenTransfers").to_owned(),
-        ),
-        ident_str!("transfer_to_script").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&receiver).unwrap(),
-            bcs::to_bytes(&creator).unwrap(),
-            bcs::to_bytes(&token_creation_num).unwrap(),
-            bcs::to_bytes(&amount).unwrap(),
-        ],
-    ))
+fn decode_cancel_offer_script_script_function(
+    payload: &TransactionPayload,
+) -> Option<ScriptFunctionCall> {
+    if let TransactionPayload::ScriptFunction(script) = payload {
+        Some(ScriptFunctionCall::CancelOfferScript {
+            receiver: bcs::from_bytes(script.args().get(0)?).ok()?,
+            creator: bcs::from_bytes(script.args().get(1)?).ok()?,
+            token_creation_num: bcs::from_bytes(script.args().get(2)?).ok()?,
+        })
+    } else {
+        None
+    }
 }
 
 fn decode_claim_mint_capability_script_function(
@@ -594,6 +599,18 @@ fn decode_claim_mint_capability_script_function(
 ) -> Option<ScriptFunctionCall> {
     if let TransactionPayload::ScriptFunction(_script) = payload {
         Some(ScriptFunctionCall::ClaimMintCapability {})
+    } else {
+        None
+    }
+}
+
+fn decode_claim_script_script_function(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
+    if let TransactionPayload::ScriptFunction(script) = payload {
+        Some(ScriptFunctionCall::ClaimScript {
+            sender: bcs::from_bytes(script.args().get(0)?).ok()?,
+            creator: bcs::from_bytes(script.args().get(1)?).ok()?,
+            token_creation_num: bcs::from_bytes(script.args().get(2)?).ok()?,
+        })
     } else {
         None
     }
@@ -696,14 +713,13 @@ fn decode_mint_script_function(payload: &TransactionPayload) -> Option<ScriptFun
     }
 }
 
-fn decode_receive_from_script_script_function(
-    payload: &TransactionPayload,
-) -> Option<ScriptFunctionCall> {
+fn decode_offer_script_script_function(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
     if let TransactionPayload::ScriptFunction(script) = payload {
-        Some(ScriptFunctionCall::ReceiveFromScript {
-            sender: bcs::from_bytes(script.args().get(0)?).ok()?,
+        Some(ScriptFunctionCall::OfferScript {
+            receiver: bcs::from_bytes(script.args().get(0)?).ok()?,
             creator: bcs::from_bytes(script.args().get(1)?).ok()?,
             token_creation_num: bcs::from_bytes(script.args().get(2)?).ok()?,
+            amount: bcs::from_bytes(script.args().get(3)?).ok()?,
         })
     } else {
         None
@@ -754,40 +770,11 @@ fn decode_set_version_script_function(payload: &TransactionPayload) -> Option<Sc
     }
 }
 
-fn decode_stop_transfer_to_script_script_function(
-    payload: &TransactionPayload,
-) -> Option<ScriptFunctionCall> {
-    if let TransactionPayload::ScriptFunction(script) = payload {
-        Some(ScriptFunctionCall::StopTransferToScript {
-            receiver: bcs::from_bytes(script.args().get(0)?).ok()?,
-            creator: bcs::from_bytes(script.args().get(1)?).ok()?,
-            token_creation_num: bcs::from_bytes(script.args().get(2)?).ok()?,
-        })
-    } else {
-        None
-    }
-}
-
 fn decode_transfer_script_function(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
     if let TransactionPayload::ScriptFunction(script) = payload {
         Some(ScriptFunctionCall::Transfer {
             to: bcs::from_bytes(script.args().get(0)?).ok()?,
             amount: bcs::from_bytes(script.args().get(1)?).ok()?,
-        })
-    } else {
-        None
-    }
-}
-
-fn decode_transfer_to_script_script_function(
-    payload: &TransactionPayload,
-) -> Option<ScriptFunctionCall> {
-    if let TransactionPayload::ScriptFunction(script) = payload {
-        Some(ScriptFunctionCall::TransferToScript {
-            receiver: bcs::from_bytes(script.args().get(0)?).ok()?,
-            creator: bcs::from_bytes(script.args().get(1)?).ok()?,
-            token_creation_num: bcs::from_bytes(script.args().get(2)?).ok()?,
-            amount: bcs::from_bytes(script.args().get(3)?).ok()?,
         })
     } else {
         None
@@ -807,8 +794,16 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
     once_cell::sync::Lazy::new(|| {
         let mut map: ScriptFunctionDecoderMap = std::collections::HashMap::new();
         map.insert(
+            "TokenTransferscancel_offer_script".to_string(),
+            Box::new(decode_cancel_offer_script_script_function),
+        );
+        map.insert(
             "TestCoinclaim_mint_capability".to_string(),
             Box::new(decode_claim_mint_capability_script_function),
+        );
+        map.insert(
+            "TokenTransfersclaim_script".to_string(),
+            Box::new(decode_claim_script_script_function),
         );
         map.insert(
             "AptosAccountcreate_account".to_string(),
@@ -839,8 +834,8 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
             Box::new(decode_mint_script_function),
         );
         map.insert(
-            "TokenTransfersreceive_from_script".to_string(),
-            Box::new(decode_receive_from_script_script_function),
+            "TokenTransfersoffer_script".to_string(),
+            Box::new(decode_offer_script_script_function),
         );
         map.insert(
             "AptosAccountrotate_authentication_key".to_string(),
@@ -855,16 +850,8 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
             Box::new(decode_set_version_script_function),
         );
         map.insert(
-            "TokenTransfersstop_transfer_to_script".to_string(),
-            Box::new(decode_stop_transfer_to_script_script_function),
-        );
-        map.insert(
             "TestCointransfer".to_string(),
             Box::new(decode_transfer_script_function),
-        );
-        map.insert(
-            "TokenTransferstransfer_to_script".to_string(),
-            Box::new(decode_transfer_to_script_script_function),
         );
         map
     });
