@@ -28,7 +28,7 @@ export class Account {
 
   /** Returns the address associated with the given account */
   address(): string {
-    return this.authKey().slice(-32);
+    return this.authKey();
   }
 
   /** Returns the authKey for the associated account */

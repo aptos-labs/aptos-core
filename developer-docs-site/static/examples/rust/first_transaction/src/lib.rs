@@ -32,8 +32,7 @@ impl Account {
     }
     /// Returns the address associated with the given account
     pub fn address(&self) -> String {
-        let auth_key = self.auth_key();
-        auth_key[auth_key.len() - 32..].to_string()
+        self.auth_key()
     }
 
     /// Returns the auth_key for the associated account
