@@ -263,9 +263,10 @@ impl<T: StorageReaderInterface> Handler<T> {
             }
         };
 
-        // If the request resulted in an unexpected error, return an internal error
+        // Process the response and handle any errors
         match response {
             Err(error) => {
+                // Log the error and update the counters
                 increment_counter(
                     &metrics::STORAGE_ERRORS_ENCOUNTERED,
                     protocol,
@@ -274,9 +275,15 @@ impl<T: StorageReaderInterface> Handler<T> {
                 error!(LogSchema::new(LogEntry::StorageServiceError)
                     .error(&error)
                     .request(&request));
-                Err(StorageServiceError::InternalError(error.to_string()))
+
+                // Return an appropriate response to the client
+                match error {
+                    Error::InvalidRequest(error) => Err(StorageServiceError::InvalidRequest(error)),
+                    error => Err(StorageServiceError::InternalError(error.to_string())),
+                }
             }
             Ok(response) => {
+                // The request was successful
                 increment_counter(
                     &metrics::STORAGE_RESPONSES_SENT,
                     protocol,
@@ -431,12 +438,13 @@ pub trait StorageReaderInterface: Clone + Send + 'static {
 /// storage server.
 #[derive(Clone)]
 pub struct StorageReader {
+    config: StorageServiceConfig,
     storage: Arc<dyn DbReader>,
 }
 
 impl StorageReader {
-    pub fn new(storage: Arc<dyn DbReader>) -> Self {
-        Self { storage }
+    pub fn new(config: StorageServiceConfig, storage: Arc<dyn DbReader>) -> Self {
+        Self { config, storage }
     }
 
     /// Returns the account states range held in the database (lowest to highest).
@@ -567,6 +575,15 @@ impl StorageReaderInterface for StorageReader {
         include_events: bool,
     ) -> Result<TransactionListWithProof, Error> {
         let expected_num_transactions = inclusive_range_len(start_version, end_version)?;
+        let max_transaction_chunk_size = self.config.max_transaction_chunk_size;
+        if expected_num_transactions > max_transaction_chunk_size {
+            return Err(Error::InvalidRequest(format!(
+                "Requested number of transactions is larger than the maximum! \
+             Requested: {:?}, maximum: {:?}.",
+                expected_num_transactions, max_transaction_chunk_size
+            )));
+        }
+
         let transaction_list_with_proof = self
             .storage
             .get_transactions(
@@ -584,6 +601,16 @@ impl StorageReaderInterface for StorageReader {
         start_epoch: u64,
         expected_end_epoch: u64,
     ) -> Result<EpochChangeProof, Error> {
+        let expected_num_epochs = inclusive_range_len(start_epoch, expected_end_epoch)?;
+        let max_epoch_chunk_size = self.config.max_epoch_chunk_size;
+        if expected_num_epochs > max_epoch_chunk_size {
+            return Err(Error::InvalidRequest(format!(
+                "Requested number of ledger infos is larger than the maximum! \
+             Requested: {:?}, maximum: {:?}.",
+                expected_num_epochs, max_epoch_chunk_size
+            )));
+        }
+
         // The DbReader interface returns the epochs up to: `expected_end_epoch - 1`.
         // However, we wish to fetch epoch endings up to expected_end_epoch (inclusive).
         let expected_end_epoch = expected_end_epoch.checked_add(1).ok_or_else(|| {
@@ -603,6 +630,15 @@ impl StorageReaderInterface for StorageReader {
         end_version: u64,
     ) -> Result<TransactionOutputListWithProof, Error> {
         let expected_num_outputs = inclusive_range_len(start_version, end_version)?;
+        let max_output_chunk_size = self.config.max_transaction_output_chunk_size;
+        if expected_num_outputs > max_output_chunk_size {
+            return Err(Error::InvalidRequest(format!(
+                "Requested number of outputs is larger than the maximum! \
+             Requested: {:?}, maximum: {:?}.",
+                expected_num_outputs, max_output_chunk_size
+            )));
+        }
+
         let output_list_with_proof = self
             .storage
             .get_transaction_outputs(start_version, expected_num_outputs, proof_version)
@@ -625,6 +661,15 @@ impl StorageReaderInterface for StorageReader {
         end_account_index: u64,
     ) -> Result<StateValueChunkWithProof, Error> {
         let expected_num_accounts = inclusive_range_len(start_account_index, end_account_index)?;
+        let max_account_chunk_size = self.config.max_account_states_chunk_sizes;
+        if expected_num_accounts > max_account_chunk_size {
+            return Err(Error::InvalidRequest(format!(
+                "Requested number of accounts is larger than the maximum! \
+             Requested: {:?}, maximum: {:?}.",
+                expected_num_accounts, max_account_chunk_size
+            )));
+        }
+
         let account_states_chunk_with_proof = self
             .storage
             .get_state_value_chunk_with_proof(

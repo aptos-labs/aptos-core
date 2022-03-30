@@ -370,7 +370,7 @@ fn setup_state_sync_storage_service(
         .expect("Failed to start the AptosNet storage-service runtime.");
 
     // Spawn all state sync storage service servers on the same runtime
-    let storage_reader = StorageReader::new(Arc::clone(&db_rw.reader));
+    let storage_reader = StorageReader::new(config, Arc::clone(&db_rw.reader));
     for events in network_handles {
         let service = StorageServiceServer::new(
             config,

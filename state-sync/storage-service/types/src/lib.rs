@@ -34,6 +34,8 @@ pub type Result<T, E = StorageServiceError> = ::std::result::Result<T, E>;
 pub enum StorageServiceError {
     #[error("Internal service error: {0}")]
     InternalError(String),
+    #[error("Invalid storage request: {0}")]
+    InvalidRequest(String),
 }
 
 /// A single storage service message sent or received over AptosNet.
