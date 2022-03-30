@@ -58,7 +58,7 @@ class TokenClient(RestClient):
 #<:!:section_2
 
 #:!:>section_4
-    def transfer_token_to(
+    def offer_token(
             self,
             account: Account,
             receiver: str,
@@ -68,7 +68,7 @@ class TokenClient(RestClient):
     ):
         payload = {
             "type": "script_function_payload",
-            "function": f"0x1::TokenTransfers::transfer_to_script",
+            "function": f"0x1::TokenTransfers::offer_script",
             "type_arguments": [],
             "arguments": [
                 receiver,
@@ -81,7 +81,7 @@ class TokenClient(RestClient):
 #<:!:section_4
             
 #:!:>section_5
-    def receive_token_from(
+    def claim_token(
             self,
             account: Account,
             sender: str,
@@ -90,7 +90,7 @@ class TokenClient(RestClient):
     ):
         payload = {
             "type": "script_function_payload",
-            "function": f"0x1::TokenTransfers::receive_from_script",
+            "function": f"0x1::TokenTransfers::claim_script",
             "type_arguments": [],
             "arguments": [
                 sender,
@@ -101,7 +101,7 @@ class TokenClient(RestClient):
         self.submit_transaction_helper(account, payload)
 #<:!:section_5
             
-    def stop_token_transfer_to(
+    def cancel_token_offer(
             self,
             account: Account,
             receiver: str,
@@ -110,7 +110,7 @@ class TokenClient(RestClient):
     ):
         payload = {
             "type": "script_function_payload",
-            "function": f"0x1::TokenTransfers::stop_transfer_to_script",
+            "function": f"0x1::TokenTransfers::cancel_offer_script",
             "type_arguments": [],
             "arguments": [
                 receiver,
@@ -168,7 +168,7 @@ if __name__ == "__main__":
     print(f"See {client.url}/accounts/{alice.address()}/resources")
 
     print("\n=== Transferring the token to Bob ===")
-    client.transfer_token_to(alice, bob.address(), alice.address(), token_id, 1)
-    client.receive_token_from(bob, alice.address(), alice.address(), token_id)
+    client.offer_token(alice, bob.address(), alice.address(), token_id, 1)
+    client.claim_token(bob, alice.address(), alice.address(), token_id)
 
     print(f"See {client.url}/accounts/{bob.address()}/resources")
