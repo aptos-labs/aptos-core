@@ -28,7 +28,7 @@ use aptos_types::{
     PeerId,
 };
 use channel::aptos_channel;
-use claim::{assert_none, assert_some};
+use claim::{assert_matches, assert_none, assert_some};
 use futures::channel::oneshot;
 use move_core_types::language_storage::TypeTag;
 use network::{
@@ -75,7 +75,7 @@ async fn test_get_server_protocol_version() {
 }
 
 #[tokio::test]
-async fn test_get_account_states_chunk_with_proof() {
+async fn test_get_account_states_with_proof() {
     let (mut mock_client, service, _) = MockClient::new();
     tokio::spawn(service.start());
 
@@ -109,6 +109,55 @@ async fn test_get_account_states_chunk_with_proof() {
             root_hash: HashValue::zero(),
         });
     assert_eq!(response, expected_response);
+
+    // Create a request to fetch the maximum amount of data
+    let max_account_chunk_size = StorageServiceConfig::default().max_account_states_chunk_sizes;
+    let start_account_index = 312;
+    let end_account_index = start_account_index + max_account_chunk_size - 1;
+    let request =
+        StorageServiceRequest::GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest {
+            version: 0,
+            start_account_index,
+            end_account_index,
+        });
+
+    // Process and verify the response is not an error
+    let _ = mock_client.send_request(request).await.unwrap();
+}
+
+#[tokio::test]
+async fn test_get_invalid_account_states_request() {
+    let (mut mock_client, service, _) = MockClient::new();
+    tokio::spawn(service.start());
+
+    // Create a request to fetch an invalid account states range
+    let start_account_index = 100;
+    let end_account_index = 99;
+    let request =
+        StorageServiceRequest::GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest {
+            version: 0,
+            start_account_index,
+            end_account_index,
+        });
+
+    // Process and verify the response
+    let response = mock_client.send_request(request).await.unwrap_err();
+    assert_matches!(response, StorageServiceError::InvalidRequest(_));
+
+    // Create a request to fetch too much data
+    let max_account_chunk_size = StorageServiceConfig::default().max_account_states_chunk_sizes;
+    let start_account_index = 100;
+    let end_account_index = start_account_index + max_account_chunk_size;
+    let request =
+        StorageServiceRequest::GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest {
+            version: 0,
+            start_account_index,
+            end_account_index,
+        });
+
+    // Process and verify the response
+    let response = mock_client.send_request(request).await.unwrap_err();
+    assert_matches!(response, StorageServiceError::InvalidRequest(_));
 }
 
 #[tokio::test]
@@ -133,32 +182,32 @@ async fn test_get_storage_server_summary() {
     let (mut mock_client, service, mock_time) = MockClient::new();
     tokio::spawn(service.start());
 
-    // Process a request to fetch the storage summary
+    // Fetch the storage summary and verify we get a default summary response
     let request = StorageServiceRequest::GetStorageServerSummary;
     let response = mock_client.send_request(request).await.unwrap();
+    let default_response =
+        StorageServiceResponse::StorageServerSummary(StorageServerSummary::default());
+    assert_eq!(response, default_response);
 
-    // Verify the response is the default response (not enough time has passed for the cache to be updated)
-    assert_eq!(
-        response,
-        StorageServiceResponse::StorageServerSummary(StorageServerSummary::default())
-    );
-
-    // Elapse enough time to force the cache to be updated
-    mock_time.advance_secs(5);
+    // Elapse enough time to force a cache update
+    let default_storage_config = StorageServiceConfig::default();
+    let cache_update_freq_ms = default_storage_config.storage_summary_refresh_interval_ms;
+    mock_time.advance_ms_async(cache_update_freq_ms).await;
 
     // Process another request to fetch the storage summary
     let request = StorageServiceRequest::GetStorageServerSummary;
     let response = mock_client.send_request(request).await.unwrap();
 
-    // Verify the response is correct
+    // Verify the response is correct (after the cache update)
     let highest_version = LAST_TXN_VERSION;
     let highest_epoch = LAST_EPOCH;
     let expected_server_summary = StorageServerSummary {
         protocol_metadata: ProtocolMetadata {
-            max_epoch_chunk_size: 100,
-            max_transaction_chunk_size: 3000,
-            max_transaction_output_chunk_size: 3000,
-            max_account_states_chunk_size: 3000,
+            max_epoch_chunk_size: default_storage_config.max_epoch_chunk_size,
+            max_transaction_chunk_size: default_storage_config.max_transaction_chunk_size,
+            max_transaction_output_chunk_size: default_storage_config
+                .max_transaction_output_chunk_size,
+            max_account_states_chunk_size: default_storage_config.max_account_states_chunk_sizes,
         },
         data_summary: DataSummary {
             synced_ledger_info: Some(create_test_ledger_info_with_sigs(
@@ -215,6 +264,20 @@ async fn test_get_transactions_with_proof_events() {
         }
         _ => panic!("Expected transactions with proof but got: {:?}", response),
     };
+
+    // Create a request to fetch the maximum amount of data
+    let max_transaction_chunk_size = StorageServiceConfig::default().max_transaction_chunk_size;
+    let start_version = 0;
+    let end_version = start_version + max_transaction_chunk_size - 1;
+    let request = StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+        proof_version: LAST_TXN_VERSION,
+        start_version,
+        end_version,
+        include_events: true,
+    });
+
+    // Process and verify the response is not an error
+    let _ = mock_client.send_request(request).await.unwrap();
 }
 
 #[tokio::test]
@@ -253,6 +316,41 @@ async fn test_get_transactions_with_proof_no_events() {
 }
 
 #[tokio::test]
+async fn test_get_invalid_transactions_request() {
+    let (mut mock_client, service, _) = MockClient::new();
+    tokio::spawn(service.start());
+
+    // Create a request to fetch an invalid transaction range
+    let start_version = 992;
+    let end_version = 101;
+    let request = StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+        proof_version: LAST_TXN_VERSION,
+        start_version,
+        end_version,
+        include_events: true,
+    });
+
+    // Process and verify the response
+    let response = mock_client.send_request(request).await.unwrap_err();
+    assert_matches!(response, StorageServiceError::InvalidRequest(_));
+
+    // Create a request to fetch too much data
+    let max_transaction_chunk_size = StorageServiceConfig::default().max_transaction_chunk_size;
+    let start_version = 35;
+    let end_version = start_version + max_transaction_chunk_size;
+    let request = StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+        proof_version: LAST_TXN_VERSION,
+        start_version,
+        end_version,
+        include_events: true,
+    });
+
+    // Process and verify the response
+    let response = mock_client.send_request(request).await.unwrap_err();
+    assert_matches!(response, StorageServiceError::InvalidRequest(_));
+}
+
+#[tokio::test]
 async fn test_get_transaction_outputs_with_proof() {
     let (mut mock_client, service, _) = MockClient::new();
     tokio::spawn(service.start());
@@ -284,6 +382,57 @@ async fn test_get_transaction_outputs_with_proof() {
         }
         _ => panic!("Expected outputs with proof but got: {:?}", response),
     };
+
+    // Create a request to fetch the maximum amount of data
+    let max_transaction_output_chunk_size =
+        StorageServiceConfig::default().max_transaction_output_chunk_size;
+    let start_version = 104;
+    let end_version = start_version + max_transaction_output_chunk_size - 1;
+    let request =
+        StorageServiceRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
+            proof_version: LAST_TXN_VERSION,
+            start_version,
+            end_version,
+        });
+
+    // Process and verify the response is not an error
+    let _ = mock_client.send_request(request).await.unwrap();
+}
+
+#[tokio::test]
+async fn test_get_invalid_transactions_outputs_request() {
+    let (mut mock_client, service, _) = MockClient::new();
+    tokio::spawn(service.start());
+
+    // Create a request to fetch an invalid output range
+    let start_version = 992;
+    let end_version = 101;
+    let request =
+        StorageServiceRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
+            proof_version: LAST_TXN_VERSION,
+            start_version,
+            end_version,
+        });
+
+    // Process and verify the response
+    let response = mock_client.send_request(request).await.unwrap_err();
+    assert_matches!(response, StorageServiceError::InvalidRequest(_));
+
+    // Create a request to fetch too much data
+    let max_transaction_output_chunk_size =
+        StorageServiceConfig::default().max_transaction_output_chunk_size;
+    let start_version = 35;
+    let end_version = start_version + max_transaction_output_chunk_size;
+    let request =
+        StorageServiceRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
+            proof_version: LAST_TXN_VERSION,
+            start_version,
+            end_version,
+        });
+
+    // Process and verify the response
+    let response = mock_client.send_request(request).await.unwrap_err();
+    assert_matches!(response, StorageServiceError::InvalidRequest(_));
 }
 
 #[tokio::test]
@@ -291,6 +440,7 @@ async fn test_get_epoch_ending_ledger_infos() {
     let (mut mock_client, service, _) = MockClient::new();
     tokio::spawn(service.start());
 
+    // Create a request to fetch epoch ending ledger infos
     let start_epoch = 11;
     let expected_end_epoch = 21;
     let request = StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
@@ -320,6 +470,49 @@ async fn test_get_epoch_ending_ledger_infos() {
         }
         _ => panic!("Expected epoch ending ledger infos but got: {:?}", response),
     };
+
+    // Create a request to fetch the maximum amount of data
+    let max_epoch_chunk_size = StorageServiceConfig::default().max_epoch_chunk_size;
+    let start_epoch = 43;
+    let expected_end_epoch = start_epoch + max_epoch_chunk_size - 1;
+    let request = StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
+        start_epoch,
+        expected_end_epoch,
+    });
+
+    // Process and verify the response is not an error
+    let _ = mock_client.send_request(request).await.unwrap();
+}
+
+#[tokio::test]
+async fn test_get_invalid_epoch_ledger_infos() {
+    let (mut mock_client, service, _) = MockClient::new();
+    tokio::spawn(service.start());
+
+    // Create a request to fetch an invalid epoch range
+    let start_epoch = 11;
+    let expected_end_epoch = 10;
+    let request = StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
+        start_epoch,
+        expected_end_epoch,
+    });
+
+    // Process and verify the response
+    let response = mock_client.send_request(request).await.unwrap_err();
+    assert_matches!(response, StorageServiceError::InvalidRequest(_));
+
+    // Create a request to fetch too much data
+    let max_epoch_chunk_size = StorageServiceConfig::default().max_epoch_chunk_size;
+    let start_epoch = 11;
+    let expected_end_epoch = start_epoch + max_epoch_chunk_size;
+    let request = StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
+        start_epoch,
+        expected_end_epoch,
+    });
+
+    // Process and verify the response
+    let response = mock_client.send_request(request).await.unwrap_err();
+    assert_matches!(response, StorageServiceError::InvalidRequest(_));
 }
 
 /// A wrapper around the inbound network interface/channel for easily sending
@@ -331,9 +524,10 @@ struct MockClient {
 impl MockClient {
     fn new() -> (Self, StorageServiceServer<StorageReader>, MockTimeService) {
         initialize_logger();
-        let storage = StorageReader::new(Arc::new(MockDbReader));
+        let storage_config = StorageServiceConfig::default();
+        let storage = StorageReader::new(storage_config, Arc::new(MockDbReader));
 
-        let queue_cfg = crate::network::network_endpoint_config(StorageServiceConfig::default())
+        let queue_cfg = crate::network::network_endpoint_config(storage_config)
             .inbound_queue
             .unwrap();
         let (peer_mgr_notifs_tx, peer_mgr_notifs_rx) = queue_cfg.build();
