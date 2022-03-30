@@ -8,19 +8,21 @@ use crate::{
         validate_signed_transaction, PreprocessedTransaction, VMAdapter,
     },
     aptos_vm_impl::{
-        charge_global_write_gas_usage, convert_changeset_and_events, get_currency_info,
-        get_gas_currency_code, get_transaction_output, AptosVMImpl, AptosVMInternals,
+        charge_global_write_gas_usage, get_currency_info, get_gas_currency_code,
+        get_transaction_output, AptosVMImpl, AptosVMInternals,
     },
     counters::*,
     data_cache::{RemoteStorage, StateViewCache},
     errors::expect_only_successful_execution,
     logging::AdapterLogSchema,
+    move_vm_ext::{SessionExt, SessionId},
     script_to_script_function,
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     VMExecutor, VMValidator,
 };
 use anyhow::Result;
+use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -49,7 +51,6 @@ use move_core_types::{
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
-use move_vm_runtime::session::Session;
 use move_vm_types::gas_schedule::GasStatus;
 use std::{
     collections::HashSet,
@@ -125,7 +126,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, TransactionOutput) {
         gas_status.set_metering(false);
-        let mut session = self.0.new_session(storage);
+        let mut session = self.0.new_session(storage, SessionId::txn_meta(txn_data));
         match TransactionStatus::from(error_code.clone()) {
             TransactionStatus::Keep(status) => {
                 // The transaction should be charged for gas, so run the epilogue to do that.
@@ -162,7 +163,7 @@ impl AptosVM {
 
     fn success_transaction_cleanup<S: MoveResolver>(
         &self,
-        mut session: Session<S>,
+        mut session: SessionExt<S>,
         gas_status: &mut GasStatus,
         txn_data: &TransactionMetadata,
         account_currency_symbol: &IdentStr,
@@ -191,7 +192,7 @@ impl AptosVM {
 
     fn execute_script_or_script_function<S: MoveResolver>(
         &self,
-        mut session: Session<S>,
+        mut session: SessionExt<S>,
         gas_status: &mut GasStatus,
         txn_data: &TransactionMetadata,
         payload: &TransactionPayload,
@@ -278,7 +279,7 @@ impl AptosVM {
 
     fn execute_modules<S: MoveResolver>(
         &self,
-        mut session: Session<S>,
+        mut session: SessionExt<S>,
         gas_status: &mut GasStatus,
         txn_data: &TransactionMetadata,
         modules: &ModuleBundle,
@@ -346,7 +347,7 @@ impl AptosVM {
         }
 
         // Revalidate the transaction.
-        let mut session = self.0.new_session(storage);
+        let mut session = self.0.new_session(storage, SessionId::txn(txn));
         if let Err(err) = validate_signature_checked_transaction::<S, Self>(
             self,
             &mut session,
@@ -416,13 +417,14 @@ impl AptosVM {
         storage: &S,
         writeset_payload: &WriteSetPayload,
         txn_sender: Option<AccountAddress>,
+        session_id: SessionId,
     ) -> Result<ChangeSet, Result<(VMStatus, TransactionOutput), VMStatus>> {
         let mut gas_status = GasStatus::new_unmetered();
 
         Ok(match writeset_payload {
             WriteSetPayload::Direct(change_set) => change_set.clone(),
             WriteSetPayload::Script { script, execute_as } => {
-                let mut tmp_session = self.0.new_session(storage);
+                let mut tmp_session = self.0.new_session(storage, session_id);
                 let aptos_version = self.0.get_version().map_err(Err)?;
                 let senders = match txn_sender {
                     None => vec![*execute_as],
@@ -456,11 +458,7 @@ impl AptosVM {
                 .and_then(|_| tmp_session.finish())
                 .map_err(|e| e.into_vm_status());
                 match execution_result {
-                    Ok((changeset, events)) => {
-                        let (cs, events) =
-                            convert_changeset_and_events(changeset, events).map_err(Err)?;
-                        ChangeSet::new(cs, events)
-                    }
+                    Ok(session_out) => session_out.into_change_set(&mut ()).map_err(Err)?,
                     Err(e) => {
                         return Err(Ok((e, discard_error_output(StatusCode::INVALID_WRITE_SET))));
                     }
@@ -489,7 +487,14 @@ impl AptosVM {
         storage: &S,
         writeset_payload: WriteSetPayload,
     ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
-        let change_set = match self.execute_writeset(storage, &writeset_payload, None) {
+        // TODO: user specified genesis id to distinguish different genesis write sets
+        let genesis_id = HashValue::zero();
+        let change_set = match self.execute_writeset(
+            storage,
+            &writeset_payload,
+            None,
+            SessionId::genesis(genesis_id),
+        ) {
             Ok(cs) => cs,
             Err(e) => return e,
         };
@@ -520,7 +525,9 @@ impl AptosVM {
             ..Default::default()
         };
         let mut gas_status = GasStatus::new_unmetered();
-        let mut session = self.0.new_session(storage);
+        let mut session = self
+            .0
+            .new_session(storage, SessionId::block_meta(&block_metadata));
 
         let (round, timestamp, previous_vote, proposer) = block_metadata.into_inner();
         let args = serialize_values(&vec![
@@ -574,7 +581,7 @@ impl AptosVM {
         }
 
         // Revalidate the transaction.
-        let mut session = self.0.new_session(storage);
+        let mut session = self.0.new_session(storage, SessionId::txn(txn));
         if let Err(e) = validate_signature_checked_transaction::<S, Self>(
             self,
             &mut session,
@@ -610,14 +617,18 @@ impl AptosVM {
         txn_data: TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
-        let change_set =
-            match self.execute_writeset(storage, writeset_payload, Some(txn_data.sender())) {
-                Ok(change_set) => change_set,
-                Err(e) => return e,
-            };
+        let change_set = match self.execute_writeset(
+            storage,
+            writeset_payload,
+            Some(txn_data.sender()),
+            SessionId::txn_meta(&txn_data),
+        ) {
+            Ok(change_set) => change_set,
+            Err(e) => return e,
+        };
 
         // Run the epilogue function.
-        let mut session = self.0.new_session(storage);
+        let mut session = self.0.new_session(storage, SessionId::txn_meta(&txn_data));
         self.0.run_writeset_epilogue(
             &mut session,
             &txn_data,
@@ -630,8 +641,9 @@ impl AptosVM {
             return Ok((e, discard_error_output(StatusCode::INVALID_WRITE_SET)));
         };
 
-        let (changeset, events) = session.finish().map_err(|e| e.into_vm_status())?;
-        let (epilogue_writeset, epilogue_events) = convert_changeset_and_events(changeset, events)?;
+        let session_out = session.finish().map_err(|e| e.into_vm_status())?;
+        let (epilogue_writeset, epilogue_events) =
+            session_out.into_change_set(&mut ())?.into_inner();
 
         // Make sure epilogue WriteSet doesn't intersect with the writeset in TransactionPayload.
         if !epilogue_writeset
@@ -770,8 +782,12 @@ impl VMValidator for AptosVM {
 }
 
 impl VMAdapter for AptosVM {
-    fn new_session<'r, R: MoveResolver>(&self, remote: &'r R) -> Session<'r, '_, R> {
-        self.0.new_session(remote)
+    fn new_session<'r, R: MoveResolver>(
+        &self,
+        remote: &'r R,
+        session_id: SessionId,
+    ) -> SessionExt<'r, '_, R> {
+        self.0.new_session(remote, session_id)
     }
 
     fn check_signature(txn: SignedTransaction) -> Result<SignatureCheckedTransaction> {
@@ -814,7 +830,7 @@ impl VMAdapter for AptosVM {
 
     fn run_prologue<S: MoveResolver>(
         &self,
-        session: &mut Session<S>,
+        session: &mut SessionExt<S>,
         transaction: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {

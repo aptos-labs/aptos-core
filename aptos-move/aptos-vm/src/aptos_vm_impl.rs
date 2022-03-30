@@ -7,7 +7,7 @@ use crate::{
     data_cache::RemoteStorage,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     logging::AdapterLogSchema,
-    natives::aptos_natives,
+    move_vm_ext::{MoveVmExt, SessionExt, SessionId},
     transaction_metadata::TransactionMetadata,
 };
 use aptos_crypto::HashValue;
@@ -37,14 +37,14 @@ use move_core_types::{
     resolver::{MoveResolver, ResourceResolver},
     value::{serialize_values, MoveValue},
 };
-use move_vm_runtime::{logging::expect_no_verification_errors, move_vm::MoveVM, session::Session};
+use move_vm_runtime::{logging::expect_no_verification_errors, session::Session};
 use move_vm_types::gas_schedule::{calculate_intrinsic_gas, GasStatus};
 use std::{convert::TryFrom, sync::Arc};
 
 #[derive(Clone)]
 /// A wrapper to make VMRuntime standalone and thread safe.
 pub struct AptosVMImpl {
-    move_vm: Arc<MoveVM>,
+    move_vm: Arc<MoveVmExt>,
     on_chain_config: Option<VMConfig>,
     version: Option<Version>,
     publishing_option: Option<VMPublishingOption>,
@@ -54,7 +54,7 @@ pub struct AptosVMImpl {
 impl AptosVMImpl {
     #[allow(clippy::new_without_default)]
     pub fn new<S: StateView>(state: &S) -> Self {
-        let inner = MoveVM::new(aptos_natives())
+        let inner = MoveVmExt::new()
             .expect("should be able to create Move VM; check if there are duplicated natives");
         let mut vm = Self {
             move_vm: Arc::new(inner),
@@ -73,7 +73,7 @@ impl AptosVMImpl {
         on_chain_config: VMConfig,
         publishing_option: VMPublishingOption,
     ) -> Self {
-        let inner = MoveVM::new(aptos_natives())
+        let inner = MoveVmExt::new()
             .expect("should be able to create Move VM; check if there are duplicated natives");
         Self {
             move_vm: Arc::new(inner),
@@ -247,7 +247,7 @@ impl AptosVMImpl {
     /// or `MULTI_AGENT_SCRIPT_PROLOGUE_NAME` function stored in the `ACCOUNT_MODULE` on chain.
     pub(crate) fn run_script_prologue<S: MoveResolver>(
         &self,
-        session: &mut Session<S>,
+        session: &mut SessionExt<S>,
         txn_data: &TransactionMetadata,
         account_currency_symbol: &IdentStr,
         log_context: &AdapterLogSchema,
@@ -315,7 +315,7 @@ impl AptosVMImpl {
     /// in the `ACCOUNT_MODULE` on chain.
     pub(crate) fn run_module_prologue<S: MoveResolver>(
         &self,
-        session: &mut Session<S>,
+        session: &mut SessionExt<S>,
         txn_data: &TransactionMetadata,
         account_currency_symbol: &IdentStr,
         log_context: &AdapterLogSchema,
@@ -354,7 +354,7 @@ impl AptosVMImpl {
     /// in the `ACCOUNT_MODULE` on chain.
     pub(crate) fn run_success_epilogue<S: MoveResolver>(
         &self,
-        session: &mut Session<S>,
+        session: &mut SessionExt<S>,
         gas_status: &mut GasStatus,
         txn_data: &TransactionMetadata,
         account_currency_symbol: &IdentStr,
@@ -395,7 +395,7 @@ impl AptosVMImpl {
     /// stored in the `ACCOUNT_MODULE` on chain.
     pub(crate) fn run_failure_epilogue<S: MoveResolver>(
         &self,
-        session: &mut Session<S>,
+        session: &mut SessionExt<S>,
         gas_status: &mut GasStatus,
         txn_data: &TransactionMetadata,
         account_currency_symbol: &IdentStr,
@@ -436,7 +436,7 @@ impl AptosVMImpl {
     /// in the `WRITESET_MODULE` on chain.
     pub(crate) fn run_writeset_prologue<S: MoveResolver>(
         &self,
-        session: &mut Session<S>,
+        session: &mut SessionExt<S>,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
@@ -470,7 +470,7 @@ impl AptosVMImpl {
     /// in the `WRITESET_MODULE` on chain.
     pub(crate) fn run_writeset_epilogue<S: MoveResolver>(
         &self,
-        session: &mut Session<S>,
+        session: &mut SessionExt<S>,
         txn_data: &TransactionMetadata,
         should_trigger_reconfiguration: bool,
         log_context: &AdapterLogSchema,
@@ -500,8 +500,12 @@ impl AptosVMImpl {
             })
     }
 
-    pub fn new_session<'r, R: MoveResolver>(&self, r: &'r R) -> Session<'r, '_, R> {
-        self.move_vm.new_session(r)
+    pub fn new_session<'r, R: MoveResolver>(
+        &self,
+        r: &'r R,
+        session_id: SessionId,
+    ) -> SessionExt<'r, '_, R> {
+        self.move_vm.new_session(r, session_id)
     }
 
     pub fn load_module<'r, R: MoveResolver>(
@@ -523,7 +527,7 @@ impl<'a> AptosVMInternals<'a> {
     }
 
     /// Returns the internal Move VM instance.
-    pub fn move_vm(self) -> &'a MoveVM {
+    pub fn move_vm(self) -> &'a MoveVmExt {
         &self.0.move_vm
     }
 
@@ -545,12 +549,20 @@ impl<'a> AptosVMInternals<'a> {
     pub fn with_txn_data_cache<T, S: StateView>(
         self,
         state_view: &S,
-        f: impl for<'txn, 'r> FnOnce(Session<'txn, 'r, RemoteStorage<S>>) -> T,
+        f: impl for<'txn, 'r> FnOnce(SessionExt<'txn, 'r, RemoteStorage<S>>) -> T,
+        session_id: SessionId,
     ) -> T {
         let remote_storage = RemoteStorage::new(state_view);
-        let session = self.move_vm().new_session(&remote_storage);
+        let session = self.move_vm().new_session(&remote_storage, session_id);
         f(session)
     }
+}
+
+pub fn convert_changeset_and_events(
+    changeset: MoveChangeSet,
+    events: Vec<MoveEvent>,
+) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
+    convert_changeset_and_events_cached(&mut (), changeset, events)
 }
 
 pub fn convert_changeset_and_events_cached<C: AccessPathCache>(
@@ -599,13 +611,6 @@ pub fn convert_changeset_and_events_cached<C: AccessPathCache>(
     Ok((ws, events))
 }
 
-pub fn convert_changeset_and_events(
-    changeset: MoveChangeSet,
-    events: Vec<MoveEvent>,
-) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
-    convert_changeset_and_events_cached(&mut (), changeset, events)
-}
-
 pub(crate) fn charge_global_write_gas_usage<R: MoveResolver>(
     gas_status: &mut GasStatus,
     session: &Session<R>,
@@ -625,15 +630,15 @@ pub(crate) fn charge_global_write_gas_usage<R: MoveResolver>(
 
 pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolver>(
     ap_cache: &mut A,
-    session: Session<S>,
+    session: SessionExt<S>,
     gas_left: GasUnits<GasCarrier>,
     txn_data: &TransactionMetadata,
     status: KeptVMStatus,
 ) -> Result<TransactionOutput, VMStatus> {
     let gas_used: u64 = txn_data.max_gas_amount().sub(gas_left).get();
 
-    let (changeset, events) = session.finish().map_err(|e| e.into_vm_status())?;
-    let (write_set, events) = convert_changeset_and_events_cached(ap_cache, changeset, events)?;
+    let session_out = session.finish().map_err(|e| e.into_vm_status())?;
+    let (write_set, events) = session_out.into_change_set(ap_cache)?.into_inner();
 
     Ok(TransactionOutput::new(
         write_set,
@@ -676,6 +681,6 @@ fn vm_thread_safe() {
 
     assert_send::<AptosVM>();
     assert_sync::<AptosVM>();
-    assert_send::<MoveVM>();
-    assert_sync::<MoveVM>();
+    assert_send::<MoveVmExt>();
+    assert_sync::<MoveVmExt>();
 }

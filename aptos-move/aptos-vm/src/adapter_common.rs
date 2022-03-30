@@ -9,9 +9,11 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use move_core_types::resolver::MoveResolver;
-use move_vm_runtime::session::Session;
 
-use crate::logging::AdapterLogSchema;
+use crate::{
+    logging::AdapterLogSchema,
+    move_vm_ext::{SessionExt, SessionId},
+};
 use aptos_logger::prelude::*;
 use aptos_types::{
     access_path::AccessPath,
@@ -31,7 +33,11 @@ pub trait VMAdapter {
     /// Creates a new Session backed by the given storage.
     /// TODO: this doesn't belong in this trait. We should be able to remove
     /// this after redesigning cache ownership model.
-    fn new_session<'r, R: MoveResolver>(&self, remote: &'r R) -> Session<'r, '_, R>;
+    fn new_session<'r, R: MoveResolver>(
+        &self,
+        remote: &'r R,
+        session_id: SessionId,
+    ) -> SessionExt<'r, '_, R>;
 
     /// Checks the signature of the given signed transaction and returns
     /// `Ok(SignatureCheckedTransaction)` if the signature is valid.
@@ -53,7 +59,7 @@ pub trait VMAdapter {
     /// Runs the prologue for the given transaction.
     fn run_prologue<S: MoveResolver>(
         &self,
-        session: &mut Session<S>,
+        session: &mut SessionExt<S>,
         transaction: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus>;
@@ -92,7 +98,7 @@ pub fn validate_signed_transaction<A: VMAdapter>(
     };
 
     let remote_cache = StateViewCache::new(state_view);
-    let mut session = adapter.new_session(&remote_cache);
+    let mut session = adapter.new_session(&remote_cache, SessionId::txn(&txn));
 
     let (status, gas_price) = match adapter.get_gas_price(&*txn, &remote_cache) {
         Ok(price) => (None, price),
@@ -122,7 +128,7 @@ pub fn validate_signed_transaction<A: VMAdapter>(
 
 pub(crate) fn validate_signature_checked_transaction<S: MoveResolver, A: VMAdapter>(
     adapter: &A,
-    mut session: &mut Session<S>,
+    mut session: &mut SessionExt<S>,
     transaction: &SignatureCheckedTransaction,
     allow_too_new: bool,
     log_context: &AdapterLogSchema,

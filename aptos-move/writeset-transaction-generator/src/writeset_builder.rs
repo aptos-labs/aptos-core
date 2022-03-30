@@ -2,13 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::format_err;
+use aptos_crypto::HashValue;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{self, aptos_root_address},
     transaction::{ChangeSet, Script, Version},
 };
-use aptos_vm::{convert_changeset_and_events, data_cache::RemoteStorage};
+use aptos_vm::{
+    data_cache::RemoteStorage,
+    move_vm_ext::{MoveVmExt, SessionExt, SessionId},
+};
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
@@ -16,10 +20,9 @@ use move_core_types::{
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
-use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use move_vm_types::gas_schedule::GasStatus;
 
-pub struct GenesisSession<'r, 'l, S>(Session<'r, 'l, S>);
+pub struct GenesisSession<'r, 'l, S>(SessionExt<'r, 'l, S>);
 
 impl<'r, 'l, S: MoveResolver> GenesisSession<'r, 'l, S> {
     pub fn exec_func(
@@ -96,10 +99,14 @@ pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F) -> ChangeS
 where
     F: FnOnce(&mut GenesisSession<RemoteStorage<S>>),
 {
-    let move_vm = MoveVM::new(aptos_vm::natives::aptos_natives()).unwrap();
-    let (changeset, events) = {
+    let move_vm = MoveVmExt::new().unwrap();
+    let session_out = {
         let state_view_storage = RemoteStorage::new(state_view);
-        let mut session = GenesisSession(move_vm.new_session(&state_view_storage));
+        // TODO: specify an id by human and pass that in.
+        let genesis_id = HashValue::zero();
+        let mut session = GenesisSession(
+            move_vm.new_session(&state_view_storage, SessionId::genesis(genesis_id)),
+        );
         session.disable_reconfiguration();
         procedure(&mut session);
         session.enable_reconfiguration();
@@ -110,9 +117,8 @@ where
             .unwrap()
     };
 
-    let (writeset, events) = convert_changeset_and_events(changeset, events)
+    session_out
+        .into_change_set(&mut ())
         .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
-        .unwrap();
-
-    ChangeSet::new(writeset, events)
+        .unwrap()
 }

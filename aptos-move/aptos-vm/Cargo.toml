@@ -19,6 +19,7 @@ tracing = "0.1.16"
 
 bcs = "0.1.2"
 aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-crypto-derive = { path = "../../crates/aptos-crypto-derive" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-metrics = { path = "../../crates/aptos-metrics" }
 aptos-state-view = { path = "../../storage/state-view" }

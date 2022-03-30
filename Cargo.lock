@@ -1130,6 +1130,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-crypto-derive",
  "aptos-framework-releases",
  "aptos-logger",
  "aptos-metrics",

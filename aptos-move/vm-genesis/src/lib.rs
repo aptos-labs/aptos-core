@@ -8,7 +8,7 @@ mod genesis_context;
 use crate::genesis_context::GenesisStateView;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
-    PrivateKey, Uniform,
+    HashValue, PrivateKey, Uniform,
 };
 use aptos_framework_releases::current_module_blobs;
 use aptos_transaction_builder::stdlib as transaction_builder;
@@ -28,7 +28,11 @@ use aptos_types::{
         authenticator::AuthenticationKey, ChangeSet, ScriptFunction, Transaction, WriteSetPayload,
     },
 };
-use aptos_vm::{convert_changeset_and_events, data_cache::StateViewCache};
+use aptos_vm::{
+    convert_changeset_and_events,
+    data_cache::StateViewCache,
+    move_vm_ext::{MoveVmExt, SessionId},
+};
 use move_binary_format::CompiledModule;
 use move_bytecode_utils::Modules;
 use move_core_types::{
@@ -37,7 +41,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     value::{serialize_values, MoveValue},
 };
-use move_vm_runtime::{move_vm::MoveVM, session::Session};
+use move_vm_runtime::session::Session;
 use move_vm_types::gas_schedule::{GasStatus, INITIAL_COST_SCHEDULE};
 use once_cell::sync::Lazy;
 use rand::prelude::*;
@@ -104,8 +108,9 @@ pub fn encode_genesis_change_set(
     }
     let data_cache = StateViewCache::new(&state_view);
 
-    let move_vm = MoveVM::new(aptos_vm::natives::aptos_natives()).unwrap();
-    let mut session = move_vm.new_session(&data_cache);
+    let move_vm = MoveVmExt::new().unwrap();
+    let id1 = HashValue::zero();
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
 
     create_and_initialize_main_accounts(
         &mut session,
@@ -150,13 +155,19 @@ pub fn encode_genesis_change_set(
         )
     }
 
-    let (mut changeset1, mut events1) = session.finish().unwrap();
+    let (mut changeset1, mut events1, _) = session.finish().unwrap().unpack();
 
     let state_view = GenesisStateView::new();
     let data_cache = StateViewCache::new(&state_view);
-    let mut session = move_vm.new_session(&data_cache);
+
+    // use a different session id, in case both scripts creates tables
+    let mut id2_arr = [0u8; 32];
+    id2_arr[31] = 1;
+    let id2 = HashValue::new(id2_arr);
+    let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
+
     publish_stdlib(&mut session, Modules::new(stdlib_modules.iter()));
-    let (changeset2, events2) = session.finish().unwrap();
+    let (changeset2, events2, _) = session.finish().unwrap().unpack();
 
     changeset1.squash(changeset2).unwrap();
     events1.extend(events2);

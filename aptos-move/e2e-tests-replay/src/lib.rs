@@ -25,7 +25,7 @@ use aptos_types::{
 };
 use aptos_vm::{
     convert_changeset_and_events,
-    natives::aptos_natives,
+    move_vm_ext::{MoveVmExt, SessionId, SessionOutput},
     script_to_script_function::remapping,
     system_module_names::{
         BLOCK_MODULE, BLOCK_PROLOGUE, SCRIPT_PROLOGUE_NAME, USER_EPILOGUE_NAME,
@@ -42,7 +42,6 @@ use language_e2e_tests::{
 };
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
-    effects::{ChangeSet, Event},
     gas_schedule::GasAlgebra,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
@@ -58,7 +57,7 @@ use move_stackless_bytecode_interpreter::{
     shared::bridge::{adapt_move_vm_change_set, adapt_move_vm_result},
     StacklessBytecodeInterpreter,
 };
-use move_vm_runtime::{move_vm::MoveVM, session::Session};
+use move_vm_runtime::session::Session;
 use move_vm_types::gas_schedule::GasStatus;
 
 const MOVE_VM_TRACING_ENV_VAR_NAME: &str = "MOVE_VM_TRACE";
@@ -142,14 +141,11 @@ fn script_to_script_function(script: &Script) -> Option<ScriptFunction> {
     })
 }
 
-fn compare_output(
-    expect_output: &TransactionOutput,
-    actual_output: VMResult<(ChangeSet, Vec<Event>)>,
-) {
+fn compare_output(expect_output: &TransactionOutput, actual_output: VMResult<SessionOutput>) {
     match actual_output {
-        Ok((change_set, events)) => {
+        Ok(session_out) => {
             let (actual_write_set, actual_events) =
-                convert_changeset_and_events(change_set, events).unwrap();
+                session_out.into_change_set(&mut ()).unwrap().into_inner();
             assert_eq!(expect_output.write_set(), &actual_write_set);
             assert_eq!(expect_output.events(), &actual_events);
         }
@@ -286,8 +282,8 @@ impl<'env> CrossRunner<'env> {
         if self.flags.verbose_vm {
             env::set_var(MOVE_VM_TRACING_ENV_VAR_NAME, MOVE_VM_TRACING_LOG_FILENAME);
         }
-        let move_vm = MoveVM::new(aptos_natives()).unwrap();
-        let mut session = move_vm.new_session(&self.move_vm_state);
+        let move_vm = MoveVmExt::new().unwrap();
+        let mut session = move_vm.new_session(&self.move_vm_state, SessionId::void());
         let move_vm_return_values = execute_function_via_session(
             &mut session,
             module_id,
@@ -295,7 +291,7 @@ impl<'env> CrossRunner<'env> {
             ty_args.to_vec(),
             args.to_vec(),
         );
-        let (move_vm_change_set, move_events) = session.finish().unwrap();
+        let (move_vm_change_set, move_events, _) = session.finish().unwrap().unpack();
         if self.flags.verbose_vm {
             env::remove_var(MOVE_VM_TRACING_ENV_VAR_NAME);
         }
@@ -348,8 +344,8 @@ impl<'env> CrossRunner<'env> {
         }
 
         // execute via move VM
-        let move_vm = MoveVM::new(aptos_natives()).unwrap();
-        let mut session = move_vm.new_session(&self.move_vm_state);
+        let move_vm = MoveVmExt::new().unwrap();
+        let mut session = move_vm.new_session(&self.move_vm_state, SessionId::void());
         let move_vm_return_values = execute_script_function_via_session(
             &mut session,
             module_id,
@@ -358,7 +354,7 @@ impl<'env> CrossRunner<'env> {
             args.to_vec(),
             senders.to_vec(),
         );
-        let (move_vm_change_set, move_events) = session.finish().unwrap();
+        let (move_vm_change_set, move_events, _) = session.finish().unwrap().unpack();
 
         // execute via stackless VM
         let (stackless_vm_return_values, stackless_vm_change_set, new_stackless_vm_state) =
@@ -487,6 +483,7 @@ impl<'env> TraceReplayer<'env> {
     ) {
         // args
         let signer = reserved_vm_address();
+        let session_id = SessionId::block_meta(&block_metadata);
         let (round, timestamp, previous_votes, proposer) = block_metadata.into_inner();
         let args: Vec<_> = vec![
             MoveValue::Signer(signer),
@@ -500,8 +497,8 @@ impl<'env> TraceReplayer<'env> {
         .collect();
 
         // execute
-        let move_vm = MoveVM::new(aptos_natives()).unwrap();
-        let mut session = move_vm.new_session(&self.data_store);
+        let move_vm = MoveVmExt::new().unwrap();
+        let mut session = move_vm.new_session(&self.data_store, session_id);
         let mut xrunner = if self.flags.xrun {
             Some(CrossRunner::new(
                 self.interpreter,
@@ -536,12 +533,12 @@ impl<'env> TraceReplayer<'env> {
         script_fun: ScriptFunction,
         gas_currency: &str,
         gas_usage: u64,
-    ) -> VMResult<(ChangeSet, Vec<Event>)> {
+    ) -> VMResult<SessionOutput> {
         let gas_currency_ty =
             type_tag_for_currency_code(from_currency_code_string(gas_currency).unwrap());
 
-        let move_vm = MoveVM::new(aptos_natives()).unwrap();
-        let mut session = move_vm.new_session(&self.data_store);
+        let move_vm = MoveVmExt::new().unwrap();
+        let mut session = move_vm.new_session(&self.data_store, SessionId::txn_meta(&txn_meta));
         let mut xrunner = if self.flags.xrun {
             Some(CrossRunner::new(
                 self.interpreter,
@@ -585,7 +582,8 @@ impl<'env> TraceReplayer<'env> {
                 if status.is_discarded() {
                     return Err(err);
                 }
-                let mut new_session = move_vm.new_session(&self.data_store);
+                let mut new_session =
+                    move_vm.new_session(&self.data_store, SessionId::txn_meta(&txn_meta));
                 let mut new_xrunner = if self.flags.xrun {
                     Some(CrossRunner::new(
                         self.interpreter,
@@ -612,9 +610,9 @@ impl<'env> TraceReplayer<'env> {
         senders: Vec<AccountAddress>,
         txn_meta: TransactionMetadata,
         script_fun: ScriptFunction,
-    ) -> VMResult<(ChangeSet, Vec<Event>)> {
-        let move_vm = MoveVM::new(aptos_natives()).unwrap();
-        let mut session = move_vm.new_session(&self.data_store);
+    ) -> VMResult<SessionOutput> {
+        let move_vm = MoveVmExt::new().unwrap();
+        let mut session = move_vm.new_session(&self.data_store, SessionId::txn_meta(&txn_meta));
         let mut xrunner = if self.flags.xrun {
             Some(CrossRunner::new(
                 self.interpreter,
@@ -647,7 +645,8 @@ impl<'env> TraceReplayer<'env> {
                 if status.is_discarded() {
                     return Err(err);
                 }
-                let mut new_session = move_vm.new_session(&self.data_store);
+                let mut new_session =
+                    move_vm.new_session(&self.data_store, SessionId::txn_meta(&txn_meta));
                 let mut new_xrunner = if self.flags.xrun {
                     Some(CrossRunner::new(
                         self.interpreter,

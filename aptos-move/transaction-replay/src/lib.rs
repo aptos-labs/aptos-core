@@ -16,14 +16,16 @@ use aptos_types::{
 };
 use aptos_validator_interface::{AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView};
 use aptos_vm::{
-    convert_changeset_and_events, data_cache::RemoteStorage, logging::AdapterLogSchema, AptosVM,
-    VMExecutor,
+    data_cache::RemoteStorage,
+    logging::AdapterLogSchema,
+    move_vm_ext::{MoveVmExt, SessionId},
+    AptosVM, VMExecutor,
 };
 use move_binary_format::{errors::VMResult, file_format::CompiledModule};
 use move_cli::sandbox::utils::on_disk_state_view::OnDiskStateView;
 use move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags};
 use move_core_types::{effects::ChangeSet as MoveChanges, language_storage::TypeTag};
-use move_vm_runtime::{move_vm::MoveVM, session::Session};
+use move_vm_runtime::session::Session;
 use move_vm_test_utils::DeltaStorage;
 use move_vm_types::gas_schedule::GasStatus;
 use std::path::{Path, PathBuf};
@@ -317,19 +319,19 @@ impl AptosDebugger {
     where
         F: FnOnce(&mut Session<DeltaStorage<RemoteStorage<DebuggerStateView>>>) -> VMResult<()>,
     {
-        let move_vm = MoveVM::new(aptos_vm::natives::aptos_natives()).unwrap();
+        let move_vm = MoveVmExt::new().unwrap();
         let state_view = DebuggerStateView::new(&*self.debugger, version.checked_sub(1));
         let state_view_storage = RemoteStorage::new(&state_view);
         let move_changes = override_changeset.unwrap_or_else(MoveChanges::new);
         let remote_storage = DeltaStorage::new(&state_view_storage, &move_changes);
-        let mut session = move_vm.new_session(&remote_storage);
+        let mut session = move_vm.new_session(&remote_storage, SessionId::void());
         f(&mut session).map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
-        let (changeset, events) = session
+        let session_out = session
             .finish()
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
-        let (write_set, events) = convert_changeset_and_events(changeset, events)
-            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
-        Ok(ChangeSet::new(write_set, events))
+        session_out
+            .into_change_set(&mut ())
+            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
     }
 
     pub fn bisect_transactions_by_script(

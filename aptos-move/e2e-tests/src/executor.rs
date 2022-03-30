@@ -35,7 +35,9 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::{
-    convert_changeset_and_events, data_cache::RemoteStorage, parallel_executor::ParallelAptosVM,
+    data_cache::RemoteStorage,
+    move_vm_ext::{MoveVmExt, SessionId},
+    parallel_executor::ParallelAptosVM,
     AptosVM, VMExecutor, VMValidator,
 };
 use aptos_writeset_generator::{
@@ -47,7 +49,6 @@ use move_core_types::{
     language_storage::{ModuleId, ResourceKey, TypeTag},
     move_resource::MoveResource,
 };
-use move_vm_runtime::move_vm::MoveVM;
 use move_vm_types::gas_schedule::GasStatus;
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
@@ -541,9 +542,9 @@ impl FakeExecutor {
     ) {
         let write_set = {
             let mut gas_status = GasStatus::new_unmetered();
-            let vm = MoveVM::new(aptos_vm::natives::aptos_natives()).unwrap();
+            let vm = MoveVmExt::new().unwrap();
             let remote_view = RemoteStorage::new(&self.data_store);
-            let mut session = vm.new_session(&remote_view);
+            let mut session = vm.new_session(&remote_view, SessionId::void());
             session
                 .execute_function(
                     &Self::module(module_name),
@@ -560,10 +561,12 @@ impl FakeExecutor {
                         e.into_vm_status()
                     )
                 });
-            let (changeset, events) = session.finish().expect("Failed to generate txn effects");
-            let (writeset, _events) = convert_changeset_and_events(changeset, events)
-                .expect("Failed to generate writeset");
-            writeset
+            let session_out = session.finish().expect("Failed to generate txn effects");
+            let (write_set, _events) = session_out
+                .into_change_set(&mut ())
+                .expect("Failed to generate writeset")
+                .into_inner();
+            write_set
         };
         self.data_store.add_write_set(&write_set);
     }
@@ -576,9 +579,9 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) -> Result<WriteSet, VMStatus> {
         let mut gas_status = GasStatus::new_unmetered();
-        let vm = MoveVM::new(aptos_vm::natives::aptos_natives()).unwrap();
+        let vm = MoveVmExt::new().unwrap();
         let remote_view = RemoteStorage::new(&self.data_store);
-        let mut session = vm.new_session(&remote_view);
+        let mut session = vm.new_session(&remote_view, SessionId::void());
         session
             .execute_function(
                 &Self::module(module_name),
@@ -588,9 +591,11 @@ impl FakeExecutor {
                 &mut gas_status,
             )
             .map_err(|e| e.into_vm_status())?;
-        let (changeset, events) = session.finish().expect("Failed to generate txn effects");
-        let (writeset, _events) =
-            convert_changeset_and_events(changeset, events).expect("Failed to generate writeset");
+        let session_out = session.finish().expect("Failed to generate txn effects");
+        let (writeset, _events) = session_out
+            .into_change_set(&mut ())
+            .expect("Failed to generate writeset")
+            .into_inner();
         Ok(writeset)
     }
 }
