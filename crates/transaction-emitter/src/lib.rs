@@ -865,10 +865,7 @@ pub fn create_account_request(
     let preimage = AuthenticationKeyPreimage::ed25519(pubkey);
     let auth_key = AuthenticationKey::from_preimage(&preimage);
     creation_account.sign_with_transaction_builder(txn_factory.payload(
-        aptos_stdlib::encode_create_account_script_function(
-            auth_key.derived_address(),
-            preimage.into_vec(),
-        ),
+        aptos_stdlib::encode_create_account_script_function(auth_key.derived_address()),
     ))
 }
 

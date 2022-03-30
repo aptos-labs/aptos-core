@@ -398,16 +398,16 @@ impl AuthenticationKey {
     /// Return an address derived from the last `AccountAddress::LENGTH` bytes of this
     /// authentication key.
     pub fn derived_address(&self) -> AccountAddress {
-        // keep only last 16 bytes
+        // keep only last AccountAddress::LENGTH bytes
         let mut array = [0u8; AccountAddress::LENGTH];
-        array.copy_from_slice(&self.0[Self::LENGTH - AccountAddress::LENGTH..]);
+        array.copy_from_slice(&self.0[AuthenticationKey::LENGTH - AccountAddress::LENGTH..]);
         AccountAddress::new(array)
     }
 
-    /// Return the first AccountAddress::LENGTH bytes of this authentication key
-    pub fn prefix(&self) -> [u8; AccountAddress::LENGTH] {
-        let mut array = [0u8; AccountAddress::LENGTH];
-        array.copy_from_slice(&self.0[..AccountAddress::LENGTH]);
+    /// Return the first self::LENGTH - AccountAddress::LENGTH bytes of this authentication key
+    pub fn prefix(&self) -> [u8; AuthenticationKey::LENGTH - AccountAddress::LENGTH] {
+        let mut array = [0u8; AuthenticationKey::LENGTH - AccountAddress::LENGTH];
+        array.copy_from_slice(&self.0[..(AuthenticationKey::LENGTH - AccountAddress::LENGTH)]);
         array
     }
 

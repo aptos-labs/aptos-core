@@ -434,7 +434,7 @@ The <code>_witness</code> guarantees that owner the registered caller of this fu
 authentication key returned is <code>auth_key_prefix</code> | <code>fresh_address</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="Account.md#0x1_Account_create_account">create_account</a>&lt;T&gt;(new_address: <b>address</b>, authentication_key_prefix: vector&lt;u8&gt;, _witness: &T): (signer, vector&lt;u8&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="Account.md#0x1_Account_create_account">create_account</a>&lt;T&gt;(new_address: <b>address</b>, _witness: &T): (signer, vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -445,16 +445,18 @@ authentication key returned is <code>auth_key_prefix</code> | <code>fresh_addres
 
 <pre><code><b>public</b> <b>fun</b> <a href="Account.md#0x1_Account_create_account">create_account</a>&lt;T&gt;(
     new_address: <b>address</b>,
-    authentication_key_prefix: vector&lt;u8&gt;,
     _witness: &T,
 ): (signer, vector&lt;u8&gt;) {
-    authentication_key_prefix = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_empty">Vector::empty</a>&lt;u8&gt;();
     <a href="Account.md#0x1_Account_assert_is_marker">assert_is_marker</a>&lt;T&gt;();
     // there cannot be an <a href="Account.md#0x1_Account">Account</a> resource under new_addr already.
     <b>assert</b>!(!<b>exists</b>&lt;<a href="Account.md#0x1_Account">Account</a>&gt;(new_address), <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_already_published">Errors::already_published</a>(<a href="Account.md#0x1_Account_EACCOUNT">EACCOUNT</a>));
 
     <b>let</b> new_account = <a href="Account.md#0x1_Account_create_signer">create_signer</a>(new_address);
-    <b>let</b> authentication_key = <a href="Account.md#0x1_Account_create_authentication_key">create_authentication_key</a>(&new_account, authentication_key_prefix);
+    <b>let</b> authentication_key = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/BCS.md#0x1_BCS_to_bytes">BCS::to_bytes</a>(&new_address);
+    <b>assert</b>!(
+        <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&authentication_key) == 32,
+        <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="Account.md#0x1_Account_EMALFORMED_AUTHENTICATION_KEY">EMALFORMED_AUTHENTICATION_KEY</a>)
+    );
     <b>move_to</b>(
         &new_account,
         <a href="Account.md#0x1_Account">Account</a> {

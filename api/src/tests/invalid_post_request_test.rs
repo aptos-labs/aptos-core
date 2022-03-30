@@ -45,22 +45,6 @@ async fn test_invalid_script_function_argument_address_string() {
 }
 
 #[tokio::test]
-async fn test_invalid_script_function_argument_hex_encoded_bytes_type() {
-    let mut req = signing_message_request();
-    req["payload"]["arguments"][1] = json!({});
-
-    response_error_msg(req, current_function_name!()).await;
-}
-
-#[tokio::test]
-async fn test_invalid_script_function_argument_hex_string() {
-    let mut req = signing_message_request();
-    req["payload"]["arguments"][1] = json!("0xZZZ");
-
-    response_error_msg(req, current_function_name!()).await;
-}
-
-#[tokio::test]
 async fn test_missing_script_function_arguments() {
     let mut req = signing_message_request();
     req["payload"]["arguments"] = json!(["0"]);
@@ -152,7 +136,6 @@ fn signing_message_request() -> Value {
             ],
             "arguments": [
                 "0x00000000000000000000000001234567", // address
-                "0x5307b5f4bc67829097a8ba9b43dba3b88261eeccd1f709d9bde240fc100fbb69",  // auth_key_image
             ]
         }
     })

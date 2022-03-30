@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error::Error, Client, Result};
-use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_types::transaction::SignedTransaction;
+use move_core_types::account_address::AccountAddress;
 use reqwest::Url;
 
 pub struct FaucetClient {
@@ -19,11 +19,11 @@ impl FaucetClient {
         }
     }
 
-    pub fn create_account(&self, public_key: Ed25519PublicKey) -> Result<()> {
+    pub fn create_account(&self, address: AccountAddress) -> Result<()> {
         let client = reqwest::blocking::Client::new();
         let mut url = Url::parse(&self.faucet_url).map_err(Error::request)?;
         url.set_path("mint");
-        let query = format!("pub_key={}&amount=0&return_txns=true", public_key);
+        let query = format!("auth_key={}&amount=0&return_txns=true", address);
         url.set_query(Some(&query));
 
         let response = client.post(url).send().map_err(Error::request)?;
@@ -44,11 +44,11 @@ impl FaucetClient {
         Ok(())
     }
 
-    pub fn fund(&self, public_key: Ed25519PublicKey, amount: u64) -> Result<()> {
+    pub fn fund(&self, address: AccountAddress, amount: u64) -> Result<()> {
         let client = reqwest::blocking::Client::new();
         let mut url = Url::parse(&self.faucet_url).map_err(Error::request)?;
         url.set_path("mint");
-        let query = format!("pub_key={}&amount={}&return_txns=true", public_key, amount);
+        let query = format!("auth_key={}&amount={}&return_txns=true", address, amount);
         url.set_query(Some(&query));
 
         // Faucet returns the transaction that creates the account and needs to be waited on before
@@ -71,9 +71,9 @@ impl FaucetClient {
         Ok(())
     }
 
-    pub fn mint(&self, public_key: Ed25519PublicKey, amount: u64) -> Result<()> {
-        self.create_account(public_key.clone())?;
-        self.fund(public_key, amount)?;
+    pub fn mint(&self, address: AccountAddress, amount: u64) -> Result<()> {
+        self.create_account(address)?;
+        self.fund(address, amount)?;
 
         Ok(())
     }

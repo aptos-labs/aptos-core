@@ -63,11 +63,10 @@ module AptosFramework::Genesis {
         Marker::initialize(core_resource_account);
         // initialize the core resource account
         AptosAccount::initialize(core_resource_account);
-        let dummy_auth_key_prefix = x"00000000000000000000000000000000";
-        AptosAccount::create_account_internal(Signer::address_of(core_resource_account), copy dummy_auth_key_prefix);
+        AptosAccount::create_account_internal(Signer::address_of(core_resource_account));
         AptosAccount::rotate_authentication_key_internal(core_resource_account, copy core_resource_account_auth_key);
         // initialize the core framework account
-        let core_framework_account = AptosAccount::create_core_framework_account(dummy_auth_key_prefix);
+        let core_framework_account = AptosAccount::create_core_framework_account();
         AptosAccount::rotate_authentication_key_internal(&core_framework_account, core_resource_account_auth_key);
 
         // Consensus config setup
@@ -140,14 +139,13 @@ module AptosFramework::Genesis {
         assert!(num_validator_network_addresses == num_full_node_network_addresses, 0);
 
         let i = 0;
-        let dummy_auth_key_prefix = x"00000000000000000000000000000000";
         while (i < num_owners) {
             let owner = Vector::borrow(&owners, i);
             let owner_address = Signer::address_of(owner);
             let owner_name = *Vector::borrow(&owner_names, i);
             // create each validator account and rotate its auth key to the correct value
             AptosAccount::create_validator_account(
-                &core_resource_account, owner_address, copy dummy_auth_key_prefix, owner_name
+                &core_resource_account, owner_address, owner_name
             );
 
             let owner_auth_key = *Vector::borrow(&owner_auth_keys, i);
@@ -159,7 +157,7 @@ module AptosFramework::Genesis {
             // create the operator account + rotate its auth key if it does not already exist
             if (!AptosAccount::exists_at(operator_address)) {
                 AptosAccount::create_validator_operator_account(
-                    &core_resource_account, operator_address, copy dummy_auth_key_prefix, copy operator_name
+                    &core_resource_account, operator_address, copy operator_name
                 );
                 let operator_auth_key = *Vector::borrow(&operator_auth_keys, i);
                 AptosAccount::rotate_authentication_key_internal(operator, operator_auth_key);

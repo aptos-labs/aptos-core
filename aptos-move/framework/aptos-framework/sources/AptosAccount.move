@@ -4,9 +4,6 @@
 
 module AptosFramework::AptosAccount {
     use Std::Errors;
-    use Std::Hash;
-    use Std::Vector;
-    use Std::BCS;
     use Std::Signer;
     use CoreFramework::Account;
     use CoreFramework::Timestamp;
@@ -40,22 +37,22 @@ module AptosFramework::AptosAccount {
     const PROLOGUE_EMODULE_NOT_ALLOWED: u64 = 1009;
     const PROLOGUE_EINVALID_WRITESET_SENDER: u64 = 1010;
 
-    public(friend) fun create_account_internal(account_address: address, auth_key_prefix: vector<u8>): (signer, vector<u8>) {
+    public(friend) fun create_account_internal(auth_key: address): (signer, vector<u8>) {
         assert!(
-            account_address != @VMReserved,
+            auth_key != @VMReserved,
             Errors::invalid_argument(ECANNOT_CREATE_AT_VM_RESERVED)
         );
         assert!(
-            account_address != @CoreFramework,
+            auth_key != @CoreFramework,
             Errors::invalid_argument(ECANNOT_CREATE_AT_CORE_CODE)
         );
-        Account::create_account(account_address, auth_key_prefix, &Marker::get())
+        Account::create_account(auth_key, &Marker::get())
     }
 
     /// Create the account for @CoreFramework to help module upgrades on testnet.
-    public(friend) fun create_core_framework_account(auth_key_prefix: vector<u8>): signer {
+    public(friend) fun create_core_framework_account(): signer {
         Timestamp::assert_genesis();
-        let (signer, _) = Account::create_account(@CoreFramework, auth_key_prefix, &Marker::get());
+        let (signer, _) = Account::create_account(@CoreFramework, &Marker::get());
         signer
     }
 
@@ -82,17 +79,8 @@ module AptosFramework::AptosAccount {
     /// Basic account creation method.
     ///////////////////////////////////////////////////////////////////////////
 
-    public(script) fun create_account(new_account_address: address, auth_key_preimage: vector<u8>) {
-        let auth_key = Hash::sha3_256(auth_key_preimage);
-        let bytes = BCS::to_bytes(&new_account_address);
-        let len = Vector::length(&bytes);
-        while (len > 0) {
-            let expect_byte = Vector::pop_back(&mut auth_key);
-            assert!(*Vector::borrow(&bytes, len - 1) == expect_byte, Errors::invalid_argument(EADDR_NOT_MATCH_PREIMAGE));
-            len = len - 1;
-        };
-
-        let (signer, _) = create_account_internal(new_account_address, auth_key);
+    public(script) fun create_account(auth_key: address) {
+        let (signer, _) = create_account_internal(auth_key);
         TestCoin::register(&signer);
     }
 
@@ -104,10 +92,9 @@ module AptosFramework::AptosAccount {
     public fun create_validator_account(
         core_resource: &signer,
         new_account_address: address,
-        auth_key_prefix: vector<u8>,
         human_name: vector<u8>,
     ) {
-        let (new_account, _) = create_account_internal(new_account_address, auth_key_prefix);
+        let (new_account, _) = create_account_internal(new_account_address);
         AptosValidatorConfig::publish(core_resource, &new_account, human_name);
     }
 
@@ -115,10 +102,9 @@ module AptosFramework::AptosAccount {
     public fun create_validator_operator_account(
         core_resource: &signer,
         new_account_address: address,
-        auth_key_prefix: vector<u8>,
         human_name: vector<u8>,
     ) {
-        let (new_account, _) = create_account_internal(new_account_address, auth_key_prefix);
+        let (new_account, _) = create_account_internal(new_account_address);
         AptosValidatorOperatorConfig::publish(core_resource, &new_account, human_name);
     }
 

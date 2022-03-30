@@ -109,11 +109,10 @@
     <a href="Marker.md#0x1_Marker_initialize">Marker::initialize</a>(core_resource_account);
     // initialize the core resource account
     <a href="AptosAccount.md#0x1_AptosAccount_initialize">AptosAccount::initialize</a>(core_resource_account);
-    <b>let</b> dummy_auth_key_prefix = x"00000000000000000000000000000000";
-    <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">AptosAccount::create_account_internal</a>(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(core_resource_account), <b>copy</b> dummy_auth_key_prefix);
+    <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">AptosAccount::create_account_internal</a>(<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(core_resource_account));
     <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key_internal">AptosAccount::rotate_authentication_key_internal</a>(core_resource_account, <b>copy</b> core_resource_account_auth_key);
     // initialize the core framework account
-    <b>let</b> core_framework_account = <a href="AptosAccount.md#0x1_AptosAccount_create_core_framework_account">AptosAccount::create_core_framework_account</a>(dummy_auth_key_prefix);
+    <b>let</b> core_framework_account = <a href="AptosAccount.md#0x1_AptosAccount_create_core_framework_account">AptosAccount::create_core_framework_account</a>();
     <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key_internal">AptosAccount::rotate_authentication_key_internal</a>(&core_framework_account, core_resource_account_auth_key);
 
     // Consensus config setup
@@ -206,14 +205,13 @@ Finally, each validator must specify the network address
     <b>assert</b>!(num_validator_network_addresses == num_full_node_network_addresses, 0);
 
     <b>let</b> i = 0;
-    <b>let</b> dummy_auth_key_prefix = x"00000000000000000000000000000000";
     <b>while</b> (i &lt; num_owners) {
         <b>let</b> owner = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(&owners, i);
         <b>let</b> owner_address = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(owner);
         <b>let</b> owner_name = *<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(&owner_names, i);
         // create each validator account and rotate its auth key <b>to</b> the correct value
         <a href="AptosAccount.md#0x1_AptosAccount_create_validator_account">AptosAccount::create_validator_account</a>(
-            &core_resource_account, owner_address, <b>copy</b> dummy_auth_key_prefix, owner_name
+            &core_resource_account, owner_address, owner_name
         );
 
         <b>let</b> owner_auth_key = *<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(&owner_auth_keys, i);
@@ -225,7 +223,7 @@ Finally, each validator must specify the network address
         // create the operator account + rotate its auth key <b>if</b> it does not already exist
         <b>if</b> (!<a href="AptosAccount.md#0x1_AptosAccount_exists_at">AptosAccount::exists_at</a>(operator_address)) {
             <a href="AptosAccount.md#0x1_AptosAccount_create_validator_operator_account">AptosAccount::create_validator_operator_account</a>(
-                &core_resource_account, operator_address, <b>copy</b> dummy_auth_key_prefix, <b>copy</b> operator_name
+                &core_resource_account, operator_address, <b>copy</b> operator_name
             );
             <b>let</b> operator_auth_key = *<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(&operator_auth_keys, i);
             <a href="AptosAccount.md#0x1_AptosAccount_rotate_authentication_key_internal">AptosAccount::rotate_authentication_key_internal</a>(operator, operator_auth_key);

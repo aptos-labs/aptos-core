@@ -145,7 +145,6 @@ impl TransactionFactory {
         let preimage = AuthenticationKeyPreimage::ed25519(public_key);
         self.payload(aptos_stdlib::encode_create_account_script_function(
             AuthenticationKey::from_preimage(&preimage).derived_address(),
-            preimage.into_vec(),
         ))
     }
 

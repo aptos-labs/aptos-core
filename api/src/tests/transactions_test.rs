@@ -23,7 +23,6 @@ use aptos_types::{
 };
 
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_types::transaction::authenticator::AuthenticationKeyPreimage;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
@@ -501,7 +500,6 @@ async fn test_signing_message_with_script_function_payload() {
     let mut context = new_test_context(current_function_name!());
     let account = context.gen_account();
     let txn = context.create_user_account(&account);
-    let auth_preimage = AuthenticationKeyPreimage::ed25519(account.public_key());
 
     let payload = json!({
         "type": "script_function_payload",
@@ -510,7 +508,6 @@ async fn test_signing_message_with_script_function_payload() {
         ],
         "arguments": [
             account.address().to_hex_literal(), // new_account_address
-            format!("0x{}", hex::encode(auth_preimage.into_vec())), // auth_key
         ]
     });
     test_signing_message_with_payload(context, txn, payload).await;

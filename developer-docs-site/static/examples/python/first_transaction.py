@@ -159,11 +159,10 @@ class FaucetClient:
         self.url = url
         self.rest_client = rest_client
 
-    def fund_account(self, pub_key: str, amount: int) -> None:
+    def fund_account(self, auth_key: str, amount: int) -> None:
         """This creates an account if it does not exist and mints the specified amount of
         coins into that account."""
-
-        txns = requests.post(f"{self.url}/mint?amount={amount}&pub_key={pub_key}")
+        txns = requests.post(f"{self.url}/mint?amount={amount}&auth_key={auth_key}")
         assert txns.status_code == 200, txns.text
         for txn_hash in txns.json():
             self.rest_client.wait_for_transaction(txn_hash)
@@ -183,8 +182,8 @@ if __name__ == "__main__":
     print(f"Alice: {alice.address()}")
     print(f"Bob: {bob.address()}")
 
-    faucet_client.fund_account(alice.pub_key(), 1_000_000)
-    faucet_client.fund_account(bob.pub_key(), 0)
+    faucet_client.fund_account(alice.auth_key(), 1_000_000)
+    faucet_client.fund_account(bob.auth_key(), 0)
 
     print("\n=== Initial Balances ===")
     print(f"Alice: {rest_client.account_balance(alice.address())}")

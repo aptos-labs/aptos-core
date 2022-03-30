@@ -270,8 +270,7 @@ mod tests {
         if let Some(script_function) = ScriptFunctionCall::decode(txn.payload()) {
             match script_function {
                 ScriptFunctionCall::CreateAccount {
-                    new_account_address: address,
-                    ..
+                    auth_key: address, ..
                 } => {
                     let mut writer = accounts.write();
                     let previous = writer.insert(address, AccountState::new(0));
@@ -328,20 +327,20 @@ mod tests {
         let (accounts, service) = setup(None);
         let filter = routes(service);
 
-        // pub_key is outside of the loop for minting same account multiple times,
+        // auth_key is outside of the loop for minting same account multiple times,
         // it should succeed and should not create same account multiple times.
-        let pub_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
+        let auth_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
         let amount = 13345;
         let resp = warp::test::request()
             .method("POST")
-            .path(format!("/mint?pub_key={}&amount={}", pub_key, amount).as_str())
+            .path(format!("/mint?auth_key={}&amount={}", auth_key, amount).as_str())
             .reply(&filter)
             .await;
         let values: Vec<HashValue> = serde_json::from_slice(resp.body()).unwrap();
         assert_eq!(values.len(), 2);
         let reader = accounts.read();
         let addr = AccountAddress::try_from(
-            "9FF98E82355EB13098F3B1157AC018A725C62C0E0820F422000814CDBA407835".to_owned(),
+            "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d".to_owned(),
         )
         .unwrap();
         let account = reader.get(&addr).expect("account should be created");
@@ -353,14 +352,14 @@ mod tests {
         let (accounts, service) = setup(None);
         let filter = routes(service);
 
-        let pub_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
+        let auth_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
         let amount = 13345;
         let resp = warp::test::request()
             .method("POST")
             .path(
                 format!(
-                    "/mint?pub_key={}&amount={}&return_txns=true",
-                    pub_key, amount
+                    "/mint?auth_key={}&amount={}&return_txns=true",
+                    auth_key, amount
                 )
                 .as_str(),
             )
@@ -373,7 +372,7 @@ mod tests {
 
         let reader = accounts.read();
         let addr = AccountAddress::try_from(
-            "9FF98E82355EB13098F3B1157AC018A725C62C0E0820F422000814CDBA407835".to_owned(),
+            "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d".to_owned(),
         )
         .unwrap();
         let account = reader.get(&addr).expect("account should be created");
@@ -395,14 +394,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_mint_invalid_pub_key() {
+    async fn test_mint_invalid_auth_key() {
         let (_accounts, service) = setup(None);
         let filter = routes(service);
 
-        let pub_key = "invalid-auth-key";
+        let auth_key = "invalid-auth-key";
         let resp = warp::test::request()
             .method("POST")
-            .path(format!("/mint?pub_key={}&amount=1000000", pub_key).as_str())
+            .path(format!("/mint?auth_key={}&amount=1000000", auth_key).as_str())
             .reply(&filter)
             .await;
         assert_eq!(resp.body(), "Invalid query string");
@@ -415,10 +414,10 @@ mod tests {
         accounts.write().remove(&address);
         let filter = routes(service);
 
-        let pub_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
+        let auth_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
         let resp = warp::test::request()
             .method("POST")
-            .path(format!("/mint?pub_key={}&amount=1000000", pub_key).as_str())
+            .path(format!("/mint?auth_key={}&amount=1000000", auth_key).as_str())
             .reply(&filter)
             .await;
 
@@ -443,15 +442,13 @@ mod tests {
                 .as_slice()
                 .try_into()
                 .unwrap();
-
+        let address = AuthenticationKey::ed25519(&pub_key).derived_address();
         assert_eq!(
-            AuthenticationKey::ed25519(&pub_key)
-                .derived_address()
-                .to_string(),
+            address.to_string(),
             "9FF98E82355EB13098F3B1157AC018A725C62C0E0820F422000814CDBA407835"
         );
 
-        let res = tokio::task::spawn_blocking(move || faucet_client.create_account(pub_key))
+        let res = tokio::task::spawn_blocking(move || faucet_client.create_account(address))
             .await
             .unwrap();
         res.unwrap();
@@ -472,11 +469,11 @@ mod tests {
                 .as_slice()
                 .try_into()
                 .unwrap();
-
+        let address = AuthenticationKey::ed25519(&pub_key).derived_address();
         let (res1, res2) = tokio::task::spawn_blocking(move || {
             (
-                faucet_client.create_account(pub_key.clone()),
-                faucet_client.fund(pub_key, 10),
+                faucet_client.create_account(address),
+                faucet_client.fund(address, 10),
             )
         })
         .await

@@ -122,16 +122,18 @@ module CoreFramework::Account {
     /// authentication key returned is `auth_key_prefix` | `fresh_address`.
     public fun create_account<T>(
         new_address: address,
-        authentication_key_prefix: vector<u8>,
         _witness: &T,
     ): (signer, vector<u8>) {
-        authentication_key_prefix = Vector::empty<u8>();
         assert_is_marker<T>();
         // there cannot be an Account resource under new_addr already.
         assert!(!exists<Account>(new_address), Errors::already_published(EACCOUNT));
 
         let new_account = create_signer(new_address);
-        let authentication_key = create_authentication_key(&new_account, authentication_key_prefix);
+        let authentication_key = BCS::to_bytes(&new_address);
+        assert!(
+            Vector::length(&authentication_key) == 32,
+            Errors::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
+        );
         move_to(
             &new_account,
             Account {

@@ -148,7 +148,10 @@ pub async fn delegate_mint_account(
         &service,
         mint::MintParams {
             amount: 100_000_000_000,
-            pub_key: delegated_account.public_key().clone(),
+            auth_key: delegated_account
+                .authentication_key()
+                .clone()
+                .derived_address(),
             return_txns: Some(true),
         },
     )

@@ -3,17 +3,11 @@
 
 use crate::Service;
 use anyhow::Result;
-use aptos_crypto::{ed25519::Ed25519PublicKey, hash::HashValue};
+use aptos_crypto::hash::HashValue;
 use aptos_logger::{error, info, warn};
 use aptos_sdk::{
     transaction_builder::aptos_stdlib,
-    types::{
-        account_address::AccountAddress,
-        transaction::{
-            authenticator::{AuthenticationKey, AuthenticationKeyPreimage},
-            SignedTransaction,
-        },
-    },
+    types::{account_address::AccountAddress, transaction::SignedTransaction},
 };
 use reqwest::StatusCode;
 use serde::Deserialize;
@@ -68,7 +62,7 @@ impl std::fmt::Display for Response {
 #[derive(Deserialize, Debug)]
 pub struct MintParams {
     pub amount: u64,
-    pub pub_key: Ed25519PublicKey,
+    pub auth_key: AccountAddress,
     pub return_txns: Option<bool>,
 }
 
@@ -79,12 +73,8 @@ impl std::fmt::Display for MintParams {
 }
 
 impl MintParams {
-    fn pre_image(&self) -> AuthenticationKeyPreimage {
-        AuthenticationKeyPreimage::ed25519(&self.pub_key)
-    }
-
     fn receiver(&self) -> AccountAddress {
-        AuthenticationKey::ed25519(&self.pub_key).derived_address()
+        self.auth_key
     }
 }
 
@@ -139,10 +129,7 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
 
         if receiver_seq.is_none() {
             let builder = service.transaction_factory.payload(
-                aptos_stdlib::encode_create_account_script_function(
-                    params.receiver(),
-                    params.pre_image().into_vec(),
-                ),
+                aptos_stdlib::encode_create_account_script_function(params.receiver()),
             );
 
             let txn = faucet_account.sign_with_transaction_builder(builder);

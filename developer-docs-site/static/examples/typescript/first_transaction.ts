@@ -204,8 +204,8 @@ export class FaucetClient {
 
   /** This creates an account if it does not exist and mints the specified amount of
    coins into that account */
-  async fundAccount(pubKey: string, amount: number) {
-    const url = `${this.url}/mint?amount=${amount}&pub_key=${pubKey}`;
+  async fundAccount(authKey: string, amount: number) {
+    const url = `${this.url}/mint?amount=${amount}&auth_key=${authKey}`;
     const response = await fetch(url, {method: "POST"});
     if (response.status != 200) {
       assert(response.status == 200, await response.text());
@@ -233,8 +233,8 @@ async function main() {
   console.log(`Alice: ${alice.address()}. Key Seed: ${Buffer.from(alice.signingKey.secretKey).toString("hex").slice(0, 64)}`);
   console.log(`Bob: ${bob.address()}. Key Seed: ${Buffer.from(bob.signingKey.secretKey).toString("hex").slice(0, 64)}`);
 
-  await faucetClient.fundAccount(alice.pubKey(), 1_000_000_000);
-  await faucetClient.fundAccount(bob.pubKey(), 0);
+  await faucetClient.fundAccount(alice.authKey(), 1_000_000_000);
+  await faucetClient.fundAccount(bob.authKey(), 0);
 
   console.log("\n=== Initial Balances ===");
   console.log(`Alice: ${await restClient.accountBalance(alice.address())}`);

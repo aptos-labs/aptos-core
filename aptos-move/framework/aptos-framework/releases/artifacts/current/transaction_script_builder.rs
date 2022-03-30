@@ -51,10 +51,7 @@ pub enum ScriptFunctionCall {
     },
 
     /// Basic account creation method.
-    CreateAccount {
-        new_account_address: AccountAddress,
-        auth_key_preimage: Bytes,
-    },
+    CreateAccount { auth_key: AccountAddress },
 
     CreateFiniteCollectionScript {
         description: Bytes,
@@ -141,10 +138,7 @@ impl ScriptFunctionCall {
                 creator,
                 token_creation_num,
             } => encode_claim_script_script_function(sender, creator, token_creation_num),
-            CreateAccount {
-                new_account_address,
-                auth_key_preimage,
-            } => encode_create_account_script_function(new_account_address, auth_key_preimage),
+            CreateAccount { auth_key } => encode_create_account_script_function(auth_key),
             CreateFiniteCollectionScript {
                 description,
                 name,
@@ -308,10 +302,7 @@ pub fn encode_claim_script_script_function(
 }
 
 /// Basic account creation method.
-pub fn encode_create_account_script_function(
-    new_account_address: AccountAddress,
-    auth_key_preimage: Vec<u8>,
-) -> TransactionPayload {
+pub fn encode_create_account_script_function(auth_key: AccountAddress) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -322,10 +313,7 @@ pub fn encode_create_account_script_function(
         ),
         ident_str!("create_account").to_owned(),
         vec![],
-        vec![
-            bcs::to_bytes(&new_account_address).unwrap(),
-            bcs::to_bytes(&auth_key_preimage).unwrap(),
-        ],
+        vec![bcs::to_bytes(&auth_key).unwrap()],
     ))
 }
 
@@ -621,8 +609,7 @@ fn decode_create_account_script_function(
 ) -> Option<ScriptFunctionCall> {
     if let TransactionPayload::ScriptFunction(script) = payload {
         Some(ScriptFunctionCall::CreateAccount {
-            new_account_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-            auth_key_preimage: bcs::from_bytes(script.args().get(1)?).ok()?,
+            auth_key: bcs::from_bytes(script.args().get(0)?).ok()?,
         })
     } else {
         None

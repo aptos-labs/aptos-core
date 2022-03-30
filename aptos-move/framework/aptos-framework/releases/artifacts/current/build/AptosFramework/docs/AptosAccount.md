@@ -30,9 +30,7 @@ transaction in addition to the core prologue and epilogue.
 <pre><code><b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Account.md#0x1_Account">0x1::Account</a>;
 <b>use</b> <a href="AptosValidatorConfig.md#0x1_AptosValidatorConfig">0x1::AptosValidatorConfig</a>;
 <b>use</b> <a href="AptosValidatorOperatorConfig.md#0x1_AptosValidatorOperatorConfig">0x1::AptosValidatorOperatorConfig</a>;
-<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/BCS.md#0x1_BCS">0x1::BCS</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors">0x1::Errors</a>;
-<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Hash.md#0x1_Hash">0x1::Hash</a>;
 <b>use</b> <a href="Marker.md#0x1_Marker">0x1::Marker</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Signer.md#0x1_Signer">0x1::Signer</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/SystemAddresses.md#0x1_SystemAddresses">0x1::SystemAddresses</a>;
@@ -40,7 +38,6 @@ transaction in addition to the core prologue and epilogue.
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Timestamp.md#0x1_Timestamp">0x1::Timestamp</a>;
 <b>use</b> <a href="TransactionFee.md#0x1_TransactionFee">0x1::TransactionFee</a>;
 <b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/TransactionPublishingOption.md#0x1_TransactionPublishingOption">0x1::TransactionPublishingOption</a>;
-<b>use</b> <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector">0x1::Vector</a>;
 </code></pre>
 
 
@@ -185,7 +182,7 @@ important to the semantics of the system.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">create_account_internal</a>(account_address: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;): (signer, vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">create_account_internal</a>(auth_key: <b>address</b>): (signer, vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -194,16 +191,16 @@ important to the semantics of the system.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">create_account_internal</a>(account_address: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;): (signer, vector&lt;u8&gt;) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">create_account_internal</a>(auth_key: <b>address</b>): (signer, vector&lt;u8&gt;) {
     <b>assert</b>!(
-        account_address != @VMReserved,
+        auth_key != @VMReserved,
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="AptosAccount.md#0x1_AptosAccount_ECANNOT_CREATE_AT_VM_RESERVED">ECANNOT_CREATE_AT_VM_RESERVED</a>)
     );
     <b>assert</b>!(
-        account_address != @CoreFramework,
+        auth_key != @CoreFramework,
         <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="AptosAccount.md#0x1_AptosAccount_ECANNOT_CREATE_AT_CORE_CODE">ECANNOT_CREATE_AT_CORE_CODE</a>)
     );
-    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Account.md#0x1_Account_create_account">Account::create_account</a>(account_address, auth_key_prefix, &<a href="Marker.md#0x1_Marker_get">Marker::get</a>())
+    <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Account.md#0x1_Account_create_account">Account::create_account</a>(auth_key, &<a href="Marker.md#0x1_Marker_get">Marker::get</a>())
 }
 </code></pre>
 
@@ -218,7 +215,7 @@ important to the semantics of the system.
 Create the account for @CoreFramework to help module upgrades on testnet.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_core_framework_account">create_core_framework_account</a>(auth_key_prefix: vector&lt;u8&gt;): signer
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_core_framework_account">create_core_framework_account</a>(): signer
 </code></pre>
 
 
@@ -227,9 +224,9 @@ Create the account for @CoreFramework to help module upgrades on testnet.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_core_framework_account">create_core_framework_account</a>(auth_key_prefix: vector&lt;u8&gt;): signer {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_core_framework_account">create_core_framework_account</a>(): signer {
     <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Timestamp.md#0x1_Timestamp_assert_genesis">Timestamp::assert_genesis</a>();
-    <b>let</b> (signer, _) = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Account.md#0x1_Account_create_account">Account::create_account</a>(@CoreFramework, auth_key_prefix, &<a href="Marker.md#0x1_Marker_get">Marker::get</a>());
+    <b>let</b> (signer, _) = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/CoreFramework/docs/Account.md#0x1_Account_create_account">Account::create_account</a>(@CoreFramework, &<a href="Marker.md#0x1_Marker_get">Marker::get</a>());
     signer
 }
 </code></pre>
@@ -284,7 +281,7 @@ Initialize this module. This is only callable from genesis.
 Basic account creation method.
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account">create_account</a>(new_account_address: <b>address</b>, auth_key_preimage: vector&lt;u8&gt;)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account">create_account</a>(auth_key: <b>address</b>)
 </code></pre>
 
 
@@ -293,17 +290,8 @@ Basic account creation method.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account">create_account</a>(new_account_address: <b>address</b>, auth_key_preimage: vector&lt;u8&gt;) {
-    <b>let</b> auth_key = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Hash.md#0x1_Hash_sha3_256">Hash::sha3_256</a>(auth_key_preimage);
-    <b>let</b> bytes = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/BCS.md#0x1_BCS_to_bytes">BCS::to_bytes</a>(&new_account_address);
-    <b>let</b> len = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_length">Vector::length</a>(&bytes);
-    <b>while</b> (len &gt; 0) {
-        <b>let</b> expect_byte = <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_pop_back">Vector::pop_back</a>(&<b>mut</b> auth_key);
-        <b>assert</b>!(*<a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Vector.md#0x1_Vector_borrow">Vector::borrow</a>(&bytes, len - 1) == expect_byte, <a href="../../../../../../../aptos-framework/releases/artifacts/current/build/MoveStdlib/docs/Errors.md#0x1_Errors_invalid_argument">Errors::invalid_argument</a>(<a href="AptosAccount.md#0x1_AptosAccount_EADDR_NOT_MATCH_PREIMAGE">EADDR_NOT_MATCH_PREIMAGE</a>));
-        len = len - 1;
-    };
-
-    <b>let</b> (signer, _) = <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">create_account_internal</a>(new_account_address, auth_key);
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_account">create_account</a>(auth_key: <b>address</b>) {
+    <b>let</b> (signer, _) = <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">create_account_internal</a>(auth_key);
     <a href="TestCoin.md#0x1_TestCoin_register">TestCoin::register</a>(&signer);
 }
 </code></pre>
@@ -343,7 +331,7 @@ Basic account creation method.
 Create a Validator account
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_validator_account">create_validator_account</a>(core_resource: &signer, new_account_address: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;, human_name: vector&lt;u8&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_validator_account">create_validator_account</a>(core_resource: &signer, new_account_address: <b>address</b>, human_name: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -355,10 +343,9 @@ Create a Validator account
 <pre><code><b>public</b> <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_validator_account">create_validator_account</a>(
     core_resource: &signer,
     new_account_address: <b>address</b>,
-    auth_key_prefix: vector&lt;u8&gt;,
     human_name: vector&lt;u8&gt;,
 ) {
-    <b>let</b> (new_account, _) = <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">create_account_internal</a>(new_account_address, auth_key_prefix);
+    <b>let</b> (new_account, _) = <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">create_account_internal</a>(new_account_address);
     <a href="AptosValidatorConfig.md#0x1_AptosValidatorConfig_publish">AptosValidatorConfig::publish</a>(core_resource, &new_account, human_name);
 }
 </code></pre>
@@ -374,7 +361,7 @@ Create a Validator account
 Create a Validator Operator account
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_validator_operator_account">create_validator_operator_account</a>(core_resource: &signer, new_account_address: <b>address</b>, auth_key_prefix: vector&lt;u8&gt;, human_name: vector&lt;u8&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_validator_operator_account">create_validator_operator_account</a>(core_resource: &signer, new_account_address: <b>address</b>, human_name: vector&lt;u8&gt;)
 </code></pre>
 
 
@@ -386,10 +373,9 @@ Create a Validator Operator account
 <pre><code><b>public</b> <b>fun</b> <a href="AptosAccount.md#0x1_AptosAccount_create_validator_operator_account">create_validator_operator_account</a>(
     core_resource: &signer,
     new_account_address: <b>address</b>,
-    auth_key_prefix: vector&lt;u8&gt;,
     human_name: vector&lt;u8&gt;,
 ) {
-    <b>let</b> (new_account, _) = <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">create_account_internal</a>(new_account_address, auth_key_prefix);
+    <b>let</b> (new_account, _) = <a href="AptosAccount.md#0x1_AptosAccount_create_account_internal">create_account_internal</a>(new_account_address);
     <a href="AptosValidatorOperatorConfig.md#0x1_AptosValidatorOperatorConfig_publish">AptosValidatorOperatorConfig::publish</a>(core_resource, &new_account, human_name);
 }
 </code></pre>

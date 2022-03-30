@@ -6,6 +6,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use aptos_crypto::HashValue;
 use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
 use hex::ToHex;
 use rand::{rngs::OsRng, Rng, SeedableRng};
@@ -293,11 +294,11 @@ impl FaucetClient {
     }
 
     /// This creates an account if it does not exist and mints the specified amount of coins into that account.
-    pub fn fund_account(&self, pub_key: &str, amount: u64) {
+    pub fn fund_account(&self, auth_key: &str, amount: u64) {
         let res = reqwest::blocking::Client::new()
             .post(format!(
-                "{}/mint?amount={}&pub_key={}",
-                self.url, amount, pub_key
+                "{}/mint?amount={}&auth_key={}",
+                self.url, amount, auth_key
             ))
             .send()
             .unwrap();

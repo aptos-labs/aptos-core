@@ -120,10 +120,7 @@ impl<'t> AptosPublicInfo<'t> {
         let create_account_txn =
             self.root_account
                 .sign_with_transaction_builder(self.transaction_factory().payload(
-                    aptos_stdlib::encode_create_account_script_function(
-                        auth_key.derived_address(),
-                        preimage.into_vec(),
-                    ),
+                    aptos_stdlib::encode_create_account_script_function(auth_key.derived_address()),
                 ));
         self.rest_client
             .submit_and_wait(&create_account_txn)
