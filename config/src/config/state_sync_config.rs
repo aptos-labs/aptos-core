@@ -114,7 +114,7 @@ impl Default for StorageServiceConfig {
     fn default() -> Self {
         Self {
             max_account_states_chunk_sizes: 3000,
-            max_concurrent_requests: 50,
+            max_concurrent_requests: 1000,
             max_epoch_chunk_size: 100,
             max_network_channel_size: 1000,
             max_transaction_chunk_size: 3000,
