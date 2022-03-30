@@ -24,7 +24,7 @@ Additionally, most NFTs are part of a collection or a set of NFTs with a common 
 * A description, the description of the asset
 * A URL, a non-descript pointer off-chain to more information about the asset could be media such as an image or video or more metadata
 
-The Aptos implementation for core NFTs or Tokens can be found in [Token.move](https://github.com/aptos-labs/aptos-core/blob/nft/aptos-move/framework/aptos-framework/sources/Token.move).
+The Aptos implementation for core NFTs or Tokens can be found in [Token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/Token.move).
 
 ## Aptos Token Definitions
 
@@ -35,19 +35,20 @@ The Aptos Token is defined as:
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | `id` | `GUID:ID` | A globally unique identifier for this token also useful for identifying the creator |
+| `name` | `ASCII::String` | The name of this token, must be unique within the collection |
 | `collection` | `GUID:ID` | A globally unique identifier for the collection that contains this token |
 | `balance` | `u64` | The current stored amount of this token in relation to the supply, `1 <= balance <= supply` |
-| `data` | `TokenData` | Additional data about this token, this is set of supply of the token is 1 |
 
 The Aptos TokenData is defined as:
 
 | Field | Type | Description |
 | ----- | ---- | ----------- |
+| `id` | `GUID:ID` | A globally unique identifier for this token also useful for identifying the creator |
 | `description` | `ASCII::String` | Describes this token |
-| `metadata` | `TokenType` | A generic, a optional user defined struct to contain additional information about this token on-chain |
 | `name` | `ASCII::String` | The name of this token, must be unique within the collection |
 | `supply` | `u64` | Total number of editions of this Token |
 | `uri` | `ASCII::String` | URL for additional information / media |
+| `metadata` | `TokenType` | A generic, a optional user defined struct to contain additional information about this token on-chain |
 
 Tokens are defined with the move attributes `store`, which means that they can be saved to global storage. Tokens cannot be implicitly dropped and must be burned to ensure that the total balance is equal to supply. Tokens cannot be copied. That is the total balance or supply cannot be changed by anyone but the creator due to the lack of a copy operator. Note, the current APIs do not expose the ability for post creation mints. A token can be uniquely identified by either its `id` or by the tuple of `TokenType, collection name, and token name`.
 
@@ -59,11 +60,17 @@ Aptos defines a set of collections grouped together by their unique `id`:
 
 ```rust
 struct Collections<TokenType: copy + drop + store> has key {
-    collections: Table<ASCII::String, Collection<TokenType>>,
+    collections: Table<ASCII::String, Collection>,
+}
+
+struct TokenMetadata<TokenType: store> has key {
+    metadata: Table<ID, TokenType>,
 }
 ```
 
-As the `Collections` has the attribute `key`, it is stored directly to the creators account. It is important to note, that if there were no notion of `Collections` and instead `Collection` had the `key` attribute, an Aptos account could only have a single collection of `TokenType`, which often is not the case. A collection can be looked up in the set of Collections by name, hence enforcing a unique `TokenType` and collect name.
+As the `Collections` has the attribute `key`, it is stored directly to the creators account. It is important to note, that if there were no notion of `Collections` and instead `Collection` had the `key` attribute, an Aptos account could only have a single collection, which often is not the case. A collection can be looked up in the set of Collections by name, hence enforcing a unique collection name.
+
+The Token and TokenData structs are fixed in their content. The resource `TokenMetadata` enables creators to store additional token data. The Data in the table is stored as the `Token`'s unique `ID`. The use of this is optional and requires API specialization due to the limitation that script functions cannot support structs or generics.
 
 Each collection has the following fields:
 
@@ -77,7 +84,7 @@ Each collection has the following fields:
 | `count` | `u64` | Total number of distinct Tokens tracked by this collection |
 | `maximum` | `Option<u64>` | Optional, maximum amount of tokens that can be minted within this collection |
 
-A collection is not a store for accumulating Tokens, so instead of containing a `Token`, it contains a `TokenMetadata`:
+A collection is not a store for accumulating Tokens, so instead of containing a `Token`, it contains a `TokenData`:
 
 | Field | Type | Description |
 | ----- | ---- | ----------- |
@@ -89,25 +96,24 @@ A collection is not a store for accumulating Tokens, so instead of containing a 
 In order to acquire and store tokens, a user must have a `Gallery` of `TokenType`:
 
 ```rust
-struct Gallery<TokenType: copy + drop + store> has key {
-    gallery: Table<ID, Token<TokenType>>,
+struct Gallery has key {
+    gallery: Table<ID, Token>,
 }
 ```
 
 Like the `Collections`, this is stored as a resource on an Aptos account.
 
-## Introducing Simple Tokens
+## Introducing Tokens
 
-As part of our core framework, Aptos provides [SimpleToken](https://github.com/aptos-labs/aptos-core/blob/nft/aptos-move/framework/aptos-framework/sources/SimpleToken.move), which are Tokens that have no metadata, or explicitly a `TokenType` of an empty struct. The motivations for doing so include:
+As part of our core framework, Aptos provides a basic [Token](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/Token.move) interface with no additional data, or explicitly one in which the `TokenMetadata` resource has no entry for that token. The motivations for doing so include:
 
 * Creating a new token requires writing Move code
 * The Script function for creating a new token must be specialized as Move does not support template types or structs as input arguments
 * Template types on script functions add extra friction to writing script functions
-* We needed to demonstrate a minimal token for this tutorial
 
 This tutorial will walk you through the process of
-* creating your own SimpleToken collection,
-* a SimpleToken of our favorite cat,
+* creating your own Token collection,
+* a Token of our favorite cat,
 * and giving that token to someone else.
 
 This tutorial builds on [Your first transaction](/tutorials/your-first-transaction) as a library for this example. The following tutorial contains example code that can be downloaded in its entirety below:
@@ -137,7 +143,7 @@ THe Aptos Token enables creators to create finite or unlimited collections. Many
 
 Finite, that is no more than a `maximum` number of tokens can ever be minted:
 ```rust
-public(script) fun create_finite_simple_collection(
+public(script) fun create_finite_collection_script(
     account: signer,
     description: vector<u8>,
     name: vector<u8>,
@@ -148,7 +154,7 @@ public(script) fun create_finite_simple_collection(
 
 Unlimited, that is there is no limit to the number of tokens that can be added to the collection:
 ```rust
-public(script) fun create_unlimited_simple_collection(
+public(script) fun create_unlimited_collection_script(
     account: signer,
     description: vector<u8>,
     name: vector<u8>,
@@ -180,7 +186,7 @@ TODO
 Tokens can be created after collection creation. To do so, the token must specify the same `collection_name` as specified as the name of a previously created collection `name`. The Move script function to create a `SimpleToken` is:
 
 ```rust
-public(script) fun create_simple_token(
+public(script) fun create_token_script(
     account: signer,
     collection_name: vector<u8>,
     description: vector<u8>,
@@ -236,10 +242,10 @@ TODO
 
 #### Offering the Token
 
-The following Move script function in `SimpleToken` supports transferring a token to another account, effectively registering that the other account can claim the token:
+The following Move script function in `Token` supports transferring a token to another account, effectively registering that the other account can claim the token:
 
 ```rust
-public(script) fun transfer_simple_token_to(
+public(script) fun offer_script(
     sender: signer,
     receiver: address,
     creator: address,
@@ -270,7 +276,7 @@ TODO
 The following Move script function in `SimpleToken` supports receiving a token provided by the previous function, effectively claiming a token:
 
 ```rust
-public(script) fun receive_token_from(
+public(script) fun claim_script(
     sender: signer,
     receiver: address,
     creator: address,
@@ -301,3 +307,4 @@ TODO
 * Add events -- needs feedback on what events
 * Provide mutable APIs for tokens
 * Write a smoketest for generics and simple token directly
+* Enable burning in a safe way

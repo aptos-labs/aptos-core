@@ -160,7 +160,7 @@ if __name__ == "__main__":
     print(f"Bob: {client.account_balance(bob.address())}")
 
     client.create_collection(alice, "Alice's simple collection", "Alice's", "https://aptos.dev")
-    client.create_token(alice, "Alice's", "Alice's simple token", "Alice's first token", 1, "https://aptos.dev")
+    client.create_token(alice, "Alice's", "Alice's simple token", "Alice's first token", 1, "https://aptos.dev/img/nyan.jpeg")
 
     print("\n=== Creating Collection and Token ===")
     token_id = client.get_token_id(alice.address(), "Alice's", "Alice's first token")
