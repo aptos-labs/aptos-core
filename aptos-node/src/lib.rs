@@ -376,6 +376,7 @@ fn setup_state_sync_storage_service(
             config,
             storage_service_runtime.handle().clone(),
             storage_reader.clone(),
+            TimeService::real(),
             events,
         );
         storage_service_runtime.spawn(service.start());

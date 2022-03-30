@@ -110,6 +110,7 @@ pub struct StorageServiceConfig {
     pub max_network_channel_size: u64,       // Max num of pending network messages
     pub max_transaction_chunk_size: u64,     // Max num of transactions per chunk
     pub max_transaction_output_chunk_size: u64, // Max num of transaction outputs per chunk
+    pub storage_summary_refresh_interval_ms: u64, // The interval (ms) to refresh the storage summary
 }
 
 impl Default for StorageServiceConfig {
@@ -121,6 +122,7 @@ impl Default for StorageServiceConfig {
             max_network_channel_size: 1000,
             max_transaction_chunk_size: 3000,
             max_transaction_output_chunk_size: 3000,
+            storage_summary_refresh_interval_ms: 1000,
         }
     }
 }

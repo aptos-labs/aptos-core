@@ -8,6 +8,7 @@ use anyhow::Result;
 use aptos_config::config::StorageServiceConfig;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_logger::Level;
+use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -59,7 +60,7 @@ const STATE_PRUNE_WINDOW: u64 = 50;
 
 #[tokio::test]
 async fn test_get_server_protocol_version() {
-    let (mut mock_client, service) = MockClient::new();
+    let (mut mock_client, service, _) = MockClient::new();
     tokio::spawn(service.start());
 
     // Process a request to fetch the protocol version
@@ -75,7 +76,7 @@ async fn test_get_server_protocol_version() {
 
 #[tokio::test]
 async fn test_get_account_states_chunk_with_proof() {
-    let (mut mock_client, service) = MockClient::new();
+    let (mut mock_client, service, _) = MockClient::new();
     tokio::spawn(service.start());
 
     // Create a request to fetch an account states chunk with a proof
@@ -112,7 +113,7 @@ async fn test_get_account_states_chunk_with_proof() {
 
 #[tokio::test]
 async fn test_get_number_of_accounts_at_version() {
-    let (mut mock_client, service) = MockClient::new();
+    let (mut mock_client, service, _) = MockClient::new();
     tokio::spawn(service.start());
 
     // Create a request to fetch the number of accounts at the specified version
@@ -129,10 +130,23 @@ async fn test_get_number_of_accounts_at_version() {
 
 #[tokio::test]
 async fn test_get_storage_server_summary() {
-    let (mut mock_client, service) = MockClient::new();
+    let (mut mock_client, service, mock_time) = MockClient::new();
     tokio::spawn(service.start());
 
     // Process a request to fetch the storage summary
+    let request = StorageServiceRequest::GetStorageServerSummary;
+    let response = mock_client.send_request(request).await.unwrap();
+
+    // Verify the response is the default response (not enough time has passed for the cache to be updated)
+    assert_eq!(
+        response,
+        StorageServiceResponse::StorageServerSummary(StorageServerSummary::default())
+    );
+
+    // Elapse enough time to force the cache to be updated
+    mock_time.advance_secs(5);
+
+    // Process another request to fetch the storage summary
     let request = StorageServiceRequest::GetStorageServerSummary;
     let response = mock_client.send_request(request).await.unwrap();
 
@@ -170,7 +184,7 @@ async fn test_get_storage_server_summary() {
 
 #[tokio::test]
 async fn test_get_transactions_with_proof_events() {
-    let (mut mock_client, service) = MockClient::new();
+    let (mut mock_client, service, _) = MockClient::new();
     tokio::spawn(service.start());
 
     // Create a request to fetch transactions with a proof
@@ -205,7 +219,7 @@ async fn test_get_transactions_with_proof_events() {
 
 #[tokio::test]
 async fn test_get_transactions_with_proof_no_events() {
-    let (mut mock_client, service) = MockClient::new();
+    let (mut mock_client, service, _) = MockClient::new();
     tokio::spawn(service.start());
 
     // Create a request to fetch transactions with a proof (excluding events)
@@ -240,7 +254,7 @@ async fn test_get_transactions_with_proof_no_events() {
 
 #[tokio::test]
 async fn test_get_transaction_outputs_with_proof() {
-    let (mut mock_client, service) = MockClient::new();
+    let (mut mock_client, service, _) = MockClient::new();
     tokio::spawn(service.start());
 
     // Create a request to fetch transaction outputs with a proof
@@ -274,7 +288,7 @@ async fn test_get_transaction_outputs_with_proof() {
 
 #[tokio::test]
 async fn test_get_epoch_ending_ledger_infos() {
-    let (mut mock_client, service) = MockClient::new();
+    let (mut mock_client, service, _) = MockClient::new();
     tokio::spawn(service.start());
 
     let start_epoch = 11;
@@ -315,7 +329,7 @@ struct MockClient {
 }
 
 impl MockClient {
-    fn new() -> (Self, StorageServiceServer<StorageReader>) {
+    fn new() -> (Self, StorageServiceServer<StorageReader>, MockTimeService) {
         initialize_logger();
         let storage = StorageReader::new(Arc::new(MockDbReader));
 
@@ -328,14 +342,17 @@ impl MockClient {
             StorageServiceNetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx);
 
         let executor = tokio::runtime::Handle::current();
+        let mock_time_service = TimeService::mock();
         let storage_server = StorageServiceServer::new(
             StorageServiceConfig::default(),
             executor,
             storage,
+            mock_time_service.clone(),
             network_requests,
         );
 
-        (Self { peer_mgr_notifs_tx }, storage_server)
+        let mock_client = Self { peer_mgr_notifs_tx };
+        (mock_client, storage_server, mock_time_service.into_mock())
     }
 
     async fn send_request(

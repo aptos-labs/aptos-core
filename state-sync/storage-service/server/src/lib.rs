@@ -10,7 +10,9 @@ use crate::{
 };
 use ::network::ProtocolId;
 use aptos_config::config::StorageServiceConfig;
+use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
     epoch_change::EpochChangeProof,
     state_store::state_value::StateValueChunkWithProof,
@@ -71,6 +73,11 @@ pub struct StorageServiceServer<T> {
     // TODO(philiphayes): would like a "multi-network" stream here, so we only
     // need one service for all networks.
     network_requests: StorageServiceNetworkEvents,
+    time_service: TimeService,
+
+    // We maintain a cached storage server summary to avoid hitting the DB for
+    // every request. This is refreshed periodically.
+    cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
 }
 
 impl<T: StorageReaderInterface> StorageServiceServer<T> {
@@ -78,19 +85,64 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
         config: StorageServiceConfig,
         executor: Handle,
         storage: T,
+        time_service: TimeService,
         network_requests: StorageServiceNetworkEvents,
     ) -> Self {
         let bounded_executor =
             BoundedExecutor::new(config.max_concurrent_requests as usize, executor);
+        let cached_storage_server_summary = Arc::new(RwLock::new(StorageServerSummary::default()));
+
         Self {
             config,
             bounded_executor,
             storage,
             network_requests,
+            time_service,
+            cached_storage_server_summary,
         }
     }
 
+    /// Spawns a non-terminating task that refreshes the cached storage server summary
+    async fn spawn_storage_summary_refresher(&mut self) {
+        let config = self.config;
+        let storage = self.storage.clone();
+        let time_service = self.time_service.clone();
+        let cached_storage_server_summary = self.cached_storage_server_summary.clone();
+
+        // Spawn the task
+        self.bounded_executor
+            .spawn(async move {
+                // Create a ticker for the refresh interval
+                let duration = Duration::from_millis(config.storage_summary_refresh_interval_ms);
+                let ticker = time_service.interval(duration);
+                futures::pin_mut!(ticker);
+
+                // Periodically refresh the cache
+                loop {
+                    ticker.next().await;
+
+                    if let Err(error) = refresh_cached_storage_summary(
+                        config,
+                        storage.clone(),
+                        cached_storage_server_summary.clone(),
+                    ) {
+                        let error = format!(
+                            "Failed to refresh the cached storage summary! Error: {:?}",
+                            error
+                        );
+                        error!(LogSchema::new(LogEntry::StorageServiceError).message(&error));
+                    }
+                }
+            })
+            .await;
+    }
+
+    /// Starts the storage service server thread
     pub async fn start(mut self) {
+        // Spawn the refresher for the cache
+        self.spawn_storage_summary_refresher().await;
+
+        // Handle the storage requests
         while let Some(request) = self.network_requests.next().await {
             // Log the request
             let (peer, protocol, request, response_sender) = request;
@@ -104,17 +156,48 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             // All handler methods are currently CPU-bound and synchronous
             // I/O-bound, so we want to spawn on the blocking thread pool to
             // avoid starving other async tasks on the same runtime.
-            let storage = self.storage.clone();
             let config = self.config;
+            let storage = self.storage.clone();
+            let cached_storage_server_summary = self.cached_storage_server_summary.clone();
             self.bounded_executor
                 .spawn_blocking(move || {
-                    let response = Handler::new(config, storage).call(protocol, request);
+                    let response = Handler::new(config, storage, cached_storage_server_summary)
+                        .call(protocol, request);
                     log_storage_response(&response);
                     response_sender.send(response);
                 })
                 .await;
         }
     }
+}
+
+/// Refreshes the cached storage server summary
+fn refresh_cached_storage_summary<T: StorageReaderInterface>(
+    storage_config: StorageServiceConfig,
+    storage: T,
+    cached_storage_summary: Arc<RwLock<StorageServerSummary>>,
+) -> Result<()> {
+    // Fetch the data summary from storage
+    let data_summary = storage
+        .get_data_summary()
+        .map_err(|error| StorageServiceError::InternalError(error.to_string()))?;
+
+    // Initialize the protocol metadata
+    let protocol_metadata = ProtocolMetadata {
+        max_epoch_chunk_size: storage_config.max_epoch_chunk_size,
+        max_transaction_chunk_size: storage_config.max_transaction_chunk_size,
+        max_transaction_output_chunk_size: storage_config.max_transaction_output_chunk_size,
+        max_account_states_chunk_size: storage_config.max_account_states_chunk_sizes,
+    };
+
+    // Save the storage server summary
+    let storage_server_summary = StorageServerSummary {
+        protocol_metadata,
+        data_summary,
+    };
+    *cached_storage_summary.write() = storage_server_summary;
+
+    Ok(())
 }
 
 /// The `Handler` is the "pure" inbound request handler. It contains all the
@@ -124,11 +207,20 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
 pub struct Handler<T> {
     config: StorageServiceConfig,
     storage: T,
+    cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
 }
 
 impl<T: StorageReaderInterface> Handler<T> {
-    pub fn new(config: StorageServiceConfig, storage: T) -> Self {
-        Self { config, storage }
+    pub fn new(
+        config: StorageServiceConfig,
+        storage: T,
+        cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+    ) -> Self {
+        Self {
+            config,
+            storage,
+            cached_storage_server_summary,
+        }
     }
 
     pub fn call(
@@ -244,16 +336,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     }
 
     fn get_storage_server_summary(&self) -> Result<StorageServiceResponse, Error> {
-        let storage_server_summary = StorageServerSummary {
-            protocol_metadata: ProtocolMetadata {
-                max_epoch_chunk_size: self.config.max_epoch_chunk_size,
-                max_transaction_chunk_size: self.config.max_transaction_chunk_size,
-                max_transaction_output_chunk_size: self.config.max_transaction_output_chunk_size,
-                max_account_states_chunk_size: self.config.max_account_states_chunk_sizes,
-            },
-            data_summary: self.storage.get_data_summary()?,
-        };
-
+        let storage_server_summary = self.cached_storage_server_summary.read().clone();
         Ok(StorageServiceResponse::StorageServerSummary(
             storage_server_summary,
         ))

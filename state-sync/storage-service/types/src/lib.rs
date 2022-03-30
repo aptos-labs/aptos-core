@@ -270,7 +270,7 @@ pub struct ServerProtocolVersion {
 /// A storage server summary, containing a summary of the information held
 /// by the corresponding server instance. This is useful for identifying the
 /// data that a server instance can provide, as well as relevant metadata.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct StorageServerSummary {
     pub protocol_metadata: ProtocolMetadata,
     pub data_summary: DataSummary,

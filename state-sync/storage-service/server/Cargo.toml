@@ -22,7 +22,9 @@ bounded-executor = { path = "../../../crates/bounded-executor" }
 channel = { path = "../../../crates/channel" }
 aptos-config = { path = "../../../config" }
 aptos-logger = { path = "../../../crates/aptos-logger" }
+aptos-infallible = { path = "../../../crates/aptos-infallible" }
 aptos-metrics = { path = "../../../crates/aptos-metrics" }
+aptos-time-service = { path = "../../../crates/aptos-time-service", features = ["async"] }
 aptos-types = { path = "../../../types" }
 aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
 network = { path = "../../../network" }
@@ -34,6 +36,7 @@ anyhow = "1.0.52"
 claim = "0.5.0"
 
 aptos-crypto = { path = "../../../crates/aptos-crypto" }
+aptos-time-service = { path = "../../../crates/aptos-time-service", features = ["async", "testing"] }
 aptos-types = { path = "../../../types" }
 move-core-types = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa", features=["address32"] }
 storage-interface = { path = "../../../storage/storage-interface" }
