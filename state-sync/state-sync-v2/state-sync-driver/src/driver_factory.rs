@@ -73,6 +73,7 @@ impl DriverFactory {
 
         // Create the storage synchronizer
         let storage_synchronizer = StorageSynchronizer::new(
+            node_config.state_sync.state_sync_driver,
             chunk_executor,
             commit_notification_sender,
             error_notification_sender,

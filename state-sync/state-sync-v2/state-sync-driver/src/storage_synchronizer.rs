@@ -5,6 +5,7 @@ use crate::{
     error::Error,
     notification_handlers::{CommitNotification, ErrorNotification},
 };
+use aptos_config::config::StateSyncDriverConfig;
 use aptos_logger::prelude::*;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -25,9 +26,6 @@ use storage_interface::DbWriter;
 use tokio::runtime::{Handle, Runtime};
 
 // TODO(joshlind): add structured logging support!
-
-// The maximum number of chunks that are pending execution or commit
-const MAX_PENDING_CHUNKS: usize = 1000;
 
 /// Synchronizes the storage of the node by verifying and storing new data
 /// (e.g., transactions and outputs).
@@ -90,6 +88,9 @@ pub struct StorageSynchronizer<ChunkExecutor> {
     // A channel through which to notify the driver of committed data
     commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
 
+    // The configuration of the state sync driver
+    driver_config: StateSyncDriverConfig,
+
     // A channel through which to notify the driver of storage errors
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
 
@@ -116,6 +117,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> Clone for StorageSynchronizer<
         Self {
             chunk_executor: self.chunk_executor.clone(),
             commit_notification_sender: self.commit_notification_sender.clone(),
+            driver_config: self.driver_config,
             error_notification_sender: self.error_notification_sender.clone(),
             executor_notifier: self.executor_notifier.clone(),
             pending_data_chunks: self.pending_data_chunks.clone(),
@@ -128,6 +130,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> Clone for StorageSynchronizer<
 
 impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecutor> {
     pub fn new(
+        driver_config: StateSyncDriverConfig,
         chunk_executor: Arc<ChunkExecutor>,
         commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
         error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
@@ -135,10 +138,11 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
         runtime: Option<&Runtime>,
     ) -> Self {
         // Create a channel to notify the executor when data chunks are ready
-        let (executor_notifier, executor_listener) = mpsc::channel(MAX_PENDING_CHUNKS);
+        let max_pending_data_chunks = driver_config.max_pending_data_chunks as usize;
+        let (executor_notifier, executor_listener) = mpsc::channel(max_pending_data_chunks);
 
         // Create a channel to notify the committer when executed chunks are ready
-        let (committer_notifier, committer_listener) = mpsc::channel(MAX_PENDING_CHUNKS);
+        let (committer_notifier, committer_listener) = mpsc::channel(max_pending_data_chunks);
 
         // Create a shared pending data chunk counter
         let pending_transaction_chunks = Arc::new(AtomicU64::new(0));
@@ -167,6 +171,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
         Self {
             chunk_executor,
             commit_notification_sender,
+            driver_config,
             error_notification_sender,
             executor_notifier,
             pending_data_chunks: pending_transaction_chunks,
@@ -232,7 +237,9 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizerInterface
         target_output_with_proof: TransactionOutputListWithProof,
     ) -> Result<(), Error> {
         // Create a channel to notify the state snapshot receiver when data chunks are ready
-        let (state_snapshot_notifier, state_snapshot_listener) = mpsc::channel(MAX_PENDING_CHUNKS);
+        let max_pending_data_chunks = self.driver_config.max_pending_data_chunks as usize;
+        let (state_snapshot_notifier, state_snapshot_listener) =
+            mpsc::channel(max_pending_data_chunks);
 
         // Spawn the state snapshot receiver that commits account states
         spawn_state_snapshot_receiver(
