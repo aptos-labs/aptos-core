@@ -25,7 +25,7 @@ class Account:
     def address(self) -> str:
         """Returns the address associated with the given account"""
 
-        return self.auth_key()[-32:]
+        return self.auth_key()
 
     def auth_key(self) -> str:
         """Returns the auth_key for the associated account"""
