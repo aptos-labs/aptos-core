@@ -762,7 +762,18 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
             ));
         }
 
-        // TODO(joshlind): Verify the expected root hash!
+        // Fetch the target ledger info and transaction info for bootstrapping
+        let ledger_info_to_sync = self
+            .account_state_syncer
+            .ledger_info_to_sync
+            .clone()
+            .expect("Ledger info to sync is missing!");
+        let transaction_output_to_sync = self
+            .account_state_syncer
+            .transaction_output_to_sync
+            .clone()
+            .expect("Transaction output to sync is missing!");
+
         // Initialize the account state synchronizer (if not already done)
         if !self
             .account_state_syncer
@@ -771,23 +782,11 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
             // Fetch all verified epoch change proofs
             let epoch_change_proofs = self.verified_epoch_states.all_epoch_ending_ledger_infos();
 
-            // Fetch the target ledger info and transaction info for bootstrapping
-            let ledger_info_to_sync = self
-                .account_state_syncer
-                .ledger_info_to_sync
-                .clone()
-                .expect("Ledger info to sync is missing!");
-            let transaction_output_to_sync = self
-                .account_state_syncer
-                .transaction_output_to_sync
-                .clone()
-                .expect("Transaction output to sync is missing!");
-
             // Initialize the account state synchronizer
             self.storage_synchronizer.initialize_account_synchronizer(
                 epoch_change_proofs,
                 ledger_info_to_sync,
-                transaction_output_to_sync,
+                transaction_output_to_sync.clone(),
             )?;
             self.account_state_syncer
                 .initialized_state_snapshot_receiver = true;
@@ -797,7 +796,21 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
         self.verify_account_states_indices(notification_id, &account_state_chunk_with_proof)
             .await?;
 
-        // TODO(joshlind): Verify the sparse merkle tree proof is valid!
+        // Verify the chunk root hash matches the expected root hash
+        let expected_root_hash = transaction_output_to_sync
+            .proof
+            .transaction_infos
+            .first()
+            .expect("Target transaction info should exist!")
+            .state_change_hash();
+        if account_state_chunk_with_proof.root_hash != expected_root_hash {
+            self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
+                .await?;
+            return Err(Error::VerificationError(format!(
+                "The account states chunk with proof root hash: {:?} didn't match the expected hash: {:?}!",
+                account_state_chunk_with_proof.root_hash, expected_root_hash,
+            )));
+        }
 
         // Process the account states chunk and proof
         let last_account_index = account_state_chunk_with_proof.last_index;
@@ -1019,22 +1032,36 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
         // Verify the payload proof (the ledger info has already been verified)
         // and save the transaction output with proof.
         if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
-            match &transaction_outputs_with_proof.proof.transaction_infos[..] {
-                [_transaction_info] => {
-                    // TODO(joshlind): don't save the transaction info until after verification!
-                    self.account_state_syncer.transaction_output_to_sync =
-                        Some(transaction_outputs_with_proof);
+            if transaction_outputs_with_proof.proof.transaction_infos.len() == 1 {
+                match transaction_outputs_with_proof.verify(
+                    ledger_info_to_sync.ledger_info(),
+                    Some(expected_start_version),
+                ) {
+                    Ok(()) => {
+                        self.account_state_syncer.transaction_output_to_sync =
+                            Some(transaction_outputs_with_proof);
+                    }
+                    Err(error) => {
+                        self.terminate_active_stream(
+                            notification_id,
+                            NotificationFeedback::PayloadProofFailed,
+                        )
+                        .await?;
+                        return Err(Error::VerificationError(format!(
+                            "Transaction outputs with proof is invalid! Error: {:?}",
+                            error
+                        )));
+                    }
                 }
-                _ => {
-                    self.terminate_active_stream(
-                        notification_id,
-                        NotificationFeedback::InvalidPayloadData,
-                    )
-                    .await?;
-                    return Err(Error::InvalidPayload(
-                        "Payload does not contain a single transaction info!".into(),
-                    ));
-                }
+            } else {
+                self.terminate_active_stream(
+                    notification_id,
+                    NotificationFeedback::InvalidPayloadData,
+                )
+                .await?;
+                return Err(Error::InvalidPayload(
+                    "Payload does not contain a single transaction info!".into(),
+                ));
             }
         } else {
             self.terminate_active_stream(

@@ -29,21 +29,25 @@ const CONSENSUS_SYNC_REQUEST_TIMEOUT_MS: u64 = 60000; // 1 minute
 const MEMPOOL_COMMIT_ACK_TIMEOUT_MS: u64 = 5000; // 5 seconds
 
 /// A notification for new data that has been committed to storage
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum CommitNotification {
     CommittedAccounts(CommittedAccounts),
     CommittedTransactions(CommittedTransactions),
 }
 
 /// A commit notification for new account states
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct CommittedAccounts {
     pub all_accounts_synced: bool,
     pub last_committed_account_index: u64,
+
+    /// If `all_accounts_synced` is true, we expect a single committed
+    /// transaction (as the node should have all required state at this version).
+    pub committed_transaction: Option<CommittedTransactions>,
 }
 
 /// A commit notification for new transactions
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct CommittedTransactions {
     pub events: Vec<ContractEvent>,
     pub transactions: Vec<Transaction>,
@@ -53,10 +57,12 @@ impl CommitNotification {
     pub fn new_committed_accounts(
         all_accounts_synced: bool,
         last_committed_account_index: u64,
+        committed_transaction: Option<CommittedTransactions>,
     ) -> Self {
         let committed_accounts = CommittedAccounts {
             all_accounts_synced,
             last_committed_account_index,
+            committed_transaction,
         };
         CommitNotification::CommittedAccounts(committed_accounts)
     }
@@ -94,6 +100,7 @@ impl CommitNotification {
                 blockchain_timestamp_usecs,
             )
             .await?;
+
         // Notify the event subscription service of the events
         debug!(
             "Notifying the event subscription service of events at version: {:?}",

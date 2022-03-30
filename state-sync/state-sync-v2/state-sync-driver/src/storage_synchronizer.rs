@@ -3,14 +3,16 @@
 
 use crate::{
     error::Error,
-    notification_handlers::{CommitNotification, ErrorNotification},
+    notification_handlers::{CommitNotification, CommittedTransactions, ErrorNotification},
 };
 use aptos_config::config::StateSyncDriverConfig;
 use aptos_logger::prelude::*;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
-    transaction::{TransactionListWithProof, TransactionOutputListWithProof},
+    transaction::{
+        Transaction, TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
+    },
 };
 use data_streaming_service::data_notification::NotificationId;
 use executor_types::ChunkExecutorTrait;
@@ -444,7 +446,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     // Commit the account states chunk
                     match storage_data_chunk {
                         StorageDataChunk::Accounts(notification_id, account_states_with_proof) => {
-                            let all_accounts_synced = account_states_with_proof.proof.right_siblings().is_empty();
+                            let all_accounts_synced = account_states_with_proof.is_last_chunk();
                             let last_committed_account_index = account_states_with_proof.last_index;
 
                             // Attempt to the commit the chunk
@@ -454,33 +456,58 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             );
                             match commit_result {
                                 Ok(()) => {
-                                    // Send a commit notification to the commit listener
-                                    let commit_notification = CommitNotification::new_committed_accounts(all_accounts_synced, last_committed_account_index);
-                                    if let Err(error) = commit_notification_sender.send(commit_notification).await {
-                                        let error = format!("Failed to send account commit notification! Error: {:?}", error);
-                                        send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
-                                    } else if all_accounts_synced {
-                                        // We're done synchronizing account states. Finalize storage and reset the executor.
-                                        let finalized_result = if let Err(error) = state_snapshot_receiver.finish_box() {
-                                            Err(format!("Failed to finish the account states synchronization! Error: {:?}", error))
-                                        } else if let Err(error) = storage.finalize_state_snapshot(version, target_output_with_proof) {
-                                            Err(format!("Failed to finalize the state snapshot! Error: {:?}", error))
-                                        } else if let Err(error) = storage.save_ledger_infos(&epoch_change_proofs) {
-                                            Err(format!("Failed to save all epoch ending ledger infos! Error: {:?}", error))
-                                        } else if let Err(error) = chunk_executor.reset() { // Reset the chunk executor (to read the latest db state)
-                                            Err(format!("Failed to reset the chunk executor after account states synchronization! Error: {:?}", error))
-                                        } else {
-                                            Ok(())
-                                        };
-
-                                        // Notify the state sync driver of any errors
-                                        if let Err(error) = finalized_result {
+                                    if !all_accounts_synced {
+                                        // Send a commit notification to the  listener
+                                        let commit_notification = CommitNotification::new_committed_accounts(all_accounts_synced, last_committed_account_index, None);
+                                        if let Err(error) = commit_notification_sender.send(commit_notification).await {
+                                            let error = format!("Failed to send account commit notification! Error: {:?}", error);
                                             send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
                                         }
 
-                                        decrement_atomic(pending_transaction_chunks.clone());
-                                        return;
+                                        continue; // Wait for the next chunk
                                     }
+
+                                    // All accounts have been synced! Finalize storage, reset
+                                    // the executor and send a commit notification to the listener.
+                                    let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
+                                            target_output_with_proof
+                                                .transactions_and_outputs
+                                                .clone()
+                                                .into_iter()
+                                                .unzip();
+                                        let events = outputs
+                                            .into_iter()
+                                            .map(|output| output.events().to_vec())
+                                            .flatten()
+                                            .collect::<Vec<_>>();
+                                    let committed_transaction = CommittedTransactions {
+                                            events,
+                                            transactions,
+                                        };
+
+                                    let commit_notification = CommitNotification::new_committed_accounts(all_accounts_synced, last_committed_account_index, Some(committed_transaction));
+                                    let finalized_result = if let Err(error) = state_snapshot_receiver.finish_box() {
+                                        Err(format!("Failed to finish the account states synchronization! Error: {:?}", error))
+                                    } else if let Err(error) = storage.finalize_state_snapshot(version, target_output_with_proof) {
+                                        Err(format!("Failed to finalize the state snapshot! Error: {:?}", error))
+                                    } else if let Err(error) = storage.save_ledger_infos(&epoch_change_proofs) {
+                                        Err(format!("Failed to save all epoch ending ledger infos! Error: {:?}", error))
+                                    } else if let Err(error) = chunk_executor.reset() {
+                                        Err(format!("Failed to reset the chunk executor after account states synchronization! Error: {:?}", error))
+                                    } else if let Err(error) = commit_notification_sender.send(commit_notification).await {
+                                       Err(format!("Failed to send the final account commit notification! Error: {:?}", error))
+                                    } else {
+                                        Ok(())
+                                    };
+
+                                    // Notify the state sync driver of any errors
+                                    if let Err(error) = finalized_result {
+                                      send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
+                                    }
+
+                                    // There's nothing left to do!
+                                    decrement_atomic(pending_transaction_chunks.clone());
+                                    return;
                                 },
                                 Err(error) => {
                                     let error = format!("Failed to commit account states chunk! Error: {:?}", error);

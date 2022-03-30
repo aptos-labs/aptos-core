@@ -15,7 +15,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     proof::{definition::LeafCount, position::FrozenSubTreeIterator},
-    transaction::{Transaction, TransactionInfo, Version},
+    transaction::{Transaction, TransactionInfo, TransactionOutput, Version},
 };
 use schemadb::DB;
 use std::sync::Arc;
@@ -97,5 +97,18 @@ pub fn save_transactions(
     ledger_store.put_transaction_infos(first_version, txn_infos, &mut cs)?;
     event_store.put_events_multiple_versions(first_version, events, &mut cs)?;
 
+    db.write_schemas(cs.batch)
+}
+
+pub fn save_transaction_outputs(
+    db: Arc<DB>,
+    transaction_store: Arc<TransactionStore>,
+    first_version: Version,
+    transaction_outputs: Vec<TransactionOutput>,
+) -> Result<()> {
+    let mut cs = ChangeSet::new();
+    for output in transaction_outputs {
+        transaction_store.put_write_set(first_version, output.write_set(), &mut cs)?;
+    }
     db.write_schemas(cs.batch)
 }

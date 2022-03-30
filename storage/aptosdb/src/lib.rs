@@ -1384,13 +1384,14 @@ impl DbWriter for AptosDB {
                 frozen_subtrees,
             )?;
 
-            // Insert the target transactions, infos and events into the database
+            // Insert the target transactions, outputs, infos and events into the database
             let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
                 output_with_proof
                     .transactions_and_outputs
                     .into_iter()
                     .unzip();
             let events = outputs
+                .clone()
                 .into_iter()
                 .map(|output| output.events().to_vec())
                 .collect::<Vec<_>>();
@@ -1404,6 +1405,12 @@ impl DbWriter for AptosDB {
                 &transactions,
                 &transaction_infos,
                 &events,
+            )?;
+            restore_utils::save_transaction_outputs(
+                self.db.clone(),
+                self.transaction_store.clone(),
+                version,
+                outputs,
             )
         })
     }
