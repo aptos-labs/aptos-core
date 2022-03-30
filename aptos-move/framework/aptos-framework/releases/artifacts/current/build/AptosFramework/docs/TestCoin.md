@@ -715,8 +715,8 @@ Returns the balance of <code>owner</code>.
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_transfer">transfer</a>(from: signer, <b>to</b>: <b>address</b>, amount: u64) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>, <a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a> {
-		<a href="TestCoin.md#0x1_TestCoin_transfer_internal">transfer_internal</a>(&from, <b>to</b>, amount);
-	}
+    <a href="TestCoin.md#0x1_TestCoin_transfer_internal">transfer_internal</a>(&from, <b>to</b>, amount);
+}
 </code></pre>
 
 

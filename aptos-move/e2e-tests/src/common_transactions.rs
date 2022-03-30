@@ -4,57 +4,22 @@
 //! Support for encoding transactions for common situations.
 
 use crate::account::Account;
-use aptos_transaction_builder::stdlib::encode_peer_to_peer_by_signers_script_function;
+use aptos_transaction_builder::{
+    aptos_stdlib::{
+        encode_create_account_script_function, encode_rotate_authentication_key_script_function,
+        encode_transfer_script_function,
+    },
+    stdlib::encode_peer_to_peer_by_signers_script_function,
+};
 use aptos_types::{
     account_config,
     transaction::{
         RawTransaction, Script, SignedTransaction, TransactionArgument, TransactionPayload,
     },
 };
-use diem_framework_releases::legacy::transaction_scripts::LegacyStdlibScript;
 use move_core_types::language_storage::TypeTag;
 use move_ir_compiler::Compiler;
 use once_cell::sync::Lazy;
-
-pub static CREATE_ACCOUNT_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
-    let code = "
-    import 0x1.Diem;
-    import 0x1.DiemAccount;
-
-    main<Token>(account: signer, fresh_address: address, auth_key_prefix: vector<u8>, initial_amount: u64) {
-      let with_cap: DiemAccount.WithdrawCapability;
-      let name: vector<u8>;
-    label b0:
-      name = h\"\";
-
-      DiemAccount.create_parent_vasp_account<Token>(
-        &account,
-        copy(fresh_address),
-        move(auth_key_prefix),
-        move(name),
-        false
-      );
-      jump_if_false (copy(initial_amount) > 0) b2;
-    label b1:
-      with_cap = DiemAccount.extract_withdraw_capability(&account);
-      DiemAccount.pay_from<Token>(
-        &with_cap,
-        move(fresh_address),
-        move(initial_amount),
-        h\"\",
-        h\"\"
-      );
-      DiemAccount.restore_withdraw_capability(move(with_cap));
-    label b2:
-      return;
-    }
-";
-
-    let compiler = Compiler {
-        deps: diem_framework_releases::current_modules().iter().collect(),
-    };
-    compiler.into_script_blob(code).expect("Failed to compile")
-});
 
 pub static EMPTY_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
     let code = "
@@ -65,7 +30,7 @@ pub static EMPTY_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
 ";
 
     let compiler = Compiler {
-        deps: diem_framework_releases::current_modules().iter().collect(),
+        deps: aptos_framework_releases::current_modules().iter().collect(),
     };
     compiler.into_script_blob(code).expect("Failed to compile")
 });
@@ -104,7 +69,7 @@ pub static MULTI_AGENT_SWAP_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
 ";
 
     let compiler = Compiler {
-        deps: diem_framework_releases::current_modules().iter().collect(),
+        deps: aptos_framework_releases::current_modules().iter().collect(),
     };
     compiler.into_script_blob(code).expect("Failed to compile")
 });
@@ -146,7 +111,7 @@ pub static MULTI_AGENT_MINT_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
 ";
 
     let compiler = Compiler {
-        deps: diem_framework_releases::current_modules().iter().collect(),
+        deps: aptos_framework_releases::current_modules().iter().collect(),
     };
     compiler.into_script_blob(code).expect("Failed to compile")
 });
@@ -173,21 +138,13 @@ pub fn create_account_txn(
     sender: &Account,
     new_account: &Account,
     seq_num: u64,
-    initial_amount: u64,
-    type_tag: TypeTag,
+    _initial_amount: u64,
+    _type_tag: TypeTag,
 ) -> SignedTransaction {
-    let args: Vec<TransactionArgument> = vec![
-        TransactionArgument::Address(*new_account.address()),
-        TransactionArgument::U8Vector(new_account.auth_key_prefix()),
-        TransactionArgument::U64(initial_amount),
-    ];
-
     sender
         .transaction()
-        .script(Script::new(
-            CREATE_ACCOUNT_SCRIPT.to_vec(),
-            vec![type_tag],
-            args,
+        .payload(encode_create_account_script_function(
+            *new_account.address(),
         ))
         .sequence_number(seq_num)
         .sign()
@@ -201,22 +158,12 @@ pub fn peer_to_peer_txn(
     seq_num: u64,
     transfer_amount: u64,
 ) -> SignedTransaction {
-    let args: Vec<TransactionArgument> = vec![
-        TransactionArgument::Address(*receiver.address()),
-        TransactionArgument::U64(transfer_amount),
-        TransactionArgument::U8Vector(vec![]),
-        TransactionArgument::U8Vector(vec![]),
-    ];
-
     // get a SignedTransaction
     sender
         .transaction()
-        .script(Script::new(
-            LegacyStdlibScript::PeerToPeerWithMetadata
-                .compiled_bytes()
-                .into_vec(),
-            vec![account_config::xus_tag()],
-            args,
+        .payload(encode_transfer_script_function(
+            *receiver.address(),
+            transfer_amount,
         ))
         .sequence_number(seq_num)
         .sign()
@@ -224,15 +171,10 @@ pub fn peer_to_peer_txn(
 
 /// Returns a transaction to change the keys for the given account.
 pub fn rotate_key_txn(sender: &Account, new_key_hash: Vec<u8>, seq_num: u64) -> SignedTransaction {
-    let args = vec![TransactionArgument::U8Vector(new_key_hash)];
     sender
         .transaction()
-        .script(Script::new(
-            LegacyStdlibScript::RotateAuthenticationKey
-                .compiled_bytes()
-                .into_vec(),
-            vec![],
-            args,
+        .payload(encode_rotate_authentication_key_script_function(
+            new_key_hash,
         ))
         .sequence_number(seq_num)
         .sign()
@@ -240,15 +182,10 @@ pub fn rotate_key_txn(sender: &Account, new_key_hash: Vec<u8>, seq_num: u64) -> 
 
 /// Returns a transaction to change the keys for the given account.
 pub fn raw_rotate_key_txn(sender: &Account, new_key_hash: Vec<u8>, seq_num: u64) -> RawTransaction {
-    let args = vec![TransactionArgument::U8Vector(new_key_hash)];
     sender
         .transaction()
-        .script(Script::new(
-            LegacyStdlibScript::RotateAuthenticationKey
-                .compiled_bytes()
-                .into_vec(),
-            vec![],
-            args,
+        .payload(encode_rotate_authentication_key_script_function(
+            new_key_hash,
         ))
         .sequence_number(seq_num)
         .raw()

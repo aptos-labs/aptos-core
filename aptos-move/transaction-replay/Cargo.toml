@@ -33,4 +33,4 @@ difference = "2.0.0"
 
 [dev-dependencies]
 vm-genesis = { path = "../vm-genesis" }
-diem-framework-releases = { path = "../framework/DPN/releases" }
+aptos-framework-releases = { path = "../framework/aptos-framework/releases" }

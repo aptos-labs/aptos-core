@@ -17,13 +17,12 @@ use crate::{
     golden_outputs::GoldenOutputs,
 };
 use aptos_crypto::HashValue;
+use aptos_framework_releases::{current_module_blobs, current_modules};
 use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
-    account_config::{
-        type_tag_for_currency_code, BalanceResource, DiemAccountResource, CORE_CODE_ADDRESS,
-    },
+    account_config::{AccountResource, BalanceResource, TransferEventsResource, CORE_CODE_ADDRESS},
     block_metadata::{new_block_event_key, BlockMetadata, NewBlockEvent},
     on_chain_config::{
         OnChainConfig, ParallelExecutionConfig, VMPublishingOption, ValidatorSet, Version,
@@ -42,14 +41,11 @@ use aptos_vm::{
 use aptos_writeset_generator::{
     encode_disable_parallel_execution, encode_enable_parallel_execution_with_config,
 };
-use diem_framework_releases::{
-    current_module_blobs, current_modules, legacy::transaction_scripts::LegacyStdlibScript,
-};
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, ResourceKey, TypeTag},
-    move_resource::MoveStructType,
+    move_resource::MoveResource,
 };
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_types::gas_schedule::GasStatus;
@@ -112,11 +108,7 @@ impl FakeExecutor {
     }
 
     pub fn allowlist_genesis() -> Self {
-        Self::custom_genesis(
-            current_module_blobs(),
-            None,
-            VMPublishingOption::locked(LegacyStdlibScript::allowlist()),
-        )
+        Self::custom_genesis(current_module_blobs(), None, VMPublishingOption::open())
     }
 
     /// Creates an executor from the genesis file GENESIS_FILE_LOCATION with script/module
@@ -263,8 +255,26 @@ impl FakeExecutor {
     }
 
     /// Reads the resource [`Value`] for an account from this executor's data store.
-    pub fn read_account_resource(&self, account: &Account) -> Option<DiemAccountResource> {
+    pub fn read_account_resource(&self, account: &Account) -> Option<AccountResource> {
         self.read_account_resource_at_address(account.address())
+    }
+
+    fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
+        let ap = AccessPath::resource_access_path(ResourceKey::new(*addr, T::struct_tag()));
+        let data_blob = StateView::get_by_access_path(&self.data_store, &ap)
+            .expect("account must exist in data store")
+            .unwrap_or_else(|| {
+                panic!(
+                    "Can't fetch {} resource for {}",
+                    T::STRUCT_NAME.to_string(),
+                    addr
+                )
+            });
+        bcs::from_bytes(data_blob.as_slice()).ok()
+    }
+
+    pub fn read_transfer_event(&self, account: &Account) -> Option<TransferEventsResource> {
+        self.read_resource(account.address())
     }
 
     /// Reads the resource [`Value`] for an account under the given address from
@@ -272,15 +282,8 @@ impl FakeExecutor {
     pub fn read_account_resource_at_address(
         &self,
         addr: &AccountAddress,
-    ) -> Option<DiemAccountResource> {
-        let ap = AccessPath::resource_access_path(ResourceKey::new(
-            *addr,
-            DiemAccountResource::struct_tag(),
-        ));
-        let data_blob = StateView::get_by_access_path(&self.data_store, &ap)
-            .expect("account must exist in data store")
-            .unwrap_or_else(|| panic!("Can't fetch account resource for {}", addr));
-        bcs::from_bytes(data_blob.as_slice()).ok()
+    ) -> Option<AccountResource> {
+        self.read_resource(addr)
     }
 
     /// Reads the balance resource value for an account from this executor's data store with the
@@ -298,16 +301,9 @@ impl FakeExecutor {
     pub fn read_balance_resource_at_address(
         &self,
         addr: &AccountAddress,
-        balance_currency_code: Identifier,
+        _balance_currency_code: Identifier,
     ) -> Option<BalanceResource> {
-        let currency_code_tag = type_tag_for_currency_code(balance_currency_code);
-        let balance_resource_tag = BalanceResource::struct_tag_for_currency(currency_code_tag);
-        let ap = AccessPath::resource_access_path(ResourceKey::new(*addr, balance_resource_tag));
-        StateView::get_by_access_path(&self.data_store, &ap)
-            .unwrap_or_else(|_| panic!("account {:?} must exist in data store", addr))
-            .map(|data_blob| {
-                bcs::from_bytes(data_blob.as_slice()).expect("Failure decoding balance resource")
-            })
+        self.read_resource(addr)
     }
 
     /// Executes the given block of transactions.

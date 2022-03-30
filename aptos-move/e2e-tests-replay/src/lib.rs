@@ -70,7 +70,7 @@ const MOVE_VM_TRACING_LOG_FILENAME: &str = "move_vm_trace.log";
 
 pub struct ReplayFlags {
     /// Filter based on which diem version the trace was executed under
-    pub diem_version: Version,
+    pub aptos_version: Version,
     /// Filters on which trace (and steps) to run
     pub filters: BTreeMap<String, BTreeSet<usize>>,
     /// Maximum number of steps per trace to replay
@@ -95,7 +95,7 @@ impl ReplayFlags {
             None => bail!("Invalid test name: {}", test),
             Some((name, version)) => (name, version.parse::<u64>()?),
         };
-        if vnum != self.diem_version.major {
+        if vnum != self.aptos_version.major {
             return Ok(false);
         }
 

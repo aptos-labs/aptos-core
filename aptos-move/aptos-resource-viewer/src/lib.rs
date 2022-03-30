@@ -16,13 +16,13 @@ use std::{
 use move_core_types::resolver::MoveResolver;
 pub use move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue};
 
-pub struct DiemValueAnnotator<'a, T>(MoveValueAnnotator<'a, T>);
+pub struct AptosValueAnnotator<'a, T>(MoveValueAnnotator<'a, T>);
 
 /// A wrapper around `MoveValueAnnotator` that adds a few aptos-specific funtionalities.
 #[derive(Debug)]
 pub struct AnnotatedAccountStateBlob(BTreeMap<StructTag, AnnotatedMoveStruct>);
 
-impl<'a, T: MoveResolver> DiemValueAnnotator<'a, T> {
+impl<'a, T: MoveResolver> AptosValueAnnotator<'a, T> {
     pub fn new(storage: &'a T) -> Self {
         Self(MoveValueAnnotator::new(storage))
     }

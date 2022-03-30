@@ -43,6 +43,6 @@ aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-h
 [dev-dependencies]
 datatest-stable = "0.1.1"
 
-[[test]]
-name = "tests"
-harness = false
+#[[test]]
+#name = "tests"
+#harness = false

@@ -2,27 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{account::Account, executor::FakeExecutor};
-use aptos_types::{
-    on_chain_config::Version,
-    transaction::{Script, TransactionArgument},
-};
+use aptos_transaction_builder::aptos_stdlib::encode_set_version_script_function;
+use aptos_types::on_chain_config::Version;
 use aptos_vm::AptosVM;
-use diem_framework_releases::legacy::transaction_scripts::LegacyStdlibScript;
 
-pub fn set_diem_version(executor: &mut FakeExecutor, version: Version) {
+pub fn set_aptos_version(executor: &mut FakeExecutor, version: Version) {
     let account = Account::new_genesis_account(aptos_types::on_chain_config::config_address());
     let txn = account
         .transaction()
-        .script(Script::new(
-            LegacyStdlibScript::UpdateVersion
-                .compiled_bytes()
-                .into_vec(),
-            vec![],
-            vec![
-                TransactionArgument::U64(0),
-                TransactionArgument::U64(version.major),
-            ],
-        ))
+        .payload(encode_set_version_script_function(version.major))
         .sequence_number(0)
         .sign();
     executor.new_block();

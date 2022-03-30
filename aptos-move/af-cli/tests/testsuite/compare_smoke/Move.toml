@@ -3,5 +3,5 @@ name = "compare_smoke"
 version = "0.0.0"
 
 [dependencies]
-DPNFramework = { local = "../../../../framework/DPN" }
+AptosFramework = { local = "../../../../framework/aptos-framework" }
 MoveNursery = { local = "../../../../framework/move-stdlib/nursery" }

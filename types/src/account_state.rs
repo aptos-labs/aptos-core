@@ -62,16 +62,8 @@ impl AccountState {
         self.get_resource::<CRSNResource>()
     }
 
-    pub fn get_balance_resources(&self) -> Result<BTreeMap<Identifier, BalanceResource>> {
-        self.get_resources_with_type::<BalanceResource>()
-            .map(|maybe_resource| {
-                let (struct_tag, resource) = maybe_resource?;
-                let currency_code = collect_exactly_one(struct_tag.type_params.into_iter())
-                    .ok_or_else(|| format_err!("expected one currency_code type tag"))
-                    .and_then(currency_code_from_type_tag)?;
-                Ok((currency_code, resource))
-            })
-            .collect()
+    pub fn get_balance_resources(&self) -> Result<Option<BalanceResource>> {
+        self.get_resource::<BalanceResource>()
     }
 
     pub fn get_preburn_balances(&self) -> Result<BTreeMap<Identifier, PreburnResource>> {

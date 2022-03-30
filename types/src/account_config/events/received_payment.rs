@@ -1,27 +1,19 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    account_address::AccountAddress, account_config::constants::DIEM_ACCOUNT_MODULE_IDENTIFIER,
-};
+use crate::account_address::AccountAddress;
 use anyhow::Result;
-use move_core_types::{
-    ident_str,
-    identifier::{IdentStr, Identifier},
-    move_resource::MoveStructType,
-};
+use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
 use serde::{Deserialize, Serialize};
 
 /// Struct that represents a ReceivedPaymentEvent.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ReceivedPaymentEvent {
+pub struct ReceivedEvent {
     amount: u64,
-    currency_code: Identifier,
     sender: AccountAddress,
-    metadata: Vec<u8>,
 }
 
-impl ReceivedPaymentEvent {
+impl ReceivedEvent {
     pub fn try_from_bytes(bytes: &[u8]) -> Result<Self> {
         bcs::from_bytes(bytes).map_err(Into::into)
     }
@@ -35,19 +27,9 @@ impl ReceivedPaymentEvent {
     pub fn amount(&self) -> u64 {
         self.amount
     }
-
-    /// Get the metadata associated with this event
-    pub fn metadata(&self) -> &[u8] {
-        &self.metadata
-    }
-
-    /// Return the currency code that the payment was made in.
-    pub fn currency_code(&self) -> &IdentStr {
-        &self.currency_code
-    }
 }
 
-impl MoveStructType for ReceivedPaymentEvent {
-    const MODULE_NAME: &'static IdentStr = DIEM_ACCOUNT_MODULE_IDENTIFIER;
-    const STRUCT_NAME: &'static IdentStr = ident_str!("ReceivedPaymentEvent");
+impl MoveStructType for ReceivedEvent {
+    const MODULE_NAME: &'static IdentStr = ident_str!("TestCoin");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("ReceivedEvent");
 }

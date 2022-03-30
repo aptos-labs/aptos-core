@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, bail, format_err, Result};
-use aptos_resource_viewer::{AnnotatedAccountStateBlob, AnnotatedMoveStruct, DiemValueAnnotator};
+use aptos_resource_viewer::{AnnotatedAccountStateBlob, AnnotatedMoveStruct, AptosValueAnnotator};
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path,
@@ -131,9 +131,9 @@ impl AptosDebugger {
         {
             Some(account) => account
                 .get_account_resource()?
-                .ok_or_else(|| anyhow!("Diem root account doesn't exist"))?
+                .ok_or_else(|| anyhow!("root account doesn't exist"))?
                 .sequence_number(),
-            None => bail!("Diem root account blob doesn't exist"),
+            None => bail!("root account blob doesn't exist"),
         };
         let txn_data = aptos_vm::transaction_metadata::TransactionMetadata {
             sequence_number,
@@ -199,7 +199,7 @@ impl AptosDebugger {
         Ok(())
     }
 
-    pub fn get_diem_framework_modules_at_version(
+    pub fn get_aptos_framework_modules_at_version(
         &self,
         version: Version,
         save_write_sets: bool,
@@ -236,7 +236,7 @@ impl AptosDebugger {
         let version = self.debugger.get_latest_version()?;
         let state_view = DebuggerStateView::new(&*self.debugger, Some(version));
         let remote_storage = RemoteStorage::new(&state_view);
-        let annotator = DiemValueAnnotator::new(&remote_storage);
+        let annotator = AptosValueAnnotator::new(&remote_storage);
         let mut events_data = vec![];
         for event in events {
             match &event.event {
@@ -259,7 +259,7 @@ impl AptosDebugger {
     ) -> Result<Option<AnnotatedAccountStateBlob>> {
         let state_view = DebuggerStateView::new(&*self.debugger, Some(version));
         let remote_storage = RemoteStorage::new(&state_view);
-        let annotator = DiemValueAnnotator::new(&remote_storage);
+        let annotator = AptosValueAnnotator::new(&remote_storage);
         Ok(
             match self
                 .debugger
@@ -284,7 +284,7 @@ impl AptosDebugger {
         let accounts = self.debugger.get_admin_accounts(version)?;
         let state_view = DebuggerStateView::new(&*self.debugger, Some(version));
         let remote_storage = RemoteStorage::new(&state_view);
-        let annotator = DiemValueAnnotator::new(&remote_storage);
+        let annotator = AptosValueAnnotator::new(&remote_storage);
 
         let mut result = vec![];
         for (addr, state) in accounts.into_iter() {
@@ -400,10 +400,10 @@ fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {
 
 fn compile_move_script(file_path: &str) -> Result<Vec<u8>> {
     let cur_path = file_path.to_owned();
-    let targets = vec![(vec![cur_path], framework::diem_framework_named_addresses())];
+    let targets = vec![(vec![cur_path], framework::aptos_framework_named_addresses())];
     let deps = vec![(
-        framework::dpn_files(),
-        framework::diem_framework_named_addresses(),
+        framework::aptos_files(),
+        framework::aptos_framework_named_addresses(),
     )];
 
     let (files, units_or_diags) = Compiler::new(targets, deps)

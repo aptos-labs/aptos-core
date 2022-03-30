@@ -28,7 +28,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     on_chain_config::{
         OnChainConfig, ParallelExecutionConfig, VMConfig, VMPublishingOption, Version,
-        DIEM_VERSION_2, DIEM_VERSION_3,
+        APTOS_VERSION_2, APTOS_VERSION_3,
     },
     transaction::{
         ChangeSet, ModuleBundle, SignatureCheckedTransaction, SignedTransaction, Transaction,
@@ -214,13 +214,13 @@ impl AptosVM {
                 TransactionPayload::Script(script) => {
                     let aptos_version = self.0.get_version()?;
                     let remapped_script =
-                        if aptos_version < aptos_types::on_chain_config::DIEM_VERSION_2 {
+                        if aptos_version < aptos_types::on_chain_config::APTOS_VERSION_2 {
                             None
                         } else {
                             script_to_script_function::remapping(script.code())
                         };
                     let mut senders = vec![txn_data.sender()];
-                    if aptos_version >= DIEM_VERSION_3 {
+                    if aptos_version >= APTOS_VERSION_3 {
                         senders.extend(txn_data.secondary_signers());
                     }
                     match remapped_script {
@@ -246,7 +246,7 @@ impl AptosVM {
                 TransactionPayload::ScriptFunction(script_fn) => {
                     let aptos_version = self.0.get_version()?;
                     let mut senders = vec![txn_data.sender()];
-                    if aptos_version >= DIEM_VERSION_3 {
+                    if aptos_version >= APTOS_VERSION_3 {
                         senders.extend(txn_data.secondary_signers());
                     }
                     session.execute_script_function(
@@ -429,7 +429,7 @@ impl AptosVM {
                     Some(sender) => vec![sender, *execute_as],
                 };
                 let remapped_script =
-                    if aptos_version < aptos_types::on_chain_config::DIEM_VERSION_2 {
+                    if aptos_version < aptos_types::on_chain_config::APTOS_VERSION_2 {
                         None
                     } else {
                         script_to_script_function::remapping(script.code())
@@ -779,7 +779,7 @@ impl VMAdapter for AptosVM {
     }
 
     fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus> {
-        if txn.is_multi_agent() && self.0.get_version()? < DIEM_VERSION_3 {
+        if txn.is_multi_agent() && self.0.get_version()? < APTOS_VERSION_3 {
             // Multi agent is not allowed
             return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING));
         }
@@ -829,7 +829,7 @@ impl VMAdapter for AptosVM {
             }
             TransactionPayload::ScriptFunction(_) => {
                 // gate the behavior until the version is ready
-                if self.0.get_version()? < DIEM_VERSION_2 {
+                if self.0.get_version()? < APTOS_VERSION_2 {
                     return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING));
                 }
                 // NOTE: Script and ScriptFunction shares the same prologue

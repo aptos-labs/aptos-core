@@ -1,5 +1,5 @@
 [package]
-name = "df-cli"
+name = "af-cli"
 version = "0.1.0"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "CLI frontend for the Move compiler and VM (with Diem Framework)"
@@ -19,13 +19,13 @@ move-core-types = { git = "https://github.com/diem/move", rev = "3fe033b112eae7d
 move-vm-types = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 move-cli = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 aptos-vm = { path = "../aptos-vm" }
-diem-framework-releases = { path = "../framework/DPN/releases" }
+aptos-framework-releases = { path = "../framework/aptos-framework/releases" }
 
 [dev-dependencies]
 datatest-stable = "0.1.1"
 
 [[bin]]
-name = "df-cli"
+name = "af-cli"
 path = "src/main.rs"
 
 [[test]]

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_resource_viewer::DiemValueAnnotator;
+use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -77,10 +77,10 @@ pub fn main() {
     // we default to `all`
     let arg_count = std::env::args().len();
     let args = Args::from_args();
-    let ws = vm_genesis::generate_genesis_change_set_for_testing(vm_genesis::GenesisOptions::Aptos);
+    let ws = vm_genesis::generate_genesis_change_set_for_testing(vm_genesis::GenesisOptions::Fresh);
 
     let mut storage = InMemoryStorage::new();
-    for (blob, module) in diem_framework_releases::current_modules_with_blobs() {
+    for (blob, module) in aptos_framework_releases::current_modules_with_blobs() {
         storage.publish_or_overwrite_module(module.self_id(), blob.clone())
     }
 
@@ -164,7 +164,7 @@ fn print_write_set_by_type(storage: &impl MoveResolver, ws: &WriteSet) {
 }
 
 fn print_events(storage: &impl MoveResolver, events: &[ContractEvent]) {
-    let annotator = DiemValueAnnotator::new(storage);
+    let annotator = AptosValueAnnotator::new(storage);
 
     for event in events {
         println!("+ {:?}", event.key());
@@ -212,7 +212,7 @@ fn print_resources(storage: &impl MoveResolver, ws: &WriteSet) {
             }
         }
     }
-    let annotator = DiemValueAnnotator::new(storage);
+    let annotator = AptosValueAnnotator::new(storage);
     for (k, v) in &resources {
         println!("AccessPath: {:?}", k);
         match annotator.view_access_path(k.clone(), v.as_ref()) {
@@ -239,7 +239,7 @@ fn print_account_states(storage: &impl MoveResolver, ws: &WriteSet) {
             }
         }
     }
-    let annotator = DiemValueAnnotator::new(storage);
+    let annotator = AptosValueAnnotator::new(storage);
     for (k, v) in &accounts {
         println!("Address: {}", k);
         for (ap, resource) in v {

@@ -84,7 +84,7 @@ impl BlockMetadata {
 }
 
 pub fn new_block_event_key() -> EventKey {
-    EventKey::new_from_address(&aptos_root_address(), 17)
+    EventKey::new_from_address(&aptos_root_address(), 5)
 }
 
 /// The path to the new block event handle under a Block::BlockMetadata resource.

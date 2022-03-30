@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_transaction_builder::stdlib::ScriptFunctionCall;
+use aptos_transaction_builder::aptos_stdlib::ScriptFunctionCall;
 use language_e2e_tests::{account::Account, executor::FakeExecutor};
 use proptest::{collection::vec, prelude::*};
 
@@ -14,7 +14,6 @@ proptest! {
         let executor = FakeExecutor::from_genesis_file();
         let accounts = vec![
             (Account::new_aptos_root(), 0),
-            (Account::new_blessed_tc(), 0),
         ];
         let num_accounts = accounts.len();
 

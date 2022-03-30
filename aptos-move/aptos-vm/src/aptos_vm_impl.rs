@@ -19,7 +19,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
     on_chain_config::{
-        ConfigStorage, OnChainConfig, VMConfig, VMPublishingOption, Version, DIEM_VERSION_3,
+        ConfigStorage, OnChainConfig, VMConfig, VMPublishingOption, Version, APTOS_VERSION_3,
     },
     transaction::{SignedTransaction, TransactionOutput, TransactionStatus},
     vm_status::{KeptVMStatus, StatusCode, VMStatus},
@@ -268,7 +268,7 @@ impl AptosVMImpl {
                 MoveValue::vector_u8(HashValue::sha3_256_of(&preimage.to_vec()).to_vec())
             })
             .collect();
-        let args = if self.get_version()? >= DIEM_VERSION_3 && txn_data.is_multi_agent() {
+        let args = if self.get_version()? >= APTOS_VERSION_3 && txn_data.is_multi_agent() {
             vec![
                 MoveValue::Signer(txn_data.sender),
                 MoveValue::U64(txn_sequence_number),
@@ -293,7 +293,7 @@ impl AptosVMImpl {
             ]
         };
         let prologue_function_name =
-            if self.get_version()? >= DIEM_VERSION_3 && txn_data.is_multi_agent() {
+            if self.get_version()? >= APTOS_VERSION_3 && txn_data.is_multi_agent() {
                 &chain_specific_info.multi_agent_prologue_name
             } else {
                 &chain_specific_info.script_prologue_name

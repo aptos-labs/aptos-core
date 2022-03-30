@@ -17,17 +17,17 @@ impl OnChainConfig for Version {
 // NOTE: version number for release 1.2 Diem
 // Items gated by this version number include:
 //  - the ScriptFunction payload type
-pub const DIEM_VERSION_2: Version = Version { major: 2 };
+pub const APTOS_VERSION_2: Version = Version { major: 2 };
 
 // NOTE: version number for release 1.3 of Diem
 // Items gated by this version number include:
 //  - Multi-agent transactions
-pub const DIEM_VERSION_3: Version = Version { major: 3 };
+pub const APTOS_VERSION_3: Version = Version { major: 3 };
 
 // NOTE: version number for release 1.4 of Diem
 // Items gated by this version number include:
 //  - Conflict-Resistant Sequence Numbers
-pub const DIEM_VERSION_4: Version = Version { major: 4 };
+pub const APTOS_VERSION_4: Version = Version { major: 4 };
 
 // Maximum current known version
-pub const DIEM_MAX_KNOWN_VERSION: Version = DIEM_VERSION_4;
+pub const APTOS_MAX_KNOWN_VERSION: Version = APTOS_VERSION_4;

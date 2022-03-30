@@ -10,6 +10,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     PrivateKey, Uniform,
 };
+use aptos_framework_releases::current_module_blobs;
 use aptos_transaction_builder::stdlib as transaction_builder;
 use aptos_types::{
     account_config::{
@@ -21,16 +22,13 @@ use aptos_types::{
     contract_event::ContractEvent,
     on_chain_config::{
         ConsensusConfigV1, OnChainConsensusConfig, ReadWriteSetAnalysis, VMPublishingOption,
-        DIEM_MAX_KNOWN_VERSION,
+        APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{
         authenticator::AuthenticationKey, ChangeSet, ScriptFunction, Transaction, WriteSetPayload,
     },
 };
 use aptos_vm::{convert_changeset_and_events, data_cache::StateViewCache};
-use diem_framework_releases::{
-    current_module_blobs, legacy::transaction_scripts::LegacyStdlibScript,
-};
 use move_binary_format::CompiledModule;
 use move_bytecode_utils::Modules;
 use move_core_types::{
@@ -73,8 +71,7 @@ pub fn encode_genesis_transaction(
         &treasury_compliance_key,
         validators,
         stdlib_module_bytes,
-        vm_publishing_option
-            .unwrap_or_else(|| VMPublishingOption::locked(LegacyStdlibScript::allowlist())),
+        vm_publishing_option.unwrap_or_else(VMPublishingOption::open),
         consensus_config,
         chain_id,
         enable_parallel_execution,
@@ -268,7 +265,7 @@ fn create_and_initialize_main_accounts(
             MoveValue::vector_u8(instr_gas_costs),
             MoveValue::vector_u8(native_gas_costs),
             MoveValue::U8(chain_id.id()),
-            MoveValue::U64(DIEM_MAX_KNOWN_VERSION.major),
+            MoveValue::U64(APTOS_MAX_KNOWN_VERSION.major),
             MoveValue::vector_u8(consensus_config_bytes),
             MoveValue::U64(min_price_per_gas_unit),
         ]),
@@ -448,15 +445,13 @@ fn verify_genesis_write_set(events: &[ContractEvent]) {
 pub enum GenesisOptions {
     Compiled,
     Fresh,
-    Aptos,
 }
 
 /// Generate an artificial genesis `ChangeSet` for testing
 pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) -> ChangeSet {
     let modules = match genesis_options {
-        GenesisOptions::Compiled => diem_framework_releases::current_module_blobs().to_vec(),
-        GenesisOptions::Fresh => framework::dpn_module_blobs(),
-        GenesisOptions::Aptos => framework::aptos_module_blobs(),
+        GenesisOptions::Compiled => aptos_framework_releases::current_module_blobs().to_vec(),
+        GenesisOptions::Fresh => framework::aptos_module_blobs(),
     };
 
     generate_test_genesis(&modules, VMPublishingOption::open(), None, false).0
@@ -472,7 +467,7 @@ pub fn test_genesis_change_set_and_validators(
 ) -> (ChangeSet, Vec<TestValidator>) {
     generate_test_genesis(
         current_module_blobs(),
-        VMPublishingOption::locked(LegacyStdlibScript::allowlist()),
+        VMPublishingOption::open(),
         count,
         false,
     )

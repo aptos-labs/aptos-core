@@ -13,7 +13,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_config::{
         self, aptos_root_address, testnet_dd_account_address, treasury_compliance_account_address,
-        type_tag_for_currency_code, BalanceResource, DiemAccountResource, XUS_IDENTIFIER, XUS_NAME,
+        AccountResource, BalanceResource, XUS_IDENTIFIER, XUS_NAME,
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -62,20 +62,20 @@ use vm_genesis::GENESIS_KEYPAIR;
  *
  ************************************************************************************************/
 
-/// The Diem transaction test adapter.
+/// The Aptos transaction test adapter.
 ///
 /// This differs from the SimpleVMTestAdapter in a few ways to ensure that our tests mimics
 /// production settings:
-///   - It uses a Diem StateView as its storage backend
-///   - It executes transactions through DiemVM, instead of MoveVM directly
-struct DiemTestAdapter<'a> {
+///   - It uses a StateView as its storage backend
+///   - It executes transactions through AptosVM, instead of MoveVM directly
+struct AptosTestAdapter<'a> {
     compiled_state: CompiledState<'a>,
     storage: FakeDataStore,
     default_syntax: SyntaxChoice,
     private_key_mapping: BTreeMap<Identifier, Ed25519PrivateKey>,
 }
 
-/// Parameters *required* to create a Diem transaction.
+/// Parameters *required* to create a transaction.
 struct TransactionParameters {
     pub sequence_number: u64,
     pub max_gas_amount: u64,
@@ -84,9 +84,9 @@ struct TransactionParameters {
     pub expiration_timestamp_secs: u64,
 }
 
-/// Diem-specific arguments for the publish command.
+/// Aptos-specific arguments for the publish command.
 #[derive(StructOpt, Debug)]
-struct DiemPublishArgs {
+struct AptosPublishArgs {
     #[structopt(long = "private-key", parse(try_from_str = RawPrivateKey::parse))]
     private_key: Option<RawPrivateKey>,
 
@@ -112,9 +112,9 @@ struct SignerAndKeyPair {
     private_key: Option<RawPrivateKey>,
 }
 
-/// Diem-specifc arguments for the run command.
+/// Aptos-specifc arguments for the run command.
 #[derive(StructOpt, Debug)]
-struct DiemRunArgs {
+struct AptosRunArgs {
     #[structopt(long = "private-key", parse(try_from_str = RawPrivateKey::parse))]
     private_key: Option<RawPrivateKey>,
 
@@ -140,9 +140,9 @@ struct DiemRunArgs {
     secondary_signers: Option<Vec<SignerAndKeyPair>>,
 }
 
-/// Diem-specifc arguments for the init command.
+/// Aptos-specifc arguments for the init command.
 #[derive(StructOpt, Debug)]
-struct DiemInitArgs {
+struct AptosInitArgs {
     #[structopt(long = "private-keys", parse(try_from_str = parse_named_private_key), multiple_values(true))]
     private_keys: Option<Vec<(Identifier, Ed25519PrivateKey)>>,
 
@@ -185,9 +185,9 @@ struct BlockCommand {
     time: u64,
 }
 
-/// Custom commands for the Diem transactional test flow.
+/// Custom commands for the transactional test flow.
 #[derive(StructOpt, Debug)]
-enum DiemSubCommand {
+enum AptosSubCommand {
     #[structopt(name = "block")]
     BlockCommand(BlockCommand),
 }
@@ -230,7 +230,7 @@ impl ParentVaspInitArgs {
             return Ok(Self {
                 name,
                 currency_type: TypeName {
-                    address: RawAddress::Named(Identifier::new("DiemFramework").unwrap()),
+                    address: RawAddress::Named(Identifier::new("AptosFramework").unwrap()),
                     module_name: XUS_IDENTIFIER.to_owned(),
                     type_name: XUS_IDENTIFIER.to_owned(),
                 },
@@ -322,13 +322,9 @@ impl SignerAndKeyPair {
  *
  ************************************************************************************************/
 
-/// Default private key mappings for special Diem accounts.
-fn diem_framework_private_key_mapping() -> Vec<(String, Ed25519PrivateKey)> {
-    vec![
-        ("DiemRoot".to_string(), GENESIS_KEYPAIR.0.clone()),
-        ("TreasuryCompliance".to_string(), GENESIS_KEYPAIR.0.clone()),
-        ("DesignatedDealer".to_string(), GENESIS_KEYPAIR.0.clone()),
-    ]
+/// Default private key mappings for special Aptos accounts.
+fn aptos_framework_private_key_mapping() -> Vec<(String, Ed25519PrivateKey)> {
+    vec![("Root".to_string(), GENESIS_KEYPAIR.0.clone())]
 }
 
 fn panic_missing_private_key_named(cmd_name: &str, name: &IdentStr) -> ! {
@@ -354,26 +350,6 @@ fn panic_missing_private_key(cmd_name: &str) -> ! {
         cmd_name
     )
 }
-
-static PRECOMPILED_DIEM_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
-    let deps = vec![(
-        framework::dpn_files(),
-        framework::diem_framework_named_addresses(),
-    )];
-    let program_res = move_compiler::construct_pre_compiled_lib(
-        deps,
-        None,
-        move_compiler::Flags::empty().set_sources_shadow_deps(false),
-    )
-    .unwrap();
-    match program_res {
-        Ok(df) => df,
-        Err((files, errors)) => {
-            eprintln!("!!!Diem Framework failed to compile!!!");
-            move_compiler::diagnostics::report_diagnostics(&files, errors)
-        }
-    }
-});
 
 static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
     let deps = vec![(
@@ -402,7 +378,7 @@ static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
  *
  ************************************************************************************************/
 
-impl<'a> DiemTestAdapter<'a> {
+impl<'a> AptosTestAdapter<'a> {
     /// Look up the named private key in the mapping.
     fn resolve_named_private_key(&self, s: &IdentStr) -> Ed25519PrivateKey {
         if let Some(private_key) = self.private_key_mapping.get(s) {
@@ -458,10 +434,10 @@ impl<'a> DiemTestAdapter<'a> {
 
     /// Obtain a Rust representation of the account resource from storage, which is used to derive
     /// a few default transaction parameters.
-    fn fetch_account_resource(&self, signer_addr: &AccountAddress) -> Result<DiemAccountResource> {
+    fn fetch_account_resource(&self, signer_addr: &AccountAddress) -> Result<AccountResource> {
         let account_access_path = AccessPath::resource_access_path(ResourceKey::new(
             *signer_addr,
-            DiemAccountResource::struct_tag(),
+            AccountResource::struct_tag(),
         ));
         let account_blob = self
             .storage
@@ -481,10 +457,9 @@ impl<'a> DiemTestAdapter<'a> {
     fn fetch_balance_resource(
         &self,
         signer_addr: &AccountAddress,
-        balance_currency_code: Identifier,
+        _balance_currency_code: Identifier,
     ) -> Result<BalanceResource> {
-        let currency_code_tag = type_tag_for_currency_code(balance_currency_code);
-        let balance_resource_tag = BalanceResource::struct_tag_for_currency(currency_code_tag);
+        let balance_resource_tag = BalanceResource::struct_tag();
         let balance_access_path =
             AccessPath::resource_access_path(ResourceKey::new(*signer_addr, balance_resource_tag));
 
@@ -548,7 +523,7 @@ impl<'a> DiemTestAdapter<'a> {
         })
     }
 
-    /// Perform a single Diem transaction.
+    /// Perform a single transaction.
     ///
     /// Should error if the transaction ends up being discarded, or having a status other than
     /// EXECUTED.
@@ -778,11 +753,11 @@ impl<'a> DiemTestAdapter<'a> {
     }
 }
 
-impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
-    type ExtraInitArgs = DiemInitArgs;
-    type ExtraPublishArgs = DiemPublishArgs;
-    type ExtraRunArgs = DiemRunArgs;
-    type Subcommand = DiemSubCommand;
+impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
+    type ExtraInitArgs = AptosInitArgs;
+    type ExtraPublishArgs = AptosPublishArgs;
+    type ExtraRunArgs = AptosRunArgs;
+    type Subcommand = AptosSubCommand;
 
     fn compiled_state(&mut self) -> &mut CompiledState<'a> {
         &mut self.compiled_state
@@ -805,7 +780,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
             None => BTreeMap::new(),
         };
 
-        let mut named_address_mapping = framework::diem_framework_named_addresses();
+        let mut named_address_mapping = framework::aptos_framework_named_addresses();
 
         for (name, addr) in test_only_named_addresses() {
             assert!(!named_address_mapping.contains_key(&name));
@@ -826,7 +801,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
 
         // Builtin private key mapping
         let mut private_key_mapping = BTreeMap::new();
-        for (name, private_key) in diem_framework_private_key_mapping() {
+        for (name, private_key) in aptos_framework_private_key_mapping() {
             private_key_mapping.insert(Identifier::new(name).unwrap(), private_key);
         }
 
@@ -886,8 +861,8 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
                         .insert(validator_name.clone(), validator_private_key.clone());
 
                     // Note: validator accounts are created at a later time.
-                    // This is because we need to fetch the sequence number of DiemRoot, which is
-                    // only available after the DiemTestAdapter has been fully initialized.
+                    // This is because we need to fetch the sequence number of Root, which is
+                    // only available after the AptosTestAdapter has been fully initialized.
                     validators_to_create.push((
                         validator_name,
                         validator_private_key,
@@ -926,8 +901,8 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
                     private_key_mapping.insert(parent_vasp_name.clone(), private_key);
 
                     // Note: parent vasp accounts are created at a later time.
-                    // This is because we need to fetch the sequence number of DiemRoot, which is
-                    // only available after the DiemTestAdapter has been fully initialized.
+                    // This is because we need to fetch the sequence number of Root, which is
+                    // only available after the AptosTestAdapter has been fully initialized.
                     parent_vasps_to_create.push((
                         parent_vasp_name,
                         auth_key_prefix,
@@ -1053,7 +1028,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
     ) -> Result<Option<String>> {
         if !extra_args.admin_script {
             panic!(
-                "Transactions scripts are not currently allowed on Diem. \
+                "Transactions scripts are not currently allowed. \
                 If you intend to run an admin script, add the `--admin-script` option to the run command."
             )
         }
@@ -1217,7 +1192,7 @@ impl<'a> MoveTestAdapter<'a> for DiemTestAdapter<'a> {
 
     fn handle_subcommand(&mut self, input: TaskInput<Self::Subcommand>) -> Result<Option<String>> {
         match input.command {
-            DiemSubCommand::BlockCommand(block_cmd) => {
+            AptosSubCommand::BlockCommand(block_cmd) => {
                 let proposer = self.compiled_state().resolve_address(&block_cmd.proposer);
                 let metadata =
                     BlockMetadata::new(HashValue::zero(), 0, block_cmd.time, vec![], proposer);
@@ -1270,11 +1245,6 @@ fn render_events(events: &[ContractEvent]) -> Option<String> {
     }
 }
 
-/// Run the Diem transactional test flow, using the given file as input.
-pub fn run_dpn_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    run_test_impl::<DiemTestAdapter>(path, Some(&*PRECOMPILED_DIEM_FRAMEWORK))
-}
-
 pub fn run_aptos_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    run_test_impl::<DiemTestAdapter>(path, Some(&*PRECOMPILED_APTOS_FRAMEWORK))
+    run_test_impl::<AptosTestAdapter>(path, Some(&*PRECOMPILED_APTOS_FRAMEWORK))
 }

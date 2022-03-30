@@ -50,11 +50,11 @@ module DiemFramework::Timestamp {
         ensures is_operating();
     }
 
-    // TODO: this is for both df-cli and the unit-test for df
-    // - df-cli, as a few test cases in df-cli uses a customized genesis module and that module needs  to invoke
+    // TODO: this is for both af-cli and the unit-test for df
+    // - af-cli, as a few test cases in af-cli uses a customized genesis module and that module needs  to invoke
     //   `set_time_has_started` in order to complete the genesis process. Until we find a way to solve this issue, this
     //   temporary function will stay here.
-    // - this is also needed for framework unit test `TimestampTests`. And once the above issue for df-cli is
+    // - this is also needed for framework unit test `TimestampTests`. And once the above issue for af-cli is
     //   resolved, we can mark this function #[test_only]
     public fun set_time_has_started_for_testing(dr_account: &signer) {
         set_time_has_started(dr_account);

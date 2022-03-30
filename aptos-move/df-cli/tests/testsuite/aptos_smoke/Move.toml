@@ -1,6 +1,0 @@
-[package]
-name = "diem_smoke"
-version = "0.0.0"
-
-[dependencies]
-DPNFramework = { local = "../../../../framework/DPN" }

@@ -5,8 +5,7 @@ use crate::{
     account_config::{
         AdminTransactionEvent, BaseUrlRotationEvent, BurnEvent, CancelBurnEvent,
         ComplianceKeyRotationEvent, CreateAccountEvent, MintEvent, NewBlockEvent, NewEpochEvent,
-        PreburnEvent, ReceivedMintEvent, ReceivedPaymentEvent, SentPaymentEvent,
-        ToXDXExchangeRateUpdateEvent,
+        PreburnEvent, ReceivedEvent, ReceivedMintEvent, SentEvent, ToXDXExchangeRateUpdateEvent,
     },
     event::EventKey,
     ledger_info::LedgerInfo,
@@ -103,22 +102,22 @@ impl ContractEventV0 {
     }
 }
 
-impl TryFrom<&ContractEvent> for SentPaymentEvent {
+impl TryFrom<&ContractEvent> for SentEvent {
     type Error = Error;
 
     fn try_from(event: &ContractEvent) -> Result<Self> {
-        if event.type_tag != TypeTag::Struct(SentPaymentEvent::struct_tag()) {
+        if event.type_tag != TypeTag::Struct(SentEvent::struct_tag()) {
             anyhow::bail!("Expected Sent Payment")
         }
         Self::try_from_bytes(&event.event_data)
     }
 }
 
-impl TryFrom<&ContractEvent> for ReceivedPaymentEvent {
+impl TryFrom<&ContractEvent> for ReceivedEvent {
     type Error = Error;
 
     fn try_from(event: &ContractEvent) -> Result<Self> {
-        if event.type_tag != TypeTag::Struct(ReceivedPaymentEvent::struct_tag()) {
+        if event.type_tag != TypeTag::Struct(ReceivedEvent::struct_tag()) {
             anyhow::bail!("Expected Received Payment")
         }
         Self::try_from_bytes(&event.event_data)
@@ -269,13 +268,13 @@ impl std::fmt::Debug for ContractEvent {
 
 impl std::fmt::Display for ContractEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Ok(payload) = SentPaymentEvent::try_from(self) {
+        if let Ok(payload) = SentEvent::try_from(self) {
             write!(
                 f,
                 "ContractEvent {{ key: {}, index: {:?}, type: {:?}, event_data: {:?} }}",
                 self.key, self.sequence_number, self.type_tag, payload,
             )
-        } else if let Ok(payload) = ReceivedPaymentEvent::try_from(self) {
+        } else if let Ok(payload) = ReceivedEvent::try_from(self) {
             write!(
                 f,
                 "ContractEvent {{ key: {}, index: {:?}, type: {:?}, event_data: {:?} }}",

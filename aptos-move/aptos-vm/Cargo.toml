@@ -42,7 +42,7 @@ aptos-parallel-executor = {path = "../parallel-executor" }
 proptest = "1.0.0"
 
 aptos-types = { path = "../../types", features = ["fuzzing"] }
-diem-framework-releases = { path = "../framework/DPN/releases" }
+aptos-framework-releases = { path = "../framework/aptos-framework/releases" }
 
 [features]
 default = []

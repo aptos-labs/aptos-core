@@ -6,23 +6,20 @@
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
 use aptos_temppath::TempPath;
-use aptos_transaction_builder::stdlib::{
-    encode_create_parent_vasp_account_script_function,
-    encode_peer_to_peer_with_metadata_script_function,
+use aptos_transaction_builder::aptos_stdlib::{
+    encode_create_account_script_function, encode_mint_script_function,
+    encode_transfer_script_function,
 };
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{
-        from_currency_code_string, testnet_dd_account_address, treasury_compliance_account_address,
-        xus_tag, BalanceResource, XUS_NAME,
-    },
+    account_config::{aptos_root_address, BalanceResource},
     account_state::AccountState,
     contract_event::ContractEvent,
     on_chain_config,
     on_chain_config::{
-        config_address, dpn_access_path_for_config, ConfigurationResource, OnChainConfig,
-        ValidatorSet,
+        access_path_for_config, config_address, dpn_access_path_for_config, ConfigurationResource,
+        OnChainConfig, ValidatorSet,
     },
     proof::SparseMerkleRangeProof,
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -46,7 +43,10 @@ use executor_test_helpers::{
     bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
 };
 use executor_types::BlockExecutorTrait;
-use move_core_types::move_resource::MoveResource;
+use move_core_types::{
+    language_storage::TypeTag,
+    move_resource::{MoveResource, MoveStructType},
+};
 use rand::SeedableRng;
 use std::{convert::TryFrom, sync::Arc};
 use storage_interface::{DbReader, DbReaderWriter, StateSnapshotReceiver};
@@ -139,17 +139,11 @@ fn get_mint_transaction(
     amount: u64,
 ) -> Transaction {
     get_test_signed_transaction(
-        testnet_dd_account_address(),
+        aptos_root_address(),
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
-        Some(encode_peer_to_peer_with_metadata_script_function(
-            xus_tag(),
-            *account,
-            amount,
-            vec![],
-            vec![],
-        )),
+        Some(encode_mint_script_function(*account, amount)),
     )
 }
 
@@ -157,22 +151,14 @@ fn get_account_transaction(
     aptos_root_key: &Ed25519PrivateKey,
     aptos_root_seq_num: u64,
     account: &AccountAddress,
-    account_key: &Ed25519PrivateKey,
+    _account_key: &Ed25519PrivateKey,
 ) -> Transaction {
-    let account_auth_key = AuthenticationKey::ed25519(&account_key.public_key());
     get_test_signed_transaction(
-        treasury_compliance_account_address(),
+        aptos_root_address(),
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
-        Some(encode_create_parent_vasp_account_script_function(
-            xus_tag(),
-            0,
-            *account,
-            account_auth_key.prefix().to_vec(),
-            vec![],
-            false,
-        )),
+        Some(encode_create_account_script_function(*account)),
     )
 }
 
@@ -188,13 +174,7 @@ fn get_transfer_transaction(
         sender_seq_number,
         sender_key.clone(),
         sender_key.public_key(),
-        Some(encode_peer_to_peer_with_metadata_script_function(
-            xus_tag(),
-            recipient,
-            amount,
-            vec![],
-            vec![],
-        )),
+        Some(encode_transfer_script_function(recipient, amount)),
     )
 }
 
@@ -208,7 +188,6 @@ fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
     account_state
         .get_balance_resources()
         .unwrap()
-        .get(&from_currency_code_string(XUS_NAME).unwrap())
         .unwrap()
         .coin()
 }
@@ -281,8 +260,8 @@ fn test_pre_genesis() {
     let (account1, account1_key, account2, account2_key) = get_demo_accounts();
     let txn1 = get_account_transaction(genesis_key, 0, &account1, &account1_key);
     let txn2 = get_account_transaction(genesis_key, 1, &account2, &account2_key);
-    let txn3 = get_mint_transaction(genesis_key, 0, &account1, 2000);
-    let txn4 = get_mint_transaction(genesis_key, 1, &account2, 2000);
+    let txn3 = get_mint_transaction(genesis_key, 2, &account1, 2000);
+    let txn4 = get_mint_transaction(genesis_key, 3, &account2, 2000);
     execute_and_commit(vec![txn1, txn2, txn3, txn4], &db_rw, &signer);
     assert_eq!(get_balance(&account1, &db_rw), 2000);
     assert_eq!(get_balance(&account2, &db_rw), 2000);
@@ -303,11 +282,11 @@ fn test_pre_genesis() {
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
         WriteSetMut::new(vec![
             (
-                dpn_access_path_for_config(ValidatorSet::CONFIG_ID),
+                access_path_for_config(ValidatorSet::CONFIG_ID),
                 WriteOp::Value(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
             ),
             (
-                AccessPath::new(account1, BalanceResource::access_path_for(xus_tag())),
+                AccessPath::new(account1, BalanceResource::resource_path()),
                 WriteOp::Value(bcs::to_bytes(&BalanceResource::new(1000)).unwrap()),
             ),
         ])
@@ -316,7 +295,7 @@ fn test_pre_genesis() {
         vec![ContractEvent::new(
             on_chain_config::new_epoch_event_key(),
             0,
-            xus_tag(),
+            TypeTag::Struct(ConfigurationResource::struct_tag()),
             vec![],
         )],
     )));
@@ -360,8 +339,8 @@ fn test_new_genesis() {
     let (account1, account1_key, account2, account2_key) = get_demo_accounts();
     let txn1 = get_account_transaction(genesis_key, 0, &account1, &account1_key);
     let txn2 = get_account_transaction(genesis_key, 1, &account2, &account2_key);
-    let txn3 = get_mint_transaction(genesis_key, 0, &account1, 2_000_000);
-    let txn4 = get_mint_transaction(genesis_key, 1, &account2, 2_000_000);
+    let txn3 = get_mint_transaction(genesis_key, 2, &account1, 2_000_000);
+    let txn4 = get_mint_transaction(genesis_key, 3, &account2, 2_000_000);
     execute_and_commit(vec![txn1, txn2, txn3, txn4], &db, &signer);
     assert_eq!(get_balance(&account1, &db), 2_000_000);
     assert_eq!(get_balance(&account2, &db), 2_000_000);
@@ -390,7 +369,7 @@ fn test_new_genesis() {
                 WriteOp::Value(bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap()),
             ),
             (
-                AccessPath::new(account1, BalanceResource::access_path_for(xus_tag())),
+                AccessPath::new(account1, BalanceResource::resource_path()),
                 WriteOp::Value(bcs::to_bytes(&BalanceResource::new(1_000_000)).unwrap()),
             ),
         ])
@@ -399,7 +378,7 @@ fn test_new_genesis() {
         vec![ContractEvent::new(
             *configuration.events().key(),
             0,
-            xus_tag(),
+            TypeTag::Struct(ConfigurationResource::struct_tag()),
             vec![],
         )],
     )));

@@ -14,6 +14,7 @@ use language_e2e_tests::{
 };
 use move_ir_compiler::Compiler;
 
+#[ignore] // writeset is not supported in aptos-framework
 #[test]
 fn build_upgrade_writeset() {
     let mut executor = FakeExecutor::from_genesis_file();
@@ -38,7 +39,7 @@ fn build_upgrade_writeset() {
     };
     let change_set = {
         let (version_writes, events) = build_changeset(executor.get_state_view(), |session| {
-            session.set_diem_version(11);
+            session.set_aptos_version(11);
         })
         .into_inner();
         let mut writeset = version_writes.into_mut();

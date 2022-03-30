@@ -6,15 +6,12 @@ use crate::{
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
-use aptos_transaction_builder::stdlib::{
-    encode_create_parent_vasp_account_script_function,
-    encode_peer_to_peer_with_metadata_script_function,
+use aptos_transaction_builder::aptos_stdlib::{
+    encode_create_account_script_function, encode_mint_script_function,
+    encode_transfer_script_function,
 };
 use aptos_types::{
-    account_config::{
-        from_currency_code_string, testnet_dd_account_address, treasury_compliance_account_address,
-        xus_tag, XUS_NAME,
-    },
+    account_config::aptos_root_address,
     account_state::AccountState,
     event::EventKey,
     state_store::{state_key::StateKey, state_value::StateValueWithProof},
@@ -54,112 +51,68 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     let privkey1 = Ed25519PrivateKey::generate(&mut rng);
     let pubkey1 = privkey1.public_key();
-    let account1_auth_key = AuthenticationKey::ed25519(&pubkey1);
-    let account1 = account1_auth_key.derived_address();
+    let account1 = AuthenticationKey::ed25519(&pubkey1).derived_address();
 
     let privkey2 = Ed25519PrivateKey::generate(&mut rng);
     let pubkey2 = privkey2.public_key();
-    let account2_auth_key = AuthenticationKey::ed25519(&pubkey2);
-    let account2 = account2_auth_key.derived_address();
+    let account2 = AuthenticationKey::ed25519(&pubkey2).derived_address();
 
     let pubkey3 = Ed25519PrivateKey::generate(&mut rng).public_key();
-    let account3_auth_key = AuthenticationKey::ed25519(&pubkey3);
-    let account3 = account3_auth_key.derived_address();
+    let account3 = AuthenticationKey::ed25519(&pubkey3).derived_address();
 
     let pubkey4 = Ed25519PrivateKey::generate(&mut rng).public_key();
-    let account4_auth_key = AuthenticationKey::ed25519(&pubkey4); // non-existent account
-    let account4 = account4_auth_key.derived_address();
-    let genesis_account = testnet_dd_account_address();
-    let tc_account = treasury_compliance_account_address();
+    let account4 = AuthenticationKey::ed25519(&pubkey4).derived_address();
+    let genesis_account = aptos_root_address();
 
     let tx1 = get_test_signed_transaction(
-        tc_account,
+        genesis_account,
         /* sequence_number = */ 0,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(encode_create_parent_vasp_account_script_function(
-            xus_tag(),
-            0,
-            account1,
-            account1_auth_key.prefix().to_vec(),
-            vec![],
-            false, /* add all currencies */
-        )),
+        Some(encode_create_account_script_function(account1)),
     );
 
     let tx2 = get_test_signed_transaction(
-        tc_account,
+        genesis_account,
         /* sequence_number = */ 1,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(encode_create_parent_vasp_account_script_function(
-            xus_tag(),
-            0,
-            account2,
-            account2_auth_key.prefix().to_vec(),
-            vec![],
-            false, /* add all currencies */
-        )),
+        Some(encode_create_account_script_function(account2)),
     );
 
     let tx3 = get_test_signed_transaction(
-        tc_account,
+        genesis_account,
         /* sequence_number = */ 2,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(encode_create_parent_vasp_account_script_function(
-            xus_tag(),
-            0,
-            account3,
-            account3_auth_key.prefix().to_vec(),
-            vec![],
-            false, /* add all currencies */
-        )),
+        Some(encode_create_account_script_function(account3)),
     );
 
     // Create account1 with 2M coins.
     let txn1 = get_test_signed_transaction(
         genesis_account,
-        /* sequence_number = */ 0,
+        /* sequence_number = */ 3,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(encode_peer_to_peer_with_metadata_script_function(
-            xus_tag(),
-            account1,
-            2_000_000,
-            vec![],
-            vec![],
-        )),
+        Some(encode_mint_script_function(account1, 2_000_000)),
     );
 
     // Create account2 with 1.2M coins.
     let txn2 = get_test_signed_transaction(
         genesis_account,
-        /* sequence_number = */ 1,
+        /* sequence_number = */ 4,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(encode_peer_to_peer_with_metadata_script_function(
-            xus_tag(),
-            account2,
-            1_200_000,
-            vec![],
-            vec![],
-        )),
+        Some(encode_mint_script_function(account2, 1_200_000)),
     );
 
     // Create account3 with 1M coins.
     let txn3 = get_test_signed_transaction(
         genesis_account,
-        /* sequence_number = */ 2,
+        /* sequence_number = */ 5,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(encode_peer_to_peer_with_metadata_script_function(
-            xus_tag(),
-            account3,
-            1_000_000,
-            vec![],
-            vec![],
-        )),
+        Some(encode_mint_script_function(account3, 1_000_000)),
     );
 
     // Transfer 20k coins from account1 to account2.
@@ -169,13 +122,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 0,
         privkey1.clone(),
         pubkey1.clone(),
-        Some(encode_peer_to_peer_with_metadata_script_function(
-            xus_tag(),
-            account2,
-            20_000,
-            vec![],
-            vec![],
-        )),
+        Some(encode_transfer_script_function(account2, 20_000)),
     );
 
     // Transfer 10k coins from account2 to account3.
@@ -185,13 +132,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 0,
         privkey2,
         pubkey2,
-        Some(encode_peer_to_peer_with_metadata_script_function(
-            xus_tag(),
-            account3,
-            10_000,
-            vec![],
-            vec![],
-        )),
+        Some(encode_transfer_script_function(account3, 10_000)),
     );
 
     // Transfer 70k coins from account1 to account3.
@@ -201,13 +142,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 1,
         privkey1.clone(),
         pubkey1.clone(),
-        Some(encode_peer_to_peer_with_metadata_script_function(
-            xus_tag(),
-            account3,
-            70_000,
-            vec![],
-            vec![],
-        )),
+        Some(encode_transfer_script_function(account3, 70_000)),
     );
 
     let block1 = vec![tx1, tx2, tx3, txn1, txn2, txn3, txn4, txn5, txn6];
@@ -223,13 +158,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             /* sequence_number = */ i,
             privkey1.clone(),
             pubkey1.clone(),
-            Some(encode_peer_to_peer_with_metadata_script_function(
-                xus_tag(),
-                account3,
-                10_000,
-                vec![],
-                vec![],
-            )),
+            Some(encode_transfer_script_function(account3, 10_000)),
         ));
     }
 
@@ -254,25 +183,25 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     let t1 = db
         .reader
-        .get_account_transaction(genesis_account, 0, false, current_version)
+        .get_account_transaction(genesis_account, 3, false, current_version)
         .unwrap();
     verify_committed_txn_status(t1.as_ref(), &block1[3]).unwrap();
 
     let t2 = db
         .reader
-        .get_account_transaction(genesis_account, 1, false, current_version)
+        .get_account_transaction(genesis_account, 4, false, current_version)
         .unwrap();
     verify_committed_txn_status(t2.as_ref(), &block1[4]).unwrap();
 
     let t3 = db
         .reader
-        .get_account_transaction(genesis_account, 2, false, current_version)
+        .get_account_transaction(genesis_account, 5, false, current_version)
         .unwrap();
     verify_committed_txn_status(t3.as_ref(), &block1[5]).unwrap();
 
     let tn = db
         .reader
-        .get_account_transaction(genesis_account, 3, false, current_version)
+        .get_account_transaction(genesis_account, 6, false, current_version)
         .unwrap();
     assert!(tn.is_none());
 
@@ -335,7 +264,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account1_sent_events = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account1, 3),
+            &EventKey::new_from_address(&account1, 0),
             0,
             Order::Ascending,
             10,
@@ -346,7 +275,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account2_sent_events = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account2, 3),
+            &EventKey::new_from_address(&account2, 0),
             0,
             Order::Ascending,
             10,
@@ -357,7 +286,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account3_sent_events = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account3, 3),
+            &EventKey::new_from_address(&account3, 0),
             0,
             Order::Ascending,
             10,
@@ -368,35 +297,35 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account1_received_events = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account1, 2),
+            &EventKey::new_from_address(&account1, 1),
             0,
             Order::Ascending,
             10,
         )
         .unwrap();
-    assert_eq!(account1_received_events.len(), 1);
+    assert_eq!(account1_received_events.len(), 0);
 
     let account2_received_events = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account2, 2),
+            &EventKey::new_from_address(&account2, 1),
             0,
             Order::Ascending,
             10,
         )
         .unwrap();
-    assert_eq!(account2_received_events.len(), 2);
+    assert_eq!(account2_received_events.len(), 1);
 
     let account3_received_events = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account3, 2),
+            &EventKey::new_from_address(&account3, 1),
             0,
             Order::Ascending,
             10,
         )
         .unwrap();
-    assert_eq!(account3_received_events.len(), 3);
+    assert_eq!(account3_received_events.len(), 2);
 
     let account4_state = db
         .reader
@@ -417,7 +346,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account4_sent_events = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account4, 3),
+            &EventKey::new_from_address(&account4, 0),
             0,
             Order::Ascending,
             10,
@@ -486,7 +415,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account1_sent_events_batch1 = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account1, 3),
+            &EventKey::new_from_address(&account1, 0),
             0,
             Order::Ascending,
             10,
@@ -497,7 +426,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account1_sent_events_batch2 = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account1, 3),
+            &EventKey::new_from_address(&account1, 0),
             10,
             Order::Ascending,
             10,
@@ -508,19 +437,19 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account3_received_events_batch1 = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account3, 2),
+            &EventKey::new_from_address(&account3, 1),
             u64::max_value(),
             Order::Descending,
             10,
         )
         .unwrap();
     assert_eq!(account3_received_events_batch1.len(), 10);
-    assert_eq!(account3_received_events_batch1[0].1.sequence_number(), 16);
+    assert_eq!(account3_received_events_batch1[0].1.sequence_number(), 15);
 
     let account3_received_events_batch2 = db
         .reader
         .get_events(
-            &EventKey::new_from_address(&account3, 2),
+            &EventKey::new_from_address(&account3, 1),
             6,
             Order::Descending,
             10,
@@ -555,7 +484,6 @@ where
     let balance = if let Some(blob) = &account_state_with_proof.value {
         AccountState::try_from(blob)?
             .get_balance_resources()?
-            .get(&from_currency_code_string(XUS_NAME).unwrap())
             .map(|b| b.coin())
             .unwrap_or(0)
     } else {

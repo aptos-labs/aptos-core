@@ -7,7 +7,12 @@ use crate::{
 };
 use aptos_types::{
     transaction::{SignedTransaction, TransactionStatus},
-    vm_status::{known_locations, KeptVMStatus, StatusCode},
+    vm_status::{KeptVMStatus, StatusCode},
+};
+use move_core_types::{
+    ident_str,
+    language_storage::{ModuleId, CORE_CODE_ADDRESS},
+    vm_status::AbortLocation,
 };
 use proptest::prelude::*;
 use proptest_derive::Arbitrary;
@@ -76,12 +81,15 @@ impl AUTransactionGen for P2PTransferGen {
                 sender.sequence_number += 1;
                 gas_used = sender.peer_to_peer_gas_cost();
                 sender.balance -= gas_used * txn.gas_unit_price();
-                // 6 means the balance was insufficient while trying to deduct gas costs in the
+                // the balance was insufficient while trying to deduct gas costs in the
                 // epilogue.
                 // TODO: define these values in a central location
                 status = TransactionStatus::Keep(KeptVMStatus::MoveAbort(
-                    known_locations::diem_account_module_abort(),
-                    6,
+                    AbortLocation::Module(ModuleId::new(
+                        CORE_CODE_ADDRESS,
+                        ident_str!("TestCoin").to_owned(),
+                    )),
+                    8,
                 ));
             }
             (true, false, _) => {
@@ -90,10 +98,13 @@ impl AUTransactionGen for P2PTransferGen {
                 sender.sequence_number += 1;
                 gas_used = sender.peer_to_peer_too_low_gas_cost();
                 sender.balance -= gas_used * txn.gas_unit_price();
-                // 10 means the balance was insufficient while trying to transfer.
+                // the balance was insufficient while trying to transfer.
                 status = TransactionStatus::Keep(KeptVMStatus::MoveAbort(
-                    known_locations::diem_account_module_abort(),
-                    1288,
+                    AbortLocation::Module(ModuleId::new(
+                        CORE_CODE_ADDRESS,
+                        ident_str!("TestCoin").to_owned(),
+                    )),
+                    8,
                 ));
             }
             (false, _, _) => {

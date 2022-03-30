@@ -162,9 +162,9 @@ module AptosFramework::TestCoin {
         borrow_global<Balance>(owner).coin.value
     }
 
-	public(script) fun transfer(from: signer, to: address, amount: u64) acquires Balance, TransferEvents {
-		transfer_internal(&from, to, amount);
-	}
+    public(script) fun transfer(from: signer, to: address, amount: u64) acquires Balance, TransferEvents {
+        transfer_internal(&from, to, amount);
+    }
 
     /// Transfers `amount` of tokens from `from` to `to`.
     public fun transfer_internal(from: &signer, to: address, amount: u64) acquires Balance, TransferEvents {

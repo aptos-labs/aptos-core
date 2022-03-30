@@ -3,9 +3,8 @@
 
 #![forbid(unsafe_code)]
 use crate::{account::Account, compile, executor::FakeExecutor};
-use aptos_transaction_builder::stdlib as transaction_builder;
+use aptos_transaction_builder::aptos_stdlib::encode_set_version_script_function;
 use move_binary_format::file_format::CompiledModule;
-use transaction_builder::*;
 
 pub fn close_module_publishing(
     executor: &mut FakeExecutor,
@@ -57,7 +56,7 @@ pub fn upgrade_df(
     update_version_number: Option<u64>,
 ) {
     close_module_publishing(executor, dr_account, dr_seqno);
-    for compiled_module_bytes in diem_framework_releases::current_module_blobs()
+    for compiled_module_bytes in aptos_framework_releases::current_module_blobs()
         .iter()
         .cloned()
     {
@@ -71,10 +70,7 @@ pub fn upgrade_df(
         executor.execute_and_apply(
             dr_account
                 .transaction()
-                .payload(encode_update_diem_version_script_function(
-                    0,
-                    version_number,
-                ))
+                .payload(encode_set_version_script_function(version_number))
                 .sequence_number(*dr_seqno)
                 .sign(),
         );

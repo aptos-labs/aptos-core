@@ -5,8 +5,8 @@ use anyhow::{bail, Result};
 use std::collections::{BTreeMap, BTreeSet};
 use structopt::StructOpt;
 
-use aptos_types::on_chain_config::{Version, DIEM_MAX_KNOWN_VERSION};
-use framework::dpn_files;
+use aptos_types::on_chain_config::{Version, APTOS_MAX_KNOWN_VERSION};
+use framework::aptos_files;
 use move_model::run_model_builder;
 use move_stackless_bytecode_interpreter::{
     concrete::settings::InterpreterSettings, StacklessBytecodeInterpreter,
@@ -21,8 +21,8 @@ struct ReplayArgs {
     trace_files: Vec<String>,
 
     /// Diem selector, if set, replay traces executed in that version instead of the latest version
-    #[structopt(short = "d", long = "diem")]
-    diem_version: Option<u64>,
+    #[structopt(short = "d", long = "aptos-version")]
+    aptos_version: Option<u64>,
 
     /// Trace filters, if specified, only replay traces that passes the filter
     #[structopt(short = "f", long = "filter")]
@@ -70,9 +70,9 @@ pub fn main() -> Result<()> {
     }
 
     let flags = ReplayFlags {
-        diem_version: args
-            .diem_version
-            .map_or(DIEM_MAX_KNOWN_VERSION, |v| Version { major: v }),
+        aptos_version: args
+            .aptos_version
+            .map_or(APTOS_MAX_KNOWN_VERSION, |v| Version { major: v }),
         filters,
         step_limit: args.step_limit.unwrap_or(usize::MAX),
         xrun: args.xrun,
@@ -92,7 +92,7 @@ pub fn main() -> Result<()> {
         settings.no_expr_check = true;
     }
 
-    let env = run_model_builder(vec![(dpn_files(), BTreeMap::<String, _>::new())], vec![])?;
+    let env = run_model_builder(vec![(aptos_files(), BTreeMap::<String, _>::new())], vec![])?;
     let interpreter = StacklessBytecodeInterpreter::new(&env, None, settings);
     for trace in args.trace_files {
         aptos_e2e_tests_replay::replay(trace, &interpreter, &flags)?;

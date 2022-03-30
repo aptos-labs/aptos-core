@@ -79,10 +79,10 @@ impl<'r, 'l, S: MoveResolver> GenesisSession<'r, 'l, S> {
             serialize_values(&vec![MoveValue::Signer(aptos_root_address())]),
         )
     }
-    pub fn set_diem_version(&mut self, version: Version) {
+    pub fn set_aptos_version(&mut self, version: Version) {
         self.exec_func(
-            "Version",
-            "set",
+            "AptosVersion",
+            "set_version",
             vec![],
             serialize_values(&vec![
                 MoveValue::Signer(aptos_root_address()),

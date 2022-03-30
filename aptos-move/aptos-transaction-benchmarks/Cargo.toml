@@ -22,7 +22,6 @@ aptos-crypto = { path = "../../crates/aptos-crypto" }
 read-write-set = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 read-write-set-dynamic = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 aptos-vm = { path = "../aptos-vm" }
-diem-framework-releases = { path = "../framework/DPN/releases" }
 
 [[bench]]
 name = "transaction_benches"

@@ -10,7 +10,7 @@ fn run_all(args_path: &Path) -> datatest_stable::Result<()> {
     let use_temp_dir = !args_path.parent().unwrap().join("NO_TEMPDIR").exists();
     test::run_one(
         args_path,
-        &PathBuf::from("../../target/debug/df-cli"),
+        &PathBuf::from("../../target/debug/af-cli"),
         /* use_temp_dir */ use_temp_dir,
         /* track_cov */ false,
     )?;

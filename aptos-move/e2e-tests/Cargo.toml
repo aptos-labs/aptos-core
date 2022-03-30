@@ -34,7 +34,7 @@ aptos-writeset-generator = { path = "../writeset-transaction-generator" }
 vm-genesis = { path = "../vm-genesis" }
 aptos-vm = { path = "../aptos-vm" }
 aptos-keygen = { path = "../aptos-keygen" }
-diem-framework-releases = { path = "../framework/DPN/releases" }
+aptos-framework-releases = { path = "../framework/aptos-framework/releases" }
 
 ## Other Diem Dependencies
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }

@@ -95,6 +95,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "af-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework-releases",
+ "aptos-vm",
+ "aptos-workspace-hack",
+ "bcs",
+ "clap 3.1.6",
+ "datatest-stable",
+ "move-cli",
+ "move-core-types",
+ "move-vm-types",
+]
+
+[[package]]
 name = "ahash"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -967,7 +983,6 @@ dependencies = [
  "aptos-workspace-hack",
  "criterion",
  "criterion-cpu-time",
- "diem-framework-releases",
  "language-e2e-tests",
  "proptest",
  "read-write-set",
@@ -994,6 +1009,7 @@ name = "aptos-transaction-replay"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-framework-releases",
  "aptos-resource-viewer",
  "aptos-state-view",
  "aptos-types",
@@ -1002,7 +1018,6 @@ dependencies = [
  "aptos-workspace-hack",
  "aptosdb",
  "bcs",
- "diem-framework-releases",
  "difference",
  "framework",
  "hex",
@@ -1115,6 +1130,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-framework-releases",
  "aptos-logger",
  "aptos-metrics",
  "aptos-parallel-executor",
@@ -1122,7 +1138,6 @@ dependencies = [
  "aptos-types",
  "aptos-workspace-hack",
  "bcs",
- "diem-framework-releases",
  "fail",
  "framework",
  "mirai-annotations",
@@ -1202,6 +1217,7 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-crypto-derive",
+ "aptos-framework-releases",
  "aptos-state-view",
  "aptos-transaction-replay",
  "aptos-types",
@@ -1209,7 +1225,6 @@ dependencies = [
  "aptos-workspace-hack",
  "aptosdb",
  "bcs",
- "diem-framework-releases",
  "framework",
  "handlebars",
  "hex",
@@ -2055,7 +2070,6 @@ dependencies = [
  "termion",
  "thiserror",
  "tokio",
- "vm-genesis",
  "vm-validator",
 ]
 
@@ -2577,22 +2591,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "850878694b7933ca4c9569d30a34b55031b9b139ee1fc7b94a527c4ef960d690"
 
 [[package]]
-name = "df-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-vm",
- "aptos-workspace-hack",
- "bcs",
- "clap 3.1.6",
- "datatest-stable",
- "diem-framework-releases",
- "move-cli",
- "move-core-types",
- "move-vm-types",
-]
-
-[[package]]
 name = "diem-framework-releases"
 version = "0.1.0"
 dependencies = [
@@ -3048,6 +3046,7 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
+ "aptos-framework-releases",
  "aptos-genesis-tool",
  "aptos-infallible",
  "aptos-logger",
@@ -3062,7 +3061,6 @@ dependencies = [
  "aptosdb",
  "bcs",
  "consensus-types",
- "diem-framework-releases",
  "executor-test-helpers",
  "executor-types",
  "fail",
@@ -3540,11 +3538,11 @@ dependencies = [
 name = "genesis-viewer"
 version = "0.1.0"
 dependencies = [
+ "aptos-framework-releases",
  "aptos-resource-viewer",
  "aptos-types",
  "aptos-workspace-hack",
  "bcs",
- "diem-framework-releases",
  "move-binary-format",
  "move-core-types",
  "move-vm-test-utils",
@@ -4341,6 +4339,7 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
+ "aptos-framework-releases",
  "aptos-keygen",
  "aptos-proptest-helpers",
  "aptos-state-view",
@@ -4350,7 +4349,6 @@ dependencies = [
  "aptos-workspace-hack",
  "aptos-writeset-generator",
  "bcs",
- "diem-framework-releases",
  "goldenfile",
  "hex",
  "move-binary-format",
@@ -4373,6 +4371,7 @@ name = "language-e2e-testsuite"
 version = "0.1.0"
 dependencies = [
  "aptos-crypto",
+ "aptos-framework-releases",
  "aptos-keygen",
  "aptos-logger",
  "aptos-parallel-executor",
@@ -4383,7 +4382,6 @@ dependencies = [
  "aptos-workspace-hack",
  "aptos-writeset-generator",
  "bcs",
- "diem-framework-releases",
  "hex",
  "language-e2e-tests",
  "move-binary-format",
@@ -7791,6 +7789,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-config",
  "aptos-crypto",
+ "aptos-framework-releases",
  "aptos-genesis-tool",
  "aptos-infallible",
  "aptos-logger",
@@ -7810,7 +7809,6 @@ dependencies = [
  "channel",
  "claim",
  "consensus-notifications",
- "diem-framework-releases",
  "event-notifications",
  "executor",
  "executor-test-helpers",
@@ -9004,6 +9002,7 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
+ "aptos-framework-releases",
  "aptos-proptest-helpers",
  "aptos-state-view",
  "aptos-transaction-builder",
@@ -9011,7 +9010,6 @@ dependencies = [
  "aptos-vm",
  "aptos-workspace-hack",
  "bcs",
- "diem-framework-releases",
  "framework",
  "move-binary-format",
  "move-bytecode-utils",

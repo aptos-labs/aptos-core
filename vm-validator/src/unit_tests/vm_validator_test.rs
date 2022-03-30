@@ -3,10 +3,12 @@
 
 use crate::vm_validator::{TransactionValidation, VMValidator};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
-use aptos_transaction_builder::stdlib::encode_peer_to_peer_with_metadata_script_function;
+use aptos_transaction_builder::aptos_stdlib::{
+    encode_mint_script_function, encode_transfer_script_function,
+};
 use aptos_types::{
     account_address, account_config,
-    account_config::{xus_tag, XUS_NAME},
+    account_config::XUS_NAME,
     chain_id::ChainId,
     test_helpers::transaction_test_helpers,
     transaction::{Module, Script, TransactionPayload},
@@ -16,7 +18,6 @@ use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use move_core_types::gas_schedule::{GasAlgebra, GasConstants, MAX_TRANSACTION_SIZE_IN_BYTES};
 use rand::SeedableRng;
-use std::u64;
 use storage_interface::DbReaderWriter;
 
 struct TestValidator {
@@ -78,8 +79,7 @@ fn test_validate_transaction() {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_root_address();
-    let program =
-        encode_peer_to_peer_with_metadata_script_function(xus_tag(), address, 100, vec![], vec![]);
+    let program = encode_mint_script_function(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
         1,
@@ -100,8 +100,7 @@ fn test_validate_invalid_signature() {
     // Submit with an account using an different private/public keypair
 
     let address = account_config::aptos_root_address();
-    let program =
-        encode_peer_to_peer_with_metadata_script_function(xus_tag(), address, 100, vec![], vec![]);
+    let program = encode_transfer_script_function(address, 100);
     let transaction = transaction_test_helpers::get_test_unchecked_txn(
         address,
         1,
@@ -231,8 +230,7 @@ fn test_validate_max_gas_price_below_bounds() {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_root_address();
-    let program =
-        encode_peer_to_peer_with_metadata_script_function(xus_tag(), address, 100, vec![], vec![]);
+    let program = encode_transfer_script_function(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         address,
         1,
@@ -270,12 +268,11 @@ fn test_validate_module_publishing() {
     assert_eq!(ret.status(), None);
 }
 
-// Make sure that we can't publish non-allowlisted modules
 #[test]
 fn test_validate_module_publishing_non_association() {
     let vm_validator = TestValidator::new();
 
-    let address = account_config::treasury_compliance_account_address();
+    let address = account_config::aptos_root_address();
     let transaction = transaction_test_helpers::get_test_signed_module_publishing_transaction(
         address,
         1,
@@ -283,8 +280,9 @@ fn test_validate_module_publishing_non_association() {
         vm_genesis::GENESIS_KEYPAIR.1.clone(),
         Module::new(vec![]),
     );
+    // open publishing is enabled
     let ret = vm_validator.validate_transaction(transaction).unwrap();
-    assert_eq!(ret.status().unwrap(), StatusCode::INVALID_MODULE_PUBLISHER);
+    assert!(ret.status().is_none());
 }
 
 #[test]
@@ -296,8 +294,7 @@ fn test_validate_invalid_auth_key() {
     // Submit with an account using an different private/public keypair
 
     let address = account_config::aptos_root_address();
-    let program =
-        encode_peer_to_peer_with_metadata_script_function(xus_tag(), address, 100, vec![], vec![]);
+    let program = encode_transfer_script_function(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
         1,
@@ -315,15 +312,14 @@ fn test_validate_account_doesnt_exist() {
 
     let address = account_config::aptos_root_address();
     let random_account_addr = account_address::AccountAddress::random();
-    let program =
-        encode_peer_to_peer_with_metadata_script_function(xus_tag(), address, 100, vec![], vec![]);
+    let program = encode_transfer_script_function(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         random_account_addr,
         1,
         &vm_genesis::GENESIS_KEYPAIR.0,
         vm_genesis::GENESIS_KEYPAIR.1.clone(),
         Some(program),
-        0,
+        u64::MAX,
         1,                   /* max gas price */
         XUS_NAME.to_owned(), /* gas currency code */
         None,
@@ -340,8 +336,7 @@ fn test_validate_sequence_number_too_new() {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_root_address();
-    let program =
-        encode_peer_to_peer_with_metadata_script_function(xus_tag(), address, 100, vec![], vec![]);
+    let program = encode_transfer_script_function(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
         1,
@@ -358,13 +353,7 @@ fn test_validate_invalid_arguments() {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_root_address();
-    let program = encode_peer_to_peer_with_metadata_script_function(
-        xus_tag(),
-        address,
-        100,
-        vec![],
-        vec![42u8],
-    );
+    let program = encode_transfer_script_function(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
         1,
@@ -392,7 +381,7 @@ fn test_validate_non_genesis_write_set() {
     )
     .into_inner();
     let ret = vm_validator.validate_transaction(transaction).unwrap();
-    assert!(ret.status().is_none());
+    assert_eq!(ret.status().unwrap(), StatusCode::REJECTED_WRITE_SET);
 
     // A WriteSet txn is only valid when sent from the root account.
     let bad_transaction = transaction_test_helpers::get_write_set_txn(
@@ -442,49 +431,4 @@ fn test_validate_chain_id() {
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(ret.status().unwrap(), StatusCode::BAD_CHAIN_ID);
-}
-
-#[test]
-fn test_validate_gas_currency_with_bad_identifier() {
-    let vm_validator = TestValidator::new();
-
-    let address = account_config::aptos_root_address();
-    let transaction = transaction_test_helpers::get_test_signed_transaction(
-        address,
-        1, /* sequence_number */
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        None,     /* script */
-        u64::MAX, /* expiration_time */
-        0,        /* gas_unit_price */
-        // The gas currency code must be composed of alphanumeric characters and the
-        // first character must be a letter.
-        "Bad_ID".to_string(),
-        None, /* max_gas_amount */
-    );
-    let ret = vm_validator.validate_transaction(transaction).unwrap();
-    assert_eq!(ret.status().unwrap(), StatusCode::INVALID_GAS_SPECIFIER);
-}
-
-#[test]
-fn test_validate_gas_currency_code() {
-    let vm_validator = TestValidator::new();
-
-    let address = account_config::aptos_root_address();
-    let transaction = transaction_test_helpers::get_test_signed_transaction(
-        address,
-        1, /* sequence_number */
-        &vm_genesis::GENESIS_KEYPAIR.0,
-        vm_genesis::GENESIS_KEYPAIR.1.clone(),
-        None,     /* script */
-        u64::MAX, /* expiration_time */
-        0,        /* gas_unit_price */
-        "INVALID".to_string(),
-        None, /* max_gas_amount */
-    );
-    let ret = vm_validator.validate_transaction(transaction).unwrap();
-    assert_eq!(
-        ret.status().unwrap(),
-        StatusCode::CURRENCY_INFO_DOES_NOT_EXIST
-    );
 }

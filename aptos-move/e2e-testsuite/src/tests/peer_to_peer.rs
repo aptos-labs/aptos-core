@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::{
-    account_config::{ReceivedPaymentEvent, SentPaymentEvent},
+    account_config::{ReceivedEvent, SentEvent},
     transaction::{SignedTransaction, TransactionOutput, TransactionStatus},
-    vm_status::{known_locations, KeptVMStatus},
+    vm_status::KeptVMStatus,
 };
 use language_e2e_tests::{
     account::{self, Account},
     common_transactions::peer_to_peer_txn,
     executor::FakeExecutor,
-    test_with_different_versions, transaction_status_eq,
+    test_with_different_versions,
     versioning::CURRENT_RELEASE_VERSIONS,
 };
 use std::{convert::TryFrom, time::Instant};
@@ -47,19 +47,18 @@ fn single_peer_to_peer_with_event() {
         let updated_sender_balance = executor
             .read_balance_resource(sender.account(), account::xus_currency_code())
             .expect("sender balance must exist");
-        let updated_receiver = executor
-            .read_account_resource(receiver.account())
-            .expect("receiver must exist");
         let updated_receiver_balance = executor
             .read_balance_resource(receiver.account(), account::xus_currency_code())
             .expect("receiver balance must exist");
+        let updated_sender_events = executor.read_transfer_event(sender.account()).unwrap();
+        let updated_receiver_events = executor.read_transfer_event(receiver.account()).unwrap();
         assert_eq!(receiver_balance, updated_receiver_balance.coin());
         assert_eq!(sender_balance, updated_sender_balance.coin());
         assert_eq!(11, updated_sender.sequence_number());
-        assert_eq!(0, updated_sender.received_events().count(),);
-        assert_eq!(1, updated_sender.sent_events().count());
-        assert_eq!(1, updated_receiver.received_events().count());
-        assert_eq!(0, updated_receiver.sent_events().count());
+        assert_eq!(0, updated_sender_events.received_events().count(),);
+        assert_eq!(1, updated_sender_events.sent_events().count());
+        assert_eq!(1, updated_receiver_events.received_events().count());
+        assert_eq!(0, updated_receiver_events.sent_events().count());
 
         let rec_ev_path = receiver.received_events_key().to_vec();
         let sent_ev_path = sender.sent_events_key().to_vec();
@@ -184,10 +183,10 @@ fn few_peer_to_peer_with_event() {
 
             // check events
             for event in txn_output.events() {
-                if let Ok(payload) = SentPaymentEvent::try_from(event) {
+                if let Ok(payload) = SentEvent::try_from(event) {
                     assert_eq!(transfer_amount, payload.amount());
                     assert_eq!(receiver.address(), &payload.receiver());
-                } else if let Ok(payload) = ReceivedPaymentEvent::try_from(event) {
+                } else if let Ok(payload) = ReceivedEvent::try_from(event) {
                     assert_eq!(transfer_amount, payload.amount());
                     assert_eq!(sender.address(), &payload.sender());
                 } else {
@@ -212,52 +211,19 @@ fn few_peer_to_peer_with_event() {
             let updated_sender_balance = executor
                 .read_balance_resource(sender.account(), account::xus_currency_code())
                 .expect("sender balance must exist");
-            let updated_receiver = executor
-                .read_account_resource(receiver.account())
-                .expect("receiver must exist");
             let updated_receiver_balance = executor
                 .read_balance_resource(receiver.account(), account::xus_currency_code())
                 .expect("receiver balance must exist");
+            let updated_sender_events = executor.read_transfer_event(sender.account()).unwrap();
+            let updated_receiver_events = executor.read_transfer_event(receiver.account()).unwrap();
             assert_eq!(receiver_balance, updated_receiver_balance.coin());
             assert_eq!(sender_balance, updated_sender_balance.coin());
             assert_eq!(11 + idx as u64, updated_sender.sequence_number());
-            assert_eq!(0, updated_sender.received_events().count());
-            assert_eq!(idx as u64 + 1, updated_sender.sent_events().count());
-            assert_eq!(idx as u64 + 1, updated_receiver.received_events().count());
-            assert_eq!(0, updated_receiver.sent_events().count());
+            assert_eq!(0, updated_sender_events.received_events().count());
+            assert_eq!(idx as u64 + 1, updated_sender_events.sent_events().count());
+            assert_eq!(idx as u64 + 1, updated_receiver_events.received_events().count());
+            assert_eq!(0, updated_receiver_events.sent_events().count());
         }
-    }
-    }
-}
-
-/// Test that a zero-amount transaction fails, per policy.
-#[test]
-fn zero_amount_peer_to_peer() {
-    test_with_different_versions! {CURRENT_RELEASE_VERSIONS, |test_env| {
-        let mut executor = test_env.executor;
-        let sequence_number = 10;
-        let sender = executor.create_raw_account_data(1_000_000, sequence_number);
-        let receiver = executor.create_raw_account_data(100_000, sequence_number);
-        executor.add_account_data(&sender);
-        executor.add_account_data(&receiver);
-
-        let transfer_amount = 0;
-        let txn = peer_to_peer_txn(
-            sender.account(),
-            receiver.account(),
-            sequence_number,
-            transfer_amount,
-        );
-
-        let output = &executor.execute_transaction(txn);
-        // Error code 7 means that the transaction was a zero-amount one.
-        assert!(transaction_status_eq(
-            output.status(),
-            &TransactionStatus::Keep(KeptVMStatus::MoveAbort(
-                known_locations::diem_account_module_abort(),
-                519
-            )),
-        ));
     }
     }
 }
@@ -280,7 +246,7 @@ impl TxnInfo {
 }
 
 // Create a cyclic transfer around a slice of Accounts.
-// Each Account makes a transfer for the same amount to the next DiemAccount.
+// Each Account makes a transfer for the same amount to the next Account.
 pub(crate) fn create_cyclic_transfers(
     executor: &FakeExecutor,
     accounts: &[Account],

@@ -66,7 +66,6 @@ aptos-config = { path = "../config", features = ["fuzzing"] }
 aptos-mempool = { path = "../mempool", features = ["fuzzing"] }
 network = { path = "../network", features = ["fuzzing"] }
 safety-rules = { path = "safety-rules", features = ["testing"] }
-vm-genesis = { path = "../aptos-move/vm-genesis" }
 vm-validator = { path = "../vm-validator" }
 
 [features]

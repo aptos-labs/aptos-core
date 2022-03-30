@@ -3,11 +3,7 @@
 
 use crate::{unit_tests::TestInterface, AptosDebugger};
 use anyhow::bail;
-use aptos_types::{
-    account_address::AccountAddress,
-    account_config::DiemAccountResource,
-    event::{EventHandle, EventKey},
-};
+use aptos_types::{account_address::AccountAddress, account_config::AccountResource};
 use move_core_types::{effects::ChangeSet, move_resource::MoveStructType};
 use std::path::PathBuf;
 
@@ -46,16 +42,8 @@ fn test_changeset_override() {
     override_changeset
         .publish_resource(
             address,
-            DiemAccountResource::struct_tag(),
-            bcs::to_bytes(&DiemAccountResource::new(
-                0,
-                vec![],
-                None,
-                None,
-                EventHandle::new(EventKey::new_from_address(&address, 0), 0),
-                EventHandle::new(EventKey::new_from_address(&address, 1), 1),
-            ))
-            .unwrap(),
+            AccountResource::struct_tag(),
+            bcs::to_bytes(&AccountResource::new(0, vec![], address)).unwrap(),
         )
         .unwrap();
 

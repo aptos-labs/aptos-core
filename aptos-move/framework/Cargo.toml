@@ -56,9 +56,5 @@ default = []
 fuzzing = ["aptos-types/fuzzing"]
 
 [[test]]
-name = "dpn_transactional_tests"
-harness = false
-
-[[test]]
 name = "aptos_transactional_tests"
 harness = false

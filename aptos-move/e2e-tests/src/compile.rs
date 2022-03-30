@@ -12,13 +12,13 @@ use move_binary_format::CompiledModule;
 /// (a Module).
 pub fn compile_module(code: &str) -> (CompiledModule, Module) {
     let compiled_module = Compiler {
-        deps: diem_framework_releases::current_modules().iter().collect(),
+        deps: aptos_framework_releases::current_modules().iter().collect(),
     }
     .into_compiled_module(code)
     .expect("Module compilation failed");
     let module = Module::new(
         Compiler {
-            deps: diem_framework_releases::current_modules().iter().collect(),
+            deps: aptos_framework_releases::current_modules().iter().collect(),
         }
         .into_module_blob(code)
         .expect("Module compilation failed"),
@@ -30,7 +30,7 @@ pub fn compile_module(code: &str) -> (CompiledModule, Module) {
 /// (a Script).
 pub fn compile_script(code: &str, extra_deps: Vec<CompiledModule>) -> Script {
     let compiler = Compiler {
-        deps: diem_framework_releases::current_modules()
+        deps: aptos_framework_releases::current_modules()
             .iter()
             .chain(extra_deps.iter())
             .collect(),

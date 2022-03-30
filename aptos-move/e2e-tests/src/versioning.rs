@@ -3,11 +3,11 @@
 
 #![forbid(unsafe_code)]
 use crate::{account::Account, executor::FakeExecutor, utils};
-use aptos_types::on_chain_config::DIEM_MAX_KNOWN_VERSION;
+use aptos_types::on_chain_config::APTOS_MAX_KNOWN_VERSION;
 
 /// The current version numbers that e2e tests should be run against.
 pub const CURRENT_RELEASE_VERSIONS: std::ops::RangeInclusive<u64> =
-    DIEM_MAX_KNOWN_VERSION.major..=DIEM_MAX_KNOWN_VERSION.major;
+    APTOS_MAX_KNOWN_VERSION.major..=APTOS_MAX_KNOWN_VERSION.major;
 
 #[derive(Debug)]
 pub struct VersionedTestEnv {

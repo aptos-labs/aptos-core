@@ -41,3 +41,20 @@ pub fn load_modules_from_paths(paths: &[PathBuf]) -> Vec<Vec<u8>> {
     .map(|file_name| std::fs::read(file_name).unwrap())
     .collect::<Vec<_>>()
 }
+
+/// Load the error descriptions from the specified release.
+pub fn load_error_descriptions_from_release(release_name: &str) -> Result<Vec<u8>> {
+    ReleaseFetcher::new(Release::Aptos, release_name).error_descriptions()
+}
+
+static CURRENT_ERROR_DESCRIPTIONS: Lazy<Vec<u8>> =
+    Lazy::new(|| load_error_descriptions_from_release("current").unwrap());
+
+pub fn current_error_descriptions() -> &'static [u8] {
+    &CURRENT_ERROR_DESCRIPTIONS
+}
+
+pub fn current_modules_with_blobs(
+) -> impl Iterator<Item = (&'static Vec<u8>, &'static CompiledModule)> {
+    CURRENT_MODULE_BLOBS.iter().zip(CURRENT_MODULES.iter())
+}

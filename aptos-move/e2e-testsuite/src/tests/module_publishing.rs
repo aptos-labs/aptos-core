@@ -2,14 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::{
-    account_config::{self},
-    on_chain_config::VMPublishingOption,
-    transaction::TransactionStatus,
-    vm_status::{KeptVMStatus, StatusCode},
+    on_chain_config::VMPublishingOption, transaction::TransactionStatus, vm_status::KeptVMStatus,
 };
 use language_e2e_tests::{
-    account::Account, assert_prologue_parity, compile::compile_module, current_function_name,
-    executor::FakeExecutor, transaction_status_eq,
+    account::Account, compile::compile_module, current_function_name, executor::FakeExecutor,
+    transaction_status_eq,
 };
 
 // A module with an address different from the sender's address should be rejected
@@ -264,72 +261,7 @@ module_republish_test!(
 );
 
 #[test]
-pub fn test_publishing_no_modules_non_allowlist_script() {
-    // create a FakeExecutor with a genesis from file
-    let mut executor =
-        FakeExecutor::from_genesis_with_options(VMPublishingOption::custom_scripts());
-    executor.set_golden_file(current_function_name!());
-
-    // create a transaction trying to publish a new module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    executor.add_account_data(&sender);
-
-    let program = format!(
-        "
-        module 0x{}.M {{
-        }}
-        ",
-        sender.address(),
-    );
-
-    let random_module = compile_module(&program).1;
-    let txn = sender
-        .account()
-        .transaction()
-        .module(random_module)
-        .sequence_number(10)
-        .gas_unit_price(1)
-        .sign();
-
-    assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
-        executor.execute_transaction(txn).status(),
-        StatusCode::INVALID_MODULE_PUBLISHER
-    );
-}
-
-#[test]
-pub fn test_publishing_no_modules_non_allowlist_script_proper_sender() {
-    // create a FakeExecutor with a genesis from file
-    let mut executor =
-        FakeExecutor::from_genesis_with_options(VMPublishingOption::custom_scripts());
-    executor.set_golden_file(current_function_name!());
-
-    // create a transaction trying to publish a new module.
-    let sender = Account::new_aptos_root();
-
-    let program = String::from(
-        "
-        module 0x1.M {
-        }
-        ",
-    );
-
-    let random_module = compile_module(&program).1;
-    let txn = sender
-        .transaction()
-        .module(random_module)
-        .sequence_number(0)
-        .sign();
-    assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
-    assert_eq!(
-        executor.execute_transaction(txn).status(),
-        &TransactionStatus::Keep(KeptVMStatus::Executed)
-    );
-}
-
-#[test]
-pub fn test_publishing_no_modules_proper_sender() {
+pub fn test_publishing_modules_proper_sender() {
     // create a FakeExecutor with a genesis from file
     let mut executor = FakeExecutor::allowlist_genesis();
     executor.set_golden_file(current_function_name!());
@@ -337,11 +269,12 @@ pub fn test_publishing_no_modules_proper_sender() {
     // create a transaction trying to publish a new module.
     let sender = Account::new_aptos_root();
 
-    let program = String::from(
+    let program = format!(
         "
-        module 0x1.M {
-        }
+        module 0x{}.M {{
+        }}
         ",
+        sender.address(),
     );
 
     let random_script = compile_module(&program).1;
@@ -358,13 +291,14 @@ pub fn test_publishing_no_modules_proper_sender() {
 }
 
 #[test]
-pub fn test_publishing_no_modules_core_code_sender() {
+pub fn test_publishing_modules_invalid_sender() {
     // create a FakeExecutor with a genesis from file
     let mut executor = FakeExecutor::allowlist_genesis();
     executor.set_golden_file(current_function_name!());
 
     // create a transaction trying to publish a new module.
-    let sender = Account::new_genesis_account(account_config::CORE_CODE_ADDRESS);
+    let sender = executor.create_raw_account_data(1_000_000, 10);
+    executor.add_account_data(&sender);
 
     let program = String::from(
         "
@@ -375,47 +309,15 @@ pub fn test_publishing_no_modules_core_code_sender() {
 
     let random_script = compile_module(&program).1;
     let txn = sender
-        .transaction()
-        .module(random_script)
-        .sequence_number(1)
-        .sign();
-    // Doesn't work because the core code address doesn't exist
-    assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
-        executor.execute_transaction(txn).status(),
-        StatusCode::INVALID_MODULE_PUBLISHER
-    );
-}
-
-#[test]
-pub fn test_publishing_no_modules_invalid_sender() {
-    // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::allowlist_genesis();
-    executor.set_golden_file(current_function_name!());
-
-    // create a transaction trying to publish a new module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    executor.add_account_data(&sender);
-
-    let program = format!(
-        "
-        module 0x{}.M {{
-        }}
-        ",
-        sender.address(),
-    );
-
-    let random_script = compile_module(&program).1;
-    let txn = sender
         .account()
         .transaction()
         .module(random_script)
         .sequence_number(10)
         .sign();
-    assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+    assert_eq!(
         executor.execute_transaction(txn).status(),
-        StatusCode::INVALID_MODULE_PUBLISHER
+        // this should be MODULE_ADDRESS_DOES_NOT_MATCH_SENDER but we don't do this check in prologue now
+        &TransactionStatus::Keep(KeptVMStatus::MiscellaneousError),
     );
 }
 

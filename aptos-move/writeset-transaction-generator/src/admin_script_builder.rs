@@ -22,11 +22,11 @@ pub const SCRIPTS_DIR_PATH: &str = "templates";
 pub fn compile_script(source_file_str: String) -> Vec<u8> {
     let targets = vec![(
         vec![source_file_str],
-        framework::diem_framework_named_addresses(),
+        framework::aptos_framework_named_addresses(),
     )];
     let deps = vec![(
-        framework::dpn_files(),
-        framework::diem_framework_named_addresses(),
+        framework::aptos_files(),
+        framework::aptos_framework_named_addresses(),
     )];
     let (_files, mut compiled_program) = Compiler::new(targets, deps)
         .set_flags(Flags::empty().set_sources_shadow_deps(false))
@@ -142,8 +142,8 @@ pub fn encode_disable_parallel_execution() -> WriteSetPayload {
 
 pub fn encode_enable_parallel_execution_with_config() -> WriteSetPayload {
     let payload = bcs::to_bytes(&ReadWriteSetAnalysis::V1(
-        analyze(diem_framework_releases::current_modules())
-            .expect("Failed to get ReadWriteSet for current Diem Framework")
+        analyze(aptos_framework_releases::current_modules())
+            .expect("Failed to get ReadWriteSet for current Framework")
             .normalize_all_scripts(aptos_vm::read_write_set_analysis::add_on_functions_list())
             .trim()
             .into_inner(),

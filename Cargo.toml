@@ -4,13 +4,13 @@ resolver = "2"
 members = [
     "api",
     "api/types",
+    "aptos-move/af-cli",
     "aptos-move/aptos-keygen",
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-transaction-benchmarks",
     "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
-    "aptos-move/df-cli",
     "aptos-move/e2e-tests",
     "aptos-move/e2e-tests-replay",
     "aptos-move/e2e-testsuite",
@@ -126,7 +126,7 @@ members = [
 #
 # For more, see the "Conditional compilation for tests" section in documentation/coding_guidelines.md.
 default-members = [
-    "aptos-move/df-cli",
+    "aptos-move/af-cli",
     "aptos-move/genesis-viewer",
     "aptos-move/transaction-replay",
     "aptos-node",
