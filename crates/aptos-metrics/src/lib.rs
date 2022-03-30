@@ -50,8 +50,8 @@
 mod json_encoder;
 pub mod json_metrics;
 pub mod metric_server;
-pub mod system_metrics;
 mod public_metrics;
+pub mod system_metrics;
 
 mod op_counters;
 pub use op_counters::{DurationHistogram, OpMetrics};

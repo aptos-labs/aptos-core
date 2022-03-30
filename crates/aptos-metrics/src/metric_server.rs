@@ -3,7 +3,7 @@
 
 use crate::{
     gather_metrics, json_encoder::JsonEncoder, json_metrics::get_json_metrics,
-    public_metrics::PUBLIC_METRICS, NUM_METRICS, system_metrics::refresh_system_metrics,
+    public_metrics::PUBLIC_METRICS, system_metrics::refresh_system_metrics, NUM_METRICS,
 };
 use futures::future;
 use hyper::{

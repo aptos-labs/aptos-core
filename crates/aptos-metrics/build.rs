@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{env, process::Command, path::Path};
+use std::{env, path::Path, process::Command};
 
 const GIT_INDEX: &str = "../../.git/index";
 
