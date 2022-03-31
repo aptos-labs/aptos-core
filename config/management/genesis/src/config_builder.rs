@@ -11,13 +11,11 @@ use rand::{rngs::StdRng, SeedableRng};
 pub fn test_config() -> (NodeConfig, Ed25519PrivateKey) {
     let path = TempPath::new();
     path.create_as_dir().unwrap();
-    let (root_keys, _genesis, _genesis_waypoint, validators) = ValidatorBuilder::new(
-        path.path(),
-        aptos_framework_releases::current_module_blobs().to_vec(),
-    )
-    .template(NodeConfig::default_for_validator())
-    .build(StdRng::from_seed([0; 32]))
-    .unwrap();
+    let (root_keys, _genesis, _genesis_waypoint, validators) =
+        ValidatorBuilder::new(path.path(), framework::aptos::module_blobs().to_vec())
+            .template(NodeConfig::default_for_validator())
+            .build(StdRng::from_seed([0; 32]))
+            .unwrap();
     let mut configs = validators.into_iter().map(|v| v.config).collect::<Vec<_>>();
     let key = root_keys.root_key;
 

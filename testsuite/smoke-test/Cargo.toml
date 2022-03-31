@@ -19,10 +19,8 @@ walkdir = "2.3.1"
 reqwest = { version = "0.11.2", features = ["json"] }
 
 aptos = { path = "../../crates/aptos" }
-aptos-framework-releases = { path = "../../aptos-move/framework/aptos-framework/releases" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
-framework =  { path = "../../aptos-move/framework" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
@@ -30,6 +28,7 @@ aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 forge = { path = "../forge" }
+framework =  { path = "../../aptos-move/framework" }
 move-command-line-common = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 move-ir-compiler = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 move-stdlib = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }

@@ -17,7 +17,7 @@ fn main() -> Result<()> {
             &ModulePublish,
             &ErrorReport,
         ])
-        .with_genesis_modules_bytes(aptos_framework_releases::current_module_blobs().to_vec());
+        .with_genesis_modules_bytes(framework::aptos::module_blobs());
 
     let options = Options::from_args();
     forge_main(tests, LocalFactory::from_workspace()?, &options)

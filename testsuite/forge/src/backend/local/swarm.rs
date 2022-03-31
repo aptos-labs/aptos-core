@@ -150,7 +150,7 @@ impl LocalSwarmBuilder {
         let (root_keys, genesis, genesis_waypoint, validators) = ValidatorBuilder::new(
             &dir,
             self.genesis_modules
-                .unwrap_or_else(|| aptos_framework_releases::current_module_blobs().to_vec()),
+                .unwrap_or_else(framework::aptos::module_blobs),
         )
         .num_validators(self.number_of_validators)
         .template(self.template)

@@ -15,18 +15,9 @@ use std::collections::BTreeMap;
 const APTOS_MODULES_DIR: &str = "aptos-framework/sources";
 static APTOS_PKG: Lazy<CompiledPackage> = Lazy::new(|| super::package("aptos-framework"));
 
-pub fn aptos_modules_full_path() -> String {
-    format!("{}/{}", env!("CARGO_MANIFEST_DIR"), APTOS_MODULES_DIR)
-}
-
 pub fn files() -> Vec<String> {
     let mut files = move_stdlib::move_stdlib_files();
-    files.extend(files_no_dependencies());
-    files
-}
-
-pub fn files_no_dependencies() -> Vec<String> {
-    let mut files = super::move_files_in_path(APTOS_MODULES_DIR);
+    files.extend(super::move_files_in_path(APTOS_MODULES_DIR));
     files.extend(super::move_files_in_path(super::CORE_MODULES_DIR));
     files
 }

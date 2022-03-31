@@ -42,7 +42,6 @@ rand = "0.8.3"
 reqwest = { version = "0.11.2", features = ["blocking", "json"], default_features = false }
 
 aptos-crypto = { path = "../crates/aptos-crypto" }
-aptos-framework-releases = { path = "../aptos-move/framework/aptos-framework/releases" }
 aptos-genesis-tool = {path = "../config/management/genesis", features = ["testing"] }
 aptos-global-constants = { path = "../config/global-constants" }
 aptos-mempool = { path = "../mempool", features = ["fuzzing"] }
@@ -53,6 +52,7 @@ aptos-vm = { path = "../aptos-move/aptos-vm" }
 aptosdb = { path = "../storage/aptosdb", features = ["fuzzing"] }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
+framework = { path = "../aptos-move/framework" }
 mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
 vm-validator = { path = "../vm-validator" }
 
