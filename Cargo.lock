@@ -405,22 +405,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-framework-releases"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-types",
- "aptos-workspace-hack",
- "bcs",
- "framework-releases",
- "include_dir",
- "move-binary-format",
- "move-command-line-common",
- "once_cell",
-]
-
-[[package]]
 name = "aptos-fuzz"
 version = "0.1.0"
 dependencies = [

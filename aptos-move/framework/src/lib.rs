@@ -3,7 +3,9 @@
 
 #![forbid(unsafe_code)]
 
-use move_command_line_common::files::{extension_equals, find_filenames, MOVE_EXTENSION, MOVE_COMPILED_EXTENSION};
+use move_command_line_common::files::{
+    extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION,
+};
 use move_compiler::{
     compiled_unit::{CompiledUnit, NamedCompiledModule},
     shared::{NumberFormat, NumericalAddress},
@@ -30,7 +32,6 @@ where
 pub fn core_modules_full_path() -> String {
     format!("{}/{}", env!("CARGO_MANIFEST_DIR"), CORE_MODULES_DIR)
 }
-
 
 /// Load the serialized modules from the specified paths.
 pub fn load_modules_from_paths(paths: &[PathBuf]) -> Vec<Vec<u8>> {

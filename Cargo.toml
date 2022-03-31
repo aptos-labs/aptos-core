@@ -16,7 +16,6 @@ members = [
     "aptos-move/e2e-testsuite",
     "aptos-move/framework",
     "aptos-move/framework/DPN/releases",
-    "aptos-move/framework/aptos-framework/releases",
     "aptos-move/framework/releases",
     "aptos-move/genesis-viewer",
     "aptos-move/move-examples",
