@@ -14,6 +14,7 @@ use aptos_types::{
     account_state_blob::AccountStateBlob,
     proof::{SparseMerkleLeafNode, SparseMerkleProof},
 };
+use once_cell::sync::Lazy;
 use proptest::prelude::*;
 
 fn update_byte(original_key: &HashValue, n: usize, byte: u8) -> HashValue {
@@ -394,18 +395,20 @@ fn test_update() {
     );
 }
 
+static KEY: Lazy<HashValue> = Lazy::new(|| b"aaaaa".test_only_hash());
+static VALUE: Lazy<AccountStateBlob> = Lazy::new(|| AccountStateBlob::from(b"value1".to_vec()));
+static LEAF: Lazy<SparseMerkleLeafNode> = Lazy::new(|| SparseMerkleLeafNode::new(*KEY, VALUE.hash()));
+static PROOF_READER: Lazy<ProofReader<AccountStateBlob>> = Lazy::new(|| {
+    let proof = SparseMerkleProof::new(Some(LEAF.clone()), vec![]);
+    ProofReader::new(vec![(*KEY, proof)])
+});
+
+fn update(smt: &SparseMerkleTree) -> SparseMerkleTree {
+    smt.batch_update(vec![(*KEY, &VALUE)], &*PROOF_READER).unwrap()
+}
+
 #[test]
 fn test_get_oldest_ancestor() {
-    let key = b"aaaaa".test_only_hash();
-    let value = AccountStateBlob::from(b"value1".to_vec());
-    let value_hash = value.hash();
-    let updates = vec![(key, &value)];
-    let leaf = SparseMerkleLeafNode::new(key, value_hash);
-    let proof = SparseMerkleProof::new(Some(leaf), vec![]);
-    let proof_reader = ProofReader::new(vec![(key, proof)]);
-
-    let update = |t: &SparseMerkleTree| t.batch_update(updates.clone(), &proof_reader).unwrap();
-
     // smt0 - smt00 - smt000 - smt0000 - smt00000
     //              \
     //              |\ smt001 - smt0010 - smt00100
@@ -416,7 +419,7 @@ fn test_get_oldest_ancestor() {
     //              \
     //                smt002
 
-    let smt0 = SparseMerkleTree::new(leaf.hash());
+    let smt0 = SparseMerkleTree::new(LEAF.hash());
     let smt00 = update(&smt0);
     let smt000 = update(&smt00);
     let smt0000 = update(&smt000);
@@ -493,7 +496,6 @@ fn test_get_oldest_ancestor() {
 fn assert_eq_pointee(left: &SparseMerkleTree, right: &SparseMerkleTree) {
     assert!(Arc::ptr_eq(&left.inner, &right.inner,))
 }
-
 #[test]
 fn test_drop() {
     let proof_reader = ProofReader::default();
