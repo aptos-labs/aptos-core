@@ -7,21 +7,22 @@
 //!
 
 use crate::CliResult;
-use structopt::StructOpt;
+use clap::{ArgEnum, Subcommand};
 
 pub mod key;
 
 /// CLI tool for performing operational tasks
 ///
-#[derive(Debug, StructOpt)]
+#[derive(Debug, ArgEnum, Subcommand)]
 pub enum OpTool {
+    #[clap(subcommand)]
     Key(key::KeyTool),
 }
 
 impl OpTool {
     pub async fn execute(self) -> CliResult {
         match self {
-            OpTool::Key(key_tool) => key_tool.execute().await,
+            OpTool::Key(tool) => tool.execute().await,
         }
     }
 }

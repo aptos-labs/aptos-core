@@ -7,13 +7,14 @@ pub mod common;
 pub mod op;
 
 use crate::common::types::{CliResult, Error};
-use structopt::StructOpt;
+use clap::Parser;
 
 /// CLI tool for interacting with the Aptos blockchain and nodes
 ///
-#[derive(Debug, StructOpt)]
-#[structopt(name = "aptos")]
+#[derive(Debug, Parser)]
+#[clap(name = "aptos")]
 pub enum Tool {
+    #[clap(subcommand)]
     Op(op::OpTool),
 }
 

@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use clap::Parser;
 use std::{fmt::Debug, str::FromStr};
-use structopt::StructOpt;
 use thiserror::Error;
 
 /// A common result to be returned to users
@@ -42,7 +42,7 @@ pub enum Error {
 }
 
 /// Types of Keys used by the blockchain
-#[derive(Clone, Copy, Debug, StructOpt)]
+#[derive(Clone, Copy, Debug, Parser)]
 pub enum KeyType {
     Ed25519,
     X25519,
@@ -61,7 +61,7 @@ impl FromStr for KeyType {
 }
 
 /// Types of encodings used by the blockchain
-#[derive(Clone, Copy, Debug, StructOpt)]
+#[derive(Clone, Copy, Debug, Parser)]
 pub enum EncodingType {
     /// Binary Canonical Serialization
     BCS,
@@ -85,17 +85,17 @@ impl FromStr for EncodingType {
 }
 
 /// An insertable option for use with prompts.
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 pub struct PromptOptions {
     /// Assume yes for all yes/no prompts
-    #[structopt(long)]
+    #[clap(long)]
     pub assume_yes: bool,
 }
 
 /// An insertable option for use with encodings.
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 pub struct EncodingOptions {
     /// Encoding of data as `base64`, `bcs`, or `hex`
-    #[structopt(long, default_value = "hex")]
+    #[clap(long, default_value = "hex")]
     pub encoding: EncodingType,
 }

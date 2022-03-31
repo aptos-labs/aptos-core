@@ -12,18 +12,18 @@ use aptos_crypto::{
     ed25519, ed25519::Ed25519PrivateKey, x25519, PrivateKey, Uniform, ValidCryptoMaterial,
     ValidCryptoMaterialStringExt,
 };
+use clap::{Parser, Subcommand};
 use rand::SeedableRng;
 use std::{
     fs::File,
     io::Write,
     path::{Path, PathBuf},
 };
-use structopt::StructOpt;
 
 pub const PUBLIC_KEY_EXTENSION: &str = ".pub";
 
 /// CLI tool for generating, inspecting, and interacting with keys.
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Subcommand)]
 pub enum KeyTool {
     Generate(GenerateKey),
 }
@@ -31,7 +31,7 @@ pub enum KeyTool {
 impl KeyTool {
     pub async fn execute(self) -> CliResult {
         match self {
-            KeyTool::Generate(generate) => to_common_success_result(generate.execute()),
+            KeyTool::Generate(tool) => to_common_success_result(tool.execute()),
         }
     }
 }
@@ -39,17 +39,17 @@ impl KeyTool {
 /// Generates a `x25519` or `ed25519` key.
 ///
 /// This can be used for generating an identity.
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 pub struct GenerateKey {
     /// Key type: `x25519` or `ed25519`
-    #[structopt(long, default_value = "ed25519")]
+    #[clap(long, default_value = "ed25519")]
     key_type: KeyType,
-    #[structopt(flatten)]
+    #[clap(flatten)]
     save_params: SaveKey,
 }
 
 impl GenerateKey {
-    fn execute(self) -> Result<(), Error> {
+    pub(crate) fn execute(self) -> Result<(), Error> {
         self.save_params.check_key_file()?;
 
         // Generate a ed25519 key
@@ -78,7 +78,7 @@ impl GenerateKey {
             key_file = key_file.to_str().unwrap(),
             encoding_type = encoding_type,
         );
-        let command = GenerateKey::from_iter(args.split_whitespace());
+        let command = GenerateKey::parse_from(args.split_whitespace());
         command.execute()?;
         Ok((
             load_key(key_file, encoding_type)?,
@@ -100,7 +100,7 @@ impl GenerateKey {
             key_file = key_file.to_str().unwrap(),
             encoding_type = encoding_type,
         );
-        let command = GenerateKey::from_iter(args.split_whitespace());
+        let command = GenerateKey::parse_from(args.split_whitespace());
         command.execute()?;
         Ok((
             load_key(key_file, encoding_type)?,
@@ -118,14 +118,14 @@ impl GenerateKey {
     }
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 pub struct SaveKey {
     /// Private key output file name.  Public key will be saved to <key-file>.pub
-    #[structopt(long, parse(from_os_str))]
+    #[clap(long, parse(from_os_str))]
     key_file: PathBuf,
-    #[structopt(flatten)]
+    #[clap(flatten)]
     encoding_options: EncodingOptions,
-    #[structopt(flatten)]
+    #[clap(flatten)]
     prompt_options: PromptOptions,
 }
 
