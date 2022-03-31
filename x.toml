@@ -178,6 +178,7 @@ members = [
     "executor-test-helpers",
     "forge",
     "forge-cli",
+    "framework-releases",
     "generate-format",
     "language-e2e-tests",
     "language-e2e-testsuite",

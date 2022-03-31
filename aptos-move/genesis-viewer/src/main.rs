@@ -80,7 +80,7 @@ pub fn main() {
     let ws = vm_genesis::generate_genesis_change_set_for_testing(vm_genesis::GenesisOptions::Fresh);
 
     let mut storage = InMemoryStorage::new();
-    for (blob, module) in aptos_framework_releases::current_modules_with_blobs() {
+    for (blob, module) in cached_framework_packages::modules_with_blobs() {
         storage.publish_or_overwrite_module(module.self_id(), blob.clone())
     }
 

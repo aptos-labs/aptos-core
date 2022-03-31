@@ -51,10 +51,11 @@ pub fn new_test_context(test_name: &'static str) -> TestContext {
     tmp_dir.create_as_dir().unwrap();
 
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
-    let builder = ValidatorBuilder::new(&tmp_dir, framework::aptos::module_blobs())
-        .publishing_option(VMPublishingOption::open())
-        .min_price_per_gas_unit(0)
-        .randomize_first_validator_ports(false);
+    let builder =
+        ValidatorBuilder::new(&tmp_dir, cached_framework_packages::module_blobs().to_vec())
+            .publishing_option(VMPublishingOption::open())
+            .min_price_per_gas_unit(0)
+            .randomize_first_validator_ports(false);
 
     let (root_keys, genesis, genesis_waypoint, validators) = builder.build(&mut rng).unwrap();
     let validator_owner = validators[0].storage().get(OWNER_ACCOUNT).unwrap().value;

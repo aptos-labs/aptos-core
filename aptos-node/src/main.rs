@@ -75,7 +75,7 @@ fn main() {
         let genesis_modules = if let Some(module_paths) = args.genesis_modules {
             framework::load_modules_from_paths(&module_paths)
         } else {
-            framework::aptos::module_blobs()
+            cached_framework_packages::module_blobs().to_vec()
         };
         aptos_node::load_test_environment(
             args.config,

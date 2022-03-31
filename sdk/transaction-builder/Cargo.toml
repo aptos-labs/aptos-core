@@ -30,4 +30,4 @@ move-core-types = { git = "https://github.com/diem/move", rev = "3fe033b112eae7d
 
 [features]
 default = []
-fuzzing = ["proptest", "proptest-derive", "move-core-types/fuzzing"]
+fuzzing = ["proptest", "proptest-derive", "cached-framework-packages/fuzzing", "move-core-types/fuzzing"]

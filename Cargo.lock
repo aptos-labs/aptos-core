@@ -99,10 +99,10 @@ name = "af-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-framework-releases",
  "aptos-vm",
  "aptos-workspace-hack",
  "bcs",
+ "cached-framework-packages",
  "clap 3.1.6",
  "datatest-stable",
  "move-cli",
@@ -199,10 +199,10 @@ dependencies = [
  "aptosdb",
  "bcs",
  "bytes",
+ "cached-framework-packages",
  "executor",
  "executor-types",
  "fail",
- "framework",
  "futures",
  "goldenfile",
  "hex",
@@ -473,9 +473,9 @@ dependencies = [
  "aptos-workspace-hack",
  "aptosdb",
  "bcs",
+ "cached-framework-packages",
  "consensus-types",
  "executor",
- "framework",
  "rand 0.8.4",
  "serde 1.0.136",
  "storage-interface",
@@ -697,6 +697,7 @@ dependencies = [
  "aptosdb",
  "backup-service",
  "bcs",
+ "cached-framework-packages",
  "consensus",
  "consensus-notifications",
  "crash-handler",
@@ -993,7 +994,6 @@ name = "aptos-transaction-replay"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-framework-releases",
  "aptos-resource-viewer",
  "aptos-state-view",
  "aptos-types",
@@ -1002,6 +1002,7 @@ dependencies = [
  "aptos-workspace-hack",
  "aptosdb",
  "bcs",
+ "cached-framework-packages",
  "difference",
  "framework",
  "hex",
@@ -1029,6 +1030,7 @@ dependencies = [
  "aptos-vm",
  "aptos-workspace-hack",
  "bcs",
+ "cached-framework-packages",
  "clap 3.1.6",
  "datatest-stable",
  "either",
@@ -1115,7 +1117,6 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-crypto-derive",
- "aptos-framework-releases",
  "aptos-logger",
  "aptos-metrics",
  "aptos-parallel-executor",
@@ -1167,6 +1168,7 @@ dependencies = [
  "generic-array 0.14.5",
  "hashbrown 0.11.2",
  "hyper",
+ "include_dir 0.7.2",
  "itertools",
  "libc",
  "log",
@@ -1202,7 +1204,6 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-crypto-derive",
- "aptos-framework-releases",
  "aptos-state-view",
  "aptos-transaction-replay",
  "aptos-types",
@@ -1210,6 +1211,7 @@ dependencies = [
  "aptos-workspace-hack",
  "aptosdb",
  "bcs",
+ "cached-framework-packages",
  "framework",
  "handlebars",
  "hex",
@@ -1716,11 +1718,18 @@ checksum = "4964518bd3b4a8190e832886cdc0da9794f12e8e6c1613a9e90ff331c4c8724b"
 name = "cached-framework-packages"
 version = "0.1.0"
 dependencies = [
+ "aptos-types",
  "aptos-workspace-hack",
+ "bcs",
  "framework",
- "framework-releases",
+ "include_dir 0.7.2",
+ "move-binary-format",
+ "move-bytecode-utils",
  "move-command-line-common",
+ "move-core-types",
  "once_cell",
+ "proptest",
+ "proptest-derive",
 ]
 
 [[package]]
@@ -2596,7 +2605,7 @@ dependencies = [
  "aptos-workspace-hack",
  "bcs",
  "framework-releases",
- "include_dir",
+ "include_dir 0.7.2",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-command-line-common",
@@ -3042,7 +3051,6 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
- "aptos-framework-releases",
  "aptos-genesis-tool",
  "aptos-infallible",
  "aptos-logger",
@@ -3251,8 +3259,8 @@ dependencies = [
  "aptos-workspace-hack",
  "async-trait",
  "base64",
+ "cached-framework-packages",
  "debug-interface",
- "framework",
  "futures",
  "hyper",
  "hyper-proxy",
@@ -3288,8 +3296,8 @@ dependencies = [
  "aptos-sdk",
  "aptos-workspace-hack",
  "async-trait",
+ "cached-framework-packages",
  "forge",
- "framework",
  "itertools",
  "rand_core 0.6.3",
  "structopt",
@@ -3322,7 +3330,7 @@ dependencies = [
  "clap 3.1.6",
  "datatest-stable",
  "dir-diff",
- "include_dir",
+ "include_dir 0.7.2",
  "log",
  "move-abigen",
  "move-binary-format",
@@ -3359,7 +3367,7 @@ dependencies = [
  "aptos-workspace-hack",
  "bcs",
  "clap 3.1.6",
- "include_dir",
+ "include_dir 0.7.2",
  "log",
  "move-binary-format",
  "move-bytecode-utils",
@@ -3506,7 +3514,7 @@ dependencies = [
  "network",
  "rand 0.8.4",
  "serde 1.0.136",
- "serde-reflection",
+ "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection)",
  "serde_yaml",
  "structopt",
 ]
@@ -3534,11 +3542,11 @@ dependencies = [
 name = "genesis-viewer"
 version = "0.1.0"
 dependencies = [
- "aptos-framework-releases",
  "aptos-resource-viewer",
  "aptos-types",
  "aptos-workspace-hack",
  "bcs",
+ "cached-framework-packages",
  "move-binary-format",
  "move-core-types",
  "move-vm-test-utils",
@@ -3727,7 +3735,7 @@ dependencies = [
  "diffy",
  "guppy",
  "guppy-workspace-hack",
- "include_dir",
+ "include_dir 0.6.2",
  "indenter",
  "itertools",
  "owo-colors",
@@ -4102,6 +4110,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "include_dir"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "482a2e29200b7eed25d7fdbd14423326760b7f6658d21a4cf12d55a50713c69f"
+dependencies = [
+ "glob",
+ "include_dir_macros",
+]
+
+[[package]]
 name = "include_dir_impl"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4112,6 +4130,16 @@ dependencies = [
  "proc-macro2 1.0.36",
  "quote 1.0.15",
  "syn 1.0.86",
+]
+
+[[package]]
+name = "include_dir_macros"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e074c19deab2501407c91ba1860fa3d6820bfde307db6d8cb851b55a10be89b"
+dependencies = [
+ "proc-macro2 1.0.36",
+ "quote 1.0.15",
 ]
 
 [[package]]
@@ -4335,7 +4363,6 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
- "aptos-framework-releases",
  "aptos-keygen",
  "aptos-proptest-helpers",
  "aptos-state-view",
@@ -4345,6 +4372,7 @@ dependencies = [
  "aptos-workspace-hack",
  "aptos-writeset-generator",
  "bcs",
+ "cached-framework-packages",
  "goldenfile",
  "hex",
  "move-binary-format",
@@ -4367,7 +4395,6 @@ name = "language-e2e-testsuite"
 version = "0.1.0"
 dependencies = [
  "aptos-crypto",
- "aptos-framework-releases",
  "aptos-keygen",
  "aptos-logger",
  "aptos-parallel-executor",
@@ -4378,6 +4405,7 @@ dependencies = [
  "aptos-workspace-hack",
  "aptos-writeset-generator",
  "bcs",
+ "cached-framework-packages",
  "hex",
  "language-e2e-tests",
  "move-binary-format",
@@ -4702,7 +4730,7 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "petgraph 0.5.1",
- "serde-reflection",
+ "serde-reflection 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "workspace-hack",
 ]
 
@@ -4749,7 +4777,7 @@ dependencies = [
  "codespan-reporting",
  "colored",
  "difference",
- "include_dir",
+ "include_dir 0.6.2",
  "itertools",
  "move-binary-format",
  "move-bytecode-source-map",
@@ -7252,16 +7280,15 @@ dependencies = [
 [[package]]
 name = "serde-generate"
 version = "0.20.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5cf21ac6679c60495e22ed041e2c913740f0332597c6a64bbcba04dbcb39249"
+source = "git+https://github.com/aptos-labs/serde-reflection#262fe0545367563e056eef99d6108cacbb102192"
 dependencies = [
  "bcs",
  "bincode",
  "heck 0.3.3",
- "include_dir",
+ "include_dir 0.6.2",
  "maplit",
  "serde 1.0.136",
- "serde-reflection",
+ "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection)",
  "serde_bytes",
  "serde_yaml",
  "structopt",
@@ -7295,6 +7322,16 @@ name = "serde-reflection"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "167450ba550f903a2b35a81ba3ca387585189e2430e3df6b94b95f3bec2f26bd"
+dependencies = [
+ "once_cell",
+ "serde 1.0.136",
+ "thiserror",
+]
+
+[[package]]
+name = "serde-reflection"
+version = "0.3.5"
+source = "git+https://github.com/aptos-labs/serde-reflection#262fe0545367563e056eef99d6108cacbb102192"
 dependencies = [
  "once_cell",
  "serde 1.0.136",
@@ -7662,9 +7699,9 @@ dependencies = [
  "backup-cli",
  "base64",
  "bcs",
+ "cached-framework-packages",
  "debug-interface",
  "forge",
- "framework",
  "futures",
  "hex",
  "move-command-line-common",
@@ -7784,7 +7821,6 @@ version = "0.1.0"
 dependencies = [
  "aptos-config",
  "aptos-crypto",
- "aptos-framework-releases",
  "aptos-genesis-tool",
  "aptos-infallible",
  "aptos-logger",
@@ -8642,7 +8678,7 @@ dependencies = [
  "move-core-types",
  "regex",
  "serde-generate",
- "serde-reflection",
+ "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection)",
  "serde_yaml",
  "structopt",
  "tempfile",
@@ -8752,7 +8788,7 @@ version = "1.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ee73e6e4924fe940354b8d4d98cad5231175d615cd855b758adc658c0aac6a0"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "static_assertions",
 ]
 
@@ -8997,7 +9033,6 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
- "aptos-framework-releases",
  "aptos-proptest-helpers",
  "aptos-state-view",
  "aptos-transaction-builder",
@@ -9005,6 +9040,7 @@ dependencies = [
  "aptos-vm",
  "aptos-workspace-hack",
  "bcs",
+ "cached-framework-packages",
  "framework",
  "move-binary-format",
  "move-bytecode-utils",

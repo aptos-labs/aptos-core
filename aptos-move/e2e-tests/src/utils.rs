@@ -56,10 +56,7 @@ pub fn upgrade_df(
     update_version_number: Option<u64>,
 ) {
     close_module_publishing(executor, dr_account, dr_seqno);
-    for compiled_module_bytes in aptos_framework_releases::current_module_blobs()
-        .iter()
-        .cloned()
-    {
+    for compiled_module_bytes in cached_framework_packages::module_blobs().iter().cloned() {
         let compiled_module_id = CompiledModule::deserialize(&compiled_module_bytes)
             .unwrap()
             .self_id();

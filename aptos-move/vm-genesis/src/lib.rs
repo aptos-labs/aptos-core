@@ -10,7 +10,6 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     HashValue, PrivateKey, Uniform,
 };
-use aptos_framework_releases::current_module_blobs;
 use aptos_transaction_builder::stdlib as transaction_builder;
 use aptos_types::{
     account_config::{
@@ -461,7 +460,7 @@ pub enum GenesisOptions {
 /// Generate an artificial genesis `ChangeSet` for testing
 pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) -> ChangeSet {
     let modules = match genesis_options {
-        GenesisOptions::Compiled => framework::aptos::module_blobs().to_vec(),
+        GenesisOptions::Compiled => cached_framework_packages::module_blobs().to_vec(),
         GenesisOptions::Fresh => framework::aptos::module_blobs(),
     };
 
@@ -477,7 +476,7 @@ pub fn test_genesis_change_set_and_validators(
     count: Option<usize>,
 ) -> (ChangeSet, Vec<TestValidator>) {
     generate_test_genesis(
-        current_module_blobs(),
+        cached_framework_packages::module_blobs(),
         VMPublishingOption::open(),
         count,
         false,

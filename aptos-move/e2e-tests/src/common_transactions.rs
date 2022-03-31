@@ -30,7 +30,7 @@ pub static EMPTY_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
 ";
 
     let compiler = Compiler {
-        deps: aptos_framework_releases::current_modules().iter().collect(),
+        deps: cached_framework_packages::modules().iter().collect(),
     };
     compiler.into_script_blob(code).expect("Failed to compile")
 });
@@ -69,7 +69,7 @@ pub static MULTI_AGENT_SWAP_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
 ";
 
     let compiler = Compiler {
-        deps: aptos_framework_releases::current_modules().iter().collect(),
+        deps: cached_framework_packages::modules().iter().collect(),
     };
     compiler.into_script_blob(code).expect("Failed to compile")
 });
@@ -111,7 +111,7 @@ pub static MULTI_AGENT_MINT_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
 ";
 
     let compiler = Compiler {
-        deps: aptos_framework_releases::current_modules().iter().collect(),
+        deps: cached_framework_packages::modules().iter().collect(),
     };
     compiler.into_script_blob(code).expect("Failed to compile")
 });

@@ -17,7 +17,6 @@ use crate::{
     golden_outputs::GoldenOutputs,
 };
 use aptos_crypto::HashValue;
-use aptos_framework_releases::{current_module_blobs, current_modules};
 use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -109,7 +108,11 @@ impl FakeExecutor {
     }
 
     pub fn allowlist_genesis() -> Self {
-        Self::custom_genesis(current_module_blobs(), None, VMPublishingOption::open())
+        Self::custom_genesis(
+            cached_framework_packages::module_blobs(),
+            None,
+            VMPublishingOption::open(),
+        )
     }
 
     /// Creates an executor from the genesis file GENESIS_FILE_LOCATION with script/module
@@ -120,7 +123,11 @@ impl FakeExecutor {
             panic!("Allowlisted transactions are not supported as a publishing option")
         }
 
-        Self::custom_genesis(current_module_blobs(), None, publishing_options)
+        Self::custom_genesis(
+            cached_framework_packages::module_blobs(),
+            None,
+            publishing_options,
+        )
     }
 
     /// Creates an executor in which no genesis state has been applied yet.
@@ -175,8 +182,8 @@ impl FakeExecutor {
     /// initialization done.
     pub fn stdlib_only_genesis() -> Self {
         let mut genesis = Self::no_genesis();
-        let blobs = current_module_blobs();
-        let modules = current_modules();
+        let blobs = cached_framework_packages::module_blobs();
+        let modules = cached_framework_packages::modules();
         assert!(blobs.len() == modules.len());
         for (module, bytes) in modules.iter().zip(blobs) {
             let id = module.self_id();
@@ -202,7 +209,7 @@ impl FakeExecutor {
 
     pub fn parallel_genesis() -> Self {
         let genesis = vm_genesis::generate_test_genesis(
-            current_module_blobs(),
+            cached_framework_packages::module_blobs(),
             VMPublishingOption::open(),
             None,
             true,

@@ -25,12 +25,12 @@ move-bytecode-verifier = { git = "https://github.com/diem/move", rev = "3fe033b1
 read-write-set = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 
 ## Aptos-Move dependencies
-language-e2e-tests = { path = "../e2e-tests" }
 aptos-keygen = { path = "../aptos-keygen" }
-aptos-vm = { path = "../aptos-vm" }
-aptos-framework-releases = { path = "../framework/aptos-framework/releases" }
 aptos-parallel-executor = { path = "../parallel-executor" }
+aptos-vm = { path = "../aptos-vm" }
 aptos-writeset-generator = { path = "../writeset-transaction-generator"}
+cached-framework-packages =  { path = "../framework/cached-packages" }
+language-e2e-tests = { path = "../e2e-tests" }
 
 ## Other dependencies
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }

@@ -47,5 +47,5 @@ aptos-rest-client = { path = "../../crates/aptos-rest-client"}
 aptos-secure-storage = { path = "../../secure/storage" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
-framework = { path = "../../aptos-move/framework" }
+cached-framework-packages = { path = "../../aptos-move/framework/cached-packages" }
 transaction-emitter = { path = "../../crates/transaction-emitter" }

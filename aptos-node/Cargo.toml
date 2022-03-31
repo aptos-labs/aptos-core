@@ -37,6 +37,7 @@ aptos-vm = { path = "../aptos-move/aptos-vm" }
 aptos-workspace-hack = { version = "0.1", path = "../crates/aptos-workspace-hack" }
 aptosdb = { path = "../storage/aptosdb" }
 backup-service = { path = "../storage/backup/backup-service" }
+cached-framework-packages = { path = "../aptos-move/framework/cached-packages" }
 consensus = { path = "../consensus" }
 consensus-notifications = { path = "../state-sync/inter-component/consensus-notifications" }
 crash-handler = { path = "../crates/crash-handler" }

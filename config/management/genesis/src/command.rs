@@ -226,13 +226,13 @@ pub mod tests {
         // Step 2) Upload the Move modules
         let tempdir = aptos_temppath::TempPath::new();
         tempdir.create_as_dir().unwrap();
-        for b in framework::aptos::module_blobs() {
+        for b in cached_framework_packages::module_blobs() {
             let mut temppath =
                 aptos_temppath::TempPath::new_with_temp_dir(tempdir.path().to_path_buf());
             temppath.create_as_file().unwrap();
             temppath.persist(); // otherwise, file will disappear before we call set_move_modules
             let mut file = File::create(temppath.path()).unwrap();
-            file.write_all(&b).unwrap();
+            file.write_all(b).unwrap();
             file.sync_all().unwrap();
         }
         helper

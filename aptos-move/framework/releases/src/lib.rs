@@ -18,14 +18,12 @@ use std::{
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub enum Release {
-    Aptos,
     DPN,
 }
 
 impl Release {
     pub fn to_string(&self) -> &'static str {
         match self {
-            Self::Aptos => "aptos-framework",
             Self::DPN => "DPN",
         }
     }
@@ -37,9 +35,11 @@ pub struct ReleaseFetcher {
     release_name: String,
 }
 
-static RELEASES_MAP: Lazy<BTreeMap<Release, Dir>> = Lazy::new(|| {
+static DPN_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../DPN/releases/artifacts");
+
+static RELEASES_MAP: Lazy<BTreeMap<Release, &Dir>> = Lazy::new(|| {
     let mut map = BTreeMap::new();
-    map.insert(Release::DPN, include_dir!("../DPN/releases/artifacts"));
+    map.insert(Release::DPN, &DPN_DIR);
     map
 });
 
@@ -99,7 +99,6 @@ impl ReleaseFetcher {
     pub fn list_releases(release: &Release) -> Vec<String> {
         RELEASES_MAP[release]
             .dirs()
-            .iter()
             .map(|dir| {
                 dir.path()
                     .file_name()
