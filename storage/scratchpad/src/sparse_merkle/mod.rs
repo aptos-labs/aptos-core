@@ -224,7 +224,12 @@ impl<V> Inner<V> {
         let mut links_locked = self.links.lock();
 
         let child = if links_locked.children.is_empty() {
-            self.spawn_impl(child_root, links_locked.branch_tracker.clone())
+            let child = self.spawn_impl(child_root, links_locked.branch_tracker.clone());
+            let mut branch_tracker_locked = links_locked.branch_tracker.lock();
+            if branch_tracker_locked.next.upgrade().is_none() {
+                branch_tracker_locked.next = Arc::downgrade(&child);
+            }
+            child
         } else {
             // forking a new branch
             let branch_tracker =

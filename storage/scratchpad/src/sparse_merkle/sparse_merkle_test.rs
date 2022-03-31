@@ -401,7 +401,7 @@ static VALUE: Lazy<AccountStateBlob> = Lazy::new(|| AccountStateBlob::from(b"val
 static LEAF: Lazy<SparseMerkleLeafNode> =
     Lazy::new(|| SparseMerkleLeafNode::new(*KEY, VALUE.hash()));
 static PROOF_READER: Lazy<ProofReader<AccountStateBlob>> = Lazy::new(|| {
-    let proof = SparseMerkleProof::new(Some(LEAF.clone()), vec![]);
+    let proof = SparseMerkleProof::new(Some(*LEAF), vec![]);
     ProofReader::new(vec![(*KEY, proof)])
 });
 
