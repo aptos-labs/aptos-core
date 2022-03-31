@@ -977,9 +977,12 @@ name = "aptos-transaction-builder"
 version = "0.0.3"
 dependencies = [
  "anyhow",
+ "aptos-temppath",
  "aptos-types",
  "aptos-workspace-hack",
  "bcs",
+ "framework",
+ "move-command-line-common",
  "move-core-types",
  "once_cell",
  "proptest",

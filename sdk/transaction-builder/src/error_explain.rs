@@ -1,12 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! A module for looking up the human-readable explanation of a Diem Move
+//! A module for looking up the human-readable explanation of a Aptos Move
 //! transaction abort code.
-//!
-//! This module mostly exists as a temporary hack until we figure out a more
-//! sustainable approach towards publishing the Diem move framework release to
-//! crates.io.
 //!
 //! Note that the ~13 KiB error descriptions will be inlined into the final binary.
 
@@ -16,7 +12,7 @@ use move_core_types::{
 };
 use once_cell::sync::Lazy;
 
-static RELEASE_ERRMAP_BYTES: &[u8] = include_bytes!("../release_errmap/error_description.errmap");
+static RELEASE_ERRMAP_BYTES: &[u8] = include_bytes!("../errmap/error_description.errmap");
 
 static RELEASE_ERRMAP: Lazy<ErrorMapping> = Lazy::new(|| {
     bcs::from_bytes(&*RELEASE_ERRMAP_BYTES)
