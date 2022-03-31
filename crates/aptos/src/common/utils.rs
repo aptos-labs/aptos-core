@@ -77,12 +77,12 @@ pub fn append_file_extension(
     file: &Path,
     appended_extension: &'static str,
 ) -> Result<PathBuf, Error> {
-    let extension = file.extension().unwrap_or_default().to_str();
+    let extension = file
+        .extension()
+        .map(|extension| extension.to_str().unwrap_or_default());
     if let Some(extension) = extension {
-        Ok(file.with_extension(extension.to_owned() + appended_extension))
+        Ok(file.with_extension(extension.to_owned() + "." + appended_extension))
     } else {
-        Err(Error::UnexpectedError(
-            "Failed to parse file path extension".to_string(),
-        ))
+        Ok(file.with_extension(appended_extension))
     }
 }

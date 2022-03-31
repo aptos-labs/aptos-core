@@ -4,37 +4,110 @@
 use crate::{
     common::{
         types::{EncodingOptions, EncodingType, Error, KeyType, PromptOptions},
-        utils::{append_file_extension, prompt_yes},
+        utils::{append_file_extension, prompt_yes, to_common_result},
     },
     CliResult,
 };
+use aptos_config::config::{Peer, PeerRole};
 use aptos_crypto::{
     ed25519, ed25519::Ed25519PrivateKey, x25519, PrivateKey, Uniform, ValidCryptoMaterial,
     ValidCryptoMaterialStringExt,
 };
-use clap::{Parser, Subcommand};
+use aptos_types::account_address::{from_identity_public_key, AccountAddress};
+use clap::{ArgEnum, Parser, Subcommand};
 use rand::SeedableRng;
+use serde::Serialize;
 use std::{
+    collections::{HashMap, HashSet},
     fs::File,
     io::Write,
     path::{Path, PathBuf},
+    str::FromStr,
 };
-use std::collections::HashMap;
-use crate::common::utils::to_common_result;
 
-pub const PUBLIC_KEY_EXTENSION: &str = ".pub";
+pub const PUBLIC_KEY_EXTENSION: &str = "pub";
 
 /// CLI tool for generating, inspecting, and interacting with keys.
 #[derive(Debug, Subcommand)]
 pub enum KeyTool {
     Generate(GenerateKey),
+    ExtractPeer(ExtractPeer),
 }
 
 impl KeyTool {
     pub async fn execute(self) -> CliResult {
         match self {
             KeyTool::Generate(tool) => to_common_result(tool.execute()),
+            KeyTool::ExtractPeer(tool) => to_common_result(tool.execute()),
         }
+    }
+}
+
+#[derive(Debug, ArgEnum, Clone)]
+enum KeyPairType {
+    Public,
+    Private,
+}
+
+impl FromStr for KeyPairType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "public" => Ok(KeyPairType::Public),
+            "private" => Ok(KeyPairType::Private),
+            _ => Err(Error::CommandArgumentError("Invalid key type".to_string())),
+        }
+    }
+}
+
+/// CLI tool for extracting full peer information from a given public key file
+#[derive(Debug, Parser)]
+pub struct ExtractPeer {
+    /// Public key input file name.
+    #[clap(long, parse(from_os_str))]
+    key_file: PathBuf,
+    /// Key is `public` or `private`
+    #[structopt(long)]
+    key_type: KeyPairType,
+    /// Peer config output file
+    #[structopt(long)]
+    output_file: Option<PathBuf>,
+    #[clap(flatten)]
+    encoding_options: EncodingOptions,
+    #[clap(flatten)]
+    prompt_options: PromptOptions,
+}
+
+impl ExtractPeer {
+    pub fn execute(self) -> Result<HashMap<AccountAddress, Peer>, Error> {
+        // If saving to file, check if file exists
+        if let Some(output_file) = self.output_file.as_ref() {
+            check_if_file_exists(output_file.as_path(), self.prompt_options.assume_yes)?;
+        }
+
+        // Load key based on public or private
+        let public_key: x25519::PublicKey = match self.key_type {
+            KeyPairType::Public => {
+                load_key(self.key_file.as_path(), self.encoding_options.encoding)?
+            }
+            KeyPairType::Private => {
+                let private_key: x25519::PrivateKey =
+                    load_key(self.key_file.as_path(), self.encoding_options.encoding)?;
+                private_key.public_key()
+            }
+        };
+
+        let (peer_id, peer) = build_peer_from_public_key(public_key);
+
+        let mut map = HashMap::new();
+        map.insert(peer_id, peer);
+
+        // Save to file if we're doing that
+        if let Some(output_file) = self.output_file {
+            save_to_yaml(output_file.as_path(), "seeds", &map)?;
+        }
+        Ok(map)
     }
 }
 
@@ -51,7 +124,7 @@ pub struct GenerateKey {
 }
 
 impl GenerateKey {
-    pub(crate) fn execute(self) -> Result<HashMap<&'static str, PathBuf>, Error> {
+    pub fn execute(self) -> Result<HashMap<&'static str, PathBuf>, Error> {
         self.save_params.check_key_file()?;
 
         // Generate a ed25519 key
@@ -156,8 +229,8 @@ impl SaveKey {
 
         // Write private and public keys to files
         let public_key_file = self.public_key_file()?;
-        write_to_file(&self.key_file, key_name, encoded_private_key)?;
-        write_to_file(&public_key_file, key_name, encoded_public_key)?;
+        write_to_file(&self.key_file, key_name, &encoded_private_key)?;
+        write_to_file(&public_key_file, key_name, &encoded_public_key)?;
 
         let mut map = HashMap::new();
         map.insert("PrivateKey Path", self.key_file.clone());
@@ -181,11 +254,11 @@ pub fn encode_key<Key: ValidCryptoMaterial>(
     })
 }
 
-/// Write a `Vec<u8>` to a file
-fn write_to_file(key_file: &Path, key_name: &str, encoded_key: Vec<u8>) -> Result<(), Error> {
-    let mut file = File::create(key_file).map_err(|e| Error::IO(key_name.to_string(), e))?;
-    file.write_all(&encoded_key)
-        .map_err(|e| Error::IO(key_name.to_string(), e))
+/// Write a `&[u8]` to a file
+fn write_to_file(key_file: &Path, name: &str, encoded: &[u8]) -> Result<(), Error> {
+    let mut file = File::create(key_file).map_err(|e| Error::IO(name.to_string(), e))?;
+    file.write_all(encoded)
+        .map_err(|e| Error::IO(name.to_string(), e))
 }
 
 /// Checks if a file exists, being overridden by `--assume-yes`
@@ -232,4 +305,17 @@ pub fn load_key<Key: ValidCryptoMaterial>(
                 .map_err(|err| Error::UnexpectedError(format!("Failed to parse key {}", err)))
         }
     }
+}
+
+fn save_to_yaml<T: Serialize>(path: &Path, input_name: &str, item: &T) -> Result<(), Error> {
+    let yaml =
+        serde_yaml::to_string(item).map_err(|err| Error::UnexpectedError(err.to_string()))?;
+    write_to_file(path, input_name, yaml.as_bytes())
+}
+
+fn build_peer_from_public_key(public_key: x25519::PublicKey) -> (AccountAddress, Peer) {
+    let peer_id = from_identity_public_key(public_key);
+    let mut public_keys = HashSet::new();
+    public_keys.insert(public_key);
+    (peer_id, Peer::new(Vec::new(), public_keys, PeerRole::Known))
 }
