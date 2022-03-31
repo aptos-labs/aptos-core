@@ -22,7 +22,7 @@ tokio = { version = "1.8.1", features = ["full"] }
 testcases = { path = "../testcases" }
 url = "2.2.2"
 aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
-aptos-framework-releases = { path = "../../aptos-move/framework/aptos-framework/releases" }
+framework = { path = "../../aptos-move/framework" }
 
 [[bin]]
 name = "forge"

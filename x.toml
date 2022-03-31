@@ -165,6 +165,7 @@ members = [
 
     "testcases",
     "aptos-e2e-tests-replay",
+    "aptos-framework-releases",
     "aptos-fuzz",
     "aptos-fuzzer",
     "aptos-keygen",

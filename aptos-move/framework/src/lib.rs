@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use move_command_line_common::files::{extension_equals, find_filenames, MOVE_EXTENSION};
+use move_command_line_common::files::{extension_equals, find_filenames, MOVE_EXTENSION, MOVE_COMPILED_EXTENSION};
 use move_compiler::{
     compiled_unit::{CompiledUnit, NamedCompiledModule},
     shared::{NumberFormat, NumericalAddress},
@@ -29,6 +29,32 @@ where
 
 pub fn core_modules_full_path() -> String {
     format!("{}/{}", env!("CARGO_MANIFEST_DIR"), CORE_MODULES_DIR)
+}
+
+
+/// Load the serialized modules from the specified paths.
+pub fn load_modules_from_paths(paths: &[PathBuf]) -> Vec<Vec<u8>> {
+    find_filenames(paths, |path| {
+        extension_equals(path, MOVE_COMPILED_EXTENSION)
+    })
+    .expect("module loading failed")
+    .iter()
+    .map(|file_name| std::fs::read(file_name).unwrap())
+    .collect::<Vec<_>>()
+}
+
+pub(crate) fn module_blobs(pkg: &CompiledPackage) -> Vec<Vec<u8>> {
+    pkg.transitive_compiled_units()
+        .iter()
+        .filter_map(|unit| match unit {
+            CompiledUnit::Module(NamedCompiledModule { module, .. }) => {
+                let mut bytes = vec![];
+                module.serialize(&mut bytes).unwrap();
+                Some(bytes)
+            }
+            CompiledUnit::Script(_) => None,
+        })
+        .collect()
 }
 
 pub(crate) fn move_files_in_path(path: &str) -> Vec<String> {
@@ -57,18 +83,4 @@ pub(crate) fn package(name: &str) -> CompiledPackage {
     build_config
         .compile_package(&path_in_crate(name), &mut Vec::new())
         .unwrap()
-}
-
-pub(crate) fn module_blobs(pkg: &CompiledPackage) -> Vec<Vec<u8>> {
-    pkg.transitive_compiled_units()
-        .iter()
-        .filter_map(|unit| match unit {
-            CompiledUnit::Module(NamedCompiledModule { module, .. }) => {
-                let mut bytes = vec![];
-                module.serialize(&mut bytes).unwrap();
-                Some(bytes)
-            }
-            CompiledUnit::Script(_) => None,
-        })
-        .collect()
 }

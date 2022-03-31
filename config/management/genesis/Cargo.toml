@@ -22,7 +22,6 @@ executor = { path = "../../../execution/executor" }
 bcs = "0.1.2"
 aptos-config = { path = "../.."}
 aptos-crypto = { path = "../../../crates/aptos-crypto" }
-aptos-framework-releases = { path = "../../../aptos-move/framework/aptos-framework/releases" }
 aptos-global-constants = { path = "../../global-constants" }
 aptos-management = { path = ".." }
 aptos-secure-storage = { path = "../../../secure/storage" }
@@ -31,6 +30,7 @@ aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspac
 aptos-temppath = { path = "../../../crates/aptos-temppath" }
 aptos-vm = { path = "../../../aptos-move/aptos-vm" }
 aptosdb = { path = "../../../storage/aptosdb" }
+framework = { path = "../../../aptos-move/framework" }
 storage-interface = { path = "../../../storage/storage-interface" }
 vm-genesis = { path = "../../../aptos-move/vm-genesis" }
 

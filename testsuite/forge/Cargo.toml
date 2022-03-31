@@ -39,7 +39,6 @@ url = "2.2.2"
 
 debug-interface = { path = "../../crates/debug-interface" }
 aptos-config = { path = "../../config" }
-aptos-framework-releases = { path = "../../aptos-move/framework/aptos-framework/releases" }
 aptos-genesis-tool = { path = "../../config/management/genesis" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-retrier = { path = "../../crates/aptos-retrier" }
@@ -48,4 +47,5 @@ aptos-rest-client = { path = "../../crates/aptos-rest-client"}
 aptos-secure-storage = { path = "../../secure/storage" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
+framework = { path = "../../aptos-move/framework" }
 transaction-emitter = { path = "../../crates/transaction-emitter" }

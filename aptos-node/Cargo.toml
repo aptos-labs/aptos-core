@@ -24,7 +24,6 @@ aptos-api = { path = "../api" }
 aptos-config = { path = "../config" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-data-client = { path = "../state-sync/aptos-data-client" }
-aptos-framework-releases = { path = "../aptos-move/framework/aptos-framework/releases" }
 aptos-genesis-tool = {path = "../config/management/genesis", features = ["testing"] }
 aptos-infallible = { path = "../crates/aptos-infallible" }
 aptos-logger = { path = "../crates/aptos-logger" }
@@ -46,6 +45,7 @@ debug-interface = { path = "../crates/debug-interface" }
 event-notifications = { path = "../state-sync/inter-component/event-notifications" }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
+framework = { path = "../aptos-move/framework" }
 mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
 network = { path = "../network" }
 network-builder = { path = "../network/builder" }
