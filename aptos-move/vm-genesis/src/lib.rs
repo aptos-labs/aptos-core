@@ -461,8 +461,8 @@ pub enum GenesisOptions {
 /// Generate an artificial genesis `ChangeSet` for testing
 pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) -> ChangeSet {
     let modules = match genesis_options {
-        GenesisOptions::Compiled => aptos_framework_releases::current_module_blobs().to_vec(),
-        GenesisOptions::Fresh => framework::aptos_module_blobs(),
+        GenesisOptions::Compiled => framework::aptos::module_blobs().to_vec(),
+        GenesisOptions::Fresh => framework::aptos::module_blobs(),
     };
 
     generate_test_genesis(&modules, VMPublishingOption::open(), None, false).0

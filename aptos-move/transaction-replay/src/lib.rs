@@ -402,10 +402,10 @@ fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {
 
 fn compile_move_script(file_path: &str) -> Result<Vec<u8>> {
     let cur_path = file_path.to_owned();
-    let targets = vec![(vec![cur_path], framework::aptos_framework_named_addresses())];
+    let targets = vec![(vec![cur_path], framework::aptos::named_addresses())];
     let deps = vec![(
-        framework::aptos_files(),
-        framework::aptos_framework_named_addresses(),
+        framework::aptos::files(),
+        framework::aptos::named_addresses(),
     )];
 
     let (files, units_or_diags) = Compiler::new(targets, deps)

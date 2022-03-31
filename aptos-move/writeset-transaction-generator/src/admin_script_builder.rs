@@ -20,13 +20,10 @@ use tempfile::NamedTempFile;
 pub const SCRIPTS_DIR_PATH: &str = "templates";
 
 pub fn compile_script(source_file_str: String) -> Vec<u8> {
-    let targets = vec![(
-        vec![source_file_str],
-        framework::aptos_framework_named_addresses(),
-    )];
+    let targets = vec![(vec![source_file_str], framework::aptos::named_addresses())];
     let deps = vec![(
-        framework::aptos_files(),
-        framework::aptos_framework_named_addresses(),
+        framework::aptos::files(),
+        framework::aptos::named_addresses(),
     )];
     let (_files, mut compiled_program) = Compiler::new(targets, deps)
         .set_flags(Flags::empty().set_sources_shadow_deps(false))

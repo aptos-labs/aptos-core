@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use forge::{Factory, LocalFactory, LocalSwarm};
-use framework::aptos_module_blobs;
 use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
 use std::num::NonZeroUsize;
@@ -31,5 +30,5 @@ pub async fn new_local_swarm(
 
 // Gas is not enabled with this setup, it's enabled via forge instance.
 pub async fn new_local_swarm_with_aptos(num_validators: usize) -> LocalSwarm {
-    new_local_swarm(num_validators, Some(aptos_module_blobs())).await
+    new_local_swarm(num_validators, Some(framework::aptos::module_blobs())).await
 }
