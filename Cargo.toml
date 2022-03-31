@@ -140,7 +140,6 @@ default-members = [
     "aptos-move/transaction-builder-generator",
     "execution/db-bootstrapper",
     "execution/execution-correctness",
-    "sdk",
     "storage/backup/backup-cli",
     "storage/aptossum",
     "storage/inspector",

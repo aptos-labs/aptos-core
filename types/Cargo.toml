@@ -6,7 +6,7 @@ description = "Aptos core types"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
-publish = ["crates-io"]
+publish = false
 edition = "2018"
 
 [dependencies]
@@ -28,8 +28,8 @@ thiserror = "1.0.24"
 tiny-keccak = { version = "2.0.2", default-features = false, features = ["sha3"] }
 
 bcs = "0.1.2"
-aptos-crypto = { path = "../crates/aptos-crypto", version = "0.0.3" }
-aptos-crypto-derive = { path = "../crates/aptos-crypto-derive", version = "0.0.3" }
+aptos-crypto = { path = "../crates/aptos-crypto" }
+aptos-crypto-derive = { path = "../crates/aptos-crypto-derive" }
 move-core-types = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa", version = "0.0.3", features=["address32"] }
 move-read-write-set-types = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 aptos-workspace-hack = { version = "0.1", path = "../crates/aptos-workspace-hack" }

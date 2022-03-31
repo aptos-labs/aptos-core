@@ -6,7 +6,7 @@ description = "The Official Aptos SDK"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
-publish = ["crates-io"]
+publish = false
 edition = "2018"
 
 [dependencies]
@@ -14,8 +14,8 @@ bcs = "0.1"
 rand_core = "0.6.2"
 serde = { version = "1.0.124", features = ["derive"] }
 
-aptos-crypto = { path = "../crates/aptos-crypto", version = "0.0.3" }
-aptos-types = { path = "../types", version = "0.0.3"}
+aptos-crypto = { path = "../crates/aptos-crypto" }
+aptos-types = { path = "../types" }
 move-core-types = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa", version = "0.0.3", features=["address32"] }
-aptos-transaction-builder = { path = "./transaction-builder", version = "0.0.3" }
+aptos-transaction-builder = { path = "./transaction-builder" }
 aptos-workspace-hack = { version = "0.1", path = "../crates/aptos-workspace-hack" }
