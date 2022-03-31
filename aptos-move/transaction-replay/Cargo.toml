@@ -11,26 +11,27 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.52"
-structopt = "0.3.21"
+bcs = "0.1.2"
+difference = "2.0.0"
 hex = "0.4.3"
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
-aptos-types = { path = "../../types" }
+structopt = "0.3.21"
+
+aptos-resource-viewer = { path = "../aptos-resource-viewer" }
 aptos-state-view = { path = "../../storage/state-view" }
+aptos-types = { path = "../../types" }
 aptos-validator-interface = { path = "../aptos-validator-interface" }
-aptosdb = { path = "../../storage/aptosdb" }
+aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 aptos-vm = { path = "../aptos-vm" }
+aptosdb = { path = "../../storage/aptosdb" }
+cached-framework-packages =  { path = "../framework/cached-packages" }
+framework =  { path = "../framework" }
 move-binary-format = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa"}
 move-cli = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
-move-vm-types = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
+move-compiler = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 move-core-types = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa", features=["address32"] }
 move-vm-runtime = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 move-vm-test-utils = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
-aptos-resource-viewer = { path = "../aptos-resource-viewer" }
-framework =  { path = "../framework" }
-move-compiler = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
-bcs = "0.1.2"
-difference = "2.0.0"
+move-vm-types = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 
 [dev-dependencies]
 vm-genesis = { path = "../vm-genesis" }
-aptos-framework-releases = { path = "../framework/aptos-framework/releases" }

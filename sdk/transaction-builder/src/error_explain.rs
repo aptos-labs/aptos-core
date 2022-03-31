@@ -12,11 +12,9 @@ use move_core_types::{
 };
 use once_cell::sync::Lazy;
 
-static RELEASE_ERRMAP_BYTES: &[u8] = include_bytes!("../errmap/error_description.errmap");
-
 static RELEASE_ERRMAP: Lazy<ErrorMapping> = Lazy::new(|| {
-    bcs::from_bytes(&*RELEASE_ERRMAP_BYTES)
-        .expect("Failed to deserialize static error descriptions")
+    let error_map = cached_framework_packages::error_map();
+    bcs::from_bytes(&*error_map).expect("Failed to deserialize static error descriptions")
 });
 
 /// Given the module ID and the abort code raised from that module, returns the

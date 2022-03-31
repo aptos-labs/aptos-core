@@ -139,7 +139,7 @@ pub fn encode_disable_parallel_execution() -> WriteSetPayload {
 
 pub fn encode_enable_parallel_execution_with_config() -> WriteSetPayload {
     let payload = bcs::to_bytes(&ReadWriteSetAnalysis::V1(
-        analyze(aptos_framework_releases::current_modules())
+        analyze(cached_framework_packages::modules())
             .expect("Failed to get ReadWriteSet for current Framework")
             .normalize_all_scripts(aptos_vm::read_write_set_analysis::add_on_functions_list())
             .trim()

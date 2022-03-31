@@ -50,9 +50,9 @@ aptos-secure-storage = { path = "../secure/storage" }
 aptos-temppath = { path = "../crates/aptos-temppath" }
 aptos-vm = { path = "../aptos-move/aptos-vm" }
 aptosdb = { path = "../storage/aptosdb", features = ["fuzzing"] }
+cached-framework-packages = { path = "../aptos-move/framework/cached-packages" }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
-framework = { path = "../aptos-move/framework" }
 mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
 vm-validator = { path = "../vm-validator" }
 

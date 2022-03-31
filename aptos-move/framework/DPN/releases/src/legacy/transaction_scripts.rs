@@ -16,7 +16,7 @@ use std::{convert::TryFrom, fmt, path::PathBuf};
 // This includes the script ABIs as binaries. We must use this hack to work around
 // a problem with Docker, which does not copy over the Move source files that would be be used to
 // produce these binaries at runtime.
-const TXN_SCRIPTS_ABI_DIR: Dir = include_dir!("legacy/script_abis");
+const TXN_SCRIPTS_ABI_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/legacy/script_abis");
 
 /// All of the Move transaction scripts that can be executed on the Diem blockchain
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -237,15 +237,17 @@ mod test {
     use super::*;
 
     // This includes the compiled script binaries.
-    const COMPILED_TXN_SCRIPTS_DIR: Dir = include_dir!("legacy/scripts");
+    const COMPILED_TXN_SCRIPTS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/legacy/scripts");
 
     #[test]
     fn test_file_correspondence() {
         // Make sure that every compiled file under transaction_scripts is represented in
         // StdlibScript::all() (and vice versa).
-        let files = COMPILED_TXN_SCRIPTS_DIR.files();
+        let files = COMPILED_TXN_SCRIPTS_DIR
+            .files()
+            .collect::<Vec<&include_dir::File<'_>>>();
         let scripts = LegacyStdlibScript::all();
-        for file in files {
+        for file in &files {
             assert!(
                 LegacyStdlibScript::is(file.contents()),
                 "File {} missing from StdlibScript enum",

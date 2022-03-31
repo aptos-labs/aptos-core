@@ -243,7 +243,7 @@ fn add_module_txn(sender: &AccountData, seq_num: u64) -> (CompiledModule, Signed
     );
 
     let compiler = Compiler {
-        deps: aptos_framework_releases::current_modules().iter().collect(),
+        deps: cached_framework_packages::modules().iter().collect(),
     };
     let module = compiler
         .into_compiled_module(module_code.as_str())

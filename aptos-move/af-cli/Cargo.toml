@@ -14,12 +14,12 @@ anyhow = "1.0.52"
 bcs = "0.1.2"
 clap = "3.1.6"
 
+aptos-vm = { path = "../aptos-vm" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+cached-framework-packages =  { path = "../framework/cached-packages" }
 move-core-types = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa", features=["address32"] }
 move-vm-types = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 move-cli = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
-aptos-vm = { path = "../aptos-vm" }
-aptos-framework-releases = { path = "../framework/aptos-framework/releases" }
 
 [dev-dependencies]
 datatest-stable = "0.1.1"

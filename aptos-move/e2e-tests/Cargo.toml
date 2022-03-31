@@ -31,10 +31,10 @@ move-command-line-common = { git = "https://github.com/diem/move", rev = "3fe033
 
 ## Diem-Move dependencies
 aptos-writeset-generator = { path = "../writeset-transaction-generator" }
-vm-genesis = { path = "../vm-genesis" }
 aptos-vm = { path = "../aptos-vm" }
 aptos-keygen = { path = "../aptos-keygen" }
-aptos-framework-releases = { path = "../framework/aptos-framework/releases" }
+cached-framework-packages = { path = "../framework/cached-packages" }
+vm-genesis = { path = "../vm-genesis" }
 
 ## Other Diem Dependencies
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }

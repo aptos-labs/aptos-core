@@ -24,8 +24,7 @@ pub enum AfCommands {
 }
 
 fn main() -> Result<()> {
-    let error_descriptions: ErrorMapping =
-        bcs::from_bytes(aptos_framework_releases::current_error_descriptions())?;
+    let error_descriptions: ErrorMapping = bcs::from_bytes(cached_framework_packages::error_map())?;
     let args = AfCli::parse();
     match &args.cmd {
         AfCommands::Command(cmd) => move_cli::run_cli(

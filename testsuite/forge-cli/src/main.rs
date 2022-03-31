@@ -340,7 +340,7 @@ fn local_test_suite() -> ForgeConfig<'static> {
         .with_aptos_tests(&[&FundAccount, &TransferCoins])
         .with_admin_tests(&[&GetMetadata])
         .with_network_tests(&[&RestartValidator, &EmitTransaction])
-        .with_genesis_modules_bytes(framework::aptos::module_blobs())
+        .with_genesis_modules_bytes(cached_framework_packages::module_blobs().to_vec())
 }
 
 fn k8s_test_suite() -> ForgeConfig<'static> {

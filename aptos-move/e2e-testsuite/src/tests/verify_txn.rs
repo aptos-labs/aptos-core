@@ -1012,7 +1012,7 @@ fn good_module_uses_bad(
     );
 
     let compiler = Compiler {
-        deps: aptos_framework_releases::current_modules()
+        deps: cached_framework_packages::modules()
             .iter()
             .chain(std::iter::once(&bad_dep))
             .collect(),

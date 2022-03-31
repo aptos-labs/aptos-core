@@ -12,7 +12,7 @@ fn main() {
         script_abis: false,
         errmap: false,
         package: PathBuf::from("aptos-framework"),
-        output: PathBuf::from("fresh"),
+        output: PathBuf::from(std::env::var("OUT_DIR").unwrap()),
     };
     release.create_release();
 }
