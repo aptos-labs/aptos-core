@@ -16,6 +16,7 @@ use aptos_types::{
 };
 use once_cell::sync::Lazy;
 use proptest::prelude::*;
+use std::collections::VecDeque;
 
 fn update_byte(original_key: &HashValue, n: usize, byte: u8) -> HashValue {
     let mut key = original_key.to_vec();
@@ -397,14 +398,16 @@ fn test_update() {
 
 static KEY: Lazy<HashValue> = Lazy::new(|| b"aaaaa".test_only_hash());
 static VALUE: Lazy<AccountStateBlob> = Lazy::new(|| AccountStateBlob::from(b"value1".to_vec()));
-static LEAF: Lazy<SparseMerkleLeafNode> = Lazy::new(|| SparseMerkleLeafNode::new(*KEY, VALUE.hash()));
+static LEAF: Lazy<SparseMerkleLeafNode> =
+    Lazy::new(|| SparseMerkleLeafNode::new(*KEY, VALUE.hash()));
 static PROOF_READER: Lazy<ProofReader<AccountStateBlob>> = Lazy::new(|| {
     let proof = SparseMerkleProof::new(Some(LEAF.clone()), vec![]);
     ProofReader::new(vec![(*KEY, proof)])
 });
 
 fn update(smt: &SparseMerkleTree) -> SparseMerkleTree {
-    smt.batch_update(vec![(*KEY, &VALUE)], &*PROOF_READER).unwrap()
+    smt.batch_update(vec![(*KEY, &VALUE)], &*PROOF_READER)
+        .unwrap()
 }
 
 #[test]
@@ -496,6 +499,41 @@ fn test_get_oldest_ancestor() {
 fn assert_eq_pointee(left: &SparseMerkleTree, right: &SparseMerkleTree) {
     assert!(Arc::ptr_eq(&left.inner, &right.inner,))
 }
+
+/// update smt from multiple threads, creating branches, trying to explore edge cases around
+/// branching and dropping
+#[test]
+fn test_multithread_branching() {
+    let t1 = SparseMerkleTree::new(LEAF.hash());
+    let q = Arc::new(Mutex::new(VecDeque::from(vec![t1])));
+
+    let work = |q: &Arc<Mutex<VecDeque<SparseMerkleTree>>>| {
+        let q = q.clone();
+        move || {
+            for _ in 0..10000 {
+                let new = update(q.lock().back().unwrap());
+
+                let _maybe_drop = {
+                    let mut q_locked = q.lock();
+                    if q_locked.len() > 1 {
+                        q_locked.pop_front()
+                    } else {
+                        None
+                    }
+                };
+
+                q.lock().push_back(new);
+            }
+        }
+    };
+
+    (0..3)
+        .map(|_| std::thread::spawn(work(&q)))
+        .collect::<Vec<_>>()
+        .into_iter()
+        .for_each(|t| t.join().unwrap())
+}
+
 #[test]
 fn test_drop() {
     let proof_reader = ProofReader::default();
