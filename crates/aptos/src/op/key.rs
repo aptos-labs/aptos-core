@@ -4,7 +4,7 @@
 use crate::{
     common::{
         types::{EncodingOptions, EncodingType, Error, KeyType, PromptOptions},
-        utils::{append_file_extension, prompt_yes, to_common_success_result},
+        utils::{append_file_extension, prompt_yes},
     },
     CliResult,
 };
@@ -19,6 +19,8 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
 };
+use std::collections::HashMap;
+use crate::common::utils::to_common_result;
 
 pub const PUBLIC_KEY_EXTENSION: &str = ".pub";
 
@@ -31,7 +33,7 @@ pub enum KeyTool {
 impl KeyTool {
     pub async fn execute(self) -> CliResult {
         match self {
-            KeyTool::Generate(tool) => to_common_success_result(tool.execute()),
+            KeyTool::Generate(tool) => to_common_result(tool.execute()),
         }
     }
 }
@@ -49,7 +51,7 @@ pub struct GenerateKey {
 }
 
 impl GenerateKey {
-    pub(crate) fn execute(self) -> Result<(), Error> {
+    pub(crate) fn execute(self) -> Result<HashMap<&'static str, PathBuf>, Error> {
         self.save_params.check_key_file()?;
 
         // Generate a ed25519 key
@@ -147,14 +149,20 @@ impl SaveKey {
         &self,
         key: &Key,
         key_name: &'static str,
-    ) -> Result<(), Error> {
+    ) -> Result<HashMap<&'static str, PathBuf>, Error> {
         let encoded_private_key = encode_key(self.encoding_options.encoding, key, key_name)?;
         let encoded_public_key =
             encode_key(self.encoding_options.encoding, &key.public_key(), key_name)?;
 
         // Write private and public keys to files
+        let public_key_file = self.public_key_file()?;
         write_to_file(&self.key_file, key_name, encoded_private_key)?;
-        write_to_file(&self.public_key_file()?, key_name, encoded_public_key)
+        write_to_file(&public_key_file, key_name, encoded_public_key)?;
+
+        let mut map = HashMap::new();
+        map.insert("PrivateKey Path", self.key_file.clone());
+        map.insert("PublicKey Path", public_key_file);
+        Ok(map)
     }
 }
 
