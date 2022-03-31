@@ -6,7 +6,7 @@
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "26",
   "success": false,
-  "vm_status": "Move abort: code 8 at 0000000000000000000000000000000000000000000000000000000000000001::TestCoin",
+  "vm_status": "Move abort by LIMIT_EXCEEDED - EINSUFFICIENT_BALANCE\n A limit on an amount, e.g. a currency, is exceeded. Example: withdrawal of money after account limits window\n is exhausted.\n Error codes",
   "accumulator_root_hash": "0xc2b49a932adb00934187e62b58ba940414f1487f6b44944c4e044057d79987ed",
   "sender": "0xe60912ecb0a8c365d163d258f3b9f1b62f8f9148c207643864d7ed4a2b23159",
   "sequence_number": "0",
