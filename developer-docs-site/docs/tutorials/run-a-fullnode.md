@@ -224,7 +224,7 @@ FullNodes will automatically start up with a randomly generated network identity
       role: Downstream
     ```
 
-    In this example, `ca3579457555c80fc7bb39964eb298c414fd60f81a2f8eedb0244ec07a26e575` is the peer id, and `ca3579457555c80fc7bb39964eb298c414fd60f81a2f8eedb0244ec07a26e575` is the public key derived from the private key you generated from the previous step.
+    In this example, `ca3579457555c80fc7bb39964eb298c414fd60f81a2f8eedb0244ec07a26e575` is the peer id as well as the public key, which is derived from the private key you generated from the previous step.
 
 2. This will create a yaml file that will have your public identity in it. This is useful if you want to connect your FullNode to a specific upstream FullNode, and that FullNode only allows known identities to connect to them. 
 
