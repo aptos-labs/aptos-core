@@ -18,12 +18,14 @@ use std::{
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub enum Release {
+    Aptos,
     DPN,
 }
 
 impl Release {
     pub fn to_string(&self) -> &'static str {
         match self {
+            Self::Aptos => "aptos-framework",
             Self::DPN => "DPN",
         }
     }

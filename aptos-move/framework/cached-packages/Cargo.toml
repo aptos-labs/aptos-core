@@ -1,0 +1,19 @@
+[package]
+name = "cached-framework-packages"
+version = "0.1.0"
+edition = "2018"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "Builds framework packages for caching in builds and tests"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
+framework-releases = { path = "../releases" }
+once_cell = "1.7.2"
+
+[build-dependencies]
+move-command-line-common = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
+framework = { path = ".." }

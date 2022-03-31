@@ -977,12 +977,10 @@ name = "aptos-transaction-builder"
 version = "0.0.3"
 dependencies = [
  "anyhow",
- "aptos-temppath",
  "aptos-types",
  "aptos-workspace-hack",
  "bcs",
- "framework",
- "move-command-line-common",
+ "cached-framework-packages",
  "move-core-types",
  "once_cell",
  "proptest",
@@ -1713,6 +1711,17 @@ name = "c_linked_list"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4964518bd3b4a8190e832886cdc0da9794f12e8e6c1613a9e90ff331c4c8724b"
+
+[[package]]
+name = "cached-framework-packages"
+version = "0.1.0"
+dependencies = [
+ "aptos-workspace-hack",
+ "framework",
+ "framework-releases",
+ "move-command-line-common",
+ "once_cell",
+]
 
 [[package]]
 name = "camino"

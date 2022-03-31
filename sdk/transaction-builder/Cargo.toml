@@ -21,11 +21,7 @@ aptos-types = { path = "../../types" }
 proptest = { version = "1.0.0", optional = true }
 proptest-derive = { version = "0.3.0", optional = true }
 aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
-
-[build-dependencies]
-aptos-temppath = { path = "../../crates/aptos-temppath" }
-framework = {path = "../../aptos-move/framework" }
-move-command-line-common = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
+cached-framework-packages = {path = "../../aptos-move/framework/cached-packages" }
 
 [dev-dependencies]
 proptest = "1.0.0"
