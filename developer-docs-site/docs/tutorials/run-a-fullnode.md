@@ -140,15 +140,15 @@ full_node_networks:
       # prevent remote, incoming connections.
       listen_address: ...
       seeds:
-        4d6a710365a2d95ac6ffbd9b9198a86a:
+        bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a:
             addresses:
             - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/ln-handshake/0"
             role: "Upstream"
-        52173b436ae1809df4a5fcfc67f8fc61:
+        7fe8523388084607cdf78ff40e3e717652173b436ae1809df4a5fcfc67f8fc61:
             addresses:
             - "/dns4/pfn1.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/7fe8523388084607cdf78ff40e3e717652173b436ae1809df4a5fcfc67f8fc61/ln-handshake/0"
             role: "Upstream"
-        476222516fdc55869d2b649c614d965b:
+        f6b135a59591677afc98168791551a0a476222516fdc55869d2b649c614d965b:
             addresses:
             - "/dns4/pfn2.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/f6b135a59591677afc98168791551a0a476222516fdc55869d2b649c614d965b/ln-handshake/0"
             role: "Upstream"
@@ -217,14 +217,14 @@ FullNodes will automatically start up with a randomly generated network identity
 
    ```
     ---
-    14fd60f81a2f8eedb0244ec07a26e575:
+    ca3579457555c80fc7bb39964eb298c414fd60f81a2f8eedb0244ec07a26e575:
       addresses: []
       keys:
         - ca3579457555c80fc7bb39964eb298c414fd60f81a2f8eedb0244ec07a26e575
       role: Downstream
     ```
 
-    In this example, `14fd60f81a2f8eedb0244ec07a26e575` is the peer id, and `ca3579457555c80fc7bb39964eb298c414fd60f81a2f8eedb0244ec07a26e575` is the public key derived from the private key you generated from the previous step.
+    In this example, `ca3579457555c80fc7bb39964eb298c414fd60f81a2f8eedb0244ec07a26e575` is the peer id, and `ca3579457555c80fc7bb39964eb298c414fd60f81a2f8eedb0244ec07a26e575` is the public key derived from the private key you generated from the previous step.
 
 2. This will create a yaml file that will have your public identity in it. This is useful if you want to connect your FullNode to a specific upstream FullNode, and that FullNode only allows known identities to connect to them. 
 
@@ -250,7 +250,7 @@ full_node_networks:
   identity:
     type: "from_config"
     key: "B8BD811A91D8E6E0C6DAC991009F189337378760B55F3AD05580235325615C74"
-    peer_id: "14fd60f81a2f8eedb0244ec07a26e575"
+    peer_id: "ca3579457555c80fc7bb39964eb298c414fd60f81a2f8eedb0244ec07a26e575"
 ```
 
 ### Allowing other FullNodes to connect
@@ -273,17 +273,23 @@ Once you start your FullNode with a static identity you can allow others to conn
 Make sure the port number you put in the address matches the one you have in the fullnode config (`6180` or `6182`). For example:
 
 ```
-4d6a710365a2d95ac6ffbd9b9198a86a:
+bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a:
   addresses:
   - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/ln-handshake/0"
   role: "Upstream"
-4d6a710365a2d95ac6ffbd9b9198a86a:
+bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a:
   addresses:
   - "/ip4/100.20.221.187/tcp/6182/ln-noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/ln-handshake/0"
   role: "Upstream"
 ```
 
 ## Update Fullnode With New Releases
+
+:::info ✨ Devnet New Address Format ✨
+Aptos addresses are now 32-bytes instead of 16-bytes. If you added seed peers before, make sure you update them to the new 32-bytes format. <br/>
+For people who are using static identity, you can regenerate your identity following the same instruction [Create a static identity for a FullNode](#create-a-static-identity-for-a-fullnode) above.
+:::info
+
 
 When `devnet` is wiped and updated with newer versions, you will need to update your FullNode as well. If you don't,
 it will not continue to synchronize with the network. To do this, follow these steps:
