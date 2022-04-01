@@ -138,6 +138,20 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
         Ok(())
     }
 
+    /// Attempts to fetch a data notification from the active stream
+    async fn fetch_next_data_notification(&mut self) -> Result<DataNotification, Error> {
+        let max_stream_wait_time_ms = self.driver_configuration.config.max_stream_wait_time_ms;
+        let result =
+            utils::get_data_notification(max_stream_wait_time_ms, self.active_data_stream.as_mut())
+                .await;
+        if matches!(result, Err(Error::CriticalDataStreamTimeout(_))) {
+            // If the stream has timed out too many times, we need to reset it
+            warn!("Resetting the currently active data stream due to too many timeouts!");
+            self.reset_active_stream();
+        }
+        result
+    }
+
     /// Processes any notifications already pending on the active stream
     async fn process_active_stream_notifications(
         &mut self,
@@ -145,12 +159,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
     ) -> Result<(), Error> {
         loop {
             // Fetch and process any data notifications
-            let max_stream_wait_time_ms = self.driver_configuration.config.max_stream_wait_time_ms;
-            let data_notification = utils::get_data_notification(
-                max_stream_wait_time_ms,
-                self.active_data_stream.as_mut(),
-            )
-            .await?;
+            let data_notification = self.fetch_next_data_notification().await?;
             match data_notification.data_payload {
                 DataPayload::ContinuousTransactionOutputsWithProof(
                     ledger_info_with_sigs,

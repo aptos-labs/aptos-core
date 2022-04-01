@@ -90,6 +90,11 @@ pub struct DataStream<T> {
     // If this count becomes too large, the stream is evidently blocked (i.e.,
     // unable to make progress) and will automatically terminate.
     request_failure_count: u64,
+
+    // Whether the data stream has encountered an error trying to send a
+    // notification to the listener. If so, the stream is dead and it will
+    // stop sending notifications. This handles when clients drop the listener.
+    send_failure: bool,
 }
 
 impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
@@ -125,6 +130,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
             notification_id_generator,
             stream_end_notification_id: None,
             request_failure_count: 0,
+            send_failure: false,
         };
 
         Ok((data_stream, data_stream_listener))
@@ -261,10 +267,21 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
         pending_client_response
     }
 
-    fn send_data_notification(&self, data_notification: DataNotification) -> Result<(), Error> {
-        self.notification_sender
-            .push((), data_notification)
-            .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))
+    fn send_data_notification(&mut self, data_notification: DataNotification) -> Result<(), Error> {
+        if let Err(error) = self.notification_sender.push((), data_notification) {
+            let error = Error::UnexpectedErrorEncountered(error.to_string());
+            warn!(
+                (LogSchema::new(LogEntry::StreamNotification)
+                    .stream_id(self.data_stream_id)
+                    .event(LogEvent::Error)
+                    .error(&error)
+                    .message("Failed to send data notification to listener!"))
+            );
+            self.send_failure = true;
+            Err(error)
+        } else {
+            Ok(())
+        }
     }
 
     fn send_end_of_stream_notification(&mut self) -> Result<(), Error> {
@@ -294,8 +311,9 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
     ) -> Result<(), Error> {
         if self.stream_engine.is_stream_complete()
             || self.request_failure_count >= self.config.max_request_retry
+            || self.send_failure
         {
-            if self.stream_end_notification_id.is_none() {
+            if !self.send_failure && self.stream_end_notification_id.is_none() {
                 self.send_end_of_stream_notification()?;
             }
             return Ok(()); // There's nothing left to do
@@ -574,6 +592,9 @@ impl<T> Drop for DataStream<T> {
 #[derive(Debug)]
 pub struct DataStreamListener {
     notification_receiver: channel::aptos_channel::Receiver<(), DataNotification>,
+
+    /// Stores the number of consecutive timeouts encountered when listening to this stream
+    pub num_consecutive_timeouts: u64,
 }
 
 impl DataStreamListener {
@@ -582,6 +603,7 @@ impl DataStreamListener {
     ) -> Self {
         Self {
             notification_receiver,
+            num_consecutive_timeouts: 0,
         }
     }
 }

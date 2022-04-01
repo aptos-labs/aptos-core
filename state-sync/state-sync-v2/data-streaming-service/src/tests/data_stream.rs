@@ -306,6 +306,60 @@ async fn test_stream_out_of_order_responses() {
     assert_none!(stream_listener.select_next_some().now_or_never());
 }
 
+#[tokio::test]
+async fn test_stream_listener_dropped() {
+    // Create an epoch ending data stream
+    let streaming_service_config = DataStreamingServiceConfig::default();
+    let (mut data_stream, mut stream_listener) =
+        create_epoch_ending_stream(streaming_service_config, MIN_ADVERTISED_EPOCH_END);
+
+    // Initialize the data stream
+    let global_data_summary = create_global_data_summary(1);
+    data_stream
+        .initialize_data_requests(global_data_summary.clone())
+        .unwrap();
+
+    // Verify no notifications have been sent yet
+    let (sent_requests, sent_notifications) = data_stream.get_sent_requests_and_notifications();
+    assert_ge!(sent_requests.as_ref().unwrap().len(), 3);
+    assert_eq!(sent_notifications.len(), 0);
+
+    // Set a response for the first request and verify a notification is sent
+    set_epoch_ending_response_in_queue(&mut data_stream, 0);
+    data_stream
+        .process_data_responses(global_data_summary.clone())
+        .unwrap();
+    verify_epoch_ending_notification(
+        &mut stream_listener,
+        create_ledger_info(0, MIN_ADVERTISED_EPOCH_END, true),
+    )
+    .await;
+
+    // Verify a single notification was sent
+    let (_, sent_notifications) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(sent_notifications.len(), 1);
+
+    // Drop the listener
+    drop(stream_listener);
+
+    // Set a response for the first request and verify an error is returned
+    // when the notification is sent.
+    set_epoch_ending_response_in_queue(&mut data_stream, 0);
+    data_stream
+        .process_data_responses(global_data_summary.clone())
+        .unwrap_err();
+    let (_, sent_notifications) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(sent_notifications.len(), 2);
+
+    // Set a response for the first request and verify no notifications are sent
+    set_epoch_ending_response_in_queue(&mut data_stream, 0);
+    data_stream
+        .process_data_responses(global_data_summary.clone())
+        .unwrap();
+    let (_, sent_notifications) = data_stream.get_sent_requests_and_notifications();
+    assert_eq!(sent_notifications.len(), 2);
+}
+
 /// Creates an account stream for the given `version`.
 fn create_account_stream(
     streaming_service_config: DataStreamingServiceConfig,

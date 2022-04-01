@@ -20,7 +20,8 @@ use std::{sync::Arc, time::Duration};
 use storage_interface::{DbReader, StartupInfo};
 use tokio::time::timeout;
 
-// TODO(joshlind): make this configurable!
+// TODO(joshlind): make these configurable!
+const MAX_NUM_DATA_STREAM_TIMEOUTS: u64 = 3;
 pub const PENDING_DATA_LOG_FREQ_SECS: u64 = 3;
 
 /// The speculative state that tracks a data stream of transactions or outputs.
@@ -85,9 +86,12 @@ impl SpeculativeStreamState {
     }
 }
 
-/// Fetches a data notification from the given data stream listener. Note: this
-/// helper assumes the `active_data_stream` exists and throws an error if a
-/// notification is not found within the `max_stream_wait_time_ms`.
+/// Fetches a data notification from the given data stream listener. Returns an
+/// error if the data stream times out after `max_stream_wait_time_ms`. Also,
+/// tracks the number of consecutive timeouts to identify when the stream has
+/// timed out too many times.
+///
+/// Note: this assumes the `active_data_stream` exists.
 pub async fn get_data_notification(
     max_stream_wait_time_ms: u64,
     active_data_stream: Option<&mut DataStreamListener>,
@@ -97,12 +101,25 @@ pub async fn get_data_notification(
     let timeout_ms = Duration::from_millis(max_stream_wait_time_ms);
     if let Ok(data_notification) = timeout(timeout_ms, active_data_stream.select_next_some()).await
     {
+        // Reset the number of consecutive timeouts for the data stream
+        active_data_stream.num_consecutive_timeouts = 0;
         Ok(data_notification)
     } else {
-        Err(Error::DataStreamNotificationTimeout(format!(
-            "{:?}",
-            timeout_ms
-        )))
+        // Increase the number of consecutive timeouts for the data stream
+        active_data_stream.num_consecutive_timeouts += 1;
+
+        // Check if we've timed out too many times
+        if active_data_stream.num_consecutive_timeouts >= MAX_NUM_DATA_STREAM_TIMEOUTS {
+            Err(Error::CriticalDataStreamTimeout(format!(
+                "{:?}",
+                MAX_NUM_DATA_STREAM_TIMEOUTS
+            )))
+        } else {
+            Err(Error::DataStreamNotificationTimeout(format!(
+                "{:?}",
+                timeout_ms
+            )))
+        }
     }
 }
 
