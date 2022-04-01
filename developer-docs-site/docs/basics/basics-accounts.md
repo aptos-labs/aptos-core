@@ -15,7 +15,7 @@ An account may contain an arbitrary number of Move resources and Move modules.
 
 ## Initial Account Setup
 
-An Aptos account is referenced by an account address, which is a 16-byte value. The account address is derived from the initial public verification key(s) for that account. Specifically, the account address is the last 16-bytes of the SHA-3 256 cryptographic hash of the initial public verification key(s) concatenated with a signature scheme identifier byte. The Aptos Blockchain supports two signature schemes: [Ed25519](/reference/glossary#ed25519) and MultiEd25519 (for multi-signature transactions). The account's private key is necessary for signing transactions.
+An Aptos account is referenced by an account address, which is a 32-byte value. The account address is derived from the initial public verification key(s) for that account. Specifically, the account address is the 32-byte of the SHA-3 256 cryptographic hash of the initial public verification key(s) concatenated with a signature scheme identifier byte. The Aptos Blockchain supports two signature schemes: [Ed25519](/reference/glossary#ed25519) and MultiEd25519 (for multi-signature transactions). The account's private key is necessary for signing transactions.
 
 Each account also stores a `sequence_number`, which represents the next transaction sequence number to prevent replay attacks of transactions. This is initialized to `0` at account creation time.
 
