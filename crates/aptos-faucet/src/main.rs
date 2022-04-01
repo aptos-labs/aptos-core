@@ -323,12 +323,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_mint() {
+    async fn test_mint_auth_key() {
         let (accounts, service) = setup(None);
         let filter = routes(service);
 
-        // auth_key is outside of the loop for minting same account multiple times,
-        // it should succeed and should not create same account multiple times.
         let auth_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
         let amount = 13345;
         let resp = warp::test::request()
@@ -336,6 +334,77 @@ mod tests {
             .path(format!("/mint?auth_key={}&amount={}", auth_key, amount).as_str())
             .reply(&filter)
             .await;
+        let values: Vec<HashValue> = serde_json::from_slice(resp.body()).unwrap();
+        assert_eq!(values.len(), 2);
+        let reader = accounts.read();
+        let addr = AccountAddress::try_from(
+            "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d".to_owned(),
+        )
+        .unwrap();
+        let account = reader.get(&addr).expect("account should be created");
+        assert_eq!(account.balance, amount);
+    }
+
+    #[tokio::test]
+    async fn test_mint_pub_key() {
+        let (accounts, service) = setup(None);
+        let filter = routes(service);
+
+        let pub_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
+        let amount = 13345;
+        let resp = warp::test::request()
+            .method("POST")
+            .path(format!("/mint?pub_key={}&amount={}", pub_key, amount).as_str())
+            .reply(&filter)
+            .await;
+        let values: Vec<HashValue> = serde_json::from_slice(resp.body()).unwrap();
+        assert_eq!(values.len(), 2);
+        let reader = accounts.read();
+        let addr = AccountAddress::try_from(
+            "9FF98E82355EB13098F3B1157AC018A725C62C0E0820F422000814CDBA407835".to_owned(),
+        )
+        .unwrap();
+        let account = reader.get(&addr).expect("account should be created");
+        assert_eq!(account.balance, amount);
+    }
+
+    #[tokio::test]
+    async fn test_mint_address() {
+        let (accounts, service) = setup(None);
+        let filter = routes(service);
+
+        let address = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
+        let amount = 13345;
+        let resp = warp::test::request()
+            .method("POST")
+            .path(format!("/mint?address={}&amount={}", address, amount).as_str())
+            .reply(&filter)
+            .await;
+
+        let values: Vec<HashValue> = serde_json::from_slice(resp.body()).unwrap();
+        assert_eq!(values.len(), 2);
+        let reader = accounts.read();
+        let addr = AccountAddress::try_from(
+            "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d".to_owned(),
+        )
+        .unwrap();
+        let account = reader.get(&addr).expect("account should be created");
+        assert_eq!(account.balance, amount);
+    }
+
+    #[tokio::test]
+    async fn test_mint_address_hex() {
+        let (accounts, service) = setup(None);
+        let filter = routes(service);
+
+        let address = "0x459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
+        let amount = 13345;
+        let resp = warp::test::request()
+            .method("POST")
+            .path(format!("/mint?address={}&amount={}", address, amount).as_str())
+            .reply(&filter)
+            .await;
+
         let values: Vec<HashValue> = serde_json::from_slice(resp.body()).unwrap();
         assert_eq!(values.len(), 2);
         let reader = accounts.read();

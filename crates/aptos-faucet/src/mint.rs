@@ -3,11 +3,14 @@
 
 use crate::Service;
 use anyhow::Result;
-use aptos_crypto::hash::HashValue;
+use aptos_crypto::{ed25519::Ed25519PublicKey, hash::HashValue};
 use aptos_logger::{error, info, warn};
 use aptos_sdk::{
     transaction_builder::aptos_stdlib,
-    types::{account_address::AccountAddress, transaction::SignedTransaction},
+    types::{
+        account_address::AccountAddress,
+        transaction::{authenticator::AuthenticationKey, SignedTransaction},
+    },
 };
 use reqwest::StatusCode;
 use serde::Deserialize;
@@ -17,8 +20,8 @@ use warp::{Filter, Rejection, Reply};
 pub fn mint_routes(
     service: Arc<Service>,
 ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
-    // POST /?amount=25&pub_key=xxx
-    // POST /mint?amount=25&pub_key=xxx
+    // POST /?amount=25&address=xxx
+    // POST /mint?amount=25&address=xxx
     warp::path::end()
         .or(warp::path::path("mint"))
         .and(warp::post())
@@ -62,7 +65,9 @@ impl std::fmt::Display for Response {
 #[derive(Deserialize, Debug)]
 pub struct MintParams {
     pub amount: u64,
-    pub auth_key: AccountAddress,
+    pub auth_key: Option<AccountAddress>,
+    pub address: Option<String>,
+    pub pub_key: Option<Ed25519PublicKey>,
     pub return_txns: Option<bool>,
 }
 
@@ -73,8 +78,23 @@ impl std::fmt::Display for MintParams {
 }
 
 impl MintParams {
-    fn receiver(&self) -> AccountAddress {
-        self.auth_key
+    fn receiver(&self) -> Option<AccountAddress> {
+        if let Some(auth_key) = self.auth_key {
+            return Some(auth_key);
+        }
+        if let Some(address) = self.address.as_ref() {
+            return match AccountAddress::from_hex_literal(address) {
+                Ok(address) => Some(address),
+                Err(_) => match AccountAddress::from_hex(address) {
+                    Ok(address) => Some(address),
+                    Err(_) => None,
+                },
+            };
+        }
+        if let Some(pub_key) = self.pub_key.as_ref() {
+            return Some(AuthenticationKey::ed25519(pub_key).derived_address());
+        }
+        None
     }
 }
 
@@ -82,7 +102,11 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
     let maybe_maximum_amount = service.maximum_amount.unwrap_or(params.amount);
     let amount = std::cmp::min(params.amount, maybe_maximum_amount);
 
-    let (mut faucet_seq, mut receiver_seq) = sequences(service, params.receiver()).await?;
+    let receiver_address = params.receiver().ok_or_else(|| {
+        anyhow::format_err!("You must provide 'address' (preferred), 'pub_key', or 'auth_key'")
+    })?;
+
+    let (mut faucet_seq, mut receiver_seq) = sequences(service, receiver_address).await?;
     let our_faucet_seq = {
         let mut faucet_account = service.faucet_account.lock().unwrap();
 
@@ -105,7 +129,7 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
         );
 
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-        let (lhs, rhs) = sequences(service, params.receiver()).await?;
+        let (lhs, rhs) = sequences(service, receiver_address).await?;
         faucet_seq = lhs;
         receiver_seq = rhs;
     }
@@ -115,7 +139,7 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
         error!("We are unhealthy, transactions have likely expired.");
         let mut faucet_account = service.faucet_account.lock().unwrap();
         if faucet_account.sequence_number() >= faucet_seq + 50 {
-            info!("Reseting the sequence number counter.");
+            info!("Resetting the sequence number counter.");
             *faucet_account.sequence_number_mut() = faucet_seq;
         } else {
             info!("Someone else reset the sequence number counter ahead of us.");
@@ -129,7 +153,7 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
 
         if receiver_seq.is_none() {
             let builder = service.transaction_factory.payload(
-                aptos_stdlib::encode_create_account_script_function(params.receiver()),
+                aptos_stdlib::encode_create_account_script_function(receiver_address),
             );
 
             let txn = faucet_account.sign_with_transaction_builder(builder);
@@ -139,7 +163,7 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
         if amount != 0 {
             txns.push(
                 faucet_account.sign_with_transaction_builder(service.transaction_factory.payload(
-                    aptos_stdlib::encode_mint_script_function(params.receiver(), amount),
+                    aptos_stdlib::encode_mint_script_function(receiver_address, amount),
                 )),
             );
         }
