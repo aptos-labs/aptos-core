@@ -89,7 +89,15 @@ module AptosFramework::AptosAccount {
     }
 
     /// Create a Validator account
-    public fun create_validator_account(
+    public(script) fun create_validator_account(
+        core_resource: signer,
+        new_account_address: address,
+        human_name: vector<u8>,
+    ) {
+        create_validator_account_internal(&core_resource, new_account_address, human_name);
+    }
+
+    public fun create_validator_account_internal(
         core_resource: &signer,
         new_account_address: address,
         human_name: vector<u8>,
@@ -99,7 +107,15 @@ module AptosFramework::AptosAccount {
     }
 
     /// Create a Validator Operator account
-    public fun create_validator_operator_account(
+    public(script) fun create_validator_operator_account(
+        core_resource: signer,
+        new_account_address: address,
+        human_name: vector<u8>,
+    ) {
+        create_validator_operator_account_internal(&core_resource, new_account_address, human_name)
+    }
+
+    public fun create_validator_operator_account_internal(
         core_resource: &signer,
         new_account_address: address,
         human_name: vector<u8>,

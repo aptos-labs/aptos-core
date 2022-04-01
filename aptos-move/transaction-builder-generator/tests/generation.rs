@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::transaction::ScriptABI;
+use cached_framework_packages::abis;
 use serde_generate as serdegen;
 use serde_generate::SourceInstaller as _;
 use serde_reflection::Registry;
-use std::{io::Write, path::Path, process::Command};
+use std::{io::Write, process::Command};
 use tempfile::tempdir;
 use transaction_builder_generator as buildgen;
 use transaction_builder_generator::SourceInstaller as _;
@@ -16,28 +17,17 @@ fn get_aptos_registry() -> Registry {
     serde_yaml::from_str::<Registry>(content.as_str()).unwrap()
 }
 
-fn get_tx_script_abis() -> Vec<ScriptABI> {
-    // This is also a custom rule in aptos-core/x.toml.
-    let legacy_path = Path::new("../framework/DPN/releases/legacy/script_abis");
-    buildgen::read_abis(&[legacy_path]).expect("reading legacy ABI files should not fail")
-}
-
 fn get_script_fun_abis() -> Vec<ScriptABI> {
-    let new_abis = Path::new("../framework/DPN/releases/artifacts/current");
-    buildgen::read_abis(&[new_abis]).expect("reading new ABI files should not fail")
+    abis()
 }
 
 fn get_stdlib_script_abis() -> Vec<ScriptABI> {
-    let mut abis = get_tx_script_abis();
-    abis.extend(get_script_fun_abis().into_iter());
-    abis
+    get_script_fun_abis()
 }
 
 const EXPECTED_OUTPUT: &str = "224 1 161 28 235 11 1 0 0 0 7 1 0 2 2 2 4 3 6 16 4 22 2 5 24 29 7 53 96 8 149 1 16 0 0 0 1 1 0 0 2 0 1 0 0 3 2 3 1 1 0 4 1 3 0 1 5 1 6 12 1 8 0 5 6 8 0 5 3 10 2 10 2 0 5 6 12 5 3 10 2 10 2 1 9 0 11 68 105 101 109 65 99 99 111 117 110 116 18 87 105 116 104 100 114 97 119 67 97 112 97 98 105 108 105 116 121 27 101 120 116 114 97 99 116 95 119 105 116 104 100 114 97 119 95 99 97 112 97 98 105 108 105 116 121 8 112 97 121 95 102 114 111 109 27 114 101 115 116 111 114 101 95 119 105 116 104 100 114 97 119 95 99 97 112 97 98 105 108 105 116 121 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 4 1 12 11 0 17 0 12 5 14 5 10 1 10 2 11 3 11 4 56 0 11 5 17 2 2 1 7 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 3 88 68 88 3 88 68 88 0 4 3 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 1 135 214 18 0 0 0 0 0 4 0 4 0 \n3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 14 80 97 121 109 101 110 116 83 99 114 105 112 116 115 26 112 101 101 114 95 116 111 95 112 101 101 114 95 119 105 116 104 95 109 101 116 97 100 97 116 97 1 7 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 3 88 68 88 3 88 68 88 0 4 16 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 8 135 214 18 0 0 0 0 0 1 0 1 0 \n";
 
-const EXPECTED_TX_SCRIPT_OUTPUT: &str = "224 1 161 28 235 11 1 0 0 0 7 1 0 2 2 2 4 3 6 16 4 22 2 5 24 29 7 53 96 8 149 1 16 0 0 0 1 1 0 0 2 0 1 0 0 3 2 3 1 1 0 4 1 3 0 1 5 1 6 12 1 8 0 5 6 8 0 5 3 10 2 10 2 0 5 6 12 5 3 10 2 10 2 1 9 0 11 68 105 101 109 65 99 99 111 117 110 116 18 87 105 116 104 100 114 97 119 67 97 112 97 98 105 108 105 116 121 27 101 120 116 114 97 99 116 95 119 105 116 104 100 114 97 119 95 99 97 112 97 98 105 108 105 116 121 8 112 97 121 95 102 114 111 109 27 114 101 115 116 111 114 101 95 119 105 116 104 100 114 97 119 95 99 97 112 97 98 105 108 105 116 121 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 4 1 12 11 0 17 0 12 5 14 5 10 1 10 2 11 3 11 4 56 0 11 5 17 2 2 1 7 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 3 88 68 88 3 88 68 88 0 4 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 1 135 214 18 0 0 0 0 0 4 0 4 0 \n";
-
-const EXPECTED_SCRIPT_FUN_OUTPUT: &str = "3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 14 80 97 121 109 101 110 116 83 99 114 105 112 116 115 26 112 101 101 114 95 116 111 95 112 101 101 114 95 119 105 116 104 95 109 101 116 97 100 97 116 97 1 7 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 3 88 68 88 3 88 68 88 0 4 32 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 8 135 214 18 0 0 0 0 0 1 0 1 0 \n";
+const EXPECTED_SCRIPT_FUN_OUTPUT: &str = "3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 8 84 101 115 116 67 111 105 110 8 116 114 97 110 115 102 101 114 0 2 32 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 34 8 135 214 18 0 0 0 0 0 \n";
 
 #[test]
 fn test_typescript_replace_keywords() {
@@ -237,15 +227,6 @@ test = false
     assert_eq!(
         std::str::from_utf8(&output.stdout).unwrap(),
         expected_output
-    );
-}
-
-#[test]
-fn test_that_rust_tx_script_code_compiles() {
-    test_rust(
-        &get_tx_script_abis(),
-        "examples/rust/tx_script_demo.rs",
-        EXPECTED_TX_SCRIPT_OUTPUT,
     );
 }
 

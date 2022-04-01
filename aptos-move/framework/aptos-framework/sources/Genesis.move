@@ -18,7 +18,6 @@ module AptosFramework::Genesis {
     use AptosFramework::Marker;
     use AptosFramework::TestCoin;
 
-    // This function needs the same signature as the DPN genesis
     fun initialize(
         core_resource_account: signer,
         _tc_account: signer,
@@ -144,7 +143,7 @@ module AptosFramework::Genesis {
             let owner_address = Signer::address_of(owner);
             let owner_name = *Vector::borrow(&owner_names, i);
             // create each validator account and rotate its auth key to the correct value
-            AptosAccount::create_validator_account(
+            AptosAccount::create_validator_account_internal(
                 &core_resource_account, owner_address, owner_name
             );
 
@@ -156,7 +155,7 @@ module AptosFramework::Genesis {
             let operator_name = *Vector::borrow(&operator_names, i);
             // create the operator account + rotate its auth key if it does not already exist
             if (!AptosAccount::exists_at(operator_address)) {
-                AptosAccount::create_validator_operator_account(
+                AptosAccount::create_validator_operator_account_internal(
                     &core_resource_account, operator_address, copy operator_name
                 );
                 let operator_auth_key = *Vector::borrow(&operator_auth_keys, i);
@@ -179,7 +178,7 @@ module AptosFramework::Genesis {
             );
 
             // finally, add this validator to the validator set
-            AptosValidatorSet::add_validator(&core_resource_account, owner_address);
+            AptosValidatorSet::add_validator_internal(&core_resource_account, owner_address);
 
             i = i + 1;
         }

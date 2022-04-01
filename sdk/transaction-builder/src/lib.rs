@@ -5,4 +5,3 @@
 
 pub use cached_framework_packages::aptos_stdlib;
 pub mod error_explain;
-pub mod stdlib;

@@ -2596,23 +2596,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "850878694b7933ca4c9569d30a34b55031b9b139ee1fc7b94a527c4ef960d690"
 
 [[package]]
-name = "diem-framework-releases"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-types",
- "aptos-workspace-hack",
- "bcs",
- "framework-releases",
- "include_dir 0.7.2",
- "move-binary-format",
- "move-bytecode-verifier",
- "move-command-line-common",
- "once_cell",
-]
-
-[[package]]
 name = "difference"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8674,6 +8657,7 @@ dependencies = [
  "aptos-types",
  "aptos-workspace-hack",
  "bcs",
+ "cached-framework-packages",
  "heck 0.3.3",
  "move-core-types",
  "regex",

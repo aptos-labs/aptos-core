@@ -14,7 +14,7 @@ use aptos_global_constants::{
     VALIDATOR_NETWORK_KEY,
 };
 use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
-use aptos_transaction_builder::stdlib as transaction_builder;
+use aptos_transaction_builder::aptos_stdlib as transaction_builder;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,

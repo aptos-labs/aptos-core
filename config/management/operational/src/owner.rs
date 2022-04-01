@@ -6,7 +6,7 @@ use aptos_management::{
     config::ConfigPath, error::Error, secure_backend::ValidatorBackend,
     transaction::build_raw_transaction,
 };
-use aptos_transaction_builder::stdlib as transaction_builder;
+use aptos_transaction_builder::aptos_stdlib as transaction_builder;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use structopt::StructOpt;
 

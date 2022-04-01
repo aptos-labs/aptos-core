@@ -11,10 +11,8 @@ use aptos_crypto::{
 use aptos_infallible::RwLock;
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_time_service::TimeService;
-use aptos_transaction_builder::stdlib::encode_peer_to_peer_with_metadata_script_function;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::xus_tag,
     block_info::BlockInfo,
     chain_id::ChainId,
     contract_event::ContractEvent,
@@ -725,12 +723,9 @@ impl MockStorage {
     fn gen_mock_user_txn() -> Transaction {
         let sender = AccountAddress::random();
         let receiver = AuthenticationKey::random();
-        let program = encode_peer_to_peer_with_metadata_script_function(
-            xus_tag(),
+        let program = aptos_transaction_builder::aptos_stdlib::encode_transfer_script_function(
             receiver.derived_address(),
             1,
-            vec![],
-            vec![],
         );
         Transaction::UserTransaction(get_test_signed_txn(
             sender,

@@ -9,7 +9,7 @@ use aptos_management::{
     secure_backend::ValidatorBackend,
     transaction::build_raw_transaction,
 };
-use aptos_transaction_builder::stdlib as transaction_builder;
+use aptos_transaction_builder::aptos_stdlib as transaction_builder;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::aptos_root_address,
@@ -40,12 +40,7 @@ pub struct CreateAccount {
 impl CreateAccount {
     async fn execute(
         self,
-        script_callback: fn(
-            nonce: u64,
-            account_address: AccountAddress,
-            auth_key_prefix: Vec<u8>,
-            name: Vec<u8>,
-        ) -> TransactionPayload,
+        script_callback: fn(account_address: AccountAddress, name: Vec<u8>) -> TransactionPayload,
         action: &'static str,
     ) -> Result<(TransactionContext, AccountAddress), Error> {
         let config = self
@@ -62,13 +57,8 @@ impl CreateAccount {
         let seq_num = client.sequence_number(aptos_root_address()).await?;
         let auth_key = AuthenticationKey::ed25519(&key);
         let account_address = auth_key.derived_address();
-        let script = script_callback(
-            seq_num,
-            account_address,
-            auth_key.prefix().to_vec(),
-            self.name.as_bytes().to_vec(),
-        )
-        .into_script_function();
+        let script =
+            script_callback(account_address, self.name.as_bytes().to_vec()).into_script_function();
         let mut transaction_context =
             build_and_submit_aptos_root_transaction(&config, seq_num, script, action).await?;
 
@@ -151,18 +141,11 @@ impl AddValidator {
 
         // Verify that this is a configured validator
         client.validator_config(self.input.account_address).await?;
-        let name = client
-            .validator_config(self.input.account_address)
-            .await?
-            .human_name;
 
         let seq_num = client.sequence_number(aptos_root_address()).await?;
-        let script = transaction_builder::encode_add_validator_and_reconfigure_script_function(
-            seq_num,
-            name,
-            self.input.account_address,
-        )
-        .into_script_function();
+        let script =
+            transaction_builder::encode_add_validator_script_function(self.input.account_address)
+                .into_script_function();
         let mut transaction_context =
             build_and_submit_aptos_root_transaction(&config, seq_num, script, "add-validator")
                 .await?;
@@ -193,15 +176,9 @@ impl RemoveValidator {
         client
             .validator_set(Some(self.input.account_address))
             .await?;
-        let name = client
-            .validator_config(self.input.account_address)
-            .await?
-            .human_name;
 
         let seq_num = client.sequence_number(aptos_root_address()).await?;
-        let script = transaction_builder::encode_remove_validator_and_reconfigure_script_function(
-            seq_num,
-            name,
+        let script = transaction_builder::encode_remove_validator_script_function(
             self.input.account_address,
         )
         .into_script_function();

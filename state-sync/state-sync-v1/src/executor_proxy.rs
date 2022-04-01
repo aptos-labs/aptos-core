@@ -215,17 +215,13 @@ mod tests {
     use super::*;
     use aptos_crypto::{ed25519::*, PrivateKey, Uniform};
     use aptos_infallible::RwLock;
-    use aptos_transaction_builder::{
-        aptos_stdlib::encode_set_version_script_function,
-        stdlib::{
-            encode_peer_to_peer_with_metadata_script_function,
-            encode_set_validator_config_and_reconfigure_script_function,
-            encode_update_diem_consensus_config_script_function,
-        },
+    use aptos_transaction_builder::aptos_stdlib::{
+        encode_set_validator_config_and_reconfigure_script_function,
+        encode_set_version_script_function, encode_transfer_script_function,
     };
     use aptos_types::{
         account_address::AccountAddress,
-        account_config::{aptos_root_address, xus_tag},
+        account_config::aptos_root_address,
         block_metadata::BlockMetadata,
         contract_event::ContractEvent,
         event::EventKey,
@@ -733,20 +729,22 @@ mod tests {
     }
 
     fn create_new_update_consensus_config_transaction(sequence_number: u64) -> Transaction {
-        let genesis_key = vm_genesis::GENESIS_KEYPAIR.0.clone();
-        get_test_signed_transaction(
-            aptos_root_address(),
-            sequence_number,
-            genesis_key.clone(),
-            genesis_key.public_key(),
-            Some(encode_update_diem_consensus_config_script_function(
-                0,
-                bcs::to_bytes(&OnChainConsensusConfig::V1(ConsensusConfigV1 {
-                    two_chain: false,
-                }))
-                .unwrap(),
-            )),
-        )
+        // placeholder until supported in aptos framework
+        create_new_update_aptos_version_transaction(sequence_number)
+        // let genesis_key = vm_genesis::GENESIS_KEYPAIR.0.clone();
+        // get_test_signed_transaction(
+        //     aptos_root_address(),
+        //     sequence_number,
+        //     genesis_key.clone(),
+        //     genesis_key.public_key(),
+        //     Some(encode_update_diem_consensus_config_script_function(
+        //         0,
+        //         bcs::to_bytes(&OnChainConsensusConfig::V1(ConsensusConfigV1 {
+        //             two_chain: false,
+        //         }))
+        //         .unwrap(),
+        //     )),
+        // )
     }
 
     /// Creates a transaction that sends funds to the specified validator account.
@@ -760,12 +758,9 @@ mod tests {
             sequence_number,
             genesis_key.clone(),
             genesis_key.public_key(),
-            Some(encode_peer_to_peer_with_metadata_script_function(
-                xus_tag(),
+            Some(encode_transfer_script_function(
                 validator_account,
                 1_000_000,
-                vec![],
-                vec![],
             )),
         )
     }

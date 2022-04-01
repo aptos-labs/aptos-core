@@ -4,18 +4,13 @@
 //! Support for encoding transactions for common situations.
 
 use crate::account::Account;
-use aptos_transaction_builder::{
-    aptos_stdlib::{
-        encode_create_account_script_function, encode_rotate_authentication_key_script_function,
-        encode_transfer_script_function,
-    },
-    stdlib::encode_peer_to_peer_by_signers_script_function,
+use aptos_transaction_builder::aptos_stdlib::{
+    encode_create_account_script_function, encode_rotate_authentication_key_script_function,
+    encode_transfer_script_function,
 };
 use aptos_types::{
     account_config,
-    transaction::{
-        RawTransaction, Script, SignedTransaction, TransactionArgument, TransactionPayload,
-    },
+    transaction::{RawTransaction, Script, SignedTransaction, TransactionArgument},
 };
 use move_core_types::language_storage::TypeTag;
 use move_ir_compiler::Compiler;
@@ -214,25 +209,6 @@ pub fn multi_agent_swap_txn(
 }
 
 /// Returns a multi-agent p2p transaction.
-pub fn multi_agent_p2p_txn(
-    payer: &Account,
-    payee: &Account,
-    seq_num: u64,
-    amount: u64,
-) -> SignedTransaction {
-    // get a SignedTransaction
-    payer
-        .transaction()
-        .secondary_signers(vec![payee.clone()])
-        .payload(encode_peer_to_peer_by_signers_script_function(
-            account_config::xus_tag(),
-            amount,
-            vec![],
-        ))
-        .sequence_number(seq_num)
-        .sign_multi_agent()
-}
-
 /// Returns a transaction to mint coins from TC to DD to VASP.
 pub fn multi_agent_mint_txn(
     tc_account: &Account,
@@ -286,10 +262,6 @@ pub fn multi_agent_swap_script(xus_amount: u64, xdx_amount: u64) -> Script {
         TransactionArgument::U64(xdx_amount),
     ];
     Script::new(MULTI_AGENT_SWAP_SCRIPT.to_vec(), vec![], args)
-}
-
-pub fn multi_agent_p2p_script_function(amount: u64) -> TransactionPayload {
-    encode_peer_to_peer_by_signers_script_function(account_config::xus_tag(), amount, vec![])
 }
 
 pub fn multi_agent_mint_script(mint_amount: u64, tier_index: u64) -> Script {

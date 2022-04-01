@@ -38,7 +38,7 @@ use move_core_types::{
     account_address::AccountAddress,
     gas_schedule::{GasAlgebra, GasConstants},
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, ResourceKey, StructTag, TypeTag},
+    language_storage::{ModuleId, ResourceKey, TypeTag},
     move_resource::MoveStructType,
     transaction_argument::{convert_txn_args, TransactionArgument},
 };
@@ -564,11 +564,11 @@ impl<'a> AptosTestAdapter<'a> {
 
         validator_private_key: Ed25519PrivateKey,
         validator_account_addr: AccountAddress,
-        validator_auth_key_prefix: Vec<u8>,
+        _validator_auth_key_prefix: Vec<u8>,
 
         operator_private_key: Ed25519PrivateKey,
         operator_account_addr: AccountAddress,
-        operator_auth_key_prefix: Vec<u8>,
+        _operator_auth_key_prefix: Vec<u8>,
     ) {
         // Step 1. Create validator account.
         let parameters = self
@@ -577,10 +577,8 @@ impl<'a> AptosTestAdapter<'a> {
         let txn = RawTransaction::new(
             aptos_root_address(),
             parameters.sequence_number,
-            aptos_transaction_builder::stdlib::encode_create_validator_account_script_function(
-                0,
+            aptos_transaction_builder::aptos_stdlib::encode_create_validator_account_script_function(
                 validator_account_addr,
-                validator_auth_key_prefix,
                 validator_name.as_bytes().into(),
             ),
             parameters.max_gas_amount,
@@ -602,10 +600,8 @@ impl<'a> AptosTestAdapter<'a> {
         let txn = RawTransaction::new(
             aptos_root_address(),
             parameters.sequence_number,
-            aptos_transaction_builder::stdlib::encode_create_validator_operator_account_script_function(
-                0,
+            aptos_transaction_builder::aptos_stdlib::encode_create_validator_operator_account_script_function(
                 operator_account_addr,
-                operator_auth_key_prefix,
                 validator_name.as_bytes().into(),
             ),
             parameters.max_gas_amount,
@@ -627,7 +623,7 @@ impl<'a> AptosTestAdapter<'a> {
         let txn = RawTransaction::new(
             validator_account_addr,
             parameters.sequence_number,
-            aptos_transaction_builder::stdlib::encode_set_validator_operator_script_function(
+            aptos_transaction_builder::aptos_stdlib::encode_set_validator_operator_script_function(
                 validator_name.as_bytes().into(),
                 operator_account_addr,
             ),
@@ -650,7 +646,7 @@ impl<'a> AptosTestAdapter<'a> {
         let txn = RawTransaction::new(
             operator_account_addr,
             parameters.sequence_number,
-            aptos_transaction_builder::stdlib::encode_register_validator_config_script_function(
+            aptos_transaction_builder::aptos_stdlib::encode_register_validator_config_script_function(
                 validator_account_addr,
                 validator_private_key.public_key().to_bytes().to_vec(),
                 vec![],
@@ -675,9 +671,7 @@ impl<'a> AptosTestAdapter<'a> {
         let txn = RawTransaction::new(
             aptos_root_address(),
             parameters.sequence_number,
-            aptos_transaction_builder::stdlib::encode_add_validator_and_reconfigure_script_function(
-                0,
-                validator_name.as_bytes().into(),
+            aptos_transaction_builder::aptos_stdlib::encode_add_validator_script_function(
                 validator_account_addr,
             ),
             parameters.max_gas_amount,
@@ -699,10 +693,10 @@ impl<'a> AptosTestAdapter<'a> {
     /// That needs to be done separately.
     fn create_parent_vasp_account(
         &mut self,
-        validator_name: Identifier,
-        auth_key_prefix: Vec<u8>,
+        _validator_name: Identifier,
+        _auth_key_prefix: Vec<u8>,
         account_addr: AccountAddress,
-        currency_type_name: TypeName,
+        _currency_type_name: TypeName,
     ) {
         let parameters = self
             .fetch_transaction_parameters(
@@ -715,28 +709,11 @@ impl<'a> AptosTestAdapter<'a> {
             )
             .unwrap();
 
-        let currency_type_tag = {
-            let address = self
-                .compiled_state()
-                .resolve_address(&currency_type_name.address);
-            TypeTag::Struct(StructTag {
-                address,
-                module: currency_type_name.module_name,
-                name: currency_type_name.type_name,
-                type_params: vec![],
-            })
-        };
-
         let txn = RawTransaction::new(
             treasury_compliance_account_address(),
             parameters.sequence_number,
-            aptos_transaction_builder::stdlib::encode_create_parent_vasp_account_script_function(
-                currency_type_tag,
-                0,
+            aptos_transaction_builder::aptos_stdlib::encode_create_account_script_function(
                 account_addr,
-                auth_key_prefix,
-                validator_name.as_bytes().into(),
-                false,
             ),
             parameters.max_gas_amount,
             parameters.gas_unit_price,

@@ -28,6 +28,8 @@ serde-generate = { git = "https://github.com/aptos-labs/serde-reflection" }
 tempfile = "3.2.0"
 which = "4.0.2"
 
+cached-framework-packages = { path = "../framework/cached-packages" }
+
 [features]
 default = []
 

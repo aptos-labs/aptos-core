@@ -10,22 +10,15 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     HashValue, PrivateKey, Uniform,
 };
-use aptos_transaction_builder::stdlib as transaction_builder;
 use aptos_types::{
-    account_config::{
-        self,
-        events::{CreateAccountEvent, NewEpochEvent},
-        DESIGNATED_DEALER_MODULE,
-    },
-    chain_id::{ChainId, NamedChain},
+    account_config::{self, events::NewEpochEvent},
+    chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::{
         ConsensusConfigV1, OnChainConsensusConfig, ReadWriteSetAnalysis, VMPublishingOption,
         APTOS_MAX_KNOWN_VERSION,
     },
-    transaction::{
-        authenticator::AuthenticationKey, ChangeSet, ScriptFunction, Transaction, WriteSetPayload,
-    },
+    transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
 use aptos_vm::{
     convert_changeset_and_events,
@@ -44,7 +37,6 @@ use move_vm_runtime::session::Session;
 use move_vm_types::gas_schedule::{GasStatus, INITIAL_COST_SCHEDULE};
 use once_cell::sync::Lazy;
 use rand::prelude::*;
-use transaction_builder::encode_create_designated_dealer_script_function;
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
@@ -96,12 +88,8 @@ pub fn encode_genesis_change_set(
     let mut stdlib_modules = Vec::new();
     // create a data view for move_vm
     let mut state_view = GenesisStateView::new();
-    let mut has_dd_module = false;
     for module_bytes in stdlib_module_bytes {
         let module = CompiledModule::deserialize(module_bytes).unwrap();
-        if module.self_id() == *DESIGNATED_DEALER_MODULE {
-            has_dd_module = true;
-        }
         state_view.add_module(&module.self_id(), module_bytes);
         stdlib_modules.push(module)
     }
@@ -123,14 +111,6 @@ pub fn encode_genesis_change_set(
     // generate the genesis WriteSet
     create_and_initialize_owners_operators(&mut session, validators);
     reconfigure(&mut session);
-
-    if has_dd_module
-        && [NamedChain::TESTNET, NamedChain::DEVNET, NamedChain::TESTING]
-            .iter()
-            .any(|test_chain_id| test_chain_id.id() == chain_id.id())
-    {
-        create_and_initialize_testnet_minting(&mut session, treasury_compliance_key);
-    }
 
     if enable_parallel_execution {
         let payload = bcs::to_bytes(&ReadWriteSetAnalysis::V1(
@@ -174,10 +154,7 @@ pub fn encode_genesis_change_set(
     let (write_set, events) = convert_changeset_and_events(changeset1, events1).unwrap();
 
     assert!(!write_set.iter().any(|(_, op)| op.is_deletion()));
-    // Perform DPN genesis verification
-    if has_dd_module {
-        verify_genesis_write_set(&events);
-    }
+    verify_genesis_write_set(&events);
     ChangeSet::new(write_set, events)
 }
 
@@ -207,24 +184,6 @@ fn exec_function(
                 e.into_vm_status()
             )
         });
-}
-
-fn exec_script_function(
-    session: &mut Session<StateViewCache<GenesisStateView>>,
-
-    sender: AccountAddress,
-    script_function: &ScriptFunction,
-) {
-    session
-        .execute_script_function(
-            script_function.module(),
-            script_function.function(),
-            script_function.ty_args().to_vec(),
-            script_function.args().to_vec(),
-            vec![sender],
-            &mut GasStatus::new_unmetered(),
-        )
-        .unwrap()
 }
 
 /// Create and initialize Association and Core Code accounts.
@@ -279,53 +238,6 @@ fn create_and_initialize_main_accounts(
             MoveValue::vector_u8(consensus_config_bytes),
             MoveValue::U64(min_price_per_gas_unit),
         ]),
-    );
-}
-
-fn create_and_initialize_testnet_minting(
-    session: &mut Session<StateViewCache<GenesisStateView>>,
-
-    public_key: &Ed25519PublicKey,
-) {
-    let genesis_auth_key = AuthenticationKey::ed25519(public_key);
-    let create_dd_script = encode_create_designated_dealer_script_function(
-        account_config::xus_tag(),
-        0,
-        account_config::testnet_dd_account_address(),
-        genesis_auth_key.prefix().to_vec(),
-        b"moneybags".to_vec(), // name
-        true,                  // add_all_currencies
-    )
-    .into_script_function();
-
-    let mint_max_xus = transaction_builder::encode_tiered_mint_script_function(
-        account_config::xus_tag(),
-        0,
-        account_config::testnet_dd_account_address(),
-        std::u64::MAX / 2,
-        3,
-    )
-    .into_script_function();
-
-    // Create the DD account
-    exec_script_function(
-        session,
-        account_config::treasury_compliance_account_address(),
-        &create_dd_script,
-    );
-
-    // mint XUS.
-    let treasury_compliance_account_address = account_config::treasury_compliance_account_address();
-    exec_script_function(session, treasury_compliance_account_address, &mint_max_xus);
-
-    let testnet_dd_account_address = account_config::testnet_dd_account_address();
-    exec_script_function(
-        session,
-        testnet_dd_account_address,
-        &transaction_builder::encode_rotate_authentication_key_script_function(
-            genesis_auth_key.to_vec(),
-        )
-        .into_script_function(),
     );
 }
 
@@ -422,21 +334,6 @@ fn reconfigure(session: &mut Session<StateViewCache<GenesisStateView>>) {
 
 /// Verify the consistency of the genesis `WriteSet`
 fn verify_genesis_write_set(events: &[ContractEvent]) {
-    // (1) first event is account creation event for DiemRoot
-    let create_diem_root_event = &events[0];
-    assert_eq!(
-        *create_diem_root_event.key(),
-        CreateAccountEvent::event_key(),
-    );
-
-    // (2) second event is account creation event for TreasuryCompliance
-    let create_treasury_compliance_event = &events[1];
-    assert_eq!(
-        *create_treasury_compliance_event.key(),
-        CreateAccountEvent::event_key(),
-    );
-
-    // (3) The first non-account creation event should be the new epoch event
     let new_epoch_events: Vec<&ContractEvent> = events
         .iter()
         .filter(|e| e.key() == &NewEpochEvent::event_key())
@@ -445,7 +342,6 @@ fn verify_genesis_write_set(events: &[ContractEvent]) {
         new_epoch_events.len() == 1,
         "There should only be one NewEpochEvent"
     );
-    // (4) This should be the first new_epoch_event
     assert_eq!(new_epoch_events[0].sequence_number(), 0,);
 }
 

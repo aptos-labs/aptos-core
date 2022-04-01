@@ -19,8 +19,8 @@ use structopt::*;
 /// Options to configure the generation of a release.
 #[derive(Debug, StructOpt, Clone)]
 #[structopt(
-    name = "Diem Frameworks",
-    about = "Release CLI for Diem frameworks",
+    name = "Aptos Frameworks",
+    about = "Release CLI for Aptos frameworks",
     author = "Aptos",
     rename_all = "kebab-case"
 )]
@@ -37,7 +37,11 @@ pub struct ReleaseOptions {
     pub script_abis: bool,
     #[structopt(long = "no-errmap")]
     pub errmap: bool,
-    #[structopt(long = "package", default_value = "DPN", parse(from_os_str))]
+    #[structopt(
+        long = "package",
+        default_value = "aptos-framework",
+        parse(from_os_str)
+    )]
     pub package: PathBuf,
     #[structopt(long = "output", default_value = "current", parse(from_os_str))]
     pub output: PathBuf,
@@ -47,7 +51,7 @@ impl Default for ReleaseOptions {
     fn default() -> Self {
         Self {
             build_docs: true,
-            package: PathBuf::from("DPN"),
+            package: PathBuf::from("aptos-framework"),
             check_layout_compatibility: false,
             with_diagram: false,
             script_abis: true,
@@ -111,11 +115,7 @@ impl ReleaseOptions {
 
         if !self.script_builder {
             println!("Generating script builders");
-            let mut abi_paths: Vec<&Path> = vec![&output_path];
-            let legacy_path = Path::new("DPN/releases/legacy/script_abis");
-            if self.package.ends_with("DPN") {
-                abi_paths.push(legacy_path);
-            }
+            let abi_paths: Vec<&Path> = vec![&output_path];
             generate_script_builder(
                 &output_path.join("transaction_script_builder.rs"),
                 &abi_paths[..],
@@ -173,7 +173,7 @@ fn generate_script_builder(output_path: impl AsRef<Path>, abi_paths: &[&Path]) {
         let mut file = std::fs::File::create(output_path)
             .expect("Failed to open file for Rust script build generation");
         transaction_builder_generator::rust::output(&mut file, &abis, /* local types */ true)
-            .expect("Failed to generate Rust builders for Diem");
+            .expect("Failed to generate Rust builders");
     }
 
     std::process::Command::new("rustfmt")

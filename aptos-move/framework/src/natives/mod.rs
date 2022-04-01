@@ -7,19 +7,8 @@ pub mod signature;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_vm_runtime::native_functions::{NativeFunction, NativeFunctionTable};
 
-pub fn all_natives(diem_framework_addr: AccountAddress) -> NativeFunctionTable {
+pub fn all_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
     const NATIVES: &[(&str, &str, NativeFunction)] = &[
-        // TODO: Remove once/if DPN is moved over to use the core framework
-        (
-            "DiemAccount",
-            "create_signer",
-            account::native_create_signer,
-        ),
-        (
-            "DiemAccount",
-            "destroy_signer",
-            account::native_destroy_signer,
-        ),
         (
             "Signature",
             "ed25519_validate_pubkey",
@@ -37,7 +26,7 @@ pub fn all_natives(diem_framework_addr: AccountAddress) -> NativeFunctionTable {
         .cloned()
         .map(|(module_name, func_name, func)| {
             (
-                diem_framework_addr,
+                framework_addr,
                 Identifier::new(module_name).unwrap(),
                 Identifier::new(func_name).unwrap(),
                 func,

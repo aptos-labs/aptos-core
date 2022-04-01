@@ -5,7 +5,7 @@ use crate::{auto_validate::AutoValidate, rest_client::RestClient, TransactionCon
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_global_constants::{OPERATOR_ACCOUNT, OPERATOR_KEY};
 use aptos_management::{error::Error, transaction::build_raw_transaction};
-use aptos_transaction_builder::stdlib as transaction_builder;
+use aptos_transaction_builder::aptos_stdlib as transaction_builder;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{authenticator::AuthenticationKey, Transaction},

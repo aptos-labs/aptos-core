@@ -4,6 +4,7 @@
 use include_dir::{include_dir, Dir, DirEntry};
 use move_binary_format::file_format::CompiledModule;
 use move_bytecode_utils::Modules;
+use move_core_types::abi::ScriptABI;
 use once_cell::sync::Lazy;
 
 pub mod aptos_stdlib;
@@ -18,6 +19,25 @@ static MODULES: Lazy<Vec<CompiledModule>> = Lazy::new(|| {
         .map(|blob| CompiledModule::deserialize(blob).unwrap())
         .collect()
 });
+
+static ABIS: Lazy<Vec<ScriptABI>> = Lazy::new(|| load_abis("build"));
+
+pub fn abis() -> Vec<ScriptABI> {
+    ABIS.clone()
+}
+
+pub fn load_abis(path: &str) -> Vec<ScriptABI> {
+    PACKAGE
+        .get_dir(path)
+        .unwrap()
+        .find("**/*abis/*.abi")
+        .unwrap()
+        .filter_map(|file_module| match file_module {
+            DirEntry::Dir(_) => None,
+            DirEntry::File(file) => Some(bcs::from_bytes::<ScriptABI>(file.contents()).unwrap()),
+        })
+        .collect::<Vec<_>>()
+}
 
 fn load_modules(path: &str) -> Vec<Vec<u8>> {
     let modules = PACKAGE
