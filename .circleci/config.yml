@@ -183,6 +183,15 @@ jobs:
             -X POST -d "{\"body\": \"${FORGE_COMMENT}\"}" \
             "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/issues/${PR_NUMBER}/comments"
             exit 0
+  sdk-typescript-test:
+    docker:
+      - image: circleci/node:16.13.1-browsers
+    steps:
+      - checkout
+      - run: cd ./ecosystem/typescript/sdk && yarn install
+      - run: cd ./ecosystem/typescript/sdk && yarn lint
+      - run: cd ./ecosystem/typescript/sdk && yarn test
+      - run: cd ./ecosystem/typescript/sdk && yarn build
 
 workflows:
   ### on bors action ###
@@ -200,6 +209,7 @@ workflows:
       - e2e-test
       - lint
       - unit-test
+      - sdk-typescript-test
       - docker-build-push:
           context: aws-dev
       - forge-k8s:
