@@ -35,6 +35,9 @@ if [ "$IMAGE_TARGETS" = "release" ] || [ "$IMAGE_TARGETS" = "all" ]; then
           -p aptos-writeset-generator \
           "$@"
 
+  # Build our core modules!
+  cargo run --package framework -- --package aptos-framework --output current
+
   # Build and overwrite the aptos-node binary with feature failpoints if $ENABLE_FAILPOINTS is configured
   if [ "$ENABLE_FAILPOINTS" = "1" ]; then
     echo "Building aptos-node with failpoints feature"

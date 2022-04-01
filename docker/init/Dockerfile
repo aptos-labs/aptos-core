@@ -32,17 +32,10 @@ RUN mkdir -p /opt/aptos/bin
 COPY --from=builder /aptos/target/release/aptos-genesis-tool /usr/local/bin
 COPY --from=builder /aptos/target/release/aptos-operational-tool /usr/local/bin
 
-### Get DPN Move modules bytecodes for genesis ceremony
-RUN mkdir -p /aptos/move/build
-RUN mkdir -p /aptos/move/modules
-COPY --from=builder /aptos/aptos-move/framework/DPN/releases/artifacts/current/build /aptos/move/build
-RUN mv /aptos/move/build/**/bytecode_modules/*.mv /aptos/move/modules
-RUN rm -rf /aptos/move/build
-
 ### Get Aptos Move modules bytecodes for genesis ceremony
 RUN mkdir -p /aptos-framework/move/build
 RUN mkdir -p /aptos-framework/move/modules
-COPY --from=builder /aptos/aptos-move/framework/cached-framework-packages/aptos-framework/releases/artifacts/fresh/build /aptos-framework/move/build
+COPY --from=builder /aptos/aptos-framework/releases/artifacts/current/build /aptos-framework/move/build
 RUN mv /aptos-framework/move/build/**/bytecode_modules/*.mv /aptos-framework/move/modules
 RUN rm -rf /aptos-framework/move/build
 
