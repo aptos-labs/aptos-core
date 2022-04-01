@@ -301,14 +301,16 @@ it will not continue to synchronize with the network. To do this, follow these s
 3. Delete the `genesis.blob` file and `waypoint.txt` file (depending on how you configured it, you might not have this
 file and may instead have a `waypoint` directly in your configuration file).
 
-4. Download this new [genesis.blob][devnet_genesis] file and the new [waypoint][devnet_waypoint].
+4. If you use the rust binary, pull the latest of `devnet` branch, and build the binary again.
 
-5. Update the configuration file (e.g., `public_full_node.yaml`) with the new waypoint (if you configure the waypoint 
+5. Download this new [genesis.blob][devnet_genesis] file and the new [waypoint][devnet_waypoint].
+
+6. Update the configuration file (e.g., `public_full_node.yaml`) with the new waypoint (if you configure the waypoint 
 directly there).
 
-6. Restart the fullnode.
+7. Restart the fullnode.
 
-7. See the [Verify initial synchronization](#verify-initial-synchronization) section above for checking if the node
+8. See the [Verify initial synchronization](#verify-initial-synchronization) section above for checking if the node
 is syncing again.
 
 [pfn_config_file]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/public_full_node.yaml
