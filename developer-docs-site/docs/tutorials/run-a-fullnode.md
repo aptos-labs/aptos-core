@@ -296,7 +296,7 @@ it will not continue to synchronize with the network. To do this, follow these s
 1. Shutdown your fullnode.
 
 2. Delete the data folder (the directory path is what you specified in the configuration file, e.g.,
-`public_full_node.yaml`). The default is `/opt/aptos/data` if you run the binary, and `DIRECTORY_WITH_YOUR_DOCKER_COMPOSE_db` if you run the docker. Use `docker volume rm DIRECTORY_WITH_YOUR_DOCKER_COMPOSE_db -f` and replaye `DIRECTORY_WITH_YOUR_DOCKER_COMPOSE` with the directory name from which you started the docker.
+`public_full_node.yaml`). The default is `/opt/aptos/data` if you run the binary, and `DIRECTORY_WITH_YOUR_DOCKER_COMPOSE_db` if you run the docker. Use `docker volume rm DIRECTORY_WITH_YOUR_DOCKER_COMPOSE_db -f` and replace `DIRECTORY_WITH_YOUR_DOCKER_COMPOSE` with the directory name from which you started the docker.
 
 3. Delete the `genesis.blob` file and `waypoint.txt` file (depending on how you configured it, you might not have this
 file and may instead have a `waypoint` directly in your configuration file).
