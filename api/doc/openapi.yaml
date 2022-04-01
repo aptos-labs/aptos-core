@@ -2,11 +2,11 @@ openapi: 3.0.3
 info:
   title: Aptos Dev API Specification
   description: >
-    The Aptos Dev API is a RESTful API for client applications to interact the Aptos blockchain.
+    The Aptos Node API is a RESTful API for client applications to interact with the Aptos blockchain.
   license:
     name: Apache 2.0
-    url: http://www.apache.org/licenses/LICENSE-2.0.html
-  version: 0.1.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+  version: 0.1.1
   contact:
     name: Aptos
     url: https://github.com/aptos-labs/aptos-core
@@ -174,19 +174,6 @@ paths:
           * Sign the transaction signing message and create transaction signature.
           * Submit the user transaction request with the transaction siganture. The request header "Content-Type" must set to "application/json".
 
-        **Submit transaction using signed transaction BCS bytes**
-
-          * Generate Aptos core types and transaction script functions for the client application langauge
-            by [Tranaction Builder](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/transaction-builder-generator)
-          * Create [RawTransaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/struct.RawTransaction.html).
-          * Create transaction signing message: bytes("DIEM::RawTransaction") + BCS bytes of the RawTransaction.
-            See [Crypto Spec](https://github.com/aptos-labs/aptos-core/blob/main/specifications/crypto/README.md) for more details.
-          * Sign the transaction signing message and create transaction signature.
-          * Create [SignedTransaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/struct.SignedTransaction.html).
-          * Serialize [SignedTransaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/struct.SignedTransaction.html)
-            into BCS bytes.
-          * Submit the [SignedTransaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/struct.SignedTransaction.html)
-            BCS bytes (do not hex-encoded it). The request header "Content-Type" must set to "application/x.diem.signed_transaction+bcs".
       tags:
         - transactions
       requestBody:
@@ -197,12 +184,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/SubmitTransactionRequest'
-          application/x.diem.signed_transaction+bcs:
-            schema:
-              type: string
-              format: binary
-              description: |
-                BCS bytes of the [SignedTransaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/struct.SignedTransaction.html).
       responses:
         "202":
           description: Transaction is accepted and submitted to mempool.
@@ -246,7 +227,7 @@ paths:
       summary: Get transaction
       description: |
         There are two types of transaction identifiers:
-          1. Tranasction hash: included in any transaction JSON respond from server.
+          1. Transaction hash: included in any transaction JSON respond from server.
           2. Transaction version: included in on-chain transaction JSON respond from server.
 
         When given transaction hash, server first looks up on-chain transaction by hash;
@@ -256,7 +237,7 @@ paths:
         When given a transaction version, server looks up the transaction on-chain by version.
 
         To create a transaction hash:
-          1. Create hash message bytes: "DIEM::Transaction" bytes + BCS bytes of [Transaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/enum.Transaction.html).
+          1. Create hash message bytes: "Aptos::Transaction" bytes + BCS bytes of [Transaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/enum.Transaction.html).
           2. Apply hash algorithm `SHA3-256` to the hash message bytes.
           3. Hex-encode the hash bytes with `0x` prefix.
       operationId: get_transaction
@@ -379,7 +360,7 @@ paths:
           required: true
           schema:
             $ref: '#/components/schemas/MoveStructTagId'
-          example: "0x1::DiemAccount::DiemAccount"
+          example: "0x1::AptosAccount::AptosAccount"
         - name: field_name
           in: path
           required: true
@@ -443,10 +424,10 @@ components:
         application/json:
           schema:
             allOf:
-              - $ref: "#/components/schemas/Error"
-              - example:
-                  code: 400
-                  message: "invalid parameter"
+              - $ref: "#/components/schemas/AptosError"
+            example:
+              code: 400
+              message: "invalid parameter"
     "404":
       description: |
         Resource or data not found.
@@ -455,11 +436,11 @@ components:
         application/json:
           schema:
             allOf:
-              - $ref: "#/components/schemas/Error"
-              - example:
-                  code: 404
-                  message: "resource not found"
-                  aptos_ledger_version: "37829327"
+              - $ref: "#/components/schemas/AptosError"
+            example:
+              code: 404
+              message: "resource not found"
+              aptos_ledger_version: "37829327"
     "413":
       description: |
         The request payload is too large.
@@ -467,10 +448,10 @@ components:
         application/json:
           schema:
             allOf:
-              - $ref: "#/components/schemas/Error"
-              - example:
-                  code: 413
-                  message: "The request payload is too large"
+              - $ref: "#/components/schemas/AptosError"
+            example:
+              code: 413
+              message: "The request payload is too large"
     "415":
       description: |
         The request's content-type is not supported.
@@ -478,10 +459,10 @@ components:
         application/json:
           schema:
             allOf:
-              - $ref: "#/components/schemas/Error"
-              - example:
-                  code: 415
-                  message: "The request's content-type is not supported"
+              - $ref: "#/components/schemas/AptosError"
+            example:
+              code: 415
+              message: "The request's content-type is not supported"
     "500":
       description: |
         Server internal error, caused by unexpected issues.
@@ -489,12 +470,12 @@ components:
         application/json:
           schema:
             allOf:
-              - $ref: "#/components/schemas/Error"
-              - example:
-                  code: 500
-                  message: "unexpected internal error"
+              - $ref: "#/components/schemas/AptosError"
+            example:
+              code: 500
+              message: "unexpected internal error"
   schemas:
-    Error:
+    AptosError:
       title: Response Error
       type: object
       required:
@@ -511,7 +492,7 @@ components:
       title: uint64
       type: string
       format: uint64
-      description: Unsiged int64 type value
+      description: Unsigned int64 type value
       example: "32425224034"
     Address:
       title: Account Address
@@ -779,7 +760,7 @@ components:
           $ref: '#/components/schemas/Address'
         name:
           type: string
-          example: "Diem"
+          example: "Aptos"
         friends:
           type: array
           items:
@@ -927,7 +908,7 @@ components:
         `address` should be hex-encoded 16 bytes account address
         that is prefixed with `0x` and leading zeros are trimmed.
 
-        Module name is case sensitive.
+        Module name is case-sensitive.
 
         See [doc](https://diem.github.io/move/modules-and-scripts.html#modules) for more details.
       example: "0x1::Aptos"
@@ -974,6 +955,8 @@ components:
         - $ref: '#/components/schemas/GenesisTransaction'
         - $ref: '#/components/schemas/UserTransaction'
         - $ref: '#/components/schemas/BlockMetadataTransaction'
+      discriminator:
+        propertyName: type
     SubmitTransactionRequest:
       title: Submit Transaction Request
       type: object
@@ -1001,6 +984,8 @@ components:
         - $ref: '#/components/schemas/GenesisTransaction'
         - $ref: '#/components/schemas/UserTransaction'
         - $ref: '#/components/schemas/BlockMetadataTransaction'
+      discriminator:
+        propertyName: type
     OnChainTransactionInfo:
       title: On-chain transaction information
       type: object
@@ -1110,6 +1095,8 @@ components:
         - $ref: '#/components/schemas/ScriptPayload'
         - $ref: '#/components/schemas/ModuleBundlePayload'
         - $ref: '#/components/schemas/WriteSetPayload'
+      discriminator:
+        propertyName: type
     ScriptFunctionPayload:
       title: Script Function Payload
       type: object
@@ -1151,7 +1138,7 @@ components:
 
         Format: `{address}::{module name}::{function name}`
 
-        Both `module name` and `function name` are case sensitive.
+        Both `module name` and `function name` are case-sensitive.
       example: "0x1::PaymentScripts::peer_to_peer_with_metadata"
     ScriptPayload:
       title: Script Payload
@@ -1206,6 +1193,8 @@ components:
       oneOf:
         - $ref: '#/components/schemas/ScriptWriteSet'
         - $ref: '#/components/schemas/DirectWriteSet'
+      discriminator:
+        propertyName: type
     ScriptWriteSet:
       title: Script WriteSet
       type: object
@@ -1246,6 +1235,8 @@ components:
         - $ref: '#/components/schemas/DeleteResource'
         - $ref: '#/components/schemas/WriteModule'
         - $ref: '#/components/schemas/WriteResource'
+      discriminator:
+        propertyName: type
     DeleteModule:
       title: Delete Module
       type: object
@@ -1415,6 +1406,8 @@ components:
         - $ref: '#/components/schemas/Ed25519Signature'
         - $ref: '#/components/schemas/MultiEd25519Signature'
         - $ref: '#/components/schemas/MultiAgentSignature'
+      discriminator:
+        propertyName: type
     Ed25519Signature:
       title: Ed25519 Signature
       type: object
@@ -1492,3 +1485,5 @@ components:
       oneOf:
         - $ref: '#/components/schemas/Ed25519Signature'
         - $ref: '#/components/schemas/MultiEd25519Signature'
+      discriminator:
+        propertyName: type
