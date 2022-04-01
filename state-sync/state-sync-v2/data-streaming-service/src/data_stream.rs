@@ -30,8 +30,12 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
+    time::Duration,
 };
 use tokio::task::JoinHandle;
+
+// The frequency at which to log sent data request messages
+const SENT_REQUESTS_LOG_FREQ_SECS: u64 = 1;
 
 /// A unique ID used to identify each stream.
 pub type DataStreamId = u64;
@@ -215,14 +219,18 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
                 self.get_sent_data_requests()
                     .push_back(pending_client_response);
             }
-            debug!(
-                (LogSchema::new(LogEntry::SendDataRequests)
-                    .stream_id(self.data_stream_id)
-                    .event(LogEvent::Success)
-                    .message(&format!(
-                        "Sent {:?} data requests to the network",
-                        client_requests.len()
-                    )))
+
+            sample!(
+                SampleRate::Duration(Duration::from_secs(SENT_REQUESTS_LOG_FREQ_SECS)),
+                debug!(
+                    (LogSchema::new(LogEntry::SendDataRequests)
+                        .stream_id(self.data_stream_id)
+                        .event(LogEvent::Success)
+                        .message(&format!(
+                            "Sent {:?} data requests to the network",
+                            client_requests.len()
+                        )))
+                )
             );
         }
         Ok(())
