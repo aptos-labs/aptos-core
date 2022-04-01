@@ -318,8 +318,10 @@ impl<
         match commit_notification {
             CommitNotification::CommittedAccounts(committed_accounts) => {
                 debug!(
-                    "Received an account commit notification from the storage synchronizer: {:?}",
-                    committed_accounts
+                    "Received an account commit notification from the storage synchronizer. \
+                    All synced: {:?}, last committed index: {:?}.",
+                    committed_accounts.all_accounts_synced,
+                    committed_accounts.last_committed_account_index,
                 );
                 self.handle_committed_accounts(committed_accounts).await;
             }
@@ -390,14 +392,28 @@ impl<
 
     /// Handles a notification sent by the storage synchronizer for committed accounts
     async fn handle_committed_accounts(&mut self, committed_accounts: CommittedAccounts) {
+        // Forward the notification to the bootstrapper
         if let Err(error) = self
             .bootstrapper
-            .handle_committed_accounts(committed_accounts)
+            .handle_committed_accounts(committed_accounts.clone())
         {
             error!(
                 "Failed to handle an account commit notification! Error: {:?}",
                 error
             );
+        }
+
+        // If we've finished syncing all accounts, we'll have a single new committed
+        // transaction at the syncing version. In this case, we need to handle the
+        // new committed transaction and events.
+        if committed_accounts.all_accounts_synced {
+            let committed_transactions = committed_accounts
+                .committed_transaction
+                .expect("Committed transaction should exist for last committed account chunk!");
+
+            // Handle the commit notification
+            self.handle_committed_transactions(committed_transactions)
+                .await;
         }
     }
 

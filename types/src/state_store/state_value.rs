@@ -10,7 +10,7 @@ use crate::{
 };
 use anyhow::ensure;
 use aptos_crypto::{
-    hash::{CryptoHash, CryptoHasher},
+    hash::{CryptoHash, CryptoHasher, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
 use aptos_crypto_derive::CryptoHasher;
@@ -81,6 +81,17 @@ pub struct StateValueChunkWithProof {
     pub raw_values: Vec<(HashValue, StateValue)>, // The account blobs in the chunk
     pub proof: SparseMerkleRangeProof, // The proof to ensure the chunk is in the account states
     pub root_hash: HashValue,          // The root hash of the sparse merkle tree for this chunk
+}
+
+impl StateValueChunkWithProof {
+    /// Returns true iff this chunk is the last chunk (i.e., there are no
+    /// more state values to write to storage after this chunk).
+    pub fn is_last_chunk(&self) -> bool {
+        let right_siblings = self.proof.right_siblings();
+        right_siblings
+            .iter()
+            .all(|sibling| *sibling == *SPARSE_MERKLE_PLACEHOLDER_HASH)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
