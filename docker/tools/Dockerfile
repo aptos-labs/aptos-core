@@ -46,17 +46,10 @@ COPY --from=builder /aptos/target/release/db-backup-verify /usr/local/bin
 COPY --from=builder /aptos/target/release/db-restore /usr/local/bin
 COPY --from=builder /aptos/target/release/aptos-transaction-replay /usr/local/bin
 
-### Get DPN Move modules bytecodes for genesis ceremony
-RUN mkdir -p /diem-framework/move/build
-RUN mkdir -p /diem-framework/move/modules
-COPY --from=builder /aptos/aptos-move/framework/DPN/releases/artifacts/current/build /diem-framework/move/build
-RUN mv /diem-framework/move/build/**/bytecode_modules/*.mv /diem-framework/move/modules
-RUN rm -rf /diem-framework/move/build
-
 ### Get Aptos Move modules bytecodes for genesis ceremony
 RUN mkdir -p /aptos-framework/move/build
 RUN mkdir -p /aptos-framework/move/modules
-COPY --from=builder /aptos/aptos-move/framework/aptos-framework/releases/artifacts/current/build /aptos-framework/move/build
+COPY --from=builder /aptos/aptos-framework/releases/artifacts/current/build /aptos-framework/move/build
 RUN mv /aptos-framework/move/build/**/bytecode_modules/*.mv /aptos-framework/move/modules
 RUN rm -rf /aptos-framework/move/build
 
