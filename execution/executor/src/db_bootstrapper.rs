@@ -14,6 +14,7 @@ use aptos_types::{
     block_info::{BlockInfo, GENESIS_EPOCH, GENESIS_ROUND, GENESIS_TIMESTAMP_USECS},
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::{config_address, ConfigurationResource},
+    state_store::state_key::StateKey,
     timestamp::TimestampResource,
     transaction::Transaction,
     waypoint::Waypoint,
@@ -177,10 +178,10 @@ pub fn calculate_genesis<V: VMExecutor>(
 
 fn get_state_timestamp(state_view: &VerifiedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
-        .get_by_access_path(&AccessPath::new(
+        .get_state_value(&StateKey::AccessPath(AccessPath::new(
             aptos_root_address(),
             TimestampResource::resource_path(),
-        ))?
+        )))?
         .ok_or_else(|| format_err!("TimestampResource missing."))?;
     let rsrc = bcs::from_bytes::<TimestampResource>(rsrc_bytes)?;
     Ok(rsrc.timestamp.microseconds)
@@ -188,10 +189,10 @@ fn get_state_timestamp(state_view: &VerifiedStateView) -> Result<u64> {
 
 fn get_state_epoch(state_view: &VerifiedStateView) -> Result<u64> {
     let rsrc_bytes = &state_view
-        .get_by_access_path(&AccessPath::new(
+        .get_state_value(&StateKey::AccessPath(AccessPath::new(
             config_address(),
             ConfigurationResource::resource_path(),
-        ))?
+        )))?
         .ok_or_else(|| format_err!("ConfigurationResource missing."))?;
     let rsrc = bcs::from_bytes::<ConfigurationResource>(rsrc_bytes)?;
     Ok(rsrc.epoch())

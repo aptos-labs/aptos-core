@@ -23,6 +23,7 @@ use aptos_types::{
 };
 
 use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_types::state_store::state_key::StateKey;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
@@ -180,18 +181,18 @@ async fn test_get_transactions_output_user_transaction_with_write_set_payload() 
         context.transaction_factory().change_set(ChangeSet::new(
             WriteSetMut::new(vec![
                 (
-                    AccessPath::new(
+                    StateKey::AccessPath(AccessPath::new(
                         code_address,
                         bcs::to_bytes(&Path::Code(ModuleId::new(
                             code_address,
                             Identifier::new("AptosAccount").unwrap(),
                         )))
                         .unwrap(),
-                    ),
+                    )),
                     WriteOp::Deletion,
                 ),
                 (
-                    AccessPath::new(
+                    StateKey::AccessPath(AccessPath::new(
                         context.root_account().address(),
                         bcs::to_bytes(&Path::Resource(StructTag {
                             address: code_address,
@@ -200,7 +201,7 @@ async fn test_get_transactions_output_user_transaction_with_write_set_payload() 
                             type_params: vec![],
                         }))
                         .unwrap(),
-                    ),
+                    )),
                     WriteOp::Deletion,
                 ),
             ])
@@ -548,18 +549,18 @@ async fn test_signing_message_with_write_set_payload() {
             .change_set(ChangeSet::new(
                 WriteSetMut::new(vec![
                     (
-                        AccessPath::new(
+                        StateKey::AccessPath(AccessPath::new(
                             code_address,
                             bcs::to_bytes(&Path::Code(ModuleId::new(
                                 code_address,
                                 Identifier::new("AptosAccount").unwrap(),
                             )))
                             .unwrap(),
-                        ),
+                        )),
                         WriteOp::Deletion,
                     ),
                     (
-                        AccessPath::new(
+                        StateKey::AccessPath(AccessPath::new(
                             context.root_account().address(),
                             bcs::to_bytes(&Path::Resource(StructTag {
                                 address: code_address,
@@ -568,7 +569,7 @@ async fn test_signing_message_with_write_set_payload() {
                                 type_params: vec![],
                             }))
                             .unwrap(),
-                        ),
+                        )),
                         WriteOp::Deletion,
                     ),
                 ])
@@ -807,14 +808,14 @@ async fn test_get_txn_execute_failed_by_invalid_write_set_payload() {
     let txn = root_account.sign_with_transaction_builder(
         context.transaction_factory().change_set(ChangeSet::new(
             WriteSetMut::new(vec![(
-                AccessPath::new(
+                StateKey::AccessPath(AccessPath::new(
                     code_address,
                     bcs::to_bytes(&Path::Code(ModuleId::new(
                         code_address,
                         Identifier::new("AptosAccount").unwrap(),
                     )))
                     .unwrap(),
-                ),
+                )),
                 WriteOp::Value(invalid_bytecode),
             )])
             .freeze()

@@ -21,6 +21,7 @@ use aptos_types::{
     on_chain_config::{
         ConfigStorage, OnChainConfig, VMConfig, VMPublishingOption, Version, APTOS_VERSION_3,
     },
+    state_store::state_key::StateKey,
     transaction::{SignedTransaction, TransactionOutput, TransactionStatus},
     vm_status::{KeptVMStatus, StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -581,7 +582,7 @@ pub fn convert_changeset_and_events_cached<C: AccessPathCache>(
                 None => WriteOp::Deletion,
                 Some(blob) => WriteOp::Value(blob),
             };
-            ops.push((ap, op))
+            ops.push((StateKey::AccessPath(ap), op))
         }
 
         for (name, blob_opt) in modules {
@@ -591,7 +592,7 @@ pub fn convert_changeset_and_events_cached<C: AccessPathCache>(
                 Some(blob) => WriteOp::Value(blob),
             };
 
-            ops.push((ap, op))
+            ops.push((StateKey::AccessPath(ap), op))
         }
     }
 

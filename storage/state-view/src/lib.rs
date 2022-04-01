@@ -7,9 +7,7 @@
 
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_types::{
-    access_path::AccessPath, state_store::state_key::StateKey, transaction::Version,
-};
+use aptos_types::{state_store::state_key::StateKey, transaction::Version};
 
 /// `StateView` is a trait that defines a read-only snapshot of the global state. It is passed to
 /// the VM for transaction execution, during which the VM is guaranteed to read anything at the
@@ -19,9 +17,6 @@ pub trait StateView: Sync {
     fn id(&self) -> StateViewId {
         StateViewId::Miscellaneous
     }
-
-    /// Gets the account resource for a single access path.
-    fn get_by_access_path(&self, access_path: &AccessPath) -> Result<Option<Vec<u8>>>;
 
     /// Gets the state value for a given state key.
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>>;

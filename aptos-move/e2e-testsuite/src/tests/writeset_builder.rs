@@ -3,6 +3,7 @@
 use aptos_types::{
     access_path::AccessPath,
     on_chain_config::Version,
+    state_store::state_key::StateKey,
     transaction::{ChangeSet, Script, TransactionStatus, WriteSetPayload},
     vm_status::KeptVMStatus,
     write_set::WriteOp,
@@ -44,7 +45,7 @@ fn build_upgrade_writeset() {
         .into_inner();
         let mut writeset = version_writes.into_mut();
         writeset.push((
-            AccessPath::code_access_path(module.self_id()),
+            StateKey::AccessPath(AccessPath::code_access_path(module.self_id())),
             WriteOp::Value(module_bytes),
         ));
         ChangeSet::new(writeset.freeze().unwrap(), events)

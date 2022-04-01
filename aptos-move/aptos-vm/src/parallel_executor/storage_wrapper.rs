@@ -4,7 +4,7 @@
 use crate::data_cache::RemoteStorage;
 use aptos_parallel_executor::executor::MVHashMapView;
 use aptos_state_view::{StateView, StateViewId};
-use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey, write_set::WriteOp};
+use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
 use move_binary_format::errors::VMError;
 use move_core_types::{
     account_address::AccountAddress,
@@ -14,13 +14,13 @@ use move_core_types::{
 
 pub(crate) struct VersionedView<'a, S: StateView> {
     base_view: &'a S,
-    hashmap_view: &'a MVHashMapView<'a, AccessPath, WriteOp>,
+    hashmap_view: &'a MVHashMapView<'a, StateKey, WriteOp>,
 }
 
 impl<'a, S: StateView> VersionedView<'a, S> {
     pub fn new_view(
         base_view: &'a S,
-        hashmap_view: &'a MVHashMapView<'a, AccessPath, WriteOp>,
+        hashmap_view: &'a MVHashMapView<'a, StateKey, WriteOp>,
     ) -> VersionedView<'a, S> {
         VersionedView {
             base_view,
@@ -35,20 +35,15 @@ impl<'a, S: StateView> StateView for VersionedView<'a, S> {
     }
 
     // Get some data either through the cache or the `StateView` on a cache miss.
-    fn get_by_access_path(&self, access_path: &AccessPath) -> anyhow::Result<Option<Vec<u8>>> {
-        match self.hashmap_view.read(access_path) {
+    fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
+        match self.hashmap_view.read(state_key) {
             Ok(Some(v)) => Ok(match v.as_ref() {
                 WriteOp::Value(w) => Some(w.clone()),
                 WriteOp::Deletion => None,
             }),
-            Ok(None) => self.base_view.get_by_access_path(access_path),
+            Ok(None) => self.base_view.get_state_value(state_key),
             Err(err) => Err(err),
         }
-    }
-
-    fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
-        // TODO: Add a caching layer on this once the VM write set starts populating state_value changes.
-        self.base_view.get_state_value(state_key)
     }
 
     fn is_genesis(&self) -> bool {

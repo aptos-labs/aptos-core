@@ -7,7 +7,9 @@ use aptos_crypto::{
     traits::{SigningKey, Uniform},
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::{contract_event, event, transaction, write_set};
+use aptos_types::{
+    contract_event, event, state_store::state_key::StateKey, transaction, write_set,
+};
 use move_core_types::language_storage;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
@@ -62,6 +64,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::authenticator::TransactionAuthenticator>(&samples)?;
     tracer.trace_type::<write_set::WriteOp>(&samples)?;
 
+    tracer.trace_type::<StateKey>(&samples)?;
     tracer.trace_type::<consensus::network_interface::ConsensusMsg>(&samples)?;
     tracer.trace_type::<consensus_types::block_data::BlockType>(&samples)?;
     tracer.trace_type::<consensus_types::block_retrieval::BlockRetrievalStatus>(&samples)?;

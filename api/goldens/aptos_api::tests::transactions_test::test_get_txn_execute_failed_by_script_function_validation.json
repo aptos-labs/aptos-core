@@ -7,7 +7,7 @@
   "gas_used": "26",
   "success": false,
   "vm_status": "Move abort by LIMIT_EXCEEDED - EINSUFFICIENT_BALANCE\n A limit on an amount, e.g. a currency, is exceeded. Example: withdrawal of money after account limits window\n is exhausted.\n Error codes",
-  "accumulator_root_hash": "0x3315ecf6b255acbe96f78c5508b930fd229abf554abc06828524110d56ba2b96",
+  "accumulator_root_hash": "0x93e1314370fb62aadfd56da4ba601cd62f1850daccb7f2be4fb8b2d7b602072a",
   "sender": "0xe60912ecb0a8c365d163d258f3b9f1b62f8f9148c207643864d7ed4a2b23159",
   "sequence_number": "0",
   "max_gas_amount": "1000",

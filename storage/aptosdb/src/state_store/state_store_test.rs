@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashSet;
+use std::{collections::HashSet, convert::TryFrom};
 
 use proptest::{
     collection::{hash_map, vec},
@@ -84,7 +84,10 @@ fn verify_state_in_store(
         .get_value_with_proof_by_version(&StateKey::AccountAddressKey(address), version)
         .unwrap();
     assert_eq!(
-        value.clone().map(AccountStateBlob::from).as_ref(),
+        value
+            .clone()
+            .map(|x| AccountStateBlob::try_from(x).unwrap())
+            .as_ref(),
         expected_value
     );
     proof

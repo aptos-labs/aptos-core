@@ -120,7 +120,8 @@ pub fn get_account_sequence_number(
                     size: crsn.size(),
                 });
             }
-            let seqno = AccountResource::try_from(&AccountStateBlob::from(blob))?.sequence_number();
+            let seqno =
+                AccountResource::try_from(&AccountStateBlob::try_from(blob)?)?.sequence_number();
             Ok(AccountSequenceInfo::Sequential(seqno))
         }
         None => Ok(AccountSequenceInfo::Sequential(0)),

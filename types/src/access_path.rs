@@ -35,7 +35,8 @@
 //! On the other hand, if you want to query only <Alice>/a/*, `address` will be set to Alice and
 //! `path` will be set to "/a" and use the `get_prefix()` method from statedb
 
-use crate::account_address::AccountAddress;
+use crate::{account_address::AccountAddress, state_store::state_key::StateKey};
+use anyhow::{Error, Result};
 use aptos_crypto::hash::HashValue;
 use move_core_types::language_storage::{ModuleId, ResourceKey, StructTag, CODE_TAG, RESOURCE_TAG};
 #[cfg(any(test, feature = "fuzzing"))]
@@ -142,6 +143,16 @@ impl From<&ModuleId> for AccessPath {
         AccessPath {
             address: *id.address(),
             path: id.access_vector(),
+        }
+    }
+}
+
+impl TryFrom<StateKey> for AccessPath {
+    type Error = Error;
+    fn try_from(state_key: StateKey) -> Result<Self> {
+        match state_key {
+            StateKey::AccessPath(access_path) => Ok(access_path),
+            _ => anyhow::bail!("Unsupported state key type"),
         }
     }
 }

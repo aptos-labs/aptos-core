@@ -345,7 +345,8 @@ impl TransactionGenerator {
                 .expect("Failed to query storage.")
                 .expect("Account must exist.");
             let account_resource =
-                AccountResource::try_from(&AccountStateBlob::from(state_store_value)).unwrap();
+                AccountResource::try_from(&AccountStateBlob::try_from(state_store_value).unwrap())
+                    .unwrap();
             assert_eq!(account_resource.sequence_number(), account.sequence_number);
             bar.inc(1);
         }

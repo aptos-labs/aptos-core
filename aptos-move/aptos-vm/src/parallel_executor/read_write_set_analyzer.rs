@@ -6,7 +6,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_parallel_executor::task::{Accesses, ReadWriteSetInferencer};
-use aptos_types::access_path::AccessPath;
+use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
 use move_core_types::resolver::MoveResolver;
 use read_write_set_dynamic::NormalizedReadWriteSetAnalysis;
 
@@ -26,16 +26,17 @@ impl<'a, S: MoveResolver + std::marker::Sync> ReadWriteSetInferencer
     for ReadWriteSetAnalysisWrapper<'a, S>
 {
     type T = PreprocessedTransaction;
-    fn infer_reads_writes(&self, txn: &Self::T) -> Result<Accesses<AccessPath>> {
+    fn infer_reads_writes(&self, txn: &Self::T) -> Result<Accesses<StateKey>> {
         let (keys_read, keys_written) = self.analyzer.get_keys_transaction(txn, false)?;
+        // TODO: Add support for table items as state key.
         Ok(Accesses {
             keys_read: keys_read
                 .into_iter()
-                .map(AccessPath::resource_access_path)
+                .map(|x| StateKey::AccessPath(AccessPath::resource_access_path(x)))
                 .collect(),
             keys_written: keys_written
                 .into_iter()
-                .map(AccessPath::resource_access_path)
+                .map(|x| StateKey::AccessPath(AccessPath::resource_access_path(x)))
                 .collect(),
         })
     }

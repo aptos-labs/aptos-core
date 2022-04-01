@@ -8,7 +8,6 @@ pub use crate::storage_interface::DBDebuggerInterface;
 use anyhow::{anyhow, Result};
 use aptos_state_view::StateView;
 use aptos_types::{
-    access_path::AccessPath,
     account_address::AccountAddress,
     account_config,
     account_state::AccountState,
@@ -117,29 +116,38 @@ impl<'a> DebuggerStateView<'a> {
     pub fn new(db: &'a dyn AptosValidatorInterface, version: Option<Version>) -> Self {
         Self { db, version }
     }
-}
 
-impl<'a> StateView for DebuggerStateView<'a> {
-    fn get_by_access_path(&self, access_path: &AccessPath) -> Result<Option<Vec<u8>>> {
-        match self.version {
-            None => Ok(None),
-            Some(ver) => match self
-                .db
-                .get_account_state_by_version(access_path.address, ver)?
-            {
-                Some(blob) => Ok(blob.get(&access_path.path).cloned()),
+    fn get_state_value_internal(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<Vec<u8>>> {
+        match state_key {
+            // This is a temporary hack until we rollout fine grained staorage for account resources
+            // in the DB.
+            StateKey::AccessPath(access_path) => {
+                match self
+                    .db
+                    .get_account_state_by_version(access_path.address, version)?
+                {
+                    None => Ok(None),
+                    Some(account_state) => Ok(account_state.get(&access_path.path).cloned()),
+                }
+            }
+
+            _ => match self.db.get_state_value_by_version(state_key, version)? {
                 None => Ok(None),
+                Some(state_value) => Ok(state_value.maybe_bytes.as_ref().cloned()),
             },
         }
     }
+}
 
+impl<'a> StateView for DebuggerStateView<'a> {
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         match self.version {
             None => Ok(None),
-            Some(ver) => Ok(self
-                .db
-                .get_state_value_by_version(state_key, ver)?
-                .map(|x| x.bytes)),
+            Some(version) => self.get_state_value_internal(state_key, version),
         }
     }
 

@@ -21,7 +21,7 @@ use parking_lot::RwLock;
 use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
 use std::{
     collections::{hash_map::Entry, HashMap},
-    convert::TryInto,
+    convert::{TryFrom, TryInto},
     sync::Arc,
 };
 
@@ -80,11 +80,13 @@ pub struct VerifiedStateView {
     ///        | +------------------------------+ +--------------------+ |
     ///        +---------------------------------------------------------+
     /// ```
-    account_to_state_cache: RwLock<HashMap<AccountAddress, AccountState>>,
+    account_state_cache: RwLock<HashMap<AccountAddress, AccountState>>,
     /// Cache of state key to state value, which is used in case of fine grained storage object.
     /// Eventually this should replace the `account_to_state_cache` as we deprecate account state blob
-    /// completely and migrate to fine grained storage.
-    state_key_value_cache: RwLock<HashMap<StateKey, StateValue>>,
+    /// completely and migrate to fine grained storage. A value of None in this cache reflects that
+    /// the corresponding key has been deleted. This is a temporary hack until we support deletion
+    /// in JMT node.
+    state_cache: RwLock<HashMap<StateKey, StateValue>>,
     state_proof_cache: RwLock<HashMap<HashValue, SparseMerkleProof<StateValue>>>,
 }
 
@@ -114,8 +116,8 @@ impl VerifiedStateView {
             latest_persistent_version,
             latest_persistent_state_root,
             speculative_state: speculative_state.freeze(),
-            account_to_state_cache: RwLock::new(HashMap::new()),
-            state_key_value_cache: RwLock::new(HashMap::new()),
+            account_state_cache: RwLock::new(HashMap::new()),
+            state_cache: RwLock::new(HashMap::new()),
             state_proof_cache: RwLock::new(HashMap::new()),
         }
     }
@@ -123,8 +125,39 @@ impl VerifiedStateView {
     pub fn into_state_cache(self) -> StateCache {
         StateCache {
             frozen_base: self.speculative_state,
-            accounts: self.account_to_state_cache.into_inner(),
+            accounts: self.account_state_cache.into_inner(),
+            state_cache: self.state_cache.into_inner(),
             proofs: self.state_proof_cache.into_inner(),
+        }
+    }
+
+    fn get_by_access_path(&self, access_path: &AccessPath) -> Result<Option<Vec<u8>>> {
+        let address = access_path.address;
+        let path = &access_path.path;
+
+        // Lock for read first:
+        if let Some(contents) = self.account_state_cache.read().get(&address) {
+            return Ok(contents.get(path).cloned());
+        }
+
+        let state_store_value_option =
+            self.get_state_value_internal(&StateKey::AccountAddressKey(address))?;
+
+        // Hack: Convert the state store value to account blob option as that is the
+        // only type of state value we support for now. This needs to change once we start
+        // supporting tables and other fine grained resources.
+        let new_account_blob = state_store_value_option
+            .map(AccountStateBlob::try_from)
+            .transpose()?
+            .as_ref()
+            .map(TryInto::try_into)
+            .transpose()?
+            .unwrap_or_default();
+
+        // Now enter the locked region, and write if still empty.
+        match self.account_state_cache.write().entry(address) {
+            Entry::Occupied(occupied) => Ok(occupied.get().get(path).cloned()),
+            Entry::Vacant(vacant) => Ok(vacant.insert(new_account_blob).get(path).cloned()),
         }
     }
 
@@ -167,11 +200,28 @@ impl VerifiedStateView {
 
         Ok(state_store_value_option)
     }
+
+    fn get_and_cache_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+        // First check if the cache has the state value.
+        if let Some(contents) = self.state_cache.read().get(state_key) {
+            // This can return None, which means the value has been deleted from the DB.
+            return Ok(contents.maybe_bytes.as_ref().cloned());
+        }
+        let state_store_value_option = self.get_state_value_internal(state_key)?;
+        // Update the cache if still empty
+        let mut cache = self.state_cache.write();
+        let new_value = cache
+            .entry(state_key.clone())
+            .or_insert_with(|| state_store_value_option.unwrap_or_default());
+
+        Ok(new_value.maybe_bytes.as_ref().cloned())
+    }
 }
 
 pub struct StateCache {
     pub frozen_base: FrozenSparseMerkleTree<StateValue>,
     pub accounts: HashMap<AccountAddress, AccountState>,
+    pub state_cache: HashMap<StateKey, StateValue>,
     pub proofs: HashMap<HashValue, SparseMerkleProof<StateValue>>,
 }
 
@@ -181,46 +231,11 @@ impl StateView for VerifiedStateView {
     }
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
-        // First check if the cache has the state value.
-        if let Some(contents) = self.state_key_value_cache.read().get(state_key) {
-            return Ok(Some(contents.bytes.clone()));
-        }
-        let state_store_value_option = self.get_state_value_internal(state_key)?;
-        // Update the cache if still empty
-        let mut cache = self.state_key_value_cache.write();
-        let new_value = cache
-            .entry(state_key.clone())
-            .or_insert_with(|| state_store_value_option.unwrap_or_default());
-
-        Ok(Some(new_value.bytes.clone()))
-    }
-
-    fn get_by_access_path(&self, access_path: &AccessPath) -> Result<Option<Vec<u8>>> {
-        let address = access_path.address;
-        let path = &access_path.path;
-
-        // Lock for read first:
-        if let Some(contents) = self.account_to_state_cache.read().get(&address) {
-            return Ok(contents.get(path).cloned());
-        }
-
-        let state_store_value_option =
-            self.get_state_value_internal(&StateKey::AccountAddressKey(address))?;
-
-        // Hack: Convert the state store value to account blob option as that is the
-        // only type of state value we support for now. This needs to change once we start
-        // supporting tables and other fine grained resources.
-        let new_account_blob = state_store_value_option
-            .map(AccountStateBlob::from)
-            .as_ref()
-            .map(TryInto::try_into)
-            .transpose()?
-            .unwrap_or_default();
-
-        // Now enter the locked region, and write if still empty.
-        match self.account_to_state_cache.write().entry(address) {
-            Entry::Occupied(occupied) => Ok(occupied.get().get(path).cloned()),
-            Entry::Vacant(vacant) => Ok(vacant.insert(new_account_blob).get(path).cloned()),
+        // This is a hack to temporary support of legacy account address based access path. This should
+        // be removed once we migrate to fine grained storage for all account resource.
+        match state_key {
+            StateKey::AccessPath(access_path) => self.get_by_access_path(access_path),
+            _ => self.get_and_cache_state_value(state_key),
         }
     }
 

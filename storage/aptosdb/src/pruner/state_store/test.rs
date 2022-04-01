@@ -9,7 +9,7 @@ use aptos_types::{
     account_state_blob::AccountStateBlob,
     state_store::{state_key::StateKey, state_value::StateValue},
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryFrom};
 
 fn put_account_state_set(
     db: &DB,
@@ -46,7 +46,7 @@ fn verify_state_in_store(
         .unwrap();
 
     assert_eq!(
-        &AccountStateBlob::from(value.unwrap()),
+        &AccountStateBlob::try_from(value.unwrap()).unwrap(),
         expected_value.unwrap()
     );
 }

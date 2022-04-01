@@ -11,6 +11,7 @@ use aptos_crypto::{
 };
 use aptos_logger::error;
 use aptos_types::{
+    access_path::AccessPath,
     account_address::AccountAddress,
     account_state::AccountState,
     account_state_blob::AccountStateBlob,
@@ -28,7 +29,6 @@ use aptos_types::{
 };
 use executor_types::{ExecutedChunk, ExecutedTrees, ProofReader, TransactionData};
 use once_cell::sync::Lazy;
-use rayon::prelude::*;
 use scratchpad::SparseMerkleTree;
 use std::{
     collections::{hash_map, HashMap, HashSet},
@@ -167,27 +167,15 @@ impl ApplyChunkOutput {
         let StateCache {
             frozen_base,
             mut accounts,
+            mut state_cache,
             proofs,
         } = state_cache;
 
         // Apply write sets to account states in the AccountCache, resulting in new account states.
-        let account_states = to_keep
+        let state_store_updates = to_keep
             .iter()
-            .map(|(t, o)| process_write_set(t, &mut accounts, o.write_set().clone()))
-            .collect::<Result<Vec<_>>>()?;
-        let state_store_updates = account_states
-            .par_iter()
-            .with_min_len(100)
-            .map(|account_to_state| {
-                account_to_state
-                    .iter()
-                    .map(|(addr, state)| {
-                        Ok((
-                            StateKey::AccountAddressKey(*addr),
-                            StateValue::from(AccountStateBlob::try_from(state)?),
-                        ))
-                    })
-                    .collect::<Result<HashMap<_, _>>>()
+            .map(|(t, o)| {
+                process_write_set(t, &mut accounts, &mut state_cache, o.write_set().clone())
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -316,58 +304,135 @@ pub fn ensure_no_retry(to_retry: Vec<Transaction>) -> Result<()> {
     Ok(())
 }
 
+fn process_access_path_write_op(
+    transaction: &Transaction,
+    account_to_state: &mut HashMap<AccountAddress, AccountState>,
+    addresses: &mut HashSet<StateKey>,
+    access_path: AccessPath,
+    write_op: WriteOp,
+) -> Result<()> {
+    let address = access_path.address;
+    let path = access_path.path;
+    match account_to_state.entry(address) {
+        hash_map::Entry::Occupied(mut entry) => {
+            update_account_state(entry.get_mut(), path, write_op);
+        }
+        hash_map::Entry::Vacant(entry) => {
+            ensure_txn_valid_for_vacant_entry(transaction)?;
+            let mut account_state = Default::default();
+            update_account_state(&mut account_state, path, write_op);
+            entry.insert(account_state);
+        }
+    }
+    addresses.insert(StateKey::AccountAddressKey(address));
+    Ok(())
+}
+
+fn ensure_txn_valid_for_vacant_entry(transaction: &Transaction) -> Result<()> {
+    // Before writing to an account, VM should always read that account. So we
+    // should not reach this code path. The exception is genesis transaction (and
+    // maybe other writeset transactions).
+    match transaction {
+        Transaction::GenesisTransaction(_) => (),
+        Transaction::BlockMetadata(_) => {
+            bail!("Write set should be a subset of read set.")
+        }
+        Transaction::UserTransaction(txn) => match txn.payload() {
+            TransactionPayload::ModuleBundle(_)
+            | TransactionPayload::Script(_)
+            | TransactionPayload::ScriptFunction(_) => {
+                bail!("Write set should be a subset of read set.")
+            }
+            TransactionPayload::WriteSet(_) => (),
+        },
+        Transaction::StateCheckpoint => {}
+    }
+    Ok(())
+}
+
+fn process_state_key_write_op(
+    transaction: &Transaction,
+    state_cache: &mut HashMap<StateKey, StateValue>,
+    addresses: &mut HashSet<StateKey>,
+    state_key: StateKey,
+    write_op: WriteOp,
+) -> Result<()> {
+    match state_cache.entry(state_key.clone()) {
+        hash_map::Entry::Occupied(mut entry) => {
+            match write_op {
+                WriteOp::Value(new_value) => entry.insert(StateValue::from(new_value)),
+                WriteOp::Deletion => entry.insert(StateValue::empty()),
+            };
+        }
+        hash_map::Entry::Vacant(entry) => {
+            ensure_txn_valid_for_vacant_entry(transaction)?;
+            match write_op {
+                WriteOp::Value(new_value) => entry.insert(StateValue::from(new_value)),
+                WriteOp::Deletion => entry.insert(StateValue::empty()),
+            };
+        }
+    }
+    addresses.insert(state_key);
+    Ok(())
+}
+
 /// For all accounts modified by this transaction, find the previous blob and update it based
 /// on the write set. Returns the blob value of all these accounts.
 pub fn process_write_set(
     transaction: &Transaction,
     account_to_state: &mut HashMap<AccountAddress, AccountState>,
+    state_cache: &mut HashMap<StateKey, StateValue>,
     write_set: WriteSet,
-) -> Result<HashMap<AccountAddress, AccountState>> {
-    let mut updated_blobs = HashMap::new();
+) -> Result<HashMap<StateKey, StateValue>> {
+    let mut state_updates = HashMap::new();
 
     // Find all addresses this transaction touches while processing each write op.
-    let mut addrs = HashSet::new();
-    for (access_path, write_op) in write_set.into_iter() {
-        let address = access_path.address;
-        let path = access_path.path;
-        match account_to_state.entry(address) {
-            hash_map::Entry::Occupied(mut entry) => {
-                update_account_state(entry.get_mut(), path, write_op);
+    let mut updated_keys = HashSet::new();
+    for (state_key, write_op) in write_set.into_iter() {
+        match &state_key {
+            StateKey::AccessPath(access_path) => process_access_path_write_op(
+                transaction,
+                account_to_state,
+                &mut updated_keys,
+                access_path.clone(),
+                write_op,
+            )?,
+            StateKey::AccountAddressKey(_) => {
+                bail!("Account address state key is not expected in write set")
             }
-            hash_map::Entry::Vacant(entry) => {
-                // Before writing to an account, VM should always read that account. So we
-                // should not reach this code path. The exception is genesis transaction (and
-                // maybe other writeset transactions).
-                match transaction {
-                    Transaction::GenesisTransaction(_) => (),
-                    Transaction::BlockMetadata(_) => {
-                        bail!("Write set should be a subset of read set.")
-                    }
-                    Transaction::UserTransaction(txn) => match txn.payload() {
-                        TransactionPayload::ModuleBundle(_)
-                        | TransactionPayload::Script(_)
-                        | TransactionPayload::ScriptFunction(_) => {
-                            bail!("Write set should be a subset of read set.")
-                        }
-                        TransactionPayload::WriteSet(_) => (),
-                    },
-                    Transaction::StateCheckpoint => {}
-                }
+            // For now, we only support write set with access path, this needs to be updated once
+            // we support table items
+            StateKey::Raw(_) => process_state_key_write_op(
+                transaction,
+                state_cache,
+                &mut updated_keys,
+                state_key,
+                write_op,
+            )?,
+        }
+    }
 
-                let mut account_state = Default::default();
-                update_account_state(&mut account_state, path, write_op);
-                entry.insert(account_state);
+    for state_key in updated_keys {
+        match state_key {
+            StateKey::AccountAddressKey(address) => {
+                let account_state = account_to_state
+                    .get(&address)
+                    .expect("Address should exist.");
+                state_updates.insert(
+                    state_key,
+                    StateValue::from(AccountStateBlob::try_from(account_state)?),
+                );
+            }
+            _ => {
+                let state_value = state_cache
+                    .get(&state_key)
+                    .expect("State value should exist.");
+                state_updates.insert(state_key, state_value.clone());
             }
         }
-        addrs.insert(address);
     }
 
-    for addr in addrs {
-        let account_state = account_to_state.get(&addr).expect("Address should exist.");
-        updated_blobs.insert(addr, account_state.clone());
-    }
-
-    Ok(updated_blobs)
+    Ok(state_updates)
 }
 
 fn update_account_state(account_state: &mut AccountState, path: Vec<u8>, write_op: WriteOp) {

@@ -17,7 +17,7 @@ use aptos_parallel_executor::{
 };
 use aptos_state_view::StateView;
 use aptos_types::{
-    access_path::AccessPath,
+    state_store::state_key::StateKey,
     transaction::{Transaction, TransactionOutput, TransactionStatus},
     write_set::{WriteOp, WriteSet},
 };
@@ -25,7 +25,7 @@ use move_core_types::vm_status::{StatusCode, VMStatus};
 use rayon::prelude::*;
 
 impl PTransaction for PreprocessedTransaction {
-    type Key = AccessPath;
+    type Key = StateKey;
     type Value = WriteOp;
 }
 
@@ -44,7 +44,7 @@ impl DiemTransactionOutput {
 impl PTransactionOutput for DiemTransactionOutput {
     type T = PreprocessedTransaction;
 
-    fn get_writes(&self) -> Vec<(AccessPath, WriteOp)> {
+    fn get_writes(&self) -> Vec<(StateKey, WriteOp)> {
         self.0.write_set().iter().cloned().collect()
     }
 

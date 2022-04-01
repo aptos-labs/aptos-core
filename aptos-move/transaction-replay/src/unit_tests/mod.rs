@@ -6,6 +6,7 @@ mod bisection_tests;
 use crate::AptosValidatorInterface;
 use anyhow::{bail, Result};
 use aptos_types::{
+    access_path::AccessPath,
     account_address::AccountAddress,
     account_state::AccountState,
     account_state_blob::AccountStateBlob,
@@ -49,7 +50,9 @@ impl TestInterface {
     pub fn genesis() -> Self {
         let changeset = generate_genesis_change_set_for_testing(GenesisOptions::Compiled);
         let mut state_db = HashMap::new();
-        for (ap, op) in changeset.write_set().iter() {
+        for (key, op) in changeset.write_set().iter() {
+            let ap = AccessPath::try_from(key.clone())
+                .expect("State key can't be converted to access path");
             match op {
                 WriteOp::Value(v) => state_db
                     .entry((0, ap.address))

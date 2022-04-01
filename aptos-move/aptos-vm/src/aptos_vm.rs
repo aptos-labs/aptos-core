@@ -474,9 +474,9 @@ impl AptosVM {
     ) -> Result<(), VMStatus> {
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.
-        for (ap, _) in write_set.iter() {
+        for (state_key, _) in write_set.iter() {
             state_view
-                .get_by_access_path(ap)
+                .get_state_value(state_key)
                 .map_err(|_| VMStatus::Error(StatusCode::STORAGE_ERROR))?;
         }
         Ok(())

@@ -73,7 +73,14 @@ impl Arbitrary for WriteOp {
 impl WriteSet {
     fn genesis_strategy() -> impl Strategy<Value = Self> {
         vec((any::<AccessPath>(), WriteOp::value_strategy()), 0..64).prop_map(|write_set| {
-            let write_set_mut = WriteSetMut::new(write_set);
+            let write_set_mut = WriteSetMut::new(
+                write_set
+                    .iter()
+                    .map(|(access_path, write_op)| {
+                        (StateKey::AccessPath(access_path.clone()), write_op.clone())
+                    })
+                    .collect(),
+            );
             write_set_mut
                 .freeze()
                 .expect("generated write sets should always be valid")
@@ -97,7 +104,14 @@ impl Arbitrary for WriteSet {
         // important? Not sure.
         vec((any::<AccessPath>(), any::<WriteOp>()), 0..64)
             .prop_map(|write_set| {
-                let write_set_mut = WriteSetMut::new(write_set);
+                let write_set_mut = WriteSetMut::new(
+                    write_set
+                        .iter()
+                        .map(|(access_path, write_op)| {
+                            (StateKey::AccessPath(access_path.clone()), write_op.clone())
+                        })
+                        .collect(),
+                );
                 write_set_mut
                     .freeze()
                     .expect("generated write sets should always be valid")

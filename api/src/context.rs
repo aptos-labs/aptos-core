@@ -112,7 +112,9 @@ impl Context {
             &StateKey::AccountAddressKey(account),
             version,
         )?;
-        Ok(state_value.map(AccountStateBlob::from))
+        Ok(state_value.map(|x| {
+            AccountStateBlob::try_from(x).expect("Can't convert state value to account state blob")
+        }))
     }
 
     pub fn get_block_timestamp(&self, version: u64) -> Result<u64> {

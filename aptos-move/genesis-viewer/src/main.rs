@@ -14,6 +14,7 @@ use move_core_types::resolver::MoveResolver;
 use move_vm_test_utils::InMemoryStorage;
 use std::{
     collections::{BTreeMap, BTreeSet},
+    convert::TryFrom,
     fmt::Debug,
 };
 use structopt::StructOpt;
@@ -143,7 +144,11 @@ fn print_keys(ws: &WriteSet) {
 fn print_keys_sorted(ws: &WriteSet) {
     let mut sorted_ws: BTreeSet<AccessPath> = BTreeSet::new();
     for (key, _) in ws {
-        sorted_ws.insert(key.clone());
+        sorted_ws.insert(
+            AccessPath::try_from(key.clone())
+                .expect("State key can't be converted to access path")
+                .clone(),
+        );
     }
     for key in sorted_ws {
         println!("{:?}", key);
@@ -180,13 +185,16 @@ fn print_events(storage: &impl MoveResolver, events: &[ContractEvent]) {
 fn print_modules(ws: &WriteSet) {
     let mut modules: BTreeMap<AccessPath, CompiledModule> = BTreeMap::new();
     for (k, v) in ws {
+        let ap =
+            AccessPath::try_from(k.clone()).expect("State key can't be converted to access path");
         match v {
             WriteOp::Deletion => panic!("found WriteOp::Deletion in WriteSet"),
             WriteOp::Value(blob) => {
-                let tag = k.path.get(0).expect("empty blob in WriteSet");
+                let tag = ap.path.get(0).expect("empty blob in WriteSet");
                 if *tag == 0 {
                     modules.insert(
-                        k.clone(),
+                        AccessPath::try_from(k.clone())
+                            .expect("State key can't be converted to access path"),
                         CompiledModule::deserialize(blob).expect("CompiledModule must deserialize"),
                     );
                 }
@@ -202,12 +210,18 @@ fn print_modules(ws: &WriteSet) {
 fn print_resources(storage: &impl MoveResolver, ws: &WriteSet) {
     let mut resources: BTreeMap<AccessPath, Vec<u8>> = BTreeMap::new();
     for (k, v) in ws {
+        let ap =
+            AccessPath::try_from(k.clone()).expect("State key can't be converted to access path");
         match v {
             WriteOp::Deletion => panic!("found WriteOp::Deletion in WriteSet"),
             WriteOp::Value(blob) => {
-                let tag = k.path.get(0).expect("empty blob in WriteSet");
+                let tag = ap.path.get(0).expect("empty blob in WriteSet");
                 if *tag == 1 {
-                    resources.insert(k.clone(), blob.clone());
+                    resources.insert(
+                        AccessPath::try_from(k.clone())
+                            .expect("State key can't be converted to access path"),
+                        blob.clone(),
+                    );
                 }
             }
         }
@@ -226,15 +240,17 @@ fn print_resources(storage: &impl MoveResolver, ws: &WriteSet) {
 fn print_account_states(storage: &impl MoveResolver, ws: &WriteSet) {
     let mut accounts: BTreeMap<AccountAddress, Vec<(AccessPath, Vec<u8>)>> = BTreeMap::new();
     for (k, v) in ws {
+        let ap =
+            AccessPath::try_from(k.clone()).expect("State key can't be converted to access path");
         match v {
             WriteOp::Deletion => panic!("found WriteOp::Deletion in WriteSet"),
             WriteOp::Value(blob) => {
-                let tag = k.path.get(0).expect("empty blob in WriteSet");
+                let tag = ap.path.get(0).expect("empty blob in WriteSet");
                 if *tag == 1 {
                     accounts
-                        .entry(k.address)
+                        .entry(ap.address)
                         .or_insert_with(Vec::new)
-                        .push((k.clone(), blob.clone()));
+                        .push((ap.clone(), blob.clone()));
                 }
             }
         }

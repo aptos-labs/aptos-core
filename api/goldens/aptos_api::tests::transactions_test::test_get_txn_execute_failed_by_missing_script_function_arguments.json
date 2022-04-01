@@ -7,7 +7,7 @@
   "gas_used": "1",
   "success": false,
   "vm_status": "Move bytecode deserialization / verification failed, including script function not found or invalid arguments",
-  "accumulator_root_hash": "0x484af11a9b12ec38c66e251d89e8ac1083ffb27db81ff09e9bf523928dc55d16",
+  "accumulator_root_hash": "0x35fac6f31b5be3a0556d704f5c98fc24ad0122fbbe04039536cfc142aa4a416f",
   "sender": "0xa550c18",
   "sequence_number": "0",
   "max_gas_amount": "1000",

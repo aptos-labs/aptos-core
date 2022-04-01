@@ -11,14 +11,22 @@ use crate::{
         MockVM, DISCARD_STATUS, KEEP_STATUS,
     },
 };
-use aptos_crypto::HashValue;
+
+use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_state_view::StateViewId;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
+    chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::definition::LeafCount,
-    transaction::{Transaction, TransactionListWithProof, TransactionStatus, Version},
+    state_store::{state_key::StateKey, state_value::StateValue},
+    transaction::{
+        RawTransaction, Script, SignedTransaction, Transaction, TransactionListWithProof,
+        TransactionOutput, TransactionPayload, TransactionStatus, Version,
+    },
+    vm_status::KeptVMStatus,
+    write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptosdb::AptosDB;
 use executor_types::{BlockExecutorTrait, ChunkExecutorTrait, ExecutedTrees, TransactionReplayer};
@@ -321,6 +329,160 @@ fn test_noop_block_after_reconfiguration() {
         .execute_block((second_block.id, second_block.txns), parent_block_id)
         .unwrap();
     assert_eq!(output1.root_hash(), output2.root_hash());
+}
+
+fn create_test_transaction(sequence_number: u64) -> Transaction {
+    let private_key = Ed25519PrivateKey::generate_for_testing();
+    let public_key = private_key.public_key();
+
+    let transaction_payload = TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
+    let raw_transaction = RawTransaction::new(
+        AccountAddress::random(),
+        sequence_number,
+        transaction_payload,
+        0,
+        0,
+        "".into(),
+        0,
+        ChainId::new(10),
+    );
+    let signed_transaction = SignedTransaction::new(
+        raw_transaction.clone(),
+        public_key,
+        private_key.sign(&raw_transaction),
+    );
+
+    Transaction::UserTransaction(signed_transaction)
+}
+
+fn apply_transaction_by_writeset(
+    db: &DbReaderWriter,
+    transactions_and_writesets: Vec<(Transaction, WriteSet)>,
+) {
+    let ledger_view: ExecutedTrees = db
+        .reader
+        .get_latest_tree_state()
+        .unwrap()
+        .into_ledger_view(&db.reader)
+        .unwrap();
+
+    let transactions_and_outputs = transactions_and_writesets
+        .iter()
+        .map(|(txn, write_set)| {
+            (
+                txn.clone(),
+                TransactionOutput::new(
+                    write_set.clone(),
+                    vec![],
+                    0,
+                    TransactionStatus::Keep(KeptVMStatus::MiscellaneousError),
+                ),
+            )
+        })
+        .collect();
+
+    let state_view =
+        ledger_view.state_view(&ledger_view, StateViewId::Miscellaneous, db.reader.clone());
+
+    let chunk_output =
+        ChunkOutput::by_transaction_output(transactions_and_outputs, state_view).unwrap();
+
+    let (executed, _, _) = chunk_output
+        .apply_to_ledger(ledger_view.txn_accumulator())
+        .unwrap();
+
+    db.writer
+        .save_transactions(
+            &executed.transactions_to_commit().unwrap(),
+            ledger_view.txn_accumulator().num_leaves(),
+            None,
+        )
+        .unwrap();
+}
+
+#[test]
+fn test_deleted_key_from_state_store() {
+    let executor = TestExecutor::new();
+    let db = &executor.db;
+    let dummy_state_key1 = StateKey::Raw(String::from("test_key1").into_bytes());
+    let dummy_value1 = 10u64.to_le_bytes().to_vec();
+    let dummy_state_key2 = StateKey::Raw(String::from("test_key2").into_bytes());
+    let dummy_value2 = 20u64.to_le_bytes().to_vec();
+    // Create test transaction, event and transaction output
+    let transaction1 = create_test_transaction(0);
+    let transaction2 = create_test_transaction(1);
+    let write_set1 = WriteSetMut::new(vec![(
+        dummy_state_key1.clone(),
+        WriteOp::Value(dummy_value1.clone()),
+    )])
+    .freeze()
+    .unwrap();
+
+    let write_set2 = WriteSetMut::new(vec![(
+        dummy_state_key2.clone(),
+        WriteOp::Value(dummy_value2.clone()),
+    )])
+    .freeze()
+    .unwrap();
+
+    apply_transaction_by_writeset(
+        db,
+        vec![(transaction1, write_set1), (transaction2, write_set2)],
+    );
+
+    let state_value1_from_db = db
+        .reader
+        .get_state_value_with_proof_by_version(&dummy_state_key1, 2)
+        .unwrap()
+        .0
+        .unwrap();
+
+    let state_value2_from_db = db
+        .reader
+        .get_state_value_with_proof_by_version(&dummy_state_key2, 2)
+        .unwrap()
+        .0
+        .unwrap();
+
+    // Ensure both the keys have been successfully written in the DB
+    assert_eq!(state_value1_from_db, StateValue::from(dummy_value1.clone()));
+    assert_eq!(state_value2_from_db, StateValue::from(dummy_value2.clone()));
+
+    let transaction3 = create_test_transaction(2);
+    let write_set3 = WriteSetMut::new(vec![(dummy_state_key1.clone(), WriteOp::Deletion)])
+        .freeze()
+        .unwrap();
+
+    apply_transaction_by_writeset(db, vec![(transaction3, write_set3)]);
+
+    // Ensure the latest version of the value in DB is None (which implies its deleted)
+    assert!(db
+        .reader
+        .get_state_value_with_proof_by_version(&dummy_state_key1, 3)
+        .unwrap()
+        .0
+        .unwrap()
+        .maybe_bytes
+        .is_none());
+
+    // Ensure the key that was not touched by the transaction is not accidentally deleted
+    let state_value_from_db2 = db
+        .reader
+        .get_state_value_with_proof_by_version(&dummy_state_key2, 3)
+        .unwrap()
+        .0
+        .unwrap();
+    assert_eq!(state_value_from_db2, StateValue::from(dummy_value2));
+
+    // Ensure the previous version of the deleted key is not accidentally deleted
+    let state_value_from_db1 = db
+        .reader
+        .get_state_value_with_proof_by_version(&dummy_state_key1, 2)
+        .unwrap()
+        .0
+        .unwrap();
+
+    assert_eq!(state_value_from_db1, StateValue::from(dummy_value1));
 }
 
 struct TestBlock {

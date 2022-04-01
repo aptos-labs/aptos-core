@@ -6,6 +6,7 @@ use aptos_resource_viewer::{AnnotatedAccountStateBlob, AnnotatedMoveStruct, Apto
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path,
+    access_path::AccessPath,
     account_address::AccountAddress,
     account_config::aptos_root_address,
     account_state::AccountState,
@@ -28,7 +29,10 @@ use move_core_types::{effects::ChangeSet as MoveChanges, language_storage::TypeT
 use move_vm_runtime::session::Session;
 use move_vm_test_utils::DeltaStorage;
 use move_vm_types::gas_schedule::GasStatus;
-use std::path::{Path, PathBuf};
+use std::{
+    convert::TryFrom,
+    path::{Path, PathBuf},
+};
 
 #[cfg(test)]
 mod unit_tests;
@@ -159,7 +163,9 @@ impl AptosDebugger {
 
     fn save_write_sets(&self, o: &TransactionOutput) -> Result<()> {
         let state_view = OnDiskStateView::create(&self.build_dir, &self.storage_dir)?;
-        for (ap, op) in o.write_set() {
+        for (key, op) in o.write_set() {
+            let ap = AccessPath::try_from(key.clone())
+                .expect("State key can't be converted to access path");
             let addr = ap.address;
             match ap.get_path() {
                 access_path::Path::Resource(tag) => match op {

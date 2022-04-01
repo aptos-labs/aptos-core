@@ -334,8 +334,13 @@ impl fmt::Debug for AccountState {
 impl TryFrom<&StateValue> for AccountState {
     type Error = Error;
 
-    fn try_from(state_store_value: &StateValue) -> Result<Self> {
-        AccountState::try_from(&state_store_value.bytes)
+    fn try_from(state_value: &StateValue) -> Result<Self> {
+        let bytes = state_value
+            .maybe_bytes
+            .as_ref()
+            .ok_or_else(|| format_err!("Empty state value passed"))?;
+
+        AccountState::try_from(bytes).map_err(Into::into)
     }
 }
 

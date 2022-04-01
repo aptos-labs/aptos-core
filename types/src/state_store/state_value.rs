@@ -31,29 +31,36 @@ use serde::{Deserialize, Serialize};
 )]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 pub struct StateValue {
-    pub bytes: Vec<u8>,
+    pub maybe_bytes: Option<Vec<u8>>,
     hash: HashValue,
 }
 
 impl StateValue {
-    fn new(bytes: Vec<u8>) -> Self {
+    fn new(maybe_bytes: Option<Vec<u8>>) -> Self {
         let mut hasher = StateValueHasher::default();
-        hasher.update(&bytes);
-        let hash = hasher.finish();
+        let hash = if let Some(bytes) = &maybe_bytes {
+            hasher.update(bytes);
+            hasher.finish()
+        } else {
+            HashValue::zero()
+        };
+        Self { maybe_bytes, hash }
+    }
 
-        Self { bytes, hash }
+    pub fn empty() -> Self {
+        StateValue::new(None)
     }
 }
 
 impl From<AccountStateBlob> for StateValue {
     fn from(account_state_blob: AccountStateBlob) -> Self {
-        StateValue::new(account_state_blob.blob)
+        StateValue::new(Some(account_state_blob.blob))
     }
 }
 
 impl From<Vec<u8>> for StateValue {
     fn from(bytes: Vec<u8>) -> Self {
-        StateValue::new(bytes)
+        StateValue::new(Some(bytes))
     }
 }
 
@@ -142,5 +149,15 @@ impl StateValueWithProof {
             state_store_key.hash(),
             self.value.as_ref(),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::state_store::state_value::StateValue;
+
+    #[test]
+    fn test_empty_state_value() {
+        StateValue::new(None);
     }
 }

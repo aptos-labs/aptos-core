@@ -4,7 +4,7 @@
 //! For each transaction the VM executes, the VM will output a `WriteSet` that contains each access
 //! path it updates. For each access path, the VM can either give its new value or delete it.
 
-use crate::access_path::AccessPath;
+use crate::state_store::state_key::StateKey;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
@@ -53,7 +53,7 @@ impl WriteSet {
     }
 
     #[inline]
-    pub fn iter(&self) -> ::std::slice::Iter<'_, (AccessPath, WriteOp)> {
+    pub fn iter(&self) -> ::std::slice::Iter<'_, (StateKey, WriteOp)> {
         self.into_iter()
     }
 
@@ -68,15 +68,15 @@ impl WriteSet {
 /// This is separate because it goes through validation before becoming an immutable `WriteSet`.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct WriteSetMut {
-    write_set: Vec<(AccessPath, WriteOp)>,
+    write_set: Vec<(StateKey, WriteOp)>,
 }
 
 impl WriteSetMut {
-    pub fn new(write_set: Vec<(AccessPath, WriteOp)>) -> Self {
+    pub fn new(write_set: Vec<(StateKey, WriteOp)>) -> Self {
         Self { write_set }
     }
 
-    pub fn push(&mut self, item: (AccessPath, WriteOp)) {
+    pub fn push(&mut self, item: (StateKey, WriteOp)) {
         self.write_set.push(item);
     }
 
@@ -91,8 +91,8 @@ impl WriteSetMut {
     }
 }
 
-impl ::std::iter::FromIterator<(AccessPath, WriteOp)> for WriteSetMut {
-    fn from_iter<I: IntoIterator<Item = (AccessPath, WriteOp)>>(iter: I) -> Self {
+impl ::std::iter::FromIterator<(StateKey, WriteOp)> for WriteSetMut {
+    fn from_iter<I: IntoIterator<Item = (StateKey, WriteOp)>>(iter: I) -> Self {
         let mut ws = WriteSetMut::default();
         for write in iter {
             ws.push((write.0, write.1));
@@ -102,8 +102,8 @@ impl ::std::iter::FromIterator<(AccessPath, WriteOp)> for WriteSetMut {
 }
 
 impl<'a> IntoIterator for &'a WriteSet {
-    type Item = &'a (AccessPath, WriteOp);
-    type IntoIter = ::std::slice::Iter<'a, (AccessPath, WriteOp)>;
+    type Item = &'a (StateKey, WriteOp);
+    type IntoIter = ::std::slice::Iter<'a, (StateKey, WriteOp)>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.write_set.iter()
@@ -111,8 +111,8 @@ impl<'a> IntoIterator for &'a WriteSet {
 }
 
 impl ::std::iter::IntoIterator for WriteSet {
-    type Item = (AccessPath, WriteOp);
-    type IntoIter = ::std::vec::IntoIter<(AccessPath, WriteOp)>;
+    type Item = (StateKey, WriteOp);
+    type IntoIter = ::std::vec::IntoIter<(StateKey, WriteOp)>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.write_set.into_iter()

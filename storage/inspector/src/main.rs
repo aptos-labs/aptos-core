@@ -87,7 +87,9 @@ fn print_account(db: &AptosDB, addr: AccountAddress) {
         .get_latest_state_value(StateKey::AccountAddressKey(addr))
         .expect("Unable to read AccountState");
     if let Some(blob) = maybe_blob {
-        match AccountResource::try_from(&AccountStateBlob::from(blob)) {
+        match AccountResource::try_from(
+            &AccountStateBlob::try_from(blob).expect("Can't convert state value to Account Blob"),
+        ) {
             Ok(r) => {
                 println!("Account {}: {:?}", addr, r);
             }

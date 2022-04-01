@@ -26,6 +26,7 @@ use aptos_types::{
     on_chain_config::{
         OnChainConfig, ParallelExecutionConfig, VMPublishingOption, ValidatorSet, Version,
     },
+    state_store::state_key::StateKey,
     transaction::{
         ChangeSet, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
         VMValidatorResult,
@@ -269,7 +270,7 @@ impl FakeExecutor {
 
     fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
         let ap = AccessPath::resource_access_path(ResourceKey::new(*addr, T::struct_tag()));
-        let data_blob = StateView::get_by_access_path(&self.data_store, &ap)
+        let data_blob = StateView::get_state_value(&self.data_store, &StateKey::AccessPath(ap))
             .expect("account must exist in data store")
             .unwrap_or_else(|| {
                 panic!(
@@ -452,7 +453,7 @@ impl FakeExecutor {
 
     /// Get the blob for the associated AccessPath
     pub fn read_from_access_path(&self, path: &AccessPath) -> Option<Vec<u8>> {
-        StateView::get_by_access_path(&self.data_store, path).unwrap()
+        StateView::get_state_value(&self.data_store, &StateKey::AccessPath(path.clone())).unwrap()
     }
 
     /// Verifies the given transaction by running it through the VM verifier.

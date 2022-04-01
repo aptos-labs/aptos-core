@@ -17,6 +17,7 @@ use aptos_types::{
         config_address, dpn_access_path_for_config, new_epoch_event_key, ConfigurationResource,
         OnChainConfig, ValidatorSet,
     },
+    state_store::state_key::StateKey,
     transaction::{
         RawTransaction, Script, SignedTransaction, Transaction, TransactionArgument,
         TransactionOutput, TransactionPayload, TransactionStatus,
@@ -202,7 +203,7 @@ fn read_seqnum_from_storage(state_view: &impl StateView, seqnum_access_path: &Ac
 
 fn read_u64_from_storage(state_view: &impl StateView, access_path: &AccessPath) -> u64 {
     state_view
-        .get_by_access_path(access_path)
+        .get_state_value(&StateKey::AccessPath(access_path.clone()))
         .expect("Failed to query storage.")
         .map_or(0, |bytes| decode_bytes(&bytes))
 }
@@ -225,11 +226,14 @@ fn gen_genesis_writeset() -> WriteSet {
     let mut write_set = WriteSetMut::default();
     let validator_set_ap = dpn_access_path_for_config(ValidatorSet::CONFIG_ID);
     write_set.push((
-        validator_set_ap,
+        StateKey::AccessPath(validator_set_ap),
         WriteOp::Value(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
     ));
     write_set.push((
-        AccessPath::new(config_address(), ConfigurationResource::resource_path()),
+        StateKey::AccessPath(AccessPath::new(
+            config_address(),
+            ConfigurationResource::resource_path(),
+        )),
         WriteOp::Value(bcs::to_bytes(&ConfigurationResource::default()).unwrap()),
     ));
     write_set
@@ -240,11 +244,11 @@ fn gen_genesis_writeset() -> WriteSet {
 fn gen_mint_writeset(sender: AccountAddress, balance: u64, seqnum: u64) -> WriteSet {
     let mut write_set = WriteSetMut::default();
     write_set.push((
-        balance_ap(sender),
+        StateKey::AccessPath(balance_ap(sender)),
         WriteOp::Value(balance.to_le_bytes().to_vec()),
     ));
     write_set.push((
-        seqnum_ap(sender),
+        StateKey::AccessPath(seqnum_ap(sender)),
         WriteOp::Value(seqnum.to_le_bytes().to_vec()),
     ));
     write_set.freeze().expect("mint writeset should be valid")
@@ -259,15 +263,15 @@ fn gen_payment_writeset(
 ) -> WriteSet {
     let mut write_set = WriteSetMut::default();
     write_set.push((
-        balance_ap(sender),
+        StateKey::AccessPath(balance_ap(sender)),
         WriteOp::Value(sender_balance.to_le_bytes().to_vec()),
     ));
     write_set.push((
-        seqnum_ap(sender),
+        StateKey::AccessPath(seqnum_ap(sender)),
         WriteOp::Value(sender_seqnum.to_le_bytes().to_vec()),
     ));
     write_set.push((
-        balance_ap(recipient),
+        StateKey::AccessPath(balance_ap(recipient)),
         WriteOp::Value(recipient_balance.to_le_bytes().to_vec()),
     ));
     write_set

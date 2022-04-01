@@ -18,6 +18,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
+    state_store::state_key::StateKey,
     transaction::{
         Module as TransactionModule, RawTransaction, Script as TransactionScript,
         ScriptFunction as TransactionScriptFunction, Transaction, TransactionOutput,
@@ -441,7 +442,7 @@ impl<'a> AptosTestAdapter<'a> {
         ));
         let account_blob = self
             .storage
-            .get_by_access_path(&account_access_path)
+            .get_state_value(&StateKey::AccessPath(account_access_path))
             .unwrap()
             .ok_or_else(|| {
                 format_err!(
@@ -465,7 +466,7 @@ impl<'a> AptosTestAdapter<'a> {
 
         let balance_blob = self
             .storage
-            .get_by_access_path(&balance_access_path)
+            .get_state_value(&StateKey::AccessPath(balance_access_path))
             .unwrap()
             .ok_or_else(|| {
                 format_err!(

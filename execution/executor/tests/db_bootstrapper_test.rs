@@ -282,11 +282,11 @@ fn test_pre_genesis() {
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
         WriteSetMut::new(vec![
             (
-                access_path_for_config(ValidatorSet::CONFIG_ID),
+                StateKey::AccessPath(access_path_for_config(ValidatorSet::CONFIG_ID)),
                 WriteOp::Value(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
             ),
             (
-                AccessPath::new(account1, BalanceResource::resource_path()),
+                StateKey::AccessPath(AccessPath::new(account1, BalanceResource::resource_path())),
                 WriteOp::Value(bcs::to_bytes(&BalanceResource::new(1000)).unwrap()),
             ),
         ])
@@ -361,15 +361,18 @@ fn test_new_genesis() {
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
         WriteSetMut::new(vec![
             (
-                dpn_access_path_for_config(ValidatorSet::CONFIG_ID),
+                StateKey::AccessPath(dpn_access_path_for_config(ValidatorSet::CONFIG_ID)),
                 WriteOp::Value(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
             ),
             (
-                AccessPath::new(config_address(), ConfigurationResource::resource_path()),
+                StateKey::AccessPath(AccessPath::new(
+                    config_address(),
+                    ConfigurationResource::resource_path(),
+                )),
                 WriteOp::Value(bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap()),
             ),
             (
-                AccessPath::new(account1, BalanceResource::resource_path()),
+                StateKey::AccessPath(AccessPath::new(account1, BalanceResource::resource_path())),
                 WriteOp::Value(bcs::to_bytes(&BalanceResource::new(1_000_000)).unwrap()),
             ),
         ])

@@ -293,6 +293,19 @@ SignedTransaction:
         TYPENAME: RawTransaction
     - authenticator:
         TYPENAME: TransactionAuthenticator
+StateKey:
+  ENUM:
+    0:
+      AccountAddressKey:
+        NEWTYPE:
+          TYPENAME: AccountAddress
+    1:
+      AccessPath:
+        NEWTYPE:
+          TYPENAME: AccessPath
+    2:
+      Raw:
+        NEWTYPE: BYTES
 StructTag:
   STRUCT:
     - address:
@@ -516,7 +529,7 @@ WriteSetMut:
     - write_set:
         SEQ:
           TUPLE:
-            - TYPENAME: AccessPath
+            - TYPENAME: StateKey
             - TYPENAME: WriteOp
 WriteSetPayload:
   ENUM:

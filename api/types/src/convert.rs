@@ -27,6 +27,7 @@ use move_resource_viewer::MoveValueAnnotator;
 
 use crate::transaction::{ModuleBundlePayload, StateCheckpointTransaction};
 use anyhow::{ensure, format_err, Result};
+use aptos_types::state_store::state_key::StateKey;
 use serde_json::Value;
 use std::{
     convert::{TryFrom, TryInto},
@@ -175,9 +176,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     write_set: WriteSet::DirectWriteSet(DirectWriteSet {
                         changes: write_set
                             .into_iter()
-                            .map(|(access_path, op)| {
-                                self.try_into_write_set_change(access_path, op)
-                            })
+                            .map(|(state_key, op)| self.try_into_write_set_change(state_key, op))
                             .collect::<Result<_>>()?,
                         events: self.try_into_events(&events)?,
                     }),
@@ -188,6 +187,27 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
     }
 
     pub fn try_into_write_set_change(
+        &self,
+        state_key: StateKey,
+        op: WriteOp,
+    ) -> Result<WriteSetChange> {
+        match state_key {
+            StateKey::AccessPath(access_path) => {
+                self.try_access_path_into_write_set_change(access_path, op)
+            }
+            // We should not expect account address here.
+            StateKey::AccountAddressKey(_) => Err(format_err!(
+                "Can't convert account address key {:?} to WriteSetChange",
+                state_key
+            )),
+            StateKey::Raw(_) => Err(format_err!(
+                "Can't convert account raw key {:?} to WriteSetChange",
+                state_key
+            )),
+        }
+    }
+
+    pub fn try_access_path_into_write_set_change(
         &self,
         access_path: AccessPath,
         op: WriteOp,

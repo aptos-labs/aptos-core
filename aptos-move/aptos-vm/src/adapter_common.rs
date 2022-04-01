@@ -18,6 +18,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{
     access_path::AccessPath,
     block_metadata::BlockMetadata,
+    state_store::state_key::StateKey,
     transaction::{
         Transaction, TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
         WriteSetPayload,
@@ -167,7 +168,7 @@ fn preload_cache(signature_verified_block: &[PreprocessedTransaction], data_view
         .into_par_iter()
         .map(|addr| {
             data_view
-                .get_by_access_path(&AccessPath::new(addr, Vec::new()))
+                .get_state_value(&StateKey::AccessPath(AccessPath::new(addr, Vec::new())))
                 .ok()?
         })
         .collect::<Vec<Option<Vec<u8>>>>();

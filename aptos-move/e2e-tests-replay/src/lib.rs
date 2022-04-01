@@ -4,13 +4,14 @@
 use anyhow::{anyhow, bail, Result};
 use std::{
     collections::{BTreeMap, BTreeSet},
+    convert::TryFrom,
     env, fs,
     path::Path,
 };
 use walkdir::WalkDir;
 
 use aptos_types::{
-    access_path::Path as AP,
+    access_path::{AccessPath, Path as AP},
     account_address::AccountAddress,
     account_config::{
         from_currency_code_string, reserved_vm_address, type_tag_for_currency_code,
@@ -215,7 +216,8 @@ impl<'env> CrossRunner<'env> {
         let mut move_vm_state = data_store.clone();
         let mut stackless_vm_state = GlobalState::default();
         let mut included_modules = BTreeSet::new();
-        for (ap, blob) in data_store.inner() {
+        for (key, blob) in data_store.inner() {
+            let ap = AccessPath::try_from(key.clone()).unwrap();
             match ap.get_path() {
                 AP::Code(module_id) => {
                     let module_env = env.find_module_by_language_storage_id(&module_id).unwrap();
@@ -987,7 +989,8 @@ fn replay_trace<P: AsRef<Path>>(
                             return Ok(());
                         }
                         TransactionPayload::WriteSet(WriteSetPayload::Direct(change_set)) => {
-                            for (ap, _) in change_set.write_set().iter() {
+                            for (key, _) in change_set.write_set().iter() {
+                                let ap = AccessPath::try_from(key.clone()).unwrap();
                                 match ap.get_path() {
                                     AP::Code(_) => {
                                         // NOTE: a direct write-set can modify the code arbitrarily,

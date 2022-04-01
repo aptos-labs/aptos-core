@@ -6,7 +6,7 @@ use crate::{
     account_state::AccountState,
     state_store::state_value::StateValue,
 };
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, format_err, Error, Result};
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
@@ -99,9 +99,14 @@ impl TryFrom<&AccountState> for AccountStateBlob {
     }
 }
 
-impl From<StateValue> for AccountStateBlob {
-    fn from(state_store_value: StateValue) -> Self {
-        AccountStateBlob::from(state_store_value.bytes)
+impl TryFrom<StateValue> for AccountStateBlob {
+    type Error = Error;
+
+    fn try_from(state_store_value: StateValue) -> Result<Self> {
+        let bytes = state_store_value
+            .maybe_bytes
+            .ok_or_else(|| format_err!("Empty state value passed"))?;
+        Ok(AccountStateBlob::from(bytes))
     }
 }
 

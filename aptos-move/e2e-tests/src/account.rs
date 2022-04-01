@@ -16,6 +16,7 @@ use aptos_types::{
     },
     chain_id::ChainId,
     event::EventHandle,
+    state_store::state_key::StateKey,
     transaction::{
         authenticator::AuthenticationKey, Module, ModuleBundle, RawTransaction, Script,
         ScriptFunction, SignedTransaction, TransactionPayload, WriteSetPayload,
@@ -681,14 +682,20 @@ impl AccountData {
             .unwrap()
             .simple_serialize(&AccountData::layout())
             .unwrap();
-        write_set.push((self.make_account_access_path(), WriteOp::Value(account)));
+        write_set.push((
+            StateKey::AccessPath(self.make_account_access_path()),
+            WriteOp::Value(account),
+        ));
         for (_, balance_blob) in balance_blobs.into_iter() {
             let balance = balance_blob
                 .value_as::<Struct>()
                 .unwrap()
                 .simple_serialize(&Balance::layout())
                 .unwrap();
-            write_set.push((self.make_balance_access_path(), WriteOp::Value(balance)));
+            write_set.push((
+                StateKey::AccessPath(self.make_balance_access_path()),
+                WriteOp::Value(balance),
+            ));
         }
         let transfer = transfer_events
             .value_as::<Struct>()
@@ -696,7 +703,7 @@ impl AccountData {
             .simple_serialize(&Self::transfer_event_layout())
             .unwrap();
         write_set.push((
-            self.make_transfer_events_access_path(),
+            StateKey::AccessPath(self.make_transfer_events_access_path()),
             WriteOp::Value(transfer),
         ));
 

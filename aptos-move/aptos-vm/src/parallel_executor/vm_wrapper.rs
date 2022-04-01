@@ -15,7 +15,7 @@ use aptos_parallel_executor::{
 };
 use aptos_state_view::StateView;
 use aptos_types::{
-    access_path::AccessPath, account_config::DIEM_ACCOUNT_MODULE, write_set::WriteOp,
+    account_config::DIEM_ACCOUNT_MODULE, state_store::state_key::StateKey, write_set::WriteOp,
 };
 use move_core_types::vm_status::VMStatus;
 
@@ -51,7 +51,7 @@ impl<'a, S: 'a + StateView> ExecutorTask for DiemVMWrapper<'a, S> {
 
     fn execute_transaction(
         &self,
-        view: &MVHashMapView<AccessPath, WriteOp>,
+        view: &MVHashMapView<StateKey, WriteOp>,
         txn: &PreprocessedTransaction,
     ) -> ExecutionStatus<DiemTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), view.txn_idx());
