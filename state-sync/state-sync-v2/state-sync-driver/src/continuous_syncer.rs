@@ -2,11 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    driver::DriverConfiguration, error::Error, notification_handlers::ConsensusSyncRequest,
-    storage_synchronizer::StorageSynchronizerInterface, utils, utils::SpeculativeStreamState,
+    driver::DriverConfiguration,
+    error::Error,
+    notification_handlers::ConsensusSyncRequest,
+    storage_synchronizer::StorageSynchronizerInterface,
+    utils,
+    utils::{SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
 };
 use aptos_config::config::ContinuousSyncingMode;
 use aptos_infallible::Mutex;
+use aptos_logger::{prelude::*, sample, sample::SampleRate};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
@@ -16,7 +21,7 @@ use data_streaming_service::{
     data_stream::DataStreamListener,
     streaming_client::{DataStreamingClient, NotificationFeedback, StreamingServiceClient},
 };
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use storage_interface::DbReader;
 
 /// A simple component that manages the continuous syncing of the node
@@ -68,6 +73,10 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
                 .await
         } else if self.storage_synchronizer.pending_storage_data() {
             // Wait for any pending data to be processed
+            sample!(
+                SampleRate::Duration(Duration::from_secs(PENDING_DATA_LOG_FREQ_SECS)),
+                info!("Waiting for the storage synchronizer to handle pending data!")
+            );
             Ok(())
         } else {
             // Fetch a new data stream to start streaming data

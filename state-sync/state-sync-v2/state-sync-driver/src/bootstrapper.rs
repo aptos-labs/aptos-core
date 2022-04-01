@@ -8,11 +8,14 @@ use crate::{
     notification_handlers::CommittedAccounts,
     storage_synchronizer::StorageSynchronizerInterface,
     utils,
-    utils::SpeculativeStreamState,
+    utils::{SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
 };
-use ::aptos_logger::*;
 use aptos_config::config::BootstrappingMode;
 use aptos_data_client::GlobalDataSummary;
+use aptos_logger::{
+    prelude::*,
+    sample::{SampleRate, Sampling},
+};
 use aptos_types::{
     epoch_change::Verifier,
     epoch_state::EpochState,
@@ -27,7 +30,7 @@ use data_streaming_service::{
     streaming_client::{DataStreamingClient, NotificationFeedback, StreamingServiceClient},
 };
 use futures::channel::oneshot;
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use storage_interface::DbReader;
 
 /// A simple container for verified epoch states and epoch ending ledger infos
@@ -382,7 +385,13 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
         if self.active_data_stream.is_some() {
             // We have an active data stream. Process any notifications!
             self.process_active_stream_notifications().await?;
-        } else if !self.storage_synchronizer.pending_storage_data() {
+        } else if self.storage_synchronizer.pending_storage_data() {
+            // Wait for any pending data to be processed
+            sample!(
+                SampleRate::Duration(Duration::from_secs(PENDING_DATA_LOG_FREQ_SECS)),
+                info!("Waiting for the storage synchronizer to handle pending data!")
+            );
+        } else {
             // Fetch a new data stream to start streaming data
             self.initialize_active_data_stream(global_data_summary)
                 .await?;

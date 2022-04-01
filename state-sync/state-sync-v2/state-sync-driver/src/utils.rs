@@ -20,6 +20,9 @@ use std::{sync::Arc, time::Duration};
 use storage_interface::{DbReader, StartupInfo};
 use tokio::time::timeout;
 
+// TODO(joshlind): make this configurable!
+pub const PENDING_DATA_LOG_FREQ_SECS: u64 = 3;
+
 /// The speculative state that tracks a data stream of transactions or outputs.
 /// This assumes all data is valid and allows the driver to speculatively verify
 /// payloads flowing along the stream without having to block on the executor or
