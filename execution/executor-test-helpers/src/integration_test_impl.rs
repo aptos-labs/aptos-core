@@ -25,6 +25,11 @@ use aptos_types::{
     trusted_state::{TrustedState, TrustedStateChange},
     waypoint::Waypoint,
 };
+use aptos_sdk::{
+    transaction_builder::TransactionFactory,
+    types::{transaction::SignedTransaction, LocalAccount},
+};
+
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use executor::block_executor::BlockExecutor;
@@ -52,21 +57,22 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let seed = [3u8; 32];
     let mut rng = ::rand::rngs::StdRng::from_seed(seed);
 
-    let privkey1 = Ed25519PrivateKey::generate(&mut rng);
+    // I am having difficulty import this module
+    let privkey1 = LocalAccount::generate(&mut rng);
     let pubkey1 = privkey1.public_key();
     let account1_auth_key = AuthenticationKey::ed25519(&pubkey1);
     let account1 = account1_auth_key.derived_address();
 
-    let privkey2 = Ed25519PrivateKey::generate(&mut rng);
+    let privkey2 = LocalAccount::generate(&mut rng);
     let pubkey2 = privkey2.public_key();
     let account2_auth_key = AuthenticationKey::ed25519(&pubkey2);
     let account2 = account2_auth_key.derived_address();
 
-    let pubkey3 = Ed25519PrivateKey::generate(&mut rng).public_key();
+    let pubkey3 = LocalAccount::generate(&mut rng).public_key();
     let account3_auth_key = AuthenticationKey::ed25519(&pubkey3);
     let account3 = account3_auth_key.derived_address();
 
-    let pubkey4 = Ed25519PrivateKey::generate(&mut rng).public_key();
+    let pubkey4 = LocalAccount::generate(&mut rng).public_key();
     let account4_auth_key = AuthenticationKey::ed25519(&pubkey4); // non-existent account
     let account4 = account4_auth_key.derived_address();
     let genesis_account = testnet_dd_account_address();

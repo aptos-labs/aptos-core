@@ -15,6 +15,8 @@ use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{RawTransaction, SignedTransaction, Transaction, Version},
 };
+use aptos_sdk::types::LocalAccount;
+
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
 use rand::{rngs::StdRng, SeedableRng};
@@ -59,6 +61,18 @@ struct P2pTestCase {
 }
 
 // TODO: use LocalAccount instead
+fn LocalAccountGenerator(){
+    
+    let mut account = LocalAccount::generate;
+    let txn = account.sign_with_transaction_builder(
+        txn_factory.payload(
+        encode_..._script_function(...),
+    )
+    );
+}
+
+
+
 #[derive(Deserialize, Serialize)]
 struct AccountData {
     private_key: Ed25519PrivateKey,
