@@ -264,7 +264,7 @@ mark-changed = []
 
 [[determinator.path-rule]]
 # Ignore typescript sdk
-globs = ["sdk-typescript/**/*"]
+globs = ["ecosystem/typescript/**/*"]
 mark-changed = []
 
 [[determinator.path-rule]]

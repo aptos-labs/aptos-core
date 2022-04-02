@@ -42,7 +42,3 @@ test("ensures input when HexString", () => {
   const hs = HexString.ensure(hs1);
   validate(hs);
 });
-
-
-
-

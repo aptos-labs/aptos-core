@@ -64,4 +64,3 @@ test("test raiseForStatus", async () => {
     .toThrow("Status Text - \"some string\"");
 
 });
-

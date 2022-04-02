@@ -5,8 +5,8 @@
   "engines": {
     "node": ">=11.0.0"
   },
-  "main": "./dist/aptos.min.js",
-  "types": "./dist/aptos.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc -p .",
     "lint": "eslint \"**/*.ts\"",
@@ -47,5 +47,5 @@
     "js-sha3": "^0.8.0",
     "tweetnacl": "^1.0.3"
   },
-  "version": "0.0.9"
+  "version": "0.0.11"
 }

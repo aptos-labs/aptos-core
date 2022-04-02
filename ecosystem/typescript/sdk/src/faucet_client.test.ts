@@ -51,7 +51,8 @@ test("full tutorial faucet flow", async () => {
   const events = await client.getEventsByEventHandle(
     tx.sender,
     "0x1::TestCoin::TransferEvents",
-    "sent_events");
+    "sent_events"
+  );
   expect(events[0].type).toBe("0x1::TestCoin::SentEvent");
 
   const events2 = await client.getEventsByEventKey(events[0].key);

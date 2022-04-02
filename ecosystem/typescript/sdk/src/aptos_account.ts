@@ -4,7 +4,7 @@ import { Buffer } from "buffer/"; // the trailing slash is important!
 import { HexString, MaybeHexString } from "./hex_string";
 import Types from "./types";
 
-export interface AptosAccountPrivateKeyObject {
+export interface AptosAccountObject {
   address?: string,
   publicKeyHex?: Types.HexEncodedBytes,
   privateKeyHex: Types.HexEncodedBytes,
@@ -17,7 +17,7 @@ export default class AptosAccount {
 
   private authKeyCached?: HexString;
 
-  static fromAptosAccountPrivateKeyObject(obj: AptosAccountPrivateKeyObject): AptosAccount {
+  static fromAptosAccountObject(obj: AptosAccountObject): AptosAccount {
     return new AptosAccount(HexString.ensure(obj.privateKeyHex).toUint8Array(), obj.address);
   }
 
@@ -36,7 +36,8 @@ export default class AptosAccount {
     return this.accountAddress;
   }
 
-  /** Returns the authKey for the associated account */
+  /** Returns the authKey for the associated account
+   * See here for more info: https://aptos.dev/basics/basics-accounts#single-signer-authentication */
   authKey(): HexString {
     if (!this.authKeyCached) {
       const hash = SHA3.sha3_256.create();
@@ -62,7 +63,7 @@ export default class AptosAccount {
     return this.signBuffer(toSign);
   }
 
-  toPrivateKeyObject(): AptosAccountPrivateKeyObject {
+  toPrivateKeyObject(): AptosAccountObject {
     return {
       address: this.address().hex(),
       publicKeyHex: this.pubKey().hex(),

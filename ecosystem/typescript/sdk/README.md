@@ -41,7 +41,7 @@ and `allowSyntheticDefaultImports` in your `tsconfig` for types compatibility:
 
 ```js
 "compilerOptions": {
-  "allowSyntheticDefaultImports": true, 
+  "allowSyntheticDefaultImports": true,
   "esModuleInterop": true,
   ...
 ```
@@ -61,8 +61,8 @@ Originally created with this:
 ```bash
 $  npx swagger-typescript-api -p ../api/doc/openapi.yaml -o ./src/api --modular --axios --single-http-client
 ```
-#### Changes to make after generation: 
-- OpenAPI/SpecHTML routes/types deleted as they're unneeded. 
+#### Changes to make after generation:
+- OpenAPI/SpecHTML routes/types deleted as they're unneeded.
 - There are a few type errors in the `http-client.ts` as the axios types are incomplete, that were fixed via `// @ts-ignore`
 
 
