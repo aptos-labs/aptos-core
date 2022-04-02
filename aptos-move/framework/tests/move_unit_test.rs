@@ -32,3 +32,8 @@ fn move_unit_tests() {
 fn aptos_move_unit_tests() {
     run_tests_for_pkg("aptos-framework");
 }
+
+#[test]
+fn example_unit_tests() {
+    run_tests_for_pkg("../../developer-docs-site/static/move_demo");
+}
