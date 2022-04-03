@@ -22,6 +22,7 @@ crossbeam-channel = { version = "0.5.2", features = ["crossbeam-utils", "std"] }
 crossbeam-deque = { version = "0.8.1", features = ["crossbeam-epoch", "crossbeam-utils", "std"] }
 crossbeam-queue = { version = "0.3.4", features = ["alloc", "std"] }
 crossbeam-utils = { version = "0.8.7", features = ["lazy_static", "std"] }
+diesel = { version = "1.4.8", features = ["32-column-tables", "bigdecimal", "bitflags", "chrono", "num-bigint", "num-integer", "num-traits", "numeric", "postgres", "pq-sys", "r2d2", "serde_json", "with-deprecated"] }
 either = { version = "1.6.1", features = ["use_std"] }
 futures-channel = { version = "0.3.21", features = ["alloc", "futures-sink", "sink", "std"] }
 futures-core = { version = "0.3.21", features = ["alloc", "std"] }
@@ -36,7 +37,7 @@ itertools = { version = "0.10.3", features = ["use_alloc", "use_std"] }
 libc = { version = "0.2.119", features = ["std"] }
 log = { version = "0.4.14", default-features = false, features = ["serde", "std"] }
 memchr = { version = "2.4.1", features = ["std", "use_std"] }
-num-integer = { version = "0.1.44", default-features = false, features = ["i128", "std"] }
+num-integer = { version = "0.1.44", features = ["i128", "std"] }
 num-traits = { version = "0.2.14", features = ["i128", "std"] }
 parking_lot = { version = "0.12.0", features = ["send_guard"] }
 phf_shared = { version = "0.10.0", features = ["std", "uncased"] }
@@ -70,6 +71,7 @@ crossbeam-channel = { version = "0.5.2", features = ["crossbeam-utils", "std"] }
 crossbeam-deque = { version = "0.8.1", features = ["crossbeam-epoch", "crossbeam-utils", "std"] }
 crossbeam-queue = { version = "0.3.4", features = ["alloc", "std"] }
 crossbeam-utils = { version = "0.8.7", features = ["lazy_static", "std"] }
+diesel = { version = "1.4.8", features = ["32-column-tables", "bigdecimal", "bitflags", "chrono", "num-bigint", "num-integer", "num-traits", "numeric", "postgres", "pq-sys", "r2d2", "serde_json", "with-deprecated"] }
 either = { version = "1.6.1", features = ["use_std"] }
 futures-channel = { version = "0.3.21", features = ["alloc", "futures-sink", "sink", "std"] }
 futures-core = { version = "0.3.21", features = ["alloc", "std"] }
@@ -84,7 +86,7 @@ itertools = { version = "0.10.3", features = ["use_alloc", "use_std"] }
 libc = { version = "0.2.119", features = ["std"] }
 log = { version = "0.4.14", default-features = false, features = ["serde", "std"] }
 memchr = { version = "2.4.1", features = ["std", "use_std"] }
-num-integer = { version = "0.1.44", default-features = false, features = ["i128", "std"] }
+num-integer = { version = "0.1.44", features = ["i128", "std"] }
 num-traits = { version = "0.2.14", features = ["i128", "std"] }
 parking_lot = { version = "0.12.0", features = ["send_guard"] }
 phf_shared = { version = "0.10.0", features = ["std", "uncased"] }

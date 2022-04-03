@@ -118,6 +118,16 @@ impl Transaction {
         }
     }
 
+    pub fn version(&self) -> Option<u64> {
+        match self {
+            Transaction::UserTransaction(txn) => Some(txn.info.version.into()),
+            Transaction::BlockMetadataTransaction(txn) => Some(txn.info.version.into()),
+            Transaction::PendingTransaction(_) => None,
+            Transaction::GenesisTransaction(txn) => Some(txn.info.version.into()),
+            Transaction::StateCheckpointTransaction(txn) => Some(txn.info.version.into()),
+        }
+    }
+
     pub fn success(&self) -> bool {
         match self {
             Transaction::UserTransaction(txn) => txn.info.success,
@@ -139,6 +149,16 @@ impl Transaction {
             Transaction::PendingTransaction(_txn) => "pending".to_owned(),
             Transaction::GenesisTransaction(txn) => txn.info.vm_status.clone(),
             Transaction::StateCheckpointTransaction(txn) => txn.info.vm_status.clone(),
+        }
+    }
+
+    pub fn type_str(&self) -> &'static str {
+        match self {
+            Transaction::PendingTransaction(_) => "pending_transaction",
+            Transaction::UserTransaction(_) => "user_transaction",
+            Transaction::GenesisTransaction(_) => "genesis_transaction",
+            Transaction::BlockMetadataTransaction(_) => "block_metadata_transaction",
+            Transaction::StateCheckpointTransaction(_) => "state_checkpoint_transaction",
         }
     }
 
