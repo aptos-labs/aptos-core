@@ -3,25 +3,13 @@
 use aptos_types::transaction::Version;
 use schemadb::{SchemaBatch, DB};
 
-use crate::pruner::db_pruner::DBPruner;
-use aptos_infallible::Mutex;
-
 use crate::{
-    pruner::{
-        event_store::event_store_pruner::EventStorePruner,
-        ledger_store::ledger_store_pruner::LedgerStorePruner,
-        state_store::StateStorePruner,
-        transaction_store::{
-            transaction_store_pruner::TransactionStorePruner, write_set_pruner::WriteSetPruner,
-        },
-    },
+    pruner::{db_pruner::DBPruner, utils},
     EventStore, LedgerStore, TransactionStore,
 };
+use aptos_infallible::Mutex;
 use itertools::zip_eq;
-use std::{
-    sync::{mpsc::Receiver, Arc},
-    time::Instant,
-};
+use std::sync::{mpsc::Receiver, Arc};
 
 /// Maintains all the DBPruners and periodically calls the db_pruner's prune method to prune the DB.
 /// This also exposes API to report the progress to the parent thread.
@@ -50,31 +38,11 @@ impl Worker {
         least_readable_versions: Arc<Mutex<Vec<Version>>>,
         max_version_to_prune_per_batch: u64,
     ) -> Self {
+        let db_pruners =
+            utils::create_db_pruners(db.clone(), transaction_store, ledger_store, event_store);
         Self {
             db: Arc::clone(&db),
-            db_pruners: vec![
-                Mutex::new(Arc::new(StateStorePruner::new(
-                    Arc::clone(&db),
-                    0,
-                    Instant::now(),
-                ))),
-                Mutex::new(Arc::new(TransactionStorePruner::new(
-                    Arc::clone(&db),
-                    Arc::clone(&transaction_store),
-                ))),
-                Mutex::new(Arc::new(LedgerStorePruner::new(
-                    Arc::clone(&db),
-                    Arc::clone(&ledger_store),
-                ))),
-                Mutex::new(Arc::new(EventStorePruner::new(
-                    Arc::clone(&db),
-                    Arc::clone(&event_store),
-                ))),
-                Mutex::new(Arc::new(WriteSetPruner::new(
-                    Arc::clone(&db),
-                    Arc::clone(&transaction_store),
-                ))),
-            ],
+            db_pruners,
             command_receiver,
             least_readable_versions,
             blocking_recv: true,

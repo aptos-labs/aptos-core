@@ -459,7 +459,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             match commit_result {
                                 Ok(()) => {
                                     if !all_accounts_synced {
-                                        // Send a commit notification to the  listener
+                                        // Send a commit notification to the listener
                                         let commit_notification = CommitNotification::new_committed_accounts(all_accounts_synced, last_committed_account_index, None);
                                         if let Err(error) = commit_notification_sender.send(commit_notification).await {
                                             let error = format!("Failed to send account commit notification! Error: {:?}", error);
@@ -469,30 +469,19 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                         continue; // Wait for the next chunk
                                     }
 
-                                    // All accounts have been synced! Finalize storage, reset
-                                    // the executor and send a commit notification to the listener.
-                                    let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
-                                            target_output_with_proof
-                                                .transactions_and_outputs
-                                                .clone()
-                                                .into_iter()
-                                                .unzip();
-                                        let events = outputs
-                                            .into_iter()
-                                            .flat_map(|output| output.events().to_vec())
-                                            .collect::<Vec<_>>();
-                                    let committed_transaction = CommittedTransactions {
-                                            events,
-                                            transactions,
-                                        };
+                                    // All accounts have been synced! Create a new commit notification
+                                    let commit_notification = create_final_commit_notification(&target_output_with_proof, last_committed_account_index);
 
-                                    let commit_notification = CommitNotification::new_committed_accounts(all_accounts_synced, last_committed_account_index, Some(committed_transaction));
+                                    // Finalize storage, reset the executor and send a commit
+                                    // notification to the listener.
                                     let finalized_result = if let Err(error) = state_snapshot_receiver.finish_box() {
                                         Err(format!("Failed to finish the account states synchronization! Error: {:?}", error))
                                     } else if let Err(error) = storage.finalize_state_snapshot(version, target_output_with_proof) {
                                         Err(format!("Failed to finalize the state snapshot! Error: {:?}", error))
                                     } else if let Err(error) = storage.save_ledger_infos(&epoch_change_proofs) {
                                         Err(format!("Failed to save all epoch ending ledger infos! Error: {:?}", error))
+                                    } else if let Err(error) = storage.delete_genesis() {
+                                        Err(format!("Failed to delete the genesis transaction! Error: {:?}", error))
                                     } else if let Err(error) = chunk_executor.reset() {
                                         Err(format!("Failed to reset the chunk executor after account states synchronization! Error: {:?}", error))
                                     } else if let Err(error) = commit_notification_sender.send(commit_notification).await {
@@ -505,9 +494,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                     if let Err(error) = finalized_result {
                                       send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
                                     }
-
-                                    // There's nothing left to do!
-                                    return;
+                                    return; // There's nothing left to do!
                                 },
                                 Err(error) => {
                                     let error = format!("Failed to commit account states chunk! Error: {:?}", error);
@@ -526,6 +513,32 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
 
     // Spawn the receiver
     spawn(runtime, receiver);
+}
+
+/// Creates a final commit notification for the last account states chunk
+fn create_final_commit_notification(
+    target_output_with_proof: &TransactionOutputListWithProof,
+    last_committed_account_index: u64,
+) -> CommitNotification {
+    let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
+        target_output_with_proof
+            .transactions_and_outputs
+            .clone()
+            .into_iter()
+            .unzip();
+    let events = outputs
+        .into_iter()
+        .flat_map(|output| output.events().to_vec())
+        .collect::<Vec<_>>();
+    let committed_transaction = CommittedTransactions {
+        events,
+        transactions,
+    };
+    CommitNotification::new_committed_accounts(
+        true,
+        last_committed_account_index,
+        Some(committed_transaction),
+    )
 }
 
 /// Spawns a future on a specified runtime. If no runtime is specified, uses

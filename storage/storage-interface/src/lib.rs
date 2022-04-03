@@ -630,6 +630,14 @@ pub trait DbWriter: Send + Sync {
     ) -> Result<()> {
         unimplemented!()
     }
+
+    /// Deletes transaction data associated with the genesis transaction. This is useful for
+    /// cleaning up the database after a node has bootstrapped all accounts through state sync.
+    ///
+    /// TODO(joshlind): find a cleaner (long term) solution to avoid us having to expose this...
+    fn delete_genesis(&self) -> Result<()> {
+        unimplemented!()
+    }
 }
 
 #[derive(Clone)]

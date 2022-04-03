@@ -9,6 +9,7 @@ pub(crate) mod event_store;
 mod ledger_store;
 pub(crate) mod state_store;
 pub(crate) mod transaction_store;
+pub mod utils;
 pub(crate) mod worker;
 
 use crate::metrics::APTOS_STORAGE_PRUNE_WINDOW;

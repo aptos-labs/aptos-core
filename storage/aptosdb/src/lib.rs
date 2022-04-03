@@ -49,7 +49,7 @@ use crate::{
         APTOS_STORAGE_LEDGER_VERSION, APTOS_STORAGE_NEXT_BLOCK_EPOCH,
         APTOS_STORAGE_OTHER_TIMERS_SECONDS, APTOS_STORAGE_ROCKSDB_PROPERTIES,
     },
-    pruner::Pruner,
+    pruner::{utils, Pruner},
     schema::*,
     state_store::StateStore,
     system_store::SystemStore,
@@ -83,7 +83,7 @@ use aptos_types::{
 };
 use itertools::zip_eq;
 use once_cell::sync::Lazy;
-use schemadb::{ColumnFamilyName, Options, DB, DEFAULT_CF_NAME};
+use schemadb::{ColumnFamilyName, Options, SchemaBatch, DB, DEFAULT_CF_NAME};
 use std::{
     collections::HashMap,
     iter::Iterator,
@@ -1367,6 +1367,28 @@ impl DbWriter for AptosDB {
                 version,
                 outputs,
             )
+        })
+    }
+
+    fn delete_genesis(&self) -> Result<()> {
+        gauged_api("delete_genesis", || {
+            // Create all the db pruners
+            let db_pruners = utils::create_db_pruners(
+                self.db.clone(),
+                self.transaction_store.clone(),
+                self.ledger_store.clone(),
+                self.event_store.clone(),
+            );
+
+            // Execute each pruner to clean up the genesis state
+            let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive).
+            let max_version = 1; // We should only really be pruning at a single version.
+            let mut db_batch = SchemaBatch::new();
+            for db_pruner in db_pruners {
+                db_pruner.lock().set_target_version(target_version);
+                db_pruner.lock().prune(&mut db_batch, max_version)?;
+            }
+            self.db.write_schemas(db_batch)
         })
     }
 }
