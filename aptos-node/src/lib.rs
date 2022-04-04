@@ -127,84 +127,83 @@ pub fn load_test_environment<R>(
 ) where
     R: ::rand::RngCore + ::rand::CryptoRng,
 {
-    // Either allocate a temppath or reuse the passed in path and make sure the directory exists
     let config_temp_path = aptos_temppath::TempPath::new();
-    let config_path = config_path.unwrap_or_else(|| config_temp_path.as_ref().to_path_buf());
+
+    let (try_load, config_path) = if let Some(config_path) = config_path {
+        (config_path.join("0").join("node.yaml").exists(), config_path)
+    } else {
+        (false, config_temp_path.as_ref().to_path_buf())
+    };
+
     std::fs::DirBuilder::new()
         .recursive(true)
         .create(&config_path)
         .unwrap();
+
     let config_path = config_path.canonicalize().unwrap();
 
-    // Build a single validator network
-    let mut maybe_config = PathBuf::from(&config_path);
-    maybe_config.push("validator_node_template.yaml");
-    let mut template = NodeConfig::load_config(maybe_config)
-        .unwrap_or_else(|_| NodeConfig::default_for_validator());
-
-    // enable REST and JSON-RPC API
-    template.api.address = format!("0.0.0.0:{}", template.api.address.port())
-        .parse()
-        .unwrap();
-    if lazy {
-        template.consensus.mempool_poll_count = u64::MAX;
-    }
-
-    let mut builder =
-        aptos_genesis_tool::validator_builder::ValidatorBuilder::new(&config_path, genesis_modules)
-            .template(template)
-            .randomize_first_validator_ports(random_ports);
-    if let Some(publishing_option) = publishing_option {
-        builder = builder.publishing_option(publishing_option);
-    }
-    let (root_keys, _genesis, genesis_waypoint, validators) = builder.build(rng).unwrap();
-
+    let validator_config_path = config_path.join("0").join("node.yaml");
     let aptos_root_key_path = config_path.join("mint.key");
-    let serialized_keys = bcs::to_bytes(&root_keys.root_key).unwrap();
-    let mut key_file = std::fs::File::create(&aptos_root_key_path).unwrap();
-    key_file.write_all(&serialized_keys).unwrap();
+
+    let config = if try_load {
+        NodeConfig::load(&validator_config_path).expect("Unable to load config:")
+    } else {
+        // Build a single validator network
+        let mut maybe_config = PathBuf::from(&config_path);
+        maybe_config.push("validator_node_template.yaml");
+        let mut template = NodeConfig::load_config(maybe_config)
+            .unwrap_or_else(|_| NodeConfig::default_for_validator());
+
+        // enable REST and JSON-RPC API
+        template.api.address = format!("0.0.0.0:{}", template.api.address.port())
+            .parse()
+            .unwrap();
+        if lazy {
+            template.consensus.mempool_poll_count = u64::MAX;
+        }
+
+        let mut builder =
+            aptos_genesis_tool::validator_builder::ValidatorBuilder::new(&config_path, genesis_modules)
+                .template(template)
+                .randomize_first_validator_ports(random_ports);
+        if let Some(publishing_option) = publishing_option {
+            builder = builder.publishing_option(publishing_option);
+        }
+        let (root_keys, _genesis, genesis_waypoint, validators) = builder.build(rng).unwrap();
+
+        let serialized_keys = bcs::to_bytes(&root_keys.root_key).unwrap();
+        let mut key_file = std::fs::File::create(&aptos_root_key_path).unwrap();
+        key_file.write_all(&serialized_keys).unwrap();
+
+        // Build a waypoint file so that clients / docker can grab it easily
+        let waypoint_file_path = config_path.join("waypoint.txt");
+        std::io::Write::write_all(
+            &mut std::fs::File::create(&waypoint_file_path).unwrap(),
+            genesis_waypoint.to_string().as_bytes(),
+        )
+        .unwrap();
+
+        validators[0].config.clone()
+    };
 
     // Prepare log file since we cannot automatically route logs to stderr
-    let mut log_file = config_path.clone();
-    log_file.push("validator.log");
+    let log_file = config_path.join("validator.log");
 
-    // Build a waypoint file so that clients / docker can grab it easily
-    let waypoint_file_path = config_path.join("waypoint.txt");
-    std::io::Write::write_all(
-        &mut std::fs::File::create(&waypoint_file_path).unwrap(),
-        genesis_waypoint.to_string().as_bytes(),
-    )
-    .unwrap();
-
-    // Intentionally leave out instructions on how to connect with different applications
     println!("Completed generating configuration:");
     println!("\tLog file: {:?}", log_file);
-    println!("\tConfig path: {:?}", validators[0].config_path());
+    println!("\tConfig path: {:?}", validator_config_path);
     println!("\tAptos root key path: {:?}", aptos_root_key_path);
-    println!("\tWaypoint: {}", genesis_waypoint);
+    println!("\tWaypoint: {}", config.base.waypoint.genesis_waypoint());
     println!("\tChainId: {}", ChainId::test());
-
-    print_api_config(&validators[0].config, lazy);
-
-    println!("Aptos is running, press ctrl-c to exit");
-    println!();
-
-    start(&validators[0].config, Some(log_file))
-}
-
-pub fn print_api_config(config: &NodeConfig, lazy: bool) {
-    println!("\tREST API endpoint: {}", config.api.address);
-    println!("\tStream-RPC enabled!");
-
-    println!(
-        "\tFullNode network: {}",
-        config.full_node_networks[0].listen_address
-    );
-    println!();
+    println!("\tREST API endpoint: {}", &config.api.address);
+    println!("\tFullNode network: {}", &config.full_node_networks[0].listen_address);
     if lazy {
         println!("\tLazy mode is enabled");
-        println!();
     }
+
+    println!("\nAptos is running, press ctrl-c to exit\n");
+
+    start(&config, Some(log_file))
 }
 
 // Fetch chain ID from on-chain resource
