@@ -1,11 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-///! MoveVM and Session wrapped, to make sure Aptos natives and extensions are always installed and
-///! taken care of after session finish.
 use crate::{
     access_path_cache::AccessPathCache, aptos_vm_impl::convert_changeset_and_events_cached,
-    natives::aptos_natives, transaction_metadata::TransactionMetadata,
+    transaction_metadata::TransactionMetadata,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -20,47 +18,12 @@ use move_core_types::{
     resolver::MoveResolver,
     vm_status::VMStatus,
 };
-use move_vm_runtime::{
-    move_vm::MoveVM, native_functions::NativeContextExtensions, session::Session,
-};
+use move_vm_runtime::{native_functions::NativeContextExtensions, session::Session};
 use serde::{Deserialize, Serialize};
 use std::{
     convert::TryInto,
     ops::{Deref, DerefMut},
 };
-
-pub struct MoveVmExt {
-    inner: MoveVM,
-}
-
-impl MoveVmExt {
-    pub fn new() -> VMResult<Self> {
-        Ok(Self {
-            inner: MoveVM::new(aptos_natives())?,
-        })
-    }
-
-    pub fn new_session<'r, S: MoveResolver>(
-        &self,
-        remote: &'r S,
-        _session_id: SessionId,
-    ) -> SessionExt<'r, '_, S> {
-        // TODO: install table extension
-        let extensions = NativeContextExtensions::default();
-
-        SessionExt {
-            inner: self.inner.new_session_with_extensions(remote, extensions),
-        }
-    }
-}
-
-impl Deref for MoveVmExt {
-    type Target = MoveVM;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
@@ -126,6 +89,10 @@ impl<'r, 'l, S> SessionExt<'r, 'l, S>
 where
     S: MoveResolver,
 {
+    pub fn new(inner: Session<'r, 'l, S>) -> Self {
+        Self { inner }
+    }
+
     pub fn finish(self) -> VMResult<SessionOutput> {
         let (change_set, events, extensions) = self.inner.finish_with_extensions()?;
         Ok(SessionOutput {
