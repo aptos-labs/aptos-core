@@ -1,4 +1,0 @@
-{
-  "code": 400,
-  "message": "invalid request body: invalid UserTransactionRequest: expected 1 arguments [string<address>], but got 2 ([String(\"0x00000000000000000000000001234567\"), Object({})])"
-}

@@ -128,7 +128,7 @@ impl TestContext {
 
     pub fn check_golden_output(&mut self, msg: Value) {
         if self.golden_output.is_none() {
-            self.golden_output = Some(GoldenOutputs::new(self.test_name));
+            self.golden_output = Some(GoldenOutputs::new(self.test_name.replace(":", "_")));
         }
         self.golden_output.as_ref().unwrap().log(&pretty(&msg));
     }

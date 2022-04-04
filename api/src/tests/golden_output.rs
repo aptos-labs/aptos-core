@@ -26,7 +26,7 @@ fn golden_path() -> PathBuf {
 }
 
 impl GoldenOutputs {
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: String) -> Self {
         let mut mint = Mint::new(golden_path());
         let mut file_path = PathBuf::new();
         file_path.push(name);
