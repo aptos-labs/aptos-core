@@ -41,6 +41,11 @@ variable "helm_force_update" {
   default     = false
 }
 
+variable "namespace" {
+  default     = "aptos"
+  description = "Kubernetes namespace that the fullnode will be deployed into"
+}
+
 variable "k8s_api_sources" {
   description = "List of CIDR subnets which can access the Kubernetes API endpoint"
   default     = ["0.0.0.0/0"]

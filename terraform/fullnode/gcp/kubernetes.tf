@@ -4,6 +4,12 @@ provider "kubernetes" {
   token                  = data.google_client_config.provider.access_token
 }
 
+resource "kubernetes_namespace" "aptos" {
+  metadata {
+    name = var.namespace
+  }
+}
+
 resource "kubernetes_storage_class" "ssd" {
   metadata {
     name = "ssd"
@@ -24,11 +30,13 @@ provider "helm" {
 }
 
 resource "helm_release" "fullnode" {
-  count       = var.num_fullnodes
-  name        = "${terraform.workspace}${count.index}"
-  chart       = var.helm_chart
-  max_history = 100
-  wait        = false
+  count            = var.num_fullnodes
+  name             = "${terraform.workspace}${count.index}"
+  chart            = var.helm_chart
+  max_history      = 100
+  wait             = false
+  namespace        = var.namespace
+  create_namespace = true
 
   values = [
     jsonencode({
