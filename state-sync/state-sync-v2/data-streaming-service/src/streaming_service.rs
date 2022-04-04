@@ -21,8 +21,8 @@ use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
 
 // Useful constants for the Data Streaming Service
-const GLOBAL_DATA_REFRESH_LOG_FREQ_SECS: u64 = 1;
-const NO_DATA_TO_FETCH_LOG_FREQ_SECS: u64 = 5;
+const GLOBAL_DATA_REFRESH_LOG_FREQ_SECS: u64 = 3;
+const NO_DATA_TO_FETCH_LOG_FREQ_SECS: u64 = 3;
 
 /// The data streaming service that responds to data stream requests.
 pub struct DataStreamingService<T> {

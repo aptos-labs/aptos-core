@@ -116,12 +116,12 @@ pub struct StorageServiceConfig {
 impl Default for StorageServiceConfig {
     fn default() -> Self {
         Self {
-            max_account_states_chunk_sizes: 3000,
+            max_account_states_chunk_sizes: 1000,
             max_concurrent_requests: 1000,
             max_epoch_chunk_size: 100,
             max_network_channel_size: 1000,
-            max_transaction_chunk_size: 3000,
-            max_transaction_output_chunk_size: 3000,
+            max_transaction_chunk_size: 1000,
+            max_transaction_output_chunk_size: 1000,
             storage_summary_refresh_interval_ms: 1000,
         }
     }
@@ -157,7 +157,7 @@ impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
             global_summary_refresh_interval_ms: 300,
-            max_concurrent_requests: 5,
+            max_concurrent_requests: 3,
             max_data_stream_channel_sizes: 1000,
             max_request_retry: 5,
             max_notification_id_mappings: 2000,
@@ -176,8 +176,8 @@ pub struct AptosDataClientConfig {
 impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
-            response_timeout_ms: 10_000,
-            summary_poll_interval_ms: 1_000,
+            response_timeout_ms: 10000,
+            summary_poll_interval_ms: 1000,
         }
     }
 }
