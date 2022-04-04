@@ -39,7 +39,8 @@ Note: this command runs `aptos-node` from a genesis-only ledger state. If you wa
 
 1. Start your local validator network
 2. Copy the *Aptos root key path* and use it to replace the `mint-key-file-path` below 
-3. Run the following command to start a Faucet: ```
+3. Run the following command to start a Faucet:
+```
    cargo run --package aptos-faucet -- \
       --chain-id TESTING \
       --mint-key-file-path "/tmp/694173aa3bbe019499bbd5cf3fe0e2fc/mint.key" \
