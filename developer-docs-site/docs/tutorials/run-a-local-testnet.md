@@ -31,40 +31,49 @@ We describe each method below.
     ./scripts/dev_setup.sh
     source ~/.cargo/env
     ```
-2. Run the process: `cargo run -p aptos-node -- --test`. After starting up, the process should print its config path (e.g., `/private/var/folders/36/w0v54r116ls44q29wh8db0mh0000gn/T/f62a72f87940e3892a860c21b55b529b/0/node.yaml`) and other metadata.
+2. Run the command: `cargo run -p aptos-node -- --test`. After starting up, the process should print its config path (e.g., `/private/var/folders/36/w0v54r116ls44q29wh8db0mh0000gn/T/f62a72f87940e3892a860c21b55b529b/0/node.yaml`) and other metadata.
 
 Note: this command runs `aptos-node` from a genesis-only ledger state. If you want to reuse the ledger state produced by a previous run of `aptos-node`, use `cargo run -p aptos-node -- --test --config <config-path>`.
 
+#### Attaching a Faucet to your Aptos Testnet
+
+1. Start your local validator network
+2. Copy the *Aptos root key path* and use it to replace the `mint-key-file-path` below 
+3. Run the following command to start a Faucet: ```
+   cargo run --package aptos-faucet -- \
+      --chain-id TESTING \
+      --mint-key-file-path "/tmp/694173aa3bbe019499bbd5cf3fe0e2fc/mint.key" \
+      --address 0.0.0.0 \
+      --port 8000 \
+      --server-url http://127.0.0.1:8080
+```
+
+This will start a Faucet running locally without any restrictions to tokens that can be claimed / minted and make the serivce as accessible as the testnet started above. Faucets are stateless services that can be run in parallel.
+
 ### Using Docker
 
-1. Install Docker and Docker-Compose.
+1. Install [Docker](docker) including Docker-Compose.
 2. Create a directory for your local test validator network.
 3. Download the [validator testnet docker compose](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/validator-testnet/docker-compose.yaml) and [validator configuration](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/validator-testnet/validator_node_template.yaml).
-4. Create configuration files in the same directory so that the data can be exported out of the docker container:
-    ```
-    # Linux / Mac
-    touch genesis.blob aptos_root_key waypoint.txt
+4. Start Docker-Compose `docker-compose up`
 
-    # Windows
-    fsutil file createnew genesis.blob 0
-    fsutil file createnew aptos_root_key 0
-    fsutil file createnew waypoint.txt 0
-    Run docker-compose: docker-compose up
-    ```
+This will start both a Validator and a Faucet. The Validator's REST endpoint will be avilable at `http://127.0.0.1:8080` and the Faucet at `http://127.0.0.1:8000`.
 
 ## Interacting with the local test validator network
 After starting your local test validator network, you should see the following:
 
 ```
-validator_1  | Entering test mode, this should never be used in production!
-validator_1  | Completed generating configuration:
-validator_1  | 	Log file: "/opt/aptos/var/validator.log"
-validator_1  | 	Config path: "/opt/aptos/var/0/node.yaml"
-validator_1  | 	Aptos root key path: "/opt/aptos/var/mint.key"
-validator_1  | 	Waypoint: 0:7ff525d33f685a5cf26a71b393fa5159874c8f0c2861c382905f49dcb6991cb6
-validator_1  | 	REST endpoint: 0.0.0.0:8080
-validator_1  | 	FullNode network: /ip4/0.0.0.0/tcp/7180
-validator_1  | 	ChainId: TESTING
+Entering test mode, this should never be used in production!
+Completed generating configuration:
+        Log file: "/tmp/694173aa3bbe019499bbd5cf3fe0e2fc/validator.log"
+        Config path: "/tmp/694173aa3bbe019499bbd5cf3fe0e2fc/0/node.yaml"
+        Aptos root key path: "/tmp/694173aa3bbe019499bbd5cf3fe0e2fc/mint.key"
+        Waypoint: 0:197bc8b76761622c2d2054d8bf93c1802fa0eb4bc55f0f3d4442878fdecc297f
+        ChainId: TESTING
+        REST API endpoint: 0.0.0.0:8080
+        FullNode network: /ip4/0.0.0.0/tcp/7180
+
+Aptos is running, press ctrl-c to exit
 ```
 
 This output contains information required for starting the Aptos CLI tool:
@@ -82,3 +91,5 @@ At this point, you will have a special root account at `0x1` that can perform th
 * [Interacting with the Aptos Blockchain](/transactions/interacting-with-the-aptos-blockchain) to learn how to mint coins.
 
 It is important to note that this guide does not include creating a faucet. That is left as an exercise for the reader.
+
+[docker](https://docs.docker.com/get-docker/)
