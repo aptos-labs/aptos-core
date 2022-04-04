@@ -26,7 +26,7 @@ services:
   validator:
     # Note this image currently does not support this, will update to the appropriate minimum
     # version shortly
-    image: "aptoslab/validator:${IMAGE_TAG:-devnet}"
+    image: "aptoslab/validator:${IMAGE_TAG:-latest}"
     networks:
       shared:
     volumes:
@@ -36,14 +36,14 @@ services:
       - type: bind
         source: ./validator_node_template.yaml
         target: /opt/aptos/var/validator_node_template.yaml
-    command: ["/opt/aptos/bin/aptos-node", "--test", "--config", "/opt/aptos/var"]
+    command: ["/opt/aptos/bin/aptos-node", "--test", "--config", "/opt/aptos/var/"]
     ports:
       - "8080:8080"
     expose:
       - 9101
 
   faucet:
-    image: "aptoslab/faucet:${IMAGE_TAG:-devnet}"
+    image: "aptoslab/faucet:${IMAGE_TAG:-latest}"
     depends_on:
       - validator
     networks:
@@ -54,20 +54,19 @@ services:
         target: /opt/aptos/var
     command: >
       /bin/bash -c "
-        for i in {1..10}
-        do
-          if [[ -s /opt/aptos/var/mint.key ]]
-          then
-            /opt/aptos/bin/aptos-faucet \
-              --address 0.0.0.0 \
-              --port 8000 \
-              --chain-id TESTING \
-              --mint-key-file-path /opt/aptos/var/mint.key \
-              --server-url http://validator:8080/v1
-            exit $$?
-          else
+        for i in {1..10}; do
+          if [[ ! -s /opt/aptos/var/mint.key ]]; then
             echo 'Validator has not populated mint.key yet. Is it running?'
             sleep 1
+          else
+            sleep 1
+            /opt/aptos/bin/aptos-faucet \\
+              --address 0.0.0.0 \\
+              --port 8000 \\
+              --chain-id TESTING \\
+              --mint-key-file-path /opt/aptos/var/mint.key \\
+              --server-url http://validator:8080
+            echo 'Faucet failed to run likely due to the Validator still starting. Will try again.'
           fi
         done
         exit 1
