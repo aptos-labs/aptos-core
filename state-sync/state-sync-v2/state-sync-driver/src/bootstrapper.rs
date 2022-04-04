@@ -2,8 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    driver::DriverConfiguration, error::Error, notification_handlers::CommittedAccounts,
-    storage_synchronizer::StorageSynchronizerInterface, utils, utils::SpeculativeStreamState,
+    driver::DriverConfiguration,
+    error::Error,
+    logging::{LogEntry, LogSchema},
+    notification_handlers::CommittedAccounts,
+    storage_synchronizer::StorageSynchronizerInterface,
+    utils,
+    utils::SpeculativeStreamState,
 };
 use aptos_config::config::BootstrappingMode;
 use aptos_data_client::GlobalDataSummary;
@@ -97,10 +102,10 @@ impl VerifiedEpochStates {
             self.latest_epoch_state = next_epoch_state.clone();
             self.insert_new_epoch_ending_ledger_info(epoch_ending_ledger_info.clone());
 
-            trace!(
+            trace!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
                 "Updated the latest epoch state to epoch: {:?}",
                 self.latest_epoch_state.epoch
-            );
+            )));
         } else {
             return Err(Error::VerificationError(
                 "The ledger info was not epoch ending!".into(),
@@ -153,10 +158,10 @@ impl VerifiedEpochStates {
         &mut self,
         epoch_ending_ledger_info: LedgerInfoWithSignatures,
     ) {
-        debug!(
+        debug!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
             "Adding a new epoch to the epoch ending ledger infos: {}",
             &epoch_ending_ledger_info
-        );
+        )));
 
         // Insert the version to ledger info mapping
         let version = epoch_ending_ledger_info.ledger_info().version();
@@ -328,7 +333,8 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
 
     /// Marks bootstrapping as complete and notifies any listeners
     pub fn bootstrapping_complete(&mut self) -> Result<(), Error> {
-        info!("The node has successfully bootstrapped!");
+        info!(LogSchema::new(LogEntry::Bootstrapper)
+            .message("The node has successfully bootstrapped!"));
         self.bootstrapped = true;
         self.notify_listeners_if_bootstrapped()
     }
@@ -627,8 +633,10 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
                 );
             return Err(Error::AdvertisedDataError(error_message));
         } else if highest_local_epoch_end < highest_advertised_epoch_end {
-            info!("Found higher epoch ending ledger infos in the network! Local: {:?}, advertised: {:?}",
-                   highest_local_epoch_end, highest_advertised_epoch_end);
+            info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+                "Found higher epoch ending ledger infos in the network! Local: {:?}, advertised: {:?}",
+                   highest_local_epoch_end, highest_advertised_epoch_end
+            )));
             let next_epoch_end = highest_local_epoch_end.checked_add(1).ok_or_else(|| {
                 Error::IntegerOverflow("The next epoch end has overflown!".into())
             })?;
@@ -638,7 +646,9 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
                 .await?;
             self.active_data_stream = Some(epoch_ending_stream);
         } else if self.verified_epoch_states.verified_waypoint() {
-            info!("No new epoch ending ledger infos to fetch! All peers are in the same epoch!");
+            info!(LogSchema::new(LogEntry::Bootstrapper).message(
+                "No new epoch ending ledger infos to fetch! All peers are in the same epoch!"
+            ));
             self.verified_epoch_states
                 .set_fetched_epoch_ending_ledger_infos();
         } else {
@@ -1233,9 +1243,12 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
 
         // Check if we've downloaded all account states
         if committed_accounts.all_accounts_synced {
-            info!("Successfully synced all account states at version: {:?}. Last committed account index: {:?}",
-                  self.account_state_syncer.ledger_info_to_sync,
-                  committed_accounts.last_committed_account_index);
+            info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+                "Successfully synced all account states at version: {:?}. \
+                Last committed account index: {:?}",
+                self.account_state_syncer.ledger_info_to_sync,
+                committed_accounts.last_committed_account_index
+            )));
             self.account_state_syncer.is_sync_complete = true;
         }
 

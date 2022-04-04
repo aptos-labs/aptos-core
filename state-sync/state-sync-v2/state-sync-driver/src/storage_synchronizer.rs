@@ -3,6 +3,7 @@
 
 use crate::{
     error::Error,
+    logging::{LogEntry, LogSchema},
     notification_handlers::{CommitNotification, CommittedTransactions, ErrorNotification},
 };
 use aptos_config::config::StateSyncDriverConfig;
@@ -26,8 +27,6 @@ use std::{
 };
 use storage_interface::DbWriter;
 use tokio::runtime::{Handle, Runtime};
-
-// TODO(joshlind): add structured logging support!
 
 /// Synchronizes the storage of the node by verifying and storing new data
 /// (e.g., transactions and outputs).
@@ -557,7 +556,7 @@ async fn send_storage_synchronizer_error(
     error_message: String,
 ) {
     let error_message = format!("Storage synchronizer error: {:?}", error_message);
-    error!("{:?}", error_message);
+    error!(LogSchema::new(LogEntry::StorageSynchronizer).message(&error_message));
 
     // Send an error notification
     let error_notification = ErrorNotification {

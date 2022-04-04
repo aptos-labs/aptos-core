@@ -6,6 +6,7 @@ use crate::{
     continuous_syncer::ContinuousSyncer,
     driver_client::{ClientNotificationListener, DriverNotification},
     error::Error,
+    logging::{LogEntry, LogSchema},
     notification_handlers::{
         CommitNotification, CommitNotificationListener, CommittedAccounts, CommittedTransactions,
         ConsensusNotificationHandler, ErrorNotification, ErrorNotificationListener,
@@ -30,8 +31,6 @@ use std::{sync::Arc, time::SystemTime};
 use storage_interface::DbReader;
 use tokio::time::{interval, Duration};
 use tokio_stream::wrappers::IntervalStream;
-
-// TODO(joshlind): use structured logging!
 
 /// The configuration of the state sync driver
 #[derive(Clone)]
@@ -152,7 +151,7 @@ impl<
         .fuse();
 
         // Start the driver
-        info!("Started the state sync v2 driver!");
+        info!(LogSchema::new(LogEntry::Driver).message("Started the state sync v2 driver!"));
         self.start_time = Some(SystemTime::now());
         loop {
             ::futures::select! {
@@ -209,10 +208,9 @@ impl<
                         .await;
                 }
             }
-            error!(
-                "Error encountered when handling the consensus notification: {:?}",
-                error
-            );
+            error!(LogSchema::new(LogEntry::ConsensusNotification)
+                .error(&error)
+                .message("Error encountered when handling the consensus notification!"));
             return;
         }
 
@@ -230,10 +228,9 @@ impl<
 
         // Log any errors from notification handling
         if let Err(error) = result {
-            error!(
-                "Error encountered when handling the consensus notification: {:?}",
-                error
-            );
+            error!(LogSchema::new(LogEntry::ConsensusNotification)
+                .error(&error)
+                .message("Error encountered when handling the consensus notification!"));
         }
     }
 
@@ -243,9 +240,11 @@ impl<
         consensus_commit_notification: ConsensusCommitNotification,
     ) -> Result<(), Error> {
         debug!(
-            "Received a consensus commit notification! Transaction total: {:?}, event total: {:?}",
-            consensus_commit_notification.transactions.len(),
-            consensus_commit_notification.reconfiguration_events.len()
+            LogSchema::new(LogEntry::ConsensusNotification).message(&format!(
+                "Received a consensus commit notification! Total transactions: {:?}, events: {:?}",
+                consensus_commit_notification.transactions.len(),
+                consensus_commit_notification.reconfiguration_events.len()
+            ))
         );
 
         // TODO(joshlind): can we get consensus to forward the events?
@@ -281,8 +280,10 @@ impl<
     ) -> Result<(), Error> {
         let latest_synced_version = utils::fetch_latest_synced_version(self.storage.clone())?;
         debug!(
+            LogSchema::new(LogEntry::ConsensusNotification).message(&format!(
             "Received a consensus sync notification! Target version: {:?}. Latest synced version: {:?}",
             sync_notification.target, latest_synced_version,
+            ))
         );
 
         // Initialize a new sync request
@@ -295,7 +296,8 @@ impl<
 
     /// Handles a client notification sent by the driver client
     fn handle_client_notification(&mut self, notification: DriverNotification) {
-        debug!("Received a notify bootstrap notification from the client!");
+        debug!(LogSchema::new(LogEntry::ClientNotification)
+            .message("Received a notify bootstrap notification from the client!"));
 
         // TODO(joshlind): refactor this if the client only supports one notification type!
         // Extract the bootstrap notifier channel
@@ -306,10 +308,9 @@ impl<
             .bootstrapper
             .subscribe_to_bootstrap_notifications(notifier_channel)
         {
-            error!(
-                "Failed to subscribe to bootstrap notifications! Error: {:?}",
-                error
-            );
+            error!(LogSchema::new(LogEntry::ClientNotification)
+                .error(&error)
+                .message("Failed to subscribe to bootstrap notifications!"));
         }
     }
 
@@ -318,17 +319,23 @@ impl<
         match commit_notification {
             CommitNotification::CommittedAccounts(committed_accounts) => {
                 debug!(
-                    "Received an account commit notification from the storage synchronizer. \
-                    All synced: {:?}, last committed index: {:?}.",
-                    committed_accounts.all_accounts_synced,
-                    committed_accounts.last_committed_account_index,
+                    LogSchema::new(LogEntry::SynchronizerNotification).message(&format!(
+                        "Received an account commit notification from the storage synchronizer. \
+                        All synced: {:?}, last committed index: {:?}.",
+                        committed_accounts.all_accounts_synced,
+                        committed_accounts.last_committed_account_index,
+                    ))
                 );
                 self.handle_committed_accounts(committed_accounts).await;
             }
             CommitNotification::CommittedTransactions(committed_transactions) => {
-                debug!("Received a transaction commit notification from the storage synchronizer! Transaction total: {:?}, event total: {:?}",
+                debug!(
+                    LogSchema::new(LogEntry::SynchronizerNotification).message(&format!(
+                        "Received a transaction commit notification from the storage synchronizer! \
+                        Transaction total: {:?}, event total: {:?}",
                        committed_transactions.transactions.len(),
                        committed_transactions.events.len()
+                    ))
                 );
                 self.handle_committed_transactions(committed_transactions)
                     .await;
@@ -350,16 +357,17 @@ impl<
                             (latest_synced_version, latest_synced_ledger_info)
                         }
                         Err(error) => {
-                            error!(
-                                "Failed to fetch latest synced ledger info! Error: {:?}",
-                                error
-                            );
+                            error!(LogSchema::new(LogEntry::SynchronizerNotification)
+                                .error(&error)
+                                .message("Failed to fetch latest synced ledger info!"));
                             return;
                         }
                     }
                 }
                 Err(error) => {
-                    error!("Failed to fetch latest synced version! Error: {:?}", error);
+                    error!(LogSchema::new(LogEntry::SynchronizerNotification)
+                        .error(&error)
+                        .message("Failed to fetch latest synced version!"));
                     return;
                 }
             };
@@ -375,10 +383,9 @@ impl<
         )
         .await
         {
-            error!(
-                "Failed to handle a transaction commit notification! Error: {:?}",
-                error
-            );
+            error!(LogSchema::new(LogEntry::SynchronizerNotification)
+                .error(&error)
+                .message("Failed to handle a transaction commit notification!"));
         }
 
         // Update the last commit timestamp for the sync request
@@ -397,10 +404,9 @@ impl<
             .bootstrapper
             .handle_committed_accounts(committed_accounts.clone())
         {
-            error!(
-                "Failed to handle an account commit notification! Error: {:?}",
-                error
-            );
+            error!(LogSchema::new(LogEntry::SynchronizerNotification)
+                .error(&error)
+                .message("Failed to handle an account commit notification!"));
         }
 
         // If we've finished syncing all accounts, we'll have a single new committed
@@ -419,10 +425,9 @@ impl<
 
     /// Handles an error notification sent by the storage synchronizer
     async fn handle_error_notification(&mut self, error_notification: ErrorNotification) {
-        info!(
-            "Received an error notification from the storage synchronizer! Error: {:?}",
-            error_notification.clone(),
-        );
+        error!(LogSchema::new(LogEntry::SynchronizerNotification)
+            .error_notification(error_notification.clone())
+            .message("Received an error notification from the storage synchronizer!"));
 
         // Terminate the currently active streams
         let notification_id = error_notification.notification_id;
@@ -494,16 +499,18 @@ impl<
                         .duration_since(connection_deadline)
                         .is_ok()
                     {
-                        info!("Passed the connection deadline! Auto-bootstrapping the validator!");
+                        info!(LogSchema::new(LogEntry::AutoBootstrapping).message(
+                            "Passed the connection deadline! Auto-bootstrapping the validator!"
+                        ));
                         if let Err(error) = self.bootstrapper.bootstrapping_complete() {
-                            error!(
-                                "Failed to mark bootstrapping as complete! Error: {:?}",
-                                error
-                            );
+                            error!(LogSchema::new(LogEntry::AutoBootstrapping)
+                                .error(&error)
+                                .message("Failed to mark bootstrapping as complete!"));
                         }
                     }
                 } else {
-                    error!("The connection deadline overflowed! Unable to auto-bootstrap!");
+                    error!(LogSchema::new(LogEntry::AutoBootstrapping)
+                        .message("The connection deadline overflowed! Unable to auto-bootstrap!"));
                 }
             }
         }
@@ -514,21 +521,23 @@ impl<
         // Fetch the global data summary and verify we have active peers
         let global_data_summary = self.aptos_data_client.get_global_data_summary();
         if global_data_summary.is_empty() {
-            trace!("The global data summary is empty! It's likely that we have no active peers.");
+            trace!(LogSchema::new(LogEntry::Driver).message(
+                "The global data summary is empty! It's likely that we have no active peers."
+            ));
             return self.check_auto_bootstrapping();
         }
 
         // Check the progress of any sync requests
         if let Err(error) = self.check_sync_request_progress().await {
-            error!(
-                "Error found when checking the sync request progress: {:?}",
-                error
-            );
+            error!(LogSchema::new(LogEntry::Driver)
+                .error(&error)
+                .message("Error found when checking the sync request progress!"));
         }
 
         // If consensus is executing, there's nothing to do
         if self.check_if_consensus_executing() {
-            trace!("Consensus is executing. There's nothing to do.");
+            trace!(LogSchema::new(LogEntry::Driver)
+                .message("Consensus is executing. There's nothing to do."));
             return;
         }
 
@@ -545,16 +554,14 @@ impl<
                 .drive_progress(consensus_sync_request)
                 .await
             {
-                error!(
-                    "Error found when driving progress of the continuous syncer: {:?}",
-                    error
-                );
+                error!(LogSchema::new(LogEntry::Driver)
+                    .error(&error)
+                    .message("Error found when driving progress of the continuous syncer!"));
             }
         } else if let Err(error) = self.bootstrapper.drive_progress(&global_data_summary).await {
-            error!(
-                "Error found when checking the bootstrapper progress: {:?}",
-                error
-            );
+            error!(LogSchema::new(LogEntry::Driver)
+                .error(&error)
+                .message("Error found when checking the bootstrapper progress!"));
         };
     }
 }

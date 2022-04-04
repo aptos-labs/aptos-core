@@ -1,7 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::error::Error;
+use crate::{
+    error::Error,
+    logging::{LogEntry, LogSchema},
+};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -17,6 +20,7 @@ use data_streaming_service::data_notification::NotificationId;
 use event_notifications::{EventNotificationSender, EventSubscriptionService};
 use futures::{channel::mpsc, stream::FusedStream, Stream};
 use mempool_notifications::MempoolNotificationSender;
+use serde::Serialize;
 use std::{
     pin::Pin,
     sync::Arc,
@@ -90,8 +94,10 @@ impl CommitNotification {
     ) -> Result<(), Error> {
         // Notify mempool of the committed transactions
         debug!(
-            "Notifying mempool of transactions at version: {:?}",
-            latest_synced_version
+            LogSchema::new(LogEntry::NotificationHandler).message(&format!(
+                "Notifying mempool of transactions at version: {:?}",
+                latest_synced_version
+            ))
         );
         let blockchain_timestamp_usecs = latest_synced_ledger_info.ledger_info().timestamp_usecs();
         mempool_notification_handler
@@ -103,8 +109,10 @@ impl CommitNotification {
 
         // Notify the event subscription service of the events
         debug!(
-            "Notifying the event subscription service of events at version: {:?}",
-            latest_synced_version
+            LogSchema::new(LogEntry::NotificationHandler).message(&format!(
+                "Notifying the event subscription service of events at version: {:?}",
+                latest_synced_version
+            ))
         );
         event_subscription_service
             .lock()
@@ -223,7 +231,8 @@ impl ConsensusNotificationHandler {
 
         // If we're now at the target, return successfully
         if sync_target_version == latest_committed_version {
-            info!("We're already at the requested sync target version! Returning early.");
+            info!(LogSchema::new(LogEntry::NotificationHandler)
+                .message("We're already at the requested sync target version! Returning early"));
             let result = Ok(());
             self.respond_to_sync_notification(sync_notification, result.clone())
                 .await?;
@@ -326,8 +335,10 @@ impl ConsensusNotificationHandler {
         });
 
         debug!(
-            "Responding to consensus sync notification with message: {:?}",
-            message
+            LogSchema::new(LogEntry::NotificationHandler).message(&format!(
+                "Responding to consensus sync notification with message: {:?}",
+                message
+            ))
         );
 
         // Send the result
@@ -354,8 +365,10 @@ impl ConsensusNotificationHandler {
         });
 
         debug!(
-            "Responding to consensus commit notification with message: {:?}",
-            message
+            LogSchema::new(LogEntry::NotificationHandler).message(&format!(
+                "Responding to consensus commit notification with message: {:?}",
+                message
+            ))
         );
 
         // Send the result
@@ -384,7 +397,7 @@ impl FusedStream for ConsensusNotificationHandler {
 
 /// A notification for error transactions and events that have been committed to
 /// storage.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ErrorNotification {
     pub error: Error,
     pub notification_id: NotificationId,
@@ -451,8 +464,11 @@ impl<M: MempoolNotificationSender> MempoolNotificationHandler<M> {
             .await;
 
         if let Err(error) = result {
-            // TODO(joshlind): log this!
-            Err(Error::NotifyMempoolError(format!("{:?}", error)))
+            let error = Error::NotifyMempoolError(format!("{:?}", error));
+            error!(LogSchema::new(LogEntry::NotificationHandler)
+                .error(&error)
+                .message("Failed to notify mempool of committed transactions!"));
+            Err(error)
         } else {
             Ok(())
         }

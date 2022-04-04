@@ -1,7 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::error::Error;
+use crate::{
+    error::Error,
+    logging::{LogEntry, LogSchema},
+};
 use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_change::Verifier, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
@@ -106,10 +109,10 @@ pub async fn terminate_stream_with_feedback(
     notification_id: NotificationId,
     notification_feedback: NotificationFeedback,
 ) -> Result<(), Error> {
-    info!(
+    info!(LogSchema::new(LogEntry::Driver).message(&format!(
         "Terminating the current stream! Feedback: {:?}, notification ID: {:?}",
         notification_feedback, notification_id
-    );
+    )));
 
     streaming_service_client
         .terminate_stream_with_feedback(notification_id, notification_feedback)
