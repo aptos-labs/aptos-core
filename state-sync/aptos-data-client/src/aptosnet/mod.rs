@@ -46,8 +46,8 @@ mod state;
 mod tests;
 
 // Useful constants for the Aptos Data Client
-const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 5;
-const POLLER_ERROR_LOG_FREQ_SECS: u64 = 1;
+const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 3;
+const POLLER_ERROR_LOG_FREQ_SECS: u64 = 3;
 
 /// An [`AptosDataClient`] that fulfills requests from remote peers' Storage Service
 /// over AptosNet.
@@ -115,7 +115,7 @@ impl AptosNetDataClient {
 
     /// Recompute and update the global data summary cache.
     fn update_global_summary_cache(&self) {
-        let aggregate = self.peer_states.read().aggregate_summary();
+        let aggregate = self.peer_states.read().calculate_aggregate_summary();
         *self.global_summary_cache.write() = aggregate;
     }
 

@@ -7,7 +7,10 @@ use crate::{
 };
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
 use aptos_logger::debug;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::{
+    cmp::min,
+    collections::{HashMap, HashSet, VecDeque},
+};
 use storage_service_types::{StorageServerSummary, StorageServiceRequest};
 
 /// Scores for peer rankings based on preferences and behavior.
@@ -194,45 +197,46 @@ impl PeerStates {
     }
 
     /// Calculates a global data summary using all known storage summaries
-    pub fn aggregate_summary(&self) -> GlobalDataSummary {
-        let mut aggregate_data = AdvertisedData::empty();
-
+    pub fn calculate_aggregate_summary(&self) -> GlobalDataSummary {
+        let mut advertised_data = AdvertisedData::empty();
         let mut max_epoch_chunk_sizes = vec![];
         let mut max_transaction_chunk_sizes = vec![];
         let mut max_transaction_output_chunk_sizes = vec![];
         let mut max_account_states_chunk_sizes = vec![];
 
-        // only include likely-not-malicious peers in the data summary aggregation.
+        // Only include likely-not-malicious peers in the data summary aggregation
         let summaries = self
             .peer_to_state
             .values()
             .filter_map(PeerState::storage_summary_if_not_ignored);
 
-        // collect each peer's protocol and data advertisements
+        // Collect each peer's protocol and data advertisements
         for summary in summaries {
-            // collect aggregate data advertisements
+            // Collect aggregate data advertisements
             if let Some(account_states) = summary.data_summary.account_states {
-                aggregate_data.account_states.push(account_states);
+                advertised_data.account_states.push(account_states);
             }
             if let Some(epoch_ending_ledger_infos) = summary.data_summary.epoch_ending_ledger_infos
             {
-                aggregate_data
+                advertised_data
                     .epoch_ending_ledger_infos
                     .push(epoch_ending_ledger_infos);
             }
             if let Some(synced_ledger_info) = summary.data_summary.synced_ledger_info.as_ref() {
-                aggregate_data
+                advertised_data
                     .synced_ledger_infos
                     .push(synced_ledger_info.clone());
             }
             if let Some(transactions) = summary.data_summary.transactions {
-                aggregate_data.transactions.push(transactions);
+                advertised_data.transactions.push(transactions);
             }
             if let Some(transaction_outputs) = summary.data_summary.transaction_outputs {
-                aggregate_data.transaction_outputs.push(transaction_outputs);
+                advertised_data
+                    .transaction_outputs
+                    .push(transaction_outputs);
             }
 
-            // collect preferred max chunk sizes
+            // Collect preferred max chunk sizes
             max_epoch_chunk_sizes.push(summary.protocol_metadata.max_epoch_chunk_size);
             max_transaction_chunk_sizes.push(summary.protocol_metadata.max_transaction_chunk_size);
             max_transaction_output_chunk_sizes
@@ -241,29 +245,62 @@ impl PeerStates {
                 .push(summary.protocol_metadata.max_account_states_chunk_size);
         }
 
-        // take the median for each max chunk size parameter.
-        // this works well when we have an honest majority that mostly agrees on
-        // the same chunk sizes.
-        let aggregate_chunk_sizes = OptimalChunkSizes {
-            account_states_chunk_size: median(&mut max_account_states_chunk_sizes)
-                .unwrap_or(self.config.max_account_states_chunk_sizes),
-            epoch_chunk_size: median(&mut max_epoch_chunk_sizes)
-                .unwrap_or(self.config.max_epoch_chunk_size),
-            transaction_chunk_size: median(&mut max_transaction_chunk_sizes)
-                .unwrap_or(self.config.max_transaction_chunk_size),
-            transaction_output_chunk_size: median(&mut max_transaction_output_chunk_sizes)
-                .unwrap_or(self.config.max_transaction_output_chunk_size),
-        };
-
+        // Calculate optimal chunk sizes based on the advertised data
+        let optimal_chunk_sizes = calculate_optimal_chunk_sizes(
+            &self.config,
+            max_account_states_chunk_sizes,
+            max_epoch_chunk_sizes,
+            max_transaction_chunk_sizes,
+            max_transaction_output_chunk_sizes,
+        );
         GlobalDataSummary {
-            advertised_data: aggregate_data,
-            optimal_chunk_sizes: aggregate_chunk_sizes,
+            advertised_data,
+            optimal_chunk_sizes,
         }
     }
 }
 
-fn median<T: Ord + Copy>(values: &mut [T]) -> Option<T> {
+/// To calculate the optimal chunk size, we take the median for each
+/// chunk size parameter. This works well when we have an honest
+/// majority that mostly agrees on the same chunk sizes.
+pub(crate) fn calculate_optimal_chunk_sizes(
+    config: &StorageServiceConfig,
+    max_account_states_chunk_sizes: Vec<u64>,
+    max_epoch_chunk_sizes: Vec<u64>,
+    max_transaction_chunk_sizes: Vec<u64>,
+    max_transaction_output_chunk_size: Vec<u64>,
+) -> OptimalChunkSizes {
+    let account_states_chunk_size = median_or_max(
+        max_account_states_chunk_sizes,
+        config.max_account_states_chunk_sizes,
+    );
+    let epoch_chunk_size = median_or_max(max_epoch_chunk_sizes, config.max_epoch_chunk_size);
+    let transaction_chunk_size = median_or_max(
+        max_transaction_chunk_sizes,
+        config.max_transaction_chunk_size,
+    );
+    let transaction_output_chunk_size = median_or_max(
+        max_transaction_output_chunk_size,
+        config.max_transaction_output_chunk_size,
+    );
+
+    OptimalChunkSizes {
+        account_states_chunk_size,
+        epoch_chunk_size,
+        transaction_chunk_size,
+        transaction_output_chunk_size,
+    }
+}
+
+/// Calculates the median of the given set of values (if it exists)
+/// and returns the median or the specified max value, whichever is
+/// lower.
+fn median_or_max<T: Ord + Copy>(mut values: Vec<T>, max_value: T) -> T {
+    // Calculate median
     values.sort_unstable();
     let idx = values.len() / 2;
-    values.get(idx).copied()
+    let median = values.get(idx).copied();
+
+    // Return median or max
+    min(median.unwrap_or(max_value), max_value)
 }
