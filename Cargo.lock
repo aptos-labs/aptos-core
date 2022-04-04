@@ -1147,6 +1147,7 @@ dependencies = [
  "read-write-set-dynamic",
  "serde 1.0.136",
  "serde_json",
+ "tracing",
 ]
 
 [[package]]
@@ -4311,6 +4312,7 @@ dependencies = [
  "bcs",
  "cached-framework-packages",
  "goldenfile",
+ "hex",
  "move-binary-format",
  "move-command-line-common",
  "move-core-types",
