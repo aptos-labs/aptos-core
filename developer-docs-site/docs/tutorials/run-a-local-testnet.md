@@ -59,6 +59,11 @@ This will start a Faucet running locally without any restrictions to tokens that
 
 This will start both a Validator and a Faucet. The Validator's REST endpoint will be avilable at `http://127.0.0.1:8080` and the Faucet at `http://127.0.0.1:8000`.
 
+As the software is in the early stages of development, it is worth noting that there may be breaking changes. If the software fails to start, delete both the containers and shared volumes, which can be queried via `docker container ls -a` and `docker volume ls` and deleted via `docker container rm $id` and `docker volume rm $name`.
+
+If you intend to use your Testnet over an extended period of time, you should pin the images to a specific ID. Image ID's can be obtained via `docker container ls` and added to the docker compose file.
+
+
 ## Interacting with the local test validator network
 After starting your local test validator network, you should see the following:
 
