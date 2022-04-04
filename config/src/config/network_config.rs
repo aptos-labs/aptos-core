@@ -43,7 +43,7 @@ pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 1;
 pub const MAX_INBOUND_CONNECTIONS: usize = 100;
 pub const MAX_FRAME_SIZE: usize = 16 * 1024 * 1024; /* 16 MiB */
 pub const CONNECTION_BACKOFF_BASE: u64 = 2;
-pub const IP_BYTE_BUCKET_RATE: usize = 102400 /* 100 KiB */;
+pub const IP_BYTE_BUCKET_RATE: usize = 102400 * 5 /* 500 KiB */;
 pub const IP_BYTE_BUCKET_SIZE: usize = IP_BYTE_BUCKET_RATE;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
