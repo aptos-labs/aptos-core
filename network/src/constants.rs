@@ -8,7 +8,7 @@
 // with your use-case. If you do change a value, please add a comment linking to the PR which
 // advocated the change.
 /// The timeout for any inbound RPC call before it's cut off
-pub const INBOUND_RPC_TIMEOUT_MS: u64 = 10_000;
+pub const INBOUND_RPC_TIMEOUT_MS: u64 = 60_000;
 /// Limit on concurrent Outbound RPC requests before backpressure is applied
 pub const MAX_CONCURRENT_OUTBOUND_RPCS: u32 = 100;
 /// Limit on concurrent Inbound RPC requests before backpressure is applied
