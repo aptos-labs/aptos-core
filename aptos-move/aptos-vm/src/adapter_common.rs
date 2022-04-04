@@ -8,12 +8,11 @@ use aptos_types::{
     transaction::{SignatureCheckedTransaction, SignedTransaction, VMValidatorResult},
     vm_status::{StatusCode, VMStatus},
 };
-use move_core_types::resolver::MoveResolver;
 
 use crate::{
     data_cache::AsMoveResolver,
     logging::AdapterLogSchema,
-    move_vm_ext::{SessionExt, SessionId},
+    move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
 };
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -35,7 +34,7 @@ pub trait VMAdapter {
     /// Creates a new Session backed by the given storage.
     /// TODO: this doesn't belong in this trait. We should be able to remove
     /// this after redesigning cache ownership model.
-    fn new_session<'r, R: MoveResolver>(
+    fn new_session<'r, R: MoveResolverExt>(
         &self,
         remote: &'r R,
         session_id: SessionId,
@@ -49,7 +48,7 @@ pub trait VMAdapter {
     fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus>;
 
     /// Runs the prologue for the given transaction.
-    fn run_prologue<S: MoveResolver>(
+    fn run_prologue<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
         transaction: &SignatureCheckedTransaction,
@@ -60,7 +59,7 @@ pub trait VMAdapter {
     fn should_restart_execution(output: &TransactionOutput) -> bool;
 
     /// Execute a single transaction.
-    fn execute_single_transaction<S: MoveResolver + StateView>(
+    fn execute_single_transaction<S: MoveResolverExt + StateView>(
         &self,
         txn: &PreprocessedTransaction,
         data_cache: &S,
@@ -113,7 +112,7 @@ pub fn validate_signed_transaction<A: VMAdapter>(
     result
 }
 
-pub(crate) fn validate_signature_checked_transaction<S: MoveResolver, A: VMAdapter>(
+pub(crate) fn validate_signature_checked_transaction<S: MoveResolverExt, A: VMAdapter>(
     adapter: &A,
     session: &mut SessionExt<S>,
     transaction: &SignatureCheckedTransaction,

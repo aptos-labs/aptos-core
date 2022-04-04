@@ -20,11 +20,11 @@ use aptos_types::{
     vm_status::{AbortLocation, KeptVMStatus},
     write_set::WriteOp,
 };
+use aptos_vm::move_vm_ext::MoveResolverExt;
 use move_binary_format::file_format::FunctionHandleIndex;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::MoveResolver,
     value::{MoveStructLayout, MoveTypeLayout},
 };
 use move_resource_viewer::MoveValueAnnotator;
@@ -39,7 +39,7 @@ pub struct MoveConverter<'a, R: ?Sized> {
     inner: MoveValueAnnotator<'a, R>,
 }
 
-impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
+impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     pub fn new(inner: &'a R) -> Self {
         Self {
             inner: MoveValueAnnotator::new(inner),
@@ -598,7 +598,7 @@ pub trait AsConverter<R> {
     fn as_converter(&self) -> MoveConverter<R>;
 }
 
-impl<R: MoveResolver> AsConverter<R> for R {
+impl<R: MoveResolverExt> AsConverter<R> for R {
     fn as_converter(&self) -> MoveConverter<R> {
         MoveConverter::new(self)
     }

@@ -845,6 +845,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-types",
+ "aptos-vm",
  "aptos-workspace-hack",
  "move-binary-format",
  "move-core-types",
@@ -1196,6 +1197,7 @@ dependencies = [
  "libc",
  "log",
  "memchr",
+ "move-vm-test-utils",
  "num-integer",
  "num-traits 0.2.14",
  "parking_lot 0.12.0",
@@ -2627,7 +2629,7 @@ dependencies = [
  "diesel_derives",
  "num-bigint 0.2.6",
  "num-integer",
- "num-traits 0.2.14",
+ "num-traits 0.1.43",
  "pq-sys",
  "r2d2",
  "serde_json",
@@ -3399,6 +3401,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-resource-viewer",
  "aptos-types",
+ "aptos-vm",
  "aptos-workspace-hack",
  "cached-framework-packages",
  "move-binary-format",
@@ -5160,6 +5163,7 @@ source = "git+https://github.com/move-language/move?rev=1b6b7513dcc1a5c866f178ca
 dependencies = [
  "anyhow",
  "move-core-types",
+ "move-table-extension",
 ]
 
 [[package]]
@@ -7125,7 +7129,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0bccbcf40c8938196944a3da0e133e031a33f4d6b72db3bda3cc556e361905d"
 dependencies = [
  "lazy_static 1.4.0",
- "parking_lot 0.11.2",
+ "parking_lot 0.10.2",
  "serial_test_derive",
 ]
 
@@ -8468,7 +8472,7 @@ version = "1.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ee73e6e4924fe940354b8d4d98cad5231175d615cd855b758adc658c0aac6a0"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "static_assertions",
 ]
 

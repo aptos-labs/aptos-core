@@ -10,6 +10,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
+aptos-vm = { path = "../../aptos-move/aptos-vm" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 move-resource-viewer = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
 aptos-types = { path = "../../types"  }

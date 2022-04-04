@@ -3,7 +3,7 @@
 
 use crate::{
     access_path_cache::AccessPathCache, aptos_vm_impl::convert_changeset_and_events_cached,
-    transaction_metadata::TransactionMetadata,
+    move_vm_ext::MoveResolverExt, transaction_metadata::TransactionMetadata,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -15,7 +15,6 @@ use move_binary_format::errors::VMResult;
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet as MoveChangeSet, Event as MoveEvent},
-    resolver::MoveResolver,
     vm_status::VMStatus,
 };
 use move_vm_runtime::{native_extensions::NativeContextExtensions, session::Session};
@@ -87,7 +86,7 @@ pub struct SessionExt<'r, 'l, S> {
 
 impl<'r, 'l, S> SessionExt<'r, 'l, S>
 where
-    S: MoveResolver,
+    S: MoveResolverExt,
 {
     pub fn new(inner: Session<'r, 'l, S>) -> Self {
         Self { inner }

@@ -3,6 +3,7 @@
 
 use crate::{
     adapter_common::PreprocessedTransaction,
+    move_vm_ext::MoveResolverExt,
     script_to_script_function::remapping,
     system_module_names::{BLOCK_MODULE, BLOCK_PROLOGUE, SCRIPT_PROLOGUE_NAME, USER_EPILOGUE_NAME},
 };
@@ -16,7 +17,7 @@ use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, ResourceKey, StructTag, TypeTag},
-    resolver::{ModuleResolver, MoveResolver},
+    resolver::ModuleResolver,
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
@@ -45,7 +46,7 @@ pub fn add_on_functions_list() -> Vec<(ModuleId, Identifier)> {
     ]
 }
 
-impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
+impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
     /// Create a Diem transaction read/write set analysis from a generic Move module read/write set
     /// analysis and a view of the current blockchain for module fetching and access concretization.
     pub fn new(rw: &'a NormalizedReadWriteSetAnalysis, blockchain_view: &'a R) -> Self {
@@ -285,7 +286,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
     }
 }
 
-impl<'a, R: MoveResolver> Deref for ReadWriteSetAnalysis<'a, R> {
+impl<'a, R: MoveResolverExt> Deref for ReadWriteSetAnalysis<'a, R> {
     type Target = NormalizedReadWriteSetAnalysis;
 
     fn deref(&self) -> &Self::Target {
