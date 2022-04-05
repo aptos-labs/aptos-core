@@ -7,7 +7,7 @@ use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use storage_interface::MoveDbReader;
+use storage_interface::DbReader;
 use warp::{filters::BoxedFilter, reject, Filter, Reply};
 
 // HealthCheckParams is optional params for different layer's health check.
@@ -23,7 +23,7 @@ struct HealthCheckParams {
 struct HealthCheckError;
 impl reject::Reject for HealthCheckError {}
 
-pub fn health_check_route(health_aptos_db: Arc<dyn MoveDbReader>) -> BoxedFilter<(impl Reply,)> {
+pub fn health_check_route(health_aptos_db: Arc<dyn DbReader>) -> BoxedFilter<(impl Reply,)> {
     warp::path!("-" / "healthy")
         .and(warp::path::end())
         .and(warp::query().map(move |params: HealthCheckParams| params))
@@ -35,7 +35,7 @@ pub fn health_check_route(health_aptos_db: Arc<dyn MoveDbReader>) -> BoxedFilter
 
 async fn health_check(
     params: HealthCheckParams,
-    db: Arc<dyn MoveDbReader>,
+    db: Arc<dyn DbReader>,
     now: SystemTime,
 ) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
     if let Some(duration) = params.duration_secs {

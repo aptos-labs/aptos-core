@@ -10,7 +10,7 @@ use crate::{
     param::{AddressParam, EventKeyParam, MoveIdentifierParam, MoveStructTagParam},
 };
 
-use aptos_api_types::{Error, LedgerInfo, Response};
+use aptos_api_types::{AsConverter, Error, LedgerInfo, Response};
 
 use anyhow::Result;
 use aptos_types::event::EventKey;
@@ -84,8 +84,8 @@ impl Events {
             self.ledger_info.version(),
         )?;
 
-        let converter = self.context.move_converter();
-        let events = converter.try_into_events(&contract_events)?;
+        let resolver = self.context.move_resolver()?;
+        let events = resolver.as_converter().try_into_events(&contract_events)?;
         Response::new(self.ledger_info, &events)
     }
 }

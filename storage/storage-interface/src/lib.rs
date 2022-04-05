@@ -29,7 +29,6 @@ use aptos_types::{
         TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
     },
 };
-use move_core_types::resolver::{ModuleResolver, ResourceResolver};
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, sync::Arc};
 use thiserror::Error;
@@ -631,11 +630,6 @@ pub trait DbWriter: Send + Sync {
     ) -> Result<()> {
         unimplemented!()
     }
-}
-
-pub trait MoveDbReader:
-    DbReader + ResourceResolver<Error = anyhow::Error> + ModuleResolver<Error = anyhow::Error>
-{
 }
 
 #[derive(Clone)]

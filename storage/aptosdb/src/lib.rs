@@ -61,7 +61,6 @@ use aptos_crypto::hash::{HashValue, SPARSE_MERKLE_PLACEHOLDER_HASH};
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress,
-    account_state::AccountState,
     contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
     epoch_change::EpochChangeProof,
     event::EventKey,
@@ -82,24 +81,17 @@ use aptos_types::{
     },
 };
 use itertools::zip_eq;
-use move_core_types::{
-    language_storage::{ModuleId, StructTag},
-    resolver::{ModuleResolver, ResourceResolver},
-};
 use once_cell::sync::Lazy;
 use schemadb::{ColumnFamilyName, Options, DB, DEFAULT_CF_NAME};
 use std::{
     collections::HashMap,
-    convert::TryFrom,
     iter::Iterator,
     path::Path,
     sync::{mpsc, Arc, Mutex},
     thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
-use storage_interface::{
-    DbReader, DbWriter, MoveDbReader, Order, StartupInfo, StateSnapshotReceiver, TreeState,
-};
+use storage_interface::{DbReader, DbWriter, Order, StartupInfo, StateSnapshotReceiver, TreeState};
 
 const MAX_LIMIT: u64 = 5000;
 
@@ -1204,42 +1196,6 @@ impl DbReader for AptosDB {
             .map(|x| x.get_state_store_pruner_window() as usize)
     }
 }
-
-impl ModuleResolver for AptosDB {
-    type Error = anyhow::Error;
-
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>> {
-        let (resource_value_with_proof, _) = self.get_state_value_with_proof_by_version(
-            &StateKey::AccountAddressKey(*module_id.address()),
-            self.get_latest_version()?,
-        )?;
-        if let Some(account_state_blob) = resource_value_with_proof {
-            let account_state = AccountState::try_from(&account_state_blob)?;
-            Ok(account_state.get(&module_id.access_vector()).cloned())
-        } else {
-            Ok(None)
-        }
-    }
-}
-
-impl ResourceResolver for AptosDB {
-    type Error = anyhow::Error;
-
-    fn get_resource(&self, address: &AccountAddress, tag: &StructTag) -> Result<Option<Vec<u8>>> {
-        let (resource_value_with_proof, _) = self.get_state_value_with_proof_by_version(
-            &StateKey::AccountAddressKey(*address),
-            self.get_latest_version()?,
-        )?;
-        if let Some(account_state_blob) = resource_value_with_proof {
-            let account_state = AccountState::try_from(&account_state_blob)?;
-            Ok(account_state.get(&tag.access_vector()).cloned())
-        } else {
-            Ok(None)
-        }
-    }
-}
-
-impl MoveDbReader for AptosDB {}
 
 impl DbWriter for AptosDB {
     fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()> {

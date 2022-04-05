@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_api_types::{Error, LedgerInfo, MoveConverter, TransactionOnChainData};
+use aptos_api_types::{Error, LedgerInfo, TransactionOnChainData};
 use aptos_config::config::{ApiConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
@@ -15,23 +15,24 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     transaction::{SignedTransaction, TransactionWithProof},
 };
-use storage_interface::{MoveDbReader, Order};
+use storage_interface::{DbReader, Order};
 
 use anyhow::{ensure, format_err, Result};
 use aptos_types::state_store::state_key::StateKey;
+use aptos_vm::data_cache::{IntoMoveResolver, RemoteStorageOwned};
 use futures::{channel::oneshot, SinkExt};
 use std::{
-    borrow::Borrow,
     convert::{Infallible, TryFrom},
     sync::Arc,
 };
+use storage_interface::state_view::{DbStateView, LatestDbStateView};
 use warp::{filters::BoxedFilter, Filter, Reply};
 
 // Context holds application scope context
 #[derive(Clone)]
 pub struct Context {
     chain_id: ChainId,
-    db: Arc<dyn MoveDbReader>,
+    db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
     role: RoleType,
     api_config: ApiConfig,
@@ -40,7 +41,7 @@ pub struct Context {
 impl Context {
     pub fn new(
         chain_id: ChainId,
-        db: Arc<dyn MoveDbReader>,
+        db: Arc<dyn DbReader>,
         mp_sender: MempoolClientSender,
         role: RoleType,
         api_config: ApiConfig,
@@ -54,8 +55,10 @@ impl Context {
         }
     }
 
-    pub fn move_converter(&self) -> MoveConverter<dyn MoveDbReader + '_> {
-        MoveConverter::new(self.db.borrow())
+    pub fn move_resolver(&self) -> Result<RemoteStorageOwned<DbStateView>> {
+        self.db
+            .latest_state_view()
+            .map(|state_view| state_view.into_move_resolver())
     }
 
     pub fn chain_id(&self) -> ChainId {

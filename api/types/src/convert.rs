@@ -21,13 +21,13 @@ use move_binary_format::file_format::FunctionHandleIndex;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
-    resolver::MoveResolver,
 };
 use move_resource_viewer::MoveValueAnnotator;
 
 use crate::transaction::{ModuleBundlePayload, StateCheckpointTransaction};
 use anyhow::{ensure, format_err, Result};
 use aptos_types::state_store::state_key::StateKey;
+use move_core_types::resolver::MoveResolver;
 use serde_json::Value;
 use std::{
     convert::{TryFrom, TryInto},
@@ -516,5 +516,15 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         let func = code.function_handle_at(FunctionHandleIndex::new(*function));
         let id = code.identifier_at(func.name);
         Ok(format!("{}", id))
+    }
+}
+
+pub trait AsConverter<R> {
+    fn as_converter(&self) -> MoveConverter<R>;
+}
+
+impl<R: MoveResolver> AsConverter<R> for R {
+    fn as_converter(&self) -> MoveConverter<R> {
+        MoveConverter::new(self)
     }
 }

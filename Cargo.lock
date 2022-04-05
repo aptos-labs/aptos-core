@@ -192,6 +192,7 @@ dependencies = [
  "aptos-metrics",
  "aptos-sdk",
  "aptos-secure-storage",
+ "aptos-state-view",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
@@ -228,8 +229,10 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-state-view",
  "aptos-transaction-builder",
  "aptos-types",
+ "aptos-vm",
  "aptos-workspace-hack",
  "bcs",
  "hex",

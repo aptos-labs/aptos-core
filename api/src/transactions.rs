@@ -10,8 +10,9 @@ use crate::{
 };
 
 use aptos_api_types::{
-    mime_types::BCS_SIGNED_TRANSACTION, Error, LedgerInfo, Response, Transaction, TransactionData,
-    TransactionId, TransactionOnChainData, TransactionSigningMessage, UserTransactionRequest,
+    mime_types::BCS_SIGNED_TRANSACTION, AsConverter, Error, LedgerInfo, Response, Transaction,
+    TransactionData, TransactionId, TransactionOnChainData, TransactionSigningMessage,
+    UserTransactionRequest,
 };
 use aptos_types::{
     mempool_status::MempoolStatusCode,
@@ -180,7 +181,8 @@ impl Transactions {
     ) -> Result<impl Reply, Error> {
         let txn = self
             .context
-            .move_converter()
+            .move_resolver()?
+            .as_converter()
             .try_into_signed_transaction(req, self.context.chain_id())
             .map_err(|e| {
                 Error::invalid_request_body(format!(
@@ -195,8 +197,8 @@ impl Transactions {
         let (mempool_status, vm_status_opt) = self.context.submit_transaction(txn.clone()).await?;
         match mempool_status.code {
             MempoolStatusCode::Accepted => {
-                let converter = self.context.move_converter();
-                let pending_txn = converter.try_into_pending_transaction(txn)?;
+                let resolver = self.context.move_resolver()?;
+                let pending_txn = resolver.as_converter().try_into_pending_transaction(txn)?;
                 let resp = Response::new(self.ledger_info, &pending_txn)?;
                 Ok(reply::with_status(resp, StatusCode::ACCEPTED))
             }
@@ -247,11 +249,13 @@ impl Transactions {
         }
         let first_version = data[0].version;
         let mut timestamp = self.context.get_block_timestamp(first_version)?;
-        let converter = self.context.move_converter();
+        let resolver = self.context.move_resolver()?;
         let txns: Vec<Transaction> = data
             .into_iter()
             .map(|t| {
-                let txn = converter.try_into_onchain_transaction(timestamp, t)?;
+                let txn = resolver
+                    .as_converter()
+                    .try_into_onchain_transaction(timestamp, t)?;
                 // update timestamp, when txn is metadata block transaction
                 // new timestamp is used for the following transactions
                 timestamp = txn.timestamp();
@@ -268,21 +272,26 @@ impl Transactions {
         }
         .ok_or_else(|| self.transaction_not_found(id))?;
 
-        let converter = self.context.move_converter();
+        let resolver = self.context.move_resolver()?;
         let txn = match txn_data {
             TransactionData::OnChain(txn) => {
                 let timestamp = self.context.get_block_timestamp(txn.version)?;
-                converter.try_into_onchain_transaction(timestamp, txn)?
+                resolver
+                    .as_converter()
+                    .try_into_onchain_transaction(timestamp, txn)?
             }
-            TransactionData::Pending(txn) => converter.try_into_pending_transaction(*txn)?,
+            TransactionData::Pending(txn) => {
+                resolver.as_converter().try_into_pending_transaction(*txn)?
+            }
         };
 
         Response::new(self.ledger_info, &txn)
     }
 
     pub fn signing_message(self, txn: UserTransactionRequest) -> Result<impl Reply, Error> {
-        let converter = self.context.move_converter();
-        let raw_txn: RawTransaction = converter
+        let resolver = self.context.move_resolver()?;
+        let raw_txn: RawTransaction = resolver
+            .as_converter()
             .try_into_raw_transaction(txn, self.context.chain_id())
             .map_err(|e| {
                 Error::invalid_request_body(format!("invalid UserTransactionRequest: {:?}", e))

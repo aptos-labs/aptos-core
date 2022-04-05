@@ -6,7 +6,7 @@ use crate::{context::Context, index};
 use aptos_config::config::{ApiConfig, JsonRpcConfig, NodeConfig};
 use aptos_mempool::MempoolClientSender;
 use aptos_types::chain_id::ChainId;
-use storage_interface::MoveDbReader;
+use storage_interface::DbReader;
 use warp::{Filter, Reply};
 
 use std::{convert::Infallible, net::SocketAddr, sync::Arc};
@@ -20,7 +20,7 @@ use tokio::runtime::{Builder, Runtime};
 pub fn bootstrap(
     config: &NodeConfig,
     chain_id: ChainId,
-    db: Arc<dyn MoveDbReader>,
+    db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
 ) -> anyhow::Result<Runtime> {
     let runtime = Builder::new_multi_thread()

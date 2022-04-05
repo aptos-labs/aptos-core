@@ -10,7 +10,8 @@ use crate::{
 };
 
 use aptos_api_types::{
-    AccountData, Address, Error, LedgerInfo, MoveModuleBytecode, Response, TransactionId,
+    AccountData, Address, AsConverter, Error, LedgerInfo, MoveModuleBytecode, Response,
+    TransactionId,
 };
 use aptos_types::{
     account_config::AccountResource,
@@ -162,7 +163,8 @@ impl Account {
     pub fn resources(self) -> Result<impl Reply, Error> {
         let resources = self
             .context
-            .move_converter()
+            .move_resolver()?
+            .as_converter()
             .try_into_resources(self.account_state()?.get_resources())?;
         Response::new(self.latest_ledger_info, &resources)
     }
@@ -215,7 +217,8 @@ impl Account {
             .ok_or_else(|| self.resource_not_found(struct_tag))?;
         Ok(self
             .context
-            .move_converter()
+            .move_resolver()?
+            .as_converter()
             .move_struct_fields(&typ, data)?)
     }
 
