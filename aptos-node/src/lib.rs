@@ -130,7 +130,10 @@ pub fn load_test_environment<R>(
     let config_temp_path = aptos_temppath::TempPath::new();
 
     let (try_load, config_path) = if let Some(config_path) = config_path {
-        (config_path.join("0").join("node.yaml").exists(), config_path)
+        (
+            config_path.join("0").join("node.yaml").exists(),
+            config_path,
+        )
     } else {
         (false, config_temp_path.as_ref().to_path_buf())
     };
@@ -162,10 +165,12 @@ pub fn load_test_environment<R>(
             template.consensus.mempool_poll_count = u64::MAX;
         }
 
-        let mut builder =
-            aptos_genesis_tool::validator_builder::ValidatorBuilder::new(&config_path, genesis_modules)
-                .template(template)
-                .randomize_first_validator_ports(random_ports);
+        let mut builder = aptos_genesis_tool::validator_builder::ValidatorBuilder::new(
+            &config_path,
+            genesis_modules,
+        )
+        .template(template)
+        .randomize_first_validator_ports(random_ports);
         if let Some(publishing_option) = publishing_option {
             builder = builder.publishing_option(publishing_option);
         }
@@ -196,7 +201,10 @@ pub fn load_test_environment<R>(
     println!("\tWaypoint: {}", config.base.waypoint.genesis_waypoint());
     println!("\tChainId: {}", ChainId::test());
     println!("\tREST API endpoint: {}", &config.api.address);
-    println!("\tFullNode network: {}", &config.full_node_networks[0].listen_address);
+    println!(
+        "\tFullNode network: {}",
+        &config.full_node_networks[0].listen_address
+    );
     if lazy {
         println!("\tLazy mode is enabled");
     }
