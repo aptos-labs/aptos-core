@@ -21,7 +21,7 @@ resource "google_project_iam_member" "gke-monitoring" {
 }
 
 resource "google_project_iam_custom_role" "k8s-debugger" {
-  role_id     = "container.debugger"
+  role_id     = "container.debugger.${terraform.workspace}"
   title       = "Kubernetes Engine Debugger"
   description = "Additional permissions to debug Kubernetes Engine workloads"
   permissions = [

@@ -32,7 +32,7 @@ provider "helm" {
 resource "helm_release" "fullnode" {
   count            = var.num_fullnodes
   name             = "${terraform.workspace}${count.index}"
-  chart            = var.helm_chart
+  chart            = "${path.module}/../../helm/fullnode"
   max_history      = 100
   wait             = false
   namespace        = var.k8s_namespace

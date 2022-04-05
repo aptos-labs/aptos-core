@@ -13,11 +13,6 @@ variable "zone" {
   type        = string
 }
 
-variable "helm_chart" {
-  description = "Path to aptos-fullnode Helm chart file"
-  default     = "../../helm/fullnode"
-}
-
 variable "helm_values" {
   description = "Map of values to pass to Helm"
   type        = any
