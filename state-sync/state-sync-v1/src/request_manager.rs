@@ -243,8 +243,10 @@ impl RequestManager {
             // At minimum, go through networks with preference level <= multicast level.
             // If no peers are found for the current multicast level, continue doing
             // best effort search of the networks to failover to.
-            if !chosen_peers.is_empty() && *network_level >= self.multicast_network_level {
-                new_multicast_network_level = Some(network_level);
+            if !chosen_peers.is_empty() {
+                if *network_level >= self.multicast_network_level {
+                    new_multicast_network_level = Some(network_level);
+                }
                 break;
             }
         }
