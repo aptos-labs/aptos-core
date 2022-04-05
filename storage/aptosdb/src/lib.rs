@@ -685,9 +685,9 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures> {
-        gauged_api("get_latest_ledger_info", || {
-            self.ledger_store.get_latest_ledger_info()
+    fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>> {
+        gauged_api("get_latest_ledger_info_option", || {
+            Ok(self.ledger_store.get_latest_ledger_info_option())
         })
     }
 

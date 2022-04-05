@@ -722,11 +722,11 @@ impl DbReader for MockDbReader {
         })
     }
 
-    fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures> {
-        Ok(create_test_ledger_info_with_sigs(
+    fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>> {
+        Ok(Some(create_test_ledger_info_with_sigs(
             LAST_EPOCH,
             LAST_TXN_VERSION,
-        ))
+        )))
     }
 
     fn get_state_leaf_count(&self, _version: Version) -> Result<usize> {
