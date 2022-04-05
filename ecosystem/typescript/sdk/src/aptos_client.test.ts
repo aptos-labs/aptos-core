@@ -32,14 +32,14 @@ test("gets account modules", async () => {
 });
 
 test("test raiseForStatus", async () => {
-  const testData = { "hello": "wow" };
+  const testData = { hello: "wow" };
   const fakeResponse: AxiosResponse = {
     status: 200,
     statusText: "Status Text",
     data: "some string",
     request: {
       host: "host",
-      path: "/path"
+      path: "/path",
     },
   } as AxiosResponse;
 
@@ -49,18 +49,15 @@ test("test raiseForStatus", async () => {
 
   // an error, oh no!
   fakeResponse.status = 500;
-  expect(() => raiseForStatus(200, fakeResponse, testData))
-    .toThrow("Status Text - \"some string\" @ host/path : {\"hello\":\"wow\"}");
+  expect(() => raiseForStatus(200, fakeResponse, testData)).toThrow(
+    'Status Text - "some string" @ host/path : {"hello":"wow"}',
+  );
 
-  expect(() => raiseForStatus(200, fakeResponse))
-    .toThrow("Status Text - \"some string\" @ host/path");
+  expect(() => raiseForStatus(200, fakeResponse)).toThrow('Status Text - "some string" @ host/path');
 
   // Just a wild test to make sure it doesn't break: request is `any`!
   delete fakeResponse.request;
-  expect(() => raiseForStatus(200, fakeResponse, testData))
-    .toThrow("Status Text - \"some string\" : {\"hello\":\"wow\"}");
+  expect(() => raiseForStatus(200, fakeResponse, testData)).toThrow('Status Text - "some string" : {"hello":"wow"}');
 
-  expect(() => raiseForStatus(200, fakeResponse))
-    .toThrow("Status Text - \"some string\"");
-
+  expect(() => raiseForStatus(200, fakeResponse)).toThrow('Status Text - "some string"');
 });

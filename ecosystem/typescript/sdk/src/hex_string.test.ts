@@ -10,7 +10,6 @@ function validate(hexString: HexString) {
   expect(hexString.noPrefix()).toBe(withoutPrefix);
 }
 
-
 test("from/to buffer", () => {
   const hs = new HexString(withPrefix);
   expect(hs.toBuffer().toString("hex")).toBe(withoutPrefix);

@@ -194,6 +194,7 @@ jobs:
       # Run package build+lint + tests
       - run: cd ./ecosystem/typescript/sdk && yarn install
       - run: cd ./ecosystem/typescript/sdk && yarn lint
+      - run: cd ./ecosystem/typescript/sdk && yarn fmt:check
       - run: cd ./ecosystem/typescript/sdk && yarn test
       - run: cd ./ecosystem/typescript/sdk && yarn build
 

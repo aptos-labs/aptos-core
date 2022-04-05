@@ -23,10 +23,7 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
     type: "script_function_payload",
     function: "0x1::TestCoin::transfer",
     type_arguments: [],
-    arguments: [
-      account2.address().hex(),
-      "717",
-    ],
+    arguments: [account2.address().hex(), "717"],
   };
   const txnRequest = await client.generateTransaction(account1.address(), payload);
   const signedTxn = await client.signTransaction(account1, txnRequest);

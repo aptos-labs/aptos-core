@@ -12,6 +12,9 @@
     "lint": "eslint \"**/*.ts\"",
     "push": "yarn publish --non-interactive --new-version",
     "test": "jest",
+    "_fmt": "prettier --config .prettierrc 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts'",
+    "fmt": "yarn _fmt --write",
+    "fmt:check": "yarn _fmt --check",
     "cov:clean": "rm -rf coverage"
   },
   "repository": {
@@ -37,6 +40,7 @@
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-plugin-import": "^2.25.4",
     "jest": "^27.5.1",
+    "prettier": "^2.6.2",
     "ts-jest": "^27.1.4",
     "ts-loader": "^9.2.8",
     "ts-node": "^10.7.0",

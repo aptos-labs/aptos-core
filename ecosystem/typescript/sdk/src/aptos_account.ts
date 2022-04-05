@@ -5,9 +5,9 @@ import { HexString, MaybeHexString } from "./hex_string";
 import { Types } from "./types";
 
 export interface AptosAccountObject {
-  address?: string,
-  publicKeyHex?: Types.HexEncodedBytes,
-  privateKeyHex: Types.HexEncodedBytes,
+  address?: string;
+  publicKeyHex?: Types.HexEncodedBytes;
+  privateKeyHex: Types.HexEncodedBytes;
 }
 
 export class AptosAccount {
