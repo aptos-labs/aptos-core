@@ -68,10 +68,10 @@ pub struct ExtractPeer {
     #[clap(long, parse(from_os_str))]
     key_file: PathBuf,
     /// Key is `public` or `private`
-    #[structopt(long)]
+    #[clap(long)]
     key_type: KeyPairType,
     /// Peer config output file
-    #[structopt(long)]
+    #[clap(long)]
     output_file: Option<PathBuf>,
     #[clap(flatten)]
     encoding_options: EncodingOptions,
