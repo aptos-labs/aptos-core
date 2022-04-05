@@ -6,7 +6,6 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use aptos_crypto::HashValue;
 use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
 use hex::ToHex;
 use rand::{rngs::OsRng, Rng, SeedableRng};
