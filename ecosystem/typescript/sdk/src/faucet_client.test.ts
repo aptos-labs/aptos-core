@@ -8,7 +8,7 @@ const nodeUrl = "https://fullnode.devnet.aptoslabs.com";
 const faucetUrl = "https://faucet.devnet.aptoslabs.com";
 
 
-test("full tutorial faucet flow", async () => {
+test.skip("full tutorial faucet flow", async () => {
   const client = new AptosClient(nodeUrl);
   const faucetClient = new FaucetClient(nodeUrl, faucetUrl);
 
