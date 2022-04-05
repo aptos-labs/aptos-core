@@ -41,7 +41,7 @@ variable "helm_force_update" {
   default     = false
 }
 
-variable "namespace" {
+variable "k8s_namespace" {
   default     = "aptos"
   description = "Kubernetes namespace that the fullnode will be deployed into"
 }

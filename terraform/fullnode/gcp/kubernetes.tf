@@ -6,7 +6,7 @@ provider "kubernetes" {
 
 resource "kubernetes_namespace" "aptos" {
   metadata {
-    name = var.namespace
+    name = var.k8s_namespace
   }
 }
 
@@ -35,7 +35,7 @@ resource "helm_release" "fullnode" {
   chart            = var.helm_chart
   max_history      = 100
   wait             = false
-  namespace        = var.namespace
+  namespace        = var.k8s_namespace
   create_namespace = true
 
   values = [
