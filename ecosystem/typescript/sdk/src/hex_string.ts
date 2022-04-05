@@ -1,5 +1,5 @@
 import { Buffer } from "buffer/"; // the trailing slash is important!
-import Types from "./types";
+import { Types } from "./types";
 
 // eslint-disable-next-line no-use-before-define
 export type MaybeHexString = HexString | string | Types.HexEncodedBytes;

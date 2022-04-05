@@ -23,6 +23,7 @@ module.exports = {
       "never",
     ],
     "max-classes-per-file": ["error", 10],
+    "import/prefer-default-export": "off",
   },
   settings: {
     "import/resolver": {

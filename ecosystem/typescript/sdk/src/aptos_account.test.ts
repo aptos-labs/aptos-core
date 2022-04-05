@@ -1,4 +1,4 @@
-import AptosAccount, { AptosAccountObject } from "./aptos_account";
+import { AptosAccount, AptosAccountObject } from "./aptos_account";
 
 const AptosAccountObject: AptosAccountObject = {
   "address": "0x978c213990c4833df71548df7ce49d54c759d6b6d932de22b24d56060b7af2aa",

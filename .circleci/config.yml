@@ -188,6 +188,10 @@ jobs:
       - image: circleci/node:16.13.1-browsers
     steps:
       - checkout
+      # install packages for examples
+      - run: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install
+      - run: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install
+      # Run package build+lint + tests
       - run: cd ./ecosystem/typescript/sdk && yarn install
       - run: cd ./ecosystem/typescript/sdk && yarn lint
       - run: cd ./ecosystem/typescript/sdk && yarn test

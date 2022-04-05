@@ -2,30 +2,30 @@ import { AptosClient, raiseForStatus } from "./aptos_client";
 import { AnyObject } from "./util";
 import { AxiosResponse } from "axios";
 
-const nodeUrl = "https://fullnode.devnet.aptoslabs.com";
+import { NODE_URL } from "./util.test";
 
 test("gets genesis account", async () => {
-  const client = new AptosClient(nodeUrl);
+  const client = new AptosClient(NODE_URL);
   const account = await client.getAccount("0x1");
   expect(account.authentication_key.length).toBe(66);
   expect(account.sequence_number).not.toBeNull();
 });
 
 test("gets transactions", async () => {
-  const client = new AptosClient(nodeUrl);
+  const client = new AptosClient(NODE_URL);
   const transactions = await client.getTransactions();
   expect(transactions.length).toBeGreaterThan(0);
 });
 
 test("gets genesis resources", async () => {
-  const client = new AptosClient(nodeUrl);
+  const client = new AptosClient(NODE_URL);
   const resources = await client.getAccountResources("0x1");
   const accountResource = resources.find((r) => r.type === "0x1::Account::Account");
   expect((accountResource.data as AnyObject)["self_address"]).toBe("0x1");
 });
 
 test("gets account modules", async () => {
-  const client = new AptosClient(nodeUrl);
+  const client = new AptosClient(NODE_URL);
   const modules = await client.getAccountModules("0x1");
   const module = modules.find((r) => r.abi.name === "TestCoin");
   expect(module.abi.address).toBe("0x1");

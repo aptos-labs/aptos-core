@@ -3,10 +3,10 @@ import axios from "axios";
 import {
   AptosClient, AptosClientConfig, raiseForStatus,
 } from "./aptos_client";
-import Types from "./types";
+import { Types } from "./types";
 import { HexString, MaybeHexString } from "./hex_string";
 
-export default class FaucetClient extends AptosClient {
+export class FaucetClient extends AptosClient {
   faucetUrl: string;
 
   constructor(nodeUrl: string, faucetUrl: string, config?: AptosClientConfig) {

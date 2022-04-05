@@ -2,7 +2,7 @@ import * as Nacl from "tweetnacl";
 import * as SHA3 from "js-sha3";
 import { Buffer } from "buffer/"; // the trailing slash is important!
 import { HexString, MaybeHexString } from "./hex_string";
-import Types from "./types";
+import { Types } from "./types";
 
 export interface AptosAccountObject {
   address?: string,
@@ -10,7 +10,7 @@ export interface AptosAccountObject {
   privateKeyHex: Types.HexEncodedBytes,
 }
 
-export default class AptosAccount {
+export class AptosAccount {
   readonly signingKey: Nacl.SignKeyPair;
 
   private readonly accountAddress: HexString;

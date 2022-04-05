@@ -5,8 +5,8 @@ import { Transactions } from "./api/Transactions";
 import { HttpClient } from "./api/http-client";
 import { HexString, MaybeHexString } from "./hex_string";
 import { sleep } from "./util";
-import AptosAccount from "./aptos_account";
-import Types from "./types";
+import { AptosAccount } from "./aptos_account";
+import { Types } from "./types";
 
 export class RequestError extends Error {
   response?: AxiosResponse<any, Types.AptosError>;

@@ -8,8 +8,9 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p .",
+    "build": "rm -rf dist && tsc -p .",
     "lint": "eslint \"**/*.ts\"",
+    "push": "yarn publish --non-interactive --new-version",
     "test": "jest",
     "cov:clean": "rm -rf coverage"
   },
@@ -47,5 +48,5 @@
     "js-sha3": "^0.8.0",
     "tweetnacl": "^1.0.3"
   },
-  "version": "0.0.11"
+  "version": "0.0.15"
 }

@@ -1,16 +1,15 @@
 import { AptosClient } from "./aptos_client";
-import FaucetClient from "./faucet_client";
-import AptosAccount from "./aptos_account";
-import Types from "./types";
+import { FaucetClient } from "./faucet_client";
+import { AptosAccount } from "./aptos_account";
+import { Types } from "./types";
 import { UserTransaction } from "./api/data-contracts";
 
-const nodeUrl = "https://fullnode.devnet.aptoslabs.com";
-const faucetUrl = "https://faucet.devnet.aptoslabs.com";
+import { NODE_URL, FAUCET_URL } from "./util.test";
 
 
 test.skip("full tutorial faucet flow", async () => {
-  const client = new AptosClient(nodeUrl);
-  const faucetClient = new FaucetClient(nodeUrl, faucetUrl);
+  const client = new AptosClient(NODE_URL);
+  const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
   const account1 = new AptosAccount();
   const txns = await faucetClient.fundAccount(account1.address(), 5000);
