@@ -474,3 +474,65 @@ pub static NETWORK_RATE_LIMIT_METRICS: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static NETWORK_APPLICATION_INBOUND_METRIC: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_network_app_inbound_traffic",
+        "Network Inbound Traffic by application",
+        &[
+            "role_type",
+            "network_id",
+            "peer_id",
+            "protocol_id",
+            "metric"
+        ]
+    )
+    .unwrap()
+});
+
+pub fn network_application_inbound_traffic(
+    network_context: NetworkContext,
+    protocol_id: ProtocolId,
+    size: u64,
+) {
+    NETWORK_APPLICATION_INBOUND_METRIC
+        .with_label_values(&[
+            network_context.role().as_str(),
+            network_context.network_id().as_str(),
+            network_context.peer_id().short_str().as_str(),
+            protocol_id.as_str(),
+            "size",
+        ])
+        .observe(size as f64);
+}
+
+pub static NETWORK_APPLICATION_OUTBOUND_METRIC: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_network_app_outbound_traffic",
+        "Network Outbound Traffic by application",
+        &[
+            "role_type",
+            "network_id",
+            "peer_id",
+            "protocol_id",
+            "metric"
+        ]
+    )
+    .unwrap()
+});
+
+pub fn network_application_outbound_traffic(
+    network_context: NetworkContext,
+    protocol_id: ProtocolId,
+    size: u64,
+) {
+    NETWORK_APPLICATION_OUTBOUND_METRIC
+        .with_label_values(&[
+            network_context.role().as_str(),
+            network_context.network_id().as_str(),
+            network_context.peer_id().short_str().as_str(),
+            protocol_id.as_str(),
+            "size",
+        ])
+        .observe(size as f64);
+}

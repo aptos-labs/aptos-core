@@ -15,7 +15,10 @@
 //! [`PeerManager`]: crate::peer_manager::PeerManager
 
 use crate::{
-    counters::{self, RECEIVED_LABEL, SENT_LABEL},
+    counters::{
+        self, network_application_inbound_traffic, network_application_outbound_traffic,
+        RECEIVED_LABEL, SENT_LABEL,
+    },
     logging::NetworkSchema,
     peer_manager::{PeerManagerError, TransportNotification},
     protocols::{
@@ -489,10 +492,10 @@ where
             peer_id.short_str(),
             protocol_id
         );
-
+        let data_len = data.len() as u64;
         counters::direct_send_messages(&self.network_context, RECEIVED_LABEL).inc();
-        counters::direct_send_bytes(&self.network_context, RECEIVED_LABEL)
-            .inc_by(data.len() as u64);
+        counters::direct_send_bytes(&self.network_context, RECEIVED_LABEL).inc_by(data_len);
+        network_application_inbound_traffic(self.network_context, message.protocol_id, data_len);
 
         let notif = PeerNotification::RecvMessage(Message {
             protocol_id,
@@ -529,6 +532,11 @@ where
             PeerRequest::SendDirectSend(message) => {
                 let message_len = message.mdata.len();
                 let protocol_id = message.protocol_id;
+                network_application_outbound_traffic(
+                    self.network_context,
+                    protocol_id,
+                    message_len as u64,
+                );
                 let message = NetworkMessage::DirectSendMsg(DirectSendMsg {
                     protocol_id,
                     priority: Priority::default(),
@@ -557,6 +565,11 @@ where
             }
             PeerRequest::SendRpc(request) => {
                 let protocol_id = request.protocol_id;
+                network_application_outbound_traffic(
+                    self.network_context,
+                    protocol_id,
+                    request.data.len() as u64,
+                );
                 if let Err(e) = self
                     .outbound_rpcs
                     .handle_outbound_request(request, write_reqs_tx)

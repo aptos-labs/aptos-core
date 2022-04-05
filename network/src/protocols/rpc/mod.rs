@@ -45,7 +45,8 @@
 
 use crate::{
     counters::{
-        self, CANCELED_LABEL, DECLINED_LABEL, FAILED_LABEL, RECEIVED_LABEL, REQUEST_LABEL,
+        self, network_application_inbound_traffic, network_application_outbound_traffic,
+        CANCELED_LABEL, DECLINED_LABEL, FAILED_LABEL, RECEIVED_LABEL, REQUEST_LABEL,
         RESPONSE_LABEL, SENT_LABEL,
     },
     logging::NetworkSchema,
@@ -234,6 +235,7 @@ impl InboundRpcs {
         // Collect counters for received request.
         counters::rpc_messages(network_context, REQUEST_LABEL, RECEIVED_LABEL).inc();
         counters::rpc_bytes(network_context, REQUEST_LABEL, RECEIVED_LABEL).inc_by(req_len);
+        network_application_inbound_traffic(self.network_context, protocol_id, req_len);
         let timer =
             counters::inbound_rpc_handler_latency(network_context, protocol_id).start_timer();
 
@@ -354,7 +356,7 @@ pub struct OutboundRpcs {
     /// Maps a `RequestId` into a handle to a task in the `outbound_rpc_tasks`
     /// completion queue. When a new `RpcResponse` message comes in, we will use
     /// this map to notify the corresponding task that its response has arrived.
-    pending_outbound_rpcs: HashMap<RequestId, oneshot::Sender<RpcResponse>>,
+    pending_outbound_rpcs: HashMap<RequestId, (ProtocolId, oneshot::Sender<RpcResponse>)>,
     /// Only allow this many concurrent outbound rpcs at one time from this remote
     /// peer. New outbound requests exceeding this limit will be dropped.
     max_concurrent_outbound_rpcs: u32,
@@ -442,13 +444,15 @@ impl OutboundRpcs {
         // Collect counters for requests sent.
         counters::rpc_messages(network_context, REQUEST_LABEL, SENT_LABEL).inc();
         counters::rpc_bytes(network_context, REQUEST_LABEL, SENT_LABEL).inc_by(req_len);
+        network_application_outbound_traffic(self.network_context, protocol_id, req_len);
 
         // Create channel over which response is delivered to outbound_rpc_task.
         let (response_tx, response_rx) = oneshot::channel::<RpcResponse>();
 
         // Store send-side in the pending map so we can notify outbound_rpc_task
         // when the rpc response has arrived.
-        self.pending_outbound_rpcs.insert(request_id, response_tx);
+        self.pending_outbound_rpcs
+            .insert(request_id, (protocol_id, response_tx));
 
         // A future that waits for the rpc response with a timeout. We create the
         // timeout out here to start the timer as soon as we push onto the queue
@@ -581,8 +585,14 @@ impl OutboundRpcs {
         let peer_id = &self.remote_peer_id;
         let request_id = response.request_id;
 
-        let is_canceled = if let Some(response_tx) = self.pending_outbound_rpcs.remove(&request_id)
+        let is_canceled = if let Some((protocol_id, response_tx)) =
+            self.pending_outbound_rpcs.remove(&request_id)
         {
+            network_application_inbound_traffic(
+                self.network_context,
+                protocol_id,
+                response.raw_response.len() as u64,
+            );
             response_tx.send(response).is_err()
         } else {
             true
