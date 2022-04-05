@@ -16,7 +16,7 @@ use aptos_vm::VMExecutor;
 use executor_types::ExecutedChunk;
 use fail::fail_point;
 use std::{collections::HashSet, sync::Arc};
-use storage_interface::state_view::{StateCache, VerifiedStateView};
+use storage_interface::verified_state_view::{StateCache, VerifiedStateView};
 
 pub struct ChunkOutput {
     /// Input transactions.

@@ -37,7 +37,7 @@ use std::{cmp::max, collections::HashMap, sync::Arc};
 use storage_interface::DbReader;
 
 pub use executed_chunk::ExecutedChunk;
-use storage_interface::state_view::VerifiedStateView;
+use storage_interface::verified_state_view::VerifiedStateView;
 
 type SparseMerkleProof = aptos_types::proof::SparseMerkleProof<StateValue>;
 type SparseMerkleTree = scratchpad::SparseMerkleTree<StateValue>;

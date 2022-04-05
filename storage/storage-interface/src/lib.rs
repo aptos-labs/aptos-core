@@ -36,7 +36,7 @@ use thiserror::Error;
 
 #[cfg(any(feature = "testing", feature = "fuzzing"))]
 pub mod mock;
-pub mod state_view;
+pub mod verified_state_view;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct StartupInfo {

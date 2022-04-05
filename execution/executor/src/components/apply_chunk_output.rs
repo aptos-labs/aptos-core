@@ -37,7 +37,7 @@ use std::{
     ops::Deref,
     sync::Arc,
 };
-use storage_interface::{state_view::StateCache, DbReader, TreeState};
+use storage_interface::{verified_state_view::StateCache, DbReader, TreeState};
 
 pub struct ApplyChunkOutput;
 

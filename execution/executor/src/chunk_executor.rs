@@ -30,7 +30,7 @@ use aptos_vm::VMExecutor;
 use executor_types::{ChunkExecutorTrait, ExecutedChunk, ExecutedTrees, TransactionReplayer};
 use fail::fail_point;
 use std::{marker::PhantomData, sync::Arc};
-use storage_interface::{state_view::VerifiedStateView, DbReaderWriter};
+use storage_interface::{verified_state_view::VerifiedStateView, DbReaderWriter};
 
 pub struct ChunkExecutor<V> {
     db: DbReaderWriter,

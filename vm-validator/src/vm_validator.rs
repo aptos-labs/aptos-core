@@ -16,7 +16,7 @@ use aptos_vm::AptosVM;
 use executor::components::apply_chunk_output::IntoLedgerView;
 use fail::fail_point;
 use std::{convert::TryFrom, sync::Arc};
-use storage_interface::{state_view::VerifiedStateView, DbReader};
+use storage_interface::{verified_state_view::VerifiedStateView, DbReader};
 
 #[cfg(test)]
 #[path = "unit_tests/vm_validator_test.rs"]
