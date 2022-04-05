@@ -60,6 +60,7 @@ pub use op_counters::{DurationHistogram, OpMetrics};
 mod unit_tests;
 
 // Re-export counter types from prometheus crate
+pub use crate::metric_server::{get_all_metrics, get_public_json_metrics, get_public_metrics};
 pub use aptos_metrics_core::{
     register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
     register_int_gauge, register_int_gauge_vec, Histogram, HistogramTimer, HistogramVec,
@@ -68,8 +69,6 @@ pub use aptos_metrics_core::{
 
 use aptos_logger::prelude::*;
 use once_cell::sync::Lazy;
-use prometheus::proto::MetricType;
-use std::collections::HashMap;
 
 pub static NUM_METRICS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
@@ -109,49 +108,6 @@ pub fn gather_metrics() -> Vec<prometheus::proto::MetricFamily> {
         .inc_by(families_over_1000);
 
     metric_families
-}
-
-pub fn get_all_metrics() -> HashMap<String, String> {
-    // TODO: use an existing metric encoder (same as used by
-    // prometheus/metric-server)
-    let all_metric_families = gather_metrics();
-    let mut all_metrics = HashMap::new();
-    for metric_family in all_metric_families {
-        let values: Vec<_> = match metric_family.get_field_type() {
-            MetricType::COUNTER => metric_family
-                .get_metric()
-                .iter()
-                .map(|m| m.get_counter().get_value().to_string())
-                .collect(),
-            MetricType::GAUGE => metric_family
-                .get_metric()
-                .iter()
-                .map(|m| m.get_gauge().get_value().to_string())
-                .collect(),
-            MetricType::SUMMARY => panic!("Unsupported Metric 'SUMMARY'"),
-            MetricType::UNTYPED => panic!("Unsupported Metric 'UNTYPED'"),
-            MetricType::HISTOGRAM => metric_family
-                .get_metric()
-                .iter()
-                .map(|m| m.get_histogram().get_sample_count().to_string())
-                .collect(),
-        };
-        let metric_names = metric_family.get_metric().iter().map(|m| {
-            let label_strings: Vec<String> = m
-                .get_label()
-                .iter()
-                .map(|l| format!("{}={}", l.get_name(), l.get_value()))
-                .collect();
-            let labels_string = format!("{{{}}}", label_strings.join(","));
-            format!("{}{}", metric_family.get_name(), labels_string)
-        });
-
-        for (name, value) in metric_names.zip(values.into_iter()) {
-            all_metrics.insert(name, value);
-        }
-    }
-
-    all_metrics
 }
 
 /// Helper function to record metrics for external calls.

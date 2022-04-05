@@ -156,6 +156,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-secure-storage",
+ "aptos-telemetry",
  "aptos-temppath",
  "aptos-types",
  "aptos-workspace-hack",
@@ -692,6 +693,7 @@ dependencies = [
  "aptos-mempool",
  "aptos-metrics",
  "aptos-secure-storage",
+ "aptos-telemetry",
  "aptos-temppath",
  "aptos-time-service",
  "aptos-types",
@@ -718,6 +720,7 @@ dependencies = [
  "network",
  "network-builder",
  "rand 0.8.4",
+ "regex",
  "state-sync-multiplexer",
  "state-sync-v1",
  "storage-client",
@@ -935,6 +938,20 @@ dependencies = [
  "storage-interface",
  "structopt",
  "tempfile",
+]
+
+[[package]]
+name = "aptos-telemetry"
+version = "0.1.0"
+dependencies = [
+ "aptos-logger",
+ "aptos-metrics",
+ "aptos-workspace-hack",
+ "reqwest",
+ "serde 1.0.136",
+ "serde_json",
+ "sysinfo",
+ "uuid",
 ]
 
 [[package]]
@@ -1169,6 +1186,7 @@ dependencies = [
  "futures-sink",
  "futures-util",
  "generic-array 0.14.5",
+ "getrandom 0.2.5",
  "hashbrown 0.11.2",
  "hyper",
  "include_dir 0.7.2",
@@ -8978,6 +8996,16 @@ name = "utf8parse"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "936e4b492acfd135421d8dca4b1aa80a7bfc26e702ef3af710e0752684df5372"
+
+[[package]]
+name = "uuid"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
+dependencies = [
+ "getrandom 0.2.5",
+ "serde 1.0.136",
+]
 
 [[package]]
 name = "valuable"

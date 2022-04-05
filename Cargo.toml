@@ -50,6 +50,7 @@ members = [
     "crates/aptos-rate-limiter",
     "crates/aptos-rest-client",
     "crates/aptos-retrier",
+    "crates/aptos-telemetry",
     "crates/aptos-temppath",
     "crates/aptos-time-service",
     "crates/aptos-workspace-hack",

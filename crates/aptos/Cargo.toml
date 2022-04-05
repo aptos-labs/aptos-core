@@ -29,6 +29,7 @@ url = "2.2.2"
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto" }
 aptos-secure-storage = { path = "../../secure/storage" }
+aptos-telemetry = { path = "../aptos-telemetry" }
 aptos-temppath = { path = "../aptos-temppath" }
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
