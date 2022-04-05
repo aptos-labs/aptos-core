@@ -11,6 +11,7 @@ use aptos_types::{
 use move_core_types::resolver::MoveResolver;
 
 use crate::{
+    data_cache::AsMoveResolver,
     logging::AdapterLogSchema,
     move_vm_ext::{SessionExt, SessionId},
 };
@@ -99,9 +100,10 @@ pub fn validate_signed_transaction<A: VMAdapter>(
     };
 
     let remote_cache = StateViewCache::new(state_view);
-    let mut session = adapter.new_session(&remote_cache, SessionId::txn(&txn));
+    let resolver = remote_cache.as_move_resolver();
+    let mut session = adapter.new_session(&resolver, SessionId::txn(&txn));
 
-    let (status, gas_price) = match adapter.get_gas_price(&*txn, &remote_cache) {
+    let (status, gas_price) = match adapter.get_gas_price(&*txn, &resolver) {
         Ok(price) => (None, price),
         Err(err) => (Some(err.status_code()), 0),
     };
@@ -214,8 +216,11 @@ pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
             debug!(log_context, "Retry after reconfiguration");
             continue;
         };
-        let (vm_status, output, sender) =
-            adapter.execute_single_transaction(&txn, data_cache, &log_context)?;
+        let (vm_status, output, sender) = adapter.execute_single_transaction(
+            &txn,
+            &data_cache.as_move_resolver(),
+            &log_context,
+        )?;
         if !output.status().is_discarded() {
             data_cache.push_write_set(output.write_set());
         } else {

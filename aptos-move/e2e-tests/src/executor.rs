@@ -35,7 +35,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::{
-    data_cache::RemoteStorage,
+    data_cache::{AsMoveResolver, RemoteStorage},
     move_vm_ext::{MoveVmExt, SessionId},
     parallel_executor::ParallelAptosVM,
     AptosVM, VMExecutor, VMValidator,
@@ -152,7 +152,8 @@ impl FakeExecutor {
         //  - the e2e test outputs a golden file, and
         //  - the environment variable is properly set
         if let Some(env_trace_dir) = env::var_os(ENV_TRACE_DIR) {
-            let aptos_version = Version::fetch_config(&self.data_store).map_or(0, |v| v.major);
+            let aptos_version =
+                Version::fetch_config(&self.data_store.as_move_resolver()).map_or(0, |v| v.major);
 
             let trace_dir = Path::new(&env_trace_dir).join(file_name);
             if trace_dir.exists() {
@@ -471,7 +472,7 @@ impl FakeExecutor {
     }
 
     pub fn new_block_with_timestamp(&mut self, time_stamp: u64) {
-        let validator_set = ValidatorSet::fetch_config(&self.data_store)
+        let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
             .expect("Unable to retrieve the validator set from storage");
         self.block_time = time_stamp;
         let new_block = BlockMetadata::new(
@@ -506,11 +507,13 @@ impl FakeExecutor {
             .sequence_number(seq_num)
             .sign();
         self.execute_and_apply(txn);
-        assert!(ParallelExecutionConfig::fetch_config(&self.data_store).is_some());
+        assert!(
+            ParallelExecutionConfig::fetch_config(&self.data_store.as_move_resolver()).is_some()
+        );
     }
 
     pub fn disable_parallel_execution(&mut self) {
-        if ParallelExecutionConfig::fetch_config(&self.data_store).is_some() {
+        if ParallelExecutionConfig::fetch_config(&self.data_store.as_move_resolver()).is_some() {
             let aptos_root = Account::new_aptos_root();
             let txn = aptos_root
                 .transaction()

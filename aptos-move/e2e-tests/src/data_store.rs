@@ -8,18 +8,11 @@ use anyhow::Result;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
-    on_chain_config::ConfigStorage,
     state_store::state_key::StateKey,
     transaction::ChangeSet,
     write_set::{WriteOp, WriteSet},
 };
-use aptos_vm::data_cache::RemoteStorage;
-use move_binary_format::errors::*;
-use move_core_types::{
-    account_address::AccountAddress,
-    language_storage::{ModuleId, StructTag},
-    resolver::{ModuleResolver, ResourceResolver},
-};
+use move_core_types::language_storage::ModuleId;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -95,12 +88,6 @@ impl FakeDataStore {
     }
 }
 
-impl ConfigStorage for FakeDataStore {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
-        StateView::get_state_value(self, &StateKey::AccessPath(access_path)).unwrap_or_default()
-    }
-}
-
 // This is used by the `execute_block` API.
 // TODO: only the "sync" get is implemented
 impl StateView for FakeDataStore {
@@ -110,25 +97,5 @@ impl StateView for FakeDataStore {
 
     fn is_genesis(&self) -> bool {
         self.state_data.is_empty()
-    }
-}
-
-impl ModuleResolver for FakeDataStore {
-    type Error = VMError;
-
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
-        RemoteStorage::new(self).get_module(module_id)
-    }
-}
-
-impl ResourceResolver for FakeDataStore {
-    type Error = VMError;
-
-    fn get_resource(
-        &self,
-        address: &AccountAddress,
-        tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
-        RemoteStorage::new(self).get_resource(address, tag)
     }
 }

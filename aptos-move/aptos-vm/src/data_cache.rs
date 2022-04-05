@@ -21,7 +21,10 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     resolver::{ModuleResolver, ResourceResolver},
 };
-use std::collections::btree_map::BTreeMap;
+use std::{
+    collections::btree_map::BTreeMap,
+    ops::{Deref, DerefMut},
+};
 
 /// A local cache for a given a `StateView`. The cache is private to the Diem layer
 /// but can be used as a one shot cache for systems that need a simple `RemoteCache`
@@ -108,33 +111,6 @@ impl<'block, S: StateView> StateView for StateViewCache<'block, S> {
     }
 }
 
-impl<'block, S: StateView> ModuleResolver for StateViewCache<'block, S> {
-    type Error = VMError;
-
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
-        RemoteStorage::new(self).get_module(module_id)
-    }
-}
-
-impl<'block, S: StateView> ResourceResolver for StateViewCache<'block, S> {
-    type Error = VMError;
-
-    fn get_resource(
-        &self,
-        address: &AccountAddress,
-        tag: &StructTag,
-    ) -> Result<Option<Vec<u8>>, Self::Error> {
-        RemoteStorage::new(self).get_resource(address, tag)
-    }
-}
-
-impl<'block, S: StateView> ConfigStorage for StateViewCache<'block, S> {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
-        self.get_state_value(&StateKey::AccessPath(access_path))
-            .ok()?
-    }
-}
-
 // Adapter to convert a `StateView` into a `RemoteCache`.
 pub struct RemoteStorage<'a, S>(&'a S);
 
@@ -176,5 +152,77 @@ impl<'a, S: StateView> ResourceResolver for RemoteStorage<'a, S> {
 impl<'a, S: StateView> ConfigStorage for RemoteStorage<'a, S> {
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
         self.get(&access_path).ok()?
+    }
+}
+
+impl<'a, S> Deref for RemoteStorage<'a, S> {
+    type Target = S;
+
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
+
+pub trait AsMoveResolver<S> {
+    fn as_move_resolver(&self) -> RemoteStorage<S>;
+}
+
+impl<S: StateView> AsMoveResolver<S> for S {
+    fn as_move_resolver(&self) -> RemoteStorage<S> {
+        RemoteStorage::new(self)
+    }
+}
+
+pub struct RemoteStorageOwned<S> {
+    state_view: S,
+}
+
+impl<S> Deref for RemoteStorageOwned<S> {
+    type Target = S;
+
+    fn deref(&self) -> &Self::Target {
+        &self.state_view
+    }
+}
+
+impl<S> DerefMut for RemoteStorageOwned<S> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.state_view
+    }
+}
+
+impl<S: StateView> ModuleResolver for RemoteStorageOwned<S> {
+    type Error = VMError;
+
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, Self::Error> {
+        self.as_move_resolver().get_module(module_id)
+    }
+}
+
+impl<S: StateView> ResourceResolver for RemoteStorageOwned<S> {
+    type Error = VMError;
+
+    fn get_resource(
+        &self,
+        address: &AccountAddress,
+        struct_tag: &StructTag,
+    ) -> Result<Option<Vec<u8>>, Self::Error> {
+        self.as_move_resolver().get_resource(address, struct_tag)
+    }
+}
+
+impl<S: StateView> ConfigStorage for RemoteStorageOwned<S> {
+    fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
+        self.as_move_resolver().fetch_config(access_path)
+    }
+}
+
+pub trait IntoMoveResolver<S> {
+    fn into_move_resolver(self) -> RemoteStorageOwned<S>;
+}
+
+impl<S: StateView> IntoMoveResolver<S> for S {
+    fn into_move_resolver(self) -> RemoteStorageOwned<S> {
+        RemoteStorageOwned { state_view: self }
     }
 }

@@ -22,8 +22,8 @@ use aptos_types::{
 };
 use aptos_vm::{
     convert_changeset_and_events,
-    data_cache::StateViewCache,
-    move_vm_ext::{MoveVmExt, SessionId},
+    data_cache::{IntoMoveResolver, StateViewCache},
+    move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
 use move_binary_format::CompiledModule;
 use move_bytecode_utils::Modules;
@@ -31,9 +31,9 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
+    resolver::MoveResolver,
     value::{serialize_values, MoveValue},
 };
-use move_vm_runtime::session::Session;
 use move_vm_types::gas_schedule::{GasStatus, INITIAL_COST_SCHEDULE};
 use once_cell::sync::Lazy;
 use rand::prelude::*;
@@ -93,7 +93,7 @@ pub fn encode_genesis_change_set(
         state_view.add_module(&module.self_id(), module_bytes);
         stdlib_modules.push(module)
     }
-    let data_cache = StateViewCache::new(&state_view);
+    let data_cache = StateViewCache::new(&state_view).into_move_resolver();
 
     let move_vm = MoveVmExt::new().unwrap();
     let id1 = HashValue::zero();
@@ -137,7 +137,7 @@ pub fn encode_genesis_change_set(
     let (mut changeset1, mut events1, _) = session.finish().unwrap().unpack();
 
     let state_view = GenesisStateView::new();
-    let data_cache = StateViewCache::new(&state_view);
+    let data_cache = StateViewCache::new(&state_view).into_move_resolver();
 
     // use a different session id, in case both scripts creates tables
     let mut id2_arr = [0u8; 32];
@@ -159,7 +159,7 @@ pub fn encode_genesis_change_set(
 }
 
 fn exec_function(
-    session: &mut Session<StateViewCache<GenesisStateView>>,
+    session: &mut SessionExt<impl MoveResolver>,
     module_name: &str,
     function_name: &str,
     ty_args: Vec<TypeTag>,
@@ -188,7 +188,7 @@ fn exec_function(
 
 /// Create and initialize Association and Core Code accounts.
 fn create_and_initialize_main_accounts(
-    session: &mut Session<StateViewCache<GenesisStateView>>,
+    session: &mut SessionExt<impl MoveResolver>,
     aptos_root_key: &Ed25519PublicKey,
     treasury_compliance_key: &Ed25519PublicKey,
     publishing_option: VMPublishingOption,
@@ -245,7 +245,7 @@ fn create_and_initialize_main_accounts(
 /// the required accounts, sets the validator operators for each validator owner, and sets the
 /// validator config on-chain.
 fn create_and_initialize_owners_operators(
-    session: &mut Session<StateViewCache<GenesisStateView>>,
+    session: &mut SessionExt<impl MoveResolver>,
     validators: &[Validator],
 ) {
     let aptos_root_address = account_config::aptos_root_address();
@@ -291,7 +291,7 @@ fn create_and_initialize_owners_operators(
 }
 
 /// Publish the standard library.
-fn publish_stdlib(session: &mut Session<StateViewCache<GenesisStateView>>, stdlib: Modules) {
+fn publish_stdlib(session: &mut SessionExt<impl MoveResolver>, stdlib: Modules) {
     let dep_graph = stdlib.compute_dependency_graph();
     let mut addr_opt: Option<AccountAddress> = None;
     let modules = dep_graph
@@ -322,7 +322,7 @@ fn publish_stdlib(session: &mut Session<StateViewCache<GenesisStateView>>, stdli
 }
 
 /// Trigger a reconfiguration. This emits an event that will be passed along to the storage layer.
-fn reconfigure(session: &mut Session<StateViewCache<GenesisStateView>>) {
+fn reconfigure(session: &mut SessionExt<impl MoveResolver>) {
     exec_function(
         session,
         "Reconfiguration",

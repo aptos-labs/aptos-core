@@ -7,7 +7,7 @@ use aptos_types::{
     on_chain_config::{OnChainConfig, ValidatorSet},
     transaction::Transaction,
 };
-use aptos_vm::{AptosVM, VMExecutor};
+use aptos_vm::{data_cache::AsMoveResolver, AptosVM, VMExecutor};
 use criterion::{measurement::Measurement, BatchSize, Bencher};
 use language_e2e_tests::{
     account_universe::{log_balance_strategy, AUTransactionGen, AccountUniverseGen},
@@ -181,8 +181,9 @@ impl TransactionBenchState {
         state.executor.enable_parallel_execution();
 
         // Insert a blockmetadata transaction at the beginning to better simulate the real life traffic.
-        let validator_set = ValidatorSet::fetch_config(state.executor.get_state_view())
-            .expect("Unable to retrieve the validator set from storage");
+        let validator_set =
+            ValidatorSet::fetch_config(&state.executor.get_state_view().as_move_resolver())
+                .expect("Unable to retrieve the validator set from storage");
 
         let new_block = BlockMetadata::new(
             HashValue::zero(),

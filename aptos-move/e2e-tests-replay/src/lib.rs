@@ -26,7 +26,8 @@ use aptos_types::{
 };
 use aptos_vm::{
     convert_changeset_and_events,
-    move_vm_ext::{MoveVmExt, SessionId, SessionOutput},
+    data_cache::{IntoMoveResolver, RemoteStorageOwned},
+    move_vm_ext::{MoveVmExt, SessionExt, SessionId, SessionOutput},
     script_to_script_function::remapping,
     system_module_names::{
         BLOCK_MODULE, BLOCK_PROLOGUE, SCRIPT_PROLOGUE_NAME, USER_EPILOGUE_NAME,
@@ -46,6 +47,7 @@ use move_core_types::{
     gas_schedule::GasAlgebra,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
+    resolver::MoveResolver,
     value::MoveValue,
     vm_status::{KeptVMStatus, VMStatus},
 };
@@ -58,7 +60,6 @@ use move_stackless_bytecode_interpreter::{
     shared::bridge::{adapt_move_vm_change_set, adapt_move_vm_result},
     StacklessBytecodeInterpreter,
 };
-use move_vm_runtime::session::Session;
 use move_vm_types::gas_schedule::GasStatus;
 
 const MOVE_VM_TRACING_ENV_VAR_NAME: &str = "MOVE_VM_TRACE";
@@ -195,7 +196,7 @@ fn compare_output(expect_output: &TransactionOutput, actual_output: VMResult<Ses
 
 struct CrossRunner<'env> {
     interpreter: &'env StacklessBytecodeInterpreter<'env>,
-    move_vm_state: FakeDataStore,
+    move_vm_state: RemoteStorageOwned<FakeDataStore>,
     stackless_vm_state: GlobalState,
     flags: &'env ReplayFlags,
 }
@@ -213,7 +214,7 @@ impl<'env> CrossRunner<'env> {
         }
 
         let env = interpreter.env;
-        let mut move_vm_state = data_store.clone();
+        let mut move_vm_state = data_store.clone().into_move_resolver();
         let mut stackless_vm_state = GlobalState::default();
         let mut included_modules = BTreeSet::new();
         for (key, blob) in data_store.inner() {
@@ -391,7 +392,7 @@ impl<'env> CrossRunner<'env> {
 //**************************************************************************************************
 
 fn execute_function_via_session(
-    session: &mut Session<FakeDataStore>,
+    session: &mut SessionExt<impl MoveResolver>,
     module_id: &ModuleId,
     function_name: &IdentStr,
     ty_args: Vec<TypeTag>,
@@ -402,7 +403,7 @@ fn execute_function_via_session(
 }
 
 fn execute_function_via_session_and_xrunner(
-    session: &mut Session<FakeDataStore>,
+    session: &mut SessionExt<impl MoveResolver>,
     xrunner: Option<&mut CrossRunner>,
     module_id: &ModuleId,
     function_name: &IdentStr,
@@ -416,7 +417,7 @@ fn execute_function_via_session_and_xrunner(
 }
 
 fn execute_script_function_via_session(
-    session: &mut Session<FakeDataStore>,
+    session: &mut SessionExt<impl MoveResolver>,
     module_id: &ModuleId,
     function_name: &IdentStr,
     ty_args: Vec<TypeTag>,
@@ -435,7 +436,7 @@ fn execute_script_function_via_session(
 }
 
 fn execute_script_function_via_session_and_xrunner(
-    session: &mut Session<FakeDataStore>,
+    session: &mut SessionExt<impl MoveResolver>,
     xrunner: Option<&mut CrossRunner>,
     module_id: &ModuleId,
     function_name: &IdentStr,
@@ -461,14 +462,14 @@ fn execute_script_function_via_session_and_xrunner(
 
 struct TraceReplayer<'env> {
     interpreter: &'env StacklessBytecodeInterpreter<'env>,
-    data_store: FakeDataStore,
+    data_store: RemoteStorageOwned<FakeDataStore>,
     flags: &'env ReplayFlags,
 }
 
 impl<'env> TraceReplayer<'env> {
     pub fn new(
         interpreter: &'env StacklessBytecodeInterpreter<'env>,
-        data_store: FakeDataStore,
+        data_store: RemoteStorageOwned<FakeDataStore>,
         flags: &'env ReplayFlags,
     ) -> Self {
         Self {
@@ -704,7 +705,7 @@ impl<'env> TraceReplayer<'env> {
 }
 
 fn execute_txn_user_script_prologue(
-    session: &mut Session<FakeDataStore>,
+    session: &mut SessionExt<impl MoveResolver>,
     xrunner: Option<&mut CrossRunner>,
     txn_meta: &TransactionMetadata,
     gas_currency_ty: &TypeTag,
@@ -747,7 +748,7 @@ fn execute_txn_user_script_prologue(
 }
 
 fn execute_txn_user_script_epilogue(
-    session: &mut Session<FakeDataStore>,
+    session: &mut SessionExt<impl MoveResolver>,
     xrunner: Option<&mut CrossRunner>,
     txn_meta: &TransactionMetadata,
     gas_currency_ty: &TypeTag,
@@ -785,7 +786,7 @@ fn execute_txn_user_script_epilogue(
 }
 
 fn execute_txn_admin_script_prologue(
-    session: &mut Session<FakeDataStore>,
+    session: &mut SessionExt<impl MoveResolver>,
     xrunner: Option<&mut CrossRunner>,
     txn_meta: &TransactionMetadata,
 ) -> VMResult<()> {
@@ -821,7 +822,7 @@ fn execute_txn_admin_script_prologue(
 }
 
 fn execute_txn_admin_script_epilogue(
-    session: &mut Session<FakeDataStore>,
+    session: &mut SessionExt<impl MoveResolver>,
     xrunner: Option<&mut CrossRunner>,
     txn_meta: &TransactionMetadata,
 ) -> VMResult<()> {
@@ -900,7 +901,7 @@ fn replay_trace<P: AsRef<Path>>(
         let data: FakeDataStore = bcs::from_bytes(&fs::read(file_data)?)?;
 
         // construct the trace replayer
-        let mut replayer = TraceReplayer::new(interpreter, data, flags);
+        let mut replayer = TraceReplayer::new(interpreter, data.into_move_resolver(), flags);
 
         // iterate over transactions in the block
         for (txn_seq, res_seq) in txn_seqs.into_iter().zip(res_seqs.into_iter()) {

@@ -17,7 +17,7 @@ use aptos_types::{
 };
 use aptos_validator_interface::{AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView};
 use aptos_vm::{
-    data_cache::RemoteStorage,
+    data_cache::{AsMoveResolver, RemoteStorage},
     logging::AdapterLogSchema,
     move_vm_ext::{MoveVmExt, SessionId},
     AptosVM, VMExecutor,
@@ -149,7 +149,7 @@ impl AptosDebugger {
 
         let (_, output) = vm
             .execute_writeset_transaction(
-                &cache,
+                &cache.as_move_resolver(),
                 payload,
                 txn_data,
                 &AdapterLogSchema::new(state_view.id(), 0),

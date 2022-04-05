@@ -26,7 +26,10 @@ use aptos_types::{
     },
     vm_status::KeptVMStatus,
 };
-use aptos_vm::AptosVM;
+use aptos_vm::{
+    data_cache::{IntoMoveResolver, RemoteStorageOwned},
+    AptosVM,
+};
 use clap::StructOpt;
 use language_e2e_tests::data_store::{FakeDataStore, GENESIS_CHANGE_SET_FRESH};
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
@@ -71,7 +74,7 @@ use vm_genesis::GENESIS_KEYPAIR;
 ///   - It executes transactions through AptosVM, instead of MoveVM directly
 struct AptosTestAdapter<'a> {
     compiled_state: CompiledState<'a>,
-    storage: FakeDataStore,
+    storage: RemoteStorageOwned<FakeDataStore>,
     default_syntax: SyntaxChoice,
     private_key_mapping: BTreeMap<Identifier, Ed25519PrivateKey>,
 }
@@ -774,7 +777,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
 
         // Genesis modules
         // TODO: rework vm-genesis and try not to compile the genesis modules twice.
-        let mut storage = FakeDataStore::new(HashMap::new());
+        let mut storage = FakeDataStore::new(HashMap::new()).into_move_resolver();
         storage.add_write_set(GENESIS_CHANGE_SET_FRESH.write_set());
 
         // Builtin private key mapping
