@@ -11,7 +11,7 @@ prefix = "sccache/aptos/"
 public = true
 region = "us-west-2"
 endpoint = "https://s3-us-west-2.amazonaws.com"
-required-cargo-home = "/opt/cargo/"
+required-cargo-home = "/opt/cargo"
 required-git-home = "/opt/git/aptos-core"
 envs = [
    #To debug sccache uncomment the two lines below.
