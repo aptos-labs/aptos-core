@@ -3363,34 +3363,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "framework-releases"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-types",
- "aptos-workspace-hack",
- "bcs",
- "clap 3.1.6",
- "include_dir 0.7.2",
- "log",
- "move-binary-format",
- "move-bytecode-utils",
- "move-bytecode-verifier",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-package",
- "move-vm-runtime",
- "move-vm-types",
- "once_cell",
- "rayon",
- "sha2",
- "smallvec",
- "structopt",
- "walkdir",
-]
-
-[[package]]
 name = "fs_extra"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
