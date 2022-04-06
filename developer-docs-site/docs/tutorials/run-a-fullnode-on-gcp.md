@@ -68,6 +68,7 @@ You can deploy a public FullNode on GCP by using the Aptos fullnode Terraform mo
     zone          = "c"            # Specify the zone suffix
     project       = "gcp-fullnode" # Specify your GCP project name
     era           = 1              # bump era number to wipe the chain
+    image_tag     = "dev_5b525691" # Specify the docker image tag to use
   }
   ```
 
@@ -129,3 +130,39 @@ Once Terraform apply finished, you can follow this section to validate your depl
       ```
 
    * Exit port-forwarding when you are done by entering control-c in the terminal
+
+## Update Fullnode With New Releases
+
+There could be two types of releasees, one comes with a data wipe to startover the blockchain, one is just a software update.
+
+### Upgrade with data wipe
+
+1. You can increase the `era` number in `main.tf` to trigger a new data volume creation, which will start the node on a new DB.
+
+2. Update `image_tag` in `main.tf`
+
+3. Update Terraform module for fullnode, run this in the same directory of your `main.tf` file
+  ```
+  $ terraform get -update
+  ```
+
+4. Apply Terraform changes
+  ```
+  $ terraform apply
+  ```
+
+### Upgrade without data wipe
+
+1. Update `image_tag` in `main.tf` (if you use `devnet` tag you can skip this step)
+
+2. Update Terraform module for fullnode, run this in the same directory of your `main.tf` file
+  ```
+  $ terraform get -update
+  ```
+
+3. Apply Terraform changes
+  ```
+  $ terraform apply
+  # if you didn't update the image tag, terraform will show nothing to change, in this case, force helm update
+  $ terraform apply -var force_helm_update=true
+  ```
