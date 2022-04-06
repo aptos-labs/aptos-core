@@ -21,7 +21,7 @@ module AptosFramework::Token {
         move_to(
             account,
             Collections {
-                collections: Table::create<ASCII::String, Collection>(),
+                collections: Table::new<ASCII::String, Collection>(),
             },
         )
     }
@@ -95,8 +95,8 @@ module AptosFramework::Token {
 
         let collections = &mut borrow_global_mut<Collections>(account_addr).collections;
         let collection = Collection {
-            tokens: Table::create(),
-            claimed_tokens: Table::create(),
+            tokens: Table::new(),
+            claimed_tokens: Table::new(),
             description,
             name,
             uri,
@@ -104,7 +104,7 @@ module AptosFramework::Token {
             maximum,
         };
 
-        Table::insert(collections, *&name, collection);
+        Table::add(collections, &name, collection);
     }
 
     // Enables storage solutions of Tokens outside of this module to inform the collection the
@@ -118,7 +118,7 @@ module AptosFramework::Token {
         let collection = Table::borrow_mut(collections, &token.collection);
         if (Table::borrow(&collection.tokens, &token.name).supply == 1) {
           Table::remove(&mut collection.claimed_tokens, &token.name);
-          Table::insert(&mut collection.claimed_tokens, *&token.name, Signer::address_of(account))
+          Table::add(&mut collection.claimed_tokens, &token.name, Signer::address_of(account))
         };
         token
     }
@@ -132,7 +132,7 @@ module AptosFramework::Token {
         move_to(
             signer,
             Gallery {
-                gallery: Table::create<ID, Token>(),
+                gallery: Table::new<ID, Token>(),
             },
         )
     }
@@ -167,7 +167,7 @@ module AptosFramework::Token {
     // not contain the data, it is easier in Move to have this extra metadata sit on the side so
     // that only creation and read operations (outside of Move) need to deal with the nuance of
     // metadata.
-    struct TokenMetadata<TokenType: store> has key {
+    struct TokenMetadata<phantom TokenType: store> has key {
         metadata: Table<ID, TokenType>,
     }
 
@@ -175,7 +175,7 @@ module AptosFramework::Token {
         move_to(
             account,
             TokenMetadata {
-                metadata: Table::create<ID, TokenType>(),
+                metadata: Table::new<ID, TokenType>(),
             },
         )
     }
@@ -232,7 +232,7 @@ module AptosFramework::Token {
         let collection = Table::borrow_mut(collections, &collection_name);
 
         if (Option::is_some(&collection.maximum)) {
-            let current = Table::count(&collection.tokens);
+            let current = Table::length(&collection.tokens);
             let maximum = Option::borrow(&collection.maximum);
             assert!(current != *maximum, EMAXIMUM_NUMBER_OF_TOKENS_FOR_COLLECTION)
         };
@@ -256,12 +256,12 @@ module AptosFramework::Token {
         };
 
         if (supply == 1) {
-            Table::insert(&mut collection.claimed_tokens, *&name, account_addr)
+            Table::add(&mut collection.claimed_tokens, &name, account_addr)
         };
-        Table::insert(&mut collection.tokens, name, token_data);
+        Table::add(&mut collection.tokens, &name, token_data);
 
         let token = claim_token_ownership(account, token);
-        Table::insert(gallery, *&token_id, token);
+        Table::add(gallery, &token_id, token);
         token_id
     }
 
@@ -281,7 +281,7 @@ module AptosFramework::Token {
 
         let id = create_token(account, collection_name, description, name, supply, uri);
         let metadata_table = borrow_global_mut<TokenMetadata<TokenType>>(account_addr);
-        Table::insert(&mut metadata_table.metadata, *&id, metadata);
+        Table::add(&mut metadata_table.metadata, &id, metadata);
         id
     }
 
@@ -301,8 +301,7 @@ module AptosFramework::Token {
         assert!(balance >= amount, EINSUFFICIENT_BALANCE);
 
         if (balance == amount) {
-            let (_key, value) = Table::remove(gallery, token_id);
-            value
+            Table::remove(gallery, token_id)
         } else {
             let token = Table::borrow_mut(gallery, token_id);
             token.balance = balance - amount;
@@ -327,11 +326,12 @@ module AptosFramework::Token {
         let token = claim_token_ownership(account, token);
 
         let gallery = &mut borrow_global_mut<Gallery>(account_addr).gallery;
-        if (Table::contains_key(gallery, &token.id)) {
+        if (Table::contains(gallery, &token.id)) {
             let current_token = Table::borrow_mut(gallery, &token.id);
             merge_token(token, current_token);
         } else {
-            Table::insert(gallery, *&token.id, token)
+            let token_id = token.id;
+            Table::add(gallery, &token_id, token)
         }
     }
 

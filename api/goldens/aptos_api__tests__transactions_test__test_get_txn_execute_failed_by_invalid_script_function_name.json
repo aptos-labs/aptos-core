@@ -2,12 +2,12 @@
   "type": "user_transaction",
   "version": "2",
   "hash": "0xc00c694596b002f38c4a5eb5b8b20a772cb2bc7e5aacd3b2637e73bec802796e",
-  "state_root_hash": "0x4b11ccdf958617bbff0aaf8d16ebcfd4c09113c8c261557580e498e158d0ae0a",
+  "state_root_hash": "0x590f869a35bfa866f85baca8bd5fbab5c53f7911bc70c10d8bb29b0187d89b1d",
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "1",
   "success": false,
   "vm_status": "Move bytecode deserialization / verification failed, including script function not found or invalid arguments",
-  "accumulator_root_hash": "0x1cb8740fa54d343f571fad37c10b329a8e3fd0c9719dba3a35ed52adc5af2a4e",
+  "accumulator_root_hash": "0xd8f750b91d389cacc8a5c4cae3d1fd0a48a52919ff3b98845bdaf78b4ca353e6",
   "changes": [
     {
       "type": "write_resource",

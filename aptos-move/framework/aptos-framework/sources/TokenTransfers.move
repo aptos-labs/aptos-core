@@ -13,7 +13,7 @@ module AptosFramework::TokenTransfers {
         move_to(
             account,
             TokenTransfers {
-                pending_claims: Table::create<address, Table<ID, Token>>(),
+                pending_claims: Table::new<address, Table<ID, Token>>(),
             }
         )
     }
@@ -43,18 +43,18 @@ module AptosFramework::TokenTransfers {
 
         let pending_claims =
             &mut borrow_global_mut<TokenTransfers>(sender_addr).pending_claims;
-        if (!Table::contains_key(pending_claims, &receiver)) {
-            Table::insert(pending_claims, receiver, Table::create())
+        if (!Table::contains(pending_claims, &receiver)) {
+            Table::add(pending_claims, &receiver, Table::new())
         };
         let addr_pending_claims = Table::borrow_mut(pending_claims, &receiver);
 
         let token = Token::withdraw_token(sender, token_id, amount);
-        let token_id = Token::token_id(&token);
-        if (Table::contains_key(addr_pending_claims, token_id)) {
-            let dst_token = Table::borrow_mut(addr_pending_claims, token_id);
+        let token_id = *Token::token_id(&token);
+        if (Table::contains(addr_pending_claims, &token_id)) {
+            let dst_token = Table::borrow_mut(addr_pending_claims, &token_id);
             Token::merge_token(token, dst_token)
         } else {
-            Table::insert(addr_pending_claims, *token_id, token)
+            Table::add(addr_pending_claims, &token_id, token)
         }
     }
 
@@ -78,10 +78,10 @@ module AptosFramework::TokenTransfers {
         let pending_claims =
             &mut borrow_global_mut<TokenTransfers>(sender).pending_claims;
         let pending_tokens = Table::borrow_mut(pending_claims, &receiver_addr);
-        let (_id, token) = Table::remove(pending_tokens, token_id);
+        let token = Table::remove(pending_tokens, token_id);
 
-        if (Table::count(pending_tokens) == 0) {
-            let (_id, real_pending_claims) = Table::remove(pending_claims, &receiver_addr);
+        if (Table::length(pending_tokens) == 0) {
+            let real_pending_claims = Table::remove(pending_claims, &receiver_addr);
             Table::destroy_empty(real_pending_claims)
         };
 
@@ -108,10 +108,10 @@ module AptosFramework::TokenTransfers {
         let pending_claims =
             &mut borrow_global_mut<TokenTransfers>(sender_addr).pending_claims;
         let pending_tokens = Table::borrow_mut(pending_claims, &receiver);
-        let (_id, token) = Table::remove(pending_tokens, token_id);
+        let token = Table::remove(pending_tokens, token_id);
 
-        if (Table::count(pending_tokens) == 0) {
-            let (_id, real_pending_claims) = Table::remove(pending_claims, &receiver);
+        if (Table::length(pending_tokens) == 0) {
+            let real_pending_claims = Table::remove(pending_claims, &receiver);
             Table::destroy_empty(real_pending_claims)
         };
 
@@ -144,13 +144,13 @@ module AptosFramework::TokenTransfers {
         let owner1_addr = Signer::address_of(&owner1);
 
         offer(&creator, owner0_addr, &token_id, 1);
-        assert!(Table::count(&borrow_global<TokenTransfers>(creator_addr).pending_claims) == 1, 1);
+        assert!(Table::length(&borrow_global<TokenTransfers>(creator_addr).pending_claims) == 1, 1);
         offer(&creator, owner1_addr, &token_id, 1);
-        assert!(Table::count(&borrow_global<TokenTransfers>(creator_addr).pending_claims) == 2, 2);
+        assert!(Table::length(&borrow_global<TokenTransfers>(creator_addr).pending_claims) == 2, 2);
         claim(&owner0, creator_addr, &token_id);
-        assert!(Table::count(&borrow_global<TokenTransfers>(creator_addr).pending_claims) == 1, 3);
+        assert!(Table::length(&borrow_global<TokenTransfers>(creator_addr).pending_claims) == 1, 3);
         claim(&owner1, creator_addr, &token_id);
-        assert!(Table::count(&borrow_global<TokenTransfers>(creator_addr).pending_claims) == 0, 4);
+        assert!(Table::length(&borrow_global<TokenTransfers>(creator_addr).pending_claims) == 0, 4);
 
         offer(&owner0, owner1_addr, &token_id, 1);
         claim(&owner1, owner0_addr, &token_id);

@@ -44,10 +44,11 @@ tempfile = "3.2.0"
 
 [dev-dependencies]
 datatest-stable = "0.1.1"
+dir-diff = "0.3.2"
+
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 move-cli = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
-move-unit-test = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
-dir-diff = "0.3.2"
+move-unit-test = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e", features=["table-extension"] }
 
 [features]
 default = []

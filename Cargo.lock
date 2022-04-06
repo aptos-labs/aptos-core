@@ -1197,6 +1197,7 @@ dependencies = [
  "libc",
  "log",
  "memchr",
+ "move-unit-test",
  "move-vm-test-utils",
  "num-integer",
  "num-traits 0.2.14",
