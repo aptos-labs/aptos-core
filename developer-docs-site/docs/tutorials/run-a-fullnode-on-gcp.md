@@ -171,6 +171,87 @@ There could be two types of releasees, one comes with a data wipe to startover t
   $ terraform apply -var force_helm_update=true
   ```
 
+## Configure identity and seed peers
+
+### Static identity
+
+If you want to configure your node with a static identity, check the [fullnode advanced guide](https://aptos.dev/tutorials/run-a-fullnode#advanced-guide) for how to generate keys, and follow the instruction below to configure it in your terraform file.
+
+1. Generate your own private key, and extract peer id, following the guide [here](https://aptos.dev/tutorials/run-a-fullnode#create-a-static-identity-for-a-fullnode)
+
+2. Modify the `main.tf` to add `fullnode_identity` in `fullnode_helm_values`, this will configure the keys for fullnode, for example:
+  ```
+  module "fullnode" {
+    # download Terraform module from aptos-labs/aptos-core repo
+    source        = "github.com/aptos-labs/aptos-core.git//terraform/fullnode/gcp?ref=main"
+    region        = "us-central1"  # Specify the region
+    zone          = "c"            # Specify the zone suffix
+    project       = "gcp-fullnode" # Specify your GCP project name
+    era           = 1              # bump era number to wipe the chain
+    image_tag     = "dev_5b525691" # Specify the docker image tag to use
+
+    fullnode_helm_values = {
+      # create fullnode from this identity config, so it will always have same peer id and address
+      fullnode_identity = {
+        type = "from_config"
+        key = "B8BD811A91D8E6E0C6DAC991009F189337378760B55F3AD05580235325615C74"
+        peer_id = "ca3579457555c80fc7bb39964eb298c414fd60f81a2f8eedb0244ec07a26e575"
+      }
+    }
+  }
+  ```
+
+3. Apply Terraform changes
+  ```
+  $ terraform apply
+  ```
+
+### Add upstream seed peers
+
+You can add upstream seed peers to allow your node state sync from a specific fullnode, this is helpful when the fullnode not able to connect to the network due to congestion.
+
+1. Get Upstream peer id info, you can either use the one we listed in the [fullnode tutorial](https://aptos.dev/tutorials/run-a-fullnode#add-upstream-seed-peers); or grab one from [Aptos Discord](http://discord.gg/aptoslabs), `#advertise-full-node` channel, those are the nodes hosted by our community.
+
+2. Modify the `main.tf` to add seeds for devnet in `fullnode_helm_values`, this will configure the upstream seeds for fullnode, for example:
+```
+module "fullnode" {
+    # download Terraform module from aptos-labs/aptos-core repo
+    source        = "github.com/aptos-labs/aptos-core.git//terraform/fullnode/gcp?ref=main"
+    region        = "us-central1"  # Specify the region
+    zone          = "c"            # Specify the zone suffix
+    project       = "gcp-fullnode" # Specify your GCP project name
+    era           = 1              # bump era number to wipe the chain
+    image_tag     = "dev_5b525691" # Specify the docker image tag to use
+
+    fullnode_helm_values = {
+      # add a list of peers as upstream
+      aptos_chains = {
+        devnet = {
+          seeds = {
+            "bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a" = {
+            addresses = ["/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/ln-handshake/0"]
+            role = "Upstream"
+            },
+            "7fe8523388084607cdf78ff40e3e717652173b436ae1809df4a5fcfc67f8fc61" = {
+            addresses = ["/dns4/pfn1.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/7fe8523388084607cdf78ff40e3e717652173b436ae1809df4a5fcfc67f8fc61/ln-handshake/0"]
+            role = "Upstream"
+            },
+            "f6b135a59591677afc98168791551a0a476222516fdc55869d2b649c614d965b" = {
+            addresses = ["/dns4/pfn2.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/f6b135a59591677afc98168791551a0a476222516fdc55869d2b649c614d965b/ln-handshake/0"]
+            role = "Upstream"
+            }
+          }
+        }
+      }
+    }
+  }
+```
+
+3. Apply Terraform changes
+  ```
+  $ terraform apply
+  ```
+
 ## Check Logging
 
 To check the logs of the pod, using the following commands.
@@ -260,4 +341,7 @@ This likely means that the state of the install is out of sync with the saved te
   terraform state rm <state>
   ```
 
+### Fullnode "NoAvailablePeers" Error message
+
+If your node cannot state sync, and the logs are showing "NoAvailablePeers", it's likely due to network congestion. You can try add some extra upstream peers for your fullnode to state sync from. See the guide [Add upstream seed peers](#add-upstream-seed-peers)
 

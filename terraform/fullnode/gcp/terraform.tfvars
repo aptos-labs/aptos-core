@@ -8,8 +8,8 @@ fullnode_helm_values = {
   aptos_chains = {
     devnet = {
       seeds = {
-        "5dfa8623d0020eb7c74bb4f74e853079" = {
-        addresses = ["/ip4/135.181.103.127/tcp/6180/ln-noise-ik/d894cded087f19b567648ffefa4277ab5dfa8623d0020eb7c74bb4f74e853079/ln-handshake/0"]
+        "7fe8523388084607cdf78ff40e3e717652173b436ae1809df4a5fcfc67f8fc61" = {
+        addresses = ["/dns4/pfn1.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/7fe8523388084607cdf78ff40e3e717652173b436ae1809df4a5fcfc67f8fc61/ln-handshake/0"]
         role = "Upstream"
         }
       }
