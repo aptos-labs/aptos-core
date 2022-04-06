@@ -6,7 +6,7 @@ use aptos_crypto::{ed25519::Ed25519PublicKey, x25519};
 use aptos_global_constants::{
     CONSENSUS_KEY, FULLNODE_NETWORK_KEY, OPERATOR_ACCOUNT, OWNER_ACCOUNT, VALIDATOR_NETWORK_KEY,
 };
-use aptos_management::{error::Error, secure_backend::ValidatorBackend, storage::to_x25519};
+use aptos_management::{error::Error, storage::to_x25519};
 use aptos_types::{
     account_address::AccountAddress,
     network_address::{NetworkAddress, Protocol},
@@ -267,11 +267,6 @@ pub struct ValidatorConfig {
     /// JSON-RPC Endpoint (e.g. http://localhost:8080)
     #[structopt(long, required_unless = "config")]
     json_server: Option<String>,
-    #[structopt(
-        long,
-        help = "The secure backend that contains the network address encryption keys"
-    )]
-    validator_backend: Option<ValidatorBackend>,
 }
 
 impl ValidatorConfig {

@@ -415,7 +415,7 @@ pub fn bcs_crypto_hash_dispatch(input: TokenStream) -> TokenStream {
     let name = &ast.ident;
     let hasher_name = Ident::new(&format!("{}Hasher", &name.to_string()), Span::call_site());
     let error_msg = syn::LitStr::new(
-        &format!("BCS serialization of {} should not fail", name.to_string()),
+        &format!("BCS serialization of {} should not fail", name),
         Span::call_site(),
     );
     let generics = add_trait_bounds(ast.generics);

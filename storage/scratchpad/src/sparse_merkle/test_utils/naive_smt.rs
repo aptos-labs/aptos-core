@@ -21,7 +21,7 @@ impl<'a> NaiveSubTree<'a> {
     fn get_proof(
         &'a self,
         key: &HashValue,
-        mut cache: &mut Cache,
+        cache: &mut Cache,
     ) -> (Option<SparseMerkleLeafNode>, Vec<HashValue>) {
         if self.is_empty() {
             (None, Vec::new())
@@ -34,12 +34,12 @@ impl<'a> NaiveSubTree<'a> {
         } else {
             let (left, right) = self.children();
             if key.bit(self.depth) {
-                let (ret_leaf, mut ret_siblings) = right.get_proof(key, &mut cache);
-                ret_siblings.push(left.get_hash(&mut cache));
+                let (ret_leaf, mut ret_siblings) = right.get_proof(key, cache);
+                ret_siblings.push(left.get_hash(cache));
                 (ret_leaf, ret_siblings)
             } else {
-                let (ret_leaf, mut ret_siblings) = left.get_proof(key, &mut cache);
-                ret_siblings.push(right.get_hash(&mut cache));
+                let (ret_leaf, mut ret_siblings) = left.get_proof(key, cache);
+                ret_siblings.push(right.get_hash(cache));
                 (ret_leaf, ret_siblings)
             }
         }
@@ -49,7 +49,7 @@ impl<'a> NaiveSubTree<'a> {
         self.leaves.is_empty()
     }
 
-    fn get_hash(&self, mut cache: &mut Cache) -> HashValue {
+    fn get_hash(&self, cache: &mut Cache) -> HashValue {
         if self.leaves.is_empty() {
             return *SPARSE_MERKLE_PLACEHOLDER_HASH;
         }
@@ -64,22 +64,21 @@ impl<'a> NaiveSubTree<'a> {
         match cache.get(&position) {
             Some(hash) => *hash,
             None => {
-                let hash = self.get_hash_uncached(&mut cache);
+                let hash = self.get_hash_uncached(cache);
                 cache.insert(position, hash);
                 hash
             }
         }
     }
 
-    fn get_hash_uncached(&self, mut cache: &mut Cache) -> HashValue {
+    fn get_hash_uncached(&self, cache: &mut Cache) -> HashValue {
         assert!(!self.leaves.is_empty());
         if self.leaves.len() == 1 {
             let only_leaf = self.leaves[0];
             SparseMerkleLeafNode::new(only_leaf.0, only_leaf.1).hash()
         } else {
             let (left, right) = self.children();
-            SparseMerkleInternalNode::new(left.get_hash(&mut cache), right.get_hash(&mut cache))
-                .hash()
+            SparseMerkleInternalNode::new(left.get_hash(cache), right.get_hash(cache)).hash()
         }
     }
 

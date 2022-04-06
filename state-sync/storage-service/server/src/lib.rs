@@ -156,12 +156,11 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             // All handler methods are currently CPU-bound and synchronous
             // I/O-bound, so we want to spawn on the blocking thread pool to
             // avoid starving other async tasks on the same runtime.
-            let config = self.config;
             let storage = self.storage.clone();
             let cached_storage_server_summary = self.cached_storage_server_summary.clone();
             self.bounded_executor
                 .spawn_blocking(move || {
-                    let response = Handler::new(config, storage, cached_storage_server_summary)
+                    let response = Handler::new(storage, cached_storage_server_summary)
                         .call(protocol, request);
                     log_storage_response(&response);
                     response_sender.send(response);
@@ -205,19 +204,16 @@ fn refresh_cached_storage_summary<T: StorageReaderInterface>(
 /// request. We usually clone/create a new handler for every request.
 #[derive(Clone)]
 pub struct Handler<T> {
-    config: StorageServiceConfig,
     storage: T,
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
 }
 
 impl<T: StorageReaderInterface> Handler<T> {
     pub fn new(
-        config: StorageServiceConfig,
         storage: T,
         cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
     ) -> Self {
         Self {
-            config,
             storage,
             cached_storage_server_summary,
         }

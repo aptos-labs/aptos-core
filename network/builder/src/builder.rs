@@ -229,7 +229,7 @@ impl NetworkBuilder {
             let reconfig_listener = if *discovery_method == DiscoveryMethod::Onchain {
                 Some(
                     reconfig_subscription_service
-                        .as_deref_mut()
+                        .as_mut()
                         .expect("An event subscription service is required for on-chain discovery!")
                         .subscribe_to_reconfigurations()
                         .expect("On-chain discovery is unable to subscribe to reconfigurations!"),

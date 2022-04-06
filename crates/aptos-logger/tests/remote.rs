@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_logger::{debug, error, trace, AptosData, Level};
+use aptos_logger::{aptos_logger::AptosData, debug, error, trace, Level};
 use serde::Deserialize;
 use std::{
     io::{BufRead, BufReader},

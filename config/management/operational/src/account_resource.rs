@@ -81,7 +81,7 @@ impl RotateOperatorKey {
             Err(e) => {
                 return Err(Error::UnexpectedError(format!(
                     "Invalid authentication key found in account resource. Error: {}",
-                    e.to_string()
+                    e,
                 )));
             }
         };

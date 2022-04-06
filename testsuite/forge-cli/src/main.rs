@@ -32,11 +32,6 @@ struct Args {
     suite: Option<String>,
     #[structopt(long, multiple = true)]
     changelog: Option<Vec<String>>,
-    #[structopt(
-        long,
-        help = "Whether transactions should be submitted to validators or full nodes"
-    )]
-    pub emit_to_validator: Option<bool>,
 
     // subcommand groups
     #[structopt(flatten)]
@@ -63,14 +58,7 @@ enum OperatorCommand {
 }
 
 #[derive(StructOpt, Debug)]
-struct LocalSwarm {
-    #[structopt(
-        long,
-        help = "Time to run --emit-tx for in seconds",
-        default_value = "60"
-    )]
-    duration: u64,
-}
+struct LocalSwarm {}
 
 #[derive(StructOpt, Debug)]
 struct K8sSwarm {

@@ -45,7 +45,7 @@ fn compile_admin_script(input: &str) -> Result<Script> {
 
 pub fn template_path() -> PathBuf {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push(SCRIPTS_DIR_PATH.to_string());
+    path.push(SCRIPTS_DIR_PATH);
     path
 }
 

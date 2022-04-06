@@ -139,7 +139,7 @@ where
         let hkdf =
             hkdf::Hkdf::<D>::from_prk(prk).map_err(|_| HkdfError::WrongPseudorandomKeyError)?;
         let mut okm = vec![0u8; length];
-        hkdf.expand(info.unwrap_or_else(|| &[]), &mut okm)
+        hkdf.expand(info.unwrap_or(&[]), &mut okm)
             // length > D::OutputSize::to_usize() * 255
             .map_err(|_| HkdfError::InvalidOutputLengthError)?;
         Ok(okm)

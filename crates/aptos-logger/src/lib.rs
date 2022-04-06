@@ -143,7 +143,7 @@ pub mod prelude {
     };
 }
 
-mod aptos_logger;
+pub mod aptos_logger;
 mod event;
 mod filter;
 mod kv;
@@ -156,9 +156,7 @@ pub mod tracing_adapter;
 mod security;
 mod struct_log;
 
-pub use crate::aptos_logger::{
-    AptosData, AptosData as Logger, AptosDataBuilder, Writer, CHANNEL_SIZE,
-};
+pub use crate::aptos_logger::{AptosData as Logger, AptosDataBuilder, Writer, CHANNEL_SIZE};
 pub use event::Event;
 pub use filter::{Filter, LevelFilter};
 pub use logger::flush;

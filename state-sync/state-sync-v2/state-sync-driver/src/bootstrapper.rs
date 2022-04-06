@@ -10,9 +10,9 @@ use crate::{
     utils,
     utils::SpeculativeStreamState,
 };
+use ::aptos_logger::*;
 use aptos_config::config::BootstrappingMode;
 use aptos_data_client::GlobalDataSummary;
-use aptos_logger::*;
 use aptos_types::{
     epoch_change::Verifier,
     epoch_state::EpochState,

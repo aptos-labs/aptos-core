@@ -89,7 +89,7 @@ impl<TSocket> NoiseStream<TSocket>
 where
     TSocket: AsyncRead + Unpin,
 {
-    fn poll_read(&mut self, mut context: &mut Context, buf: &mut [u8]) -> Poll<io::Result<usize>> {
+    fn poll_read(&mut self, context: &mut Context, buf: &mut [u8]) -> Poll<io::Result<usize>> {
         loop {
             trace!("NoiseStream ReadState::{:?}", self.read_state);
             match self.read_state {
@@ -104,7 +104,7 @@ where
                     ref mut offset,
                 } => {
                     match ready!(poll_read_u16frame_len(
-                        &mut context,
+                        context,
                         Pin::new(&mut self.socket),
                         buf,
                         offset
@@ -137,7 +137,7 @@ where
                     ref mut offset,
                 } => {
                     match ready!(poll_read_exact(
-                        &mut context,
+                        context,
                         Pin::new(&mut self.socket),
                         &mut self.buffers.read_buffer[..(frame_len as usize)],
                         offset
@@ -234,7 +234,7 @@ where
 {
     fn poll_write_or_flush(
         &mut self,
-        mut context: &mut Context,
+        context: &mut Context,
         buf: Option<&[u8]>,
     ) -> Poll<io::Result<Option<usize>>> {
         loop {
@@ -310,7 +310,7 @@ where
                     ref mut offset,
                 } => {
                     match ready!(poll_write_all(
-                        &mut context,
+                        context,
                         Pin::new(&mut self.socket),
                         buf,
                         offset
@@ -334,7 +334,7 @@ where
                     ref mut offset,
                 } => {
                     match ready!(poll_write_all(
-                        &mut context,
+                        context,
                         Pin::new(&mut self.socket),
                         &self.buffers.write_buffer[..(frame_len as usize)],
                         offset
@@ -351,7 +351,7 @@ where
                     }
                 }
                 WriteState::Flush => {
-                    ready!(Pin::new(&mut self.socket).poll_flush(&mut context))?;
+                    ready!(Pin::new(&mut self.socket).poll_flush(context))?;
                     self.write_state = WriteState::Init;
                 }
                 WriteState::Eof => return Poll::Ready(Err(io::ErrorKind::WriteZero.into())),
@@ -461,7 +461,7 @@ impl ::std::fmt::Debug for NoiseBuffers {
 
 /// Write an offset of a buffer to a socket, only returns Ready once done.
 fn poll_write_all<TSocket>(
-    mut context: &mut Context,
+    context: &mut Context,
     mut socket: Pin<&mut TSocket>,
     buf: &[u8],
     offset: &mut usize,
@@ -471,7 +471,7 @@ where
 {
     assert!(*offset <= buf.len());
     loop {
-        let n = ready!(socket.as_mut().poll_write(&mut context, &buf[*offset..]))?;
+        let n = ready!(socket.as_mut().poll_write(context, &buf[*offset..]))?;
         trace!("poll_write_all: wrote {}/{} bytes", *offset + n, buf.len());
         if n == 0 {
             return Poll::Ready(Err(io::ErrorKind::WriteZero.into()));
@@ -516,7 +516,7 @@ where
 /// It is possible that this function never completes,
 /// so a timeout needs to be set on the caller side.
 fn poll_read_exact<TSocket>(
-    mut context: &mut Context,
+    context: &mut Context,
     mut socket: Pin<&mut TSocket>,
     buf: &mut [u8],
     offset: &mut usize,
@@ -526,7 +526,7 @@ where
 {
     assert!(*offset <= buf.len());
     loop {
-        let n = ready!(socket.as_mut().poll_read(&mut context, &mut buf[*offset..]))?;
+        let n = ready!(socket.as_mut().poll_read(context, &mut buf[*offset..]))?;
         trace!("poll_read_exact: read {}/{} bytes", *offset + n, buf.len());
         if n == 0 {
             return Poll::Ready(Err(io::ErrorKind::UnexpectedEof.into()));

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_api_types::{Error, LedgerInfo, TransactionOnChainData};
-use aptos_config::config::{ApiConfig, RoleType};
+use aptos_config::config::ApiConfig;
 use aptos_crypto::HashValue;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_types::{
@@ -34,7 +34,6 @@ pub struct Context {
     chain_id: ChainId,
     db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
-    role: RoleType,
     api_config: ApiConfig,
 }
 
@@ -43,14 +42,12 @@ impl Context {
         chain_id: ChainId,
         db: Arc<dyn DbReader>,
         mp_sender: MempoolClientSender,
-        role: RoleType,
         api_config: ApiConfig,
     ) -> Self {
         Self {
             chain_id,
             db,
             mp_sender,
-            role,
             api_config,
         }
     }

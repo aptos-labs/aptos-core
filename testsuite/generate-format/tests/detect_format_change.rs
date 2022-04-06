@@ -26,7 +26,7 @@ fn analyze_serde_formats() {
                 generate_format::lint_bcs_format(&value),
                 Ok(()),
                 "In corpus {}: lint error while analyzing {}",
-                corpus.to_string(),
+                corpus,
                 key
             );
 
@@ -39,7 +39,7 @@ fn analyze_serde_formats() {
                     &value,
                     "Type {} in corpus {} differs with previous definition in another corpus: {:?} vs {:?}",
                     key,
-                    corpus.to_string(),
+                    corpus,
                     e.get(),
                     &value,
                 ),

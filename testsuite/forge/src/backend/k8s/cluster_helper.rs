@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{get_validators, k8s_retry_strategy, nodes_healthcheck, Result};
+use ::aptos_logger::*;
 use anyhow::{bail, format_err};
-use aptos_logger::*;
 use futures::future::try_join_all;
 use hyper::{Client, Uri};
 use hyper_proxy::{Intercept, Proxy, ProxyConnector};
@@ -393,13 +393,13 @@ fn create_eks_client(auth_with_k8s_env: bool) -> Result<EksClient> {
     let connector = HttpsConnector::new();
     let http_connector: hyper_proxy::ProxyConnector<
         hyper_tls::HttpsConnector<hyper::client::HttpConnector>,
-    >;
-    if let Ok(proxy_url) = std::env::var("HTTP_PROXY") {
+    > = if let Ok(proxy_url) = std::env::var("HTTP_PROXY") {
         let proxy = Proxy::new(Intercept::All, proxy_url.parse::<Uri>()?);
-        http_connector = ProxyConnector::from_proxy(connector, proxy)?;
+        ProxyConnector::from_proxy(connector, proxy)
     } else {
-        http_connector = ProxyConnector::new(connector)?;
-    }
+        ProxyConnector::new(connector)
+    }?;
+
     let mut hyper_builder = Client::builder();
     // disabling due to connection closed issue
     hyper_builder.pool_max_idle_per_host(0);
@@ -604,7 +604,7 @@ pub fn scale_sts_replica(sts_name: &str, replica_num: u64) -> Result<()> {
     let scale_sts_args = [
         "scale",
         "sts",
-        &sts_name.to_string(),
+        sts_name,
         &format!("--replicas={}", replica_num),
     ];
     println!("{:?}", scale_sts_args);

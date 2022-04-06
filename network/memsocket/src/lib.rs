@@ -318,7 +318,7 @@ impl AsyncRead for MemorySocket {
     /// Attempt to read from the `AsyncRead` into `buf`.
     fn poll_read(
         mut self: Pin<&mut Self>,
-        mut context: &mut Context,
+        context: &mut Context,
         buf: &mut [u8],
     ) -> Poll<Result<usize>> {
         if self.incoming.is_terminated() {
@@ -354,7 +354,7 @@ impl AsyncRead for MemorySocket {
                 // Either we've exhausted our current buffer or don't have one
                 _ => {
                     self.current_buffer = {
-                        match Pin::new(&mut self.incoming).poll_next(&mut context) {
+                        match Pin::new(&mut self.incoming).poll_next(context) {
                             Poll::Pending => {
                                 // If we've read anything up to this point return the bytes read
                                 if bytes_read > 0 {

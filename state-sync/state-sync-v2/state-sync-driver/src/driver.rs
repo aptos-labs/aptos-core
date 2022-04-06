@@ -15,10 +15,10 @@ use crate::{
     storage_synchronizer::StorageSynchronizerInterface,
     utils,
 };
+use ::aptos_logger::*;
 use aptos_config::config::{RoleType, StateSyncDriverConfig};
 use aptos_data_client::AptosDataClient;
 use aptos_infallible::Mutex;
-use aptos_logger::*;
 use aptos_types::waypoint::Waypoint;
 use consensus_notifications::{
     ConsensusCommitNotification, ConsensusNotification, ConsensusSyncNotification,

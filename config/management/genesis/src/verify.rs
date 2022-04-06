@@ -243,15 +243,13 @@ fn validator_config(
         .get_latest_state_value(StateKey::AccountAddressKey(
             account_config::validator_set_address(),
         ))
-        .map_err(|e| {
-            Error::UnexpectedError(format!("ValidatorSet Account issue {}", e.to_string()))
-        })?
+        .map_err(|e| Error::UnexpectedError(format!("ValidatorSet Account issue {}", e)))?
         .ok_or_else(|| Error::UnexpectedError("ValidatorSet Account not found".into()))?;
     let account_state = AccountState::try_from(&blob)
         .map_err(|e| Error::UnexpectedError(format!("Failed to parse blob: {}", e)))?;
     let validator_set: ValidatorSet = account_state
         .get_validator_set()
-        .map_err(|e| Error::UnexpectedError(format!("ValidatorSet issue {}", e.to_string())))?
+        .map_err(|e| Error::UnexpectedError(format!("ValidatorSet issue {}", e)))?
         .ok_or_else(|| Error::UnexpectedError("ValidatorSet does not exist".into()))?;
     let info = validator_set
         .payload()

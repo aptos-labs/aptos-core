@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_infallible::RwLock;
-use aptos_logger::{AptosData, Writer};
+use aptos_logger::{aptos_logger::AptosData, Writer};
 use std::sync::Arc;
 use tracing::Level;
 

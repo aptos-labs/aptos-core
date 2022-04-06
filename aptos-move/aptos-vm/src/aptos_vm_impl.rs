@@ -265,9 +265,7 @@ impl AptosVMImpl {
         let secondary_public_key_hashes: Vec<MoveValue> = txn_data
             .secondary_authentication_key_preimages
             .iter()
-            .map(|preimage| {
-                MoveValue::vector_u8(HashValue::sha3_256_of(&preimage.to_vec()).to_vec())
-            })
+            .map(|preimage| MoveValue::vector_u8(HashValue::sha3_256_of(preimage).to_vec()))
             .collect();
         let args = if self.get_version()? >= APTOS_VERSION_3 && txn_data.is_multi_agent() {
             vec![

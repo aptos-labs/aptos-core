@@ -368,7 +368,7 @@ fn create_range_random_u64(min_value: u64, max_value: u64) -> u64 {
 
 /// Initializes the Aptos logger for tests
 pub fn initialize_logger() {
-    aptos_logger::AptosData::builder()
+    aptos_logger::Logger::builder()
         .is_async(false)
         .level(Level::Info)
         .build();

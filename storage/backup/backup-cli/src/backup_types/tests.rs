@@ -34,7 +34,6 @@ struct TestData {
     txn_start_ver: Version,
     state_snapshot_ver: Option<Version>,
     target_ver: Version,
-    latest_ver: Version,
 }
 
 fn test_data_strategy() -> impl Strategy<Value = TestData> {
@@ -56,7 +55,6 @@ fn test_data_strategy() -> impl Strategy<Value = TestData> {
                 txn_start_ver,
                 state_snapshot_ver,
                 target_ver,
-                latest_ver,
             },
         )
 }

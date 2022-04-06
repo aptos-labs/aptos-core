@@ -88,7 +88,7 @@ impl<'t> AptosContext<'t> {
     }
 
     pub fn root_account(&mut self) -> &mut LocalAccount {
-        &mut self.public_info.root_account
+        self.public_info.root_account
     }
 }
 

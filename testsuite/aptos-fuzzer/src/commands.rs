@@ -69,7 +69,7 @@ pub fn fuzz_target(
     // Do a bit of arg parsing -- look for a "--" and insert the target and corpus directory
     // before that.
     let dash_dash_pos = args.iter().position(|x| x == "--");
-    let splice_pos = dash_dash_pos.unwrap_or_else(|| args.len());
+    let splice_pos = dash_dash_pos.unwrap_or(args.len());
     args.splice(
         splice_pos..splice_pos,
         vec![FUZZ_RUNNER.into(), corpus_dir.into()],

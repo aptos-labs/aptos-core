@@ -260,7 +260,7 @@ impl BlockStore {
 
         let blocks_to_commit = self
             .path_from_ordered_root(block_id_to_commit)
-            .unwrap_or_else(Vec::new);
+            .unwrap_or_default();
 
         assert!(!blocks_to_commit.is_empty());
 
@@ -359,7 +359,7 @@ impl BlockStore {
                 // recover the block tree in executor
                 let blocks_to_reexecute = self
                     .path_from_ordered_root(parent_block_id)
-                    .unwrap_or_else(Vec::new);
+                    .unwrap_or_default();
 
                 for block in blocks_to_reexecute {
                     self.execute_block(block.block().clone()).await?;

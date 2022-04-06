@@ -61,9 +61,10 @@ pub async fn send_data(event_name: String, user_id: String, event_params: HashMa
     }
 
     // parse environment variables
-    let api_secret = env::var(GA_API_SECRET).unwrap_or_else(|_| constants::APTOS_GA_API_SECRET.to_string());
-    let measurement_id =
-        env::var(GA_MEASUREMENT_ID).unwrap_or_else(|_| constants::APTOS_GA_MEASUREMENT_ID.to_string());
+    let api_secret =
+        env::var(GA_API_SECRET).unwrap_or_else(|_| constants::APTOS_GA_API_SECRET.to_string());
+    let measurement_id = env::var(GA_MEASUREMENT_ID)
+        .unwrap_or_else(|_| constants::APTOS_GA_MEASUREMENT_ID.to_string());
 
     // dump event params in a new hashmap with some default params to include
     let mut new_event_params: HashMap<String, String> = event_params.clone();

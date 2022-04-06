@@ -273,13 +273,7 @@ impl FakeExecutor {
         let ap = AccessPath::resource_access_path(ResourceKey::new(*addr, T::struct_tag()));
         let data_blob = StateView::get_state_value(&self.data_store, &StateKey::AccessPath(ap))
             .expect("account must exist in data store")
-            .unwrap_or_else(|| {
-                panic!(
-                    "Can't fetch {} resource for {}",
-                    T::STRUCT_NAME.to_string(),
-                    addr
-                )
-            });
+            .unwrap_or_else(|| panic!("Can't fetch {} resource for {}", T::STRUCT_NAME, addr));
         bcs::from_bytes(data_blob.as_slice()).ok()
     }
 

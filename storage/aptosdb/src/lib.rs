@@ -83,14 +83,7 @@ use aptos_types::{
 use itertools::zip_eq;
 use once_cell::sync::Lazy;
 use schemadb::{ColumnFamilyName, Options, DB, DEFAULT_CF_NAME};
-use std::{
-    collections::HashMap,
-    iter::Iterator,
-    path::Path,
-    sync::{mpsc, Arc, Mutex},
-    thread::{self, JoinHandle},
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, iter::Iterator, path::Path, sync::Arc, time::Instant};
 use storage_interface::{DbReader, DbWriter, Order, StartupInfo, StateSnapshotReceiver, TreeState};
 
 const MAX_LIMIT: u64 = 5000;
@@ -134,7 +127,7 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
         "rocksdb.block-cache-pinned-usage",
     ]
     .iter()
-    .map(|x| (*x, format!("aptos_{}", x.replace(".", "_"))))
+    .map(|x| (*x, format!("aptos_{}", x.replace('.', "_"))))
     .collect()
 });
 
@@ -167,48 +160,6 @@ fn update_rocksdb_properties(db: &DB) -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug)]
-struct RocksdbPropertyReporter {
-    sender: Mutex<mpsc::Sender<()>>,
-    join_handle: Option<JoinHandle<()>>,
-}
-
-impl RocksdbPropertyReporter {
-    fn new(db: Arc<DB>) -> Self {
-        let (send, recv) = mpsc::channel();
-        let join_handle = Some(thread::spawn(move || loop {
-            if let Err(e) = update_rocksdb_properties(&db) {
-                warn!(
-                    error = ?e,
-                    "Updating rocksdb property failed."
-                );
-            }
-            // report rocksdb properties each 10 seconds
-            match recv.recv_timeout(Duration::from_secs(10)) {
-                Ok(_) => break,
-                Err(mpsc::RecvTimeoutError::Timeout) => (),
-                Err(mpsc::RecvTimeoutError::Disconnected) => break,
-            }
-        }));
-        Self {
-            sender: Mutex::new(send),
-            join_handle,
-        }
-    }
-}
-
-impl Drop for RocksdbPropertyReporter {
-    fn drop(&mut self) {
-        // Notify the property reporting thread to exit
-        self.sender.lock().unwrap().send(()).unwrap();
-        self.join_handle
-            .take()
-            .expect("Rocksdb property reporting thread must exist.")
-            .join()
-            .expect("Rocksdb property reporting thread should join peacefully.");
-    }
-}
-
 /// This holds a handle to the underlying DB responsible for physical storage and provides APIs for
 /// access to the core Aptos data structures.
 #[derive(Debug)]
@@ -219,7 +170,6 @@ pub struct AptosDB {
     state_store: Arc<StateStore>,
     event_store: Arc<EventStore>,
     system_store: Arc<SystemStore>,
-    rocksdb_property_reporter: RocksdbPropertyReporter,
     pruner: Option<Pruner>,
 }
 
@@ -258,7 +208,6 @@ impl AptosDB {
             state_store: Arc::new(StateStore::new(Arc::clone(&db))),
             transaction_store: Arc::clone(&transaction_store),
             system_store: Arc::clone(&system_store),
-            rocksdb_property_reporter: RocksdbPropertyReporter::new(Arc::clone(&db)),
             pruner: match storage_pruner_config {
                 NO_OP_STORAGE_PRUNER_CONFIG => None,
                 _ => Some(Pruner::new(
@@ -568,7 +517,7 @@ impl AptosDB {
         &self,
         txns_to_commit: &[TransactionToCommit],
         first_version: u64,
-        mut cs: &mut ChangeSet,
+        cs: &mut ChangeSet,
     ) -> Result<HashValue> {
         let last_version = first_version + txns_to_commit.len() as u64 - 1;
 
@@ -587,12 +536,8 @@ impl AptosDB {
                 .iter()
                 .map(|txn_to_commit| txn_to_commit.jf_node_hashes())
                 .collect::<Option<Vec<_>>>();
-            self.state_store.put_value_sets(
-                account_state_sets,
-                node_hashes,
-                first_version,
-                &mut cs,
-            )?;
+            self.state_store
+                .put_value_sets(account_state_sets, node_hashes, first_version, cs)?;
         }
 
         // Event updates. Gather event accumulator root hashes.
@@ -602,8 +547,7 @@ impl AptosDB {
                 .start_timer();
             zip_eq(first_version..=last_version, txns_to_commit)
                 .map(|(ver, txn_to_commit)| {
-                    self.event_store
-                        .put_events(ver, txn_to_commit.events(), &mut cs)
+                    self.event_store.put_events(ver, txn_to_commit.events(), cs)
                 })
                 .collect::<Result<Vec<_>>>()?;
         }
@@ -615,13 +559,10 @@ impl AptosDB {
             zip_eq(first_version..=last_version, txns_to_commit).try_for_each(
                 |(ver, txn_to_commit)| {
                     // Transaction updates. Gather transaction hashes.
-                    self.transaction_store.put_transaction(
-                        ver,
-                        txn_to_commit.transaction(),
-                        &mut cs,
-                    )?;
                     self.transaction_store
-                        .put_write_set(ver, txn_to_commit.write_set(), &mut cs)
+                        .put_transaction(ver, txn_to_commit.transaction(), cs)?;
+                    self.transaction_store
+                        .put_write_set(ver, txn_to_commit.write_set(), cs)
                 },
             )?;
             // Transaction accumulator updates. Get result root hash.
@@ -631,7 +572,7 @@ impl AptosDB {
                 .cloned()
                 .collect();
             self.ledger_store
-                .put_transaction_infos(first_version, &txn_infos, &mut cs)?
+                .put_transaction_infos(first_version, &txn_infos, cs)?
         };
 
         Ok(new_root_hash)

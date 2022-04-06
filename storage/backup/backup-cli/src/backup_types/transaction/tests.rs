@@ -40,8 +40,7 @@ fn end_to_end() {
     assert_eq!(latest_version as usize + 1, total_txns);
     let txns = blocks
         .iter()
-        .map(|(txns, _li)| txns)
-        .flatten()
+        .flat_map(|(txns, _li)| txns)
         .map(|txn_to_commit| txn_to_commit.transaction())
         .collect::<Vec<_>>();
     let max_chunk_size = txns
@@ -128,11 +127,10 @@ fn end_to_end() {
         recovered_transactions.events.unwrap(),
         blocks
             .iter()
-            .map(|(txns, _li)| {
+            .flat_map(|(txns, _li)| {
                 txns.iter()
                     .map(|txn_to_commit| txn_to_commit.events().to_vec())
             })
-            .flatten()
             .skip(first_ver_to_backup as usize)
             .take(num_txns_to_restore)
             .collect::<Vec<_>>()

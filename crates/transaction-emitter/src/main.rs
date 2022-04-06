@@ -29,8 +29,6 @@ struct Args {
     vasp: bool,
 
     #[structopt(long)]
-    health_check: bool,
-    #[structopt(long)]
     emit_tx: bool,
     #[structopt(long)]
     diag: bool,

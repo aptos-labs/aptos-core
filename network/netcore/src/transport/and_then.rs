@@ -154,18 +154,18 @@ where
 {
     type Output = Result<O2, E>;
 
-    fn poll(self: Pin<&mut Self>, mut context: &mut Context) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, context: &mut Context) -> Poll<Self::Output> {
         let mut this = self.project();
         loop {
             let (output, (f, addr, origin)) = match this.chain.as_mut().project() {
                 // Step 1: Drive Fut1 to completion
-                AndThenChainProj::First(fut1, data) => match fut1.poll(&mut context) {
+                AndThenChainProj::First(fut1, data) => match fut1.poll(context) {
                     Poll::Pending => return Poll::Pending,
                     Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                     Poll::Ready(Ok(output)) => (output, data.take().expect("must be initialized")),
                 },
                 // Step 4: Drive Fut2 to completion
-                AndThenChainProj::Second(fut2) => return fut2.poll(&mut context),
+                AndThenChainProj::Second(fut2) => return fut2.poll(context),
                 AndThenChainProj::Empty => unreachable!(),
             };
 

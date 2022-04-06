@@ -6,7 +6,7 @@ use aptos_api_types::{
     mime_types, HexEncodedBytes, TransactionOnChainData, X_APTOS_CHAIN_ID,
     X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
 };
-use aptos_config::config::{ApiConfig, RoleType};
+use aptos_config::config::ApiConfig;
 use aptos_crypto::{hash::HashValue, SigningKey};
 use aptos_genesis_tool::validator_builder::{RootKeys, ValidatorBuilder};
 use aptos_global_constants::OWNER_ACCOUNT;
@@ -72,7 +72,6 @@ pub fn new_test_context(test_name: &'static str) -> TestContext {
             ChainId::test(),
             db.clone(),
             mempool.ac_client.clone(),
-            RoleType::Validator,
             ApiConfig::default(),
         ),
         rng,
@@ -128,7 +127,7 @@ impl TestContext {
 
     pub fn check_golden_output(&mut self, msg: Value) {
         if self.golden_output.is_none() {
-            self.golden_output = Some(GoldenOutputs::new(self.test_name.replace(":", "_")));
+            self.golden_output = Some(GoldenOutputs::new(self.test_name.replace(':', "_")));
         }
         self.golden_output.as_ref().unwrap().log(&pretty(&msg));
     }

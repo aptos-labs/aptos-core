@@ -133,7 +133,7 @@ impl LogEntry {
     }
 
     pub fn hostname(&self) -> Option<&str> {
-        self.hostname.as_deref()
+        self.hostname
     }
 
     pub fn timestamp(&self) -> &str {
@@ -517,7 +517,7 @@ impl Writer for FileWriter {
     /// Write to file
     fn write(&self, log: String) {
         if let Err(err) = writeln!(self.log_file.write(), "{}", log) {
-            eprintln!("Unable to write to log file: {}", err.to_string());
+            eprintln!("Unable to write to log file: {}", err);
         }
     }
 }

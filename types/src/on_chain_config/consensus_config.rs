@@ -60,15 +60,9 @@ impl Default for OnChainConsensusConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct ConsensusConfigV1 {
     pub two_chain: bool,
-}
-
-impl Default for ConsensusConfigV1 {
-    fn default() -> Self {
-        Self { two_chain: false }
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

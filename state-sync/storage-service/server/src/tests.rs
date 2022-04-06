@@ -765,7 +765,7 @@ impl DbReader for MockDbReader {
 
 /// Initializes the Aptos logger for tests
 pub fn initialize_logger() {
-    aptos_logger::AptosData::builder()
+    aptos_logger::Logger::builder()
         .is_async(false)
         .level(Level::Debug)
         .build();

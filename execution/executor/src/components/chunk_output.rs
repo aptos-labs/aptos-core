@@ -53,8 +53,7 @@ impl ChunkOutput {
         // collect all accounts touched and dedup
         let access_paths = transaction_outputs
             .iter()
-            .map(|o| o.write_set())
-            .flatten()
+            .flat_map(|o| o.write_set())
             .collect::<HashSet<_>>();
 
         // prime the state cache by fetching all touched accounts

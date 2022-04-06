@@ -18,9 +18,6 @@ struct Opt {
     /// Path to the local AptosDB file
     #[structopt(long, parse(from_os_str))]
     db: Option<PathBuf>,
-    /// Full URL address to connect to - should include port number, if applicable
-    #[structopt(short = "u", long)]
-    url: Option<String>,
     /// If true, persist the effects of replaying transactions via `cmd` to disk in a format understood by the Move CLI
     #[structopt(short = "s", global = true)]
     save_write_sets: bool,

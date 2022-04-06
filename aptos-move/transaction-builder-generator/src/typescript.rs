@@ -465,7 +465,7 @@ return new AptosTypes.Script(code, tyArgs, args);"#,
 }},
             "#,
             abi.name().to_camel_case(),
-            abi.doc().replace("\"", "\\\"").replace("\n", "\" + \n \""),
+            abi.doc().replace('\"', "\\\"").replace('\n', "\" + \n \""),
             abi.ty_args()
                 .iter()
                 .map(|ty_arg| format!("\"{}\"", ty_arg.name()))
@@ -504,7 +504,7 @@ return new AptosTypes.Script(code, tyArgs, args);"#,
         writeln!(
             self.out,
             "  description: \"{}\",",
-            abi.doc().replace("\"", "\\\"").replace("\n", "\" + \n \"")
+            abi.doc().replace('\"', "\\\"").replace('\n', "\" + \n \"")
         )?;
         writeln!(
             self.out,

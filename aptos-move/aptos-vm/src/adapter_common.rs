@@ -131,14 +131,14 @@ pub fn validate_signed_transaction<A: VMAdapter>(
 
 pub(crate) fn validate_signature_checked_transaction<S: MoveResolver, A: VMAdapter>(
     adapter: &A,
-    mut session: &mut SessionExt<S>,
+    session: &mut SessionExt<S>,
     transaction: &SignatureCheckedTransaction,
     allow_too_new: bool,
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
     adapter.check_transaction_format(transaction)?;
 
-    let prologue_status = adapter.run_prologue(&mut session, transaction, log_context);
+    let prologue_status = adapter.run_prologue(session, transaction, log_context);
     match prologue_status {
         Err(err) if !allow_too_new || err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW => {
             Err(err)

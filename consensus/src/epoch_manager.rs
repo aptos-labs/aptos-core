@@ -586,8 +586,7 @@ impl EpochManager {
         event: VerifiedEvent,
     ) -> anyhow::Result<()> {
         match event {
-            buffer_manager_event
-            @ (VerifiedEvent::CommitVote(_)
+            buffer_manager_event @ (VerifiedEvent::CommitVote(_)
             | VerifiedEvent::CommitDecision(_)) => {
                 if let Some(sender) = &mut self.buffer_manager_msg_tx {
                     sender.push(peer_id, buffer_manager_event)?;

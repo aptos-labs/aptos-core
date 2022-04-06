@@ -454,12 +454,12 @@ mod tests {
 
         let resp = warp::test::request()
             .method("GET")
-            .path(&"/health".to_string())
+            .path("/health")
             .reply(&routes(service))
             .await;
 
         assert_eq!(resp.status(), 200);
-        assert_eq!(resp.body(), 0.to_string().as_str());
+        assert_eq!(resp.body(), std::string::ToString::to_string(&0).as_str());
     }
 
     #[tokio::test]

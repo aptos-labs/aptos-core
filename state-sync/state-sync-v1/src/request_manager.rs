@@ -39,7 +39,6 @@ const STARTING_SCORE_PREFERRED: f64 = 100.0;
 /// Basic metadata about the chunk request.
 #[derive(Clone, Debug)]
 pub struct ChunkRequestInfo {
-    version: u64,
     first_request_time: SystemTime,
     last_request_time: SystemTime,
     multicast_level: NetworkId,
@@ -48,10 +47,9 @@ pub struct ChunkRequestInfo {
 }
 
 impl ChunkRequestInfo {
-    pub fn new(version: u64, peers: Vec<PeerNetworkId>, multicast_level: NetworkId) -> Self {
+    pub fn new(peers: Vec<PeerNetworkId>, multicast_level: NetworkId) -> Self {
         let now = SystemTime::now();
         Self {
-            version,
             first_request_time: now,
             last_request_time: now,
             multicast_level,
@@ -342,8 +340,7 @@ impl RequestManager {
             prev_request.last_request_time = now;
             prev_request.clone()
         } else {
-            let chunk_request_info =
-                ChunkRequestInfo::new(version, peers, self.multicast_network_level);
+            let chunk_request_info = ChunkRequestInfo::new(peers, self.multicast_network_level);
             self.requests.insert(version, chunk_request_info.clone());
             chunk_request_info
         }

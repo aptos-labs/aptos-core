@@ -155,7 +155,7 @@ fn list_accounts(db: &AptosDB) {
 }
 
 fn main() {
-    ::aptos_logger::AptosData::builder().build();
+    ::aptos_logger::Logger::builder().build();
 
     let opt = Opt::from_args();
 

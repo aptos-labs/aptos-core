@@ -24,7 +24,6 @@ use aptos_sdk::{
     },
 };
 use rand::seq::SliceRandom;
-use reqwest::Client;
 use std::{convert::TryFrom, path::Path};
 
 const DD_KEY: &str = "dd.key";
@@ -47,7 +46,6 @@ impl Cluster {
         chain_id: ChainId,
         vasp: bool,
     ) -> Self {
-        let http_client = Client::new();
         let instances: Vec<Instance> = peers
             .into_iter()
             .map(|host_port| {
@@ -56,7 +54,6 @@ impl Cluster {
                     host_port.0,
                     host_port.1,
                     host_port.2,
-                    http_client.clone(),
                 )
             })
             .collect();

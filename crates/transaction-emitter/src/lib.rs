@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use ::aptos_logger::*;
 use anyhow::{format_err, Context, Result};
-use aptos_logger::*;
 use aptos_rest_client::{Client as RestClient, PendingTransaction, Response};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,

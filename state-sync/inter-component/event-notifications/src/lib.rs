@@ -123,7 +123,6 @@ impl EventSubscriptionService {
         // Create a new event subscription
         let subscription_id = self.get_new_subscription_id();
         let event_subscription = EventSubscription {
-            subscription_id,
             notification_sender,
             event_buffer: vec![],
         };
@@ -167,7 +166,6 @@ impl EventSubscriptionService {
         // Create a new reconfiguration subscription
         let subscription_id = self.get_new_subscription_id();
         let reconfig_subscription = ReconfigSubscription {
-            subscription_id,
             notification_sender,
         };
 
@@ -359,7 +357,6 @@ type SubscriptionId = u64;
 /// send the corresponding notifications and a buffer to hold pending events.
 #[derive(Debug)]
 struct EventSubscription {
-    pub subscription_id: SubscriptionId,
     pub event_buffer: Vec<ContractEvent>,
     pub notification_sender: channel::aptos_channel::Sender<(), EventNotification>,
 }
@@ -385,7 +382,6 @@ impl EventSubscription {
 /// corresponding notifications.
 #[derive(Debug)]
 struct ReconfigSubscription {
-    pub subscription_id: SubscriptionId,
     pub notification_sender: channel::aptos_channel::Sender<(), ReconfigNotification>,
 }
 

@@ -479,8 +479,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                                 .unzip();
                                         let events = outputs
                                             .into_iter()
-                                            .map(|output| output.events().to_vec())
-                                            .flatten()
+                                            .flat_map(|output| output.events().to_vec())
                                             .collect::<Vec<_>>();
                                     let committed_transaction = CommittedTransactions {
                                             events,

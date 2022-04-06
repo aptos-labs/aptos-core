@@ -6,7 +6,7 @@ use crate::{
     validator_config::{fullnode_addresses, validator_addresses, DecodedValidatorConfig},
 };
 use aptos_crypto::ed25519::Ed25519PublicKey;
-use aptos_management::{config::ConfigPath, error::Error, secure_backend::ValidatorBackend};
+use aptos_management::{config::ConfigPath, error::Error};
 use aptos_types::{
     account_address::AccountAddress, network_address::NetworkAddress, validator_info::ValidatorInfo,
 };
@@ -22,11 +22,6 @@ pub struct ValidatorSet {
     json_server: Option<String>,
     #[structopt(long, help = "AccountAddress to retrieve the validator set info")]
     account_address: Option<AccountAddress>,
-    #[structopt(
-        long,
-        help = "The secure backend that contains the network address encryption keys"
-    )]
-    validator_backend: Option<ValidatorBackend>,
 }
 
 impl ValidatorSet {

@@ -23,13 +23,16 @@ pub struct Options {
     #[structopt(long = "exact")]
     /// Exactly match filters rather than by substring
     filter_exact: bool,
+    #[allow(dead_code)]
     #[structopt(long, default_value = "1", env = "RUST_TEST_THREADS")]
     /// NO-OP: unsupported option, exists for compatibility with the default test harness
     /// Number of threads used for running tests in parallel
     test_threads: NonZeroUsize,
+    #[allow(dead_code)]
     #[structopt(short = "q", long)]
-    /// Output minimal information
+    /// NO-OP: unsupported option, exists for compatibility with the default test harness
     quiet: bool,
+    #[allow(dead_code)]
     #[structopt(long)]
     /// NO-OP: unsupported option, exists for compatibility with the default test harness
     nocapture: bool,
@@ -48,11 +51,13 @@ pub struct Options {
     ///   (json is unsupported, exists for compatibility with the default test harness)
     #[structopt(long, possible_values = &Format::variants(), default_value, case_insensitive = true)]
     format: Format,
+    #[allow(dead_code)]
     #[structopt(short = "Z")]
     /// NO-OP: unsupported option, exists for compatibility with the default test harness
     /// -Z unstable-options Enable nightly-only flags:
     ///                     unstable-options = Allow use of experimental features
     z_unstable_options: Option<String>,
+    #[allow(dead_code)]
     #[structopt(long)]
     /// NO-OP: unsupported option, exists for compatibility with the default test harness
     /// Show captured stdout of successful tests

@@ -5,9 +5,9 @@ use crate::{
     backend::k8s::node::K8sNode, create_k8s_client, query_sequence_numbers, remove_helm_release,
     set_validator_image_tag, ChainInfo, FullNode, Node, Result, Swarm, Validator, Version,
 };
+use ::aptos_logger::*;
 use anyhow::{anyhow, bail, format_err};
 use aptos_config::config::NodeConfig;
-use aptos_logger::*;
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{

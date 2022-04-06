@@ -65,8 +65,7 @@ impl ExecutedChunk {
     pub fn events_to_commit(&self) -> Vec<ContractEvent> {
         self.to_commit
             .iter()
-            .map(|(_, txn_data)| txn_data.events())
-            .flatten()
+            .flat_map(|(_, txn_data)| txn_data.events())
             .cloned()
             .collect()
     }

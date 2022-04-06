@@ -19,18 +19,13 @@ pub use swarm::{LocalSwarm, LocalSwarmBuilder, SwarmDirectory};
 
 #[derive(Clone, Debug)]
 pub struct LocalVersion {
-    revision: String,
     bin: PathBuf,
     version: Version,
 }
 
 impl LocalVersion {
-    pub fn new(revision: String, bin: PathBuf, version: Version) -> Self {
-        Self {
-            revision,
-            bin,
-            version,
-        }
+    pub fn new(bin: PathBuf, version: Version) -> Self {
+        Self { bin, version }
     }
 
     pub fn bin(&self) -> &Path {
@@ -56,12 +51,8 @@ impl LocalFactory {
     pub fn from_workspace() -> Result<Self> {
         let mut versions = HashMap::new();
         let new_version = cargo::get_aptos_node_binary_from_worktree().map(|(revision, bin)| {
-            let version = Version::new(usize::max_value(), revision.clone());
-            LocalVersion {
-                revision,
-                bin,
-                version,
-            }
+            let version = Version::new(usize::max_value(), revision);
+            LocalVersion { bin, version }
         })?;
 
         versions.insert(new_version.version.clone(), new_version);
@@ -72,12 +63,8 @@ impl LocalFactory {
         let mut versions = HashMap::new();
         let new_version =
             cargo::get_aptos_node_binary_at_revision(revision).map(|(revision, bin)| {
-                let version = Version::new(usize::max_value(), revision.clone());
-                LocalVersion {
-                    revision,
-                    bin,
-                    version,
-                }
+                let version = Version::new(usize::max_value(), revision);
+                LocalVersion { bin, version }
             })?;
 
         versions.insert(new_version.version.clone(), new_version);
@@ -86,21 +73,13 @@ impl LocalFactory {
 
     pub fn with_revision_and_workspace(revision: &str) -> Result<Self> {
         let workspace = cargo::get_aptos_node_binary_from_worktree().map(|(revision, bin)| {
-            let version = Version::new(usize::max_value(), revision.clone());
-            LocalVersion {
-                revision,
-                bin,
-                version,
-            }
+            let version = Version::new(usize::max_value(), revision);
+            LocalVersion { bin, version }
         })?;
         let revision =
             cargo::get_aptos_node_binary_at_revision(revision).map(|(revision, bin)| {
-                let version = Version::new(usize::min_value(), revision.clone());
-                LocalVersion {
-                    revision,
-                    bin,
-                    version,
-                }
+                let version = Version::new(usize::min_value(), revision);
+                LocalVersion { bin, version }
             })?;
 
         let mut versions = HashMap::new();

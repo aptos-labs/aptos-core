@@ -53,13 +53,13 @@ impl Genesis {
 
         if let Some(path) = self.path {
             let mut file = File::create(path).map_err(|e| {
-                Error::UnexpectedError(format!("Unable to create genesis file: {}", e.to_string()))
+                Error::UnexpectedError(format!("Unable to create genesis file: {}", e))
             })?;
             let bytes = bcs::to_bytes(&genesis).map_err(|e| {
-                Error::UnexpectedError(format!("Unable to serialize genesis: {}", e.to_string()))
+                Error::UnexpectedError(format!("Unable to serialize genesis: {}", e))
             })?;
             file.write_all(&bytes).map_err(|e| {
-                Error::UnexpectedError(format!("Unable to write genesis file: {}", e.to_string()))
+                Error::UnexpectedError(format!("Unable to write genesis file: {}", e))
             })?;
         }
 

@@ -3,7 +3,7 @@
 
 use anyhow::{format_err, Result};
 use aptos_rest_client::Client as RestClient;
-use reqwest::{Client, Url};
+use reqwest::Url;
 use std::{
     fmt,
     str::FromStr,
@@ -17,8 +17,6 @@ pub struct Instance {
     ip: String,
     ac_port: u32,
     debug_interface_port: Option<u32>,
-    // todo: remove this, no where is using it
-    http_client: Client,
 }
 
 impl Instance {
@@ -27,14 +25,12 @@ impl Instance {
         ip: String,
         ac_port: u32,
         debug_interface_port: Option<u32>,
-        http_client: Client,
     ) -> Instance {
         Instance {
             peer_name,
             ip,
             ac_port,
             debug_interface_port,
-            http_client,
         }
     }
 

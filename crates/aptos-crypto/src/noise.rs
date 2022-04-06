@@ -181,7 +181,7 @@ fn hash(data: &[u8]) -> Vec<u8> {
 }
 
 fn hkdf(ck: &[u8], dh_output: Option<&[u8]>) -> Result<(Vec<u8>, Vec<u8>), NoiseError> {
-    let dh_output = dh_output.unwrap_or_else(|| &[]);
+    let dh_output = dh_output.unwrap_or(&[]);
     let hkdf_output = if dh_output.is_empty() {
         Hkdf::<sha2::Sha256>::extract_then_expand_no_ikm(Some(ck), None, 64)
     } else {
@@ -326,7 +326,7 @@ impl NoiseConfig {
         let aead = Aes256Gcm::new(GenericArray::from_slice(&k));
 
         let msg_and_ad = Payload {
-            msg: payload.unwrap_or_else(|| &[]),
+            msg: payload.unwrap_or(&[]),
             aad: &h,
         };
         let nonce = GenericArray::from_slice(&[0u8; AES_NONCE_SIZE]);
@@ -547,7 +547,7 @@ impl NoiseConfig {
         let aead = Aes256Gcm::new(GenericArray::from_slice(&k));
 
         let msg_and_ad = Payload {
-            msg: payload.unwrap_or_else(|| &[]),
+            msg: payload.unwrap_or(&[]),
             aad: &h,
         };
         let nonce = GenericArray::from_slice(&[0u8; AES_NONCE_SIZE]);

@@ -122,7 +122,7 @@ async fn test_get_events_by_struct_type_has_generic_type_parameter() {
     // Instead of creating the example, we just look up an event handle that does not exist.
     let path = format!(
         "/accounts/0x1/events/{}/coin",
-        utf8_percent_encode("0x1::TestCoin::Balance<0x1::ABC::ABC>", NON_ALPHANUMERIC).to_string()
+        utf8_percent_encode("0x1::TestCoin::Balance<0x1::ABC::ABC>", NON_ALPHANUMERIC)
     );
     let resp = context.expect_status_code(404).get(path.as_str()).await;
     context.check_golden_output(resp);

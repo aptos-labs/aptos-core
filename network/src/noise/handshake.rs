@@ -227,7 +227,7 @@ impl NoiseUpgrader {
         client_message[PeerId::LENGTH..Self::PROLOGUE_SIZE]
             .copy_from_slice(remote_public_key.as_slice());
 
-        let (prologue_msg, mut client_noise_msg) = client_message.split_at_mut(Self::PROLOGUE_SIZE);
+        let (prologue_msg, client_noise_msg) = client_message.split_at_mut(Self::PROLOGUE_SIZE);
 
         // craft 8-byte payload as current timestamp (in milliseconds)
         let payload = time_provider();
@@ -241,7 +241,7 @@ impl NoiseUpgrader {
                 prologue_msg,
                 remote_public_key,
                 Some(&payload),
-                &mut client_noise_msg,
+                client_noise_msg,
             )
             .map_err(NoiseHandshakeError::BuildClientHandshakeMessageFailed)?;
 
