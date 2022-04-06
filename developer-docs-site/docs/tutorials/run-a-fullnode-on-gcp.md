@@ -72,7 +72,7 @@ You can deploy a public FullNode on GCP by using the Aptos fullnode Terraform mo
   }
   ```
 
-5. Initialise Terraform in the same diretory of your `main.tf` file
+5. Initialise Terraform in the same directory of your `main.tf` file
   ```
   $ terraform init
   ```
@@ -170,3 +170,76 @@ There could be two types of releasees, one comes with a data wipe to startover t
   # if you didn't update the image tag, terraform will show nothing to change, in this case, force helm update
   $ terraform apply -var force_helm_update=true
   ```
+
+## Check Logging
+
+To check the logs of the pod, using the following commands.
+
+  ```
+  # Get a list of the pods
+  $ kubectl get pods -n aptos
+
+  # Get logs of the pod
+  $ kubectl logs <pod-name> -n aptos
+  ```
+
+
+When using GKE, the logs of the cluster and pod will automatically show up in the Google Cloud console.  From the console menu, choose `Kubernetes Engine`.  From the side menu, choose `Workloads`.  You will see all the pods from the cluster listed.  
+
+![GKE Workloads screenshot](../../static/img/tutorial-gcp-logging1.png "GKE Workloads screenshot")
+
+The “devnet0-aptos-fullnode” is the pod that is running the aptos fullnode container. Click on the pod to view details.  You will see some metrics and other details about the pod.
+
+![GKE Workloads Pod screenshot](../../static/img/tutorial-gcp-logging2.png "GKE Workloads Pod screenshot")
+
+Click the “LOGS” tab to view the logs directly from the pod.  If there are errors in the pod, you will see them here.
+
+![GKE Workloads Pod Logs screenshot](../../static/img/tutorial-gcp-logging3.png "GKE Workloads Pod Logs screenshot")
+
+Click the `open in new window` icon to view the logs in the Log Explorer.  This screen allows advanced searching in the logs.  
+
+![GKE Workloads Pod Logs Explorer screenshot](../../static/img/tutorial-gcp-logging4.png "GKE Workloads Pod Logs Explorer screenshot")
+
+
+Other logging insights are available in the Logs Dashboard 
+
+![GKE Workloads Pod Logs Dashboard screenshot](../../static/img/tutorial-gcp-logging5.png "GKE Workloads Pod Logs Dashboard screenshot")
+
+
+Additional [features](https://cloud.google.com/logging/docs) are available through [Cloud Logging](https://cloud.google.com/logging), including creating log-based metrics, logging sinks and log buckets. 
+
+
+## Check Monitoring
+
+Google cloud captures many metrics from the cluster and makes them easily viewable in the console.  From the console menu, choose `Kubernetes Engine`.  Click on the cluster that aptos is deployed to.  Click on the `Operations` link at the top right.  Click on the `Metrics` sub-tab to view specific cluster metrics.
+
+![GKE Monitoring metrics screenshot](../../static/img/tutorial-gcp-mon1.png "GKE Monitoring metrics screenshot")
+
+Click the `View in Cloud Monitoring` link at the top to view the built-in GKE [dashboard](https://cloud.google.com/stackdriver/docs/solutions/gke/observing) for the cluster.  
+
+![GKE Monitoring dashboard screenshot](../../static/img/tutorial-gcp-mon2.png "GKE Monitoring dashboard screenshot")
+
+Google Cloud [Monitoring](https://cloud.google.com/monitoring) has many other features to easily monitor the cluster and pods.  You can configure [uptime checks](https://cloud.google.com/monitoring/uptime-checks/introduction) for the services and configure [alerts](https://cloud.google.com/monitoring/alerts/using-alerting-ui) for when the metrics reach a certain [threshold](https://cloud.google.com/stackdriver/docs/solutions/slo-monitoring/sli-metrics/overview).  
+
+
+## Troubleshooting
+
+Common troubleshooting solutions.
+
+### Terraform “Connection Refused” Error Message
+
+When running terraform, the command errors out with a connection refused error message.
+
+  ```
+  Error: Get "http://localhost/api/v1/namespaces/aptos": dial tcp 127.0.0.1:80: connect: connection refused
+  ```
+
+This likely means that the state of the install is out of sync with the saved terraform state file located in the storage bucket.  (configured during `terraform init` statement).  This could happen if the cluster or other components were deleted outside of terraform.  Or if terraform had an error and did not finish.  Use the following commands to check the state.  Delete the state that is related to the error message.  You will likely need to run terraform destroy, clean up the environment, and run the terraform script again.  
+
+  ```
+  terraform state list
+
+  terraform state rm <state>
+  ```
+
+
