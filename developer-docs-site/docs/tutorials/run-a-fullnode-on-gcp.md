@@ -38,11 +38,11 @@ You can deploy a public FullNode on GCP by using the Aptos fullnode Terraform mo
     $ mkdir -p ~/$WORKSPACE
     ```
 
-2. Create a storage bucket for storing the Terraform state on Google Cloud Storage.  Use the console or this gcs command to create the bucket.  See the Google Cloud Storage documentation here: https://cloud.google.com/storage/docs/creating-buckets#prereq-cli
+2. Create a storage bucket for storing the Terraform state on Google Cloud Storage.  Use the console or this gcs command to create the bucket.  The name of the bucket must be unique.  See the Google Cloud Storage documentation here: https://cloud.google.com/storage/docs/creating-buckets#prereq-cli
   ```
   $ gsutil mb gs://BUCKET_NAME
   # for example
-  $ gsutil mb gs://aptos-terraform-dev
+  $ gsutil mb gs://<project-name>-aptos-terraform-dev
   ```
 
 3. Create Terraform file called `main.tf` in your working directory:
@@ -63,7 +63,7 @@ You can deploy a public FullNode on GCP by using the Aptos fullnode Terraform mo
 
   module "fullnode" {
     # download Terraform module from aptos-labs/aptos-core repo
-    source        = "git@github.com:aptos-labs/aptos-core.git//terraform/fullnode/gcp?ref=main"
+    source        = "github.com/aptos-labs/aptos-core.git//terraform/fullnode/gcp?ref=main"
     region        = "us-central1"  # Specify the region
     zone          = "c"            # Specify the zone suffix
     project       = "gcp-fullnode" # Specify your GCP project name
@@ -81,6 +81,8 @@ This should download all the terraform dependencies for you, in the `.terraform`
 6. Create a new Terraform workspace to isolate your environments:
   ```
   $ terraform workspace new $WORKSPACE
+  # This command will list all workspaces
+  $ terraform workspace list
   ```
 
 7. Apply the configuration.
@@ -120,6 +122,8 @@ Once Terraform apply finished, you can follow this section to validate your depl
    * Set up the port-forwarding to the aptos-fullnode pod.  Use `kubectl get pods -n aptos` to get the name of the pod
       ```
       $ kubectl port-forward -n aptos <pod-name> 9101:9101
+      # for example:
+      $ kubectl port-forward -n aptos devnet0-aptos-fullnode-0 9101:9101
       ```
 
    * Open a new ssh terminal.  Execute the following curl calls to verify the correctness
