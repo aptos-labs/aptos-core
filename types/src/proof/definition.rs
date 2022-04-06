@@ -197,9 +197,9 @@ where
                 // should match element_key and element_value_hash. `siblings` should prove the
                 // route from the leaf node to the root.
                 ensure!(
-                    element_key == leaf.key,
+                    element_key == leaf.key_hash,
                     "Keys do not match. Key in proof: {:x}. Expected key: {:x}.",
-                    leaf.key,
+                    leaf.key_hash,
                     element_key
                 );
                 let hash = value.hash();
@@ -218,11 +218,11 @@ where
                 // node represented by `proof_key` into a branch. `siblings` should prove the
                 // route from that leaf node to the root.
                 ensure!(
-                    element_key != leaf.key,
+                    element_key != leaf.key_hash,
                     "Expected non-inclusion proof, but key exists in proof.",
                 );
                 ensure!(
-                    element_key.common_prefix_bits_len(leaf.key) >= self.siblings.len(),
+                    element_key.common_prefix_bits_len(leaf.key_hash) >= self.siblings.len(),
                     "Key would not have ended up in the subtree where the provided key in proof \
                      is the only existing key, if it existed. So this is not a valid \
                      non-inclusion proof.",

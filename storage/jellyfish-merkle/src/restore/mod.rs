@@ -25,6 +25,7 @@ use aptos_types::{
         Nibble,
     },
     proof::{SparseMerkleInternalNode, SparseMerkleLeafNode, SparseMerkleRangeProof},
+    state_store::state_key::StateKey,
     transaction::Version,
 };
 use mirai_annotations::*;
@@ -293,20 +294,21 @@ where
     /// error will be returned and nothing will be written to storage.
     fn add_chunk_impl(
         &mut self,
-        chunk: Vec<(HashValue, V)>,
+        chunk: Vec<(HashValue, (StateKey, V))>,
         proof: SparseMerkleRangeProof,
     ) -> Result<()> {
         ensure!(!chunk.is_empty(), "Should not add empty chunks.");
 
-        for (key, value) in chunk {
+        for (state_key_hash, (state_key, value)) in chunk {
             if let Some(ref prev_leaf) = self.previous_leaf {
                 ensure!(
-                    key > prev_leaf.account_key(),
+                    state_key_hash > prev_leaf.state_key_hash(),
                     "Account keys must come in increasing order.",
                 )
             }
-            self.add_one(key, value.clone());
-            self.previous_leaf.replace(LeafNode::new(key, value));
+            self.add_one(state_key_hash, state_key.clone(), value.clone());
+            self.previous_leaf
+                .replace(LeafNode::new(state_key_hash, state_key, value));
             self.num_keys_received += 1;
         }
 
@@ -321,8 +323,8 @@ where
     }
 
     /// Restores one account.
-    fn add_one(&mut self, new_key: HashValue, new_value: V) {
-        let nibble_path = NibblePath::new(new_key.to_vec());
+    fn add_one(&mut self, new_key_hash: HashValue, new_state_key: StateKey, new_value: V) {
+        let nibble_path = NibblePath::new(new_key_hash.to_vec());
         let mut nibbles = nibble_path.nibbles();
 
         for i in 0..ROOT_NIBBLE_HEIGHT {
@@ -345,7 +347,8 @@ where
                         self.insert_at_leaf(
                             child_index,
                             existing_leaf,
-                            new_key,
+                            new_key_hash,
+                            new_state_key,
                             new_value,
                             nibbles,
                         );
@@ -361,7 +364,7 @@ where
                     self.partial_nodes[i].set_child(
                         child_index,
                         ChildInfo::Leaf {
-                            node: LeafNode::new(new_key, new_value),
+                            node: LeafNode::new(new_key_hash, new_state_key, new_value),
                         },
                     );
 
@@ -380,7 +383,8 @@ where
         &mut self,
         child_index: usize,
         existing_leaf: LeafNode<V>,
-        new_key: HashValue,
+        new_key_hash: HashValue,
+        new_key: StateKey,
         new_value: V,
         mut remaining_nibbles: NibbleIterator,
     ) {
@@ -399,8 +403,8 @@ where
         // Next we build the new internal nodes from top to bottom. All these internal node except
         // the bottom one will now have a single internal node child.
         let common_prefix_len = existing_leaf
-            .account_key()
-            .common_prefix_nibbles_len(new_key);
+            .state_key_hash()
+            .common_prefix_nibbles_len(new_key_hash);
         for _ in num_existing_partial_nodes..common_prefix_len {
             let visited_nibbles = remaining_nibbles.visited_nibbles().collect();
             let next_nibble = remaining_nibbles.next().expect("This nibble must exist.");
@@ -423,7 +427,7 @@ where
         let mut internal_info = InternalInfo::new_empty(new_node_key);
 
         // Next we put the existing leaf as a child of this internal node.
-        let existing_child_index = existing_leaf.account_key().get_nibble(common_prefix_len);
+        let existing_child_index = existing_leaf.state_key_hash().get_nibble(common_prefix_len);
         internal_info.set_child(
             u8::from(existing_child_index) as usize,
             ChildInfo::Leaf {
@@ -438,7 +442,7 @@ where
         self.freeze(self.partial_nodes.len());
 
         // Now we set the new child.
-        let new_child_index = new_key.get_nibble(common_prefix_len);
+        let new_child_index = new_key_hash.get_nibble(common_prefix_len);
         assert!(
             new_child_index > existing_child_index,
             "New leaf must be on the right.",
@@ -449,7 +453,7 @@ where
             .set_child(
                 u8::from(new_child_index) as usize,
                 ChildInfo::Leaf {
-                    node: LeafNode::new(new_key, new_value),
+                    node: LeafNode::new(new_key_hash, new_key, new_value),
                 },
             );
     }
@@ -537,7 +541,7 @@ where
             .previous_leaf
             .as_ref()
             .expect("The previous leaf must exist.");
-        let previous_key = previous_leaf.account_key();
+        let previous_key = previous_leaf.state_key_hash();
 
         // If we have all siblings on the path from root to `previous_key`, we should be able to
         // compute the root hash. The siblings on the right are already in the proof. Now we
@@ -678,7 +682,7 @@ where
 impl<V: crate::Value> StateSnapshotReceiver<V> for JellyfishMerkleRestore<V> {
     fn add_chunk(
         &mut self,
-        chunk: Vec<(HashValue, V)>,
+        chunk: Vec<(HashValue, (StateKey, V))>,
         proof: SparseMerkleRangeProof,
     ) -> Result<()> {
         self.add_chunk_impl(chunk, proof)

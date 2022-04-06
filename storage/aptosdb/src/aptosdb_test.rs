@@ -641,6 +641,7 @@ fn test_get_latest_tree_state() {
             &NodeKey::new_empty_path(PRE_GENESIS_VERSION),
             &Node::new_leaf(
                 StateKey::AccountAddressKey(address).hash(),
+                StateKey::AccountAddressKey(address),
                 StateValue::from(blob.clone()),
             ),
         )

@@ -88,7 +88,7 @@ use aptos_types::{
         Nibble, ROOT_NIBBLE_HEIGHT,
     },
     proof::{SparseMerkleProof, SparseMerkleRangeProof},
-    state_store::state_value::StateValue,
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
 use node_type::{Child, Children, InternalNode, LeafNode, Node, NodeKey, NodeType};
@@ -268,7 +268,7 @@ where
     /// The batch version of `put_value_sets`.
     pub fn batch_put_value_sets(
         &self,
-        value_sets: Vec<Vec<(HashValue, &V)>>,
+        value_sets: Vec<Vec<(HashValue, (&StateKey, &V))>>,
         node_hashes: Option<Vec<&HashMap<NibblePath, HashValue>>>,
         first_version: Version,
     ) -> Result<(Vec<HashValue>, TreeUpdateBatch<V>)> {
@@ -313,7 +313,7 @@ where
         &self,
         mut node_key: NodeKey,
         version: Version,
-        kvs: &[(HashValue, &V)],
+        kvs: &[(HashValue, (&StateKey, &V))],
         depth: usize,
         hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
         tree_cache: &mut TreeCache<R, V>,
@@ -419,15 +419,16 @@ where
         node_key: NodeKey,
         version: Version,
         existing_leaf_node: LeafNode<V>,
-        kvs: &[(HashValue, &V)],
+        kvs: &[(HashValue, (&StateKey, &V))],
         depth: usize,
         hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
         tree_cache: &mut TreeCache<R, V>,
     ) -> Result<(NodeKey, Node<V>)> {
-        let existing_leaf_key = existing_leaf_node.account_key();
+        let existing_leaf_key = existing_leaf_node.state_key_hash();
 
         if kvs.len() == 1 && kvs[0].0 == existing_leaf_key {
-            let new_leaf_node = Node::new_leaf(existing_leaf_key, kvs[0].1.clone());
+            let new_leaf_node =
+                Node::new_leaf(existing_leaf_key, kvs[0].1 .0.clone(), kvs[0].1 .1.clone());
             tree_cache.put_node(node_key.clone(), new_leaf_node.clone())?;
             Ok((node_key, new_leaf_node))
         } else {
@@ -489,13 +490,13 @@ where
         &self,
         node_key: NodeKey,
         version: Version,
-        kvs: &[(HashValue, &V)],
+        kvs: &[(HashValue, (&StateKey, &V))],
         depth: usize,
         hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
         tree_cache: &mut TreeCache<R, V>,
     ) -> Result<(NodeKey, Node<V>)> {
         if kvs.len() == 1 {
-            let new_leaf_node = Node::new_leaf(kvs[0].0, kvs[0].1.clone());
+            let new_leaf_node = Node::new_leaf(kvs[0].0, kvs[0].1 .0.clone(), kvs[0].1 .1.clone());
             tree_cache.put_node(node_key.clone(), new_leaf_node.clone())?;
             Ok((node_key, new_leaf_node))
         } else {
@@ -533,7 +534,7 @@ where
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn put_value_set(
         &self,
-        value_set: Vec<(HashValue, &V)>,
+        value_set: Vec<(HashValue, (&StateKey, &V))>,
         version: Version,
     ) -> Result<(HashValue, TreeUpdateBatch<V>)> {
         let (root_hashes, tree_update_batch) =
@@ -589,7 +590,7 @@ where
     /// the batch is not reachable from public interfaces before being committed.
     pub fn put_value_sets(
         &self,
-        value_sets: Vec<Vec<(HashValue, V)>>,
+        value_sets: Vec<Vec<(HashValue, (StateKey, V))>>,
         first_version: Version,
     ) -> Result<(Vec<HashValue>, TreeUpdateBatch<V>)> {
         let mut tree_cache = TreeCache::new(self.reader, first_version)?;
@@ -601,7 +602,9 @@ where
             let version = first_version + idx as u64;
             value_set
                 .into_iter()
-                .try_for_each(|(key, value)| self.put(key, value, version, &mut tree_cache))?;
+                .try_for_each(|(state_key_hash, (state_key, value))| {
+                    self.put(state_key_hash, state_key, value, version, &mut tree_cache)
+                })?;
             // Freezes the current cache to make all contents in the current cache immutable.
             tree_cache.freeze();
         }
@@ -611,12 +614,13 @@ where
 
     fn put(
         &self,
-        key: HashValue,
+        state_key_hash: HashValue,
+        state_key: StateKey,
         value: V,
         version: Version,
         tree_cache: &mut TreeCache<R, V>,
     ) -> Result<()> {
-        let nibble_path = NibblePath::new(key.to_vec());
+        let nibble_path = NibblePath::new(state_key_hash.to_vec());
 
         // Get the root node. If this is the first operation, it would get the root node from the
         // underlying db. Otherwise it most likely would come from `cache`.
@@ -628,6 +632,7 @@ where
             root_node_key.clone(),
             version,
             &mut nibble_iter,
+            state_key,
             value,
             tree_cache,
         )?;
@@ -645,6 +650,7 @@ where
         node_key: NodeKey,
         version: Version,
         nibble_iter: &mut NibbleIterator,
+        state_key: StateKey,
         value: V,
         tree_cache: &mut TreeCache<R, V>,
     ) -> Result<(NodeKey, Node<V>)> {
@@ -655,6 +661,7 @@ where
                 internal_node,
                 version,
                 nibble_iter,
+                state_key,
                 value,
                 tree_cache,
             ),
@@ -663,6 +670,7 @@ where
                 leaf_node,
                 version,
                 nibble_iter,
+                state_key,
                 value,
                 tree_cache,
             ),
@@ -680,6 +688,7 @@ where
                 Self::create_leaf_node(
                     NodeKey::new_empty_path(version),
                     nibble_iter,
+                    state_key,
                     value,
                     tree_cache,
                 )
@@ -696,6 +705,7 @@ where
         internal_node: InternalNode,
         version: Version,
         nibble_iter: &mut NibbleIterator,
+        state_key: StateKey,
         value: V,
         tree_cache: &mut TreeCache<R, V>,
     ) -> Result<(NodeKey, Node<V>)> {
@@ -711,11 +721,24 @@ where
         let (_, new_child_node) = match internal_node.child(child_index) {
             Some(child) => {
                 let child_node_key = node_key.gen_child_node_key(child.version, child_index);
-                self.insert_at(child_node_key, version, nibble_iter, value, tree_cache)?
+                self.insert_at(
+                    child_node_key,
+                    version,
+                    nibble_iter,
+                    state_key,
+                    value,
+                    tree_cache,
+                )?
             }
             None => {
                 let new_child_node_key = node_key.gen_child_node_key(version, child_index);
-                Self::create_leaf_node(new_child_node_key, nibble_iter, value, tree_cache)?
+                Self::create_leaf_node(
+                    new_child_node_key,
+                    nibble_iter,
+                    state_key,
+                    value,
+                    tree_cache,
+                )?
             }
         };
 
@@ -743,6 +766,7 @@ where
         existing_leaf_node: LeafNode<V>,
         version: Version,
         nibble_iter: &mut NibbleIterator,
+        state_key: StateKey,
         value: V,
         tree_cache: &mut TreeCache<R, V>,
     ) -> Result<(NodeKey, Node<V>)> {
@@ -755,7 +779,8 @@ where
         // visited part of the nibble iter of the incoming key and advances the existing leaf
         // nibble iterator by the length of that prefix.
         let mut visited_nibble_iter = nibble_iter.visited_nibbles();
-        let existing_leaf_nibble_path = NibblePath::new(existing_leaf_node.account_key().to_vec());
+        let existing_leaf_nibble_path =
+            NibblePath::new(existing_leaf_node.state_key_hash().to_vec());
         let mut existing_leaf_nibble_iter = existing_leaf_nibble_path.nibbles();
         skip_common_prefix(&mut visited_nibble_iter, &mut existing_leaf_nibble_iter);
 
@@ -781,7 +806,7 @@ where
             // The new leaf node will have the same nibble_path with a new version as node_key.
             node_key.set_version(version);
             // Create the new leaf node with the same address but the new value.
-            return Self::create_leaf_node(node_key, nibble_iter, value, tree_cache);
+            return Self::create_leaf_node(node_key, nibble_iter, state_key, value, tree_cache);
         }
 
         // 2.2. both are unfinished(They have keys with same length so it's impossible to have one
@@ -811,6 +836,7 @@ where
         let (_, new_leaf_node) = Self::create_leaf_node(
             node_key.gen_child_node_key(version, new_leaf_index),
             nibble_iter,
+            state_key,
             value,
             tree_cache,
         )?;
@@ -849,6 +875,7 @@ where
     fn create_leaf_node(
         node_key: NodeKey,
         nibble_iter: &NibbleIterator,
+        state_key: StateKey,
         value: V,
         tree_cache: &mut TreeCache<R, V>,
     ) -> Result<(NodeKey, Node<V>)> {
@@ -857,6 +884,7 @@ where
         let new_leaf_node = Node::new_leaf(
             HashValue::from_slice(nibble_iter.get_nibble_path().bytes())
                 .expect("LeafNode must have full nibble path."),
+            state_key,
             value,
         );
 
@@ -909,7 +937,7 @@ where
                 }
                 Node::Leaf(leaf_node) => {
                     return Ok((
-                        if leaf_node.account_key() == key {
+                        if leaf_node.state_key_hash() == key {
                             Some(leaf_node.value().clone())
                         } else {
                             None

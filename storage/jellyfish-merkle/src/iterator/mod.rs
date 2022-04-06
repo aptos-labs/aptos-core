@@ -17,6 +17,7 @@ use anyhow::{bail, ensure, format_err, Result};
 use aptos_crypto::HashValue;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
+    state_store::state_key::StateKey,
     transaction::Version,
 };
 use std::{marker::PhantomData, sync::Arc};
@@ -170,7 +171,7 @@ where
         match reader.get_node(&current_node_key)? {
             Node::Internal(_) => unreachable!("Should have reached the bottom of the tree."),
             Node::Leaf(leaf_node) => {
-                if leaf_node.account_key() < starting_key {
+                if leaf_node.state_key_hash() < starting_key {
                     Self::cleanup_stack(&mut parent_stack);
                     if parent_stack.is_empty() {
                         done = true;
@@ -278,7 +279,7 @@ where
     R: TreeReader<V>,
     V: crate::Value,
 {
-    type Item = Result<(HashValue, V)>;
+    type Item = Result<(HashValue, (StateKey, V))>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.done {
@@ -294,7 +295,10 @@ where
                     // true in `new`). Return the node and mark `self.done` so next time we return
                     // None.
                     self.done = true;
-                    return Some(Ok((leaf_node.account_key(), leaf_node.value().clone())));
+                    return Some(Ok((
+                        leaf_node.state_key_hash(),
+                        (leaf_node.state_key().clone(), leaf_node.value().clone()),
+                    )));
                 }
                 Ok(Node::Internal(_)) => {
                     // This means `starting_key` is bigger than every key in this tree, or we have
@@ -327,7 +331,10 @@ where
                     self.parent_stack.push(visit_info);
                 }
                 Ok(Node::Leaf(leaf_node)) => {
-                    let ret = (leaf_node.account_key(), leaf_node.value().clone());
+                    let ret = (
+                        leaf_node.state_key_hash(),
+                        (leaf_node.state_key().clone(), leaf_node.value().clone()),
+                    );
                     Self::cleanup_stack(&mut self.parent_stack);
                     return Some(Ok(ret));
                 }

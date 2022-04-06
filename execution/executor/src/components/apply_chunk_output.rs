@@ -206,9 +206,9 @@ impl ApplyChunkOutput {
     }
 
     fn state_store_updates_to_smt_updates(
-        account_blobs: &[HashMap<StateKey, StateValue>],
+        state_updates: &[HashMap<StateKey, StateValue>],
     ) -> Vec<Vec<(HashValue, &StateValue)>> {
-        account_blobs
+        state_updates
             .iter()
             .map(|m| {
                 m.iter()

@@ -585,7 +585,7 @@ impl AptosDB {
                 .with_label_values(&["save_transactions_state"])
                 .start_timer();
 
-            let account_state_sets = txns_to_commit
+            let value_sets = txns_to_commit
                 .iter()
                 .map(|txn_to_commit| txn_to_commit.state_updates())
                 .collect::<Vec<_>>();
@@ -595,7 +595,7 @@ impl AptosDB {
                 .map(|txn_to_commit| txn_to_commit.jf_node_hashes())
                 .collect::<Option<Vec<_>>>();
             self.state_store
-                .put_value_sets(account_state_sets, node_hashes, first_version, cs)?;
+                .put_value_sets(value_sets, node_hashes, first_version, cs)?;
         }
 
         // Event updates. Gather event accumulator root hashes.

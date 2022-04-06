@@ -21,6 +21,7 @@ use aptos_crypto::{
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleInternalNode, SparseMerkleLeafNode},
+    state_store::state_key::StateKey,
     transaction::Version,
 };
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
@@ -576,9 +577,11 @@ pub(crate) fn get_child_and_sibling_half_start(n: Nibble, height: u8) -> (u8, u8
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct LeafNode<V> {
     // The hashed account address associated with this leaf node.
-    account_key: HashValue,
+    state_key_hash: HashValue,
     // The hash of the value.
-    value_hash: HashValue,
+    state_value_hash: HashValue,
+    // Actual key of the leaf
+    state_key: StateKey,
     // The value stored in the leaf, associated with `account_key`.
     value: V,
 }
@@ -588,18 +591,24 @@ where
     V: crate::Value,
 {
     /// Creates a new leaf node.
-    pub fn new(account_key: HashValue, value: V) -> Self {
+    pub fn new(state_key_hash: HashValue, state_key: StateKey, value: V) -> Self {
         let value_hash = value.hash();
         Self {
-            account_key,
-            value_hash,
+            state_key_hash,
+            state_value_hash: value_hash,
+            state_key,
             value,
         }
     }
 
     /// Gets the account key, the hashed account address.
-    pub fn account_key(&self) -> HashValue {
-        self.account_key
+    pub fn state_key_hash(&self) -> HashValue {
+        self.state_key_hash
+    }
+
+    /// Gets the associated state key
+    pub fn state_key(&self) -> &StateKey {
+        &self.state_key
     }
 
     /// Gets the associated value itself.
@@ -609,17 +618,17 @@ where
 
     /// Gets the associated value hash.
     pub fn value_hash(&self) -> HashValue {
-        self.value_hash
+        self.state_value_hash
     }
 
     pub fn hash(&self) -> HashValue {
-        SparseMerkleLeafNode::new(self.account_key, self.value_hash).hash()
+        SparseMerkleLeafNode::new(self.state_key_hash, self.state_value_hash).hash()
     }
 }
 
 impl<V> From<LeafNode<V>> for SparseMerkleLeafNode {
     fn from(leaf_node: LeafNode<V>) -> Self {
-        Self::new(leaf_node.account_key, leaf_node.value_hash)
+        Self::new(leaf_node.state_key_hash, leaf_node.state_value_hash)
     }
 }
 
@@ -676,8 +685,8 @@ where
     }
 
     /// Creates the [`Leaf`](Node::Leaf) variant.
-    pub fn new_leaf(account_key: HashValue, value: V) -> Self {
-        Node::Leaf(LeafNode::new(account_key, value))
+    pub fn new_leaf(state_key_hash: HashValue, state_key: StateKey, state_value: V) -> Self {
+        Node::Leaf(LeafNode::new(state_key_hash, state_key, state_value))
     }
 
     /// Returns `true` if the node is a leaf node.

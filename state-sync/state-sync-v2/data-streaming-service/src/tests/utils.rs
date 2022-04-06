@@ -15,7 +15,7 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::SparseMerkleRangeProof,
-    state_store::state_value::StateValueChunkWithProof,
+    state_store::{state_key::StateKey, state_value::StateValueChunkWithProof},
     transaction::{
         RawTransaction, Script, SignedTransaction, Transaction, TransactionListWithProof,
         TransactionOutput, TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
@@ -127,7 +127,7 @@ impl AptosDataClient for MockAptosDataClient {
         // Create epoch ending ledger infos according to the requested epochs
         let mut account_blobs = vec![];
         for _ in start_index..=end_index {
-            account_blobs.push((HashValue::random(), vec![].into()));
+            account_blobs.push((HashValue::random(), (StateKey::Raw(vec![]), vec![].into())));
         }
 
         // Create an account states chunk with proof

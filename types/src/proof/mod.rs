@@ -98,17 +98,20 @@ pub type TestAccumulatorInternalNode = MerkleTreeInternalNode<TestOnlyHasher>;
 #[derive(Clone, Copy, CryptoHasher, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct SparseMerkleLeafNode {
-    key: HashValue,
+    key_hash: HashValue,
     value_hash: HashValue,
 }
 
 impl SparseMerkleLeafNode {
     pub fn new(key: HashValue, value_hash: HashValue) -> Self {
-        SparseMerkleLeafNode { key, value_hash }
+        SparseMerkleLeafNode {
+            key_hash: key,
+            value_hash,
+        }
     }
 
     pub fn key(&self) -> HashValue {
-        self.key
+        self.key_hash
     }
 
     pub fn value_hash(&self) -> HashValue {
@@ -121,7 +124,7 @@ impl CryptoHash for SparseMerkleLeafNode {
 
     fn hash(&self) -> HashValue {
         let mut state = Self::Hasher::default();
-        state.update(self.key.as_ref());
+        state.update(self.key_hash.as_ref());
         state.update(self.value_hash.as_ref());
         state.finish()
     }

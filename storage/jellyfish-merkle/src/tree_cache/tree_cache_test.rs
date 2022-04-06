@@ -3,13 +3,17 @@
 
 use super::*;
 use crate::{mock_tree_store::MockTreeStore, node_type::Node, test_helper::ValueBlob, NodeKey};
-use aptos_crypto::HashValue;
-use aptos_types::nibble::nibble_path::NibblePath;
+use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_types::{nibble::nibble_path::NibblePath, state_store::state_key::StateKey};
+use rand::{rngs::OsRng, Rng};
 
 fn random_leaf_with_key(next_version: Version) -> (Node<ValueBlob>, NodeKey) {
-    let address = HashValue::random();
-    let node = Node::new_leaf(address, ValueBlob::from(HashValue::random().to_vec()));
-    let node_key = NodeKey::new(next_version, NibblePath::new(address.to_vec()));
+    let mut rng = OsRng;
+    let random_key: [u8; 10] = rng.gen();
+    let key = StateKey::Raw(random_key.to_vec());
+    let key_hash = key.hash();
+    let node = Node::new_leaf(key_hash, key, ValueBlob::from(HashValue::random().to_vec()));
+    let node_key = NodeKey::new(next_version, NibblePath::new(key_hash.to_vec()));
     (node, node_key)
 }
 

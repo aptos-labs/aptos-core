@@ -39,7 +39,8 @@ where
         for (key, value) in locked.0.iter() {
             if let Node::Leaf(leaf_node) = value {
                 if node_key_and_node.is_none()
-                    || leaf_node.account_key() > node_key_and_node.as_ref().unwrap().1.account_key()
+                    || leaf_node.state_key_hash()
+                        > node_key_and_node.as_ref().unwrap().1.state_key_hash()
                 {
                     node_key_and_node.replace((key.clone(), leaf_node.clone()));
                 }

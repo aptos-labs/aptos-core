@@ -8,7 +8,7 @@ use crate::{
     JellyfishMerkleTree, TreeReader,
 };
 use aptos_crypto::HashValue;
-use aptos_types::transaction::Version;
+use aptos_types::{state_store::state_key::StateKey, transaction::Version};
 use proptest::{collection::btree_map, prelude::*};
 use std::{collections::BTreeMap, sync::Arc};
 use storage_interface::StateSnapshotReceiver;
@@ -18,7 +18,7 @@ proptest! {
 
     #[test]
     fn test_restore_without_interruption(
-        btree in btree_map(any::<HashValue>(), any::<ValueBlob>(), 1..1000),
+        btree in btree_map(any::<HashValue>(), any::<(StateKey, ValueBlob)>(), 1..1000),
         target_version in 0u64..2000,
     ) {
         let restore_db = Arc::new(MockTreeStore::default());
@@ -28,7 +28,7 @@ proptest! {
 
     #[test]
     fn test_restore_with_interruption(
-        (all, batch1_size) in btree_map(any::<HashValue>(), any::<ValueBlob>(), 2..1000)
+        (all, batch1_size) in btree_map(any::<HashValue>(), any::<(StateKey, ValueBlob)>(), 2..1000)
             .prop_flat_map(|btree| {
                 let len = btree.len();
                 (Just(btree), 1..len)
@@ -56,7 +56,7 @@ proptest! {
                     // Sometimes the batch is too small so nothing is written to DB.
                     return Ok(());
                 }
-                Some((_, node)) => node.account_key(),
+                Some((_, node)) => node.state_key_hash(),
             };
             let remaining_accounts: Vec<_> = all
                 .clone()
@@ -81,8 +81,8 @@ proptest! {
 
     #[test]
     fn test_overwrite(
-        btree1 in btree_map(any::<HashValue>(), any::<ValueBlob>(), 1..1000),
-        btree2 in btree_map(any::<HashValue>(), any::<ValueBlob>(), 1..1000),
+        btree1 in btree_map(any::<HashValue>(), any::<(StateKey, ValueBlob)>(), 1..1000),
+        btree2 in btree_map(any::<HashValue>(), any::<(StateKey, ValueBlob)>(), 1..1000),
         target_version in 0u64..2000,
     ) {
         let restore_db = Arc::new(MockTreeStore::new(true /* allow_overwrite */));
@@ -95,14 +95,14 @@ proptest! {
 fn assert_success<V>(
     db: &MockTreeStore<V>,
     expected_root_hash: HashValue,
-    btree: &BTreeMap<HashValue, V>,
+    btree: &BTreeMap<HashValue, (StateKey, V)>,
     version: Version,
 ) where
     V: crate::TestValue,
 {
     let tree = JellyfishMerkleTree::new(db);
-    for (key, value) in btree {
-        assert_eq!(tree.get(*key, version).unwrap(), Some(value.clone()));
+    for (key_hash, (_, value)) in btree {
+        assert_eq!(tree.get(*key_hash, version).unwrap(), Some(value.clone()));
     }
 
     let actual_root_hash = tree.get_root_hash(version).unwrap();
@@ -110,7 +110,7 @@ fn assert_success<V>(
 }
 
 fn restore_without_interruption<V>(
-    btree: &BTreeMap<HashValue, V>,
+    btree: &BTreeMap<HashValue, (StateKey, V)>,
     target_version: Version,
     target_db: &Arc<MockTreeStore<V>>,
     try_resume: bool,

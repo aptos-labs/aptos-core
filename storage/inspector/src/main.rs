@@ -135,8 +135,9 @@ fn list_accounts(db: &AptosDB) {
     let mut num_account = 0;
     for res in iter {
         match res {
-            Ok((_, blob)) => {
-                let accs = AccountState::try_from(&blob).expect("Failed to read AccountState");
+            Ok((_, (_, state_value))) => {
+                let accs =
+                    AccountState::try_from(&state_value).expect("Failed to read AccountState");
                 let addr = accs
                     .get_account_address()
                     .expect("Could not get address from state");

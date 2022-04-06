@@ -116,7 +116,7 @@ pub struct TreeCache<'a, R, V> {
     /// The version of the transaction to which the upcoming `put`s will be related.
     next_version: Version,
 
-    /// Intermediate nodes keyed by node hash
+    /// Internal nodes keyed by node hash
     node_cache: HashMap<NodeKey, Node<V>>,
 
     /// # of leaves in the `node_cache`,

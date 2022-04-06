@@ -205,7 +205,7 @@ fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
 fn get_state_backup(
     db: &Arc<AptosDB>,
 ) -> (
-    Vec<(HashValue, StateValue)>,
+    Vec<(HashValue, (StateKey, StateValue))>,
     SparseMerkleRangeProof,
     HashValue,
 ) {
@@ -231,14 +231,14 @@ fn get_state_backup(
 
 fn restore_state_to_db(
     db: &Arc<AptosDB>,
-    accounts: Vec<(HashValue, StateValue)>,
+    key_values: Vec<(HashValue, (StateKey, StateValue))>,
     proof: SparseMerkleRangeProof,
     root_hash: HashValue,
     version: Version,
 ) {
     let rh = db.get_restore_handler();
     let mut receiver = rh.get_state_restore_receiver(version, root_hash).unwrap();
-    for (chunk, proof) in vec![(accounts, proof)].into_iter() {
+    for (chunk, proof) in vec![(key_values, proof)].into_iter() {
         receiver.add_chunk(chunk, proof).unwrap();
     }
     receiver.finish().unwrap();

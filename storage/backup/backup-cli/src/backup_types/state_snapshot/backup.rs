@@ -13,6 +13,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
+use aptos_types::state_store::state_key::StateKey;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, proof::TransactionInfoWithProof,
     state_store::state_value::StateValue, transaction::Version,
@@ -155,7 +156,7 @@ impl StateSnapshotBackupController {
     }
 
     fn parse_key(record: &Bytes) -> Result<HashValue> {
-        let (key, _): (HashValue, StateValue) = bcs::from_bytes(record)?;
+        let (key, (_, _)): (HashValue, (StateKey, StateValue)) = bcs::from_bytes(record)?;
         Ok(key)
     }
 

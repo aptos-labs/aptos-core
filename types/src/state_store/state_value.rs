@@ -81,13 +81,13 @@ impl CryptoHash for StateValue {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 pub struct StateValueChunkWithProof {
-    pub first_index: u64,                         // The first account index in chunk
-    pub last_index: u64,                          // The last account index in chunk
-    pub first_key: HashValue,                     // The first account key in chunk
-    pub last_key: HashValue,                      // The last account key in chunk
-    pub raw_values: Vec<(HashValue, StateValue)>, // The account blobs in the chunk
+    pub first_index: u64,     // The first index in chunk
+    pub last_index: u64,      // The last index in chunk
+    pub first_key: HashValue, // The first key in chunk
+    pub last_key: HashValue,  // The last key in chunk
+    pub raw_values: Vec<(HashValue, (StateKey, StateValue))>, // The state key, value in the chunk
     pub proof: SparseMerkleRangeProof, // The proof to ensure the chunk is in the account states
-    pub root_hash: HashValue,          // The root hash of the sparse merkle tree for this chunk
+    pub root_hash: HashValue, // The root hash of the sparse merkle tree for this chunk
 }
 
 impl StateValueChunkWithProof {

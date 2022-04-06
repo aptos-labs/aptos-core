@@ -77,10 +77,10 @@ impl StateStore {
     ) -> Result<Vec<HashValue>> {
         let value_sets = value_state_sets
             .into_iter()
-            .map(|account_states| {
-                account_states
+            .map(|value_set| {
+                value_set
                     .iter()
-                    .map(|(addr, blob)| (addr.hash(), blob))
+                    .map(|(state_key, state_value)| (state_key.hash(), (state_key, state_value)))
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
@@ -136,7 +136,7 @@ impl StateStore {
                 match ret {
                     None => ret = Some((node_key, leaf_node)),
                     Some(ref other) => {
-                        if leaf_node.account_key() > other.1.account_key() {
+                        if leaf_node.state_key_hash() > other.1.state_key_hash() {
                             ret = Some((node_key, leaf_node));
                         }
                     }
@@ -160,15 +160,15 @@ impl StateStore {
         let result_iter =
             JellyfishMerkleIterator::new_by_index(Arc::clone(self), version, first_index)?
                 .take(chunk_size);
-        let account_blobs: Vec<(HashValue, StateValue)> =
+        let raw_values: Vec<(HashValue, (StateKey, StateValue))> =
             process_results(result_iter, |iter| iter.collect())?;
         ensure!(
-            !account_blobs.is_empty(),
+            !raw_values.is_empty(),
             AptosDbError::NotFound(format!("State chunk starting at {}", first_index)),
         );
-        let last_index = (account_blobs.len() - 1 + first_index) as u64;
-        let first_key = account_blobs.first().expect("checked to exist").0;
-        let last_key = account_blobs.last().expect("checked to exist").0;
+        let last_index = (raw_values.len() - 1 + first_index) as u64;
+        let first_key = raw_values.first().expect("checked to exist").0;
+        let last_key = raw_values.last().expect("checked to exist").0;
         let proof = self.get_value_range_proof(last_key, version)?;
         let root_hash = self.get_root_hash(version)?;
 
@@ -177,7 +177,7 @@ impl StateStore {
             last_index,
             first_key,
             last_key,
-            raw_values: account_blobs,
+            raw_values,
             proof,
             root_hash,
         })
@@ -250,7 +250,7 @@ impl TreeReader<StateValue> for StateStore {
                     match ret {
                         None => ret = Some((node_key, leaf_node)),
                         Some(ref other) => {
-                            if leaf_node.account_key() > other.1.account_key() {
+                            if leaf_node.state_key_hash() > other.1.state_key_hash() {
                                 ret = Some((node_key, leaf_node));
                             }
                         }

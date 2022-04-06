@@ -274,7 +274,7 @@ proptest! {
                 .unwrap();
             let mut expected_values: Vec<_> = kvs[..=i]
                 .iter()
-                .map(|(key, value)| (key.hash(), value.clone()))
+                .map(|(key, value)| (key.hash(), (key.clone(), value.clone())))
                 .collect();
             expected_values.sort_unstable_by_key(|item| item.0);
             prop_assert_eq!(actual_values, expected_values);
@@ -306,7 +306,7 @@ proptest! {
 
         let mut ordered_input: Vec<_> = input
             .into_iter()
-            .map(|(addr, value)| (addr.hash(), value))
+            .map(|(key, value)| (key.hash(), (key, value)))
             .collect();
         ordered_input.sort_unstable_by_key(|(key, _value)| *key);
 
@@ -405,7 +405,7 @@ proptest! {
 
         let mut ordered_input: Vec<_> = input
             .into_iter()
-            .map(|(addr, value)| (addr.hash(), value))
+            .map(|(addr, value)| (addr.hash(), (addr, value)))
             .collect();
         ordered_input.sort_unstable_by_key(|(key, _value)| *key);
 

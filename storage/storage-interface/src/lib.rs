@@ -136,7 +136,7 @@ impl TreeState {
 pub trait StateSnapshotReceiver<V>: Send {
     fn add_chunk(
         &mut self,
-        chunk: Vec<(HashValue, V)>,
+        chunk: Vec<(HashValue, (StateKey, V))>,
         proof: SparseMerkleRangeProof,
     ) -> Result<()>;
 
