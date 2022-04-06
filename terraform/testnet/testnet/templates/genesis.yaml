@@ -123,6 +123,7 @@ spec:
           done
 
           VAULT_BACKEND="backend=vault;server={{ .Values.vault.server.address }};ca_certificate={{ .Values.vault.server.ca_cert }};token=/opt/vault/token"
+          aptos-operational-tool extract-private-key --key-name 'aptos_root' --key-file /tmp/mint.key --validator-backend "$VAULT_BACKEND;namespace=aptos"
           kubectl create secret generic {{ include "testnet.fullname" . }}-faucet-e{{ .Values.genesis.era }} --from-file=mint.key=/tmp/mint.key --from-file=waypoint.txt=/tmp/waypoint.txt --from-literal=chainid.txt="{{ .Values.genesis.chain_id | default .Values.genesis.era }}"
           kubectl create configmap {{ include "testnet.fullname" .}}-genesis-e{{ .Values.genesis.era }} --from-file=genesis.blob=/tmp/genesis.blob --from-file=waypoint.txt=/tmp/waypoint.txt --from-literal=chainid.txt="{{ .Values.genesis.chain_id | default .Values.genesis.era }}" --from-literal=era.txt="{{ .Values.genesis.era }}"
         resources:
