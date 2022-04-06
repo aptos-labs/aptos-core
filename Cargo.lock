@@ -538,17 +538,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-keygen"
-version = "0.1.0"
-dependencies = [
- "aptos-crypto",
- "aptos-types",
- "aptos-workspace-hack",
- "hex",
- "rand 0.8.4",
-]
-
-[[package]]
 name = "aptos-log-derive"
 version = "0.1.0"
 dependencies = [
@@ -1028,8 +1017,8 @@ name = "aptos-transactional-test-harness"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos",
  "aptos-crypto",
- "aptos-keygen",
  "aptos-state-view",
  "aptos-transaction-builder",
  "aptos-types",
@@ -4293,9 +4282,9 @@ name = "language-e2e-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos",
  "aptos-config",
  "aptos-crypto",
- "aptos-keygen",
  "aptos-proptest-helpers",
  "aptos-state-view",
  "aptos-transaction-builder",
@@ -4325,8 +4314,8 @@ dependencies = [
 name = "language-e2e-testsuite"
 version = "0.1.0"
 dependencies = [
+ "aptos",
  "aptos-crypto",
- "aptos-keygen",
  "aptos-logger",
  "aptos-parallel-executor",
  "aptos-state-view",

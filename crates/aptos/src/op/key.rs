@@ -191,6 +191,14 @@ impl GenerateKey {
         let mut rng = rand::rngs::StdRng::from_entropy();
         Ed25519PrivateKey::generate(&mut rng)
     }
+
+    /// Generates an `Ed25519` keypair without saving it to disk
+    pub fn generate_ed25519_keypair_in_memory(
+    ) -> (ed25519::Ed25519PrivateKey, ed25519::Ed25519PublicKey) {
+        let private_key = Self::generate_ed25519_in_memory();
+        let public_key = private_key.public_key();
+        (private_key, public_key)
+    }
 }
 
 #[derive(Debug, Parser)]

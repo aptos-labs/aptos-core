@@ -5,12 +5,12 @@
 #![allow(dead_code)]
 
 use anyhow::{bail, format_err, Result};
+use aptos::op::key::GenerateKey;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     hash::HashValue,
     PrivateKey, ValidCryptoMaterialStringExt,
 };
-use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -22,9 +22,9 @@ use aptos_types::{
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
     transaction::{
-        Module as TransactionModule, RawTransaction, Script as TransactionScript,
-        ScriptFunction as TransactionScriptFunction, Transaction, TransactionOutput,
-        TransactionStatus,
+        authenticator::AuthenticationKey, Module as TransactionModule, RawTransaction,
+        Script as TransactionScript, ScriptFunction as TransactionScriptFunction, Transaction,
+        TransactionOutput, TransactionStatus,
     },
     vm_status::KeptVMStatus,
 };
@@ -770,7 +770,6 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         }
 
         // Handle extra init args
-        let mut keygen = KeyGen::from_seed([0; 32]);
         let mut validators_to_create = vec![];
         let mut parent_vasps_to_create = vec![];
 
@@ -809,10 +808,10 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     }
 
                     let (validator_private_key, validator_auth_key_prefix, validator_account_addr) =
-                        keygen.generate_credentials_for_account_creation();
+                        generate_credentials_for_account_creation();
 
                     let (operator_private_key, operator_auth_key_prefix, operator_account_addr) =
-                        keygen.generate_credentials_for_account_creation();
+                        generate_credentials_for_account_creation();
 
                     named_address_mapping.insert(
                         validator_name.to_string(),
@@ -857,7 +856,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     }
 
                     let (private_key, auth_key_prefix, account_addr) =
-                        keygen.generate_credentials_for_account_creation();
+                        generate_credentials_for_account_creation();
                     named_address_mapping.insert(
                         parent_vasp_name.to_string(),
                         NumericalAddress::new(account_addr.into_bytes(), NumberFormat::Hex),
@@ -1211,4 +1210,14 @@ fn render_events(events: &[ContractEvent]) -> Option<String> {
 
 pub fn run_aptos_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     run_test_impl::<AptosTestAdapter>(path, Some(&*PRECOMPILED_APTOS_FRAMEWORK))
+}
+
+fn generate_credentials_for_account_creation() -> (Ed25519PrivateKey, Vec<u8>, AccountAddress) {
+    let private_key = GenerateKey::generate_ed25519_in_memory();
+    let public_key = private_key.public_key();
+    let auth_key = AuthenticationKey::ed25519(&public_key).to_vec();
+    const AUTH_KEY_PREFIX_LENGTH: usize = AuthenticationKey::LENGTH - AccountAddress::LENGTH;
+    let auth_key_prefix = auth_key[..AUTH_KEY_PREFIX_LENGTH].to_vec();
+    let account_addr = AccountAddress::from_bytes(&auth_key[AUTH_KEY_PREFIX_LENGTH..]).unwrap();
+    (private_key, auth_key_prefix, account_addr)
 }

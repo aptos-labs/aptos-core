@@ -16,7 +16,7 @@ fn create_account() {
 
     // create and publish a sender with 1_000_000 coins
     let sender = Account::new_aptos_root();
-    let new_account = executor.create_raw_account();
+    let new_account = Account::new();
 
     // define the arguments to the create account transaction
     let initial_amount = 0;

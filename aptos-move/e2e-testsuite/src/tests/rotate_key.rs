@@ -1,12 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos::op::key::GenerateKey;
 use aptos_crypto::{
     ed25519::Ed25519PrivateKey,
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
     PrivateKey, SigningKey, Uniform,
 };
-use aptos_keygen::KeyGen;
 use aptos_types::{
     transaction::{authenticator::AuthenticationKey, SignedTransaction, TransactionStatus},
     vm_status::{KeptVMStatus, StatusCode},
@@ -84,10 +84,9 @@ fn rotate_ed25519_multisig_key() {
         let _sender_address = sender.address();
 
         // create a 1-of-2 multisig policy
-        let mut keygen = KeyGen::from_seed([9u8; 32]);
+        let (privkey1, pubkey1) = GenerateKey::generate_ed25519_keypair_in_memory();
+        let (privkey2, pubkey2) = GenerateKey::generate_ed25519_keypair_in_memory();
 
-        let (privkey1, pubkey1) = keygen.generate_keypair();
-        let (privkey2, pubkey2) = keygen.generate_keypair();
         let threshold = 1;
         let multi_ed_public_key =
             MultiEd25519PublicKey::new(vec![pubkey1, pubkey2], threshold).unwrap();

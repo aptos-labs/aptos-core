@@ -167,7 +167,6 @@ members = [
     "aptos-e2e-tests-replay",
     "aptos-fuzz",
     "aptos-fuzzer",
-    "aptos-keygen",
     "aptos-proptest-helpers",
     "aptos-retrier",
     "aptos-transactional-test-harness",

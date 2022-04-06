@@ -10,7 +10,7 @@ use aptos_vm::{
     AptosVM,
 };
 use language_e2e_tests::{
-    account, common_transactions::peer_to_peer_txn, test_with_different_versions,
+    account, account::Account, common_transactions::peer_to_peer_txn, test_with_different_versions,
     versioning::CURRENT_RELEASE_VERSIONS,
 };
 use move_binary_format::file_format::NUMBER_OF_NATIVE_FUNCTIONS;
@@ -82,7 +82,7 @@ fn non_existent_sender() {
     test_with_different_versions! {CURRENT_RELEASE_VERSIONS, |test_env| {
         let mut executor = test_env.executor;
         let sequence_number = 0;
-        let sender = executor.create_raw_account();
+        let sender = Account::new();
         let receiver = executor.create_raw_account_data(100_000, sequence_number);
         executor.add_account_data(&receiver);
 

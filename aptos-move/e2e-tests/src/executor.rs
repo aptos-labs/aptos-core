@@ -17,7 +17,6 @@ use crate::{
     golden_outputs::GoldenOutputs,
 };
 use aptos_crypto::HashValue;
-use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -51,8 +50,6 @@ use move_core_types::{
 };
 use move_vm_types::gas_schedule::GasStatus;
 
-static RNG_SEED: [u8; 32] = [9u8; 32];
-
 const ENV_TRACE_DIR: &str = "TRACE";
 
 /// Directory structure of the trace dir
@@ -75,7 +72,6 @@ pub struct FakeExecutor {
     block_time: u64,
     executed_output: Option<GoldenOutputs>,
     trace_dir: Option<PathBuf>,
-    rng: KeyGen,
 }
 
 impl FakeExecutor {
@@ -86,7 +82,6 @@ impl FakeExecutor {
             block_time: 0,
             executed_output: None,
             trace_dir: None,
-            rng: KeyGen::from_seed(RNG_SEED),
         };
         executor.apply_write_set(write_set);
         executor
@@ -138,7 +133,6 @@ impl FakeExecutor {
             block_time: 0,
             executed_output: None,
             trace_dir: None,
-            rng: KeyGen::from_seed(RNG_SEED),
         }
     }
 
@@ -221,18 +215,13 @@ impl FakeExecutor {
     }
 
     /// Create one instance of [`AccountData`] without saving it to data store.
-    pub fn create_raw_account(&mut self) -> Account {
-        Account::new_from_seed(&mut self.rng)
-    }
-
-    /// Create one instance of [`AccountData`] without saving it to data store.
     pub fn create_raw_account_data(&mut self, balance: u64, seq_num: u64) -> AccountData {
-        AccountData::new_from_seed(&mut self.rng, balance, seq_num)
+        AccountData::new(balance, seq_num)
     }
 
     /// Create one instance of [`AccountData`] with XDX balance without saving it to data store.
     pub fn create_xdx_raw_account_data(&mut self, balance: u64, seq_num: u64) -> AccountData {
-        AccountData::new_xdx_from_seed(&mut self.rng, balance, seq_num)
+        AccountData::new_xdx(balance, seq_num)
     }
 
     /// Creates a number of [`Account`] instances all with the same balance and sequence number,
@@ -240,7 +229,7 @@ impl FakeExecutor {
     pub fn create_accounts(&mut self, size: usize, balance: u64, seq_num: u64) -> Vec<Account> {
         let mut accounts: Vec<Account> = Vec::with_capacity(size);
         for _i in 0..size {
-            let account_data = AccountData::new_from_seed(&mut self.rng, balance, seq_num);
+            let account_data = AccountData::new(balance, seq_num);
             self.add_account_data(&account_data);
             accounts.push(account_data.into_account());
         }

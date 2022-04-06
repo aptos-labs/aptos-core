@@ -5,7 +5,6 @@ members = [
     "api",
     "api/types",
     "aptos-move/af-cli",
-    "aptos-move/aptos-keygen",
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-transaction-benchmarks",
     "aptos-move/aptos-transactional-test-harness",

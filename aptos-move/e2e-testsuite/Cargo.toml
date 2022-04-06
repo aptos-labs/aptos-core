@@ -22,7 +22,7 @@ move-bytecode-verifier = { git = "https://github.com/diem/move", rev = "3fe033b1
 read-write-set = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 
 ## Aptos-Move dependencies
-aptos-keygen = { path = "../aptos-keygen" }
+aptos = { path = "../../crates/aptos" }
 aptos-parallel-executor = { path = "../parallel-executor" }
 aptos-vm = { path = "../aptos-vm" }
 aptos-writeset-generator = { path = "../writeset-transaction-generator"}

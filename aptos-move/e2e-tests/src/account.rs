@@ -5,8 +5,8 @@
 
 use crate::gas_costs;
 use anyhow::{Error, Result};
+use aptos::op::key::GenerateKey;
 use aptos_crypto::ed25519::*;
-use aptos_keygen::KeyGen;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -70,14 +70,8 @@ impl Account {
     /// [`FakeExecutor::add_account_data`][crate::executor::FakeExecutor::add_account_data].
     /// This function returns distinct values upon every call.
     pub fn new() -> Self {
-        let (privkey, pubkey) = KeyGen::from_os_rng().generate_keypair();
-        Self::with_keypair(privkey, pubkey)
-    }
-
-    /// Creates a new account in memory given a random seed.
-    pub fn new_from_seed(seed: &mut KeyGen) -> Self {
-        let (privkey, pubkey) = seed.generate_keypair();
-        Self::with_keypair(privkey, pubkey)
+        let (private_key, public_key) = GenerateKey::generate_ed25519_keypair_in_memory();
+        Self::with_keypair(private_key, public_key)
     }
 
     /// Creates a new account with the given keypair.
@@ -491,25 +485,12 @@ impl AccountData {
         )
     }
 
-    /// Creates a new `AccountData` with a new account.
-    ///
-    /// Most tests will want to use this constructor.
-    pub fn new_from_seed(seed: &mut KeyGen, balance: u64, sequence_number: u64) -> Self {
-        Self::with_account(
-            Account::new_from_seed(seed),
-            balance,
-            xus_currency_code(),
-            sequence_number,
-            AccountRoleSpecifier::ParentVASP,
-        )
-    }
-
     /// Creates a new `AccountData` with a new account, with XDX balance.
     ///
     /// Most tests will want to use this constructor.
-    pub fn new_xdx_from_seed(seed: &mut KeyGen, balance: u64, sequence_number: u64) -> Self {
+    pub fn new_xdx(balance: u64, sequence_number: u64) -> Self {
         Self::with_account(
-            Account::new_from_seed(seed),
+            Account::new(),
             balance,
             xdx_currency_code(),
             sequence_number,

@@ -1,12 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos::op::key::GenerateKey;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
     PrivateKey, SigningKey, Uniform,
 };
-use aptos_keygen::KeyGen;
 use aptos_transaction_builder::aptos_stdlib::encode_transfer_script_function;
 use aptos_types::{
     account_address::AccountAddress,
@@ -200,16 +200,18 @@ fn verify_multi_agent_num_sigs_exceeds() {
     executor.add_account_data(&secondary_signer);
 
     // create two multisigs with `MAX_NUM_OF_SIGS/MAX_NUM_OF_SIGS` policy.
-    let mut keygen = KeyGen::from_seed([9u8; 32]);
     let threshold = MAX_NUM_OF_SIGS as u8;
 
-    let (sender_privkeys, sender_pubkeys): (Vec<Ed25519PrivateKey>, Vec<Ed25519PublicKey>) =
-        (0..threshold).map(|_| keygen.generate_keypair()).unzip();
+    let (sender_privkeys, sender_pubkeys): (Vec<Ed25519PrivateKey>, Vec<Ed25519PublicKey>) = (0
+        ..threshold)
+        .map(|_| GenerateKey::generate_ed25519_keypair_in_memory())
+        .unzip();
     let sender_multi_ed_public_key = MultiEd25519PublicKey::new(sender_pubkeys, threshold).unwrap();
     let sender_new_auth_key = AuthenticationKey::multi_ed25519(&sender_multi_ed_public_key);
 
-    let (secondary_signer_privkeys, secondary_signer_pubkeys) =
-        (0..threshold).map(|_| keygen.generate_keypair()).unzip();
+    let (secondary_signer_privkeys, secondary_signer_pubkeys) = (0..threshold)
+        .map(|_| GenerateKey::generate_ed25519_keypair_in_memory())
+        .unzip();
     let secondary_signer_multi_ed_public_key =
         MultiEd25519PublicKey::new(secondary_signer_pubkeys, threshold).unwrap();
     let secondary_signer_new_auth_key =

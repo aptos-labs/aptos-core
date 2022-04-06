@@ -26,7 +26,7 @@ move-core-types = { git = "https://github.com/diem/move", rev = "3fe033b112eae7d
 move-command-line-common = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 
 # Diem-Move dependencies
-aptos-keygen = { path = "../aptos-keygen" }
+aptos = { path = "../../crates/aptos" }
 aptos-vm =  { path = "../aptos-vm" }
 cached-framework-packages =  { path = "../framework/cached-packages" }
 framework =  { path = "../framework" }
