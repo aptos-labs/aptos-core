@@ -10,9 +10,6 @@ license = "Apache-2.0"
 publish = false
 
 [dependencies]
-serde_json = "1.0.64"
-hex = "0.4.3"
-bcs = "0.1.2"
 proptest = "1.0.0"
 
 ## Move dependencies

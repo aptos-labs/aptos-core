@@ -13,9 +13,7 @@ edition = "2018"
 anyhow = "1.0.52"
 async-trait = "0.1.42"
 bcs = "0.1.2"
-proptest = "1.0.0"
 tokio = { version = "1.8.1", features = ["full"] }
-walkdir = "2.3.1"
 reqwest = { version = "0.11.2", features = ["json"] }
 
 aptos = { path = "../../crates/aptos" }

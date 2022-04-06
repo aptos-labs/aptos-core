@@ -12,7 +12,6 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.52"
 rand = "0.8.3"
-tempfile = "3.2.0"
 
 executor = { path = "../executor" }
 executor-types = { path = "../executor-types" }

@@ -10,8 +10,6 @@ publish = false
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.52"
-rand = { version = "0.8.3", default-features = false }
 
 consensus-types = { path = "../../consensus/consensus-types", default-features = false }
 executor = { path = "../executor" }

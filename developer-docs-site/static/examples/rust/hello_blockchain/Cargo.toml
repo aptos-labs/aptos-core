@@ -11,6 +11,5 @@ edition = "2018"
 
 [dependencies]
 first-transaction = { path = "../first_transaction" }
-serde = { version = "1.0.124", features = ["derive"], default-features = false }
 serde_json = "1.0.64"
 hex = "0.4.3"

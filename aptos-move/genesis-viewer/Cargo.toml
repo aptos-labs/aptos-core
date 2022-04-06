@@ -10,7 +10,6 @@ publish = false
 edition = "2018"
 
 [dependencies]
-bcs = "0.1.2"
 structopt = "0.3.21"
 
 aptos-resource-viewer = { path = "../aptos-resource-viewer"}
