@@ -35,7 +35,7 @@ fn benchmarks(c: &mut Criterion) {
         let responder_static = responder_static.to_bytes();
 
         let mut first_message = [0u8; handshake_init_msg_len(0)];
-        let mut second_message = [0u8; handshake_init_msg_len(0)];
+        let mut second_message = [0u8; handshake_resp_msg_len(0)];
 
         b.iter(|| {
             let initiator_static =
