@@ -6,7 +6,6 @@ use anyhow::Result;
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_global_constants::{
     APTOS_ROOT_KEY, MIN_PRICE_PER_GAS_UNIT, MOVE_MODULES, OPERATOR_KEY, OWNER_KEY,
-    TREASURY_COMPLIANCE_KEY,
 };
 use aptos_management::constants::{self, VALIDATOR_CONFIG, VALIDATOR_OPERATOR};
 use aptos_secure_storage::{KVStorage, Namespaced};
@@ -76,24 +75,6 @@ impl<S: KVStorage> GenesisBuilder<S> {
         let layout = self.layout()?;
         self.with_namespace(&layout.aptos_root)
             .get(APTOS_ROOT_KEY)
-            .map(|r| r.value)
-            .map_err(Into::into)
-    }
-
-    pub fn set_treasury_compliance_key(
-        &mut self,
-        treasury_compliance_key: Ed25519PublicKey,
-    ) -> Result<()> {
-        let layout = self.layout()?;
-        self.with_namespace_mut(&layout.treasury_compliance)
-            .set(TREASURY_COMPLIANCE_KEY, treasury_compliance_key)
-            .map_err(Into::into)
-    }
-
-    pub fn treasury_compliance_key(&self) -> Result<Ed25519PublicKey> {
-        let layout = self.layout()?;
-        self.with_namespace(&layout.treasury_compliance)
-            .get(TREASURY_COMPLIANCE_KEY)
             .map(|r| r.value)
             .map_err(Into::into)
     }
@@ -232,14 +213,12 @@ impl<S: KVStorage> GenesisBuilder<S> {
         consensus_config: OnChainConsensusConfig,
     ) -> Result<Transaction> {
         let aptos_root_key = self.root_key()?;
-        let treasury_compliance_key = self.treasury_compliance_key()?;
         let validators = self.validators()?;
         let move_modules = self.move_modules()?;
         let min_price_per_gas_unit = self.min_price_per_gas_unit().unwrap_or(1);
 
         let genesis = vm_genesis::encode_genesis_transaction(
             aptos_root_key,
-            treasury_compliance_key,
             &validators,
             &move_modules,
             publishing_option,

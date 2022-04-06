@@ -55,7 +55,7 @@ enum Command {
         account: AccountAddress,
         version: Option<Version>,
     },
-    /// Annotate the resources stored under `aptos_root`, `treasury_compliance` and all validator addresses.
+    /// Annotate the resources stored under `aptos_root`, and all validator addresses.
     #[structopt(name = "annotate-key-accounts")]
     AnnotateKeyAccounts { version: Version },
     /// Annotate the events stored under `key` with range `start` to `start+limit`.

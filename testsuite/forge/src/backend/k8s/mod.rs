@@ -20,7 +20,6 @@ use aptos_secure_storage::{CryptoStorage, KVStorage, VaultStorage};
 
 pub struct K8sFactory {
     root_key: [u8; ED25519_PRIVATE_KEY_LENGTH],
-    treasury_compliance_key: [u8; ED25519_PRIVATE_KEY_LENGTH],
     cluster_name: String,
     helm_repo: String,
     image_tag: String,
@@ -64,14 +63,9 @@ impl K8sFactory {
             .export_private_key("aptos__aptos_root")
             .unwrap()
             .to_bytes();
-        let treasury_compliance_key = vault
-            .export_private_key("aptos__treasury_compliance")
-            .unwrap()
-            .to_bytes();
 
         Ok(Self {
             root_key,
-            treasury_compliance_key,
             cluster_name,
             helm_repo,
             image_tag,
@@ -133,7 +127,6 @@ impl Factory for K8sFactory {
 
         let swarm = K8sSwarm::new(
             &self.root_key,
-            &self.treasury_compliance_key,
             &self.cluster_name,
             &self.helm_repo,
             &self.image_tag,

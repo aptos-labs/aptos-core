@@ -33,20 +33,14 @@ pub fn close_module_publishing(
     *dr_seqno = dr_seqno.checked_add(1).unwrap();
 }
 
-pub fn start_with_released_df() -> (FakeExecutor, Account, Account, Account) {
+pub fn start_with_released_df() -> (FakeExecutor, Account) {
     let executor = FakeExecutor::from_fresh_genesis();
-    let mut dd_account = Account::new_testing_dd();
     let mut dr_account = Account::new_aptos_root();
-    let mut tc_account = Account::new_blessed_tc();
 
-    let (private_key, public_key) = vm_genesis::GENESIS_KEYPAIR.clone();
-    dd_account.rotate_key(private_key, public_key);
     let (private_key, public_key) = vm_genesis::GENESIS_KEYPAIR.clone();
     dr_account.rotate_key(private_key, public_key);
-    let (private_key, public_key) = vm_genesis::GENESIS_KEYPAIR.clone();
-    tc_account.rotate_key(private_key, public_key);
 
-    (executor, dr_account, tc_account, dd_account)
+    (executor, dr_account)
 }
 
 pub fn upgrade_df(

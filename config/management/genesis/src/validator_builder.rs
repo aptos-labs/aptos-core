@@ -126,7 +126,6 @@ impl ValidatorConfig {
 
 pub struct RootKeys {
     pub root_key: Ed25519PrivateKey,
-    pub treasury_compliance_key: Ed25519PrivateKey,
 }
 
 impl RootKeys {
@@ -134,17 +133,10 @@ impl RootKeys {
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
-        // TODO use distinct keys for aptos root and treasury
-        // let root_key = Ed25519PrivateKey::generate(rng);
-        // let treasury_compliance_key = Ed25519PrivateKey::generate(rng);
         let key = Ed25519PrivateKey::generate(&mut rng).to_bytes();
         let root_key = Ed25519PrivateKey::try_from(key.as_ref()).unwrap();
-        let treasury_compliance_key = Ed25519PrivateKey::try_from(key.as_ref()).unwrap();
 
-        Self {
-            root_key,
-            treasury_compliance_key,
-        }
+        Self { root_key }
     }
 }
 
@@ -391,16 +383,12 @@ impl ValidatorBuilder {
             owners: validators.iter().map(|v| v.owner()).collect(),
             operators: validators.iter().map(|v| v.operator()).collect(),
             aptos_root: APTOS_ROOT_NS.into(),
-            treasury_compliance: APTOS_ROOT_NS.into(),
         };
         genesis_builder.set_layout(&layout)?;
         genesis_builder.set_move_modules(move_modules)?;
 
-        // Set Root and Treasury public keys
+        // Set Root public keys
         genesis_builder.set_root_key(Ed25519PublicKey::from(&root_keys.root_key))?;
-        genesis_builder.set_treasury_compliance_key(Ed25519PublicKey::from(
-            &root_keys.treasury_compliance_key,
-        ))?;
 
         // Set Validator specific information
         for validator in validators {

@@ -52,7 +52,6 @@ pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::
 
 pub fn encode_genesis_transaction(
     aptos_root_key: Ed25519PublicKey,
-    treasury_compliance_key: Ed25519PublicKey,
     validators: &[Validator],
     stdlib_module_bytes: &[Vec<u8>],
     vm_publishing_option: Option<VMPublishingOption>,
@@ -63,7 +62,6 @@ pub fn encode_genesis_transaction(
 ) -> Transaction {
     Transaction::GenesisTransaction(WriteSetPayload::Direct(encode_genesis_change_set(
         &aptos_root_key,
-        &treasury_compliance_key,
         validators,
         stdlib_module_bytes,
         vm_publishing_option.unwrap_or_else(VMPublishingOption::open),
@@ -76,7 +74,6 @@ pub fn encode_genesis_transaction(
 
 pub fn encode_genesis_change_set(
     aptos_root_key: &Ed25519PublicKey,
-    treasury_compliance_key: &Ed25519PublicKey,
     validators: &[Validator],
     stdlib_module_bytes: &[Vec<u8>],
     vm_publishing_option: VMPublishingOption,
@@ -102,7 +99,6 @@ pub fn encode_genesis_change_set(
     create_and_initialize_main_accounts(
         &mut session,
         aptos_root_key,
-        treasury_compliance_key,
         vm_publishing_option,
         consensus_config,
         chain_id,
@@ -190,17 +186,14 @@ fn exec_function(
 fn create_and_initialize_main_accounts(
     session: &mut SessionExt<impl MoveResolver>,
     aptos_root_key: &Ed25519PublicKey,
-    treasury_compliance_key: &Ed25519PublicKey,
     publishing_option: VMPublishingOption,
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     min_price_per_gas_unit: u64,
 ) {
     let aptos_root_auth_key = AuthenticationKey::ed25519(aptos_root_key);
-    let treasury_compliance_auth_key = AuthenticationKey::ed25519(treasury_compliance_key);
 
     let root_aptos_root_address = account_config::aptos_root_address();
-    let tc_account_address = account_config::treasury_compliance_account_address();
 
     let initial_allow_list = MoveValue::Vector(
         publishing_option
@@ -226,9 +219,7 @@ fn create_and_initialize_main_accounts(
         vec![],
         serialize_values(&vec![
             MoveValue::Signer(root_aptos_root_address),
-            MoveValue::Signer(tc_account_address),
             MoveValue::vector_u8(aptos_root_auth_key.to_vec()),
-            MoveValue::vector_u8(treasury_compliance_auth_key.to_vec()),
             initial_allow_list,
             MoveValue::Bool(publishing_option.is_open_module),
             MoveValue::vector_u8(instr_gas_costs),
@@ -453,7 +444,6 @@ pub fn generate_test_genesis(
     let validators = &validators_;
 
     let genesis = encode_genesis_change_set(
-        &GENESIS_KEYPAIR.1,
         &GENESIS_KEYPAIR.1,
         validators,
         stdlib_modules,

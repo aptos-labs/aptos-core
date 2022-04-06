@@ -62,14 +62,6 @@ resource "vault_transit_secret_backend_key" "aptos_root" {
   exportable       = true
 }
 
-resource "vault_transit_secret_backend_key" "treasury_compliance" {
-  backend          = vault_mount.transit.path
-  name             = "aptos__treasury_compliance"
-  type             = "ed25519"
-  deletion_allowed = true
-  exportable       = true
-}
-
 data "vault_policy_document" "genesis-root" {
   rule {
     path         = "${vault_mount.transit.path}/keys/${vault_transit_secret_backend_key.aptos_root.name}"
@@ -82,16 +74,6 @@ data "vault_policy_document" "genesis-root" {
     description  = "Allow reading the Aptos root private key"
   }
 
-  rule {
-    path         = "${vault_mount.transit.path}/keys/${vault_transit_secret_backend_key.treasury_compliance.name}"
-    capabilities = ["read"]
-    description  = "Allow reading the treasury compliance public key"
-  }
-  rule {
-    path         = "${vault_mount.transit.path}/export/signing-key/${vault_transit_secret_backend_key.treasury_compliance.name}"
-    capabilities = ["read"]
-    description  = "Allow reading the treasury compliance private key"
-  }
 }
 
 resource "vault_policy" "genesis-root" {

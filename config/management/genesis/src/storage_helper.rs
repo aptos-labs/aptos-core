@@ -10,7 +10,7 @@ use aptos_crypto::{
 };
 use aptos_global_constants::{
     APTOS_ROOT_KEY, CONSENSUS_KEY, EXECUTION_KEY, FULLNODE_NETWORK_KEY, OPERATOR_KEY, OWNER_KEY,
-    SAFETY_DATA, TREASURY_COMPLIANCE_KEY, VALIDATOR_NETWORK_KEY, WAYPOINT,
+    SAFETY_DATA, VALIDATOR_NETWORK_KEY, WAYPOINT,
 };
 use aptos_management::{error::Error, secure_backend::DISK};
 use aptos_secure_storage::{CryptoStorage, KVStorage, Namespaced, OnDiskStorage, Storage};
@@ -58,11 +58,6 @@ impl StorageHelper {
         // Initialize all keys in storage
         storage
             .import_private_key(APTOS_ROOT_KEY, Ed25519PrivateKey::generate(&mut rng))
-            .unwrap();
-        // TODO(davidiw) use distinct keys in tests for treasury and root keys
-        let aptos_root_key = storage.export_private_key(APTOS_ROOT_KEY).unwrap();
-        storage
-            .import_private_key(TREASURY_COMPLIANCE_KEY, aptos_root_key)
             .unwrap();
         storage
             .import_private_key(CONSENSUS_KEY, Ed25519PrivateKey::generate(&mut rng))
@@ -284,32 +279,6 @@ impl StorageHelper {
 
         let command = Command::from_iter(args.split_whitespace());
         command.set_operator()
-    }
-
-    pub fn treasury_compliance_key(
-        &self,
-        validator_ns: &str,
-        shared_ns: &str,
-    ) -> Result<Ed25519PublicKey, Error> {
-        let args = format!(
-            "
-                aptos-genesis-tool
-                treasury-compliance-key
-                --validator-backend backend={backend};\
-                    path={path};\
-                    namespace={validator_ns}
-                --shared-backend backend={backend};\
-                    path={path};\
-                    namespace={shared_ns}
-            ",
-            backend = DISK,
-            path = self.path_string(),
-            validator_ns = validator_ns,
-            shared_ns = shared_ns,
-        );
-
-        let command = Command::from_iter(args.split_whitespace());
-        command.treasury_compliance_key()
     }
 
     pub fn validator_config(

@@ -32,8 +32,6 @@ pub struct K8sSwarm {
     validators: HashMap<PeerId, K8sNode>,
     fullnodes: HashMap<PeerId, K8sNode>,
     root_account: LocalAccount,
-    treasury_compliance_account: LocalAccount,
-    designated_dealer_account: LocalAccount,
     kube_client: K8sClient,
     cluster_name: String,
     helm_repo: String,
@@ -44,7 +42,6 @@ pub struct K8sSwarm {
 impl K8sSwarm {
     pub async fn new(
         root_key: &[u8],
-        treasury_compliance_key: &[u8],
         cluster_name: &str,
         helm_repo: &str,
         image_tag: &str,
@@ -71,17 +68,6 @@ impl K8sSwarm {
             })?[0];
         let root_account = LocalAccount::new(address, account_key, sequence_number);
 
-        let key = load_tc_key(treasury_compliance_key);
-        let account_key = AccountKey::from_private_key(key);
-        let address = aptos_sdk::types::account_config::treasury_compliance_account_address();
-        let sequence_number = 0;
-        let treasury_compliance_account = LocalAccount::new(address, account_key, sequence_number);
-
-        let key = load_tc_key(treasury_compliance_key);
-        let account_key = AccountKey::from_private_key(key);
-        let address = aptos_sdk::types::account_config::testnet_dd_account_address();
-        let designated_dealer_account = LocalAccount::new(address, account_key, sequence_number);
-
         let mut versions = HashMap::new();
         let base_version = Version::new(0, base_image_tag.to_string());
         let cur_version = Version::new(1, image_tag.to_string());
@@ -92,8 +78,6 @@ impl K8sSwarm {
             validators,
             fullnodes,
             root_account,
-            treasury_compliance_account,
-            designated_dealer_account,
             kube_client,
             chain_id: ChainId::new(NamedChain::DEVNET.id()),
             cluster_name: cluster_name.to_string(),
@@ -206,13 +190,7 @@ impl Swarm for K8sSwarm {
 
     fn chain_info(&mut self) -> ChainInfo<'_> {
         let rest_api_url = self.get_rest_api_url();
-        ChainInfo::new(
-            &mut self.root_account,
-            &mut self.treasury_compliance_account,
-            &mut self.designated_dealer_account,
-            rest_api_url,
-            self.chain_id,
-        )
+        ChainInfo::new(&mut self.root_account, rest_api_url, self.chain_id)
     }
 
     // Returns env CENTRAL_LOGGING_ADDRESS if present (without timestamps)
@@ -344,10 +322,6 @@ fn parse_node_id(s: &str) -> Result<usize> {
 
 fn load_root_key(root_key_bytes: &[u8]) -> Ed25519PrivateKey {
     Ed25519PrivateKey::try_from(root_key_bytes).unwrap()
-}
-
-fn load_tc_key(tc_key_bytes: &[u8]) -> Ed25519PrivateKey {
-    Ed25519PrivateKey::try_from(tc_key_bytes).unwrap()
 }
 
 pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {

@@ -385,7 +385,7 @@ fn test_validate_non_genesis_write_set() {
 
     // A WriteSet txn is only valid when sent from the root account.
     let bad_transaction = transaction_test_helpers::get_write_set_txn(
-        account_config::treasury_compliance_account_address(),
+        account_config::aptos_root_address(),
         1,
         &vm_genesis::GENESIS_KEYPAIR.0,
         vm_genesis::GENESIS_KEYPAIR.1.clone(),

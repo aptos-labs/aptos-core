@@ -20,9 +20,7 @@ module AptosFramework::Genesis {
 
     fun initialize(
         core_resource_account: signer,
-        _tc_account: signer,
         core_resource_account_auth_key: vector<u8>,
-        _tc_auth_key: vector<u8>,
         initial_script_allow_list: vector<vector<u8>>,
         is_open_module: bool,
         instruction_schedule: vector<u8>,

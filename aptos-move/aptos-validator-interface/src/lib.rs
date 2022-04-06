@@ -65,8 +65,7 @@ pub trait AptosValidatorInterface: Sync {
     /// Get the account states of the most critical accounts, including:
     /// 1. Diem Framework code address
     /// 2. Diem Root address
-    /// 3. Treasury Compliance address
-    /// 4. All validator addresses
+    /// 3. All validator addresses
     fn get_admin_accounts(&self, version: Version) -> Result<Vec<(AccountAddress, AccountState)>> {
         let mut result = vec![];
         let aptos_root = self
@@ -78,21 +77,13 @@ pub trait AptosValidatorInterface: Sync {
             .get_config::<ValidatorSet>()?
             .ok_or_else(|| anyhow!("validator_config doesn't exist"))?;
 
-        // Get code account, aptos_root and treasury compliance accounts.
+        // Get code account, aptos_root
         result.push((
             account_config::CORE_CODE_ADDRESS,
             self.get_account_state_by_version(account_config::CORE_CODE_ADDRESS, version)?
                 .ok_or_else(|| anyhow!("core_code_address doesn't exist"))?,
         ));
         result.push((account_config::aptos_root_address(), aptos_root));
-        result.push((
-            account_config::treasury_compliance_account_address(),
-            self.get_account_state_by_version(
-                account_config::treasury_compliance_account_address(),
-                version,
-            )?
-            .ok_or_else(|| anyhow!("treasury_compliance_account doesn't exist"))?,
-        ));
 
         // Get all validator accounts
         for validator_info in validators.payload() {

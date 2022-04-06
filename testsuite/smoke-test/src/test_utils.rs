@@ -97,7 +97,7 @@ pub async fn assert_balance(client: &RestClient, account: &LocalAccount, balance
 pub mod swarm_utils {
     use crate::test_utils::fetch_backend_storage;
     use aptos_config::config::{NodeConfig, OnDiskStorageConfig, SecureBackend, WaypointConfig};
-    use aptos_global_constants::{APTOS_ROOT_KEY, TREASURY_COMPLIANCE_KEY};
+    use aptos_global_constants::APTOS_ROOT_KEY;
     use aptos_secure_storage::{CryptoStorage, KVStorage, OnDiskStorage, Storage};
     use aptos_types::waypoint::Waypoint;
     use forge::{LocalNode, LocalSwarm, Swarm};
@@ -112,19 +112,12 @@ pub mod swarm_utils {
         let root_key =
             bcs::from_bytes(&bcs::to_bytes(chain_info.root_account.private_key()).unwrap())
                 .unwrap();
-        let treasury_compliance_key = bcs::from_bytes(
-            &bcs::to_bytes(chain_info.treasury_compliance_account.private_key()).unwrap(),
-        )
-        .unwrap();
 
         let mut root_storage_config = OnDiskStorageConfig::default();
         root_storage_config.path = swarm.dir().join("root-storage.json");
         let mut root_storage = OnDiskStorage::new(root_storage_config.path());
         root_storage
             .import_private_key(APTOS_ROOT_KEY, root_key)
-            .unwrap();
-        root_storage
-            .import_private_key(TREASURY_COMPLIANCE_KEY, treasury_compliance_key)
             .unwrap();
 
         SecureBackend::OnDiskStorage(root_storage_config)

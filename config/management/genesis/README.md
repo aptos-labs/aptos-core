@@ -3,7 +3,6 @@
 The `aptos-genesis-tool` provides a tool for the genesis ceremony of the Aptos blockchain. The functionality of the tool is dictated by the organization of nodes within the system:
 
 * A aptos root account that maintains the set of validator owners, validator operators, and the active validator set.
-* A treasury compliance account that maintains VASPs, DDs, and other related topics.
 * The initial set of Move modules published at genesis.
 * Validator owners (OW) that have accounts on the blockchain. These accounts contain a validator configuration and specify a validator operator.
 * Validator operators (OP) that have accounts on the blockchain. These accounts have the ability to manipulate validator configuration.
@@ -55,7 +54,7 @@ In addition, the association will provide an entry point into a `shared storage`
 
 Each participant must retrieve an appropriate GitHub [token](https://github.com/settings/tokens) for their account that allows access to the `repo` scope. This token must be stored locally on their disk in a file accessible to the management tool.
 
-Finally, each participant should initialize their respective key: `aptos_root`, `treasury_compliance`, `owner`, or `operator` in a secure storage solution. How this is done is outside the scope of this document.
+Finally, each participant should initialize their respective key: `aptos_root`, `owner`, or `operator` in a secure storage solution. How this is done is outside the scope of this document.
 
 The remainder of this section specifies distinct behaviors for each role.
 
@@ -113,12 +112,6 @@ cargo run -p aptos-genesis-tool -- \
     aptos-root-key \
     --config config_file.yaml
 ```
-* The association will publish the the `treasury compliance` public key to the `shared storage`:
-```
-cargo run -p aptos-genesis-tool -- \
-    aptos-treasury-compliance-key \
-    --config config_file.yaml
-```
 * Upon both OW and OP completing their portion of this process, the association will build a genesis waypoint:
 ```
 cargo run -p aptos-genesis-tool -- \
@@ -131,7 +124,6 @@ The layout is a toml configuration file of the following format:
 [operator] = ["alice", "bob"]
 [owner] = ["carol", "dave"]
 aptos_root = "erin"
-treasury_compliance = "fred"
 ```
 where each field maps to a role as described in this document.
 

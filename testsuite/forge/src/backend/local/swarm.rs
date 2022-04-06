@@ -8,16 +8,12 @@ use crate::{
 use anyhow::{anyhow, bail, Result};
 use aptos_config::config::NodeConfig;
 use aptos_genesis_tool::{fullnode_builder::FullnodeConfig, validator_builder::ValidatorBuilder};
-use aptos_sdk::{
-    crypto::ed25519::Ed25519PrivateKey,
-    types::{
-        chain_id::ChainId, transaction::Transaction, waypoint::Waypoint, AccountKey, LocalAccount,
-        PeerId,
-    },
+use aptos_sdk::types::{
+    chain_id::ChainId, transaction::Transaction, waypoint::Waypoint, AccountKey, LocalAccount,
+    PeerId,
 };
 use std::{
     collections::HashMap,
-    convert::TryFrom,
     fs, mem,
     num::NonZeroUsize,
     ops,
@@ -184,22 +180,6 @@ impl LocalSwarmBuilder {
             0,
         );
 
-        // Designated dealer account is built to have the same private key as the TC account
-        let designated_dealer_account = LocalAccount::new(
-            aptos_sdk::types::account_config::testnet_dd_account_address(),
-            AccountKey::from_private_key(
-                Ed25519PrivateKey::try_from(root_keys.treasury_compliance_key.to_bytes().as_ref())
-                    .unwrap(),
-            ),
-            0,
-        );
-
-        let treasury_compliance_account = LocalAccount::new(
-            aptos_sdk::types::account_config::treasury_compliance_account_address(),
-            AccountKey::from_private_key(root_keys.treasury_compliance_key),
-            0,
-        );
-
         Ok(LocalSwarm {
             node_name_counter: validators.len() as u64,
             genesis,
@@ -209,8 +189,6 @@ impl LocalSwarmBuilder {
             fullnodes: HashMap::new(),
             dir,
             root_account,
-            treasury_compliance_account,
-            designated_dealer_account,
             chain_id: ChainId::test(),
         })
     }
@@ -226,8 +204,6 @@ pub struct LocalSwarm {
     fullnodes: HashMap<PeerId, LocalNode>,
     dir: SwarmDirectory,
     root_account: LocalAccount,
-    treasury_compliance_account: LocalAccount,
-    designated_dealer_account: LocalAccount,
     chain_id: ChainId,
 }
 
@@ -492,8 +468,6 @@ impl Swarm for LocalSwarm {
     fn chain_info(&mut self) -> ChainInfo<'_> {
         ChainInfo::new(
             &mut self.root_account,
-            &mut self.treasury_compliance_account,
-            &mut self.designated_dealer_account,
             self.validators
                 .values()
                 .map(|v| v.rest_api_endpoint().to_string())

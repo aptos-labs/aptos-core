@@ -15,18 +15,10 @@ use aptos_crypto::{
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
-    types::{
-        account_config::{
-            aptos_root_address, testnet_dd_account_address, treasury_compliance_account_address,
-        },
-        chain_id::ChainId,
-        AccountKey, LocalAccount,
-    },
+    types::{account_config::aptos_root_address, chain_id::ChainId, AccountKey, LocalAccount},
 };
 use rand::seq::SliceRandom;
 use std::{convert::TryFrom, path::Path};
-
-const DD_KEY: &str = "dd.key";
 
 pub struct Cluster {
     instances: Vec<Instance>,
@@ -106,29 +98,8 @@ impl Cluster {
     }
 
     pub async fn load_faucet_account(&self, client: &RestClient) -> Result<LocalAccount> {
-        self.load_account_with_mint_key(client, testnet_dd_account_address())
+        self.load_account_with_mint_key(client, aptos_root_address())
             .await
-    }
-
-    pub async fn load_tc_account(&self, client: &RestClient) -> Result<LocalAccount> {
-        self.load_account_with_mint_key(client, treasury_compliance_account_address())
-            .await
-    }
-
-    pub async fn load_dd_account(&self, client: &RestClient) -> Result<LocalAccount> {
-        let mint_key: Ed25519PrivateKey = load_key(Path::new(DD_KEY), EncodingType::BCS).unwrap();
-        let account_key = AccountKey::from_private_key(mint_key);
-        let address = account_key.authentication_key().derived_address();
-        let sequence_number = query_sequence_numbers(client, &[address])
-            .await
-            .map_err(|e| {
-                format_err!(
-                    "query_sequence_numbers on {:?} for dd account failed: {}",
-                    client,
-                    e
-                )
-            })?[0];
-        Ok(LocalAccount::new(address, account_key, sequence_number))
     }
 
     pub fn random_instance(&self) -> Instance {

@@ -15,8 +15,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
     account_config::{
-        self, aptos_root_address, testnet_dd_account_address, treasury_compliance_account_address,
-        AccountResource, BalanceResource, XUS_IDENTIFIER, XUS_NAME,
+        self, aptos_root_address, AccountResource, BalanceResource, XUS_IDENTIFIER, XUS_NAME,
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -341,13 +340,6 @@ fn panic_missing_private_key_named(cmd_name: &str, name: &IdentStr) -> ! {
             name '{}' in the init command.",
         cmd_name, name,
     )
-}
-
-fn test_only_named_addresses() -> Vec<(String, NumericalAddress)> {
-    vec![(
-        "DesignatedDealer".to_string(),
-        NumericalAddress::new(testnet_dd_account_address().into_bytes(), NumberFormat::Hex),
-    )]
 }
 
 fn panic_missing_private_key(cmd_name: &str) -> ! {
@@ -706,18 +698,11 @@ impl<'a> AptosTestAdapter<'a> {
         _currency_type_name: TypeName,
     ) {
         let parameters = self
-            .fetch_transaction_parameters(
-                &treasury_compliance_account_address(),
-                None,
-                None,
-                None,
-                None,
-                None,
-            )
+            .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None, None)
             .unwrap();
 
         let txn = RawTransaction::new(
-            treasury_compliance_account_address(),
+            aptos_root_address(),
             parameters.sequence_number,
             aptos_transaction_builder::aptos_stdlib::encode_create_account_script_function(
                 account_addr,
@@ -765,11 +750,6 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         };
 
         let mut named_address_mapping = framework::aptos::named_addresses();
-
-        for (name, addr) in test_only_named_addresses() {
-            assert!(!named_address_mapping.contains_key(&name));
-            named_address_mapping.insert(name, addr);
-        }
 
         for (name, addr) in additional_named_address_mapping {
             if named_address_mapping.contains_key(&name) {

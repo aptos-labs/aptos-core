@@ -20,7 +20,6 @@ pub struct Layout {
     pub operators: Vec<String>,
     pub owners: Vec<String>,
     pub aptos_root: String,
-    pub treasury_compliance: String,
 }
 
 impl Layout {
@@ -90,7 +89,6 @@ mod tests {
             operators = [\"alice\", \"bob\"]\n\
             owners = [\"carol\"]\n\
             aptos_root = \"dave\"\n\
-            treasury_compliance = \"other_dave\"\n\
         ";
 
         let layout = Layout::parse(contents).unwrap();
@@ -100,6 +98,5 @@ mod tests {
         );
         assert_eq!(layout.owners, vec!["carol".to_string()]);
         assert_eq!(layout.aptos_root, "dave");
-        assert_eq!(layout.treasury_compliance, "other_dave");
     }
 }

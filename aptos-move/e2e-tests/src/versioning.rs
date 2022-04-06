@@ -13,30 +13,20 @@ pub const CURRENT_RELEASE_VERSIONS: std::ops::RangeInclusive<u64> =
 pub struct VersionedTestEnv {
     pub executor: FakeExecutor,
     pub dr_account: Account,
-    pub tc_account: Account,
-    pub dd_account: Account,
     pub dr_sequence_number: u64,
-    pub tc_sequence_number: u64,
-    pub dd_sequence_number: u64,
     pub version_number: u64,
 }
 
 impl VersionedTestEnv {
     // At each release, this function will need to be updated to handle the release logic
     pub fn new(version_number: u64) -> Option<Self> {
-        let (executor, dr_account, tc_account, dd_account) = utils::start_with_released_df();
+        let (executor, dr_account) = utils::start_with_released_df();
         let dr_sequence_number = 0;
-        let tc_sequence_number = 0;
-        let dd_sequence_number = 0;
 
         Some(Self {
             executor,
             dr_account,
-            tc_account,
-            dd_account,
             dr_sequence_number,
-            tc_sequence_number,
-            dd_sequence_number,
             version_number,
         })
     }
