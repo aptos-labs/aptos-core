@@ -3,7 +3,7 @@
 
 use crate::{
     common::{
-        types::{EncodingOptions, EncodingType, Error, KeyType, PromptOptions},
+        types::{EncodingOptions, EncodingType, Error, KeyInputOptions, KeyType, PromptOptions},
         utils::{append_file_extension, prompt_yes, to_common_result},
     },
     CliResult,
@@ -64,14 +64,10 @@ impl FromStr for KeyPairType {
 /// CLI tool for extracting full peer information for an upstream peer
 #[derive(Debug, Parser)]
 pub struct ExtractPeer {
-    /// Public key input file name.
-    #[clap(long, parse(from_os_str))]
-    key_file: PathBuf,
-    /// Key is `public` or `private`
-    #[clap(long)]
-    key_type: KeyPairType,
+    #[clap(flatten)]
+    key_input_options: KeyInputOptions,
     /// Peer config output file
-    #[clap(long)]
+    #[structopt(long, parse(from_os_str))]
     output_file: Option<PathBuf>,
     #[clap(flatten)]
     encoding_options: EncodingOptions,
@@ -87,16 +83,9 @@ impl ExtractPeer {
         }
 
         // Load key based on public or private
-        let public_key: x25519::PublicKey = match self.key_type {
-            KeyPairType::Public => {
-                load_key(self.key_file.as_path(), self.encoding_options.encoding)?
-            }
-            KeyPairType::Private => {
-                let private_key: x25519::PrivateKey =
-                    load_key(self.key_file.as_path(), self.encoding_options.encoding)?;
-                private_key.public_key()
-            }
-        };
+        let public_key = self
+            .key_input_options
+            .extract_public_key(self.encoding_options.encoding)?;
 
         let (peer_id, peer) = build_peer_from_public_key(public_key);
 
@@ -288,6 +277,14 @@ pub fn load_key<Key: ValidCryptoMaterial>(
         Error::UnableToReadFile(path.to_str().unwrap().to_string(), err.to_string())
     })?;
 
+    decode_key(data, encoding)
+}
+
+/// Decodes an encoded key given the known encoding
+pub fn decode_key<Key: ValidCryptoMaterial>(
+    data: Vec<u8>,
+    encoding: EncodingType,
+) -> Result<Key, Error> {
     match encoding {
         EncodingType::BCS => {
             bcs::from_bytes(&data).map_err(|err| Error::BCS("Key".to_string(), err))

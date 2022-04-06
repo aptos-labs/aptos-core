@@ -1,8 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::op::key::{decode_key, load_key};
+use aptos_crypto::x25519;
 use clap::Parser;
-use std::{fmt::Debug, str::FromStr};
+use std::{fmt::Debug, path::PathBuf, str::FromStr};
 use thiserror::Error;
 
 /// A common result to be returned to users
@@ -98,4 +100,78 @@ pub struct EncodingOptions {
     /// Encoding of data as `base64`, `bcs`, or `hex`
     #[clap(long, default_value = "hex")]
     pub encoding: EncodingType,
+}
+
+#[derive(Debug, Parser)]
+pub struct PrivateKeyInputOptions {
+    /// Private key input file name
+    #[clap(long, group = "key_input", parse(from_os_str))]
+    private_key_file: Option<PathBuf>,
+    /// Private key encoded in a type as shown in `encoding`
+    #[clap(long, group = "key_input")]
+    private_key: Option<String>,
+}
+
+impl PrivateKeyInputOptions {
+    pub fn extract_private_key(&self, encoding: EncodingType) -> Result<x25519::PrivateKey, Error> {
+        if let Some(ref file) = self.private_key_file {
+            load_key(file.as_path(), encoding)
+        } else if let Some(ref key) = self.private_key {
+            let key = key.as_bytes().to_vec();
+            decode_key(key, encoding)
+        } else {
+            Err(Error::CommandArgumentError(
+                "One of ['--private-key', '--private-key-file'] must be used".to_string(),
+            ))
+        }
+    }
+}
+
+#[derive(Debug, Parser)]
+pub struct PublicKeyInputOptions {
+    /// Public key input file name.
+    #[clap(long, group = "key_input", parse(from_os_str))]
+    public_key_file: Option<PathBuf>,
+    /// Public key encoded in a type as shown in `encoding`
+    #[clap(long, group = "key_input")]
+    public_key: Option<String>,
+}
+
+impl PublicKeyInputOptions {
+    pub fn extract_public_key(&self, encoding: EncodingType) -> Result<x25519::PublicKey, Error> {
+        if let Some(ref file) = self.public_key_file {
+            load_key(file.as_path(), encoding)
+        } else if let Some(ref key) = self.public_key {
+            let key = key.as_bytes().to_vec();
+            decode_key(key, encoding)
+        } else {
+            Err(Error::CommandArgumentError(
+                "One of ['--public-key', '--public-key-file'] must be used".to_string(),
+            ))
+        }
+    }
+}
+
+#[derive(Debug, Parser)]
+pub struct KeyInputOptions {
+    #[clap(flatten)]
+    private_key_options: PrivateKeyInputOptions,
+    #[clap(flatten)]
+    public_key_options: PublicKeyInputOptions,
+}
+
+impl KeyInputOptions {
+    pub fn extract_public_key(&self, encoding: EncodingType) -> Result<x25519::PublicKey, Error> {
+        let private_key_result = self.private_key_options.extract_private_key(encoding);
+        let public_key_result = self.public_key_options.extract_public_key(encoding);
+
+        if let Ok(private_key) = private_key_result {
+            Ok(private_key.public_key())
+        } else if let Ok(public_key) = public_key_result {
+            Ok(public_key)
+        } else {
+            // TODO: merge above errors better
+            Err(Error::CommandArgumentError("One of ['--private-key', '--private-key-file', '--public-key', '--public-key-file'] must be used".to_string()))
+        }
+    }
 }
