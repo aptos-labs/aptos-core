@@ -38,8 +38,8 @@ pub const PING_FAILURES_TOLERATED: u64 = 5;
 pub const CONNECTIVITY_CHECK_INTERVAL_MS: u64 = 5000;
 pub const MAX_CONCURRENT_NETWORK_REQS: usize = 100;
 pub const MAX_CONNECTION_DELAY_MS: u64 = 60_000; /* 1 minute */
-/// Max default fullnode outbound connections is now 1 to decrease load on network
-pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 1;
+// Max default fullnode outbound connections is now 2 to decrease load on network
+pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 2;
 pub const MAX_INBOUND_CONNECTIONS: usize = 100;
 pub const MAX_FRAME_SIZE: usize = 16 * 1024 * 1024; /* 16 MiB */
 pub const CONNECTION_BACKOFF_BASE: u64 = 2;
