@@ -230,6 +230,19 @@ module AptosFramework::TestCoin {
         borrow_global<CoinInfo>(@CoreResources).scaling_factor
     }
 
+    public fun zero(): Coin {
+        Coin {value: 0}
+    }
+
+    public fun merge(lhs: &mut Coin, rhs: Coin) {
+        let Coin { value } = rhs;
+        lhs.value = lhs.value + value;
+    }
+
+    public fun value(coin: &Coin): u64 {
+        coin.value
+    }
+
     #[test(account = @0x1)]
     #[expected_failure] // This test should abort
     fun mint_non_owner(account: signer) acquires Balance, MintCapability, CoinInfo {
