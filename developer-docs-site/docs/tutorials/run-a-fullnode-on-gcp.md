@@ -181,12 +181,16 @@ To check the logs of the pod, using the following commands.
 
   # Get logs of the pod
   $ kubectl logs <pod-name> -n aptos
+  # for example:
+  $ kubectl logs devnet0-aptos-fullnode-0 -n aptos
   ```
 
 
 When using GKE, the logs of the cluster and pod will automatically show up in the Google Cloud console.  From the console menu, choose `Kubernetes Engine`.  From the side menu, choose `Workloads`.  You will see all the pods from the cluster listed.  
 
-![GKE Workloads screenshot](../../static/img/tutorial-gcp-logging1.png "GKE Workloads screenshot")
+
+![GKE Workloads screenshot](../../static/img/tutorial-gcp-logging1.png "GKE Workloads screenshot"){ width=80% }
+
 
 The “devnet0-aptos-fullnode” is the pod that is running the aptos fullnode container. Click on the pod to view details.  You will see some metrics and other details about the pod.
 
