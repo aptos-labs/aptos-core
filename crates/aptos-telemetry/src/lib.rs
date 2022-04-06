@@ -18,7 +18,7 @@ use uuid::Uuid;
 
 pub const GA_MEASUREMENT_ID: &str = "GA_MEASUREMENT_ID";
 pub const GA_API_SECRET: &str = "GA_API_SECRET";
-pub const APTOS_TELEMETRY_OPTOUT: &str = "APTOS_TELEMETRY_OPTOUT";
+pub const APTOS_TELEMETRY_DISABLE: &str = "APTOS_TELEMETRY_DISABLE";
 
 #[derive(Debug, Serialize, Deserialize)]
 struct MetricsDump {
@@ -39,8 +39,8 @@ struct Ip {
     origin: String,
 }
 
-pub fn is_optout() -> bool {
-    env::var(APTOS_TELEMETRY_OPTOUT).is_ok()
+pub fn is_disable() -> bool {
+    env::var(APTOS_TELEMETRY_DISABLE).is_ok()
 }
 
 async fn get_ip_origin() -> String {
@@ -55,15 +55,15 @@ async fn get_ip_origin() -> String {
 }
 
 pub async fn send_data(event_name: String, user_id: String, event_params: HashMap<String, String>) {
-    if is_optout() {
-        debug!("Error sending data: optout of Aptos telemetry");
+    if is_disable() {
+        debug!("Error sending data: disabled Aptos telemetry");
         return;
     }
 
     // parse environment variables
-    let api_secret = env::var(GA_API_SECRET).unwrap_or(constants::APTOS_GA_API_SECRET.to_string());
+    let api_secret = env::var(GA_API_SECRET).unwrap_or_else(|_| constants::APTOS_GA_API_SECRET.to_string());
     let measurement_id =
-        env::var(GA_MEASUREMENT_ID).unwrap_or(constants::APTOS_GA_MEASUREMENT_ID.to_string());
+        env::var(GA_MEASUREMENT_ID).unwrap_or_else(|_| constants::APTOS_GA_MEASUREMENT_ID.to_string());
 
     // dump event params in a new hashmap with some default params to include
     let mut new_event_params: HashMap<String, String> = event_params.clone();
