@@ -189,48 +189,62 @@ To check the logs of the pod, using the following commands.
 When using GKE, the logs of the cluster and pod will automatically show up in the Google Cloud console.  From the console menu, choose `Kubernetes Engine`.  From the side menu, choose `Workloads`.  You will see all the pods from the cluster listed.  
 
 
-![GKE Workloads screenshot](../../static/img/tutorial-gcp-logging1.png "GKE Workloads screenshot"){ width=80% }
+![GKE Workloads screenshot](../../static/img/tutorial-gcp-logging1.png "GKE Workloads screenshot")
 
 
-The “devnet0-aptos-fullnode” is the pod that is running the aptos fullnode container. Click on the pod to view details.  You will see some metrics and other details about the pod.
+The `devnet0-aptos-fullnode` is the pod that is running the aptos fullnode container. Click on the pod to view details.  You will see some metrics and other details about the pod.
+
 
 ![GKE Workloads Pod screenshot](../../static/img/tutorial-gcp-logging2.png "GKE Workloads Pod screenshot")
 
-Click the “LOGS” tab to view the logs directly from the pod.  If there are errors in the pod, you will see them here.
+
+Click the `LOGS` tab to view the logs directly from the pod.  If there are errors in the pod, you will see them here.
+
 
 ![GKE Workloads Pod Logs screenshot](../../static/img/tutorial-gcp-logging3.png "GKE Workloads Pod Logs screenshot")
 
+
 Click the `open in new window` icon to view the logs in the Log Explorer.  This screen allows advanced searching in the logs.  
+
 
 ![GKE Workloads Pod Logs Explorer screenshot](../../static/img/tutorial-gcp-logging4.png "GKE Workloads Pod Logs Explorer screenshot")
 
 
+
 Other logging insights are available in the Logs Dashboard 
+
 
 ![GKE Workloads Pod Logs Dashboard screenshot](../../static/img/tutorial-gcp-logging5.png "GKE Workloads Pod Logs Dashboard screenshot")
 
 
+
 Additional [features](https://cloud.google.com/logging/docs) are available through [Cloud Logging](https://cloud.google.com/logging), including creating log-based metrics, logging sinks and log buckets. 
+
 
 
 ## Check Monitoring
 
 Google cloud captures many metrics from the cluster and makes them easily viewable in the console.  From the console menu, choose `Kubernetes Engine`.  Click on the cluster that aptos is deployed to.  Click on the `Operations` link at the top right.  Click on the `Metrics` sub-tab to view specific cluster metrics.
 
+
 ![GKE Monitoring metrics screenshot](../../static/img/tutorial-gcp-mon1.png "GKE Monitoring metrics screenshot")
+
 
 Click the `View in Cloud Monitoring` link at the top to view the built-in GKE [dashboard](https://cloud.google.com/stackdriver/docs/solutions/gke/observing) for the cluster.  
 
+
 ![GKE Monitoring dashboard screenshot](../../static/img/tutorial-gcp-mon2.png "GKE Monitoring dashboard screenshot")
 
+
 Google Cloud [Monitoring](https://cloud.google.com/monitoring) has many other features to easily monitor the cluster and pods.  You can configure [uptime checks](https://cloud.google.com/monitoring/uptime-checks/introduction) for the services and configure [alerts](https://cloud.google.com/monitoring/alerts/using-alerting-ui) for when the metrics reach a certain [threshold](https://cloud.google.com/stackdriver/docs/solutions/slo-monitoring/sli-metrics/overview).  
+
 
 
 ## Troubleshooting
 
 Common troubleshooting solutions.
 
-### Terraform “Connection Refused” Error Message
+### Terraform "Connection Refused" Error Message
 
 When running terraform, the command errors out with a connection refused error message.
 
