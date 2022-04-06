@@ -13,14 +13,6 @@ jobs:
     steps:
       - dev-setup
       - run: cargo x bench --no-run
-  crypto:
-    docker:
-      - image: cimg/base:stable
-    resource_class: medium
-    steps:
-      - dev-setup
-      - run: cargo nextest --nextest-profile ci --package aptos-crypto --features='u32' --no-default-features
-      - run: cargo nextest --nextest-profile ci --package aptos-crypto --features='u64' --no-default-features
   lint:
     docker:
       - image: cimg/base:2020.01
@@ -210,7 +202,6 @@ workflows:
         - equal: [ canary, << pipeline.git.branch >> ]
     jobs:
 #      - build-benchmarks
-      - crypto
       - e2e-test
       - lint
       - unit-test

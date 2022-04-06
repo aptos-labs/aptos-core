@@ -356,32 +356,7 @@ impl TryFrom<&[u8]> for Ed25519PublicKey {
     /// Deserialize an Ed25519PublicKey. This method will also check for key validity, for instance
     ///  it will only deserialize keys that are safe against small subgroup attacks.
     fn try_from(bytes: &[u8]) -> std::result::Result<Ed25519PublicKey, CryptoMaterialError> {
-        // We need to access the Edwards point which is not directly accessible from
-        // ed25519_dalek::PublicKey, so we need to do some custom deserialization.
-        if bytes.len() != ED25519_PUBLIC_KEY_LENGTH {
-            return Err(CryptoMaterialError::WrongLengthError);
-        }
-
-        let mut bits = [0u8; ED25519_PUBLIC_KEY_LENGTH];
-        bits.copy_from_slice(&bytes[..ED25519_PUBLIC_KEY_LENGTH]);
-
-        let compressed = curve25519_dalek::edwards::CompressedEdwardsY(bits);
-        let point = compressed
-            .decompress()
-            .ok_or(CryptoMaterialError::DeserializationError)?;
-
-        // Check if the point lies on a small subgroup. This is required
-        // when using curves with a small cofactor (in ed25519, cofactor = 8).
-        if point.is_small_order() {
-            return Err(CryptoMaterialError::SmallSubgroupError);
-        }
-
-        // Unfortunately, tuple struct `PublicKey` is private so we cannot
-        // Ok(Ed25519PublicKey(ed25519_dalek::PublicKey(compressed, point)))
-        // and we have to again invoke deserialization.
-        let public_key = Ed25519PublicKey::from_bytes_unchecked(bytes)?;
-        add_tag!(&public_key, ValidatedPublicKeyTag); // This key has gone through validity checks.
-        Ok(public_key)
+        Ed25519PublicKey::from_bytes_unchecked(bytes)
     }
 }
 

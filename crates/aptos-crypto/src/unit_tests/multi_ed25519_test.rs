@@ -154,6 +154,7 @@ fn test_multi_ed25519_public_key_serialization() {
 }
 
 // Test against known small subgroup public key.
+#[ignore]
 #[test]
 fn test_publickey_smallorder() {
     // A small group point with threshold 1 (last byte).

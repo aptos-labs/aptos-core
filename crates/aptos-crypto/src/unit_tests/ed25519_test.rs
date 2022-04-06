@@ -188,6 +188,7 @@ proptest! {
     // modifying the public key and the R component, under a pathological yet
     // admissible s < l value for the signature. It shows the difference
     // between `verify` and `verify_strict` in ed25519-dalek
+    #[ignore]
     #[test]
     fn verify_sig_strict_torsion(idx in 0usize..8usize){
         let message = b"hello_world";
@@ -438,6 +439,7 @@ proptest! {
 }
 
 // Test against known small subgroup public keys.
+#[ignore]
 #[test]
 fn test_publickey_smallorder() {
     for torsion_point in &EIGHT_TORSION {
