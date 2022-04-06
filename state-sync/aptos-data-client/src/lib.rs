@@ -380,4 +380,29 @@ impl AdvertisedData {
             None
         }
     }
+
+    /// Returns the lowest advertised version containing all account states
+    pub fn lowest_account_states_version(&self) -> Option<Version> {
+        get_lowest_version_from_range_set(&self.account_states)
+    }
+
+    /// Returns the lowest advertised transaction output version
+    pub fn lowest_transaction_output_version(&self) -> Option<Version> {
+        get_lowest_version_from_range_set(&self.transaction_outputs)
+    }
+
+    /// Returns the lowest advertised transaction version
+    pub fn lowest_transaction_version(&self) -> Option<Version> {
+        get_lowest_version_from_range_set(&self.transactions)
+    }
+}
+
+/// Returns the lowest version from the given set of data ranges
+fn get_lowest_version_from_range_set(
+    data_ranges: &[CompleteDataRange<Version>],
+) -> Option<Version> {
+    data_ranges
+        .iter()
+        .map(|data_range| data_range.lowest())
+        .min()
 }

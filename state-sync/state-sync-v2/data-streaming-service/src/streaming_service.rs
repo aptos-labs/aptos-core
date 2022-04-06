@@ -6,7 +6,6 @@ use crate::{
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
     metrics,
-    metrics::increment_counter,
     streaming_client::{
         StreamRequest, StreamRequestMessage, StreamingServiceListener, TerminateStreamRequest,
     },
@@ -128,7 +127,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
     ) -> Result<(), Error> {
         // Increment the stream termination counter
         let notification_feedback = &terminate_request.notification_feedback;
-        increment_counter(
+        metrics::increment_counter(
             &metrics::TERMINATE_DATA_STREAM,
             notification_feedback.get_label().into(),
         );
@@ -164,7 +163,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
         request_message: &StreamRequestMessage,
     ) -> Result<DataStreamListener, Error> {
         // Increment the stream creation counter
-        increment_counter(
+        metrics::increment_counter(
             &metrics::CREATE_DATA_STREAM,
             request_message.stream_request.get_label().into(),
         );
@@ -208,7 +207,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
     /// Refreshes the global data summary by communicating with the Aptos data client
     fn refresh_global_data_summary(&mut self) {
         if let Err(error) = self.fetch_global_data_summary() {
-            increment_counter(
+            metrics::increment_counter(
                 &metrics::GLOBAL_DATA_SUMMARY_ERROR,
                 error.get_label().into(),
             );
@@ -251,7 +250,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
                             .error(&error))
                     );
                 } else {
-                    increment_counter(
+                    metrics::increment_counter(
                         &metrics::CHECK_STREAM_PROGRESS_ERROR,
                         error.get_label().into(),
                     );

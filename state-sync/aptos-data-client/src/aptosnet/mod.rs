@@ -4,7 +4,7 @@
 use crate::{
     aptosnet::{
         logging::{LogEntry, LogEvent, LogSchema},
-        metrics::{increment_counter, start_timer},
+        metrics::{increment_counter, start_timer, DataType},
         state::{ErrorType, PeerStates},
     },
     AptosDataClient, Error, GlobalDataSummary, Response, ResponseCallback, ResponseContext,
@@ -553,7 +553,7 @@ impl DataSummaryPoller {
                 self.data_client.update_summary(peer, storage_summary);
                 self.data_client.update_global_summary_cache();
 
-                // Log the new global data summary
+                // Log the new global data summary and update the metrics
                 sample!(
                     SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_LOG_FREQ_SECS)),
                     debug!(
@@ -563,9 +563,63 @@ impl DataSummaryPoller {
                                 "Global data summary: {:?}",
                                 self.data_client.get_global_data_summary()
                             )))
-                    )
+                    );
+                    let global_data_summary = self.data_client.global_summary_cache.read().clone();
+                    update_advertised_data_metrics(global_data_summary);
                 );
             }
+        }
+    }
+}
+
+/// Updates the advertised data metrics using the given global
+/// data summary.
+fn update_advertised_data_metrics(global_data_summary: GlobalDataSummary) {
+    // Update the optimal chunk sizes
+    let optimal_chunk_sizes = &global_data_summary.optimal_chunk_sizes;
+    for data_type in DataType::get_all_types() {
+        let optimal_chunk_size = match data_type {
+            DataType::AccountStates => optimal_chunk_sizes.account_states_chunk_size,
+            DataType::LedgerInfos => optimal_chunk_sizes.epoch_chunk_size,
+            DataType::TransactionOutputs => optimal_chunk_sizes.transaction_output_chunk_size,
+            DataType::Transactions => optimal_chunk_sizes.transaction_chunk_size,
+        };
+        metrics::set_gauge(
+            &metrics::OPTIMAL_CHUNK_SIZES,
+            data_type.as_str().into(),
+            optimal_chunk_size,
+        );
+    }
+
+    // Update the highest advertised data
+    let advertised_data = &global_data_summary.advertised_data;
+    let highest_advertised_version = advertised_data
+        .highest_synced_ledger_info()
+        .map(|ledger_info| ledger_info.ledger_info().version());
+    if let Some(highest_advertised_version) = highest_advertised_version {
+        for data_type in DataType::get_all_types() {
+            metrics::set_gauge(
+                &metrics::HIGHEST_ADVERTISED_DATA,
+                data_type.as_str().into(),
+                highest_advertised_version,
+            );
+        }
+    }
+
+    // Update the lowest advertised data
+    for data_type in DataType::get_all_types() {
+        let lowest_advertised_version = match data_type {
+            DataType::AccountStates => advertised_data.lowest_account_states_version(),
+            DataType::LedgerInfos => Some(0), // All nodes contain all epoch ending ledger infos
+            DataType::TransactionOutputs => advertised_data.lowest_transaction_output_version(),
+            DataType::Transactions => advertised_data.lowest_transaction_version(),
+        };
+        if let Some(lowest_advertised_version) = lowest_advertised_version {
+            metrics::set_gauge(
+                &metrics::LOWEST_ADVERTISED_DATA,
+                data_type.as_str().into(),
+                lowest_advertised_version,
+            );
         }
     }
 }
