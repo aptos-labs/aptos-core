@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos::{common::types::EncodingType, op::key::load_key};
+use aptos::common::types::EncodingType;
 use aptos_crypto::ed25519;
 use aptos_logger::info;
 use aptos_sdk::types::{
@@ -67,8 +67,9 @@ async fn main() {
         args.maximum_amount,
     );
 
-    let key: ed25519::Ed25519PrivateKey =
-        load_key(Path::new(&args.mint_key_file_path), EncodingType::BCS).unwrap();
+    let key: ed25519::Ed25519PrivateKey = EncodingType::BCS
+        .load_key(Path::new(&args.mint_key_file_path))
+        .unwrap();
 
     let faucet_address: AccountAddress =
         args.mint_account_address.unwrap_or_else(aptos_root_address);

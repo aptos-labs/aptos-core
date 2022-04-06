@@ -3,7 +3,11 @@
 
 use crate::{CliResult, Error};
 use serde::Serialize;
-use std::path::{Path, PathBuf};
+use std::{
+    fs::File,
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 /// Prompts for confirmation until a yes or no is given explicitly
 /// TODO: Capture interrupts
@@ -70,6 +74,31 @@ impl<T> From<Result<T, Error>> for ResultWrapper<T> {
             Err(inner) => ResultWrapper::Error(inner.to_string()),
         }
     }
+}
+
+/// Checks if a file exists, being overridden by `--assume-yes`
+pub fn check_if_file_exists(file: &Path, assume_yes: bool) -> Result<(), Error> {
+    if file.exists()
+        && !assume_yes
+        && !prompt_yes(
+            format!(
+                "{:?} already exists, are you sure you want to overwrite it?",
+                file.as_os_str()
+            )
+            .as_str(),
+        )
+    {
+        Err(Error::AbortedError)
+    } else {
+        Ok(())
+    }
+}
+
+/// Write a `&[u8]` to a file
+pub fn write_to_file(key_file: &Path, name: &str, encoded: &[u8]) -> Result<(), Error> {
+    let mut file = File::create(key_file).map_err(|e| Error::IO(name.to_string(), e))?;
+    file.write_all(encoded)
+        .map_err(|e| Error::IO(name.to_string(), e))
 }
 
 /// Appends a file extension to a `Path` without overwriting the original extension.

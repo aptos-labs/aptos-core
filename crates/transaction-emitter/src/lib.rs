@@ -39,7 +39,7 @@ pub mod atomic_histogram;
 pub mod cluster;
 pub mod instance;
 
-use aptos::{common::types::EncodingType, op::key::load_key};
+use aptos::common::types::EncodingType;
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_sdk::{
     transaction_builder::aptos_stdlib,
@@ -378,7 +378,7 @@ impl<'t> TxnEmitter<'t> {
         index: usize,
     ) -> Result<LocalAccount> {
         let file = "vasp".to_owned() + index.to_string().as_str() + ".key";
-        let mint_key: Ed25519PrivateKey = load_key(Path::new(&file), EncodingType::BCS).unwrap();
+        let mint_key: Ed25519PrivateKey = EncodingType::BCS.load_key(Path::new(&file)).unwrap();
         let account_key = AccountKey::from_private_key(mint_key);
         let address = account_key.authentication_key().derived_address();
         let sequence_number = query_sequence_numbers(client, &[address])

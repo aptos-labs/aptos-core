@@ -5,7 +5,7 @@
 
 use crate::{instance::Instance, query_sequence_numbers};
 use anyhow::{format_err, Result};
-use aptos::{common::types::EncodingType, op::key::load_key};
+use aptos::common::types::EncodingType;
 use aptos_crypto::{
     ed25519,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -54,7 +54,8 @@ impl Cluster {
             dummy_key_pair()
         } else {
             KeyPair::from(
-                load_key::<ed25519::Ed25519PrivateKey>(Path::new(mint_file), EncodingType::BCS)
+                EncodingType::BCS
+                    .load_key::<ed25519::Ed25519PrivateKey>(Path::new(mint_file))
                     .unwrap(),
             )
         };

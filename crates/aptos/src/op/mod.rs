@@ -13,7 +13,7 @@ pub mod key;
 
 /// CLI tool for performing operational tasks
 ///
-#[derive(Debug, ArgEnum, Subcommand)]
+#[derive(ArgEnum, Debug, Subcommand)]
 pub enum OpTool {
     #[clap(subcommand)]
     Key(key::KeyTool),
