@@ -247,7 +247,7 @@ impl SigningKey for Ed25519PrivateKey {
 impl Uniform for Ed25519PrivateKey {
     fn generate<R>(rng: &mut R) -> Self
     where
-        R: ::rand::RngCore + ::rand::CryptoRng,
+        R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
     {
         Ed25519PrivateKey(ed25519_dalek::SecretKey::generate(rng))
     }

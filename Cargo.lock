@@ -292,9 +292,9 @@ dependencies = [
  "byteorder",
  "bytes",
  "criterion",
- "curve25519-dalek-fiat",
+ "curve25519-dalek",
  "digest 0.9.0",
- "ed25519-dalek-fiat",
+ "ed25519-dalek",
  "hex",
  "hkdf",
  "mirai-annotations",
@@ -314,7 +314,7 @@ dependencies = [
  "thiserror",
  "tiny-keccak",
  "trybuild",
- "x25519-dalek-fiat",
+ "x25519-dalek",
 ]
 
 [[package]]
@@ -2446,6 +2446,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "curve25519-dalek"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b9fdf9972b2bd6af2d913799d9ebc165ea4d2e65878e329d9c6b372c4491b61"
+dependencies = [
+ "byteorder",
+ "digest 0.9.0",
+ "rand_core 0.5.1",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
 name = "curve25519-dalek-fiat"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2750,6 +2763,20 @@ checksum = "eed12bbf7b5312f8da1c2722bc06d8c6b12c2d86a7fb35a194c7f3e6fc2bbe39"
 dependencies = [
  "serde 1.0.136",
  "signature",
+]
+
+[[package]]
+name = "ed25519-dalek"
+version = "1.0.1"
+source = "git+https://github.com/dalek-cryptography/ed25519-dalek?rev=44488e43b8d61fa8263b146f9a1beba5549f8b0e#44488e43b8d61fa8263b146f9a1beba5549f8b0e"
+dependencies = [
+ "curve25519-dalek",
+ "ed25519",
+ "rand 0.8.4",
+ "serde 1.0.136",
+ "serde_bytes",
+ "sha2",
+ "zeroize",
 ]
 
 [[package]]
@@ -9409,12 +9436,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "x25519-dalek-fiat"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f3519d56987103ef084eba6ddfc3be45b7eaee08f2d60bc8495cdca30362a32"
+name = "x25519-dalek"
+version = "2.0.0-pre.1"
+source = "git+https://github.com/dalek-cryptography/x25519-dalek?rev=3fc0108d7dee1c434158169f5a64b1f08e7bc12d#3fc0108d7dee1c434158169f5a64b1f08e7bc12d"
 dependencies = [
- "curve25519-dalek-fiat",
+ "curve25519-dalek",
  "rand_core 0.6.3",
  "zeroize",
 ]
@@ -9436,9 +9462,9 @@ dependencies = [
 
 [[package]]
 name = "zeroize"
-version = "1.5.3"
+version = "1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50344758e2f40e3a1fcfc8f6f91aa57b5f8ebd8d27919fe6451f15aaaf9ee608"
+checksum = "7eb5728b8afd3f280a869ce1d4c554ffaed35f45c231fc41bfbd0381bef50317"
 dependencies = [
  "zeroize_derive",
 ]

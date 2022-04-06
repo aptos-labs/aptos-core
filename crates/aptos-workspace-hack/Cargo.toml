@@ -55,7 +55,7 @@ tokio = { version = "1.17.0", features = ["bytes", "fs", "full", "io-std", "io-u
 tokio-util = { version = "0.6.9", features = ["codec", "compat", "futures-io", "io"] }
 tracing = { version = "0.1.32", features = ["attributes", "log", "std", "tracing-attributes"] }
 warp = { version = "0.3.2", features = ["multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
-zeroize = { version = "1.5.3", features = ["alloc", "zeroize_derive"] }
+zeroize = { version = "1.4.0", features = ["alloc", "zeroize_derive"] }
 
 [build-dependencies]
 Inflector = { version = "0.11.4", features = ["heavyweight", "lazy_static", "regex"] }
@@ -104,7 +104,7 @@ tokio = { version = "1.17.0", features = ["bytes", "fs", "full", "io-std", "io-u
 tokio-util = { version = "0.6.9", features = ["codec", "compat", "futures-io", "io"] }
 tracing = { version = "0.1.32", features = ["attributes", "log", "std", "tracing-attributes"] }
 warp = { version = "0.3.2", features = ["multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
-zeroize = { version = "1.5.3", features = ["alloc", "zeroize_derive"] }
+zeroize = { version = "1.4.0", features = ["alloc", "zeroize_derive"] }
 
 [target.x86_64-unknown-linux-gnu.dependencies]
 hashbrown = { version = "0.11.2", default-features = false, features = ["inline-more", "raw"] }
