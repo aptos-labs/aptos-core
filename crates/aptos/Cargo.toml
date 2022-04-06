@@ -2,7 +2,7 @@
 name = "aptos"
 version = "0.1.0"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
-description = "Aptos tool for management of nodes and interacting with blockchain"
+description = "Aptos tool for management of nodes and interacting with the blockchain"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"

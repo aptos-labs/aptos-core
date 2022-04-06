@@ -13,7 +13,7 @@ use clap::Parser;
 /// CLI tool for interacting with the Aptos blockchain and nodes
 ///
 #[derive(Parser)]
-#[clap(name = "aptos")]
+#[clap(name = "aptos", author, version, propagate_version = true)]
 pub enum Tool {
     #[clap(subcommand)]
     Move(move_tool::MoveTool),
