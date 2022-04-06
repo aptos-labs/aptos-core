@@ -98,6 +98,7 @@ impl GenerateKey {
     }
 }
 
+/// Extracts an upstream peer config from a key
 #[derive(Debug, StructOpt)]
 pub struct ExtractPeersFromKeys {
     #[structopt(long, parse(try_from_str = parse_public_keys_hex))]
@@ -144,6 +145,7 @@ impl ExtractPeersFromKeys {
     }
 }
 
+/// Extracts an upstream peer config from a file
 #[derive(Debug, StructOpt)]
 pub struct ExtractPeerFromFile {
     /// Location to read the key
@@ -169,6 +171,7 @@ impl ExtractPeerFromFile {
     }
 }
 
+/// Extracts an upstream peer config from storage
 #[derive(Debug, StructOpt)]
 pub struct ExtractPeerFromStorage {
     #[structopt(flatten)]
@@ -209,7 +212,7 @@ fn peer_from_public_key(public_key: x25519::PublicKey) -> (AccountAddress, Peer)
     public_keys.insert(public_key);
     (
         peer_id,
-        Peer::new(Vec::new(), public_keys, PeerRole::Downstream),
+        Peer::new(Vec::new(), public_keys, PeerRole::Upstream),
     )
 }
 

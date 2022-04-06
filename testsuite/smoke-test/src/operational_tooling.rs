@@ -609,7 +609,7 @@ async fn test_extract_peers_from_keys() {
 
         assert_eq!(1, keys.len());
         assert!(keys.contains(&key));
-        assert_eq!(PeerRole::Downstream, peer.role);
+        assert_eq!(PeerRole::Upstream, peer.role);
         assert!(peer.addresses.is_empty());
     }
 }

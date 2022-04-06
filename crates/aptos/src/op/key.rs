@@ -61,7 +61,7 @@ impl FromStr for KeyPairType {
     }
 }
 
-/// CLI tool for extracting full peer information from a given public key file
+/// CLI tool for extracting full peer information for an upstream peer
 #[derive(Debug, Parser)]
 pub struct ExtractPeer {
     /// Public key input file name.
@@ -317,5 +317,8 @@ fn build_peer_from_public_key(public_key: x25519::PublicKey) -> (AccountAddress,
     let peer_id = from_identity_public_key(public_key);
     let mut public_keys = HashSet::new();
     public_keys.insert(public_key);
-    (peer_id, Peer::new(Vec::new(), public_keys, PeerRole::Known))
+    (
+        peer_id,
+        Peer::new(Vec::new(), public_keys, PeerRole::Upstream),
+    )
 }
