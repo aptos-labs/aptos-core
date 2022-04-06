@@ -58,6 +58,7 @@ use crate::{
 use anyhow::{ensure, format_err, Result};
 use aptos_config::config::{RocksdbConfig, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_crypto::hash::{HashValue, SPARSE_MERKLE_PLACEHOLDER_HASH};
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress,
@@ -83,7 +84,15 @@ use aptos_types::{
 use itertools::zip_eq;
 use once_cell::sync::Lazy;
 use schemadb::{ColumnFamilyName, Options, DB, DEFAULT_CF_NAME};
-use std::{collections::HashMap, iter::Iterator, path::Path, sync::Arc, time::Instant};
+use std::{
+    collections::HashMap,
+    iter::Iterator,
+    path::Path,
+    sync::{mpsc, Arc},
+    thread,
+    thread::JoinHandle,
+    time::{Duration, Instant},
+};
 use storage_interface::{DbReader, DbWriter, Order, StartupInfo, StateSnapshotReceiver, TreeState};
 
 const MAX_LIMIT: u64 = 5000;
@@ -160,6 +169,53 @@ fn update_rocksdb_properties(db: &DB) -> Result<()> {
     Ok(())
 }
 
+#[derive(Debug)]
+struct RocksdbPropertyReporter {
+    sender: Mutex<mpsc::Sender<()>>,
+    join_handle: Option<JoinHandle<()>>,
+}
+
+impl RocksdbPropertyReporter {
+    fn new(db: Arc<DB>) -> Self {
+        let (send, recv) = mpsc::channel();
+        let join_handle = Some(thread::spawn(move || loop {
+            if let Err(e) = update_rocksdb_properties(&db) {
+                warn!(
+                    error = ?e,
+                    "Updating rocksdb property failed."
+                );
+            }
+            // report rocksdb properties each 10 seconds
+            #[cfg(not(test))]
+            const TIMEOUT_MS: u64 = 10000;
+            #[cfg(test)]
+            const TIMEOUT_MS: u64 = 10;
+
+            match recv.recv_timeout(Duration::from_millis(TIMEOUT_MS)) {
+                Ok(_) => break,
+                Err(mpsc::RecvTimeoutError::Timeout) => (),
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        }));
+        Self {
+            sender: Mutex::new(send),
+            join_handle,
+        }
+    }
+}
+
+impl Drop for RocksdbPropertyReporter {
+    fn drop(&mut self) {
+        // Notify the property reporting thread to exit
+        self.sender.lock().send(()).unwrap();
+        self.join_handle
+            .take()
+            .expect("Rocksdb property reporting thread must exist.")
+            .join()
+            .expect("Rocksdb property reporting thread should join peacefully.");
+    }
+}
+
 /// This holds a handle to the underlying DB responsible for physical storage and provides APIs for
 /// access to the core Aptos data structures.
 #[derive(Debug)]
@@ -171,6 +227,7 @@ pub struct AptosDB {
     event_store: Arc<EventStore>,
     system_store: Arc<SystemStore>,
     pruner: Option<Pruner>,
+    _rocksdb_property_reporter: RocksdbPropertyReporter,
 }
 
 impl AptosDB {
@@ -218,6 +275,7 @@ impl AptosDB {
                     event_store,
                 )),
             },
+            _rocksdb_property_reporter: RocksdbPropertyReporter::new(Arc::clone(&db)),
         }
     }
 

@@ -676,3 +676,22 @@ fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &TransactionIn
         .unwrap();
     db.db.write_schemas(cs.batch).unwrap();
 }
+
+#[test]
+fn test_rocksdb_properties_reporter() {
+    fn get_metric() -> i64 {
+        APTOS_STORAGE_ROCKSDB_PROPERTIES
+            .get_metric_with_label_values(&[
+                "transaction_info",
+                "aptos_rocksdb_is-file-deletions-enabled",
+            ])
+            .unwrap()
+            .get()
+    }
+
+    assert_eq!(get_metric(), 0);
+    let tmp_dir = TempPath::new();
+    let _db = AptosDB::new_for_test(&tmp_dir);
+    std::thread::sleep(Duration::from_secs(1));
+    assert_eq!(get_metric(), 1);
+}
