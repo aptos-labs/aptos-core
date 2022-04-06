@@ -512,7 +512,7 @@ impl FakeExecutor {
             let remote_view = RemoteStorage::new(&self.data_store);
             let mut session = vm.new_session(&remote_view, SessionId::void());
             session
-                .execute_function(
+                .execute_function_bypass_visibility(
                     &Self::module(module_name),
                     &Self::name(function_name),
                     type_params,
@@ -549,7 +549,7 @@ impl FakeExecutor {
         let remote_view = RemoteStorage::new(&self.data_store);
         let mut session = vm.new_session(&remote_view, SessionId::void());
         session
-            .execute_function(
+            .execute_function_bypass_visibility(
                 &Self::module(module_name),
                 &Self::name(function_name),
                 type_params,

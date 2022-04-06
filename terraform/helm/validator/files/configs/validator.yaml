@@ -80,7 +80,7 @@ full_node_networks:
   identity:
     type: "from_config"
     key: "b0f405a3e75516763c43a2ae1d70423699f34cd68fa9f8c6bb2d67aa87d0af69"
-    peer_id: "00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237"
+    peer_id: "0x00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237"
 
 {{- if .Values.exposeValidatorRestApi }}
 api:

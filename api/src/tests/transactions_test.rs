@@ -1041,9 +1041,7 @@ async fn test_transaction_vm_status(
         .expect_status_code(202)
         .post_bcs_txn("/transactions", body)
         .await;
-
     context.commit_mempool_txns(1).await;
-
     let resp = context
         .get(format!("/transactions/{}", txn.committed_hash().to_hex_literal()).as_str())
         .await;

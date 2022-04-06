@@ -113,7 +113,7 @@ mod tests {
 
         let account_address: AccountAddress = address.into();
         assert_eq!(
-            account_address.to_string(),
+            account_address.short_str_lossless().as_str(),
             AccountAddress::ONE.to_hex().as_str()
         );
 
@@ -127,7 +127,7 @@ mod tests {
 
         let account_address: AccountAddress = (&address).into();
         assert_eq!(
-            account_address.to_string(),
+            account_address.short_str_lossless().as_str(),
             AccountAddress::ONE.to_hex().as_str()
         );
 

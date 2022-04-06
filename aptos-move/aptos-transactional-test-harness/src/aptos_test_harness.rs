@@ -47,12 +47,14 @@ use move_core_types::{
     language_storage::{ModuleId, ResourceKey, TypeTag},
     move_resource::MoveStructType,
     transaction_argument::{convert_txn_args, TransactionArgument},
+    value::MoveTypeLayout,
 };
 use move_transactional_test_runner::{
     framework::{run_test_impl, CompiledState, MoveTestAdapter},
     tasks::{InitCommand, RawAddress, SyntaxChoice, TaskInput},
     vm_test_harness::view_resource_in_move_storage,
 };
+use move_vm_runtime::session::SerializedReturnValues;
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -989,7 +991,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         txn_args: Vec<TransactionArgument>,
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
-    ) -> Result<Option<String>> {
+    ) -> Result<(Option<String>, SerializedReturnValues)> {
         if !extra_args.admin_script {
             panic!(
                 "Transactions scripts are not currently allowed. \
@@ -1060,7 +1062,13 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             None
         };
 
-        Ok(output)
+        //TODO: replace this dummy value with actual txn return value
+        let a = SerializedReturnValues {
+            mutable_reference_outputs: vec![(0, vec![0], MoveTypeLayout::U8)],
+            return_values: vec![(vec![0], MoveTypeLayout::U8)],
+        };
+
+        Ok((output, a))
     }
 
     fn call_function(
@@ -1072,7 +1080,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         txn_args: Vec<TransactionArgument>,
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
-    ) -> Result<Option<String>> {
+    ) -> Result<(Option<String>, SerializedReturnValues)> {
         if extra_args.admin_script {
             panic!("Admin script functions are not supported.")
         }
@@ -1141,7 +1149,12 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             None
         };
 
-        Ok(output)
+        //TODO: replace this dummy value with actual txn return value
+        let a = SerializedReturnValues {
+            mutable_reference_outputs: vec![(0, vec![0], MoveTypeLayout::U8)],
+            return_values: vec![(vec![0], MoveTypeLayout::U8)],
+        };
+        Ok((output, a))
     }
 
     fn view_data(

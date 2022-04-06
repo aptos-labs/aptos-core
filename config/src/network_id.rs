@@ -299,10 +299,10 @@ mod test {
         let peer_id = PeerId::random();
         let context = NetworkContext::new(RoleType::Validator, NetworkId::Vfn, peer_id);
         let expected = format!(
-            "---\nrole: {}\nnetwork_id: {}\npeer_id: {:x}\n",
+            "---\nrole: {}\nnetwork_id: {}\npeer_id: \"{}\"\n",
             RoleType::Validator,
             VFN_NETWORK,
-            peer_id
+            peer_id.to_hex_literal()
         );
         assert_eq!(expected, serde_yaml::to_string(&context).unwrap());
     }

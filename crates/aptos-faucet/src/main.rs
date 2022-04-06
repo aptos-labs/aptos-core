@@ -211,10 +211,12 @@ mod tests {
         accounts: AccountStates,
     ) -> Result<impl Reply, Rejection> {
         let reader = accounts.read();
-        let account = AccountAddress::try_from(address)
-            .ok()
-            .and_then(|address| reader.get(&address));
-
+        let account = match AccountAddress::try_from(address.clone())
+            .or_else(|_e| AccountAddress::from_hex(address.clone()))
+        {
+            Ok(addr) => reader.get(&addr),
+            _ => None,
+        };
         if let Some(account) = account {
             let auth_vec: Vec<u8> = account.authentication_key.as_ref().into();
             let account_data = AccountData {
@@ -327,8 +329,7 @@ mod tests {
     async fn test_mint_auth_key() {
         let (accounts, service) = setup(None);
         let filter = routes(service);
-
-        let auth_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
+        let auth_key = "0x459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
         let amount = 13345;
         let resp = warp::test::request()
             .method("POST")
@@ -339,7 +340,7 @@ mod tests {
         assert_eq!(values.len(), 2);
         let reader = accounts.read();
         let addr = AccountAddress::try_from(
-            "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d".to_owned(),
+            "0x459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d".to_owned(),
         )
         .unwrap();
         let account = reader.get(&addr).expect("account should be created");
@@ -351,7 +352,7 @@ mod tests {
         let (accounts, service) = setup(None);
         let filter = routes(service);
 
-        let pub_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
+        let pub_key = "0x459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
         let amount = 13345;
         let resp = warp::test::request()
             .method("POST")
@@ -362,7 +363,7 @@ mod tests {
         assert_eq!(values.len(), 2);
         let reader = accounts.read();
         let addr = AccountAddress::try_from(
-            "9FF98E82355EB13098F3B1157AC018A725C62C0E0820F422000814CDBA407835".to_owned(),
+            "0x9FF98E82355EB13098F3B1157AC018A725C62C0E0820F422000814CDBA407835".to_owned(),
         )
         .unwrap();
         let account = reader.get(&addr).expect("account should be created");
@@ -374,7 +375,7 @@ mod tests {
         let (accounts, service) = setup(None);
         let filter = routes(service);
 
-        let address = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
+        let address = "0x459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
         let amount = 13345;
         let resp = warp::test::request()
             .method("POST")
@@ -386,7 +387,7 @@ mod tests {
         assert_eq!(values.len(), 2);
         let reader = accounts.read();
         let addr = AccountAddress::try_from(
-            "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d".to_owned(),
+            "0x459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d".to_owned(),
         )
         .unwrap();
         let account = reader.get(&addr).expect("account should be created");
@@ -410,7 +411,7 @@ mod tests {
         assert_eq!(values.len(), 2);
         let reader = accounts.read();
         let addr = AccountAddress::try_from(
-            "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d".to_owned(),
+            "0x459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d".to_owned(),
         )
         .unwrap();
         let account = reader.get(&addr).expect("account should be created");
@@ -422,7 +423,7 @@ mod tests {
         let (accounts, service) = setup(None);
         let filter = routes(service);
 
-        let auth_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
+        let auth_key = "0x459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
         let amount = 13345;
         let resp = warp::test::request()
             .method("POST")
@@ -442,7 +443,7 @@ mod tests {
 
         let reader = accounts.read();
         let addr = AccountAddress::try_from(
-            "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d".to_owned(),
+            "0x459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d".to_owned(),
         )
         .unwrap();
         let account = reader.get(&addr).expect("account should be created");
@@ -474,7 +475,10 @@ mod tests {
             .path(format!("/mint?auth_key={}&amount=1000000", auth_key).as_str())
             .reply(&filter)
             .await;
-        assert_eq!(resp.body(), "Invalid query string");
+        assert_eq!(
+            resp.body(),
+            "You must provide 'address' (preferred), 'pub_key', or 'auth_key'"
+        );
     }
 
     #[tokio::test]

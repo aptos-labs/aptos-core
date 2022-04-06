@@ -45,7 +45,7 @@ You can find the typescript project [here](https://github.com/aptos-labs/aptos-c
 
 ### Step 1.1) Download Aptos-core
 
-For the simplicity of this exercise, Aptos-core has a `move-examples` directory that makes it easy to build and test Move modules without downloading additional resources. Over time, we will expand this section to describe how to leverage [Move](https://github.com/diem/move/tree/main/language/documentation/tutorial) tools for development.
+For the simplicity of this exercise, Aptos-core has a `move-examples` directory that makes it easy to build and test Move modules without downloading additional resources. Over time, we will expand this section to describe how to leverage [Move](https://github.com/move-language/move/tree/main/language/documentation/tutorial) tools for development.
 
 For now, download and prepare Aptos-core:
 

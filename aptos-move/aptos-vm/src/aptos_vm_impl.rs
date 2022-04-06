@@ -27,7 +27,10 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use fail::fail_point;
-use move_binary_format::errors::{Location, VMResult};
+use move_binary_format::{
+    errors::{Location, VMResult},
+    CompiledModule,
+};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet as MoveChangeSet, Event as MoveEvent},
@@ -298,7 +301,7 @@ impl AptosVMImpl {
                 &chain_specific_info.script_prologue_name
             };
         session
-            .execute_function(
+            .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
                 prologue_function_name,
                 gas_currency,
@@ -329,7 +332,7 @@ impl AptosVMImpl {
         let chain_id = txn_data.chain_id();
         let mut gas_status = GasStatus::new_unmetered();
         session
-            .execute_function(
+            .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
                 &chain_specific_info.module_prologue_name,
                 gas_currency,
@@ -372,7 +375,7 @@ impl AptosVMImpl {
         let txn_max_gas_units = txn_data.max_gas_amount().get();
         let gas_remaining = gas_status.remaining_gas().get();
         session
-            .execute_function(
+            .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
                 &chain_specific_info.user_epilogue_name,
                 gas_currency,
@@ -407,7 +410,7 @@ impl AptosVMImpl {
         let txn_max_gas_units = txn_data.max_gas_amount().get();
         let gas_remaining = gas_status.remaining_gas().get();
         session
-            .execute_function(
+            .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
                 &chain_specific_info.user_epilogue_name,
                 gas_currency,
@@ -447,7 +450,7 @@ impl AptosVMImpl {
 
         let mut gas_status = GasStatus::new_unmetered();
         session
-            .execute_function(
+            .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
                 &chain_specific_info.writeset_prologue_name,
                 vec![],
@@ -477,7 +480,7 @@ impl AptosVMImpl {
         let mut gas_status = GasStatus::new_unmetered();
         let chain_specific_info = self.chain_info();
         session
-            .execute_function(
+            .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
                 &chain_specific_info.writeset_epilogue_name,
                 vec![],
@@ -511,7 +514,7 @@ impl AptosVMImpl {
         &self,
         module_id: &ModuleId,
         remote: &'r R,
-    ) -> VMResult<()> {
+    ) -> VMResult<Arc<CompiledModule>> {
         self.move_vm.load_module(module_id, remote)
     }
 }

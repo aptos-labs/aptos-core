@@ -7,7 +7,7 @@ use crate::{
 };
 use move_binary_format::errors::VMResult;
 use move_core_types::resolver::MoveResolver;
-use move_vm_runtime::{move_vm::MoveVM, native_functions::NativeContextExtensions};
+use move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions};
 use std::ops::Deref;
 
 pub struct MoveVmExt {
@@ -27,7 +27,7 @@ impl MoveVmExt {
         _session_id: SessionId,
     ) -> SessionExt<'r, '_, S> {
         // TODO: install table extension
-        let extensions = NativeContextExtensions::default();
+        let extensions = NativeContextExtensions::<'r>::default();
 
         SessionExt::new(self.inner.new_session_with_extensions(remote, extensions))
     }

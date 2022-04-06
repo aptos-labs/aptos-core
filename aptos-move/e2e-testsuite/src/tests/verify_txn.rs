@@ -664,8 +664,9 @@ fn verify_simple_payment() {
             .max_gas_amount(100_000)
             .gas_unit_price(1)
             .sign();
+        let output = executor.execute_transaction(txn);
         assert_eq!(
-            executor.execute_transaction(txn).status(),
+            output.status(),
             // StatusCode::TYPE_MISMATCH
             &TransactionStatus::Keep(KeptVMStatus::MiscellaneousError)
         );
