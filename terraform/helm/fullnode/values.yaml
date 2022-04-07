@@ -5,8 +5,8 @@ chain:
 
 aptos_chains:
   devnet:
-    id: 6
-    waypoint: 0:1c6b78c47afb4bb0a3ffea912aa24bd841fdf3aaf561a7f353fa76d86eb942bb
+    id: 8
+    waypoint: 0:3bc5eba286d5a9ac6fb84851a1715be00a8d16e2ef72a0a05995141184adb3b8
 
 fullnode_identity:
   # Set this to start fullnode from an existing key.
