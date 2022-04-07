@@ -87,7 +87,7 @@ export class RestClient {
     return {
       "sender": `0x${sender}`,
       "sequence_number": seqNum.toString(),
-      "max_gas_amount": "1000",
+      "max_gas_amount": "2000",
       "gas_unit_price": "1",
       "gas_currency_code": "XUS",
       // Unix timestamp, in seconds + 10 minutes
