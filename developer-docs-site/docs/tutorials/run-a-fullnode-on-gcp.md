@@ -12,9 +12,9 @@ This tutorial explains how to configure and deploy a public FullNode to connect 
 >
 
 ## Prerequisites
-You can run the commands in this guide to deploy your full node on Google Kubernetes Engine from any machine you want. From a [VM on GCP](https://cloud.google.com/compute), [Google Cloud Shell](https://cloud.google.com/shell), or even your personal computer.
+You can run the commands in this guide to deploy your full node on Google Kubernetes Engine from any machine you want. From a [VM on GCP](https://cloud.google.com/compute), [Google Cloud Shell](https://cloud.google.com/shell), or your personal computer.
 
-The following packages come pre-installed with Cloud Shell. Make sure to review the [documentation around ephermability](https://cloud.google.com/shell/docs/using-cloud-shell#choosing_ephemeral_mode) if you choose to use Cloud Shell. But if you are running the installation remotely from another machine, you need to install:
+The following packages come pre-installed with Cloud Shell. Make sure to review the [documentation around ephermability](https://cloud.google.com/shell/docs/using-cloud-shell#choosing_ephemeral_mode) if you choose to use Cloud Shell. But if you are running the installation from your laptop or another machine, you need to install:
 * Terraform 1.1.7: https://www.terraform.io/downloads.html
 * Kubernetes cli: https://kubernetes.io/docs/tasks/tools/
 * Google Cloud cli: https://cloud.google.com/sdk/docs/install-sdk
@@ -23,29 +23,33 @@ Once you have installed the gcloud CLI, log into GCP using gcloud (https://cloud
 ```
 $ gcloud auth login --update-adc
 ```
-## GCP Setup
-# Sign Up for the 90 Day Free Trial
+
+If you already have a GCP account setup, jump right into [Getting Started](#getting-started), if you don't, follow the sections below to create and configure your GCP account.
+
+### GCP Setup
+
+#### Sign Up for the 90 Day Free Trial
 Google Cloud offers a [90 day $300 free trial for every new user](https://cloud.google.com/free/docs/gcp-free-tier/#free-trial). These $300 are given as credits to your account and you can use them to get a sense of Google Cloud products. Be aware that you will need to add payment information when signing up for the free trial. This is for identity verification purposes and [will not incur charges until you upgrade to a paid account and run out of credits](https://cloud.google.com/free/docs/gcp-free-tier/#:~:text=Don%27t%20worry%2C%20setting,90%2Dday%20period).). Some GCP feature such as GPUs and Windows servers are not available in the free trial. 
 
 [Sign up for the $300 in credits here.](https://cloud.google.com/free)
 
-# Create a new GCP Project
+#### Create a new GCP Project
 You will also need to create a new project on the GCP Console or using the glcoud command from the Google Cloud CLI. Before you do that, however, it may be helpful to familiarize yourself with the [resource hierarchy on GCP](https://cloud.google.com/resource-manager/docs/cloud-platform-resource-hierarchy).
 
 [Follow these instructions to setup a new project.](https://cloud.google.com/resource-manager/docs/creating-managing-projects#creating_a_project)
 
-# Enable billing / Upgrade your Account
+#### Enable billing / Upgrade your Account
 You will still be able to use the free trial credits, but enabling billing allows you to have full access to all the features of GCP and not experience any interruption to your nodes.
 
 [Upgrade your account by following the steps outlined here.](https://cloud.google.com/free/docs/gcp-free-tier#how-to-upgrade)
 
-# Further GCP Resources
+#### Further GCP Resources
 This should be enough to get your GCP setup ready to start deploying your fullnod. But if you are brand new to GCP, you may want to check out some of our [quickstart guides](https://cloud.google.com/docs/get-started/quickstarts) and [Google Cloud Skills Boost](https://www.cloudskillsboost.google/catalog).
 
 
 ## Getting started
 
-You can deploy a public FullNode on GCP by using the Aptos fullnode Terraform module.
+You can deploy a public FullNode on GCP by using the Aptos fullnode Terraform module, this guide assumes you already have GCP account setup, and have created a new project for deploying Aptos fullnode. If you don't, check out the instructions above for [GCP Setup](#gcp-setup).
 
 1. Create a working directory for your configuration.
 
