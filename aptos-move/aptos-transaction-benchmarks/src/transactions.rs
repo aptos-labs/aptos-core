@@ -7,7 +7,9 @@ use aptos_types::{
     on_chain_config::{OnChainConfig, ValidatorSet},
     transaction::Transaction,
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM, VMExecutor};
+use aptos_vm::{
+    data_cache::AsMoveResolver, parallel_executor::ParallelAptosVM, AptosVM, VMExecutor,
+};
 use criterion::{measurement::Measurement, BatchSize, Bencher};
 use language_e2e_tests::{
     account_universe::{log_balance_strategy, AUTransactionGen, AccountUniverseGen},
@@ -80,13 +82,13 @@ where
     pub fn bench_parallel<M: Measurement>(&self, b: &mut Bencher<M>) {
         b.iter_batched(
             || {
-                TransactionBenchState::with_size_parallel(
+                TransactionBenchState::with_size(
                     &self.strategy,
                     self.num_accounts,
                     self.num_transactions,
                 )
             },
-            |state| state.execute(),
+            |state| state.execute_parallel(),
             // The input here is the entire list of signed transactions, so it's pretty large.
             BatchSize::LargeInput,
         )
@@ -115,11 +117,30 @@ impl TransactionBenchState {
         S: Strategy,
         S::Value: AUTransactionGen,
     {
-        Self::with_universe(
+        let mut state = Self::with_universe(
             strategy,
             universe_strategy(num_accounts, num_transactions),
             num_transactions,
-        )
+        );
+
+        // Insert a blockmetadata transaction at the beginning to better simulate the real life traffic.
+        let validator_set =
+            ValidatorSet::fetch_config(&state.executor.get_state_view().as_move_resolver())
+                .expect("Unable to retrieve the validator set from storage");
+
+        let new_block = BlockMetadata::new(
+            HashValue::zero(),
+            0,
+            1,
+            vec![],
+            *validator_set.payload()[0].account_address(),
+        );
+
+        state
+            .transactions
+            .insert(0, Transaction::BlockMetadata(new_block));
+
+        state
     }
 
     /// Creates a new benchmark state with the given account universe strategy and number of
@@ -168,36 +189,12 @@ impl TransactionBenchState {
             .expect("VM should not fail to start");
     }
 
-    fn with_size_parallel<S>(strategy: S, num_accounts: usize, num_transactions: usize) -> Self
-    where
-        S: Strategy,
-        S::Value: AUTransactionGen,
-    {
-        let mut state = Self::with_universe(
-            strategy,
-            universe_strategy(num_accounts, num_transactions),
-            num_transactions,
-        );
-        state.executor.enable_parallel_execution();
-
-        // Insert a blockmetadata transaction at the beginning to better simulate the real life traffic.
-        let validator_set =
-            ValidatorSet::fetch_config(&state.executor.get_state_view().as_move_resolver())
-                .expect("Unable to retrieve the validator set from storage");
-
-        let new_block = BlockMetadata::new(
-            HashValue::zero(),
-            0,
-            1,
-            vec![],
-            *validator_set.payload()[0].account_address(),
-        );
-
-        state
-            .transactions
-            .insert(0, Transaction::BlockMetadata(new_block));
-
-        state
+    /// Executes this state in a single block via parallel execution.
+    fn execute_parallel(self) {
+        // The output is ignored here since we're just testing transaction performance, not trying
+        // to assert correctness.
+        ParallelAptosVM::execute_block(self.transactions, self.executor.get_state_view())
+            .expect("VM should not fail to start");
     }
 }
 

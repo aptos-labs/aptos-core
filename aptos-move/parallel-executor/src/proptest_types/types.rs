@@ -242,11 +242,7 @@ where
                 // Reads
                 let mut reads_result = vec![];
                 for k in reads.iter() {
-                    reads_result.push(match view.read(k) {
-                        Ok(Some(v)) => Some((*v).clone()),
-                        Ok(None) => None,
-                        Err(_) => return ExecutionStatus::Abort(0),
-                    })
+                    reads_result.push(view.read(k).map(|v| (*v).clone()));
                 }
                 ExecutionStatus::Success(Output(actual_writes.clone(), reads_result))
             }

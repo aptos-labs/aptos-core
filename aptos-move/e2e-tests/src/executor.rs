@@ -23,9 +23,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_config::{AccountResource, BalanceResource, TransferEventsResource, CORE_CODE_ADDRESS},
     block_metadata::{new_block_event_key, BlockMetadata, NewBlockEvent},
-    on_chain_config::{
-        OnChainConfig, ParallelExecutionConfig, VMPublishingOption, ValidatorSet, Version,
-    },
+    on_chain_config::{OnChainConfig, VMPublishingOption, ValidatorSet, Version},
     state_store::state_key::StateKey,
     transaction::{
         ChangeSet, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
@@ -39,9 +37,6 @@ use aptos_vm::{
     move_vm_ext::{MoveVmExt, SessionId},
     parallel_executor::ParallelAptosVM,
     AptosVM, VMExecutor, VMValidator,
-};
-use aptos_writeset_generator::{
-    encode_disable_parallel_execution, encode_enable_parallel_execution_with_config,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -486,40 +481,6 @@ impl FakeExecutor {
         assert_eq!(event.key(), &new_block_event_key());
         assert!(bcs::from_bytes::<NewBlockEvent>(event.event_data()).is_ok());
         self.apply_write_set(output.write_set());
-    }
-
-    pub fn enable_parallel_execution(&mut self) {
-        let aptos_root = Account::new_aptos_root();
-        let seq_num = self
-            .read_account_resource_at_address(aptos_root.address())
-            .unwrap()
-            .sequence_number();
-
-        let txn = aptos_root
-            .transaction()
-            .write_set(encode_enable_parallel_execution_with_config())
-            .sequence_number(seq_num)
-            .sign();
-        self.execute_and_apply(txn);
-        assert!(
-            ParallelExecutionConfig::fetch_config(&self.data_store.as_move_resolver()).is_some()
-        );
-    }
-
-    pub fn disable_parallel_execution(&mut self) {
-        if ParallelExecutionConfig::fetch_config(&self.data_store.as_move_resolver()).is_some() {
-            let aptos_root = Account::new_aptos_root();
-            let txn = aptos_root
-                .transaction()
-                .write_set(encode_disable_parallel_execution())
-                .sequence_number(
-                    self.read_account_resource_at_address(aptos_root.address())
-                        .unwrap()
-                        .sequence_number(),
-                )
-                .sign();
-            self.execute_and_apply(txn);
-        }
     }
 
     fn module(name: &str) -> ModuleId {

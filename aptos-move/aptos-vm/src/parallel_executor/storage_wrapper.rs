@@ -32,12 +32,11 @@ impl<'a, S: StateView> StateView for VersionedView<'a, S> {
     // Get some data either through the cache or the `StateView` on a cache miss.
     fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
         match self.hashmap_view.read(state_key) {
-            Ok(Some(v)) => Ok(match v.as_ref() {
+            Some(v) => Ok(match v.as_ref() {
                 WriteOp::Value(w) => Some(w.clone()),
                 WriteOp::Deletion => None,
             }),
-            Ok(None) => self.base_view.get_state_value(state_key),
-            Err(err) => Err(err),
+            None => self.base_view.get_state_value(state_key),
         }
     }
 

@@ -8,7 +8,7 @@ mod vm_wrapper;
 use crate::{
     adapter_common::{preprocess_transaction, PreprocessedTransaction},
     aptos_vm::AptosVM,
-    parallel_executor::vm_wrapper::DiemVMWrapper,
+    parallel_executor::vm_wrapper::AptosVMWrapper,
 };
 use aptos_parallel_executor::{
     errors::Error,
@@ -30,9 +30,9 @@ impl PTransaction for PreprocessedTransaction {
 }
 
 // Wrapper to avoid orphan rule
-pub(crate) struct DiemTransactionOutput(TransactionOutput);
+pub(crate) struct AptosTransactionOutput(TransactionOutput);
 
-impl DiemTransactionOutput {
+impl AptosTransactionOutput {
     pub fn new(output: TransactionOutput) -> Self {
         Self(output)
     }
@@ -41,7 +41,7 @@ impl DiemTransactionOutput {
     }
 }
 
-impl PTransactionOutput for DiemTransactionOutput {
+impl PTransactionOutput for AptosTransactionOutput {
     type T = PreprocessedTransaction;
 
     fn get_writes(&self) -> Vec<(StateKey, WriteOp)> {
@@ -74,13 +74,13 @@ impl ParallelAptosVM {
             .map(|txn| preprocess_transaction::<AptosVM>(txn.clone()))
             .collect();
 
-        match ParallelTransactionExecutor::<PreprocessedTransaction, DiemVMWrapper<S>>::new()
+        match ParallelTransactionExecutor::<PreprocessedTransaction, AptosVMWrapper<S>>::new()
             .execute_transactions_parallel(state_view, signature_verified_block)
         {
             Ok(results) => Ok((
                 results
                     .into_iter()
-                    .map(DiemTransactionOutput::into)
+                    .map(AptosTransactionOutput::into)
                     .collect(),
                 None,
             )),

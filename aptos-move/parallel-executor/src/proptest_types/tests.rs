@@ -73,7 +73,6 @@ proptest! {
         prop_assert!(run_transactions(universe, transaction_gen, abort_transactions, skip_rest_transactions));
     }
 
-
     #[test]
     fn mixed_transactions(
         universe in vec(any::<[u8; 32]>(), 100),
