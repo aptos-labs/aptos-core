@@ -26,7 +26,7 @@ services:
   validator:
     # Note this image currently does not support this, will update to the appropriate minimum
     # version shortly
-    image: "aptoslab/validator:${IMAGE_TAG:-devnet}"
+    image: "${VALIDATOR_IMAGE_REPO:-aptoslab/validator}:${IMAGE_TAG:-devnet}"
     networks:
       shared:
     volumes:
@@ -43,7 +43,7 @@ services:
       - 9101
 
   faucet:
-    image: "aptoslab/faucet:${IMAGE_TAG:-devnet}"
+    image: "${FAUCET_IMAGE_REPO:-aptoslab/faucet}:${IMAGE_TAG:-devnet}"
     depends_on:
       - validator
     networks:
