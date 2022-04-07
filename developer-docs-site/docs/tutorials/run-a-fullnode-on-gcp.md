@@ -19,37 +19,6 @@ The following packages come pre-installed with Cloud Shell. Make sure to review 
 * Kubernetes cli: https://kubernetes.io/docs/tasks/tools/
 * Google Cloud cli: https://cloud.google.com/sdk/docs/install-sdk
 
-For a Debian distribution, you can run the following .sh file:
-```
-#!/bin/bash
-
-# Sudo update
-sudo apt-get update && sudo apt-get install -y gnupg software-properties-common curl
-
-# Install Terraform 1.1.7
-curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
-sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
-sudo apt update
-sudo apt install terraform
-
-# Install Docker
-sudo apt-get install ca-certificates curl gnupg lsb-release
-curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian \ $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update
-sudo apt-get install docker-ce docker-ce-cli containerd.io
-
-# Install Kubernetes CLI
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-
-# Install GCP CLI
-sudo apt-get install apt-transport-https ca-certificates gnupg
-echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
-sudo apt-get install google-cloud-cli
-```
-
 Once you have installed the gcloud CLI, log into GCP using gcloud (https://cloud.google.com/sdk/gcloud/reference/auth/login)
 ```
 $ gcloud auth login --update-adc
