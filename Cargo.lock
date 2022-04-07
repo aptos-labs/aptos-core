@@ -1138,6 +1138,7 @@ dependencies = [
  "move-bytecode-utils",
  "move-core-types",
  "move-stdlib",
+ "move-table-extension",
  "move-vm-runtime",
  "move-vm-types",
  "mvhashmap",
