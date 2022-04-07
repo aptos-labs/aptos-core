@@ -402,7 +402,7 @@ pub fn process_write_set(
             }
             // For now, we only support write set with access path, this needs to be updated once
             // we support table items
-            StateKey::Raw(_) => process_state_key_write_op(
+            StateKey::Raw(_) | StateKey::TableItem { .. } => process_state_key_write_op(
                 transaction,
                 state_cache,
                 &mut updated_keys,

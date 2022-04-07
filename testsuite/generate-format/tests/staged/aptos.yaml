@@ -136,6 +136,11 @@ StateKey:
         NEWTYPE:
           TYPENAME: AccessPath
     2:
+      TableItem:
+        STRUCT:
+          - handle: U128
+          - key: BYTES
+    3:
       Raw:
         NEWTYPE: BYTES
 StructTag:

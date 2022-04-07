@@ -11,6 +11,7 @@ use move_core_types::account_address::AccountAddress;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
+use std::convert::TryInto;
 use thiserror::Error;
 
 #[derive(
@@ -20,6 +21,11 @@ use thiserror::Error;
 pub enum StateKey {
     AccountAddressKey(AccountAddress),
     AccessPath(AccessPath),
+    TableItem {
+        handle: u128,
+        #[serde(with = "serde_bytes")]
+        key: Vec<u8>,
+    },
     // Only used for testing
     #[serde(with = "serde_bytes")]
     Raw(Vec<u8>),
@@ -30,6 +36,7 @@ pub enum StateKey {
 pub enum StateKeyTag {
     AccountAddress,
     AccessPath,
+    TableItem,
     Raw = 255,
 }
 
@@ -44,6 +51,11 @@ impl StateKey {
             }
             StateKey::AccessPath(access_path) => {
                 (StateKeyTag::AccessPath, bcs::to_bytes(access_path)?)
+            }
+            StateKey::TableItem { handle, key } => {
+                let mut bytes = handle.to_be_bytes().to_vec();
+                bytes.extend(key);
+                (StateKeyTag::TableItem, bytes)
             }
             StateKey::Raw(raw_bytes) => (StateKeyTag::Raw, raw_bytes.to_vec()),
         };
@@ -65,8 +77,22 @@ impl StateKey {
                 Ok(StateKey::AccountAddressKey(bcs::from_bytes(&val[1..])?))
             }
             StateKeyTag::AccessPath => Ok(StateKey::AccessPath(bcs::from_bytes(&val[1..])?)),
+            StateKeyTag::TableItem => {
+                const HANDLE_SIZE: usize = std::mem::size_of::<u128>();
+                let handle = u128::from_be_bytes(
+                    val[1..1 + HANDLE_SIZE]
+                        .try_into()
+                        .expect("Bytes too short."),
+                );
+                let key = val[1 + HANDLE_SIZE..].to_vec();
+                Ok(StateKey::table_item(handle, key))
+            }
             StateKeyTag::Raw => Ok(StateKey::Raw(val[1..].to_vec())),
         }
+    }
+
+    pub fn table_item(handle: u128, key: Vec<u8>) -> Self {
+        StateKey::TableItem { handle, key }
     }
 }
 

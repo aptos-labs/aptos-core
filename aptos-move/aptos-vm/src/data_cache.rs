@@ -19,7 +19,7 @@ use fail::fail_point;
 use move_binary_format::errors::*;
 use move_core_types::{
     account_address::AccountAddress,
-    gas_schedule::{GasCarrier, InternalGasUnits},
+    gas_schedule::{GasAlgebra, GasCarrier, InternalGasUnits},
     language_storage::{ModuleId, StructTag},
     resolver::{ModuleResolver, ResourceResolver},
 };
@@ -155,10 +155,10 @@ impl<'a, S: StateView> ResourceResolver for RemoteStorage<'a, S> {
 impl<'a, S: StateView> TableResolver for RemoteStorage<'a, S> {
     fn resolve_table_entry(
         &self,
-        _handle: &TableHandle,
-        _key: &[u8],
+        handle: &TableHandle,
+        key: &[u8],
     ) -> Result<Option<Vec<u8>>, Error> {
-        todo!()
+        self.get_state_value(&StateKey::table_item(handle.0, key.to_vec()))
     }
 
     fn operation_cost(
@@ -167,7 +167,7 @@ impl<'a, S: StateView> TableResolver for RemoteStorage<'a, S> {
         _key_size: usize,
         _val_size: usize,
     ) -> InternalGasUnits<GasCarrier> {
-        todo!()
+        InternalGasUnits::new(1)
     }
 }
 

@@ -6,6 +6,7 @@ use crate::{
     natives::aptos_natives,
 };
 use move_binary_format::errors::VMResult;
+use move_table_extension::NativeTableContext;
 use move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions};
 use std::ops::Deref;
 
@@ -23,10 +24,10 @@ impl MoveVmExt {
     pub fn new_session<'r, S: MoveResolverExt>(
         &self,
         remote: &'r S,
-        _session_id: SessionId,
+        session_id: SessionId,
     ) -> SessionExt<'r, '_, S> {
-        // TODO: install table extension
-        let extensions = NativeContextExtensions::<'r>::default();
+        let mut extensions = NativeContextExtensions::default();
+        extensions.add(NativeTableContext::new(session_id.as_uuid(), remote));
 
         SessionExt::new(self.inner.new_session_with_extensions(remote, extensions))
     }

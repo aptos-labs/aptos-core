@@ -40,6 +40,7 @@ use move_core_types::{
     resolver::ResourceResolver,
     value::{serialize_values, MoveValue},
 };
+use move_table_extension::TableChangeSet;
 use move_vm_runtime::{logging::expect_no_verification_errors, session::Session};
 use move_vm_types::gas_schedule::{calculate_intrinsic_gas, GasStatus};
 use std::{convert::TryFrom, sync::Arc};
@@ -549,17 +550,28 @@ pub fn convert_changeset_and_events(
     changeset: MoveChangeSet,
     events: Vec<MoveEvent>,
 ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
-    convert_changeset_and_events_cached(&mut (), changeset, events)
+    let mut out_write_set = WriteSetMut::new(vec![]);
+    let mut out_events = Vec::new();
+    convert_changeset_and_events_cached(
+        &mut (),
+        changeset,
+        events,
+        &mut out_write_set,
+        &mut out_events,
+    )?;
+    let ws = out_write_set
+        .freeze()
+        .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR))?;
+    Ok((ws, out_events))
 }
 
 pub fn convert_changeset_and_events_cached<C: AccessPathCache>(
     ap_cache: &mut C,
     changeset: MoveChangeSet,
     events: Vec<MoveEvent>,
-) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
-    // TODO: Cache access path computations if necessary.
-    let mut ops = vec![];
-
+    out_write_set: &mut WriteSetMut,
+    out_events: &mut Vec<ContractEvent>,
+) -> Result<(), VMStatus> {
     for (addr, account_changeset) in changeset.into_inner() {
         let (modules, resources) = account_changeset.into_inner();
         for (struct_tag, blob_opt) in resources {
@@ -568,7 +580,7 @@ pub fn convert_changeset_and_events_cached<C: AccessPathCache>(
                 None => WriteOp::Deletion,
                 Some(blob) => WriteOp::Value(blob),
             };
-            ops.push((StateKey::AccessPath(ap), op))
+            out_write_set.push((StateKey::AccessPath(ap), op))
         }
 
         for (name, blob_opt) in modules {
@@ -578,13 +590,9 @@ pub fn convert_changeset_and_events_cached<C: AccessPathCache>(
                 Some(blob) => WriteOp::Value(blob),
             };
 
-            ops.push((StateKey::AccessPath(ap), op))
+            out_write_set.push((StateKey::AccessPath(ap), op))
         }
     }
-
-    let ws = WriteSetMut::new(ops)
-        .freeze()
-        .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR))?;
 
     let events = events
         .into_iter()
@@ -595,7 +603,26 @@ pub fn convert_changeset_and_events_cached<C: AccessPathCache>(
         })
         .collect::<Result<Vec<_>, VMStatus>>()?;
 
-    Ok((ws, events))
+    out_events.extend(events.into_iter());
+    Ok(())
+}
+
+pub fn convert_table_changeset(
+    table_changeset: TableChangeSet,
+    out_write_set: &mut WriteSetMut,
+) -> Result<(), VMStatus> {
+    for (handle, change) in table_changeset.changes {
+        for (key, value_opt) in change.entries {
+            let state_key = StateKey::table_item(handle.0, key);
+            if let Some(bytes) = value_opt {
+                out_write_set.push((state_key, WriteOp::Value(bytes)))
+            } else {
+                out_write_set.push((state_key, WriteOp::Deletion))
+            }
+        }
+    }
+
+    Ok(())
 }
 
 pub(crate) fn charge_global_write_gas_usage<R: MoveResolverExt>(
