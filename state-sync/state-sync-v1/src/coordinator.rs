@@ -1504,7 +1504,7 @@ impl<T: ExecutorProxyTrait, M: MempoolNotificationSender> StateSyncCoordinator<T
     /// Returns true if consensus is currently executing and state sync should
     /// therefore not write to storage. Reads are still permitted (e.g., to
     /// handle chunk requests).
-    fn is_consensus_executing(&mut self) -> bool {
+    fn is_consensus_executing(&self) -> bool {
         self.is_initialized() && self.role == RoleType::Validator && self.sync_request.is_none()
     }
 
