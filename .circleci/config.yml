@@ -185,7 +185,7 @@ jobs:
       - aws-setup
       - aws-ecr-setup
       - local-deploy-setup
-      - run: echo "export IMAGE_TAG=dev_$(git rev-parse --short=8 HEAD)" >> $BASH_ENV
+      - run: echo "export IMAGE_TAG=main" >> $BASH_ENV
       # since we're running with `--build-all`, assume that if it passes, we have all images required for Forge
       - run: aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG
       - run:
@@ -237,20 +237,20 @@ workflows:
           - equal: [canary, << pipeline.git.branch >>]
     jobs:
       #      - build-benchmarks
-      - e2e-test
-      - lint
-      - unit-test
-      - sdk-typescript-test
-      - docker-build-push:
-          context: aws-dev
+      # - e2e-test
+      # - lint
+      # - unit-test
+      # - sdk-typescript-test
+      # - docker-build-push:
+      #     context: aws-dev
       - docker-compose-test:
           context: aws-dev
-          requires:
-            - docker-build-push
-      - forge-k8s-test:
-          context: aws-dev
-          requires:
-            - docker-build-push
+      #     requires:
+      #       - docker-build-push
+      # - forge-k8s-test:
+      #     context: aws-dev
+      #     requires:
+      #       - docker-build-push
   ### on devnet branch update ###
   # Ensure the latest is built on the "devnet" branch, and mirror from ECR to Dockerhub
   devnet-branch-cut:
