@@ -96,7 +96,7 @@ backup:
     transaction_batch_size: 100000
 
 backup_verify:
-  schedule: '@daily'
+  schedule: "@daily"
   resources:
     limits:
       cpu: 0.5
@@ -136,3 +136,9 @@ restore:
     trusted_waypoints: []
     concurrent_downloads: 2
     restore_era:
+
+test:
+  image:
+    repo: aptoslab/tools
+    tag: devnet
+    pullPolicy: IfNotPresent
