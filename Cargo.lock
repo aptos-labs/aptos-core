@@ -1072,6 +1072,8 @@ dependencies = [
  "mirai-annotations",
  "move-core-types",
  "move-read-write-set-types",
+ "num-derive",
+ "num-traits 0.2.14",
  "once_cell",
  "proptest",
  "proptest-derive",

@@ -3,12 +3,12 @@
     "type": "genesis_transaction",
     "version": "0",
     "hash": "0x48f7beb0c3c3c5378934981fc1a66ed7caffdd0a8e8b4e943aadc98e4ce3efbd",
-    "state_root_hash": "0xa90d31fb6a5df17fe7a8bb071b661ba00c360dc172657ac9013dbf563dbf32b3",
+    "state_root_hash": "0x9b0cec4915f003fe065032552a965e3f4709d71b19120c0e7384eed74eca7170",
     "event_root_hash": "0xcbdbb1b830d1016d45a828bb3171ea81826e8315f14140acfbd7886f49fbcb40",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xb00d306484416ed404724ba7fcb70f23101ad23a8bce6deafc0f0dcda284b690",
+    "accumulator_root_hash": "0x640b122b4c24b12f3218d2d09bc6c797135f458b92a710bf296fe6a2f9ce5226",
     "payload": {
       "type": "write_set_payload",
       "write_set": {
