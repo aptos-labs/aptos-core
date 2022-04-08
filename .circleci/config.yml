@@ -10,6 +10,10 @@ executors:
     machine:
       image: ubuntu-2004:current
     resource_class: medium
+  ubuntu-large:
+    machine:
+      image: ubuntu-2004:current
+    resource_class: large
   ubuntu-xl:
     machine:
       image: ubuntu-2004:current
@@ -211,6 +215,54 @@ jobs:
               sleep 1
             done
             exit 1
+  helm-test:
+    executor: ubuntu-large
+    steps:
+      - checkout
+      - aws-setup
+      - aws-ecr-setup
+      - local-deploy-setup
+      - deploy-setup
+      - run: echo "export IMAGE_TAG=dev_$(git rev-parse --short=8 HEAD)" >> $BASH_ENV
+      # since we're running with `--build-all`, assume that if it passes, we have all images required for Forge
+      - run: aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG
+      - run:
+          name: Start Minikube
+          # https://aptos.dev/tutorials/run-a-fullnode#hardware-requirements
+          command: minikube start --driver=docker --cpus=2 --memory=4Gi
+      - run:
+          name: Wait for node status
+          command: kubectl wait --for=condition=ready node/minikube --timeout=5m
+      - run:
+          name: Interact with the cluster
+          command: kubectl get nodes
+      - run:
+          name: Get the images in minikube docker daemon
+          command: |
+            eval $(minikube docker-env)
+            docker pull ${VALIDATOR_IMAGE_REPO}/${IMAGE_TAG}
+            docker pull ${TOOLS_IMAGE_REPO}/${IMAGE_TAG}
+      - run:
+          name: Install fullnode helm chart
+          working_directory: terraform/helm/fullnode
+          command: |
+            helm install fullnode --set storage.class=standard --set storage.size=10Gi \
+              --set image.repo=$VALIDATOR_IMAGE_REPO --set image.tag=$IMAGE_TAG --set image.imagePullPolicy=Never \
+              --set test.image.repo=$TOOLS_IMAGE_REPO --set test.image.tag=$IMAGE_TAG --set test.image.imagePullPolicy=Never \
+              .
+      - run:
+          name: Wait and check pods
+          command: |
+            echo "Sleep 30s while fullnode starts"
+            sleep 30
+            kubectl wait -l statefulset.kubernetes.io/pod-name=fullnode-aptos-fullnode-0 --for=condition=ready pod --timeout=5m
+            echo "Sleep 1m while fullnode syncs"
+            sleep 60
+            kubectl get pods
+      - run:
+          name: Run the fullnode helm chart tests
+          working_directory: terraform/helm/fullnode
+          command: helm test fullnode --logs
   sdk-typescript-test:
     executor: docker-typescript-builder
     steps:
@@ -324,6 +376,11 @@ commands:
             sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
+      - run:
+          name: Install Minikube
+          command: |
+            curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+            sudo install minikube-linux-amd64 /usr/local/bin/minikube
   ### Sets up the permissions required for accessing AWS resources
   aws-setup:
     steps:
@@ -337,6 +394,8 @@ commands:
           name: Compose AWS Env Variables
           command: |
             echo 'export AWS_ECR_ACCOUNT_URL="${AWS_ECR_ACCOUNT_NUM}.dkr.ecr.${AWS_REGION}.amazonaws.com"' >> $BASH_ENV
+            echo 'export VALIDATOR_IMAGE_REPO=${AWS_ECR_ACCOUNT_URL}/aptos/validator' >> $BASH_ENV
+            echo 'export TOOLS_IMAGE_REPO=${AWS_ECR_ACCOUNT_URL}/aptos/tools' >> $BASH_ENV
       - aws-ecr/ecr-login
   ### Sets up the permissions for using Dockerhub
   dockerhub-setup:
