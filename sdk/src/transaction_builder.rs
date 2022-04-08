@@ -93,7 +93,7 @@ pub struct TransactionFactory {
 impl TransactionFactory {
     pub fn new(chain_id: ChainId) -> Self {
         Self {
-            max_gas_amount: 1_000,
+            max_gas_amount: 2_000,
             gas_unit_price: 0,
             gas_currency: Currency::XUS,
             transaction_expiration_time: 30,

@@ -27,6 +27,7 @@ aptos-types = { path = "../../types" }
 aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 cached-framework-packages =  { path = "../../aptos-move/framework/cached-packages" }
 forge = { path = "../forge" }
+hex = "0.4.3"
 move-command-line-common = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 move-ir-compiler = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 move-stdlib = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
@@ -35,7 +36,6 @@ move-package = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d
 
 [dev-dependencies]
 base64 = "0.13.0"
-hex = "0.4.3"
 once_cell = "1.7.2"
 rand = "0.8.3"
 regex = "1.5.5"

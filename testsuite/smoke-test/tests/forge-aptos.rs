@@ -12,10 +12,11 @@ fn main() -> Result<()> {
         .with_aptos_tests(&[
             &AccountCreation,
             &ExternalTransactionSigner,
-            &MintTransfer,
-            &GasCheck,
-            &ModulePublish,
             &ErrorReport,
+            &GasCheck,
+            &MintTransfer,
+            &ModulePublish,
+            &smoke_test::nft_transaction::NFTTransaction,
         ])
         .with_genesis_modules_bytes(cached_framework_packages::module_blobs().to_vec());
 

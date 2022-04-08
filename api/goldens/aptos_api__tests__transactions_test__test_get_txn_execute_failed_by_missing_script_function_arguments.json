@@ -1,16 +1,16 @@
 {
   "type": "user_transaction",
   "version": "2",
-  "hash": "0x7d70c809eaed055de23cd99cc946954ebc3905e20dd1db0b6634dab13a3046f6",
+  "hash": "0xf0f0fcfd90c806e9985fceabcc836b172007cc3490641a8830c1ff8684a50485",
   "state_root_hash": "0x35704a7851c5e2da0ef26eae6d11826060066f9c09365ba1cd3a037ee9c5fb7b",
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "1",
   "success": false,
   "vm_status": "Move bytecode deserialization / verification failed, including script function not found or invalid arguments",
-  "accumulator_root_hash": "0x8d7bfad264c9c6d97fa8b49a07fa4d06f1240eac1bd1964eb6467379f4f4bb4b",
+  "accumulator_root_hash": "0xd29dc3f964eec63eb7433e5b24ab1e72ea5ae2398920216f187760145f72476c",
   "sender": "0xa550c18",
   "sequence_number": "0",
-  "max_gas_amount": "1000",
+  "max_gas_amount": "2000",
   "gas_unit_price": "0",
   "gas_currency_code": "XUS",
   "expiration_timestamp_secs": "18446744073709551615",
@@ -25,7 +25,7 @@
   "signature": {
     "type": "ed25519_signature",
     "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-    "signature": "0x4d9ecdbda013772cb9e308a75788f162ba20b1abfde4ca72a9e485a4e72d51a8f06c97119c540fadfdee6fd03c53d1f1559e9ddd80de546dcfa99370094b6106"
+    "signature": "0x488f4347b71e958a33c56b789d437059b19363006a6aff3df33e5959ca922b8995d49b111ab140a6240e2ce743cdbb005a447ab8860c0d1fa889675a48de5a08"
   },
   "events": [],
   "timestamp": "1"

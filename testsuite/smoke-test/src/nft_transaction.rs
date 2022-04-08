@@ -1,14 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_rest_client::Client as RestClient;
-use aptos_sdk::{
-    crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform},
-    types::transaction::{authenticator::AuthenticationKey, SignedTransaction},
-};
-use aptos_transaction_builder::experimental_stdlib;
-use aptos_types::nft::tokens;
-use forge::{NFTPublicUsageContext, NFTPublicUsageTest, Result, Test};
+use aptos_transaction_builder::aptos_stdlib;
+use aptos_types::account_address::AccountAddress;
+use forge::{AptosContext, AptosTest, Result, Test};
 
 pub struct NFTTransaction;
 
@@ -19,92 +14,80 @@ impl Test for NFTTransaction {
 }
 
 #[async_trait::async_trait]
-impl NFTPublicUsageTest for NFTTransaction {
-    async fn run<'t>(&self, ctx: &mut NFTPublicUsageContext<'t>) -> Result<()> {
+impl AptosTest for NFTTransaction {
+    async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
         let client = ctx.client();
 
-        // prepare sender and receiver accounts
-        let sender_private_key = Ed25519PrivateKey::generate(ctx.rng());
-        let sender_public_key = sender_private_key.public_key();
-        let sender_auth_key = AuthenticationKey::ed25519(&sender_public_key);
-        let sender_address = sender_auth_key.derived_address();
-        ctx.create_user_account(sender_auth_key).await?;
-        let receiver_private_key = Ed25519PrivateKey::generate(ctx.rng());
-        let receiver_public_key = receiver_private_key.public_key();
-        let receiver_auth_key = AuthenticationKey::ed25519(&receiver_public_key);
-        let receiver_address = receiver_auth_key.derived_address();
-        ctx.create_user_account(receiver_auth_key).await?;
+        let mut creator = ctx.random_account();
+        ctx.create_user_account(creator.public_key()).await?;
+        ctx.mint(creator.address(), 10_000_000).await?;
 
-        // register bars user for sender
-        let sender_register_txn = register_bars_user_txn(&sender_private_key, &client, ctx).await?;
-        client.submit_and_wait(&sender_register_txn).await?;
-        // mint 100 nft tokens to sender
-        ctx.mint_bars(sender_address, 100).await?;
-        // register bars user for receiver
-        let receiver_register_txn =
-            register_bars_user_txn(&receiver_private_key, &client, ctx).await?;
-        client.submit_and_wait(&receiver_register_txn).await?;
+        let mut owner = ctx.random_account();
+        ctx.create_user_account(owner.public_key()).await?;
+        ctx.mint(owner.address(), 10_000_000).await?;
 
-        // transfer 42 tokens to receiver
-        let transfer_amount = 42;
+        let collection_builder = ctx.transaction_factory().payload(
+            aptos_stdlib::encode_create_unlimited_collection_script_script_function(
+                hex::encode("description").into_bytes(),
+                hex::encode("collection name").into_bytes(),
+                hex::encode("uri").into_bytes(),
+            ),
+        );
 
-        // prepare transfer transaction
-        let test_sequence_number = client
-            .get_account(sender_address)
-            .await?
-            .into_inner()
-            .sequence_number;
+        let collection_txn = creator.sign_with_transaction_builder(collection_builder);
+        client.submit_and_wait(&collection_txn).await?;
 
-        let unsigned_txn = ctx
-            .transaction_factory()
-            .payload(
-                experimental_stdlib::encode_transfer_token_between_galleries_script_function(
-                    tokens::bars_tag(),
-                    receiver_address,
-                    transfer_amount,
-                    sender_address,
-                    0,
-                ),
+        let token_builder = ctx.transaction_factory().payload(
+            aptos_stdlib::encode_create_token_script_script_function(
+                hex::encode("collection name").into_bytes(),
+                hex::encode("description").into_bytes(),
+                hex::encode("token name").into_bytes(),
+                1,
+                hex::encode("uri").into_bytes(),
+            ),
+        );
+
+        let token_txn = creator.sign_with_transaction_builder(token_builder);
+        client.submit_and_wait(&token_txn).await?;
+
+        let token_num = client
+            .get_account_resources_by_type(
+                creator.address(),
+                AccountAddress::from_hex_literal("0x1").unwrap(),
+                &"Token".parse().unwrap(),
+                &"Collections".parse().unwrap(),
             )
-            .sender(sender_address)
-            .sequence_number(test_sequence_number)
-            .build();
-        assert_eq!(unsigned_txn.sender(), sender_address);
+            .await?
+            .inner()[0]
+            .data["collections"]["data"][0]["value"]["tokens"]["data"][0]["value"]["id"]
+            ["creation_num"]
+            .as_str()
+            .unwrap()
+            .parse::<u64>()
+            .unwrap();
 
-        // sign the transaction with the private key
-        let signature = sender_private_key.sign(&unsigned_txn);
-        // submit the transaction
-        let txn = SignedTransaction::new(unsigned_txn, sender_public_key, signature);
-        client.submit_and_wait(&txn).await?;
+        let offer_builder =
+            ctx.transaction_factory()
+                .payload(aptos_stdlib::encode_offer_script_script_function(
+                    owner.address(),
+                    creator.address(),
+                    token_num,
+                    1,
+                ));
+
+        let offer_txn = creator.sign_with_transaction_builder(offer_builder);
+        client.submit_and_wait(&offer_txn).await?;
+
+        let claim_builder =
+            ctx.transaction_factory()
+                .payload(aptos_stdlib::encode_claim_script_script_function(
+                    creator.address(),
+                    creator.address(),
+                    token_num,
+                ));
+
+        let claim_txn = owner.sign_with_transaction_builder(claim_builder);
+        client.submit_and_wait(&claim_txn).await?;
         Ok(())
     }
-}
-
-async fn register_bars_user_txn(
-    private_key: &Ed25519PrivateKey,
-    client: &RestClient,
-    ctx: &NFTPublicUsageContext<'_>,
-) -> Result<SignedTransaction> {
-    let public_key = private_key.public_key();
-
-    let sender_auth_key = AuthenticationKey::ed25519(&public_key);
-    let sender_address = sender_auth_key.derived_address();
-
-    let sequence_number = client
-        .get_account(sender_address)
-        .await?
-        .into_inner()
-        .sequence_number;
-
-    let unsigned_txn = ctx
-        .transaction_factory()
-        .payload(experimental_stdlib::encode_register_bars_user_script_function())
-        .sender(sender_address)
-        .sequence_number(sequence_number)
-        .build();
-
-    // sign the transaction with the private key
-    let signature = private_key.sign(&unsigned_txn);
-
-    Ok(SignedTransaction::new(unsigned_txn, public_key, signature))
 }
