@@ -27,18 +27,33 @@ We describe each method below.
 
     ```
     git clone https://github.com/aptos-labs/aptos-core.git
-    cd aptos
+    cd aptos-core
     ./scripts/dev_setup.sh
     source ~/.cargo/env
     ```
-2. Run the command: `cargo run -p aptos-node -- --test`. After starting up, the process should print its config path (e.g., `/private/var/folders/36/w0v54r116ls44q29wh8db0mh0000gn/T/f62a72f87940e3892a860c21b55b529b`) and other metadata.
+2. Run the following command:
+    ```
+    CARGO_NET_GIT_FETCH_WITH_CLI=true cargo run -p aptos-node -- --test
+    ```
 
-Note: this command runs `aptos-node` from a genesis-only ledger state. If you want to reuse the ledger state produced by a previous run of `aptos-node`, use `cargo run -p aptos-node -- --test --config <config-path>`.
+    Make note of the `Config path` from the output of the above command which should look like so:
+    ```
+    Completed generating configuration:
+        Log file: "/private/var/folders/gn/m74t8ylx55z935q8wx035qn80000gn/T/b3adc18c144bfcc78a1541953893bc1c/validator.log"
+        Config path: "/private/var/folders/gn/m74t8ylx55z935q8wx035qn80000gn/T/b3adc18c144bfcc78a1541953893bc1c/0/node.yaml"
+        Aptos root key path: "/private/var/folders/gn/m74t8ylx55z935q8wx035qn80000gn/T/b3adc18c144bfcc78a1541953893bc1c/mint.key"
+        Waypoint: 0:47e676b5fe38ebe2aec6053db7b3daa0b805693d6422e3475e46e89499464ecf
+        ChainId: TESTING
+        REST API endpoint: 0.0.0.0:8080
+        FullNode network: /ip4/0.0.0.0/tcp/7180
+    ```
+
+    _Note: this command runs `aptos-node` from a genesis-only ledger state. If you want to reuse the ledger state produced by a previous run of `aptos-node`, use `cargo run -p aptos-node -- --test --config <config-path>`._
 
 #### Attaching a Faucet to your Aptos Testnet
 
 1. Start your local validator network
-2. Copy the *Aptos root key path* and use it to replace the `mint-key-file-path` below 
+2. Copy the _Aptos root key path_ and use it to replace the `mint-key-file-path` below 
 3. Run the following command to start a Faucet:
 ```
    cargo run --package aptos-faucet -- \
@@ -53,14 +68,27 @@ This will start a Faucet running locally without any restrictions to tokens that
 
 ### Using Docker
 
-1. Install [Docker](docker) including Docker-Compose.
+1. Install [Docker](https://docs.docker.com/get-docker/) including [Docker-Compose](https://docs.docker.com/compose/install/).
 2. Create a directory for your local test validator network.
 3. Download the [validator testnet docker compose](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/validator-testnet/docker-compose.yaml) and [validator configuration](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/validator-testnet/validator_node_template.yaml).
 4. Start Docker-Compose `docker-compose up`
 
+For simplicitly, you can perform 2 through 4 with the following commands:
+
+```bash
+mkdir aptos_local_validatosr && cd aptos_local_validatosr
+wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/validator-testnet/docker-compose.yaml
+wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/validator-testnet/validator_node_template.yaml
+docker-compose up
+```
+
 This will start both a Validator and a Faucet. The Validator's REST endpoint will be avilable at `http://127.0.0.1:8080` and the Faucet at `http://127.0.0.1:8000`.
 
-As the software is in the early stages of development, it is worth noting that there may be breaking changes. If the software fails to start, delete both the containers and shared volumes, which can be queried via `docker container ls -a` and `docker volume ls` and deleted via `docker container rm $id` and `docker volume rm $name`.
+As the software is in the early stages of development, it is worth noting that there may be breaking changes. If the software fails to start, delete both the containers and shared volumes, which can be queried via `docker container ls -a` and `docker volume ls` and deleted via `docker container rm $id` and `docker volume rm $name`. Alternatively you can start with a clean slate by cleaning your entire local docker state like so:
+
+```bash
+docker stop $(docker ps -a -q) && docker rm $(docker ps -a -q) && docker rmi $(docker images -q) && docker volume rm $(docker volume ls -q)
+```
 
 If you intend to use your Testnet over an extended period of time, you should pin the images to a specific ID. Image ID's can be obtained via `docker container ls` and added to the docker compose file.
 
