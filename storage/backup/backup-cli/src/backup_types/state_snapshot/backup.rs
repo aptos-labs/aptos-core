@@ -15,7 +15,7 @@ use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, proof::TransactionInfoWithProof,
-    state_store::state_value::StateValue, transaction::Version,
+    state_store::state_value::StateKeyAndValue, transaction::Version,
 };
 use bytes::Bytes;
 use once_cell::sync::Lazy;
@@ -155,7 +155,7 @@ impl StateSnapshotBackupController {
     }
 
     fn parse_key(record: &Bytes) -> Result<HashValue> {
-        let (key, _): (HashValue, StateValue) = bcs::from_bytes(record)?;
+        let (key, _): (HashValue, StateKeyAndValue) = bcs::from_bytes(record)?;
         Ok(key)
     }
 

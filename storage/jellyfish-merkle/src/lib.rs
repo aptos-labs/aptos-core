@@ -88,7 +88,7 @@ use aptos_types::{
         Nibble, ROOT_NIBBLE_HEIGHT,
     },
     proof::{SparseMerkleProof, SparseMerkleRangeProof},
-    state_store::state_value::StateValue,
+    state_store::state_value::{StateKeyAndValue, StateValue},
     transaction::Version,
 };
 use node_type::{Child, Children, InternalNode, LeafNode, Node, NodeKey, NodeType};
@@ -147,6 +147,9 @@ pub trait TestValue: Value + Arbitrary + std::fmt::Debug + Eq + PartialEq + 'sta
 impl Value for aptos_types::account_state_blob::AccountStateBlob {}
 
 impl Value for StateValue {}
+
+impl Value for StateKeyAndValue {}
+
 #[cfg(any(test, feature = "fuzzing"))]
 impl TestValue for aptos_types::account_state_blob::AccountStateBlob {}
 

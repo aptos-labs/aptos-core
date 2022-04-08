@@ -9,7 +9,7 @@ use super::{
 };
 use crate::{
     ledger_info::LedgerInfo,
-    state_store::state_value::StateValue,
+    state_store::state_value::{StateKeyAndValue, StateValue},
     transaction::{TransactionInfo, Version},
 };
 use anyhow::{bail, ensure, format_err, Context, Result};
@@ -262,6 +262,12 @@ where
         );
 
         Ok(())
+    }
+}
+
+impl From<SparseMerkleProof<StateKeyAndValue>> for SparseMerkleProof<StateValue> {
+    fn from(proof: SparseMerkleProof<StateKeyAndValue>) -> Self {
+        SparseMerkleProof::new(proof.leaf(), proof.siblings().to_vec())
     }
 }
 

@@ -25,7 +25,7 @@ use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, proof::TransactionInfoWithProof,
-    state_store::state_value::StateValue, transaction::Version,
+    state_store::state_value::StateKeyAndValue, transaction::Version,
 };
 use std::sync::Arc;
 use storage_interface::StateSnapshotReceiver;
@@ -145,7 +145,7 @@ impl StateSnapshotRestoreController {
     async fn read_state_value(
         &self,
         file_handle: FileHandle,
-    ) -> Result<Vec<(HashValue, StateValue)>> {
+    ) -> Result<Vec<(HashValue, StateKeyAndValue)>> {
         let mut file = self.storage.open_for_read(&file_handle).await?;
 
         let mut chunk = vec![];

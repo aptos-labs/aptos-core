@@ -73,7 +73,9 @@ use aptos_types::{
     state_proof::StateProof,
     state_store::{
         state_key::StateKey,
-        state_value::{StateValue, StateValueChunkWithProof, StateValueWithProof},
+        state_value::{
+            StateKeyAndValue, StateValue, StateValueChunkWithProof, StateValueWithProof,
+        },
     },
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
@@ -1301,7 +1303,7 @@ impl DbWriter for AptosDB {
         &self,
         version: Version,
         expected_root_hash: HashValue,
-    ) -> Result<Box<dyn StateSnapshotReceiver<StateValue>>> {
+    ) -> Result<Box<dyn StateSnapshotReceiver<StateKeyAndValue>>> {
         gauged_api("get_state_snapshot_receiver", || {
             self.state_store
                 .get_snapshot_receiver(version, expected_root_hash)

@@ -15,7 +15,9 @@ use aptos_config::config::{RocksdbConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_crypto::HashValue;
 use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{restore::JellyfishMerkleRestore, NodeBatch, TreeWriter};
-use aptos_types::{state_store::state_value::StateValue, transaction::Version, waypoint::Waypoint};
+use aptos_types::{
+    state_store::state_value::StateKeyAndValue, transaction::Version, waypoint::Waypoint,
+};
 use aptosdb::{backup::restore_handler::RestoreHandler, AptosDB, GetRestoreHandler};
 use std::{
     collections::HashMap,
@@ -101,8 +103,8 @@ pub enum RestoreRunMode {
 
 struct MockTreeWriter;
 
-impl TreeWriter<StateValue> for MockTreeWriter {
-    fn write_node_batch(&self, _node_batch: &NodeBatch<StateValue>) -> Result<()> {
+impl TreeWriter<StateKeyAndValue> for MockTreeWriter {
+    fn write_node_batch(&self, _node_batch: &NodeBatch<StateKeyAndValue>) -> Result<()> {
         Ok(())
     }
 }
@@ -126,7 +128,7 @@ impl RestoreRunMode {
         &self,
         version: Version,
         expected_root_hash: HashValue,
-    ) -> Result<JellyfishMerkleRestore<StateValue>> {
+    ) -> Result<JellyfishMerkleRestore<StateKeyAndValue>> {
         match self {
             Self::Restore { restore_handler } => {
                 restore_handler.get_state_restore_receiver(version, expected_root_hash)

@@ -22,7 +22,9 @@ use aptos_types::{
     state_proof::StateProof,
     state_store::{
         state_key::StateKey,
-        state_value::{StateValue, StateValueChunkWithProof, StateValueWithProof},
+        state_value::{
+            StateKeyAndValue, StateValue, StateValueChunkWithProof, StateValueWithProof,
+        },
     },
     transaction::{
         AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof,
@@ -592,7 +594,7 @@ pub trait DbWriter: Send + Sync {
         &self,
         version: Version,
         expected_root_hash: HashValue,
-    ) -> Result<Box<dyn StateSnapshotReceiver<StateValue>>> {
+    ) -> Result<Box<dyn StateSnapshotReceiver<StateKeyAndValue>>> {
         unimplemented!()
     }
 

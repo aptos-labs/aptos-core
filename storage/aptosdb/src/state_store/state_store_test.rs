@@ -274,7 +274,7 @@ proptest! {
                 .unwrap();
             let mut expected_values: Vec<_> = kvs[..=i]
                 .iter()
-                .map(|(key, value)| (key.hash(), value.clone()))
+                .map(|(key, value)| (key.hash(), StateKeyAndValue::new(key.clone(), value.clone())))
                 .collect();
             expected_values.sort_unstable_by_key(|item| item.0);
             prop_assert_eq!(actual_values, expected_values);
@@ -314,6 +314,7 @@ proptest! {
             .clone()
             .into_iter()
             .take(batch1_size)
+            .map(|(key, value)| (key, StateKeyAndValue::new(StateKey::Raw(vec![]), value)))
             .collect();
         let rightmost_of_batch1 = batch1.last().map(|(key, _value)| *key).unwrap();
         let proof_of_batch1 = store1
@@ -325,6 +326,7 @@ proptest! {
         let batch2: Vec<_> = ordered_input
             .into_iter()
             .skip(batch1_size)
+            .map(|(key, value)| (key, StateKeyAndValue::new(StateKey::Raw(vec![]), value)))
             .collect();
         let rightmost_of_batch2 = batch2.last().map(|(key, _value)| *key).unwrap();
         let proof_of_batch2 = store1
@@ -412,6 +414,7 @@ proptest! {
         let batch1: Vec<_> = ordered_input
             .into_iter()
             .take(batch1_size)
+            .map(|(key, value)| (key, StateKeyAndValue::new(StateKey::Raw(vec![]), value)))
             .collect();
         let rightmost_of_batch1 = batch1.last().map(|(key, _value)| *key).unwrap();
         let proof_of_batch1 = store1
