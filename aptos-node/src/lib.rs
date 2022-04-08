@@ -202,7 +202,7 @@ pub fn load_test_environment<R>(
 
     println!("Completed generating configuration:");
     println!("\tLog file: {:?}", log_file);
-    println!("\tConfig path: {:?}", validator_config_path);
+    println!("\tConfig path: {:?}", config_path);
     println!("\tAptos root key path: {:?}", aptos_root_key_path);
     println!("\tWaypoint: {}", config.base.waypoint.genesis_waypoint());
     println!("\tChainId: {}", ChainId::test());
