@@ -102,8 +102,8 @@ impl TryFrom<&AccountState> for AccountStateBlob {
 impl TryFrom<StateValue> for AccountStateBlob {
     type Error = Error;
 
-    fn try_from(state_store_value: StateValue) -> Result<Self> {
-        let bytes = state_store_value
+    fn try_from(state_value: StateValue) -> Result<Self> {
+        let bytes = state_value
             .maybe_bytes
             .ok_or_else(|| format_err!("Empty state value passed"))?;
         Ok(AccountStateBlob::from(bytes))

@@ -127,14 +127,14 @@ impl StateValueWithProof {
     ///
     /// Two things are ensured if no error is raised:
     ///   1. This value exists in the ledger represented by `ledger_info`.
-    ///   2. It belongs to state_store_key and is seen at the time the transaction at version
+    ///   2. It belongs to state_key and is seen at the time the transaction at version
     /// `state_version` is just committed. To make sure this is the latest state, pass in
     /// `ledger_info.version()` as `state_version`.
     pub fn verify(
         &self,
         ledger_info: &LedgerInfo,
         version: Version,
-        state_store_key: StateKey,
+        state_key: StateKey,
     ) -> anyhow::Result<()> {
         ensure!(
             self.version == version,
@@ -143,12 +143,8 @@ impl StateValueWithProof {
             version,
         );
 
-        self.proof.verify(
-            ledger_info,
-            version,
-            state_store_key.hash(),
-            self.value.as_ref(),
-        )
+        self.proof
+            .verify(ledger_info, version, state_key.hash(), self.value.as_ref())
     }
 }
 

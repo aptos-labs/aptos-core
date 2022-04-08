@@ -57,7 +57,7 @@ impl StorageService {
     ) -> Result<(Option<StateValue>, SparseMerkleProof<StateValue>), Error> {
         Ok(self
             .db
-            .get_state_value_with_proof_by_version(&req.state_store_key, req.version)?)
+            .get_state_value_with_proof_by_version(&req.state_key, req.version)?)
     }
 
     fn get_startup_info(&self) -> Result<Option<StartupInfo>, Error> {

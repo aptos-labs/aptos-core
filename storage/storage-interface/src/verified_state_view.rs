@@ -140,13 +140,13 @@ impl VerifiedStateView {
             return Ok(contents.get(path).cloned());
         }
 
-        let state_store_value_option =
+        let state_value_option =
             self.get_state_value_internal(&StateKey::AccountAddressKey(address))?;
 
         // Hack: Convert the state store value to account blob option as that is the
         // only type of state value we support for now. This needs to change once we start
         // supporting tables and other fine grained resources.
-        let new_account_blob = state_store_value_option
+        let new_account_blob = state_value_option
             .map(AccountStateBlob::try_from)
             .transpose()?
             .as_ref()
@@ -164,13 +164,13 @@ impl VerifiedStateView {
     fn get_state_value_internal(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
         // Do most of the work outside the write lock.
         let key_hash = state_key.hash();
-        let state_store_value_option = match self.speculative_state.get(key_hash) {
+        let state_value_option = match self.speculative_state.get(key_hash) {
             StateStoreStatus::ExistsInScratchPad(blob) => Some(blob),
             StateStoreStatus::DoesNotExist => None,
             // No matter it is in db or unknown, we have to query from db since even the
             // former case, we don't have the blob data but only its hash.
             StateStoreStatus::ExistsInDB | StateStoreStatus::Unknown => {
-                let (state_store_value, proof) = match self.latest_persistent_version {
+                let (state_value, proof) = match self.latest_persistent_version {
                     Some(version) => self
                         .reader
                         .get_state_value_with_proof_by_version(state_key, version)?,
@@ -180,7 +180,7 @@ impl VerifiedStateView {
                     .verify(
                         self.latest_persistent_state_root,
                         key_hash,
-                        state_store_value.as_ref(),
+                        state_value.as_ref(),
                     )
                     .map_err(|err| {
                         format_err!(
@@ -194,11 +194,11 @@ impl VerifiedStateView {
                 // multiple threads may enter this code, and another thread might add
                 // an address before this one. Thus the insertion might return a None here.
                 self.state_proof_cache.write().insert(key_hash, proof);
-                state_store_value
+                state_value
             }
         };
 
-        Ok(state_store_value_option)
+        Ok(state_value_option)
     }
 
     fn get_and_cache_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
@@ -207,12 +207,12 @@ impl VerifiedStateView {
             // This can return None, which means the value has been deleted from the DB.
             return Ok(contents.maybe_bytes.as_ref().cloned());
         }
-        let state_store_value_option = self.get_state_value_internal(state_key)?;
+        let state_value_option = self.get_state_value_internal(state_key)?;
         // Update the cache if still empty
         let mut cache = self.state_cache.write();
         let new_value = cache
             .entry(state_key.clone())
-            .or_insert_with(|| state_store_value_option.unwrap_or_default());
+            .or_insert_with(|| state_value_option.unwrap_or_default());
 
         Ok(new_value.maybe_bytes.as_ref().cloned())
     }

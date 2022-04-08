@@ -750,14 +750,14 @@ impl StateStoreValueProof {
         ledger_info: &LedgerInfo,
         state_version: Version,
         value_hash: HashValue,
-        state_store_value: Option<&StateValue>,
+        state_value: Option<&StateValue>,
     ) -> Result<()> {
         self.transaction_info_to_value_proof.verify(
             self.transaction_info_with_proof
                 .transaction_info
                 .state_change_hash(),
             value_hash,
-            state_store_value,
+            state_value,
         )?;
 
         self.transaction_info_with_proof

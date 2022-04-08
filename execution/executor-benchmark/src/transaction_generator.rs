@@ -340,12 +340,12 @@ impl TransactionGenerator {
         let bar = get_progress_bar(self.accounts_cache.len());
         for account in &self.accounts_cache {
             let address = account.address;
-            let state_store_value = db
+            let state_value = db
                 .get_latest_state_value(StateKey::AccountAddressKey(address))
                 .expect("Failed to query storage.")
                 .expect("Account must exist.");
             let account_resource =
-                AccountResource::try_from(&AccountStateBlob::try_from(state_store_value).unwrap())
+                AccountResource::try_from(&AccountStateBlob::try_from(state_value).unwrap())
                     .unwrap();
             assert_eq!(account_resource.sequence_number(), account.sequence_number);
             bar.inc(1);

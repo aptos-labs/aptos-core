@@ -131,7 +131,7 @@ impl StateSnapshotRestoreController {
         ver_gauge.set(self.version as i64);
         tgt_leaf_idx.set(manifest.chunks.last().map_or(0, |c| c.last_idx as i64));
         for chunk in manifest.chunks {
-            let blobs = self.read_state_store_value(chunk.blobs).await?;
+            let blobs = self.read_state_value(chunk.blobs).await?;
             let proof = self.storage.load_bcs_file(&chunk.proof).await?;
 
             receiver.add_chunk(blobs, proof)?;
@@ -142,7 +142,7 @@ impl StateSnapshotRestoreController {
         Ok(())
     }
 
-    async fn read_state_store_value(
+    async fn read_state_value(
         &self,
         file_handle: FileHandle,
     ) -> Result<Vec<(HashValue, StateValue)>> {

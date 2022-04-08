@@ -318,7 +318,7 @@ pub trait DbReader: Send + Sync {
     ///
     /// [`AptosDB::get_latest_account_state`]:
     /// ../aptosdb/struct.AptosDB.html#method.get_latest_account_state
-    fn get_latest_state_value(&self, state_store_key: StateKey) -> Result<Option<StateValue>> {
+    fn get_latest_state_value(&self, state_key: StateKey) -> Result<Option<StateValue>> {
         unimplemented!()
     }
 
@@ -407,7 +407,7 @@ pub trait DbReader: Send + Sync {
     /// based on `ledger_version`
     fn get_state_value_with_proof(
         &self,
-        state_store_key: StateKey,
+        state_key: StateKey,
         version: Version,
         ledger_version: Version,
     ) -> Result<StateValueWithProof> {
@@ -523,12 +523,12 @@ impl MoveStorage for &dyn DbReader {
         access_path: AccessPath,
         version: Version,
     ) -> Result<Vec<u8>> {
-        let (state_store_value, _) = self.get_state_value_with_proof_by_version(
+        let (state_value, _) = self.get_state_value_with_proof_by_version(
             &StateKey::AccountAddressKey(access_path.address),
             version,
         )?;
         let account_state =
-            AccountState::try_from(&state_store_value.ok_or_else(|| {
+            AccountState::try_from(&state_value.ok_or_else(|| {
                 format_err!("missing blob in account state/account does not exist")
             })?)?;
 
@@ -678,7 +678,7 @@ pub enum StorageRequest {
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
 pub struct GetStateValueWithProofByVersionRequest {
     /// The access key for the resource
-    pub state_store_key: StateKey,
+    pub state_key: StateKey,
 
     /// The version the query is based on.
     pub version: Version,
@@ -686,11 +686,8 @@ pub struct GetStateValueWithProofByVersionRequest {
 
 impl GetStateValueWithProofByVersionRequest {
     /// Constructor.
-    pub fn new(state_store_key: StateKey, version: Version) -> Self {
-        Self {
-            state_store_key,
-            version,
-        }
+    pub fn new(state_key: StateKey, version: Version) -> Self {
+        Self { state_key, version }
     }
 }
 
