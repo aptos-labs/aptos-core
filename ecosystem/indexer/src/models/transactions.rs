@@ -1,8 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::database::PgPoolConnection;
+// This is required because a diesel macro makes clippy sad
+#![allow(clippy::unused_unit)]
+
 use crate::{
+    database::PgPoolConnection,
     models::events::{Event, EventModel},
     schema::{block_metadata_transactions, transactions, user_transactions},
 };
@@ -10,10 +13,13 @@ use aptos_rest_client::aptos_api_types::{
     BlockMetadataTransaction as APIBlockMetadataTransaction, Transaction as APITransaction,
     TransactionInfo, UserTransaction as APIUserTransaction, U64,
 };
-use diesel::RunQueryDsl;
+use diesel::{
+    BelongingToDsl, ExpressionMethods, GroupedBy, OptionalExtension, QueryDsl, RunQueryDsl,
+};
 use futures::future::Either;
 
-#[derive(Debug, Queryable, Insertable, AsChangeset)]
+#[derive(Debug, Queryable, Insertable, AsChangeset, Identifiable)]
+#[primary_key(hash)]
 #[diesel(table_name = "transactions")]
 pub struct Transaction {
     #[diesel(column_name = type)]
@@ -32,18 +38,105 @@ pub struct Transaction {
 }
 
 impl Transaction {
-    pub fn get_by_hash(transaction_hash: String, connection: &PgPoolConnection) {
-        let transactions = transactions::table.load::<Transaction>(connection)?;
-        let user_transactions = UserTransaction::belonging_to(&transactions)
-            .load::<UserTransaction>(&connection)?
-            .grouped_by(&users);
-        let block_metadata_transactions = BlockMetadataTransaction::belonging_to(&transactions)
-            .load::<BlockMetadataTransaction>(&connection)?
-            .grouped_by(&users);
-        (transactions, user_transactions, block_metadata_transactions)
+    pub fn get_many_by_version(
+        start_version: i64,
+        number_to_get: i64,
+        connection: &PgPoolConnection,
+    ) -> diesel::QueryResult<
+        Vec<(
+            Transaction,
+            Option<UserTransaction>,
+            Option<BlockMetadataTransaction>,
+        )>,
+    > {
+        let mut transactions = transactions::table
+            .filter(transactions::version.ge(start_version))
+            .limit(number_to_get)
+            .load::<Transaction>(connection)?;
+
+        let mut user_transactions: Vec<Vec<UserTransaction>> =
+            UserTransaction::belonging_to(&transactions)
+                .load::<UserTransaction>(connection)?
+                .grouped_by(&transactions);
+
+        let mut block_metadata_transactions: Vec<Vec<BlockMetadataTransaction>> =
+            BlockMetadataTransaction::belonging_to(&transactions)
+                .load::<BlockMetadataTransaction>(connection)?
+                .grouped_by(&transactions);
+
+        // Convert to the nice result tuple
+        let mut result = vec![];
+        while !transactions.is_empty() {
+            result.push((
+                transactions.pop().unwrap(),
+                user_transactions.pop().unwrap().pop(),
+                block_metadata_transactions.pop().unwrap().pop(),
+            ))
+        }
+
+        Ok(result)
     }
 
-    pub fn get_by_version(version: u64) {}
+    pub fn get_by_version(
+        version: u64,
+        connection: &PgPoolConnection,
+    ) -> diesel::QueryResult<(
+        Transaction,
+        Option<UserTransaction>,
+        Option<BlockMetadataTransaction>,
+    )> {
+        let transaction = transactions::table
+            .filter(transactions::version.eq(version as i64))
+            .first::<Transaction>(connection)?;
+
+        let (user_transaction, block_metadata_transaction) =
+            transaction.get_details_for_transaction(connection)?;
+
+        Ok((transaction, user_transaction, block_metadata_transaction))
+    }
+
+    pub fn get_by_hash(
+        transaction_hash: &str,
+        connection: &PgPoolConnection,
+    ) -> diesel::QueryResult<(
+        Transaction,
+        Option<UserTransaction>,
+        Option<BlockMetadataTransaction>,
+    )> {
+        let transaction = transactions::table
+            .filter(transactions::hash.eq(&transaction_hash))
+            .first::<Transaction>(connection)?;
+
+        let (user_transaction, block_metadata_transaction) =
+            transaction.get_details_for_transaction(connection)?;
+
+        Ok((transaction, user_transaction, block_metadata_transaction))
+    }
+
+    fn get_details_for_transaction(
+        &self,
+        connection: &PgPoolConnection,
+    ) -> diesel::QueryResult<(Option<UserTransaction>, Option<BlockMetadataTransaction>)> {
+        let mut user_transaction: Option<UserTransaction> = None;
+        let mut block_metadata_transaction: Option<BlockMetadataTransaction> = None;
+
+        match self.type_.as_str() {
+            "user_transaction" => {
+                user_transaction = user_transactions::table
+                    .filter(user_transactions::hash.eq(&self.hash))
+                    .first::<UserTransaction>(connection)
+                    .optional()?;
+            }
+            "block_metadata_transaction" => {
+                block_metadata_transaction = block_metadata_transactions::table
+                    .filter(block_metadata_transactions::hash.eq(&self.hash))
+                    .first::<BlockMetadataTransaction>(connection)
+                    .optional()?;
+            }
+            _ => unreachable!("Unknown transaction type: {}", &self.type_),
+        };
+        Ok((user_transaction, block_metadata_transaction))
+    }
 
     pub fn from_transaction(
         transaction: &APITransaction,
@@ -107,8 +200,9 @@ impl Transaction {
     }
 }
 
-#[derive(Debug, Queryable, Insertable, AsChangeset, Associations)]
+#[derive(Debug, Queryable, Identifiable, Insertable, AsChangeset, Associations)]
 #[belongs_to(Transaction, foreign_key = "hash")]
+#[primary_key(hash)]
 #[diesel(table_name = "user_transactions")]
 pub struct UserTransaction {
     pub hash: String,
@@ -145,8 +239,9 @@ impl UserTransaction {
     }
 }
 
-#[derive(Debug, Queryable, Insertable, AsChangeset, Associations)]
+#[derive(Debug, Queryable, Identifiable, Insertable, AsChangeset, Associations)]
 #[belongs_to(Transaction, foreign_key = "hash")]
+#[primary_key("hash")]
 #[diesel(table_name = "block_metadata_transactions")]
 pub struct BlockMetadataTransaction {
     pub hash: String,
