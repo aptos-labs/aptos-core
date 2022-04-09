@@ -76,8 +76,8 @@ async function main() {
   console.log(`Alice: ${alice.address()}`);
   console.log(`Bob: ${bob.address()}`);
 
-  await faucetClient.fundAccount(alice.pubKey(), 10_000_000);
-  await faucetClient.fundAccount(bob.pubKey(), 10_000_000);
+  await faucetClient.fundAccount(alice.address(), 10_000_000);
+  await faucetClient.fundAccount(bob.address(), 10_000_000);
 
   console.log("\n=== Initial Balances ===");
   console.log(`Alice: ${await restClient.accountBalance(alice.address())}`);
