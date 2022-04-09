@@ -34,6 +34,10 @@ struct IndexerArgs {
     #[clap(long)]
     skip_previous_errors: bool,
 
+    /// If set, will exit after migrations/repairs instead of starting indexing loop
+    #[clap(long)]
+    dont_index: bool,
+
     /// If set, will ignore database contents and start processing from the specified version.
     /// This will not delete any database contents, just transactions as it reprocesses them.
     #[clap(long)]
@@ -76,6 +80,11 @@ async fn main() -> std::io::Result<()> {
 
     if !args.skip_previous_errors {
         tailer.handle_previous_errors().await;
+    }
+
+    if args.dont_index {
+        info!("All pre-index tasks complete, exiting!");
+        return Ok(());
     }
 
     info!("Indexing loop started!");

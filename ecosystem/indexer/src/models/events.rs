@@ -1,11 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::schema::events;
+use crate::{models::transactions::Transaction, schema::events};
 use aptos_rest_client::aptos_api_types::Event as APIEvent;
+use serde::Serialize;
 
-#[derive(Debug, Queryable, Insertable)]
+#[derive(Debug, Serialize, Queryable, Insertable, Associations, Identifiable)]
 #[diesel(table_name = "events")]
+#[belongs_to(Transaction, foreign_key = "transaction_hash")]
+#[primary_key(key, sequence_number)]
 pub struct Event {
     pub transaction_hash: String,
     pub key: String,
@@ -29,6 +32,7 @@ impl Event {
             inserted_at: chrono::Utc::now().naive_utc(),
         }
     }
+
     pub fn from_events(transaction_hash: String, events: &[APIEvent]) -> Option<Vec<Self>> {
         if events.is_empty() {
             return None;

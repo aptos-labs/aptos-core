@@ -17,8 +17,9 @@ use diesel::{
     BelongingToDsl, ExpressionMethods, GroupedBy, OptionalExtension, QueryDsl, RunQueryDsl,
 };
 use futures::future::Either;
+use serde::Serialize;
 
-#[derive(Debug, Queryable, Insertable, AsChangeset, Identifiable)]
+#[derive(Debug, Queryable, Serialize, Insertable, AsChangeset, Identifiable)]
 #[primary_key(hash)]
 #[diesel(table_name = "transactions")]
 pub struct Transaction {
@@ -47,30 +48,36 @@ impl Transaction {
             Transaction,
             Option<UserTransaction>,
             Option<BlockMetadataTransaction>,
+            Vec<EventModel>,
         )>,
     > {
-        let mut transactions = transactions::table
+        let mut txs = transactions::table
             .filter(transactions::version.ge(start_version))
+            .order(transactions::version.asc())
             .limit(number_to_get)
             .load::<Transaction>(connection)?;
 
-        let mut user_transactions: Vec<Vec<UserTransaction>> =
-            UserTransaction::belonging_to(&transactions)
-                .load::<UserTransaction>(connection)?
-                .grouped_by(&transactions);
+        let mut user_transactions: Vec<Vec<UserTransaction>> = UserTransaction::belonging_to(&txs)
+            .load::<UserTransaction>(connection)?
+            .grouped_by(&txs);
 
         let mut block_metadata_transactions: Vec<Vec<BlockMetadataTransaction>> =
-            BlockMetadataTransaction::belonging_to(&transactions)
+            BlockMetadataTransaction::belonging_to(&txs)
                 .load::<BlockMetadataTransaction>(connection)?
-                .grouped_by(&transactions);
+                .grouped_by(&txs);
+
+        let mut events: Vec<Vec<EventModel>> = EventModel::belonging_to(&txs)
+            .load::<EventModel>(connection)?
+            .grouped_by(&txs);
 
         // Convert to the nice result tuple
         let mut result = vec![];
-        while !transactions.is_empty() {
+        while !txs.is_empty() {
             result.push((
-                transactions.pop().unwrap(),
+                txs.pop().unwrap(),
                 user_transactions.pop().unwrap().pop(),
                 block_metadata_transactions.pop().unwrap().pop(),
+                events.pop().unwrap(),
             ))
         }
 
@@ -84,15 +91,21 @@ impl Transaction {
         Transaction,
         Option<UserTransaction>,
         Option<BlockMetadataTransaction>,
+        Vec<EventModel>,
     )> {
         let transaction = transactions::table
             .filter(transactions::version.eq(version as i64))
             .first::<Transaction>(connection)?;
 
-        let (user_transaction, block_metadata_transaction) =
+        let (user_transaction, block_metadata_transaction, events) =
             transaction.get_details_for_transaction(connection)?;
 
-        Ok((transaction, user_transaction, block_metadata_transaction))
+        Ok((
+            transaction,
+            user_transaction,
+            block_metadata_transaction,
+            events,
+        ))
     }
 
     pub fn get_by_hash(
@@ -102,23 +115,37 @@ impl Transaction {
         Transaction,
         Option<UserTransaction>,
         Option<BlockMetadataTransaction>,
+        Vec<EventModel>,
     )> {
         let transaction = transactions::table
             .filter(transactions::hash.eq(&transaction_hash))
             .first::<Transaction>(connection)?;
 
-        let (user_transaction, block_metadata_transaction) =
+        let (user_transaction, block_metadata_transaction, events) =
             transaction.get_details_for_transaction(connection)?;
 
-        Ok((transaction, user_transaction, block_metadata_transaction))
+        Ok((
+            transaction,
+            user_transaction,
+            block_metadata_transaction,
+            events,
+        ))
     }
 
     fn get_details_for_transaction(
         &self,
         connection: &PgPoolConnection,
-    ) -> diesel::QueryResult<(Option<UserTransaction>, Option<BlockMetadataTransaction>)> {
+    ) -> diesel::QueryResult<(
+        Option<UserTransaction>,
+        Option<BlockMetadataTransaction>,
+        Vec<EventModel>,
+    )> {
         let mut user_transaction: Option<UserTransaction> = None;
         let mut block_metadata_transaction: Option<BlockMetadataTransaction> = None;
+
+        let events = crate::schema::events::table
+            .filter(crate::schema::events::transaction_hash.eq(&self.hash))
+            .load::<EventModel>(connection)?;
 
         match self.type_.as_str() {
             "user_transaction" => {
@@ -135,7 +162,7 @@ impl Transaction {
             }
             _ => unreachable!("Unknown transaction type: {}", &self.type_),
         };
-        Ok((user_transaction, block_metadata_transaction))
+        Ok((user_transaction, block_metadata_transaction, events))
     }
 
     pub fn from_transaction(
@@ -200,7 +227,7 @@ impl Transaction {
     }
 }
 
-#[derive(Debug, Queryable, Identifiable, Insertable, AsChangeset, Associations)]
+#[derive(Debug, Queryable, Serialize, Identifiable, Insertable, AsChangeset, Associations)]
 #[belongs_to(Transaction, foreign_key = "hash")]
 #[primary_key(hash)]
 #[diesel(table_name = "user_transactions")]
@@ -239,7 +266,7 @@ impl UserTransaction {
     }
 }
 
-#[derive(Debug, Queryable, Identifiable, Insertable, AsChangeset, Associations)]
+#[derive(Debug, Queryable, Serialize, Identifiable, Insertable, AsChangeset, Associations)]
 #[belongs_to(Transaction, foreign_key = "hash")]
 #[primary_key("hash")]
 #[diesel(table_name = "block_metadata_transactions")]
