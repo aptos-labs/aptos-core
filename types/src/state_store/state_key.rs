@@ -40,8 +40,8 @@ impl StateKeyPrefix {
     }
 }
 
-struct RawStateKey {
-    bytes: Vec<u8>,
+pub struct RawStateKey {
+    pub bytes: Vec<u8>,
 }
 
 impl From<&StateKey> for RawStateKey {

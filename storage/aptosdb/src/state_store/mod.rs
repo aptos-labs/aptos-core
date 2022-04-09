@@ -6,6 +6,7 @@
 #[cfg(test)]
 mod state_store_test;
 
+use crate::state_value_index::StateValueIndexSchema;
 use crate::{
     change_set::ChangeSet,
     ledger_counters::LedgerCounter,
@@ -117,7 +118,7 @@ impl StateStore {
                 counter_bumps.bump(LedgerCounter::StaleStateNodes, stats.stale_nodes);
                 counter_bumps.bump(LedgerCounter::StaleStateLeaves, stats.stale_leaves);
             });
-        add_node_batch(&mut cs.batch, &tree_update_batch.node_batch)?;
+        add_node_batch_and_index(&mut cs.batch, &tree_update_batch.node_batch)?;
 
         tree_update_batch
             .stale_node_index_batch
@@ -281,15 +282,26 @@ impl TreeReader<StateKeyAndValue> for StateStore {
 impl TreeWriter<StateKeyAndValue> for StateStore {
     fn write_node_batch(&self, node_batch: &NodeBatch) -> Result<()> {
         let mut batch = SchemaBatch::new();
-        add_node_batch(&mut batch, node_batch)?;
+        add_node_batch_and_index(&mut batch, node_batch)?;
         self.db.write_schemas(batch)
     }
 }
 
-fn add_node_batch(batch: &mut SchemaBatch, node_batch: &NodeBatch) -> Result<()> {
+fn add_node_batch_and_index(batch: &mut SchemaBatch, node_batch: &NodeBatch) -> Result<()> {
     node_batch
         .iter()
-        .map(|(node_key, node)| batch.put::<JellyfishMerkleNodeSchema>(node_key, node))
+        .map(|(node_key, node)| {
+            batch.put::<JellyfishMerkleNodeSchema>(node_key, node)?;
+            // Add the value index for leaf nodes.
+            match node {
+                Node::Leaf(leaf) => batch.put::<StateValueIndexSchema>(
+                    &(leaf.value().key.clone(), node_key.version()),
+                    &(node_key.nibble_path().num_nibbles() as u8),
+                ),
+
+                _ => Ok(()),
+            }
+        })
         .collect::<Result<Vec<_>>>()?;
     Ok(())
 }
