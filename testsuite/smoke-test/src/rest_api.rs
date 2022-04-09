@@ -37,12 +37,8 @@ impl AptosTest for BasicClient {
         let client = ctx.client();
         client.get_ledger_information().await?;
 
-        let mut account1 = ctx.random_account();
-        ctx.create_user_account(account1.public_key()).await?;
-        ctx.mint(account1.address(), 10_000).await?;
-        let account2 = ctx.random_account();
-        ctx.create_user_account(account2.public_key()).await?;
-        ctx.mint(account2.address(), 10_000).await?;
+        let mut account1 = ctx.create_and_fund_user_account(10_000).await?;
+        let account2 = ctx.create_and_fund_user_account(10_000).await?;
 
         let tx = account1.sign_with_transaction_builder(ctx.transaction_factory().payload(
             aptos_stdlib::encode_transfer_script_function(account2.address(), 1),

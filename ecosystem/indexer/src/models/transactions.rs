@@ -160,6 +160,7 @@ impl Transaction {
                     .first::<BlockMetadataTransaction>(connection)
                     .optional()?;
             }
+            "genesis_transaction" => {}
             _ => unreachable!("Unknown transaction type: {}", &self.type_),
         };
         Ok((user_transaction, block_metadata_transaction, events))
@@ -306,3 +307,16 @@ fn parse_timestamp(ts: U64, version: U64) -> chrono::NaiveDateTime {
 pub type BlockMetadataTransactionModel = BlockMetadataTransaction;
 pub type TransactionModel = Transaction;
 pub type UserTransactionModel = UserTransaction;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Datelike;
+
+    #[test]
+    fn test_parse_timestamp() {
+        let ts = parse_timestamp(U64::from(1649560602763949), U64::from(1));
+        assert_eq!(ts.timestamp(), 1649560602);
+        assert_eq!(ts.year(), 2022);
+    }
+}

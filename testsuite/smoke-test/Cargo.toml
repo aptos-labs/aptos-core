@@ -13,12 +13,15 @@ edition = "2018"
 anyhow = "1.0.52"
 async-trait = "0.1.42"
 bcs = "0.1.2"
+diesel = { version = "1.4.8", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
+proptest = "1.0.0"
 tokio = { version = "1.8.1", features = ["full"] }
 reqwest = { version = "0.11.2", features = ["json"] }
 
 aptos = { path = "../../crates/aptos" }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-indexer = { path = "../../ecosystem/indexer" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
@@ -41,6 +44,7 @@ rand = "0.8.3"
 regex = "1.5.5"
 serde_yaml = "0.8.17"
 futures = "0.3.12"
+
 
 backup-cli = { path = "../../storage/backup/backup-cli" }
 debug-interface = { path = "../../crates/debug-interface" }

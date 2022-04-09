@@ -3,7 +3,7 @@
 
 use super::Test;
 use crate::{CoreContext, Result, TestReport};
-use aptos_rest_client::Client as RestClient;
+use aptos_rest_client::{Client as RestClient, PendingTransaction};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PublicKey,
     move_types::identifier::Identifier,
@@ -83,6 +83,24 @@ impl<'t> AptosContext<'t> {
         self.public_info.mint(addr, amount).await
     }
 
+    pub async fn create_and_fund_user_account(&mut self, amount: u64) -> Result<LocalAccount> {
+        let account = self.random_account();
+        self.create_user_account(account.public_key()).await?;
+        self.mint(account.address(), amount).await?;
+        Ok(account)
+    }
+
+    pub async fn transfer(
+        &self,
+        from_account: &mut LocalAccount,
+        to_account: &LocalAccount,
+        amount: u64,
+    ) -> Result<PendingTransaction> {
+        self.public_info
+            .transfer(from_account, to_account, amount)
+            .await
+    }
+
     pub async fn get_balance(&self, address: AccountAddress) -> Option<u64> {
         self.public_info.get_balance(address).await
     }
@@ -135,6 +153,20 @@ impl<'t> AptosPublicInfo<'t> {
         );
         self.rest_client.submit_and_wait(&mint_txn).await?;
         Ok(())
+    }
+
+    pub async fn transfer(
+        &self,
+        from_account: &mut LocalAccount,
+        to_account: &LocalAccount,
+        amount: u64,
+    ) -> Result<PendingTransaction> {
+        let tx = from_account.sign_with_transaction_builder(self.transaction_factory().payload(
+            aptos_stdlib::encode_transfer_script_function(to_account.address(), amount),
+        ));
+        let pending_txn = self.rest_client.submit(&tx).await?.into_inner();
+        self.rest_client.wait_for_transaction(&pending_txn).await?;
+        Ok(pending_txn)
     }
 
     pub fn transaction_factory(&self) -> TransactionFactory {
