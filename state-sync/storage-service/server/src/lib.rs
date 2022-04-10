@@ -695,7 +695,6 @@ fn inclusive_range_len(start: u64, end: u64) -> Result<u64, Error> {
 fn log_storage_response(storage_response: &Result<StorageServiceResponse, StorageServiceError>) {
     match storage_response {
         Ok(storage_response) => {
-            let response = format!("{}", storage_response); // Use display formatting
             if matches!(
                 storage_response,
                 StorageServiceResponse::StorageServerSummary(_)
@@ -705,15 +704,17 @@ fn log_storage_response(storage_response: &Result<StorageServiceResponse, Storag
                 sample!(
                     SampleRate::Duration(Duration::from_secs(SUMMARY_LOG_FREQUENCY_SECS)),
                     {
+                        let response = format!("{}", storage_response);
                         debug!(LogSchema::new(LogEntry::SentStorageResponse).response(&response));
                     }
                 );
             } else {
+                let response = format!("{}", storage_response);
                 debug!(LogSchema::new(LogEntry::SentStorageResponse).response(&response));
             }
         }
         Err(storage_error) => {
-            let storage_error = format!("{:?}", storage_error); // Use debug formatting
+            let storage_error = format!("{:?}", storage_error);
             debug!(LogSchema::new(LogEntry::SentStorageResponse).response(&storage_error));
         }
     };
