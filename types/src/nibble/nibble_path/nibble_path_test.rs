@@ -7,10 +7,10 @@ use proptest::prelude::*;
 
 #[test]
 fn test_nibble_path_fmt() {
-    let nibble_path = NibblePath::new(vec![0x12, 0x34, 0x56]);
+    let nibble_path = NibblePath::new_even(vec![0x12, 0x34, 0x56]);
     assert_eq!(format!("{:?}", nibble_path), "123456");
 
-    let nibble_path = NibblePath::new(vec![0x12, 0x34, 0x50]);
+    let nibble_path = NibblePath::new_even(vec![0x12, 0x34, 0x50]);
     assert_eq!(format!("{:?}", nibble_path), "123450");
 
     let nibble_path = NibblePath::new_odd(vec![0x12, 0x34, 0x50]);
@@ -19,16 +19,16 @@ fn test_nibble_path_fmt() {
 
 #[test]
 fn test_create_nibble_path_success() {
-    let nibble_path = NibblePath::new(vec![0x12, 0x34, 0x56]);
+    let nibble_path = NibblePath::new_even(vec![0x12, 0x34, 0x56]);
     assert_eq!(nibble_path.num_nibbles(), 6);
 
-    let nibble_path = NibblePath::new(vec![0x12, 0x34, 0x50]);
+    let nibble_path = NibblePath::new_even(vec![0x12, 0x34, 0x50]);
     assert_eq!(nibble_path.num_nibbles(), 6);
 
     let nibble_path = NibblePath::new_odd(vec![0x12, 0x34, 0x50]);
     assert_eq!(nibble_path.num_nibbles(), 5);
 
-    let nibble_path = NibblePath::new(vec![]);
+    let nibble_path = NibblePath::new_even(vec![]);
     assert_eq!(nibble_path.num_nibbles(), 0);
 }
 
@@ -48,11 +48,28 @@ fn test_empty_nibble_path() {
 #[test]
 fn test_get_nibble() {
     let bytes = vec![0x12, 0x34];
-    let nibble_path = NibblePath::new(bytes);
+    let nibble_path = NibblePath::new_even(bytes);
     assert_eq!(nibble_path.get_nibble(0), Nibble::from(0x01));
     assert_eq!(nibble_path.get_nibble(1), Nibble::from(0x02));
     assert_eq!(nibble_path.get_nibble(2), Nibble::from(0x03));
     assert_eq!(nibble_path.get_nibble(3), Nibble::from(0x04));
+}
+
+#[test]
+fn test_get_nibble_from_byte_array() {
+    let bytes = vec![0x12, 0x34, 0x56, 0x78];
+    let nibble_path = NibblePath::new_from_byte_array(bytes.as_slice(), 4);
+    assert_eq!(nibble_path.num_nibbles, 4);
+    assert_eq!(nibble_path.get_nibble(0), Nibble::from(0x01));
+    assert_eq!(nibble_path.get_nibble(1), Nibble::from(0x02));
+    assert_eq!(nibble_path.get_nibble(2), Nibble::from(0x03));
+    assert_eq!(nibble_path.get_nibble(3), Nibble::from(0x04));
+
+    let nibble_path = NibblePath::new_from_byte_array(bytes.as_slice(), 3);
+    assert_eq!(nibble_path.num_nibbles, 3);
+    assert_eq!(nibble_path.get_nibble(0), Nibble::from(0x01));
+    assert_eq!(nibble_path.get_nibble(1), Nibble::from(0x02));
+    assert_eq!(nibble_path.get_nibble(2), Nibble::from(0x03));
 }
 
 #[test]
@@ -69,7 +86,7 @@ fn test_nibble_iterator() {
 #[test]
 fn test_get_bit() {
     let bytes = vec![0x01, 0x02];
-    let nibble_path = NibblePath::new(bytes);
+    let nibble_path = NibblePath::new_even(bytes);
     assert_eq!(nibble_path.get_bit(0), false);
     assert_eq!(nibble_path.get_bit(1), false);
     assert_eq!(nibble_path.get_bit(2), false);
@@ -105,7 +122,7 @@ fn test_bit_iter() {
 #[test]
 fn test_visited_nibble_iter() {
     let bytes = vec![0x12, 0x34, 0x56];
-    let nibble_path = NibblePath::new(bytes);
+    let nibble_path = NibblePath::new_even(bytes);
     let mut iter = nibble_path.nibbles();
     assert_eq!(iter.next().unwrap(), 0x01.into());
     assert_eq!(iter.next().unwrap(), 0x02.into());
@@ -119,8 +136,8 @@ fn test_visited_nibble_iter() {
 #[test]
 fn test_skip_common_prefix() {
     {
-        let nibble_path1 = NibblePath::new(vec![0x12, 0x34, 0x56]);
-        let nibble_path2 = NibblePath::new(vec![0x12, 0x34, 0x56]);
+        let nibble_path1 = NibblePath::new_even(vec![0x12, 0x34, 0x56]);
+        let nibble_path2 = NibblePath::new_even(vec![0x12, 0x34, 0x56]);
         let mut iter1 = nibble_path1.nibbles();
         let mut iter2 = nibble_path2.nibbles();
         assert_eq!(skip_common_prefix(&mut iter1, &mut iter2), 6);
@@ -128,8 +145,8 @@ fn test_skip_common_prefix() {
         assert!(iter2.is_finished());
     }
     {
-        let nibble_path1 = NibblePath::new(vec![0x12, 0x35]);
-        let nibble_path2 = NibblePath::new(vec![0x12, 0x34, 0x56]);
+        let nibble_path1 = NibblePath::new_even(vec![0x12, 0x35]);
+        let nibble_path2 = NibblePath::new_even(vec![0x12, 0x34, 0x56]);
         let mut iter1 = nibble_path1.nibbles();
         let mut iter2 = nibble_path2.nibbles();
         assert_eq!(skip_common_prefix(&mut iter1, &mut iter2), 3);
@@ -147,7 +164,7 @@ fn test_skip_common_prefix() {
         );
     }
     {
-        let nibble_path1 = NibblePath::new(vec![0x12, 0x34, 0x56]);
+        let nibble_path1 = NibblePath::new_even(vec![0x12, 0x34, 0x56]);
         let nibble_path2 = NibblePath::new_odd(vec![0x12, 0x30]);
         let mut iter1 = nibble_path1.nibbles();
         let mut iter2 = nibble_path2.nibbles();

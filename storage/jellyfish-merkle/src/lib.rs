@@ -619,7 +619,7 @@ where
         version: Version,
         tree_cache: &mut TreeCache<R, V>,
     ) -> Result<()> {
-        let nibble_path = NibblePath::new(key.to_vec());
+        let nibble_path = NibblePath::new_even(key.to_vec());
 
         // Get the root node. If this is the first operation, it would get the root node from the
         // underlying db. Otherwise it most likely would come from `cache`.
@@ -758,7 +758,8 @@ where
         // visited part of the nibble iter of the incoming key and advances the existing leaf
         // nibble iterator by the length of that prefix.
         let mut visited_nibble_iter = nibble_iter.visited_nibbles();
-        let existing_leaf_nibble_path = NibblePath::new(existing_leaf_node.account_key().to_vec());
+        let existing_leaf_nibble_path =
+            NibblePath::new_even(existing_leaf_node.account_key().to_vec());
         let mut existing_leaf_nibble_iter = existing_leaf_nibble_path.nibbles();
         skip_common_prefix(&mut visited_nibble_iter, &mut existing_leaf_nibble_iter);
 
@@ -876,7 +877,7 @@ where
         // Empty tree just returns proof with no sibling hash.
         let mut next_node_key = NodeKey::new_empty_path(version);
         let mut siblings = vec![];
-        let nibble_path = NibblePath::new(key.to_vec());
+        let nibble_path = NibblePath::new_even(key.to_vec());
         let mut nibble_iter = nibble_path.nibbles();
 
         // We limit the number of loops here deliberately to avoid potential cyclic graph bugs

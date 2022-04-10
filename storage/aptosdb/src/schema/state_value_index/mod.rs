@@ -18,8 +18,7 @@
 
 use crate::schema::{ensure_slice_len_eq, ensure_slice_len_gt, STATE_VALUE_INDEX_CF_NAME};
 use anyhow::Result;
-use aptos_types::state_store::state_key::StateKey;
-use aptos_types::transaction::Version;
+use aptos_types::{state_store::state_key::StateKey, transaction::Version};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use schemadb::{
     define_schema,

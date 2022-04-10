@@ -60,7 +60,7 @@ impl NodeKey {
 
     /// A shortcut to generate a node key consisting of a version and an empty nibble path.
     pub fn new_empty_path(version: Version) -> Self {
-        Self::new(version, NibblePath::new(vec![]))
+        Self::new(version, NibblePath::new_even(vec![]))
     }
 
     /// Gets the version.
@@ -123,7 +123,7 @@ impl NodeKey {
             nibble_bytes
         );
         let nibble_path = if num_nibbles % 2 == 0 {
-            NibblePath::new(nibble_bytes)
+            NibblePath::new_even(nibble_bytes)
         } else {
             let padding = nibble_bytes.last().unwrap() & 0x0f;
             ensure!(

@@ -73,7 +73,18 @@ fn prune_stale_indices(
     .unwrap();
 }
 
-fn verify_state_in_store(
+fn verify_value_and_proof(
+    store: &StateStore,
+    address: AccountAddress,
+    expected_value: Option<&AccountStateBlob>,
+    version: Version,
+    root: HashValue,
+) {
+    verify_value_and_proof_in_store(store, address, expected_value, version, root);
+    verify_value_index_in_store(store, address, expected_value, version);
+}
+
+fn verify_value_and_proof_in_store(
     store: &StateStore,
     address: AccountAddress,
     expected_value: Option<&AccountStateBlob>,
@@ -97,6 +108,23 @@ fn verify_state_in_store(
             value.as_ref(),
         )
         .unwrap();
+}
+
+fn verify_value_index_in_store(
+    store: &StateStore,
+    address: AccountAddress,
+    expected_value: Option<&AccountStateBlob>,
+    version: Version,
+) {
+    let value = store
+        .get_value_by_version(&StateKey::AccountAddressKey(address), version)
+        .unwrap();
+    assert_eq!(
+        value
+            .map(|x| AccountStateBlob::try_from(x).unwrap())
+            .as_ref(),
+        expected_value
+    );
 }
 
 #[test]
@@ -132,12 +160,14 @@ fn test_state_store_reader_writer() {
         0, /* expected_nodes_retired */
         0, /* expected_blobs_retired */
     );
-    verify_state_in_store(store, address1, Some(&value1), 0, root);
-    verify_state_in_store(store, address2, None, 0, root);
-    verify_state_in_store(store, address3, None, 0, root);
+    verify_value_and_proof(store, address1, Some(&value1), 0, root);
+
+    verify_value_and_proof(store, address2, None, 0, root);
+    verify_value_and_proof(store, address3, None, 0, root);
 
     // Insert address 1 with updated value1, address2 with value 2 and address3 with value3 and
     // verify new states.
+
     root = put_account_state_set(
         store,
         vec![
@@ -150,9 +180,10 @@ fn test_state_store_reader_writer() {
         1, /* expected_nodes_retired */
         1, /* expected_blobs_retired */
     );
-    verify_state_in_store(store, address1, Some(&value1_update), 1, root);
-    verify_state_in_store(store, address2, Some(&value2), 1, root);
-    verify_state_in_store(store, address3, Some(&value3), 1, root);
+
+    verify_value_and_proof(store, address1, Some(&value1_update), 1, root);
+    verify_value_and_proof(store, address2, Some(&value2), 1, root);
+    verify_value_and_proof(store, address3, Some(&value3), 1, root);
 }
 
 #[test]
@@ -213,7 +244,7 @@ fn test_retired_records() {
             1, /* target_least_readable_version */
             0, /* limit */
         );
-        verify_state_in_store(store, address1, Some(&value1), 0, root0);
+        verify_value_and_proof(store, address1, Some(&value1), 0, root0);
     }
     // Prune till version=1.
     {
@@ -227,9 +258,9 @@ fn test_retired_records() {
             .get_value_with_proof_by_version(&StateKey::AccountAddressKey(address2), 0)
             .is_err());
         // root1 is still there.
-        verify_state_in_store(store, address1, Some(&value1), 1, root1);
-        verify_state_in_store(store, address2, Some(&value2_update), 1, root1);
-        verify_state_in_store(store, address3, Some(&value3), 1, root1);
+        verify_value_and_proof(store, address1, Some(&value1), 1, root1);
+        verify_value_and_proof(store, address2, Some(&value2_update), 1, root1);
+        verify_value_and_proof(store, address3, Some(&value3), 1, root1);
     }
     // Prune till version=2.
     {
@@ -243,9 +274,9 @@ fn test_retired_records() {
             .get_value_with_proof_by_version(&StateKey::AccountAddressKey(address2), 1)
             .is_err());
         // root2 is still there.
-        verify_state_in_store(store, address1, Some(&value1), 2, root2);
-        verify_state_in_store(store, address2, Some(&value2_update), 2, root2);
-        verify_state_in_store(store, address3, Some(&value3_update), 2, root2);
+        verify_value_and_proof(store, address1, Some(&value1), 2, root2);
+        verify_value_and_proof(store, address2, Some(&value2_update), 2, root2);
+        verify_value_and_proof(store, address3, Some(&value3_update), 2, root2);
     }
 }
 

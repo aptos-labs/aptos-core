@@ -322,7 +322,7 @@ where
 
     /// Restores one account.
     fn add_one(&mut self, new_key: HashValue, new_value: V) {
-        let nibble_path = NibblePath::new(new_key.to_vec());
+        let nibble_path = NibblePath::new_even(new_key.to_vec());
         let mut nibbles = nibble_path.nibbles();
 
         for i in 0..ROOT_NIBBLE_HEIGHT {

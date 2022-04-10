@@ -486,7 +486,7 @@ where
             .with_label_values(&["generate_node_hashes"])
             .start_timer();
         let mut node_hashes = HashMap::new();
-        let mut nibble_path = NibblePath::new(vec![]);
+        let mut nibble_path = NibblePath::new_even(vec![]);
         self.collect_new_hashes(
             touched_accounts.as_slice(),
             self.smt.root_weak(),
@@ -516,7 +516,7 @@ where
         if level_within_nibble == 0 {
             if depth_in_nibble != 0 {
                 cur_nibble_path
-                    .push(NibblePath::new(keys[0].to_vec()).get_nibble(depth_in_nibble - 1));
+                    .push(NibblePath::new_even(keys[0].to_vec()).get_nibble(depth_in_nibble - 1));
             }
             node_hashes.insert(cur_nibble_path.clone(), subtree.hash());
         }
@@ -559,7 +559,7 @@ where
                 if level_within_nibble != 0 {
                     let mut leaf_nibble_path = cur_nibble_path.clone();
                     leaf_nibble_path
-                        .push(NibblePath::new(keys[0].to_vec()).get_nibble(depth_in_nibble));
+                        .push(NibblePath::new_even(keys[0].to_vec()).get_nibble(depth_in_nibble));
                     node_hashes.insert(leaf_nibble_path, subtree.hash());
                 }
             }

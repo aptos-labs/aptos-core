@@ -9,7 +9,7 @@ use aptos_types::nibble::nibble_path::NibblePath;
 fn random_leaf_with_key(next_version: Version) -> (Node<ValueBlob>, NodeKey) {
     let address = HashValue::random();
     let node = Node::new_leaf(address, ValueBlob::from(HashValue::random().to_vec()));
-    let node_key = NodeKey::new(next_version, NibblePath::new(address.to_vec()));
+    let node_key = NodeKey::new(next_version, NibblePath::new_even(address.to_vec()));
     (node, node_key)
 }
 

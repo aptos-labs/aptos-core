@@ -6,13 +6,13 @@
 #[cfg(test)]
 mod state_store_test;
 
-use crate::state_value_index::StateValueIndexSchema;
 use crate::{
     change_set::ChangeSet,
     ledger_counters::LedgerCounter,
     schema::{
         jellyfish_merkle_node::JellyfishMerkleNodeSchema, stale_node_index::StaleNodeIndexSchema,
     },
+    state_value_index::StateValueIndexSchema,
     AptosDbError,
 };
 use anyhow::{ensure, Result};
@@ -49,7 +49,7 @@ impl StateStore {
         Self { db }
     }
 
-    /// Get the account state blob given account address and root hash of state Merkle tree
+    /// Get the state value with proof given the state key and root hash of state Merkle tree
     pub fn get_value_with_proof_by_version(
         &self,
         state_key: &StateKey,
@@ -61,6 +61,61 @@ impl StateStore {
             state_key_value_option.map(|x| x.value),
             SparseMerkleProof::from(proof),
         ))
+    }
+
+    /// Get the state value given the state key and root hash of state Merkle tree by using the
+    /// state value index. Only used for testing for now but should replace the
+    /// `get_value_with_proof_by_version` call for VM execution to fetch the value without proof.
+    #[cfg(test)]
+    pub fn get_value_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<StateValue>> {
+        match self.get_jmt_leaf_node_key(state_key, version)? {
+            Some(node_key) => {
+                let state_value =
+                    if let Some(node) = self.db.get::<JellyfishMerkleNodeSchema>(&node_key)? {
+                        match node {
+                            // Only if the node is a leaf node then the value
+                            // is present in the DB.
+                            Node::Leaf(leaf) => Some(leaf.value().value.clone()),
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    };
+                Ok(state_value)
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Returns the value index in the form of number of nibbles for given pair of state key and version
+    /// which can be used to index into the JMT leaf.
+    #[cfg(test)]
+    fn get_jmt_leaf_node_key(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<NodeKey>> {
+        let mut iter = self.db.iter::<StateValueIndexSchema>(Default::default())?;
+        iter.seek_for_prev(&(state_key.clone(), version))?;
+        Ok(iter
+            .next()
+            .transpose()?
+            .and_then(|((db_state_key, db_version), num_nibbles)| {
+                if *state_key == db_state_key {
+                    Some(NodeKey::new(
+                        // It is possible that the db_version is not equal to the version passed,
+                        // but it should be strictly less than or equal to the version.
+                        db_version,
+                        NibblePath::new_from_state_key(state_key, num_nibbles as usize),
+                    ))
+                } else {
+                    None
+                }
+            }))
     }
 
     /// Gets the proof that proves a range of accounts.

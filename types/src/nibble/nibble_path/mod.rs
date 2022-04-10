@@ -7,7 +7,11 @@
 #[cfg(test)]
 mod nibble_path_test;
 
-use crate::nibble::{Nibble, ROOT_NIBBLE_HEIGHT};
+use crate::{
+    nibble::{Nibble, ROOT_NIBBLE_HEIGHT},
+    state_store::state_key::StateKey,
+};
+use aptos_crypto::hash::CryptoHash;
 use mirai_annotations::*;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{collection::vec, prelude::*};
@@ -39,7 +43,7 @@ impl fmt::Debug for NibblePath {
 /// Convert a vector of bytes into `NibblePath` using the lower 4 bits of each byte as nibble.
 impl FromIterator<Nibble> for NibblePath {
     fn from_iter<I: IntoIterator<Item = Nibble>>(iter: I) -> Self {
-        let mut nibble_path = NibblePath::new(vec![]);
+        let mut nibble_path = NibblePath::new_even(vec![]);
         for nibble in iter {
             nibble_path.push(nibble);
         }
@@ -68,7 +72,7 @@ prop_compose! {
                 return NibblePath::new_odd(bytes);
             }
         }
-        NibblePath::new(bytes)
+        NibblePath::new_even(bytes)
     }
 }
 
@@ -86,7 +90,7 @@ prop_compose! {
 
 impl NibblePath {
     /// Creates a new `NibblePath` from a vector of bytes assuming each byte has 2 nibbles.
-    pub fn new(bytes: Vec<u8>) -> Self {
+    pub fn new_even(bytes: Vec<u8>) -> Self {
         checked_precondition!(bytes.len() <= ROOT_NIBBLE_HEIGHT / 2);
         let num_nibbles = bytes.len() * 2;
         NibblePath { num_nibbles, bytes }
@@ -102,6 +106,33 @@ impl NibblePath {
         );
         let num_nibbles = bytes.len() * 2 - 1;
         NibblePath { num_nibbles, bytes }
+    }
+
+    pub fn new_from_state_key(state_key: &StateKey, num_nibbles: usize) -> Self {
+        NibblePath::new_from_byte_array(state_key.hash().as_ref(), num_nibbles)
+    }
+
+    fn new_from_byte_array(bytes: &[u8], num_nibbles: usize) -> Self {
+        checked_precondition!(num_nibbles <= ROOT_NIBBLE_HEIGHT);
+        if num_nibbles % 2 == 1 {
+            // Rounded up number of bytes to be considered
+            let num_bytes = (num_nibbles + 1) / 2;
+            let mut nibble_bytes = bytes[..num_bytes].to_vec();
+            checked_precondition!(bytes.len() >= num_bytes);
+            // If number of nibbles is odd, make sure to pad the last nibble with 0s.
+            let last_byte_padded = bytes[num_bytes - 1] & 0xF0;
+            nibble_bytes[num_bytes - 1] = last_byte_padded;
+            NibblePath {
+                num_nibbles,
+                bytes: nibble_bytes,
+            }
+        } else {
+            checked_precondition!(bytes.len() >= num_nibbles / 2);
+            NibblePath {
+                num_nibbles,
+                bytes: bytes[..num_nibbles / 2].to_vec(),
+            }
+        }
     }
 
     /// Adds a nibble to the end of the nibble path.

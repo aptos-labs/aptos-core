@@ -125,7 +125,7 @@ where
         let mut done = false;
 
         let mut current_node_key = NodeKey::new_empty_path(version);
-        let nibble_path = NibblePath::new(starting_key.to_vec());
+        let nibble_path = NibblePath::new_even(starting_key.to_vec());
         let mut nibble_iter = nibble_path.nibbles();
 
         while let Node::Internal(internal_node) = reader.get_node(&current_node_key)? {
