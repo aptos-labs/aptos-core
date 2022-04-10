@@ -28,7 +28,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     on_chain_config::{
         OnChainConfig, ParallelExecutionConfig, VMConfig, VMPublishingOption, Version,
-        DIEM_VERSION_2, DIEM_VERSION_3,
+        
     },
     transaction::{
         ChangeSet, ModuleBundle, SignatureCheckedTransaction, SignedTransaction, Transaction,
@@ -212,17 +212,13 @@ impl AptosVM {
 
             match payload {
                 TransactionPayload::Script(script) => {
-                    let aptos_version = self.0.get_version()?;
-                    let remapped_script =
-                        if aptos_version < aptos_types::on_chain_config::DIEM_VERSION_2 {
-                            None
-                        } else {
-                            script_to_script_function::remapping(script.code())
-                        };
+                    // let aptos_version = self.0.get_version()?;
+                    let remapped_script = script_to_script_function::remapping(script.code());
+                        
                     let mut senders = vec![txn_data.sender()];
-                    if aptos_version >= DIEM_VERSION_3 {
-                        senders.extend(txn_data.secondary_signers());
-                    }
+                    
+                    senders.extend(txn_data.secondary_signers());
+                    
                     match remapped_script {
                         // We are in this case before VERSION_2
                         // or if there is no remapping for the script
@@ -244,11 +240,10 @@ impl AptosVM {
                     }
                 }
                 TransactionPayload::ScriptFunction(script_fn) => {
-                    let aptos_version = self.0.get_version()?;
+                    // let aptos_version = self.0.get_version()?;
                     let mut senders = vec![txn_data.sender()];
-                    if aptos_version >= DIEM_VERSION_3 {
-                        senders.extend(txn_data.secondary_signers());
-                    }
+                    senders.extend(txn_data.secondary_signers());
+
                     session.execute_script_function(
                         script_fn.module(),
                         script_fn.function(),
@@ -423,17 +418,13 @@ impl AptosVM {
             WriteSetPayload::Direct(change_set) => change_set.clone(),
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(storage);
-                let aptos_version = self.0.get_version().map_err(Err)?;
+                // let aptos_version = self.0.get_version().map_err(Err)?;
                 let senders = match txn_sender {
                     None => vec![*execute_as],
                     Some(sender) => vec![sender, *execute_as],
                 };
-                let remapped_script =
-                    if aptos_version < aptos_types::on_chain_config::DIEM_VERSION_2 {
-                        None
-                    } else {
-                        script_to_script_function::remapping(script.code())
-                    };
+                let remapped_script = script_to_script_function::remapping(script.code());
+                    
                 let execution_result = match remapped_script {
                     // We are in this case before VERSION_2
                     // or if there is no remapping for the script
@@ -779,10 +770,6 @@ impl VMAdapter for AptosVM {
     }
 
     fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus> {
-        if txn.is_multi_agent() && self.0.get_version()? < DIEM_VERSION_3 {
-            // Multi agent is not allowed
-            return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING));
-        }
         if txn.contains_duplicate_signers() {
             return Err(VMStatus::Error(StatusCode::SIGNERS_CONTAIN_DUPLICATES));
         }
@@ -828,10 +815,6 @@ impl VMAdapter for AptosVM {
                     .run_script_prologue(session, &txn_data, &currency_code, log_context)
             }
             TransactionPayload::ScriptFunction(_) => {
-                // gate the behavior until the version is ready
-                if self.0.get_version()? < DIEM_VERSION_2 {
-                    return Err(VMStatus::Error(StatusCode::FEATURE_UNDER_GATING));
-                }
                 // NOTE: Script and ScriptFunction shares the same prologue
                 self.0.check_gas(&txn_data, log_context)?;
                 self.0
