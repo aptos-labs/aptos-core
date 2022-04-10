@@ -1,0 +1,76 @@
+# Rust specific ignores
+# Please follow https://help.github.com/en/articles/ignoring-files to create a global
+# .gitignore file locally for IDE/Emacs/Vim generated files.
+**/target
+**/*.rs.bk
+.idea/
+
+# Ignore wallet mnemonic files used for deterministic key derivation
+*.mnemonic
+
+# GDB related
+**/.gdb_history
+
+# macOS Specific ignores
+# General
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Generated VM config in vm-genesis
+aptos-move/vm-genesis/genesis/vm_config.toml
+
+# Terraform
+.terraform/
+terraform/terraform.tfstate*
+terraform/.terraform.tfstate*
+terraform/fullnode/*-kubernetes.json
+terraform/validator/*/*-kubernetes.json
+terraform/validator/*/*-vault.ca
+terraform/validator/*/*-kube.config
+terraform/validator/vault-init/backend.tf
+terraform/testnet/*-kubernetes.json
+terraform/testnet/*-vault.ca
+
+# Move Build Output
+build/
+
+# Move coverage and tracing information
+.trace
+*.mvcov
+
+# Do not ignore the Move build output under the releases for DPN, core, and
+# experimental -- these are the release code.
+!aptos-move/framework/DPN/releases/artifacts/**
+!aptos-move/framework/experimental/releases/artifacts/**
+!aptos-move/framework/aptos-framework/releases/artifacts/**
+
+# Docker incremental build temporary files and directories
+target-out-docker
+**/Dockerfile.tmp
+
+# Doc generation output
+*.md.old
+
+# Vim swap files
+*.swp
+*.swo
