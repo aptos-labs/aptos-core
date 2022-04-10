@@ -4,7 +4,7 @@
 
 ---
 
-[![Aptos Rust Crate Documentation (main)](https://img.shields.io/badge/docs-main-59f)](https://aptos.github.io/aptos/)
+[![Aptos Rust Crate Documentation (main)](https://img.shields.io/badge/docs-main-59f)](https://aptos-labs.github.io/aptos-core/)
 [![License](https://img.shields.io/badge/license-Apache-green.svg)](LICENSE)
 [![CircleCI](https://circleci.com/gh/aptos-labs/aptos-core/tree/main.svg?style=shield&circle-token=d248cf1c0580eb69a507a71c0d238e1eaf193767)](https://circleci.com/gh/aptos-labs/aptos-core/tree/main)
 [![grcov](https://img.shields.io/badge/Coverage-grcov-green)](https://ci-artifacts.aptoslabs.com/coverage/unit-coverage/latest/index.html)
