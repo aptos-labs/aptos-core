@@ -29,6 +29,8 @@ aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspac
 aptos-temppath = { path = "../../../crates/aptos-temppath" }
 aptos-vm = { path = "../../../aptos-move/aptos-vm" }
 aptosdb = { path = "../../../storage/aptosdb" }
+aptos-state-view =  { path = "../../../storage/state-view" }
+
 cached-framework-packages = { path = "../../../aptos-move/framework/cached-packages" }
 storage-interface = { path = "../../../storage/storage-interface" }
 vm-genesis = { path = "../../../aptos-move/vm-genesis" }

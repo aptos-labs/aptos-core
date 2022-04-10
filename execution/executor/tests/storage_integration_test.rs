@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::PrivateKey;
+use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_transaction_builder::aptos_stdlib::{
     encode_mint_script_function, encode_set_version_script_function,
 };
 use aptos_types::{
-    account_config::aptos_root_address,
-    account_state::AccountState,
+    access_path::AccessPath,
+    account_config::{aptos_root_address, AccountResource},
+    account_view::AccountView,
     block_metadata::BlockMetadata,
     state_store::state_key::StateKey,
     transaction::{Transaction, WriteSetPayload},
@@ -21,7 +23,8 @@ use executor_test_helpers::{
     },
 };
 use executor_types::BlockExecutorTrait;
-use std::convert::TryFrom;
+use move_core_types::move_resource::MoveStructType;
+use storage_interface::state_view::DbStateViewAtVersion;
 
 #[test]
 fn test_genesis() {
@@ -43,12 +46,16 @@ fn test_genesis() {
     let li = state_proof.latest_ledger_info();
     assert_eq!(li.version(), 0);
 
-    let aptos_root_account = db
+    let account_resource_path = StateKey::AccessPath(AccessPath::new(
+        aptos_root_address(),
+        AccountResource::struct_tag().access_vector(),
+    ));
+    let aptos_root_account_resource = db
         .reader
-        .get_state_value_with_proof(StateKey::AccountAddressKey(aptos_root_address()), 0, 0)
+        .get_state_value_with_proof(account_resource_path.clone(), 0, 0)
         .unwrap();
-    aptos_root_account
-        .verify(li, 0, StateKey::AccountAddressKey(aptos_root_address()))
+    aptos_root_account_resource
+        .verify(li, 0, account_resource_path)
         .unwrap();
 }
 
@@ -70,25 +77,16 @@ fn test_reconfiguration() {
     // test the current keys in the validator's account equals to the key in the validator set
     let state_proof = db.reader.get_state_proof(0).unwrap();
     let current_version = state_proof.latest_ledger_info().version();
-    let validator_account_state_with_proof = db
+    let db_state_view = db
         .reader
-        .get_state_value_with_proof(
-            StateKey::AccountAddressKey(validator_account),
-            current_version,
-            current_version,
-        )
+        .state_view_at_version(Some(current_version))
         .unwrap();
-    let aptos_root_account_state_with_proof = db
-        .reader
-        .get_state_value_with_proof(
-            StateKey::AccountAddressKey(aptos_root_address()),
-            current_version,
-            current_version,
-        )
-        .unwrap();
+    let validator_account_state_view = db_state_view.as_account_with_state_view(&validator_account);
+    let root_address = aptos_root_address();
+    let root_account_state_view = db_state_view.as_account_with_state_view(&root_address);
+
     assert_eq!(
-        AccountState::try_from(&aptos_root_account_state_with_proof.value.unwrap())
-            .unwrap()
+        root_account_state_view
             .get_validator_set()
             .unwrap()
             .unwrap()
@@ -96,8 +94,7 @@ fn test_reconfiguration() {
             .next()
             .unwrap()
             .consensus_public_key(),
-        &AccountState::try_from(&validator_account_state_with_proof.value.unwrap())
-            .unwrap()
+        &validator_account_state_view
             .get_validator_config_resource()
             .unwrap()
             .unwrap()
@@ -155,17 +152,15 @@ fn test_reconfiguration() {
         .unwrap();
     verify_committed_txn_status(t3.as_ref(), &txn_block[2]).unwrap();
 
-    let aptos_root_account_state_with_proof = db
+    let db_state_view = db
         .reader
-        .get_state_value_with_proof(
-            StateKey::AccountAddressKey(aptos_root_address()),
-            current_version,
-            current_version,
-        )
+        .state_view_at_version(Some(current_version))
         .unwrap();
+
+    let root_account_state_view2 = db_state_view.as_account_with_state_view(&root_address);
+
     assert_eq!(
-        AccountState::try_from(&aptos_root_account_state_with_proof.value.unwrap())
-            .unwrap()
+        root_account_state_view2
             .get_version()
             .unwrap()
             .unwrap()

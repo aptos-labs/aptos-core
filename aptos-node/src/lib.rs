@@ -14,6 +14,7 @@ use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, Logger};
 use aptos_metrics::{get_public_json_metrics, get_public_metrics, metric_server};
+use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_telemetry::{
     constants::{APTOS_NODE_PUSH_METRICS, CHAIN_ID_METRIC, PEER_ID_METRIC},
     send_data,
@@ -21,11 +22,10 @@ use aptos_telemetry::{
 use aptos_time_service::TimeService;
 use aptos_types::{
     account_config::aptos_root_address,
-    account_state::AccountState,
+    account_view::AccountView,
     chain_id::ChainId,
     move_resource::MoveStorage,
     on_chain_config::{VMPublishingOption, ON_CHAIN_CONFIG_REGISTRY},
-    state_store::state_key::StateKey,
     waypoint::Waypoint,
 };
 use aptos_vm::AptosVM;
@@ -52,7 +52,6 @@ use state_sync_v1::network::{StateSyncEvents, StateSyncSender};
 use std::{
     boxed::Box,
     collections::{HashMap, HashSet},
-    convert::TryFrom,
     io::Write,
     net::ToSocketAddrs,
     path::PathBuf,
@@ -63,7 +62,7 @@ use std::{
     thread,
     time::Instant,
 };
-use storage_interface::DbReaderWriter;
+use storage_interface::{state_view::DbStateViewAtVersion, DbReaderWriter};
 use storage_service::start_storage_service_with_db;
 use storage_service_client::{StorageServiceClient, StorageServiceMultiSender};
 use storage_service_server::{
@@ -225,19 +224,15 @@ pub fn load_test_environment<R>(
 
 // Fetch chain ID from on-chain resource
 fn fetch_chain_id(db: &DbReaderWriter) -> ChainId {
-    let blob = db
+    let synced_version = (&*db.reader)
+        .fetch_synced_version()
+        .expect("[aptos-node] failed fetching synced version.");
+    let db_state_view = db
         .reader
-        .get_state_value_with_proof_by_version(
-            &StateKey::AccountAddressKey(aptos_root_address()),
-            (&*db.reader)
-                .fetch_synced_version()
-                .expect("[aptos-node] failed fetching synced version."),
-        )
-        .expect("[aptos-node] failed to get Aptos root address account state")
-        .0
-        .expect("[aptos-node] missing Aptos root address account state");
-    AccountState::try_from(&blob)
-        .expect("[aptos-node] failed to convert blob to account state")
+        .state_view_at_version(Some(synced_version))
+        .expect("[aptos-node] failed to create db state view");
+    db_state_view
+        .as_account_with_state_view(&aptos_root_address())
         .get_chain_id_resource()
         .expect("[aptos-node] failed to get chain ID resource")
         .expect("[aptos-node] missing chain ID resource")

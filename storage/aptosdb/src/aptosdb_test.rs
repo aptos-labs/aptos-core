@@ -635,25 +635,19 @@ fn test_get_latest_tree_state() {
     );
 
     // unbootstrapped db with pre-genesis state
-    let address = AccountAddress::ZERO;
-    let blob = AccountStateBlob::from(vec![1]);
+    let key = StateKey::Raw(String::from("test_key").into_bytes());
+    let value = StateValue::from(String::from("test_val").into_bytes());
+
     db.db
         .put::<JellyfishMerkleNodeSchema>(
             &NodeKey::new_empty_path(PRE_GENESIS_VERSION),
             &Node::new_leaf(
-                StateKey::AccountAddressKey(address).hash(),
-                StateKeyAndValue::new(
-                    StateKey::AccountAddressKey(address),
-                    StateValue::from(blob.clone()),
-                ),
+                key.hash(),
+                StateKeyAndValue::new(key.clone(), value.clone()),
             ),
         )
         .unwrap();
-    let hash = SparseMerkleLeafNode::new(
-        StateKey::AccountAddressKey(address).hash(),
-        StateValue::from(blob).hash(),
-    )
-    .hash();
+    let hash = SparseMerkleLeafNode::new(key.hash(), value.hash()).hash();
     let pre_genesis = db.get_latest_tree_state().unwrap();
     assert_eq!(pre_genesis, TreeState::new(0, vec![], hash));
 

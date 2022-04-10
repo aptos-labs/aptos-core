@@ -4,21 +4,20 @@
 use crate::{
     access_path::Path,
     account_address::AccountAddress,
-    account_config::{AccountResource, BalanceResource, CRSNResource, ChainIdResource},
+    account_config::{AccountResource, BalanceResource},
     account_state_blob::AccountStateBlob,
-    block_metadata::BlockResource,
-    on_chain_config::{
-        access_path_for_config, dpn_access_path_for_config, ConfigurationResource, OnChainConfig,
-        VMPublishingOption, ValidatorSet, Version,
-    },
-    state_store::state_value::StateValue,
-    timestamp::TimestampResource,
+    on_chain_config::{access_path_for_config, OnChainConfig, ValidatorSet},
+    state_store::{state_key::StateKey, state_value::StateValue},
     validator_config::{ValidatorConfig, ValidatorOperatorConfigResource},
 };
-use anyhow::{format_err, Error, Result};
+use anyhow::{anyhow, Error, Result};
 use move_core_types::{language_storage::StructTag, move_resource::MoveResource};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::btree_map::BTreeMap, convert::TryFrom, fmt};
+use std::{
+    collections::{btree_map::BTreeMap, HashMap},
+    convert::TryFrom,
+    fmt,
+};
 
 #[derive(Clone, Default, Deserialize, PartialEq, Serialize)]
 pub struct AccountState(BTreeMap<Vec<u8>, Vec<u8>>);
@@ -40,26 +39,6 @@ impl AccountState {
         }
     }
 
-    pub fn get_crsn_resource(&self) -> Result<Option<CRSNResource>> {
-        self.get_resource::<CRSNResource>()
-    }
-
-    pub fn get_balance_resources(&self) -> Result<Option<BalanceResource>> {
-        self.get_resource::<BalanceResource>()
-    }
-
-    pub fn get_chain_id_resource(&self) -> Result<Option<ChainIdResource>> {
-        self.get_resource::<ChainIdResource>()
-    }
-
-    pub fn get_configuration_resource(&self) -> Result<Option<ConfigurationResource>> {
-        self.get_resource::<ConfigurationResource>()
-    }
-
-    pub fn get_timestamp_resource(&self) -> Result<Option<TimestampResource>> {
-        self.get_resource::<TimestampResource>()
-    }
-
     pub fn get_validator_config_resource(&self) -> Result<Option<ValidatorConfig>> {
         self.get_resource::<ValidatorConfig>()
     }
@@ -72,22 +51,6 @@ impl AccountState {
 
     pub fn get_validator_set(&self) -> Result<Option<ValidatorSet>> {
         self.get_config::<ValidatorSet>()
-    }
-
-    pub fn get_version(&self) -> Result<Option<Version>> {
-        self.get_config::<Version>()
-    }
-
-    pub fn get_vm_publishing_option(&self) -> Result<Option<VMPublishingOption>> {
-        self.0
-            .get(&dpn_access_path_for_config(VMPublishingOption::CONFIG_ID).path)
-            .map(|bytes| VMPublishingOption::deserialize_into_config(bytes))
-            .transpose()
-            .map_err(Into::into)
-    }
-
-    pub fn get_block_resource(&self) -> Result<Option<BlockResource>> {
-        self.get_resource::<BlockResource>()
     }
 
     pub fn get(&self, key: &[u8]) -> Option<&Vec<u8>> {
@@ -115,10 +78,7 @@ impl AccountState {
     }
 
     pub fn get_config<T: OnChainConfig>(&self) -> Result<Option<T>> {
-        match self.get_resource_impl(&access_path_for_config(T::CONFIG_ID).path)? {
-            Some(config) => Ok(Some(config)),
-            _ => self.get_resource_impl(&dpn_access_path_for_config(T::CONFIG_ID).path),
-        }
+        self.get_resource_impl(&access_path_for_config(T::CONFIG_ID).path)
     }
 
     pub fn get_resource<T: MoveResource>(&self) -> Result<Option<T>> {
@@ -156,28 +116,13 @@ impl AccountState {
         })
     }
 
-    /// Given a particular `MoveResource`, return an iterator with all instances
-    /// of that resource (there may be multiple with different generic type parameters).
-    pub fn get_resources_with_type<T: MoveResource>(
-        &self,
-    ) -> impl Iterator<Item = Result<(StructTag, T)>> + '_ {
-        self.get_resources().filter_map(|(struct_tag, bytes)| {
-            let matches_resource = struct_tag.address == T::ADDRESS
-                && struct_tag.module.as_ref() == T::MODULE_NAME
-                && struct_tag.name.as_ref() == T::STRUCT_NAME;
-            if matches_resource {
-                match bcs::from_bytes::<T>(bytes) {
-                    Ok(resource) => Some(Ok((struct_tag, resource))),
-                    Err(err) => Some(Err(format_err!(
-                        "failed to deserialize resource: '{}', error: {:?}",
-                        struct_tag,
-                        err
-                    ))),
-                }
-            } else {
-                None
-            }
-        })
+    pub fn from_access_paths_and_values(
+        key_value_map: &HashMap<StateKey, StateValue>,
+    ) -> Result<Option<Self>> {
+        if key_value_map.is_empty() {
+            return Ok(None);
+        }
+        Some(Self::try_from(key_value_map)).transpose()
     }
 }
 
@@ -189,30 +134,12 @@ impl fmt::Debug for AccountState {
             .map(|account_resource_opt| format!("{:#?}", account_resource_opt))
             .unwrap_or_else(|e| format!("parse error: {:#?}", e));
 
-        let timestamp_str = self
-            .get_timestamp_resource()
-            .map(|timestamp_opt| format!("{:#?}", timestamp_opt))
-            .unwrap_or_else(|e| format!("parse: {:#?}", e));
-
-        let validator_config_str = self
-            .get_validator_config_resource()
-            .map(|validator_config_opt| format!("{:#?}", validator_config_opt))
-            .unwrap_or_else(|e| format!("parse error: {:#?}", e));
-
-        let validator_set_str = self
-            .get_validator_set()
-            .map(|validator_set_opt| format!("{:#?}", validator_set_opt))
-            .unwrap_or_else(|e| format!("parse error: {:#?}", e));
-
         write!(
             f,
             "{{ \n \
              AccountResource {{ {} }} \n \
-             Timestamp {{ {} }} \n \
-             ValidatorConfig {{ {} }} \n \
-             ValidatorSet {{ {} }} \n \
              }}",
-            account_resource_str, timestamp_str, validator_config_str, validator_set_str,
+            account_resource_str,
         )
     }
 }
@@ -224,7 +151,7 @@ impl TryFrom<&StateValue> for AccountState {
         let bytes = state_value
             .maybe_bytes
             .as_ref()
-            .ok_or_else(|| format_err!("Empty state value passed"))?;
+            .ok_or_else(|| anyhow!("Empty state value passed"))?;
 
         AccountState::try_from(bytes).map_err(Into::into)
     }
@@ -262,6 +189,25 @@ impl TryFrom<(&AccountResource, &BalanceResource)> for AccountState {
             bcs::to_bytes(balance_resource)?,
         );
 
+        Ok(Self(btree_map))
+    }
+}
+
+impl TryFrom<&HashMap<StateKey, StateValue>> for AccountState {
+    type Error = Error;
+
+    fn try_from(key_value_map: &HashMap<StateKey, StateValue>) -> Result<Self> {
+        let mut btree_map: BTreeMap<Vec<u8>, Vec<u8>> = BTreeMap::new();
+        for (key, value) in key_value_map {
+            match key {
+                StateKey::AccessPath(access_path) => {
+                    if let Some(bytes) = &value.maybe_bytes {
+                        btree_map.insert(access_path.path.clone(), bytes.clone());
+                    }
+                }
+                _ => return Err(anyhow!("Encountered unexpected key type {:?}", key)),
+            }
+        }
         Ok(Self(btree_map))
     }
 }

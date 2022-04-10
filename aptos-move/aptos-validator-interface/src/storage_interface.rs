@@ -9,11 +9,11 @@ use aptos_types::{
     account_state::AccountState,
     contract_event::EventWithProof,
     event::EventKey,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
     transaction::{Transaction, Version},
 };
 use aptosdb::AptosDB;
-use std::{convert::TryFrom, path::Path, sync::Arc};
+use std::{path::Path, sync::Arc};
 use storage_interface::{DbReader, Order};
 
 pub struct DBDebuggerInterface(Arc<dyn DbReader>);
@@ -35,11 +35,11 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         account: AccountAddress,
         version: Version,
     ) -> Result<Option<AccountState>> {
-        self.0
-            .get_state_value_with_proof_by_version(&StateKey::AccountAddressKey(account), version)?
-            .0
-            .map(|s| AccountState::try_from(&s))
-            .transpose()
+        AccountState::from_access_paths_and_values(
+            &self
+                .0
+                .get_state_values_by_key_prefix(&StateKeyPrefix::from(account), version)?,
+        )
     }
 
     fn get_state_value_by_version(

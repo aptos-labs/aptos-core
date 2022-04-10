@@ -41,6 +41,7 @@ pub mod write_set;
 
 pub use account_address::AccountAddress as PeerId;
 
+pub mod account_view;
 pub mod state_store;
 #[cfg(test)]
 mod unit_tests;

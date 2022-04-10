@@ -10,11 +10,9 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_logger::error;
+use aptos_state_view::account_with_state_cache::AsAccountWithStateCache;
 use aptos_types::{
-    access_path::AccessPath,
-    account_address::AccountAddress,
-    account_state::AccountState,
-    account_state_blob::AccountStateBlob,
+    account_view::AccountView,
     contract_event::ContractEvent,
     epoch_state::EpochState,
     event::EventKey,
@@ -32,7 +30,6 @@ use once_cell::sync::Lazy;
 use scratchpad::SparseMerkleTree;
 use std::{
     collections::{hash_map, HashMap, HashSet},
-    convert::TryFrom,
     iter::repeat,
     ops::Deref,
     sync::Arc,
@@ -166,17 +163,14 @@ impl ApplyChunkOutput {
     )> {
         let StateCache {
             frozen_base,
-            mut accounts,
-            mut state_cache,
+            state_cache: mut state_cache_map,
             proofs,
         } = state_cache;
 
         // Apply write sets to account states in the AccountCache, resulting in new account states.
         let state_store_updates = to_keep
             .iter()
-            .map(|(t, o)| {
-                process_write_set(t, &mut accounts, &mut state_cache, o.write_set().clone())
-            })
+            .map(|(t, o)| process_write_set(t, &mut state_cache_map, o.write_set().clone()))
             .collect::<Result<Vec<_>>>()?;
 
         // Apply new account states to the base state tree, resulting in updated state tree.
@@ -192,7 +186,7 @@ impl ApplyChunkOutput {
 
         // Get the updated validator set from updated account state.
         let next_epoch_state = if new_epoch {
-            Some(Self::parse_validator_set(&accounts)?)
+            Some(Self::parse_validator_set(&state_cache_map)?)
         } else {
             None
         };
@@ -218,23 +212,15 @@ impl ApplyChunkOutput {
             .collect()
     }
 
-    fn parse_validator_set(accounts: &HashMap<AccountAddress, AccountState>) -> Result<EpochState> {
-        let validator_set = accounts
-            .get(&on_chain_config::config_address())
-            .map(|state| {
-                state
-                    .get_validator_set()?
-                    .ok_or_else(|| anyhow!("ValidatorSet does not exist"))
-            })
-            .ok_or_else(|| anyhow!("ValidatorSet account does not exist"))??;
-        let configuration = accounts
-            .get(&on_chain_config::config_address())
-            .map(|state| {
-                state
-                    .get_configuration_resource()?
-                    .ok_or_else(|| anyhow!("Configuration does not exist"))
-            })
-            .ok_or_else(|| anyhow!("Association account does not exist"))??;
+    fn parse_validator_set(state_cache: &HashMap<StateKey, StateValue>) -> Result<EpochState> {
+        let on_chain_config_address = on_chain_config::config_address();
+        let account_state_view = state_cache.as_account_with_state_cache(&on_chain_config_address);
+        let validator_set = account_state_view
+            .get_validator_set()?
+            .ok_or_else(|| anyhow!("ValidatorSet not touched on epoch change"))?;
+        let configuration = account_state_view
+            .get_configuration_resource()?
+            .ok_or_else(|| anyhow!("Configuration resource not touched on epoch change"))?;
 
         Ok(EpochState {
             epoch: configuration.epoch(),
@@ -304,30 +290,6 @@ pub fn ensure_no_retry(to_retry: Vec<Transaction>) -> Result<()> {
     Ok(())
 }
 
-fn process_access_path_write_op(
-    transaction: &Transaction,
-    account_to_state: &mut HashMap<AccountAddress, AccountState>,
-    addresses: &mut HashSet<StateKey>,
-    access_path: AccessPath,
-    write_op: WriteOp,
-) -> Result<()> {
-    let address = access_path.address;
-    let path = access_path.path;
-    match account_to_state.entry(address) {
-        hash_map::Entry::Occupied(mut entry) => {
-            update_account_state(entry.get_mut(), path, write_op);
-        }
-        hash_map::Entry::Vacant(entry) => {
-            ensure_txn_valid_for_vacant_entry(transaction)?;
-            let mut account_state = Default::default();
-            update_account_state(&mut account_state, path, write_op);
-            entry.insert(account_state);
-        }
-    }
-    addresses.insert(StateKey::AccountAddressKey(address));
-    Ok(())
-}
-
 fn ensure_txn_valid_for_vacant_entry(transaction: &Transaction) -> Result<()> {
     // Before writing to an account, VM should always read that account. So we
     // should not reach this code path. The exception is genesis transaction (and
@@ -380,7 +342,6 @@ fn process_state_key_write_op(
 /// on the write set. Returns the blob value of all these accounts.
 pub fn process_write_set(
     transaction: &Transaction,
-    account_to_state: &mut HashMap<AccountAddress, AccountState>,
     state_cache: &mut HashMap<StateKey, StateValue>,
     write_set: WriteSet,
 ) -> Result<HashMap<StateKey, StateValue>> {
@@ -389,57 +350,23 @@ pub fn process_write_set(
     // Find all addresses this transaction touches while processing each write op.
     let mut updated_keys = HashSet::new();
     for (state_key, write_op) in write_set.into_iter() {
-        match &state_key {
-            StateKey::AccessPath(access_path) => process_access_path_write_op(
-                transaction,
-                account_to_state,
-                &mut updated_keys,
-                access_path.clone(),
-                write_op,
-            )?,
-            StateKey::AccountAddressKey(_) => {
-                bail!("Account address state key is not expected in write set")
-            }
-            // For now, we only support write set with access path, this needs to be updated once
-            // we support table items
-            StateKey::Raw(_) | StateKey::TableItem { .. } => process_state_key_write_op(
-                transaction,
-                state_cache,
-                &mut updated_keys,
-                state_key,
-                write_op,
-            )?,
-        }
+        process_state_key_write_op(
+            transaction,
+            state_cache,
+            &mut updated_keys,
+            state_key,
+            write_op,
+        )?;
     }
 
     for state_key in updated_keys {
-        match state_key {
-            StateKey::AccountAddressKey(address) => {
-                let account_state = account_to_state
-                    .get(&address)
-                    .expect("Address should exist.");
-                state_updates.insert(
-                    state_key,
-                    StateValue::from(AccountStateBlob::try_from(account_state)?),
-                );
-            }
-            _ => {
-                let state_value = state_cache
-                    .get(&state_key)
-                    .expect("State value should exist.");
-                state_updates.insert(state_key, state_value.clone());
-            }
-        }
+        let state_value = state_cache
+            .get(&state_key)
+            .expect("State value should exist.");
+        state_updates.insert(state_key, state_value.clone());
     }
 
     Ok(state_updates)
-}
-
-fn update_account_state(account_state: &mut AccountState, path: Vec<u8>, write_op: WriteOp) {
-    match write_op {
-        WriteOp::Value(new_value) => account_state.insert(path, new_value),
-        WriteOp::Deletion => account_state.remove(&path),
-    };
 }
 
 pub trait IntoLedgerView {

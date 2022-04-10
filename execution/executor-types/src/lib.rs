@@ -376,12 +376,12 @@ impl Default for ExecutedTrees {
 }
 
 pub struct ProofReader {
-    account_to_proof: HashMap<HashValue, SparseMerkleProof>,
+    proofs: HashMap<HashValue, SparseMerkleProof>,
 }
 
 impl ProofReader {
-    pub fn new(account_to_proof: HashMap<HashValue, SparseMerkleProof>) -> Self {
-        ProofReader { account_to_proof }
+    pub fn new(proofs: HashMap<HashValue, SparseMerkleProof>) -> Self {
+        ProofReader { proofs }
     }
 
     pub fn new_empty() -> Self {
@@ -391,7 +391,7 @@ impl ProofReader {
 
 impl ProofRead<StateValue> for ProofReader {
     fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProof> {
-        self.account_to_proof.get(&key)
+        self.proofs.get(&key)
     }
 }
 

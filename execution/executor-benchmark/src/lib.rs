@@ -121,7 +121,7 @@ pub fn run_benchmark(
 
     // Do a sanity check on the sequence number to make sure all transactions are committed.
     if verify {
-        generator.verify_sequence_number(db.as_ref());
+        generator.verify_sequence_number(db.clone());
     }
 }
 

@@ -6,15 +6,15 @@ use crate::{
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
+use aptos_state_view::account_with_state_view::{AccountWithStateView, AsAccountWithStateView};
 use aptos_transaction_builder::aptos_stdlib::{
     encode_create_account_script_function, encode_mint_script_function,
     encode_transfer_script_function,
 };
 use aptos_types::{
     account_config::aptos_root_address,
-    account_state::AccountState,
+    account_view::AccountView,
     event::EventKey,
-    state_store::{state_key::StateKey, state_value::StateValueWithProof},
     transaction::{
         authenticator::AuthenticationKey, Transaction, TransactionListWithProof,
         TransactionWithProof, WriteSetPayload,
@@ -27,8 +27,9 @@ use aptosdb::AptosDB;
 use executor::block_executor::BlockExecutor;
 use executor_types::BlockExecutorTrait;
 use rand::SeedableRng;
-use std::{convert::TryFrom, sync::Arc};
-use storage_interface::{DbReaderWriter, Order};
+use std::sync::Arc;
+
+use storage_interface::{state_view::DbStateViewAtVersion, DbReaderWriter, Order};
 
 pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let (genesis, validators) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
@@ -225,35 +226,29 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         .unwrap();
     verify_committed_txn_status(t6.as_ref(), &block1[8]).unwrap();
 
-    let account1_state_with_proof = db
+    let db_state_view = db
         .reader
-        .get_state_value_with_proof(
-            StateKey::AccountAddressKey(account1),
-            current_version,
-            current_version,
-        )
+        .state_view_at_version(Some(current_version))
         .unwrap();
-    verify_account_balance(&account1_state_with_proof, |x| x == 1_910_000).unwrap();
+    let account1_state_view = db_state_view.as_account_with_state_view(&account1);
+    verify_account_balance(get_account_balance(&account1_state_view), |x| {
+        x == 1_910_000
+    })
+    .unwrap();
 
-    let account2_state_with_proof = db
-        .reader
-        .get_state_value_with_proof(
-            StateKey::AccountAddressKey(account2),
-            current_version,
-            current_version,
-        )
-        .unwrap();
-    verify_account_balance(&account2_state_with_proof, |x| x == 1_210_000).unwrap();
+    let account2_state_view = db_state_view.as_account_with_state_view(&account2);
 
-    let account3_state_with_proof = db
-        .reader
-        .get_state_value_with_proof(
-            StateKey::AccountAddressKey(account3),
-            current_version,
-            current_version,
-        )
-        .unwrap();
-    verify_account_balance(&account3_state_with_proof, |x| x == 1_080_000).unwrap();
+    verify_account_balance(get_account_balance(&account2_state_view), |x| {
+        x == 1_210_000
+    })
+    .unwrap();
+
+    let account3_state_view = db_state_view.as_account_with_state_view(&account3);
+
+    verify_account_balance(get_account_balance(&account3_state_view), |x| {
+        x == 1_080_000
+    })
+    .unwrap();
 
     let transaction_list_with_proof = db
         .reader
@@ -326,16 +321,14 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         )
         .unwrap();
     assert_eq!(account3_received_events.len(), 2);
-
-    let account4_state = db
+    let account4_resource = db
         .reader
-        .get_state_value_with_proof(
-            StateKey::AccountAddressKey(account4),
-            current_version,
-            current_version,
-        )
+        .state_view_at_version(Some(current_version))
+        .unwrap()
+        .as_account_with_state_view(&account4)
+        .get_account_resource()
         .unwrap();
-    assert!(account4_state.value.is_none());
+    assert!(account4_resource.is_none());
 
     let account4_transaction = db
         .reader
@@ -386,25 +379,24 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         .unwrap();
     verify_committed_txn_status(t20.as_ref(), &block2[13]).unwrap();
 
-    let account1_state_with_proof = db
+    let db_state_view = db
         .reader
-        .get_state_value_with_proof(
-            StateKey::AccountAddressKey(account1),
-            current_version,
-            current_version,
-        )
+        .state_view_at_version(Some(current_version))
         .unwrap();
-    verify_account_balance(&account1_state_with_proof, |x| x == 1_770_000).unwrap();
 
-    let account3_state_with_proof = db
-        .reader
-        .get_state_value_with_proof(
-            StateKey::AccountAddressKey(account3),
-            current_version,
-            current_version,
-        )
-        .unwrap();
-    verify_account_balance(&account3_state_with_proof, |x| x == 1_220_000).unwrap();
+    let account1_state_view = db_state_view.as_account_with_state_view(&account1);
+
+    verify_account_balance(get_account_balance(&account1_state_view), |x| {
+        x == 1_770_000
+    })
+    .unwrap();
+
+    let account3_state_view = db_state_view.as_account_with_state_view(&account3);
+
+    verify_account_balance(get_account_balance(&account3_state_view), |x| {
+        x == 1_220_000
+    })
+    .unwrap();
 
     let transaction_list_with_proof = db
         .reader
@@ -438,7 +430,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         .reader
         .get_events(
             &EventKey::new_from_address(&account3, 1),
-            u64::max_value(),
+            u64::MAX,
             Order::Descending,
             10,
         )
@@ -477,18 +469,18 @@ pub fn create_db_and_executor<P: AsRef<std::path::Path>>(
     (db, dbrw, executor, waypoint)
 }
 
-pub fn verify_account_balance<F>(account_state_with_proof: &StateValueWithProof, f: F) -> Result<()>
+pub fn get_account_balance(account_state_view: &AccountWithStateView) -> u64 {
+    account_state_view
+        .get_balance_resource()
+        .unwrap()
+        .map(|b| b.coin())
+        .unwrap_or(0)
+}
+
+pub fn verify_account_balance<F>(balance: u64, f: F) -> Result<()>
 where
     F: Fn(u64) -> bool,
 {
-    let balance = if let Some(blob) = &account_state_with_proof.value {
-        AccountState::try_from(blob)?
-            .get_balance_resources()?
-            .map(|b| b.coin())
-            .unwrap_or(0)
-    } else {
-        0
-    };
     ensure!(
         f(balance),
         "balance {} doesn't satisfy the condition passed in",
