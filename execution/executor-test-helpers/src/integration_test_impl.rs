@@ -25,10 +25,8 @@ use aptos_types::{
     trusted_state::{TrustedState, TrustedStateChange},
     waypoint::Waypoint,
 };
-use aptos_sdk::{
-    transaction_builder::TransactionFactory,
-    types::{transaction::SignedTransaction, LocalAccount},
-};
+
+use aptos_sdk::types::LocalAccount;
 
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
@@ -57,23 +55,28 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let seed = [3u8; 32];
     let mut rng = ::rand::rngs::StdRng::from_seed(seed);
 
-    // I am having difficulty import this module
-    let privkey1 = LocalAccount::generate(&mut rng);
-    let pubkey1 = privkey1.public_key();
-    let account1_auth_key = AuthenticationKey::ed25519(&pubkey1);
+    let local_account1 = LocalAccount::generate(&mut rng);
+    let privkey1 = local_account1.private_key();
+    let pubkey1 = local_account1.public_key();
+    let account1_auth_key = local_account1.authentication_key();
     let account1 = account1_auth_key.derived_address();
 
-    let privkey2 = LocalAccount::generate(&mut rng);
-    let pubkey2 = privkey2.public_key();
-    let account2_auth_key = AuthenticationKey::ed25519(&pubkey2);
+    let local_account2 = LocalAccount::generate(&mut rng);
+    let privkey2 = local_account1.private_key();
+    let pubkey2 = local_account1.public_key();
+    let account2_auth_key = local_account1.authentication_key();
     let account2 = account2_auth_key.derived_address();
 
-    let pubkey3 = LocalAccount::generate(&mut rng).public_key();
-    let account3_auth_key = AuthenticationKey::ed25519(&pubkey3);
+    let local_account3 = LocalAccount::generate(&mut rng);
+    let privkey3 = local_account1.private_key();
+    let pubkey3 = local_account1.public_key();
+    let account3_auth_key = local_account1.authentication_key();
     let account3 = account3_auth_key.derived_address();
 
-    let pubkey4 = LocalAccount::generate(&mut rng).public_key();
-    let account4_auth_key = AuthenticationKey::ed25519(&pubkey4); // non-existent account
+    let local_account4 = LocalAccount::generate(&mut rng);
+    let privkey4 = local_account1.private_key();
+    let pubkey4 = local_account1.public_key();
+    let account4_auth_key = local_account1.authentication_key();
     let account4 = account4_auth_key.derived_address();
     let genesis_account = testnet_dd_account_address();
     let tc_account = treasury_compliance_account_address();
@@ -189,8 +192,8 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let txn5 = get_test_signed_transaction(
         account2,
         /* sequence_number = */ 0,
-        privkey2,
-        pubkey2,
+        privkey2.clone(),
+        pubkey2.clone(),
         Some(encode_peer_to_peer_with_metadata_script_function(
             xus_tag(),
             account3,

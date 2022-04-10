@@ -28,3 +28,4 @@ storage-interface = { path = "../../storage/storage-interface" }
 storage-service = { path = "../../storage/storage-service" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 vm-genesis = { path = "../../aptos-move/vm-genesis" }
+aptos-sdk = { path = "../../sdk" }

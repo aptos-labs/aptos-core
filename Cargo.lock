@@ -3124,6 +3124,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-genesis-tool",
+ "aptos-sdk",
  "aptos-temppath",
  "aptos-transaction-builder",
  "aptos-types",
