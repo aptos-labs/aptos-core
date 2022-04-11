@@ -10,7 +10,7 @@ The project is undergoing daily changes. Pull Requests will be reviewed and resp
 
 ### Have you read the [Contributing Guidelines on pull requests](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md#pull-requests)?
 
-(Write your answer here.)
+(You must have submitted a [signed CLA](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md#contributor-license-agreement) that includes your GitHub handle prior to us accepting and landing your work. Write your answer here.)
 
 ## Test Plan
 
@@ -19,10 +19,3 @@ The project is undergoing daily changes. Pull Requests will be reviewed and resp
 ## Related PRs
 
 (If this PR adds or changes functionality, please take some time to update the docs at https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site, and link to your PR here.)
-
-## If targeting a release branch, please fill the below out as well
-
- * Justification and breaking nature (who does it affect? validators, full nodes, tooling, operators, AOS, etc.)
- * Comprehensive test results that demonstrate the fix working and not breaking existing workflows.
- * Why we must have it for the release.
- * What workarounds and alternative we have if we do not push the PR.
