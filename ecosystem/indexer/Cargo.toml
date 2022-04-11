@@ -8,7 +8,6 @@ repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
-default-run = "indexer"
 
 [dependencies]
 aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
@@ -32,5 +31,4 @@ url = "2.2.2"
 
 
 [[bin]]
-name = "indexer"
-path = "src/main.rs"
+name = "aptos-indexer"

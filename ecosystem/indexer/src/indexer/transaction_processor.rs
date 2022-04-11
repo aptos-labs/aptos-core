@@ -123,7 +123,11 @@ pub trait TransactionProcessor: Send + Sync + Debug {
 
         dsl::processor_statuses
             .select(dsl::version)
-            .filter(dsl::ok.eq(false).and(dsl::name.eq(self.name().to_string())))
+            .filter(
+                dsl::success
+                    .eq(false)
+                    .and(dsl::name.eq(self.name().to_string())),
+            )
             .load::<i64>(&conn)
             .expect("Error loading the error versions only query")
             .iter()

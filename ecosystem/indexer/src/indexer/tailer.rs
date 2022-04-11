@@ -52,7 +52,7 @@ impl Tailer {
         self.processors.push(processor);
     }
 
-    /// For all versions which have an `ok=false` in the `processor_status` table, re-run them
+    /// For all versions which have an `success=false` in the `processor_status` table, re-run them
     pub async fn handle_previous_errors(&self) {
         info!("Checking for previously errored versions...");
         let mut tasks = vec![];

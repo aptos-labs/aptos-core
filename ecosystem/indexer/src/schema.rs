@@ -29,7 +29,7 @@ table! {
     processor_statuses (name, version) {
         name -> Varchar,
         version -> Int8,
-        ok -> Bool,
+        success -> Bool,
         details -> Nullable<Text>,
         last_updated -> Timestamp,
     }
@@ -60,6 +60,7 @@ table! {
         sequence_number -> Int8,
         max_gas_amount -> Int8,
         expiration_timestamp_secs -> Timestamp,
+        gas_unit_price -> Int8,
         timestamp -> Timestamp,
         inserted_at -> Timestamp,
     }

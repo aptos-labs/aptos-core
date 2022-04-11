@@ -32,8 +32,9 @@ CREATE TABLE user_transactions
     sender                    VARCHAR(255)                    NOT NULL,
     sequence_number           BIGINT                          NOT NULL,
     max_gas_amount            BIGINT                          NOT NULL,
-    -- ignore 'gas_currency_code' and 'gas_unit_price', we'll remove it
+    -- ignore 'gas_currency_code', as we'll remove it
     expiration_timestamp_secs TIMESTAMP                       NOT NULL,
+    gas_unit_price            BIGINT                          NOT NULL,
 
     -- from UserTransaction
     "timestamp"               TIMESTAMP                       NOT NULL,

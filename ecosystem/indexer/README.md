@@ -1,6 +1,13 @@
 # Aptos Indexer
 > Tails the blockchain's transactions and pushes them into a postgres DB
 
+Tails the node utilizing the rest interface/client, and maintains state for each registered `TransactionProcessor`.
+On startup, by default, will retry any previously errored versions for each registered processor.
+
+When developing your own, ensure each `TransactionProcessor` is idempotent, and being called with the same input won't result in an error if
+some or all of the processing had previously been completed.
+
+
 Example invocation:
 ```bash
 cargo run -- --pg-uri "postgresql://localhost/postgres" --node-url "https://fullnode.devnet.aptoslabs.com" --emit-every 25 --batch-size 100

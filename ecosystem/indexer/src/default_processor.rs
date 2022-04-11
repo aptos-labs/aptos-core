@@ -62,7 +62,7 @@ impl TransactionProcessor for DefaultTransactionProcessor {
         })?;
 
         let tx_result = conn.transaction::<(), diesel::result::Error, _>(||{
-        aptos_logger::debug!(
+        aptos_logger::trace!(
             "[default_processor] inserting 'transaction' version {} with hash {}",
             version,
             &transaction_model.hash
@@ -80,7 +80,7 @@ impl TransactionProcessor for DefaultTransactionProcessor {
         if let Some(tx_details_model) = maybe_details_model {
             match tx_details_model {
                 Either::Left(ut) => {
-                    aptos_logger::debug!(
+                    aptos_logger::trace!(
                         "[default_processor] inserting 'user_transaction' version {} with hash {}",
                         version,
                         &transaction_model.hash
@@ -96,7 +96,7 @@ impl TransactionProcessor for DefaultTransactionProcessor {
                     .expect("Error inserting row into database");
                 }
                 Either::Right(bmt) => {
-                    aptos_logger::debug!(
+                    aptos_logger::trace!(
                         "[default_processor] inserting 'block_metadata_transaction' version {} with hash {}",
                         version,
                         &transaction_model.hash

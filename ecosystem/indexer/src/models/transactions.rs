@@ -19,7 +19,7 @@ use diesel::{
 use futures::future::Either;
 use serde::Serialize;
 
-#[derive(Debug, Queryable, Serialize, Insertable, AsChangeset, Identifiable)]
+#[derive(AsChangeset, Debug, Identifiable, Insertable, Queryable, Serialize)]
 #[primary_key(hash)]
 #[diesel(table_name = "transactions")]
 pub struct Transaction {
@@ -228,7 +228,7 @@ impl Transaction {
     }
 }
 
-#[derive(Debug, Queryable, Serialize, Identifiable, Insertable, AsChangeset, Associations)]
+#[derive(AsChangeset, Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
 #[belongs_to(Transaction, foreign_key = "hash")]
 #[primary_key(hash)]
 #[diesel(table_name = "user_transactions")]
@@ -241,6 +241,7 @@ pub struct UserTransaction {
 
     // from UserTransactionRequest
     pub expiration_timestamp_secs: chrono::NaiveDateTime,
+    pub gas_unit_price: i64,
 
     // from UserTransaction
     pub timestamp: chrono::NaiveDateTime,
@@ -261,13 +262,14 @@ impl UserTransaction {
                 *tx.request.expiration_timestamp_secs.inner() as i64,
                 0,
             ),
+            gas_unit_price: *tx.request.gas_unit_price.inner() as i64,
             timestamp: parse_timestamp(tx.timestamp, tx.info.version),
             inserted_at: chrono::Utc::now().naive_utc(),
         }
     }
 }
 
-#[derive(Debug, Queryable, Serialize, Identifiable, Insertable, AsChangeset, Associations)]
+#[derive(AsChangeset, Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
 #[belongs_to(Transaction, foreign_key = "hash")]
 #[primary_key("hash")]
 #[diesel(table_name = "block_metadata_transactions")]

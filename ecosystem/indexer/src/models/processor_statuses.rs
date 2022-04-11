@@ -6,22 +6,22 @@ use crate::{
     schema::processor_statuses as processor_statuss,
 };
 
-#[derive(Debug, Queryable, Insertable, AsChangeset)]
+#[derive(AsChangeset, Debug, Insertable, Queryable)]
 #[diesel(table_name = processor_statuses)]
 pub struct ProcessorStatus {
     pub name: &'static str,
     pub version: i64,
-    pub ok: bool,
+    pub success: bool,
     pub details: Option<String>,
     pub last_updated: chrono::NaiveDateTime,
 }
 
 impl ProcessorStatus {
-    pub fn new(name: &'static str, version: i64, ok: bool, details: Option<String>) -> Self {
+    pub fn new(name: &'static str, version: i64, success: bool, details: Option<String>) -> Self {
         Self {
             name,
             version,
-            ok,
+            success,
             details,
             last_updated: chrono::Utc::now().naive_utc(),
         }
