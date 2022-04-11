@@ -7,7 +7,7 @@
 //!
 
 use crate::CliResult;
-use clap::{ArgEnum, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use move_core_types::errmap::ErrorMapping;
 use move_vm_types::gas_schedule::INITIAL_COST_SCHEDULE;
 
@@ -15,7 +15,7 @@ pub mod chain;
 
 /// CLI tool for performing Move tasks
 ///
-#[derive(ArgEnum, Subcommand)]
+#[derive(Subcommand)]
 pub enum MoveTool {
     Command(MoveCli),
 }

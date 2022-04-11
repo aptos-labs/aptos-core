@@ -103,7 +103,7 @@ dependencies = [
  "aptos-workspace-hack",
  "bcs",
  "cached-framework-packages",
- "clap 3.1.6",
+ "clap 3.1.8",
  "datatest-stable",
  "move-cli",
  "move-core-types",
@@ -163,7 +163,7 @@ dependencies = [
  "base64",
  "bcs",
  "cached-framework-packages",
- "clap 3.1.6",
+ "clap 3.1.8",
  "hex",
  "move-cli",
  "move-core-types",
@@ -1042,7 +1042,7 @@ dependencies = [
  "aptos-workspace-hack",
  "bcs",
  "cached-framework-packages",
- "clap 3.1.6",
+ "clap 3.1.8",
  "datatest-stable",
  "framework",
  "hex",
@@ -1922,9 +1922,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.1.6"
+version = "3.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8c93436c21e4698bacadf42917db28b23017027a4deccb35dbe47a7e7840123"
+checksum = "71c47df61d9e16dc010b55dba1952a57d8c215dbb533fd13cdd13369aac73b1c"
 dependencies = [
  "atty",
  "bitflags",
@@ -1939,9 +1939,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "3.1.4"
+version = "3.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da95d038ede1a964ce99f49cbe27a7fb538d1da595e4b4f70b8c8f338d17bf16"
+checksum = "a3aab4734e083b809aaf5794e14e756d1c798d2c69c7f7de7a09a2f5214993c1"
 dependencies = [
  "heck 0.4.0",
  "proc-macro-error",
@@ -3295,7 +3295,7 @@ dependencies = [
  "aptos-vm",
  "aptos-workspace-hack",
  "bcs",
- "clap 3.1.6",
+ "clap 3.1.8",
  "datatest-stable",
  "dir-diff",
  "include_dir 0.7.2",
@@ -4690,7 +4690,7 @@ version = "0.1.0"
 source = "git+https://github.com/diem/move?rev=3fe033b112eae7df2d15ab3467624165ae510caa#3fe033b112eae7df2d15ab3467624165ae510caa"
 dependencies = [
  "anyhow",
- "clap 3.1.6",
+ "clap 3.1.8",
  "crossterm 0.21.0",
  "move-binary-format",
  "move-bytecode-source-map",
@@ -4709,7 +4709,7 @@ source = "git+https://github.com/diem/move?rev=3fe033b112eae7df2d15ab3467624165a
 dependencies = [
  "anyhow",
  "bcs",
- "clap 3.1.6",
+ "clap 3.1.8",
  "codespan-reporting",
  "colored",
  "difference",
@@ -4766,7 +4766,7 @@ source = "git+https://github.com/diem/move?rev=3fe033b112eae7df2d15ab3467624165a
 dependencies = [
  "anyhow",
  "bcs",
- "clap 3.1.6",
+ "clap 3.1.8",
  "codespan-reporting",
  "difference",
  "hex",
@@ -4815,7 +4815,7 @@ source = "git+https://github.com/diem/move?rev=3fe033b112eae7df2d15ab3467624165a
 dependencies = [
  "anyhow",
  "bcs",
- "clap 3.1.6",
+ "clap 3.1.8",
  "codespan",
  "colored",
  "move-binary-format",
@@ -4836,7 +4836,7 @@ version = "0.1.0"
 source = "git+https://github.com/diem/move?rev=3fe033b112eae7df2d15ab3467624165ae510caa#3fe033b112eae7df2d15ab3467624165ae510caa"
 dependencies = [
  "anyhow",
- "clap 3.1.6",
+ "clap 3.1.8",
  "colored",
  "move-binary-format",
  "move-bytecode-source-map",
@@ -4906,7 +4906,7 @@ source = "git+https://github.com/diem/move?rev=3fe033b112eae7df2d15ab3467624165a
 dependencies = [
  "anyhow",
  "bcs",
- "clap 3.1.6",
+ "clap 3.1.8",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-bytecode-verifier",
@@ -5002,7 +5002,7 @@ source = "git+https://github.com/diem/move?rev=3fe033b112eae7df2d15ab3467624165a
 dependencies = [
  "anyhow",
  "bcs",
- "clap 3.1.6",
+ "clap 3.1.8",
  "colored",
  "move-abigen",
  "move-binary-format",
@@ -5037,7 +5037,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "atty",
- "clap 3.1.6",
+ "clap 3.1.8",
  "codespan",
  "codespan-reporting",
  "futures",
@@ -5160,7 +5160,7 @@ source = "git+https://github.com/diem/move?rev=3fe033b112eae7df2d15ab3467624165a
 dependencies = [
  "anyhow",
  "bytecode-interpreter-crypto",
- "clap 3.1.6",
+ "clap 3.1.8",
  "codespan-reporting",
  "itertools",
  "move-binary-format",
@@ -5234,7 +5234,7 @@ source = "git+https://github.com/diem/move?rev=3fe033b112eae7df2d15ab3467624165a
 dependencies = [
  "anyhow",
  "atty",
- "clap 3.1.6",
+ "clap 3.1.8",
  "codespan",
  "codespan-reporting",
  "ethnum",
@@ -5271,7 +5271,7 @@ version = "0.1.0"
 source = "git+https://github.com/diem/move?rev=3fe033b112eae7df2d15ab3467624165ae510caa#3fe033b112eae7df2d15ab3467624165ae510caa"
 dependencies = [
  "anyhow",
- "clap 3.1.6",
+ "clap 3.1.8",
  "colored",
  "move-binary-format",
  "move-bytecode-source-map",
@@ -5303,7 +5303,7 @@ version = "0.1.0"
 source = "git+https://github.com/diem/move?rev=3fe033b112eae7df2d15ab3467624165ae510caa#3fe033b112eae7df2d15ab3467624165ae510caa"
 dependencies = [
  "anyhow",
- "clap 3.1.6",
+ "clap 3.1.8",
  "colored",
  "evm",
  "evm-exec-utils",
@@ -8713,7 +8713,7 @@ version = "1.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ee73e6e4924fe940354b8d4d98cad5231175d615cd855b758adc658c0aac6a0"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "static_assertions",
 ]
 
@@ -9315,7 +9315,7 @@ dependencies = [
  "byteorder",
  "bytes",
  "clap 2.34.0",
- "clap 3.1.6",
+ "clap 3.1.8",
  "codespan-reporting",
  "crossbeam-utils",
  "crunchy",

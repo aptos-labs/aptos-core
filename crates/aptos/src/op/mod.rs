@@ -7,13 +7,13 @@
 //!
 
 use crate::CliResult;
-use clap::{ArgEnum, Subcommand};
+use clap::Subcommand;
 
 pub mod key;
 
 /// CLI tool for performing operational tasks
 ///
-#[derive(ArgEnum, Debug, Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum OpTool {
     #[clap(subcommand)]
     Key(key::KeyTool),

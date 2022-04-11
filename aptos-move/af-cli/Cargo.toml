@@ -12,7 +12,7 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.52"
 bcs = "0.1.2"
-clap = "3.1.6"
+clap = "3.1.8"
 
 aptos-vm = { path = "../aptos-vm" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }

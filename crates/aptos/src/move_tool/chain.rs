@@ -3,11 +3,11 @@
 
 use crate::CliResult;
 use aptos_types::account_address::AccountAddress;
-use clap::{ArgEnum, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 
 /// CLI tool for performing onchain tasks
 ///
-#[derive(Debug, ArgEnum, Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum ChainTool {
     List(ListResources),
 }
