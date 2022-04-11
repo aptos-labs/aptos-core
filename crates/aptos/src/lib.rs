@@ -16,6 +16,7 @@ use clap::Parser;
 #[derive(Parser)]
 #[clap(name = "aptos", author, version, propagate_version = true)]
 pub enum Tool {
+    Init(common::init::InitTool),
     List(list::ListResources),
     #[clap(subcommand)]
     Move(move_tool::MoveTool),
@@ -26,9 +27,10 @@ pub enum Tool {
 impl Tool {
     pub async fn execute(self) -> CliResult {
         match self {
-            Tool::List(list_tool) => list_tool.execute().await,
+            Tool::Init(tool) => tool.execute().await,
+            Tool::List(tool) => tool.execute().await,
             Tool::Move(tool) => tool.execute().await,
-            Tool::Op(op_tool) => op_tool.execute().await,
+            Tool::Op(tool) => tool.execute().await,
         }
     }
 }

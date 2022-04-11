@@ -160,6 +160,13 @@ impl GenerateKey {
         let mut rng = rand::rngs::StdRng::from_entropy();
         Ed25519PrivateKey::generate(&mut rng)
     }
+
+    pub fn generate_x25519_in_memory() -> Result<x25519::PrivateKey, Error> {
+        let key = Self::generate_ed25519_in_memory();
+        x25519::PrivateKey::from_ed25519_private_bytes(&key.to_bytes()).map_err(|err| {
+            Error::UnexpectedError(format!("Failed to convert ed25519 to x25519 {:?}", err))
+        })
+    }
 }
 
 #[derive(Debug, Parser)]

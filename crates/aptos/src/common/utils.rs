@@ -95,9 +95,9 @@ pub fn check_if_file_exists(file: &Path, assume_yes: bool) -> Result<(), Error> 
 }
 
 /// Write a `&[u8]` to a file
-pub fn write_to_file(key_file: &Path, name: &str, encoded: &[u8]) -> Result<(), Error> {
-    let mut file = File::create(key_file).map_err(|e| Error::IO(name.to_string(), e))?;
-    file.write_all(encoded)
+pub fn write_to_file(path: &Path, name: &str, bytes: &[u8]) -> Result<(), Error> {
+    let mut file = File::create(path).map_err(|e| Error::IO(name.to_string(), e))?;
+    file.write_all(bytes)
         .map_err(|e| Error::IO(name.to_string(), e))
 }
 

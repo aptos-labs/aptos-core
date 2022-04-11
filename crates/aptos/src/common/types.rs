@@ -3,7 +3,9 @@
 
 use crate::common::utils::{check_if_file_exists, write_to_file};
 use aptos_crypto::{x25519, ValidCryptoMaterial, ValidCryptoMaterialStringExt};
+use aptos_logger::{debug, info};
 use clap::{ArgEnum, Parser};
+use serde::{Deserialize, Serialize};
 use std::{
     fmt::Debug,
     path::{Path, PathBuf},
@@ -27,6 +29,8 @@ pub enum Error {
     CommandArgumentError(String),
     #[error("Unable to load config: {0}")]
     ConfigError(String),
+    #[error("Unable to find config {0}, have you run `aptos init`?")]
+    ConfigNotFoundError(String),
     #[error("Error accessing '{0}': {1}")]
     IO(String, #[source] std::io::Error),
     #[error("Error (de)serializing '{0}': {1}")]
@@ -45,6 +49,67 @@ pub enum Error {
     UnexpectedError(String),
     #[error("Aborted command")]
     AbortedError,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct CliConfig {
+    /// Private key for commands.  TODO: Add vault functionality
+    pub private_key: Option<x25519::PrivateKey>,
+}
+
+impl CliConfig {
+    /// Checks if the config exists in the current working directory
+    pub fn config_exists() -> Result<bool, Error> {
+        Self::aptos_folder().map(|folder| folder.exists())
+    }
+
+    /// Loads the config from the current working directory
+    pub fn load() -> Result<Self, Error> {
+        let config_file = Self::aptos_folder()?.join("config.yml");
+        if !config_file.exists() {
+            return Err(Error::ConfigError(format!("{:?}", config_file)));
+        }
+
+        let bytes = std::fs::read(&config_file)
+            .map_err(|err| Error::IO(format!("Failed to read {:?}", config_file), err))?;
+        serde_yaml::from_slice(&bytes)
+            .map_err(|err| Error::UnableToParseFile(format!("{:?}", config_file), err.to_string()))
+    }
+
+    /// Saves the config to ./.aptos/config.yml
+    pub fn save(&self) -> Result<(), Error> {
+        let aptos_folder = Self::aptos_folder()?;
+
+        // Create if it doesn't exist
+        if !aptos_folder.exists() {
+            std::fs::create_dir(&aptos_folder).map_err(|err| {
+                Error::CommandArgumentError(format!(
+                    "Unable to create {:?} directory {}",
+                    aptos_folder, err
+                ))
+            })?;
+            info!("Created .aptos/ folder");
+        } else {
+            debug!(".aptos/ folder already initialized");
+        }
+
+        // Save over previous config file
+        // TODO: Ask for saving over?
+        let config_file = aptos_folder.join("config.yml");
+        let config_bytes = serde_yaml::to_string(&self)
+            .map_err(|err| Error::UnexpectedError(format!("Failed to serialize config {}", err)))?;
+        write_to_file(&config_file, "config.yml", config_bytes.as_bytes())?;
+        Ok(())
+    }
+
+    /// Finds the current directory's .aptos folder
+    fn aptos_folder() -> Result<PathBuf, Error> {
+        std::env::current_dir()
+            .map_err(|err| {
+                Error::UnexpectedError(format!("Unable to get current directory {}", err))
+            })
+            .map(|dir| dir.join(".aptos"))
+    }
 }
 
 /// Types of Keys used by the blockchain
@@ -164,16 +229,17 @@ pub struct PrivateKeyInputOptions {
 }
 
 impl PrivateKeyInputOptions {
-    pub fn extract_private_key(&self, encoding: EncodingType) -> Result<x25519::PrivateKey, Error> {
+    pub fn extract_private_key(
+        &self,
+        encoding: EncodingType,
+    ) -> Result<Option<x25519::PrivateKey>, Error> {
         if let Some(ref file) = self.private_key_file {
-            encoding.load_key(file.as_path())
+            encoding.load_key(file.as_path()).map(Some)
         } else if let Some(ref key) = self.private_key {
             let key = key.as_bytes().to_vec();
-            encoding.decode_key(key)
+            encoding.decode_key(key).map(Some)
         } else {
-            Err(Error::CommandArgumentError(
-                "One of ['--private-key', '--private-key-file'] must be used".to_string(),
-            ))
+            Ok(None)
         }
     }
 }
@@ -189,16 +255,17 @@ pub struct PublicKeyInputOptions {
 }
 
 impl PublicKeyInputOptions {
-    pub fn extract_public_key(&self, encoding: EncodingType) -> Result<x25519::PublicKey, Error> {
+    pub fn extract_public_key(
+        &self,
+        encoding: EncodingType,
+    ) -> Result<Option<x25519::PublicKey>, Error> {
         if let Some(ref file) = self.public_key_file {
-            encoding.load_key(file.as_path())
+            encoding.load_key(file.as_path()).map(Some)
         } else if let Some(ref key) = self.public_key {
             let key = key.as_bytes().to_vec();
-            encoding.decode_key(key)
+            encoding.decode_key(key).map(Some)
         } else {
-            Err(Error::CommandArgumentError(
-                "One of ['--public-key', '--public-key-file'] must be used".to_string(),
-            ))
+            Ok(None)
         }
     }
 }
@@ -214,16 +281,21 @@ pub struct KeyInputOptions {
 impl KeyInputOptions {
     /// Extracts public key from either private or public key options
     pub fn extract_public_key(&self, encoding: EncodingType) -> Result<x25519::PublicKey, Error> {
-        let private_key_result = self.private_key_options.extract_private_key(encoding);
-        let public_key_result = self.public_key_options.extract_public_key(encoding);
+        let private_key_result = self.private_key_options.extract_private_key(encoding)?;
+        let public_key_result = self.public_key_options.extract_public_key(encoding)?;
 
-        if let Ok(private_key) = private_key_result {
+        if let Some(private_key) = private_key_result {
             Ok(private_key.public_key())
-        } else if let Ok(public_key) = public_key_result {
+        } else if let Some(public_key) = public_key_result {
             Ok(public_key)
         } else {
-            // TODO: merge above errors better
-            Err(Error::CommandArgumentError("One of ['--private-key', '--private-key-file', '--public-key', '--public-key-file'] must be used".to_string()))
+            let config = CliConfig::load()?;
+            if let Some(private_key) = config.private_key {
+                println!("Using .aptos/config.yml private key");
+                Ok(private_key.public_key())
+            } else {
+                Err(Error::CommandArgumentError("One of ['--private-key', '--private-key-file', '--public-key', '--public-key-file'] must be used".to_string()))
+            }
         }
     }
 }

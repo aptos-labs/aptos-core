@@ -154,6 +154,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-config",
  "aptos-crypto",
+ "aptos-logger",
  "aptos-secure-storage",
  "aptos-telemetry",
  "aptos-temppath",
