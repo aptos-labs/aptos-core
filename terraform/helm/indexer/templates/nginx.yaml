@@ -1,0 +1,63 @@
+{{- if .Values.nginx.enabled }}
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "aptos-indexer.fullname" . }}-nginx
+  labels:
+    {{- include "aptos-indexer.labels" . | nindent 4 }}
+data:
+  nginx.conf: |-
+{{ (tpl (.Files.Get "files/nginx.conf") .) | indent 4 }}
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aptos-indexer.fullname" . }}-nginx
+  labels:
+    {{- include "aptos-indexer.labels" . | nindent 4 }}
+    app.kubernetes.io/name: nginx
+spec:
+  selector:
+    matchLabels:
+      {{- include "aptos-indexer.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: nginx
+  template:
+    metadata:
+      labels:
+        {{- include "aptos-indexer.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: nginx
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: runtime/default
+    spec:
+      containers:
+      - name: nginx
+        image: {{ .Values.nginx.image.repo }}:{{ .Values.nginx.image.tag }}
+        imagePullPolicy: {{ .Values.nginx.image.pullPolicy }}
+        volumeMounts:
+        - name: nginx
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+          readOnly: true
+        - name: nginx-data
+          mountPath: /var/run
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 6180
+        runAsGroup: 6180
+      serviceAccountName: {{ include "aptos-indexer.serviceAccountName" . }}
+      volumes:
+      - name: nginx-data
+        emptyDir: {}
+      - name: nginx
+        configMap:
+          name: {{ include "aptos-indexer.fullname" . }}-nginx
+{{- end}}

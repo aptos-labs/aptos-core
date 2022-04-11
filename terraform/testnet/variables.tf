@@ -84,6 +84,12 @@ variable "public_fullnode_helm_values" {
   default     = {}
 }
 
+variable "indexer_helm_values" {
+  description = "Map of values to pass to indexer Helm"
+  type        = any
+  default     = {}
+}
+
 variable "zone_id" {
   description = "Route53 Zone ID to create records in"
   default     = ""
@@ -152,17 +158,18 @@ variable "num_trusted_instance" {
   default     = 0
 }
 
-variable "explorer_image_repo" {
-  default = "ghcr.io/aptos/explorer"
-}
-
-variable "explorer_image_tag" {
-  default = "latest"
-}
-
 variable "enable_dev_vault" {
   description = "TEST ONLY: Enables Vault in Dev Mode for all validators"
   default     = false
+}
+
+variable "enable_indexer" {
+  description = "Enable Aptos indexer"
+  default     = false
+}
+
+variable "indexer_db_password" {
+  description = "password for indexer RDS instance"
 }
 
 variable "enable_k8s_metrics_server" {

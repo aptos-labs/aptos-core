@@ -1,0 +1,4 @@
+apiVersion: v2
+appVersion: 0.1.0
+name: indexer
+version: 0.1.0
