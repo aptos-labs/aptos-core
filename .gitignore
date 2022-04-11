@@ -74,3 +74,6 @@ target-out-docker
 # Vim swap files
 *.swp
 *.swo
+
+# Aptos CLI files
+.aptos/
