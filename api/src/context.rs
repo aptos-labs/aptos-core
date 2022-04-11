@@ -18,14 +18,14 @@ use aptos_types::{
 use storage_interface::{DbReader, Order};
 
 use anyhow::{ensure, format_err, Result};
-use aptos_types::state_store::state_key::StateKey;
+use aptos_types::{state_store::state_key::StateKey, transaction::Version};
 use aptos_vm::data_cache::{IntoMoveResolver, RemoteStorageOwned};
 use futures::{channel::oneshot, SinkExt};
 use std::{
     convert::{Infallible, TryFrom},
     sync::Arc,
 };
-use storage_interface::state_view::{DbStateView, LatestDbStateView};
+use storage_interface::state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateView};
 use warp::{filters::BoxedFilter, Filter, Reply};
 
 // Context holds application scope context
@@ -56,6 +56,10 @@ impl Context {
         self.db
             .latest_state_view()
             .map(|state_view| state_view.into_move_resolver())
+    }
+
+    pub fn state_view_at_version(&self, version: Version) -> Result<DbStateView> {
+        self.db.state_view_at_version(Some(version))
     }
 
     pub fn chain_id(&self) -> ChainId {

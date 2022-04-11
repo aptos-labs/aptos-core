@@ -1,0 +1,4 @@
+{
+  "code": 400,
+  "message": "invalid parameter struct tag: 0x1::GUID_Generator"
+}

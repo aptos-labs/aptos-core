@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::DbReader;
-use anyhow::Result;
+use anyhow::{ensure, Result};
 use aptos_state_view::StateView;
 use aptos_types::{
     account_state::AccountState, state_store::state_key::StateKey, transaction::Version,
@@ -59,6 +59,27 @@ impl LatestDbStateView for Arc<dyn DbReader> {
         Ok(DbStateView {
             db: self.clone(),
             version: self.get_latest_version_option()?,
+        })
+    }
+}
+
+pub trait DbStateViewAtVersion {
+    fn state_view_at_version(&self, version: Option<Version>) -> Result<DbStateView>;
+}
+
+impl DbStateViewAtVersion for Arc<dyn DbReader> {
+    fn state_view_at_version(&self, version: Option<Version>) -> Result<DbStateView> {
+        if let Some(some_version) = version {
+            let ledger_version = self.get_latest_version()?;
+            ensure!(
+                some_version <= ledger_version,
+                "Asking for state view newer than ledger version."
+            );
+        }
+
+        Ok(DbStateView {
+            db: self.clone(),
+            version,
         })
     }
 }

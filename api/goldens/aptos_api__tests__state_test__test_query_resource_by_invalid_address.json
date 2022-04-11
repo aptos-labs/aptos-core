@@ -1,0 +1,12 @@
+{
+  "code": 400,
+  "message": "invalid parameter account address: 1"
+}
+{
+  "code": 400,
+  "message": "invalid parameter account address: 0xzz"
+}
+{
+  "code": 400,
+  "message": "invalid parameter account address: 01"
+}

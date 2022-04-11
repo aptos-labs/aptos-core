@@ -6,6 +6,7 @@ mod events_test;
 mod golden_output;
 mod index_test;
 mod invalid_post_request_test;
+mod state_test;
 mod string_resource_test;
 mod test_context;
 mod transactions_test;
