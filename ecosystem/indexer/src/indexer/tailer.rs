@@ -195,9 +195,11 @@ pub async fn await_tasks<T: Debug>(tasks: Vec<JoinHandle<T>>) -> Vec<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::database::{new_db_pool, PgPoolConnection};
-    use crate::default_processor::DefaultTransactionProcessor;
-    use crate::models::transactions::TransactionModel;
+    use crate::{
+        database::{new_db_pool, PgPoolConnection},
+        default_processor::DefaultTransactionProcessor,
+        models::transactions::TransactionModel,
+    };
     use diesel::Connection;
     use serde_json::json;
 

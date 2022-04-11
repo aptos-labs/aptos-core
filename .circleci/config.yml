@@ -46,13 +46,15 @@ jobs:
     executor: ubuntu-2xl
     steps:
       - dev-setup
-      - run: RUST_BACKTRACE=full cargo nextest --nextest-profile ci --partition hash:1/1 --test-threads 5 --package smoke-test
+      - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      - run: INDEXER_DATABASE_URL="postgresql://postgres@localhost/postgres" RUST_BACKTRACE=full cargo nextest --nextest-profile ci --partition hash:1/1 --test-threads 5 --package smoke-test
   unit-test:
     executor: ubuntu-2xl
     steps:
       - dev-setup
       - run: cargo xtest --doc --unit --changed-since "origin/main"
-      - run: cargo nextest --nextest-profile ci --partition hash:1/1 --unit --exclude backup-cli --changed-since "origin/main"
+      - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      - run: INDEXER_DATABASE_URL="postgresql://postgres@localhost/postgres" cargo nextest --nextest-profile ci --partition hash:1/1 --unit --exclude backup-cli --changed-since "origin/main"
   docker-build-push:
     executor: ubuntu-medium
     parameters:
@@ -314,7 +316,7 @@ commands:
     steps:
       - checkout
       - run: sudo apt-get update
-      - run: sudo apt-get install build-essential ca-certificates clang curl git libssl-dev pkg-config --no-install-recommends --assume-yes
+      - run: sudo apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config --no-install-recommends --assume-yes
       - run: curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
       - run: cat $HOME/.cargo/env >> $BASH_ENV
   deploy-setup:
