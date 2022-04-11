@@ -13,8 +13,16 @@ base:
 consensus:
   safety_rules:
     service:
-      type: "process"
-      server_address: "/dns4/{{ include "aptos-validator.fullname" . }}-safety-rules/tcp/6185"
+      type: "local"
+    backend:
+      type: "vault"
+      server: "{{ .Values.vault.server.address }}"
+      {{- if .Values.vault.server.ca_cert }}
+      ca_certificate: "{{ .Values.vault.server.ca_cert }}"
+      {{- end }}
+      namespace: "{{ .Values.vault.namespace }}"
+      token:
+        from_disk: "/opt/vault/token"
   sync_only: {{ .Values.validator.config.sync_only | default false}}
   {{- if .Values.validator.config.mempool_poll_count }}
   mempool_poll_count: {{ .Values.validator.config.mempool_poll_count }}

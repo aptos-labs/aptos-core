@@ -33,10 +33,10 @@ impl Default for SafetyRulesConfig {
         Self {
             backend: SecureBackend::InMemoryStorage,
             logger: LoggerConfig::default(),
-            service: SafetyRulesService::Thread,
+            service: SafetyRulesService::Local,
             test: None,
             verify_vote_proposal_signature: false,
-            export_consensus_key: false,
+            export_consensus_key: true,
             // Default value of 30 seconds for a timeout
             network_timeout_ms: 30_000,
             enable_cached_safety_data: true,
