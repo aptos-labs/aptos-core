@@ -228,7 +228,7 @@ impl NetworkAddress {
     /// let addr = addr.append_prod_protos(pubkey, 0);
     /// assert_eq!(
     ///     addr.to_string(),
-    ///     "/dns/example.com/tcp/6180/ln-noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/ln-handshake/0",
+    ///     "/dns/example.com/tcp/6180/ln-noise-ik/0x080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/ln-handshake/0",
     /// );
     /// ```
     // TODO(philiphayes): use handshake version enum

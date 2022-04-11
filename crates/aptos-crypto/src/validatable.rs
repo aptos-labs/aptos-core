@@ -158,7 +158,7 @@ impl Serialize for UnvalidatedEd25519PublicKey {
     {
         if serializer.is_human_readable() {
             let encoded = ::hex::encode(&self.0);
-            serializer.serialize_str(&encoded)
+            serializer.serialize_str(&format!("0x{}", encoded))
         } else {
             // See comment in deserialize_key.
             serializer.serialize_newtype_struct(
@@ -178,7 +178,7 @@ impl<'de> Deserialize<'de> for UnvalidatedEd25519PublicKey {
 
         if deserializer.is_human_readable() {
             let encoded_key = <String>::deserialize(deserializer)?;
-            let bytes_out = ::hex::decode(encoded_key).map_err(D::Error::custom)?;
+            let bytes_out = ::hex::decode(&encoded_key[2..]).map_err(D::Error::custom)?;
             <[u8; ED25519_PUBLIC_KEY_LENGTH]>::try_from(bytes_out.as_ref())
                 .map(UnvalidatedEd25519PublicKey)
                 .map_err(D::Error::custom)

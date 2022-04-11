@@ -289,14 +289,14 @@ proptest! {
         {
             let encoded = keypair.private_key.to_encoded_string().unwrap();
             // Hex encoding of a 32-bytes key is 64 (2 x 32) characters.
-            prop_assert_eq!(2 * ED25519_PRIVATE_KEY_LENGTH, encoded.len());
+            prop_assert_eq!(2 + 2 * ED25519_PRIVATE_KEY_LENGTH, encoded.len());
             let decoded = Ed25519PrivateKey::from_encoded_string(&encoded);
             prop_assert_eq!(Some(keypair.private_key), decoded.ok());
         }
         {
             let encoded = keypair.public_key.to_encoded_string().unwrap();
             // Hex encoding of a 32-bytes key is 64 (2 x 32) characters.
-            prop_assert_eq!(2 * ED25519_PUBLIC_KEY_LENGTH, encoded.len());
+            prop_assert_eq!(2 + 2 * ED25519_PUBLIC_KEY_LENGTH, encoded.len());
             let decoded = Ed25519PublicKey::from_encoded_string(&encoded);
             prop_assert_eq!(Some(keypair.public_key), decoded.ok());
         }

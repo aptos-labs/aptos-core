@@ -9,10 +9,9 @@ use aptos_config::{
     config::{RoleType, HANDSHAKE_VERSION},
     network_id::{NetworkContext, NetworkId},
 };
-use aptos_crypto::{x25519, x25519::PRIVATE_KEY_SIZE};
+use aptos_crypto::{x25519, x25519::PRIVATE_KEY_SIZE, ValidCryptoMaterialStringExt};
 use aptos_management::error::Error;
 use aptos_types::{account_address, chain_id::ChainId, network_address::NetworkAddress, PeerId};
-use fallible::copy_from_slice::copy_slice_to_vec;
 use futures::{AsyncReadExt, AsyncWriteExt};
 use netcore::transport::tcp::{resolve_and_connect, TcpSocket};
 use network::{
@@ -49,21 +48,8 @@ pub struct CheckEndpoint {
 }
 
 fn parse_private_key_hex(src: &str) -> Result<x25519::PrivateKey, Error> {
-    let input = src.trim();
-    if input.len() != 64 {
-        return Err(Error::CommandArgumentError(
-            "Invalid private key length, must be 64 hex characters".to_string(),
-        ));
-    }
-
-    let value_slice = hex::decode(src.trim())
-        .map_err(|_| Error::CommandArgumentError(format!("Not a valid private key: {}", src)))?;
-
-    let mut value = [0; PRIVATE_KEY_SIZE];
-    copy_slice_to_vec(&value_slice, &mut value)
-        .map_err(|e| Error::CommandArgumentError(format!("{}", e)))?;
-
-    Ok(x25519::PrivateKey::from(value))
+    x25519::PrivateKey::from_encoded_string(src.trim())
+        .map_err(|err| Error::UnexpectedError(err.to_string()))
 }
 
 impl CheckEndpoint {
