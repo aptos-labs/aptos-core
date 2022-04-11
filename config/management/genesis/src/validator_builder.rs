@@ -321,7 +321,6 @@ impl ValidatorBuilder {
         config.consensus.safety_rules.service = SafetyRulesService::Thread;
         config.consensus.safety_rules.backend =
             SecureBackend::OnDiskStorage(validator.storage_config.clone());
-        config.execution.backend = SecureBackend::OnDiskStorage(validator.storage_config.clone());
 
         if index > 0 || self.randomize_first_validator_ports {
             config.randomize_ports();

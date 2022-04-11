@@ -224,12 +224,6 @@ root-members = [
     "safety-rules",
 ]
 
-[subsets.lec]
-# The Aptos execution correctness TCB.
-root-members = [
-    "execution-correctness",
-]
-
 [subsets.release]
 # The Aptos release binaries
 root-members = [
@@ -238,7 +232,6 @@ root-members = [
     "aptos-genesis-tool",
     "aptos-node",
     "aptos-operational-tool",
-    "execution-correctness",
     "safety-rules",
 ]
 

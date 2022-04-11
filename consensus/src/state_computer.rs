@@ -15,8 +15,7 @@ use aptos_types::{
 };
 use consensus_notifications::ConsensusNotificationSender;
 use consensus_types::{block::Block, executed_block::ExecutedBlock};
-use execution_correctness::ExecutionCorrectness;
-use executor_types::{Error as ExecutionError, StateComputeResult};
+use executor_types::{BlockExecutorTrait, Error as ExecutionError, StateComputeResult};
 use fail::fail_point;
 use futures::{SinkExt, StreamExt};
 use std::{boxed::Box, sync::Arc};
@@ -30,7 +29,7 @@ type NotificationType = (
 /// Basic communication with the Execution module;
 /// implements StateComputer traits.
 pub struct ExecutionProxy {
-    execution_correctness_client: Box<dyn ExecutionCorrectness + Send + Sync>,
+    executor: Box<dyn BlockExecutorTrait>,
     mempool_notifier: Arc<dyn TxnManager>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     async_state_sync_notifier: channel::Sender<NotificationType>,
@@ -38,7 +37,7 @@ pub struct ExecutionProxy {
 
 impl ExecutionProxy {
     pub fn new(
-        execution_correctness_client: Box<dyn ExecutionCorrectness + Send + Sync>,
+        executor: Box<dyn BlockExecutorTrait>,
         mempool_notifier: Arc<dyn TxnManager>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         handle: &tokio::runtime::Handle,
@@ -59,7 +58,7 @@ impl ExecutionProxy {
             }
         });
         Self {
-            execution_correctness_client,
+            executor,
             mempool_notifier,
             state_sync_notifier,
             async_state_sync_notifier: tx,
@@ -90,8 +89,10 @@ impl StateComputer for ExecutionProxy {
         // TODO: figure out error handling for the prologue txn
         let compute_result = monitor!(
             "execute_block",
-            self.execution_correctness_client
-                .execute_block(block.clone(), parent_block_id)
+            self.executor.execute_block(
+                (block.id(), block.transactions_to_execute()),
+                parent_block_id
+            )
         )?;
 
         // notify mempool about failed transaction
@@ -126,7 +127,7 @@ impl StateComputer for ExecutionProxy {
 
         monitor!(
             "commit_block",
-            self.execution_correctness_client
+            self.executor
                 .commit_blocks(block_ids, finality_proof.clone())?
         );
 
@@ -159,7 +160,7 @@ impl StateComputer for ExecutionProxy {
         );
         // Similarily, after the state synchronization, we have to reset the cache
         // of BlockExecutor to guarantee the latest committed state is up to date.
-        self.execution_correctness_client.reset()?;
+        self.executor.reset()?;
 
         res.map_err(|error| {
             let anyhow_error: anyhow::Error = error.into();

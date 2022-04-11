@@ -1,13 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::{Error, RootPath, SecureBackend};
+use crate::config::{Error, RootPath};
 use aptos_types::transaction::Transaction;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
     io::{Read, Write},
-    net::SocketAddr,
     path::PathBuf,
 };
 
@@ -18,10 +17,7 @@ const GENESIS_DEFAULT: &str = "genesis.blob";
 pub struct ExecutionConfig {
     #[serde(skip)]
     pub genesis: Option<Transaction>,
-    pub sign_vote_proposal: bool,
     pub genesis_file_location: PathBuf,
-    pub service: ExecutionCorrectnessService,
-    pub backend: SecureBackend,
     pub network_timeout_ms: u64,
 }
 
@@ -37,13 +33,7 @@ impl std::fmt::Debug for ExecutionConfig {
             f,
             ", genesis_file_location: {:?} ",
             self.genesis_file_location
-        )?;
-        write!(
-            f,
-            ", sign_vote_proposal: {:?}, service: {:?}, backend: {:?} }}",
-            self.sign_vote_proposal, self.service, self.backend
-        )?;
-        self.service.fmt(f)
+        )
     }
 }
 
@@ -52,9 +42,6 @@ impl Default for ExecutionConfig {
         ExecutionConfig {
             genesis: None,
             genesis_file_location: PathBuf::new(),
-            service: ExecutionCorrectnessService::Local,
-            backend: SecureBackend::InMemoryStorage,
-            sign_vote_proposal: true,
             // Default value of 30 seconds for the network timeout.
             network_timeout_ms: 30_000,
         }
@@ -89,33 +76,6 @@ impl ExecutionConfig {
         }
         Ok(())
     }
-
-    pub fn set_data_dir(&mut self, data_dir: PathBuf) {
-        if let SecureBackend::OnDiskStorage(backend) = &mut self.backend {
-            backend.set_data_dir(data_dir);
-        }
-    }
-}
-
-/// Defines how execution correctness should be run
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case", tag = "type")]
-pub enum ExecutionCorrectnessService {
-    /// This runs execution correctness in the same thread as event processor.
-    Local,
-    /// This is the production, separate service approach
-    Process(RemoteExecutionService),
-    /// This runs safety rules in the same thread as event processor but data is passed through the
-    /// light weight RPC (serializer)
-    Serializer,
-    /// This creates a separate thread to run execution correctness, it is similar to a fork / exec style
-    Thread,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct RemoteExecutionService {
-    pub server_address: SocketAddr,
 }
 
 #[cfg(test)]

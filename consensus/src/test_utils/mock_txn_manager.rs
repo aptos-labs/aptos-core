@@ -16,9 +16,7 @@ use executor_types::StateComputeResult;
 use futures::{channel::mpsc, future::BoxFuture};
 use rand::Rng;
 
-#[derive(Clone)]
 pub struct MockTransactionManager {
-    rejected_txns: Payload,
     // used non-mocked TxnManager to test interaction with shared mempool
     mempool_proxy: Option<MempoolProxy>,
 }
@@ -26,10 +24,7 @@ pub struct MockTransactionManager {
 impl MockTransactionManager {
     pub fn new(consensus_to_mempool_sender: Option<mpsc::Sender<ConsensusRequest>>) -> Self {
         let mempool_proxy = consensus_to_mempool_sender.map(|s| MempoolProxy::new(s, 1, 1, 1));
-        Self {
-            rejected_txns: vec![],
-            mempool_proxy,
-        }
+        Self { mempool_proxy }
     }
 }
 

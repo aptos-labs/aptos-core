@@ -35,10 +35,6 @@ use std::{sync::Arc, time::Duration};
 #[path = "block_store_test.rs"]
 mod block_store_test;
 
-#[cfg(test)]
-#[path = "block_store_and_lec_recovery_test.rs"]
-mod block_store_and_lec_recovery_test;
-
 #[path = "sync_manager.rs"]
 pub mod sync_manager;
 

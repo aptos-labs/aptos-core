@@ -2053,7 +2053,6 @@ dependencies = [
  "consensus-notifications",
  "consensus-types",
  "event-notifications",
- "execution-correctness",
  "executor",
  "executor-test-helpers",
  "executor-types",
@@ -3022,34 +3021,6 @@ dependencies = [
  "evm-core",
  "primitive-types",
  "sha3 0.8.2",
-]
-
-[[package]]
-name = "execution-correctness"
-version = "0.1.0"
-dependencies = [
- "aptos-config",
- "aptos-crypto",
- "aptos-genesis-tool",
- "aptos-global-constants",
- "aptos-infallible",
- "aptos-logger",
- "aptos-secure-net",
- "aptos-secure-storage",
- "aptos-temppath",
- "aptos-transaction-builder",
- "aptos-types",
- "aptos-vm",
- "aptos-workspace-hack",
- "bcs",
- "consensus-types",
- "executor",
- "executor-test-helpers",
- "executor-types",
- "serde 1.0.136",
- "storage-client",
- "storage-interface",
- "thiserror",
 ]
 
 [[package]]

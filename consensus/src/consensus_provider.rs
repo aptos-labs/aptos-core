@@ -14,9 +14,10 @@ use crate::{
 use aptos_config::config::NodeConfig;
 use aptos_logger::prelude::*;
 use aptos_mempool::ConsensusRequest;
+use aptos_vm::AptosVM;
 use consensus_notifications::ConsensusNotificationSender;
 use event_notifications::ReconfigNotificationListener;
-use execution_correctness::ExecutionCorrectnessManager;
+use executor::block_executor::BlockExecutor;
 use futures::channel::mpsc;
 use network::application::storage::PeerMetadataStorage;
 use std::sync::Arc;
@@ -46,10 +47,9 @@ pub fn start_consensus(
         node_config.consensus.mempool_txn_pull_timeout_ms,
         node_config.consensus.mempool_executed_txn_timeout_ms,
     ));
-    let execution_correctness_manager = ExecutionCorrectnessManager::new(node_config, aptos_db);
 
     let state_computer = Arc::new(ExecutionProxy::new(
-        execution_correctness_manager.client(),
+        Box::new(BlockExecutor::<AptosVM>::new(aptos_db)),
         txn_manager.clone(),
         state_sync_notifier,
         runtime.handle(),
