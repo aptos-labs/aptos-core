@@ -1,7 +1,7 @@
 module AptosFramework::Marker {
     use Std::Capability;
-    use CoreFramework::Timestamp;
-    use CoreFramework::SystemAddresses;
+    use AptosFramework::Timestamp;
+    use AptosFramework::SystemAddresses;
 
     friend AptosFramework::AptosAccount;
     friend AptosFramework::AptosConsensusConfig;

@@ -2,12 +2,12 @@ module AptosFramework::Genesis {
     use Std::Signer;
     use Std::Event;
     use Std::Vector;
-    use CoreFramework::CoreGenesis;
+    use AptosFramework::CoreGenesis;
     use AptosFramework::AptosAccount;
 
     // Config imports
-    use CoreFramework::ValidatorConfig;
-    use CoreFramework::ValidatorOperatorConfig;
+    use AptosFramework::ValidatorConfig;
+    use AptosFramework::ValidatorOperatorConfig;
     use AptosFramework::AptosConsensusConfig;
     use AptosFramework::AptosTransactionPublishingOption;
     use AptosFramework::AptosValidatorConfig;
@@ -200,10 +200,10 @@ module AptosFramework::Genesis {
 
     #[test(account = @CoreResources)]
     fun test_setup(account: signer) {
-        use CoreFramework::Account;
+        use AptosFramework::Account;
 
         setup(&account);
-        assert!(Account::exists_at(@CoreFramework), 0);
+        assert!(Account::exists_at(@AptosFramework), 0);
         assert!(Account::exists_at(@CoreResources), 0);
     }
 }

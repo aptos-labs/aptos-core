@@ -17,9 +17,9 @@ files. See the [Layout](#layout) section for a more detailed overview of the str
 ## Documentation
 
 Each of the main components of the Aptos Framework and contributing guidelines are documented separately. Particularly:
-* Documentation for the set of allowed transaction scripts in aptos-framework can be found in [script_documentation.md](aptos-framework/releases/artifacts/current/build/AptosCoreFramework/docs/script_documentation.md).
-* The overview documentation for the Move modules can be found in [overview.md](aptos-framework/releases/artifacts/current/build/AptosCoreFramework/docs/overview.md).
-* An overview of the approach to formal verification of the framework can be found in [spec_documentation.md](aptos-framework/releases/artifacts/current/build/AptosCoreFramework/docs/spec_documentation.md).
+* Documentation for the set of allowed transaction scripts in aptos-framework can be found in [script_documentation.md](aptos-framework/releases/artifacts/current/build/AptosFramework/docs/script_documentation.md).
+* The overview documentation for the Move modules can be found in [overview.md](aptos-framework/releases/artifacts/current/build/AptosFramework/docs/overview.md).
+* An overview of the approach to formal verification of the framework can be found in [spec_documentation.md](aptos-framework/releases/artifacts/current/build/AptosFramework/docs/spec_documentation.md).
 * Contributing guidelines and basic coding standards for the Aptos Framework can be found in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Compilation and Generation

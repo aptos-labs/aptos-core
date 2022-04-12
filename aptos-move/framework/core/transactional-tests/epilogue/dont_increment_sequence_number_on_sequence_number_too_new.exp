@@ -1,4 +1,0 @@
-processed 4 tasks
-
-task 2 'run'. lines 9-11:
-Error: Transaction discarded. VMStatus: status SEQUENCE_NUMBER_TOO_NEW of type Validation

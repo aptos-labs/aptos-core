@@ -1,4 +1,0 @@
-processed 6 tasks
-
-task 5 'run'. lines 50-53:
-Error: Transaction discarded. VMStatus: status BAD_TRANSACTION_FEE_CURRENCY of type Validation

@@ -4,7 +4,6 @@
 use std::path::PathBuf;
 
 fn main() {
-    println!("cargo:rerun-if-changed=../core/sources");
     println!("cargo:rerun-if-changed=../aptos-framework/sources");
     let release = framework::release::ReleaseOptions {
         check_layout_compatibility: false,

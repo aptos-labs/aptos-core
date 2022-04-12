@@ -1,4 +1,0 @@
-processed 9 tasks
-
-task 6 'run'. lines 45-49:
-Error: Failed to execute transaction. VMStatus: status ABORTED of type Execution with sub status 1793

@@ -1,9 +1,9 @@
 module AptosFramework::Stake {
     use Std::Vector;
     use Std::Signer;
-    use CoreFramework::SystemAddresses;
-    use CoreFramework::Timestamp;
-//    use CoreFramework::Reconfiguration;
+    use AptosFramework::SystemAddresses;
+    use AptosFramework::Timestamp;
+//    use AptosFramework::Reconfiguration;
     use AptosFramework::TestCoin::{Self, Coin};
 
     const MINIMUM_LOCK_PERIOD: u64 = 86400;

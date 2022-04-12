@@ -1,6 +1,6 @@
 module AptosFramework::AptosVersion {
     use Std::Capability;
-    use CoreFramework::Version;
+    use AptosFramework::Version;
     use AptosFramework::Marker;
 
     /// Publishes the Version config.

@@ -1,6 +1,6 @@
 module AptosFramework::AptosValidatorOperatorConfig {
     use Std::Capability;
-    use CoreFramework::ValidatorOperatorConfig;
+    use AptosFramework::ValidatorOperatorConfig;
     use AptosFramework::Marker;
 
     friend AptosFramework::AptosAccount;

@@ -7,7 +7,7 @@ module AptosFramework::TestCoin {
     use Std::Event::{Self, EventHandle};
     use Std::Option::{Self, Option};
 
-    use CoreFramework::SystemAddresses;
+    use AptosFramework::SystemAddresses;
 
     friend AptosFramework::TransactionFee;
 

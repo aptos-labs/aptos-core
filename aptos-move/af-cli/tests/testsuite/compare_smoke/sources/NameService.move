@@ -5,7 +5,7 @@ address 0x2 {
 // the account address of each list node is actually the address bound to the key(name)
 module NameService {
     use 0x2::SortedLinkedList::{Self, EntryHandle};
-    use CoreFramework::Block;
+    use AptosFramework::Block;
     use Std::Signer;
     use Std::Vector;
 

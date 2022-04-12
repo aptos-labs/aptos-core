@@ -1,7 +1,0 @@
-processed 4 tasks
-
-task 2 'run'. lines 12-20:
-Error: Transaction discarded. VMStatus: status REJECTED_WRITE_SET of type Validation
-
-task 3 'run'. lines 22-31:
-Error: Transaction discarded. VMStatus: status INVALID_AUTH_KEY of type Validation

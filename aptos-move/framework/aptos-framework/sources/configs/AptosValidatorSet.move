@@ -1,6 +1,6 @@
 module AptosFramework::AptosValidatorSet {
     use Std::Capability;
-    use CoreFramework::ValidatorSystem;
+    use AptosFramework::ValidatorSystem;
     use AptosFramework::Marker;
 
     public fun initialize_validator_set(

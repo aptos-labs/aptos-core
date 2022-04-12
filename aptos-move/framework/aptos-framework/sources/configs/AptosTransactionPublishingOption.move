@@ -1,7 +1,7 @@
 module AptosFramework::AptosTransactionPublishingOption {
     use Std::Capability;
     use AptosFramework::Marker::{Self, ChainMarker};
-    use CoreFramework::TransactionPublishingOption;
+    use AptosFramework::TransactionPublishingOption;
 
     public fun initialize(
         core_resource_account: &signer,

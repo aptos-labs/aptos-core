@@ -1,6 +1,6 @@
 module AptosFramework::AptosConsensusConfig {
     use Std::Capability;
-    use CoreFramework::ConsensusConfig;
+    use AptosFramework::ConsensusConfig;
     use AptosFramework::Marker;
 
     public fun initialize(account: &signer) {

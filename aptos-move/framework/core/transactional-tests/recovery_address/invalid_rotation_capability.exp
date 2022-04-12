@@ -1,4 +1,0 @@
-processed 4 tasks
-
-task 3 'run'. lines 33-43:
-Error: Transaction discarded. VMStatus: status ABORTED of type Execution with sub status 263

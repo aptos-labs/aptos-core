@@ -18,7 +18,6 @@ static APTOS_PKG: Lazy<CompiledPackage> = Lazy::new(|| super::package("aptos-fra
 pub fn files() -> Vec<String> {
     let mut files = move_stdlib::move_stdlib_files();
     files.extend(super::move_files_in_path(APTOS_MODULES_DIR));
-    files.extend(super::move_files_in_path(super::CORE_MODULES_DIR));
     files
 }
 

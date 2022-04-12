@@ -1,6 +1,6 @@
 module AptosFramework::AptosVMConfig {
     use Std::Capability;
-    use CoreFramework::VMConfig;
+    use AptosFramework::VMConfig;
     use AptosFramework::Marker;
 
     /// Publishes the VM config.

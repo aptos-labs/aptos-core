@@ -5,10 +5,10 @@
 module AptosFramework::AptosAccount {
     use Std::Errors;
     use Std::Signer;
-    use CoreFramework::Account;
-    use CoreFramework::Timestamp;
-    use CoreFramework::SystemAddresses;
-    use CoreFramework::TransactionPublishingOption;
+    use AptosFramework::Account;
+    use AptosFramework::Timestamp;
+    use AptosFramework::SystemAddresses;
+    use AptosFramework::TransactionPublishingOption;
     use AptosFramework::Marker;
     use AptosFramework::AptosValidatorConfig;
     use AptosFramework::AptosValidatorOperatorConfig;
@@ -43,16 +43,16 @@ module AptosFramework::AptosAccount {
             Errors::invalid_argument(ECANNOT_CREATE_AT_VM_RESERVED)
         );
         assert!(
-            auth_key != @CoreFramework,
+            auth_key != @AptosFramework,
             Errors::invalid_argument(ECANNOT_CREATE_AT_CORE_CODE)
         );
         Account::create_account(auth_key, &Marker::get())
     }
 
-    /// Create the account for @CoreFramework to help module upgrades on testnet.
+    /// Create the account for @AptosFramework to help module upgrades on testnet.
     public(friend) fun create_core_framework_account(): signer {
         Timestamp::assert_genesis();
-        let (signer, _) = Account::create_account(@CoreFramework, &Marker::get());
+        let (signer, _) = Account::create_account(@AptosFramework, &Marker::get());
         signer
     }
 
@@ -63,7 +63,7 @@ module AptosFramework::AptosAccount {
         SystemAddresses::assert_core_resource(core_resource);
         Account::initialize<Marker::ChainMarker>(
             core_resource,
-            @CoreFramework,
+            @AptosFramework,
             b"AptosAccount",
             b"script_prologue",
             b"module_prologue",
