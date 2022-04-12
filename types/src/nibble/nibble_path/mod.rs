@@ -117,21 +117,15 @@ impl NibblePath {
         if num_nibbles % 2 == 1 {
             // Rounded up number of bytes to be considered
             let num_bytes = (num_nibbles + 1) / 2;
-            let mut nibble_bytes = bytes[..num_bytes].to_vec();
             checked_precondition!(bytes.len() >= num_bytes);
+            let mut nibble_bytes = bytes[..num_bytes].to_vec();
             // If number of nibbles is odd, make sure to pad the last nibble with 0s.
             let last_byte_padded = bytes[num_bytes - 1] & 0xF0;
             nibble_bytes[num_bytes - 1] = last_byte_padded;
-            NibblePath {
-                num_nibbles,
-                bytes: nibble_bytes,
-            }
+            NibblePath::new_odd(nibble_bytes)
         } else {
             checked_precondition!(bytes.len() >= num_nibbles / 2);
-            NibblePath {
-                num_nibbles,
-                bytes: bytes[..num_nibbles / 2].to_vec(),
-            }
+            NibblePath::new_even(bytes[..num_nibbles / 2].to_vec())
         }
     }
 

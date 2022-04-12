@@ -74,18 +74,16 @@ impl StateStore {
     ) -> Result<Option<StateValue>> {
         match self.get_jmt_leaf_node_key(state_key, version)? {
             Some(node_key) => {
-                let state_value =
-                    if let Some(node) = self.db.get::<JellyfishMerkleNodeSchema>(&node_key)? {
-                        match node {
-                            // Only if the node is a leaf node then the value
-                            // is present in the DB.
-                            Node::Leaf(leaf) => Some(leaf.value().value.clone()),
-                            _ => None,
-                        }
-                    } else {
-                        None
-                    };
-                Ok(state_value)
+                if let Some(Node::Leaf(leaf)) =
+                    self.db.get::<JellyfishMerkleNodeSchema>(&node_key)?
+                {
+                    Ok(Some(leaf.value().value.clone()))
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Can't find value in JMT for state key {:?}",
+                        state_key
+                    ))
+                }
             }
             None => Ok(None),
         }
