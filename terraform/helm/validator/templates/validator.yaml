@@ -133,11 +133,15 @@ spec:
           tcpSocket:
             port: 6180
         securityContext:
+          {{- if $.Values.enablePrivilegedMode }}
+          privileged: true
+          {{- else }}
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
           capabilities:
             drop:
             - ALL
+          {{- end }}
       {{- with .Values.vault }}
       - name: vault
         image: {{ .image.repo }}:{{ .image.tag }}
