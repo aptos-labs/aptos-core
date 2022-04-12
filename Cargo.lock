@@ -169,6 +169,7 @@ dependencies = [
  "move-core-types",
  "move-vm-types",
  "rand 0.8.4",
+ "reqwest",
  "serde 1.0.136",
  "serde_json",
  "serde_yaml",
