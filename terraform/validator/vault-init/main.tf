@@ -91,6 +91,7 @@ resource "vault_transit_secret_backend_key" "consensus" {
   backend    = var.transit_mount
   name       = "${var.namespace}__consensus"
   type       = "ed25519"
+  exportable = true
   depends_on = [null_resource.mounts_created]
   lifecycle {
     ignore_changes = [min_decryption_version, min_encryption_version]

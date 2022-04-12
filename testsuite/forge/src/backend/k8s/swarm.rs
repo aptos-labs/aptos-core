@@ -332,6 +332,7 @@ pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
         // perform healthcheck with retry, returning unhealthy
         let check = aptos_retrier::retry_async(k8s_retry_strategy(), || {
             Box::pin(async move {
+                println!("Attempting health check: {}", node.name());
                 match node.rest_client().get_ledger_information().await {
                     Ok(_) => {
                         println!("Node {} healthy", node.name());
