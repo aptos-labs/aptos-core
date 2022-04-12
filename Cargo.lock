@@ -152,12 +152,16 @@ dependencies = [
 name = "aptos"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-config",
  "aptos-crypto",
  "aptos-logger",
+ "aptos-rest-client",
+ "aptos-sdk",
  "aptos-secure-storage",
  "aptos-telemetry",
  "aptos-temppath",
+ "aptos-transaction-builder",
  "aptos-types",
  "aptos-vm",
  "aptos-workspace-hack",

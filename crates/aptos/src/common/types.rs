@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::PrivateKey;
 use crate::common::utils::{check_if_file_exists, write_to_file};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -277,7 +276,7 @@ impl PublicKeyInputOptions {
 #[derive(Debug, Parser)]
 pub struct KeyInputOptions {
     #[clap(flatten)]
-    private_key_options: PrivateKeyInputOptions,
+    pub private_key_options: PrivateKeyInputOptions,
     #[clap(flatten)]
     public_key_options: PublicKeyInputOptions,
 }

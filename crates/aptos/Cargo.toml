@@ -10,6 +10,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0.52"
 base64 = "0.13.0"
 clap = "3.1.8"
 hex = "0.4.3"
@@ -28,7 +29,10 @@ aptos-logger = { path = "../aptos-logger" }
 aptos-secure-storage = { path = "../../secure/storage" }
 aptos-telemetry = { path = "../aptos-telemetry" }
 aptos-temppath = { path = "../aptos-temppath" }
+aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
+aptos-sdk = { path = "../../sdk" }
+aptos-rest-client = { path = "../../crates/aptos-rest-client"}
 aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 bcs = "0.1.2"
