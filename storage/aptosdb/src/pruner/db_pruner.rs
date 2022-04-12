@@ -67,6 +67,6 @@ pub trait DBPruner {
 
     /// True if there is pruning work pending to be done
     fn is_pruning_pending(&self) -> bool {
-        self.target_version() >= self.least_readable_version()
+        self.target_version() > self.least_readable_version()
     }
 }
