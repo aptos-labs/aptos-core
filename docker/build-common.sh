@@ -33,6 +33,7 @@ if [ "$IMAGE_TARGETS" = "release" ] || [ "$IMAGE_TARGETS" = "all" ]; then
           -p backup-cli \
           -p aptos-transaction-replay \
           -p aptos-writeset-generator \
+          -p transaction-emitter \
           "$@"
 
   # Build our core modules!
