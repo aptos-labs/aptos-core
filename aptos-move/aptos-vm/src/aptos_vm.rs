@@ -240,7 +240,6 @@ impl AptosVM {
                     }
                 }
                 TransactionPayload::ScriptFunction(script_fn) => {
-                    // let aptos_version = self.0.get_version()?;
                     let mut senders = vec![txn_data.sender()];
                     senders.extend(txn_data.secondary_signers());
 
