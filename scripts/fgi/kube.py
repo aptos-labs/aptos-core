@@ -16,6 +16,7 @@ FORGE_K8S_CLUSTERS = [
 WORKSPACE_CHART_BUCKETS = {
     "forge-0": "aptos-testnet-forge-0-helm-312428ba",
     "forge-1": "aptos-testnet-forge-1-helm-a2b65112",
+    "forge-dev": "aptos-testnet-forge-dev-helm-8d0a5291",
 }
 
 AWS_ACCOUNT = (
