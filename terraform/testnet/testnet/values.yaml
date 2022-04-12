@@ -107,6 +107,7 @@ monitoring:
       class:
       size: 50Gi
     retention: 15d
+    deleteWal: false
   alertmanager:
     alertRouteTrees:
       - match:

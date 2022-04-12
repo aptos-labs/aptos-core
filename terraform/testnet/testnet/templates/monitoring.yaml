@@ -171,12 +171,14 @@ spec:
       - name: prometheus
         image: {{ .prometheus.image.repo }}:{{ .prometheus.image.tag }}
         imagePullPolicy: {{ .prometheus.image.pullPolicy }}
-        args:
-        - "--web.enable-lifecycle"
-        - "--config.file=/etc/prometheus/prometheus.yml"
-        - "--storage.tsdb.min-block-duration=15m"
-        - "--storage.tsdb.max-block-duration=30m"
-        - "--storage.tsdb.retention.time={{ .prometheus.retention }}"
+        command:
+          - sh
+          - -c
+          - |
+            {{- if .prometheus.deleteWal }}
+            rm -r /prometheus/data/wal/*
+            {{- end }}
+            prometheus --web.enable-lifecycle --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.min-block-duration=15m --storage.tsdb.max-block-duration=30m --storage.tsdb.retention.time={{ .prometheus.retention }}
         resources:
           {{- toYaml .prometheus.resources | nindent 10 }}
         ports:
