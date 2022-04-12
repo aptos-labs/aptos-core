@@ -106,10 +106,6 @@ resource "google_spanner_database" "vault" {
     "CREATE TABLE Vault (Key STRING(MAX) NOT NULL, Value BYTES(MAX)) PRIMARY KEY (Key)",
     "CREATE TABLE VaultHA (Key STRING(MAX) NOT NULL, Value STRING(MAX), Identity STRING(36) NOT NULL, Timestamp TIMESTAMP NOT NULL) PRIMARY KEY (Key)",
   ]
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "google_spanner_database_iam_member" "vault" {

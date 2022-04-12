@@ -23,10 +23,6 @@ resource "aws_eks_cluster" "aptos" {
     aws_iam_role_policy_attachment.cluster-service,
     aws_cloudwatch_log_group.eks,
   ]
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 data "aws_eks_cluster_auth" "aptos" {
@@ -43,11 +39,6 @@ locals {
     validators = {
       instance_type = var.validator_instance_type
       size          = 3
-      taint         = true
-    }
-    trusted = {
-      instance_type = var.trusted_instance_type
-      size          = 1
       taint         = true
     }
   }

@@ -58,10 +58,6 @@ resource "google_container_cluster" "aptos" {
   pod_security_policy_config {
     enabled = true
   }
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "google_container_node_pool" "utilities" {
@@ -113,36 +109,6 @@ resource "google_container_node_pool" "validators" {
     taint {
       key    = "aptos.org/nodepool"
       value  = "validators"
-      effect = "NO_EXECUTE"
-    }
-  }
-}
-
-resource "google_container_node_pool" "trusted" {
-  provider   = google-beta
-  name       = "trusted"
-  location   = local.zone
-  cluster    = google_container_cluster.aptos.name
-  node_count = lookup(var.node_pool_sizes, "trusted", 1)
-
-  node_config {
-    machine_type    = "n2-custom-2-4096"
-    image_type      = "COS_CONTAINERD"
-    disk_size_gb    = 20
-    service_account = google_service_account.gke.email
-    tags            = ["trusted"]
-
-    shielded_instance_config {
-      enable_secure_boot = true
-    }
-
-    workload_metadata_config {
-      node_metadata = "GKE_METADATA_SERVER"
-    }
-
-    taint {
-      key    = "aptos.org/nodepool"
-      value  = "trusted"
       effect = "NO_EXECUTE"
     }
   }

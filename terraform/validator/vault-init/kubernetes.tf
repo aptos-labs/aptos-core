@@ -35,16 +35,6 @@ resource "vault_kubernetes_auth_backend_config" "kubernetes" {
   issuer             = var.issuer
 }
 
-resource "vault_kubernetes_auth_backend_role" "safety-rules" {
-  backend                          = vault_auth_backend.kubernetes.path
-  role_name                        = "${var.namespace}-safety-rules"
-  bound_service_account_names      = ["${var.service_account_prefix}-safety-rules"]
-  bound_service_account_namespaces = ["*"]
-  token_bound_cidrs                = var.pod_cidrs
-  token_period                     = 3600
-  token_policies                   = [vault_policy.safety-rules.name]
-}
-
 resource "vault_kubernetes_auth_backend_role" "validator" {
   backend                          = vault_auth_backend.kubernetes.path
   role_name                        = "${var.namespace}-validator"

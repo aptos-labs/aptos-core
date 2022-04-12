@@ -33,10 +33,6 @@ resource "azurerm_kubernetes_cluster" "aptos" {
     client_id     = azuread_service_principal.aptos.application_id
     client_secret = azuread_application_password.aptos.value
   }
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "azurerm_kubernetes_cluster_node_pool" "validators" {
@@ -49,18 +45,6 @@ resource "azurerm_kubernetes_cluster_node_pool" "validators" {
   node_count      = lookup(var.node_pool_sizes, "validators", 3)
   os_disk_size_gb = 30
   node_taints     = ["aptos.org/nodepool=validators:NoExecute"]
-}
-
-resource "azurerm_kubernetes_cluster_node_pool" "trusted" {
-  kubernetes_cluster_id = azurerm_kubernetes_cluster.aptos.id
-  orchestrator_version  = azurerm_kubernetes_cluster.aptos.kubernetes_version
-
-  name            = "trusted"
-  vm_size         = "Standard_F2s_v2"
-  vnet_subnet_id  = azurerm_subnet.nodes.id
-  node_count      = lookup(var.node_pool_sizes, "trusted", 1)
-  os_disk_size_gb = 30
-  node_taints     = ["aptos.org/nodepool=trusted:NoExecute"]
 }
 
 resource "azurerm_log_analytics_workspace" "aptos" {

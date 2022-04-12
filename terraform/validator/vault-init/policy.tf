@@ -1,36 +1,3 @@
-data "vault_policy_document" "safety-rules" {
-  rule {
-    path         = "${var.kv_v2_mount}/data/${var.namespace}/*"
-    capabilities = ["read", "update", "create"]
-    description  = "Allow read and write on safety-rules secure data"
-  }
-  rule {
-    path         = "${var.transit_mount}/keys/${vault_transit_secret_backend_key.consensus.name}"
-    capabilities = ["read"]
-    description  = "Allow reading the consensus public key"
-  }
-  rule {
-    path         = "${var.transit_mount}/export/signing-key/${vault_transit_secret_backend_key.consensus.name}"
-    capabilities = ["read"]
-    description  = "Allow reading the consensus private key"
-  }
-  rule {
-    path         = "${var.transit_mount}/sign/${vault_transit_secret_backend_key.consensus.name}"
-    capabilities = ["update"]
-    description  = "Allow signing with the consensus key"
-  }
-  rule {
-    path         = "${var.transit_mount}/keys/${vault_transit_secret_backend_key.execution.name}"
-    capabilities = ["read"]
-    description  = "Allow reading the execution public key"
-  }
-}
-
-resource "vault_policy" "safety-rules" {
-  name   = "${var.namespace}-safety-rules"
-  policy = data.vault_policy_document.safety-rules.hcl
-}
-
 data "vault_policy_document" "validator" {
   rule {
     path         = "${var.transit_mount}/export/signing-key/${vault_transit_secret_backend_key.execution.name}"

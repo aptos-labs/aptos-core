@@ -127,24 +127,6 @@ restore:
     concurrent_downloads: 2
     restore_era:
 
-safetyrules:
-  image:
-    repo: aptoslab/validator_tcb
-    tag:
-    pullPolicy: IfNotPresent
-  resources:
-    limits:
-      cpu: 1
-      memory: 512Mi
-    requests:
-      cpu: 1
-      memory: 512Mi
-  rust_log: debug
-  rust_log_remote: debug,hyper=off
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
-
 fullnode:
   groups:
   - name: fullnode
@@ -268,7 +250,7 @@ monitoring:
   pushgateway:
     image:
       repo: prom/pushgateway
-      tag: v1.4.2@sha256:0604285851ff4871d2bd740a89c00e49098939f5f648f78f42c0a450a7a987fc
+      tag: v1.4.1@sha256:b561435cb17ee816c5d90c2408bcc1ffe25304f1608e18db16a3969f6cc44626
       pullPolicy: IfNotPresent
     resources:
       limits:

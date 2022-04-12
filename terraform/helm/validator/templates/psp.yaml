@@ -72,9 +72,6 @@ subjects:
   name: {{ include "aptos-validator.fullname" . }}-prometheus
 - kind: ServiceAccount
   namespace: {{ .Release.Namespace }}
-  name: {{ include "aptos-validator.fullname" . }}-safety-rules
-- kind: ServiceAccount
-  namespace: {{ .Release.Namespace }}
   name: {{ include "aptos-validator.fullname" . }}-validator
 - kind: ServiceAccount
   namespace: {{ .Release.Namespace }}

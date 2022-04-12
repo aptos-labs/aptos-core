@@ -42,9 +42,6 @@ roleRef:
   name: {{ include "aptos-validator.fullname" . }}-tokenreview
 subjects:
 - kind: ServiceAccount
-  name: {{ include "aptos-validator.fullname" . }}-safety-rules
-  namespace: {{ .Release.Namespace }}
-- kind: ServiceAccount
   name: {{ include "aptos-validator.fullname" . }}-validator
   namespace: {{ .Release.Namespace }}
 - kind: ServiceAccount

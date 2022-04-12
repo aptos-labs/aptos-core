@@ -111,16 +111,6 @@ locals {
         effect = "NoExecute"
       }]
     }
-    safetyrules = {
-      nodeSelector = {
-        "eks.amazonaws.com/nodegroup" = "trusted"
-      }
-      tolerations = [{
-        key    = "aptos.org/nodepool"
-        value  = "trusted"
-        effect = "NoExecute"
-      }]
-    }
     keymanager = {
       nodeSelector = {
         "eks.amazonaws.com/nodegroup" = "trusted"

@@ -50,16 +50,6 @@ resource "helm_release" "validator" {
           effect = "NoExecute"
         }]
       }
-      safetyrules = {
-        nodeSelector = {
-          "cloud.google.com/gke-nodepool" = google_container_node_pool.trusted.name
-        }
-        tolerations = [{
-          key    = google_container_node_pool.trusted.node_config[0].taint[0].key
-          value  = google_container_node_pool.trusted.node_config[0].taint[0].value
-          effect = "NoExecute"
-        }]
-      }
       keymanager = {
         nodeSelector = {
           "cloud.google.com/gke-nodepool" = google_container_node_pool.trusted.name
