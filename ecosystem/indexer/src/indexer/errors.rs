@@ -6,7 +6,6 @@ use anyhow::Error;
 type ErrorWithVersionAndName = (Error, u64, &'static str);
 
 #[derive(Debug)]
-#[allow(dead_code)]
 #[allow(clippy::large_enum_variant)]
 pub enum TransactionProcessingError {
     /// Could not get a connection

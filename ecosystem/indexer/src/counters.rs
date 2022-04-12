@@ -25,7 +25,7 @@ pub static PROCESSOR_ERRORS: Lazy<IntCounterVec> = Lazy::new(|| {
 });
 
 /// Number of times any given processor has completed successfully
-pub static PROCESSOR_OKS: Lazy<IntCounterVec> = Lazy::new(|| {
+pub static PROCESSOR_SUCCESSES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "indexer_processor_success_count",
         "Number of times a given processor has completed successfully",

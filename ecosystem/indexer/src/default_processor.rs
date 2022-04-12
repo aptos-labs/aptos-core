@@ -2,15 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    database::{execute_with_better_error, PgDbPool},
+    database::{execute_with_better_error, PgDbPool, PgPoolConnection},
     indexer::{
         errors::TransactionProcessingError, processing_result::ProcessingResult,
         transaction_processor::TransactionProcessor,
     },
-    models::transactions::TransactionModel,
+    models::{
+        events::EventModel,
+        transactions::{BlockMetadataTransactionModel, TransactionModel, UserTransactionModel},
+    },
     schema,
 };
-
 use aptos_rest_client::Transaction;
 use async_trait::async_trait;
 use diesel::Connection;
@@ -38,6 +40,77 @@ impl Debug for DefaultTransactionProcessor {
     }
 }
 
+fn insert_events(conn: &PgPoolConnection, events: &Vec<EventModel>) {
+    execute_with_better_error(
+        conn,
+        diesel::insert_into(schema::events::table)
+            .values(events)
+            .on_conflict_do_nothing(),
+    )
+    .expect("Error inserting row into database");
+}
+
+fn insert_transaction(conn: &PgPoolConnection, version: u64, transaction_model: &TransactionModel) {
+    aptos_logger::trace!(
+        "[default_processor] inserting 'transaction' version {} with hash {}",
+        version,
+        transaction_model.hash
+    );
+    execute_with_better_error(
+        conn,
+        diesel::insert_into(schema::transactions::table)
+            .values(transaction_model)
+            .on_conflict(schema::transactions::dsl::hash)
+            .do_update()
+            .set(transaction_model),
+    )
+    .expect("Error inserting row into database");
+}
+
+fn insert_user_transaction(
+    conn: &PgPoolConnection,
+    version: u64,
+    transaction_model: &TransactionModel,
+    user_transaction_model: &UserTransactionModel,
+) {
+    aptos_logger::trace!(
+        "[default_processor] inserting 'user_transaction' version {} with hash {}",
+        version,
+        &transaction_model.hash
+    );
+    execute_with_better_error(
+        conn,
+        diesel::insert_into(schema::user_transactions::table)
+            .values(user_transaction_model)
+            .on_conflict(schema::user_transactions::dsl::hash)
+            .do_update()
+            .set(user_transaction_model),
+    )
+    .expect("Error inserting row into database");
+}
+
+fn insert_block_metadata_transaction(
+    conn: &PgPoolConnection,
+    version: u64,
+    transaction_model: &TransactionModel,
+    block_metadata_transaction_model: &BlockMetadataTransactionModel,
+) {
+    aptos_logger::trace!(
+        "[default_processor] inserting 'block_metadata_transaction' version {} with hash {}",
+        version,
+        &transaction_model.hash
+    );
+    execute_with_better_error(
+        conn,
+        diesel::insert_into(schema::block_metadata_transactions::table)
+            .values(block_metadata_transaction_model)
+            .on_conflict(schema::block_metadata_transactions::dsl::hash)
+            .do_update()
+            .set(block_metadata_transaction_model),
+    )
+    .expect("Error inserting row into database");
+}
+
 #[async_trait]
 impl TransactionProcessor for DefaultTransactionProcessor {
     fn name(&self) -> &'static str {
@@ -53,76 +126,34 @@ impl TransactionProcessor for DefaultTransactionProcessor {
         let (transaction_model, maybe_details_model, maybe_events) =
             TransactionModel::from_transaction(&transaction);
 
-        let conn = self.connection_pool.get().map_err(|e| {
-            TransactionProcessingError::ConnectionPoolError((
-                anyhow::Error::from(e),
-                version,
-                self.name(),
-            ))
-        })?;
+        let conn = self.get_conn();
 
-        let tx_result = conn.transaction::<(), diesel::result::Error, _>(||{
-        aptos_logger::trace!(
-            "[default_processor] inserting 'transaction' version {} with hash {}",
-            version,
-            &transaction_model.hash
-        );
-        execute_with_better_error(
-            &conn,
-            diesel::insert_into(schema::transactions::table)
-                .values(&transaction_model)
-                .on_conflict(schema::transactions::dsl::hash)
-                .do_update()
-                .set(&transaction_model),
-        )
-        .expect("Error inserting row into database");
-
-        if let Some(tx_details_model) = maybe_details_model {
-            match tx_details_model {
-                Either::Left(ut) => {
-                    aptos_logger::trace!(
-                        "[default_processor] inserting 'user_transaction' version {} with hash {}",
-                        version,
-                        &transaction_model.hash
-                    );
-                    execute_with_better_error(
-                        &conn,
-                        diesel::insert_into(schema::user_transactions::table)
-                            .values(&ut)
-                            .on_conflict(schema::user_transactions::dsl::hash)
-                            .do_update()
-                            .set(&ut),
-                    )
-                    .expect("Error inserting row into database");
-                }
-                Either::Right(bmt) => {
-                    aptos_logger::trace!(
-                        "[default_processor] inserting 'block_metadata_transaction' version {} with hash {}",
-                        version,
-                        &transaction_model.hash
-                    );
-                    execute_with_better_error(
-                        &conn,
-                        diesel::insert_into(schema::block_metadata_transactions::table)
-                            .values(&bmt)
-                            .on_conflict(schema::block_metadata_transactions::dsl::hash)
-                            .do_update()
-                            .set(&bmt),
-                    )
-                    .expect("Error inserting row into database");
-                }
+        let tx_result = conn.transaction::<(), diesel::result::Error, _>(|| {
+            insert_transaction(&conn, version, &transaction_model);
+            if let Some(tx_details_model) = maybe_details_model {
+                match tx_details_model {
+                    Either::Left(user_transaction_model) => {
+                        insert_user_transaction(
+                            &conn,
+                            version,
+                            &transaction_model,
+                            &user_transaction_model,
+                        );
+                    }
+                    Either::Right(block_metadata_transaction_model) => {
+                        insert_block_metadata_transaction(
+                            &conn,
+                            version,
+                            &transaction_model,
+                            &block_metadata_transaction_model,
+                        );
+                    }
+                };
             };
-        };
 
-        if let Some(events) = maybe_events {
-            execute_with_better_error(
-                &conn,
-                diesel::insert_into(schema::events::table)
-                    .values(events)
-                    .on_conflict_do_nothing(),
-            )
-            .expect("Error inserting row into database");
-        };
+            if let Some(events) = maybe_events {
+                insert_events(&conn, &events);
+            };
             Ok(())
         });
 

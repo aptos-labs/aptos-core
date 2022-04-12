@@ -53,6 +53,7 @@ impl Tailer {
     }
 
     /// For all versions which have an `success=false` in the `processor_status` table, re-run them
+    /// TODO: also handle gaps in sequence numbers (pg query for this is super easy)
     pub async fn handle_previous_errors(&self) {
         info!("Checking for previously errored versions...");
         let mut tasks = vec![];
@@ -233,6 +234,9 @@ mod test {
 
     #[tokio::test]
     async fn test_parsing_and_writing() {
+        if crate::should_skip_pg_tests() {
+            return;
+        }
         let (conn_pool, tailer) = setup_indexer().unwrap();
         // An abridged genesis transaction
         let genesis_txn: Transaction = serde_json::from_value(json!(

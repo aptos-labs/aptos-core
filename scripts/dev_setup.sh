@@ -626,6 +626,21 @@ function install_python3 {
   fi
 }
 
+function install_postgres {
+  if [[ "$PACKAGE_MANAGER" == "apt-get" ]] || [[ "$PACKAGE_MANAGER" == "apk" ]]; then
+    install_pkg libpq-dev "$PACKAGE_MANAGER"
+  fi
+  if [[ "$PACKAGE_MANAGER" == "pacman" ]] || [[ "$PACKAGE_MANAGER" == "yum" ]]; then
+    install_pkg postgresql-libs "$PACKAGE_MANAGER"
+  fi
+  if [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+    install_pkg libpq-devel "$PACKAGE_MANAGER"
+  fi
+  if [[ "$PACKAGE_MANAGER" == "brew" ]]; then
+    install_pkg postgresql "$PACKAGE_MANAGER"
+  fi
+}
+
 function welcome_message {
 cat <<EOF
 Welcome to Aptos!
@@ -868,6 +883,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_cargo_guppy
   install_sccache
   install_grcov
+  install_postgres
   install_pkg git "$PACKAGE_MANAGER"
   install_lcov "$PACKAGE_MANAGER"
   install_nodejs "$PACKAGE_MANAGER"

@@ -33,9 +33,24 @@ pub fn wipe_database(conn: &PgPoolConnection) {
     }
 }
 
+/// By default, skips test unless `INDEXER_DATABASE_URL` is set.
+/// In CI, will explode if `INDEXER_DATABASE_URL` is NOT set.
+pub fn should_skip() -> bool {
+    if std::env::var("CIRCLECI").is_ok() {
+        std::env::var("INDEXER_DATABASE_URL").expect("must set 'INDEXER_DATABASE_URL' in CI!");
+    }
+    if std::env::var("INDEXER_DATABASE_URL").is_ok() {
+        false
+    } else {
+        println!("`INDEXER_DATABASE_URL` is not set: skipping indexer tests");
+        true
+    }
+}
+
 pub fn setup_indexer(ctx: &mut AptosContext) -> anyhow::Result<(PgDbPool, Tailer)> {
     let database_url = std::env::var("INDEXER_DATABASE_URL")
         .expect("must set 'INDEXER_DATABASE_URL' to run tests!");
+
     let conn_pool = new_db_pool(database_url.as_str())?;
     wipe_database(&conn_pool.get()?);
 
@@ -50,6 +65,9 @@ pub fn setup_indexer(ctx: &mut AptosContext) -> anyhow::Result<(PgDbPool, Tailer
 #[async_trait::async_trait]
 impl AptosTest for Indexer {
     async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
+        if aptos_indexer::should_skip_pg_tests() {
+            return Ok(());
+        }
         let (conn_pool, mut tailer) = setup_indexer(ctx)?;
 
         let client = ctx.client();
@@ -71,7 +89,6 @@ impl AptosTest for Indexer {
                 .unwrap()
                 .into_inner()
                 .version;
-            println!("Height: {}", version);
 
             tailer.process_next_batch((version + 1) as u8).await;
 
