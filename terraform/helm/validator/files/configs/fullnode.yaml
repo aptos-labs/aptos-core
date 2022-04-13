@@ -21,6 +21,10 @@ execution:
 
 storage:
   backup_service_address: "0.0.0.0:6186"
+  storage_pruner_config:
+    default_prune_window: {{ int .Values.validator.config.default_prune_window }}
+    state_store_prune_window: {{ int .Values.validator.config.state_store_prune_window }}
+    max_version_to_prune_per_batch: {{ int .Values.validator.config.max_version_to_prune_per_batch }}
 
 full_node_networks:
 - network_id:
