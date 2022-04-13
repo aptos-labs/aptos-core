@@ -23,6 +23,11 @@ shift 2
 
 DIR="$( cd "$( dirname "$0" )" && pwd )"
 
+CACHE_FROM=""
+if [ -n "$CACHE_FROM_IMAGE" ]; then
+  CACHE_FROM=" --cache-from $CACHE_FROM_IMAGE"
+fi
+
 PROXY=""
 if [ "$https_proxy" ]; then
     PROXY=" --network host --build-arg https_proxy=$https_proxy --build-arg http_proxy=$http_proxy"
@@ -77,6 +82,7 @@ for _ in seq 1 2; do
     --build-arg BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
     --build-arg ENABLE_FAILPOINTS="$ENABLE_FAILPOINTS" \
     $PROXY \
+    $CACHE_FROM \
     "$@"; then
       exit 0
   fi
