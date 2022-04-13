@@ -164,3 +164,8 @@ variable "enable_dev_vault" {
   description = "TEST ONLY: Enables Vault in Dev Mode for all validators"
   default     = false
 }
+
+variable "enable_k8s_metrics_server" {
+  description = "Installs kubernetes metrics server: https://github.com/kubernetes-sigs/metrics-server"
+  default     = false
+}
