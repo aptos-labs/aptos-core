@@ -37,7 +37,6 @@ const MAX_NUM_VALIDATORS: usize = 30;
 const HEALTH_CHECK_URL: &str = "http://127.0.0.1:8001";
 const VALIDATOR_SCALING_FACTOR: i64 = 3;
 const UTILITIES_SCALING_FACTOR: i64 = 3;
-const TRUSTED_SCALING_FACTOR: i64 = 1;
 
 const GENESIS_MODULES_DIR: &str = "/aptos-framework/move/modules";
 
@@ -465,8 +464,7 @@ pub async fn set_eks_nodegroup_size(
     // nodegroup scaling factors
     let max_surge = 2; // multiplier for max size
     let num_validators: i64 = num_validators as i64;
-    let idle_utilities_size = 5; // keep extra utilities nodes around for forge pods and monitoring
-                                 // make minimum of 5 extra buffer nodes on cluster when we do scaling up
+    let idle_utilities_size = 10; // keep extra utilities nodes around for forge pods and monitoring
     let buffer_node = if num_validators != 0 {
         cmp::max(5, num_validators / 5)
     } else {
@@ -497,16 +495,8 @@ pub async fn set_eks_nodegroup_size(
             idle_utilities_size,
         )),
     };
-    let trusted_scaling = NodegroupScalingConfig {
-        desired_size: Some(num_validators * TRUSTED_SCALING_FACTOR + buffer_node),
-        max_size: Some(cmp::max(
-            num_validators * max_surge * TRUSTED_SCALING_FACTOR,
-            1,
-        )),
-        min_size: Some(num_validators * TRUSTED_SCALING_FACTOR),
-    };
-    let desire_nodegroup_size = num_validators
-        * (VALIDATOR_SCALING_FACTOR + UTILITIES_SCALING_FACTOR + TRUSTED_SCALING_FACTOR);
+    let desire_nodegroup_size =
+        num_validators * (VALIDATOR_SCALING_FACTOR + UTILITIES_SCALING_FACTOR);
 
     // submit the scaling requests
     let validators_update_id = submit_update_nodegroup_config_request(
@@ -523,19 +513,11 @@ pub async fn set_eks_nodegroup_size(
         utilities_scaling,
     )
     .await?;
-    let trusted_update_id = submit_update_nodegroup_config_request(
-        &eks_client,
-        &cluster_name,
-        "trusted",
-        trusted_scaling,
-    )
-    .await?;
 
     // wait for nodegroup updates
     let updates: Vec<(&str, &str)> = vec![
         ("validators", &validators_update_id),
         ("utilities", &utilities_update_id),
-        ("trusted", &trusted_update_id),
     ];
     try_join_all(updates.into_iter().map(|(nodegroup_name, update_id)| {
         describe_update(
