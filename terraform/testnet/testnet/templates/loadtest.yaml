@@ -35,6 +35,10 @@ spec:
             - --duration={{ .config.duration }}
             - --accounts-per-client={{ .config.accounts_per_client }}
             - --workers-per-ac={{ .config.workers_per_ac }}
+            {{- if .config.enableBurst }}
+            - --burst
+            - --wait-millis={{ .config.waitMillis }}
+            {{- end }}
             env:
             - name: RUST_BACKTRACE
               value: "1"

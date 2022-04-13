@@ -170,6 +170,8 @@ load_test:
     duration: 300
     accounts_per_client: 12
     workers_per_ac: 64
+    enableBurst: false
+    waitMillis: 1000
 
 # if enabled, faucet_test is synchronized with cluster_test traffic
 # to prevent race on mint account
