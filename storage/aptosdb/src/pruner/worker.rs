@@ -62,7 +62,7 @@ impl Worker {
             for db_pruner in &self.db_pruners {
                 let result = db_pruner
                     .lock()
-                    .prune(&mut db_batch, self.max_version_to_prune_per_batch);
+                    .prune_impl(&mut db_batch, self.max_version_to_prune_per_batch);
                 result.map_err(|_| error_in_pruning = true).ok();
             }
             // Commit all the changes to DB atomically

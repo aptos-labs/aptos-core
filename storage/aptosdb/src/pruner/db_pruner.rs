@@ -38,7 +38,16 @@ pub trait DBPruner {
 
     /// Performs the actual pruning, a target version is passed, which is the target the pruner
     /// tries to prune.
-    fn prune(&self, db_batch: &mut SchemaBatch, max_versions: u64) -> anyhow::Result<Version>;
+    fn prune(&self, db_batch: &mut SchemaBatch, max_versions: u64) -> anyhow::Result<Version> {
+        if self.least_readable_version() >= self.target_version() {
+            return Ok(self.least_readable_version());
+        }
+        self.prune_impl(db_batch, max_versions)
+    }
+
+    /// Performs the actual pruning, a target version is passed, which is the target the pruner
+    /// tries to prune.
+    fn prune_impl(&self, db_batch: &mut SchemaBatch, max_versions: u64) -> anyhow::Result<Version>;
 
     /// Initializes the least readable version stored in underlying DB storage
     fn initialize_least_readable_version(&self) -> anyhow::Result<Version>;

@@ -4,9 +4,9 @@
 #![forbid(unsafe_code)]
 
 pub mod common;
+pub mod list;
 pub mod move_tool;
 pub mod op;
-pub mod list;
 
 use crate::common::types::{CliResult, Error};
 use clap::Parser;

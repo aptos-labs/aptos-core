@@ -87,7 +87,8 @@ fn main() {
                 StoragePrunerConfig::new(
                     Some(state_store_prune_window.unwrap_or(1_000_000)),
                     Some(default_store_prune_window.unwrap_or(10_000_000)),
-                    Some(max_version_to_prune_per_batch.unwrap_or(100)),
+                    Some(max_version_to_prune_per_batch.unwrap_or(1000)),
+                    1000,
                 ),
             );
         }

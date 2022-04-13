@@ -230,6 +230,8 @@ pub struct AptosDB {
     system_store: Arc<SystemStore>,
     pruner: Option<Pruner>,
     _rocksdb_property_reporter: RocksdbPropertyReporter,
+    versions_per_pruning_batch: u64,
+    last_version_sent_to_pruner: Arc<Mutex<u64>>,
 }
 
 impl AptosDB {
@@ -279,6 +281,8 @@ impl AptosDB {
                 )),
             },
             _rocksdb_property_reporter: RocksdbPropertyReporter::new(Arc::clone(&db)),
+            versions_per_pruning_batch: storage_pruner_config.versions_per_pruning_batch,
+            last_version_sent_to_pruner: Arc::new(Mutex::new(0)),
         }
     }
 
@@ -1293,7 +1297,12 @@ impl DbWriter for AptosDB {
                         .map_or(-1, |c| c as i64),
                 );
 
-                self.wake_pruner(last_version);
+                if *self.last_version_sent_to_pruner.lock()
+                    < last_version - self.versions_per_pruning_batch
+                {
+                    self.wake_pruner(last_version);
+                    *self.last_version_sent_to_pruner.lock() = last_version;
+                }
             }
 
             Ok(())
@@ -1389,7 +1398,7 @@ impl DbWriter for AptosDB {
             let mut db_batch = SchemaBatch::new();
             for db_pruner in db_pruners {
                 db_pruner.lock().set_target_version(target_version);
-                db_pruner.lock().prune(&mut db_batch, max_version)?;
+                db_pruner.lock().prune_impl(&mut db_batch, max_version)?;
             }
             self.db.write_schemas(db_batch)
         })

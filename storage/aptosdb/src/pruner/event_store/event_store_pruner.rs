@@ -31,7 +31,7 @@ impl DBPruner for EventStorePruner {
         EVENT_STORE_PRUNER_NAME
     }
 
-    fn prune(&self, db_batch: &mut SchemaBatch, max_versions: u64) -> anyhow::Result<Version> {
+    fn prune_impl(&self, db_batch: &mut SchemaBatch, max_versions: u64) -> anyhow::Result<Version> {
         // Current target version  might be less than the target version to ensure we don't prune
         // more than max_version in one go.
         let current_target_version = self.get_currrent_batch_target(max_versions);

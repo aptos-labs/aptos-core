@@ -36,7 +36,11 @@ impl DBPruner for StateStorePruner {
         STATE_STORE_PRUNER_NAME
     }
 
-    fn prune(&self, _db_batch: &mut SchemaBatch, max_versions: u64) -> anyhow::Result<Version> {
+    fn prune_impl(
+        &self,
+        _db_batch: &mut SchemaBatch,
+        max_versions: u64,
+    ) -> anyhow::Result<Version> {
         let least_readable_version = self.least_readable_version.load(Ordering::Relaxed);
         let target_version = self.target_version();
         return match prune_state_store(
