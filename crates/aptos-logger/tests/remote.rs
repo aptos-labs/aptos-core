@@ -21,7 +21,11 @@ fn remote_end_to_end() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap().to_string();
 
-    AptosData::builder().address(addr).is_async(true).build();
+    AptosData::builder()
+        .address(addr)
+        .is_async(true)
+        .enable_backtrace()
+        .build();
 
     let handle = std::thread::spawn(|| {
         error!("Hello");

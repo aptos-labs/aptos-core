@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 pub struct LoggerConfig {
     // channel size for the asychronous channel for node logging.
     pub chan_size: usize,
+    // Enables backtraces on error logs
+    pub enable_backtrace: bool,
     // Use async logging
     pub is_async: bool,
     // The default logging level for slog.
@@ -19,6 +21,7 @@ impl Default for LoggerConfig {
     fn default() -> LoggerConfig {
         LoggerConfig {
             chan_size: CHANNEL_SIZE,
+            enable_backtrace: false,
             is_async: true,
             level: Level::Info,
         }

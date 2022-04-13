@@ -42,8 +42,8 @@ pub struct LogEntry {
     metadata: Metadata,
     #[serde(skip_serializing_if = "Option::is_none")]
     thread_name: Option<String>,
-    /// The program backtrace taken when the event occurred. Backtraces are
-    /// only supported for errors.
+    /// The program backtrace taken when the event occurred. Backtraces
+    /// are only supported for errors and must be configured.
     #[serde(skip_serializing_if = "Option::is_none")]
     backtrace: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -56,7 +56,7 @@ pub struct LogEntry {
 }
 
 impl LogEntry {
-    fn new(event: &Event, thread_name: Option<&str>) -> Self {
+    fn new(event: &Event, thread_name: Option<&str>, enable_backtrace: bool) -> Self {
         use crate::{Value, Visitor};
 
         struct JsonVisitor<'a>(&'a mut BTreeMap<Key, serde_json::Value>);
@@ -91,17 +91,16 @@ impl LogEntry {
 
         let hostname = HOSTNAME.as_deref();
 
-        let backtrace = match metadata.level() {
-            Level::Error => {
-                let mut backtrace = Backtrace::new();
-                let mut frames = backtrace.frames().to_vec();
-                if frames.len() > 3 {
-                    frames.drain(0..3); // Remove the first 3 unnecessary frames to simplify backtrace
-                }
-                backtrace = frames.into();
-                Some(format!("{:?}", backtrace))
+        let backtrace = if enable_backtrace && matches!(metadata.level(), Level::Error) {
+            let mut backtrace = Backtrace::new();
+            let mut frames = backtrace.frames().to_vec();
+            if frames.len() > 3 {
+                frames.drain(0..3); // Remove the first 3 unnecessary frames to simplify backtrace
             }
-            _ => None,
+            backtrace = frames.into();
+            Some(format!("{:?}", backtrace))
+        } else {
+            None
         };
 
         let mut data = BTreeMap::new();
@@ -152,6 +151,7 @@ impl LogEntry {
 /// A builder for a `AptosData`, configures what, where, and how to write logs.
 pub struct AptosDataBuilder {
     channel_size: usize,
+    enable_backtrace: bool,
     level: Level,
     remote_level: Level,
     address: Option<String>,
@@ -165,6 +165,7 @@ impl AptosDataBuilder {
     pub fn new() -> Self {
         Self {
             channel_size: CHANNEL_SIZE,
+            enable_backtrace: false,
             level: Level::Info,
             remote_level: Level::Info,
             address: None,
@@ -176,6 +177,11 @@ impl AptosDataBuilder {
 
     pub fn address(&mut self, address: String) -> &mut Self {
         self.address = Some(address);
+        self
+    }
+
+    pub fn enable_backtrace(&mut self) -> &mut Self {
+        self.enable_backtrace = true;
         self
     }
 
@@ -263,6 +269,7 @@ impl AptosDataBuilder {
         let logger = if self.is_async {
             let (sender, receiver) = mpsc::sync_channel(self.channel_size);
             let logger = Arc::new(AptosData {
+                enable_backtrace: self.enable_backtrace,
                 sender: Some(sender),
                 printer: None,
                 filter: RwLock::new(filter),
@@ -279,6 +286,7 @@ impl AptosDataBuilder {
             logger
         } else {
             Arc::new(AptosData {
+                enable_backtrace: self.enable_backtrace,
                 sender: None,
                 printer: self.printer.take(),
                 filter: RwLock::new(filter),
@@ -306,6 +314,7 @@ impl FilterPair {
 }
 
 pub struct AptosData {
+    enable_backtrace: bool,
     sender: Option<SyncSender<LoggerServiceEvent>>,
     printer: Option<Box<dyn Writer>>,
     filter: RwLock<FilterPair>,
@@ -329,6 +338,7 @@ impl AptosData {
 
         Self::builder()
             .is_async(false)
+            .enable_backtrace()
             .printer(Box::new(StderrWriter))
             .build();
     }
@@ -362,7 +372,11 @@ impl Logger for AptosData {
     }
 
     fn record(&self, event: &Event) {
-        let entry = LogEntry::new(event, ::std::thread::current().name());
+        let entry = LogEntry::new(
+            event,
+            ::std::thread::current().name(),
+            self.enable_backtrace,
+        );
 
         self.send_entry(entry)
     }
@@ -589,12 +603,19 @@ mod tests {
         }
     }
 
-    struct LogStream(SyncSender<LogEntry>);
+    struct LogStream {
+        sender: SyncSender<LogEntry>,
+        enable_backtrace: bool,
+    }
 
     impl LogStream {
-        fn new() -> (Self, Receiver<LogEntry>) {
+        fn new(enable_backtrace: bool) -> (Self, Receiver<LogEntry>) {
             let (sender, receiver) = mpsc::sync_channel(1024);
-            (Self(sender), receiver)
+            let log_stream = Self {
+                sender,
+                enable_backtrace,
+            };
+            (log_stream, receiver)
         }
     }
 
@@ -604,15 +625,19 @@ mod tests {
         }
 
         fn record(&self, event: &Event) {
-            let entry = LogEntry::new(event, ::std::thread::current().name());
-            self.0.send(entry).unwrap();
+            let entry = LogEntry::new(
+                event,
+                ::std::thread::current().name(),
+                self.enable_backtrace,
+            );
+            self.sender.send(entry).unwrap();
         }
 
         fn flush(&self) {}
     }
 
     fn set_test_logger() -> Receiver<LogEntry> {
-        let (logger, receiver) = LogStream::new();
+        let (logger, receiver) = LogStream::new(true);
         let logger = Arc::new(logger);
         crate::logger::set_global_logger(logger);
         receiver

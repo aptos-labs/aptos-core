@@ -96,6 +96,9 @@ pub fn start(config: &NodeConfig, log_file: Option<PathBuf>) {
         .is_async(config.logger.is_async)
         .level(config.logger.level)
         .read_env();
+    if config.logger.enable_backtrace {
+        logger.enable_backtrace();
+    }
     if let Some(log_file) = log_file {
         logger.printer(Box::new(FileWriter::new(log_file)));
     }
