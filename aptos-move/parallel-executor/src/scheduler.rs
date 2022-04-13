@@ -41,7 +41,7 @@ impl Drop for TaskGuard<'_> {
 /// NoTask holds no task (similar None if we wrapped tasks in Option), and Done implies that
 /// there are no more tasks and the scheduler is done.
 pub enum SchedulerTask<'a> {
-    ExecutionTask(TxnIndex, Option<DependencyCondvar>, TaskGuard<'a>),
+    ExecutionTask(Version, Option<DependencyCondvar>, TaskGuard<'a>),
     ValidationTask(Version, TaskGuard<'a>),
     NoTask,
     Done,
@@ -71,7 +71,7 @@ pub enum SchedulerTask<'a> {
 ///    |  try_incarnate (incarnate successfully)
 ///    |
 ///    ↓         suspend (waiting on dependency)                resume
-/// Executing(i) -----------------------------> Suspended(i) ------------> Ready(i+1)
+/// Executing(i) -----------------------------> Suspended(i) ------------> Ready(i)
 ///    |
 ///    |  finish_execution
 ///    ↓
@@ -81,6 +81,7 @@ pub enum SchedulerTask<'a> {
 ///    ↓                finish_abort
 /// Aborting(i) ---------------------------------------------------------> Ready(i+1)
 ///
+#[derive(Debug)]
 enum TransactionStatus {
     ReadyToExecute(Incarnation, Option<DependencyCondvar>),
     Executing(Incarnation),
@@ -204,10 +205,10 @@ impl Scheduler {
                 if let Some((version_to_validate, guard)) = self.try_validate_next_version() {
                     return SchedulerTask::ValidationTask(version_to_validate, guard);
                 }
-            } else if let Some((idx_to_execute, maybe_condvar, guard)) =
-                self.try_execute_next_index()
+            } else if let Some((version_to_execute, maybe_condvar, guard)) =
+                self.try_execute_next_version()
             {
-                return SchedulerTask::ExecutionTask(idx_to_execute, maybe_condvar, guard);
+                return SchedulerTask::ExecutionTask(version_to_execute, maybe_condvar, guard);
             }
         }
     }
@@ -330,23 +331,16 @@ impl Scheduler {
             // re-execution task back to the caller. If incarnation fails, there is
             // nothing to do, as another thread must have succeeded to incarnate and
             // obtain the task for re-execution.
-            if let Some((_new_incarnation, maybe_condvar)) = self.try_incarnate(txn_idx) {
-                return SchedulerTask::ExecutionTask(txn_idx, maybe_condvar, guard);
+            if let Some((new_incarnation, maybe_condvar)) = self.try_incarnate(txn_idx) {
+                return SchedulerTask::ExecutionTask(
+                    (txn_idx, new_incarnation),
+                    maybe_condvar,
+                    guard,
+                );
             }
         }
 
         SchedulerTask::NoTask
-    }
-
-    /// If the status is EXECUTING, return the executing incarnation number.
-    pub fn get_executing_incarnation(&self, txn_idx: TxnIndex) -> Incarnation {
-        let status = self.txn_status[txn_idx].lock();
-
-        if let TransactionStatus::Executing(incarnation) = &*status {
-            *incarnation
-        } else {
-            unreachable!();
-        }
     }
 }
 
@@ -443,7 +437,7 @@ impl Scheduler {
     /// return the version to the caller together with a guard to be used for the
     /// corresponding ExecutionTask.
     /// - Otherwise, return None.
-    fn try_execute_next_index(&self) -> Option<(TxnIndex, Option<DependencyCondvar>, TaskGuard)> {
+    fn try_execute_next_version(&self) -> Option<(Version, Option<DependencyCondvar>, TaskGuard)> {
         let idx_to_execute = self.execution_idx.load(Ordering::SeqCst);
 
         // Optimization for check-done, to avoid num_tasks going up and down.
@@ -474,7 +468,7 @@ impl Scheduler {
                     self.drain_idx.fetch_add(1, Ordering::SeqCst);
                 }
 
-                (idx_to_execute, maybe_condvar, guard)
+                ((idx_to_execute, incarnation), maybe_condvar, guard)
             })
     }
 
@@ -496,8 +490,7 @@ impl Scheduler {
     fn resume(&self, txn_idx: TxnIndex) {
         let mut status = self.txn_status[txn_idx].lock();
         if let TransactionStatus::Suspended(incarnation, dep_condvar) = &*status {
-            *status =
-                TransactionStatus::ReadyToExecute(*incarnation + 1, Some(dep_condvar.clone()));
+            *status = TransactionStatus::ReadyToExecute(*incarnation, Some(dep_condvar.clone()));
         } else {
             unreachable!();
         }

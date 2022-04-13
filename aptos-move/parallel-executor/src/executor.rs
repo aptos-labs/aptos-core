@@ -121,7 +121,7 @@ where
 
     fn execute<'a>(
         &self,
-        idx_to_execute: TxnIndex,
+        version: Version,
         guard: TaskGuard<'a>,
         signature_verified_block: &[T],
         last_input_output: &TxnLastInputOutput<
@@ -133,6 +133,7 @@ where
         scheduler: &'a Scheduler,
         executor: &E,
     ) -> SchedulerTask<'a> {
+        let (idx_to_execute, incarnation) = version;
         let txn = &signature_verified_block[idx_to_execute];
 
         let state_view = MVHashMapView {
@@ -144,7 +145,6 @@ where
 
         // VM execution.
         let execute_result = executor.execute_transaction(&state_view, txn);
-        let incarnation = scheduler.get_executing_incarnation(idx_to_execute);
         let mut prev_write_set: HashSet<T::Key> = last_input_output.write_set(idx_to_execute);
 
         // For tracking whether the recent execution wrote outside of the previous write set.
@@ -251,8 +251,8 @@ where
                     versioned_data_cache,
                     scheduler,
                 ),
-                SchedulerTask::ExecutionTask(idx_to_execute, None, guard) => self.execute(
-                    idx_to_execute,
+                SchedulerTask::ExecutionTask(version_to_execute, None, guard) => self.execute(
+                    version_to_execute,
                     guard,
                     block,
                     last_input_output,
