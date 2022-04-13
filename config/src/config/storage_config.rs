@@ -99,8 +99,9 @@ impl Default for StorageConfig {
             // depending on the size of an average account blob.
             storage_pruner_config: StoragePrunerConfig {
                 state_store_prune_window: Some(1_000_000),
-                default_prune_window: Some(10_000_000),
+                default_prune_window: Some(1_000_000_000),
                 max_version_to_prune_per_batch: Some(100),
+
             },
             data_dir: PathBuf::from("/opt/aptos/data"),
             // Default read/write/connection timeout, in milliseconds
