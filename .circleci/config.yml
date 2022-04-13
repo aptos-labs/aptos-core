@@ -143,21 +143,21 @@ jobs:
   forge-k8s-test:
     executor: ubuntu-medium
     steps:
-      - checkout
-      - aws-setup
-      - deploy-setup
+      # - checkout
+      # - aws-setup
+      # - deploy-setup
       - run: echo "export IMAGE_TAG=dev_$(git rev-parse --short=8 HEAD)" >> $BASH_ENV
-      # since we're running with `--build-all`, assume that if it passes, we have all images required for Forge
-      - run: aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG
-      # XXX: make forge non-blocking for now
+      # # since we're running with `--build-all`, assume that if it passes, we have all images required for Forge
+      # - run: aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG
+      # # XXX: make forge non-blocking for now
       - run:
           name: Run Forge
           shell: /bin/bash
           command: |
             FGI_REPRO_CMD="./scripts/fgi/run --tag $IMAGE_TAG --suite land_blocking --report forge_report.json"
-            eval $FGI_REPRO_CMD
+            # eval $FGI_REPRO_CMD
             FGI_EXIT_CODE=$?
-            echo "export FGI_REPRO_CMD=$FGI_REPRO_CMD" >> $BASH_ENV
+            echo "export FGI_REPRO_CMD='$FGI_REPRO_CMD'" >> $BASH_ENV
             echo "export FGI_EXIT_CODE=$FGI_EXIT_CODE" >> $BASH_ENV
       - run:
           name: Post Forge test results
@@ -170,11 +170,10 @@ jobs:
 
             cat \<<EOF > forge_comment.txt
             Forge run: ${CIRCLE_BUILD_URL}
-            Forge Test Result: \`$(cat forge_report.json | jq -r .text)\`
+            Forge Test Result:  \`$(cat forge_report.json | jq -r .text)\`
             EOF
             # replace all newlines
             FORGE_COMMENT=$(awk '{printf "%s\\n", $0}' forge_comment.txt)
-            echo "export FORGE_COMMENT=$FORGE_COMMENT" >> $BASH_ENV
 
             # post github comment on the PR
             curl -s -H "Authorization: token ${FORGE_GH_TOKEN}" \
@@ -187,13 +186,10 @@ jobs:
               "blocks": [
                 {
                   "type": "section",
-                  "fields": [
-                    {
-                      "type": "plain_text",
-                      "text": "$FORGE_COMMENT",
-                      "emoji": true
-                    }
-                  ]
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<$CIRCLE_BUILD_URL|Forge ran for $IMAGE_TAG: $FGI_REPRO_CMD>"
+                  }
                 }
               ]
             }
@@ -255,20 +251,20 @@ workflows:
         - equal: [canary, << pipeline.git.branch >>]
     jobs:
       #      - build-benchmarks
-      - e2e-test
-      - lint
-      - unit-test
-      - sdk-typescript-test
-      - docker-build-push:
-          context: aws-dev
-      - docker-compose-test:
-          context: aws-dev
-          requires:
-            - docker-build-push
+      # - e2e-test
+      # - lint
+      # - unit-test
+      # - sdk-typescript-test
+      # - docker-build-push:
+      #     context: aws-dev
+      # - docker-compose-test:
+      #     context: aws-dev
+      #     requires:
+      #       - docker-build-push
       - forge-k8s-test:
           context: aws-dev
-          requires:
-            - docker-build-push
+          # requires:
+          #   - docker-build-push
   ### on devnet branch update ###
   # Ensure the latest is built on the "devnet" branch, and mirror from ECR to Dockerhub
   devnet-branch-cut:
