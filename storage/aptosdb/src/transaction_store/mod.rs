@@ -10,7 +10,6 @@ use crate::{
         transaction::TransactionSchema, transaction_by_account::TransactionByAccountSchema,
         transaction_by_hash::TransactionByHashSchema, write_set::WriteSetSchema,
     },
-    transaction_accumulator::TransactionAccumulatorSchema,
     transaction_info::TransactionInfoSchema,
 };
 use anyhow::{ensure, format_err, Result};
@@ -255,18 +254,6 @@ impl TransactionStore {
         Ok(())
     }
 
-    /// Prune the transaction schema store between a range of version in [begin, end).
-    pub fn prune_transaction_accumulator(
-        &self,
-        begin: Version,
-        end: Version,
-        db_batch: &mut SchemaBatch,
-    ) -> anyhow::Result<()> {
-        let begin_position = self.get_min_proof_node(begin);
-        let end_position = self.get_min_proof_node(end);
-        db_batch.delete_range::<TransactionAccumulatorSchema>(&begin_position, &end_position)?;
-        Ok(())
-    }
     /// Returns the minimum position node needed to be included in the proof of the leaf index. This
     /// will be the left child of the root if the leaf index is non zero and zero otherwise.
     pub fn get_min_proof_node(&self, leaf_index: u64) -> Position {

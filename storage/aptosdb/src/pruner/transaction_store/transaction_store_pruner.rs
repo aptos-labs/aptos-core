@@ -44,11 +44,6 @@ impl DBPruner for TransactionStorePruner {
             current_target_version,
             db_batch,
         )?;
-        self.transaction_store.prune_transaction_accumulator(
-            self.least_readable_version(),
-            current_target_version,
-            db_batch,
-        )?;
 
         self.record_progress(current_target_version);
         Ok(current_target_version)
