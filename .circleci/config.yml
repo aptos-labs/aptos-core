@@ -40,7 +40,6 @@ jobs:
       - run: shellcheck scripts/weekly-dep-report.sh
       - run: cargo x lint
       - run: cargo xclippy --workspace --all-targets
-      - run: cargo fmt
       - run: cargo xfmt --check
   e2e-test:
     executor: ubuntu-2xl
