@@ -43,7 +43,9 @@ pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 2;
 pub const MAX_INBOUND_CONNECTIONS: usize = 100;
 pub const MAX_FRAME_SIZE: usize = 16 * 1024 * 1024; /* 16 MiB */
 pub const CONNECTION_BACKOFF_BASE: u64 = 2;
-pub const IP_BYTE_BUCKET_RATE: usize = 102400 /* 100 KiB */;
+// We estimate the max amount of data required to serve 1000 txn outputs a
+// second (currently ~1.5MB/s) and include an additional buffer.
+pub const IP_BYTE_BUCKET_RATE: usize = 2 * 1024 * 1024 /* 2 MB */;
 pub const IP_BYTE_BUCKET_SIZE: usize = IP_BYTE_BUCKET_RATE;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
