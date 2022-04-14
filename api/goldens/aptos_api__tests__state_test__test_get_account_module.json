@@ -1,0 +1,210 @@
+{
+  "bytecode": "0xa11ceb0b050000000a010004020410031446055a2f078901fd010886032006a6030a0ab003170cc703ba020d8106080000000100020e0000000600000308000004070000050001000006020300000704010000080501000009060700000a060400000b080900000c000a00000d040700000e060300000f0b070000100b04000011000c00011400040001060c01080102050301080301050205060800010608010103020608010608030101010800010608030002030708020447554944065369676e6572104372656174654361706162696c6974790947656e657261746f7202494406637265617465096372656174655f69640b6372656174655f696d706c166372656174655f776974685f6361706162696c6974790c6372656174696f6e5f6e756d0f63726561746f725f616464726573730565715f69641567656e5f6372656174655f6361706162696c697479156765745f6e6578745f6372656174696f6e5f6e756d0269640f69645f6372656174696f6e5f6e756d1269645f63726561746f725f61646472657373117075626c6973685f67656e657261746f72046164647207636f756e7465720a616464726573735f6f6600000000000000000000000000000000000000000000000000000000000000010308000000000000000000020112050102010e0803020201130303020209031205000100010204120a00110d0c010a012902200308050d0b0006000000000000000012022d02050f0b00010b01110202010100000c040b010b0012030202000001020d120a002a020c020a021000140c010a01060100000000000000160b020f00150b010b00120312010203010001020c080a00290203050700270b00110202040100000c050b00100110021402050100000c050b00100110031402060100000c050b0010010b0121020701000004120a00110d0c010a012902200308050d0b0006000000000000000012022d02050f0b00010b011200020801000102070f0a00290220030505080600000000000000000c01050d0b002b021000140c010b0102090100000c040b00100114020a0100000c040b00100214020b0100000c040b00100314020c0100000c050b0006000000000000000012022d0202020001000300030100",
+  "abi": {
+    "address": "0x1",
+    "name": "GUID",
+    "friends": [],
+    "exposed_functions": [
+      {
+        "name": "create",
+        "visibility": "public",
+        "generic_type_params": [],
+        "params": [
+          "&signer"
+        ],
+        "return": [
+          "0x1::GUID::GUID"
+        ]
+      },
+      {
+        "name": "create_id",
+        "visibility": "public",
+        "generic_type_params": [],
+        "params": [
+          "address",
+          "u64"
+        ],
+        "return": [
+          "0x1::GUID::ID"
+        ]
+      },
+      {
+        "name": "create_with_capability",
+        "visibility": "public",
+        "generic_type_params": [],
+        "params": [
+          "address",
+          "&0x1::GUID::CreateCapability"
+        ],
+        "return": [
+          "0x1::GUID::GUID"
+        ]
+      },
+      {
+        "name": "creation_num",
+        "visibility": "public",
+        "generic_type_params": [],
+        "params": [
+          "&0x1::GUID::GUID"
+        ],
+        "return": [
+          "u64"
+        ]
+      },
+      {
+        "name": "creator_address",
+        "visibility": "public",
+        "generic_type_params": [],
+        "params": [
+          "&0x1::GUID::GUID"
+        ],
+        "return": [
+          "address"
+        ]
+      },
+      {
+        "name": "eq_id",
+        "visibility": "public",
+        "generic_type_params": [],
+        "params": [
+          "&0x1::GUID::GUID",
+          "&0x1::GUID::ID"
+        ],
+        "return": [
+          "bool"
+        ]
+      },
+      {
+        "name": "gen_create_capability",
+        "visibility": "public",
+        "generic_type_params": [],
+        "params": [
+          "&signer"
+        ],
+        "return": [
+          "0x1::GUID::CreateCapability"
+        ]
+      },
+      {
+        "name": "get_next_creation_num",
+        "visibility": "public",
+        "generic_type_params": [],
+        "params": [
+          "address"
+        ],
+        "return": [
+          "u64"
+        ]
+      },
+      {
+        "name": "id",
+        "visibility": "public",
+        "generic_type_params": [],
+        "params": [
+          "&0x1::GUID::GUID"
+        ],
+        "return": [
+          "0x1::GUID::ID"
+        ]
+      },
+      {
+        "name": "id_creation_num",
+        "visibility": "public",
+        "generic_type_params": [],
+        "params": [
+          "&0x1::GUID::ID"
+        ],
+        "return": [
+          "u64"
+        ]
+      },
+      {
+        "name": "id_creator_address",
+        "visibility": "public",
+        "generic_type_params": [],
+        "params": [
+          "&0x1::GUID::ID"
+        ],
+        "return": [
+          "address"
+        ]
+      },
+      {
+        "name": "publish_generator",
+        "visibility": "public",
+        "generic_type_params": [],
+        "params": [
+          "&signer"
+        ],
+        "return": []
+      }
+    ],
+    "structs": [
+      {
+        "name": "CreateCapability",
+        "is_native": false,
+        "abilities": [
+          "drop",
+          "store",
+          "key"
+        ],
+        "generic_type_params": [],
+        "fields": [
+          {
+            "name": "addr",
+            "type": "address"
+          }
+        ]
+      },
+      {
+        "name": "GUID",
+        "is_native": false,
+        "abilities": [
+          "drop",
+          "store"
+        ],
+        "generic_type_params": [],
+        "fields": [
+          {
+            "name": "id",
+            "type": "0x1::GUID::ID"
+          }
+        ]
+      },
+      {
+        "name": "Generator",
+        "is_native": false,
+        "abilities": [
+          "key"
+        ],
+        "generic_type_params": [],
+        "fields": [
+          {
+            "name": "counter",
+            "type": "u64"
+          }
+        ]
+      },
+      {
+        "name": "ID",
+        "is_native": false,
+        "abilities": [
+          "copy",
+          "drop",
+          "store"
+        ],
+        "generic_type_params": [],
+        "fields": [
+          {
+            "name": "creation_num",
+            "type": "u64"
+          },
+          {
+            "name": "addr",
+            "type": "address"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -89,6 +89,19 @@ pub fn get_account_modules(context: Context) -> BoxedFilter<(impl Reply,)> {
         .boxed()
 }
 
+// GET /state/module/<address>/<module_name>
+pub fn get_account_module(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("accounts" / AddressParam / "module" / MoveIdentifierParam)
+        .and(warp::get())
+        .and(context.filter())
+        .and(warp::query::<Version>())
+        .map(|address, name, ctx, version: Version| (version.version, address, name, ctx))
+        .untuple_one()
+        .and_then(handle_get_account_module)
+        .with(metrics("get_account_module"))
+        .boxed()
+}
+
 async fn handle_get_account(
     address: AddressParam,
     context: Context,
@@ -137,6 +150,19 @@ async fn handle_get_account_modules(
 ) -> Result<impl Reply, Rejection> {
     fail_point("endpoint_get_account_modules")?;
     Ok(Account::new(ledger_version, address, context)?.modules()?)
+}
+
+async fn handle_get_account_module(
+    ledger_version: Option<LedgerVersionParam>,
+    address: AddressParam,
+    name: MoveIdentifierParam,
+    context: Context,
+) -> Result<impl Reply, Rejection> {
+    fail_point("endpoint_get_account_module")?;
+    Ok(State::new(ledger_version, context)?.module(
+        address.parse("account address")?.into(),
+        name.parse("module name")?,
+    )?)
 }
 
 pub(crate) struct Account {

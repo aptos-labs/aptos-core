@@ -2,16 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{context::Context, param::LedgerVersionParam};
-use aptos_api_types::{AsConverter, Error, LedgerInfo, Response, TransactionId};
+use aptos_api_types::{
+    AsConverter, Error, LedgerInfo, MoveModuleBytecode, Response, TransactionId,
+};
 use aptos_state_view::StateView;
 use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
 use aptos_vm::data_cache::AsMoveResolver;
 use move_core_types::{
     account_address::AccountAddress,
-    language_storage::{ResourceKey, StructTag},
+    identifier::Identifier,
+    language_storage::{ModuleId, ResourceKey, StructTag},
 };
 use storage_interface::state_view::DbStateView;
-use warp::Reply;
+use warp::{http::StatusCode, Reply};
 
 pub(crate) struct State {
     state_view: DbStateView,
@@ -65,5 +68,20 @@ impl State {
             .as_converter()
             .try_into_resource(&struct_tag, &bytes)?;
         Response::new(self.latest_ledger_info, &resource)
+    }
+
+    pub fn module(self, address: AccountAddress, name: Identifier) -> Result<impl Reply, Error> {
+        let module_id = ModuleId::new(address, name);
+        let access_path = AccessPath::code_access_path(module_id.clone());
+        let state_key = StateKey::AccessPath(access_path);
+        let bytes = self
+            .state_view
+            .get_state_value(&state_key)?
+            .ok_or_else(|| Error::not_found("Module", module_id, self.ledger_version))?;
+
+        let module = MoveModuleBytecode::new(bytes)
+            .try_parse_abi()
+            .map_err(|e| Error::from_anyhow_error(StatusCode::INTERNAL_SERVER_ERROR, e))?;
+        Response::new(self.latest_ledger_info, &module)
     }
 }

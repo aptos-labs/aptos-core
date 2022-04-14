@@ -177,6 +177,42 @@ paths:
           $ref: '#/components/responses/404'
         "500":
           $ref: '#/components/responses/500'
+  /accounts/{address}/module/{module_name}:
+    get:
+      summary: Get module by module id.
+      operationId: get_account_module
+      description: |
+        This API renders a Move module identified by the module id. A
+        module id consists of the module owner `address` and the
+        `module_name`. The module is rendered at a ledger version (AKA
+        transaction version) specified as a query param, otherwise the
+        latest version is used.
+      tags:
+        - accounts
+        - state
+      parameters:
+        - $ref: '#/components/parameters/AccountAddress'
+        - name: module_name
+          in: path
+          required: true
+          description: The name of the module.
+          schema:
+            type: string
+          example: "GUID"
+        - $ref: '#/components/parameters/LedgerVersion'
+      responses:
+        "200":
+          description: Returns a move module.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoveModule'
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/500'
   /transactions:
     get:
       summary: Get transactions
