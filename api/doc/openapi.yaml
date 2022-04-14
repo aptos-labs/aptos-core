@@ -616,7 +616,7 @@ components:
     MoveTypeTagId:
       title: Move Type Tag ID
       type: string
-      pattern: '^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<>]+)$'
+      pattern: '^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+)$'
       description: |
         String representation of an on-chain Move type tag that is exposed in transaction payload.
 
@@ -647,7 +647,7 @@ components:
     MoveTypeId:
       title: Move Type ID
       type: string
-      pattern: '^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<>]+|^&(mut )?.+$|T\d+)$'
+      pattern: '^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+|^&(mut )?.+$|T\d+)$'
       description: |
         String representation of an on-chain Move type identifier defined by the Move language.
 
