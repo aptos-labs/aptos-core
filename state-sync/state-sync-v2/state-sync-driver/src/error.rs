@@ -44,6 +44,31 @@ pub enum Error {
     UnexpectedError(String),
 }
 
+impl Error {
+    /// Returns a summary label for the error
+    pub fn get_label(&self) -> &'static str {
+        match self {
+            Error::AlreadyBootstrapped(_) => "already_boostrapped",
+            Error::AdvertisedDataError(_) => "advertised_data_error",
+            Error::BootstrapNotComplete(_) => "bootstrap_not_complete",
+            Error::CallbackSendFailed(_) => "callback_send_failed",
+            Error::CriticalDataStreamTimeout(_) => "critical_data_stream_timeout",
+            Error::DataStreamNotificationTimeout(_) => "data_stream_notification_timeout",
+            Error::EventNotificationError(_) => "event_notification_error",
+            Error::FullNodeConsensusNotification(_) => "full_node_consensus_notification",
+            Error::IntegerOverflow(_) => "integer_overflow",
+            Error::InvalidPayload(_) => "invalid_payload",
+            Error::NotifyMempoolError(_) => "notify_mempool_error",
+            Error::OldSyncRequest(_, _) => "old_sync_request",
+            Error::SenderDroppedError(_) => "sender_dropped_error",
+            Error::StorageError(_) => "storage_error",
+            Error::SyncedBeyondTarget(_, _) => "synced_beyond_target",
+            Error::VerificationError(_) => "verification_error",
+            Error::UnexpectedError(_) => "unexpected_error",
+        }
+    }
+}
+
 impl From<Canceled> for Error {
     fn from(canceled: Canceled) -> Self {
         Error::SenderDroppedError(canceled.to_string())

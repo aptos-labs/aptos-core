@@ -4,6 +4,7 @@
 use crate::{
     error::Error,
     logging::{LogEntry, LogSchema},
+    metrics,
     notification_handlers::{CommitNotification, CommittedTransactions, ErrorNotification},
 };
 use aptos_config::config::StateSyncDriverConfig;
@@ -13,6 +14,7 @@ use aptos_types::{
     state_store::state_value::StateValueChunkWithProof,
     transaction::{
         Transaction, TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
+        Version,
     },
 };
 use data_streaming_service::data_notification::NotificationId;
@@ -190,7 +192,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
                 error
             )))
         } else {
-            increment_atomic(self.pending_data_chunks.clone());
+            increment_pending_data_chunks(self.pending_data_chunks.clone());
             Ok(())
         }
     }
@@ -281,7 +283,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizerInterface
                 error
             )))
         } else {
-            increment_atomic(self.pending_data_chunks.clone());
+            increment_pending_data_chunks(self.pending_data_chunks.clone());
             Ok(())
         }
     }
@@ -324,22 +326,40 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     // Execute/apply the storage data chunk
                     let (notification_id, result) = match storage_data_chunk {
                         StorageDataChunk::Transactions(notification_id, transactions_with_proof, target_ledger_info, end_of_epoch_ledger_info) => {
+                            let num_transactions = transactions_with_proof.transactions.len();
                             let result = chunk_executor
                                .execute_chunk(
                                     transactions_with_proof,
                                     &target_ledger_info,
                                     end_of_epoch_ledger_info.as_ref(),
                                 );
+                            if result.is_ok() {
+                                metrics::increment_gauge(
+                                    &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+                                    metrics::StorageSynchronizerOperations::ExecutedTransactions
+                                        .get_label(),
+                                    num_transactions as u64,
+                                );
+                            }
                             (notification_id, result)
                         },
                         StorageDataChunk::TransactionOutputs(notification_id, outputs_with_proof, target_ledger_info, end_of_epoch_ledger_info) => {
+                            let num_outputs = outputs_with_proof.transactions_and_outputs.len();
                             let result = chunk_executor
                                 .apply_chunk(
                                     outputs_with_proof,
                                     &target_ledger_info,
                                     end_of_epoch_ledger_info.as_ref(),
                                 );
-                             (notification_id, result)
+                            if result.is_ok() {
+                                metrics::increment_gauge(
+                                    &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+                                    metrics::StorageSynchronizerOperations::AppliedTransactionOutputs
+                                        .get_label(),
+                                    num_outputs as u64,
+                                );
+                            }
+                            (notification_id, result)
                         }
                         storage_data_chunk => {
                             panic!("Invalid storage data chunk sent to executor: {:?}", storage_data_chunk);
@@ -352,13 +372,13 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             if let Err(error) = committer_notifier.try_send(notification_id) {
                                 let error = format!("Failed to notify the committer! Error: {:?}", error);
                                 send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
-                                decrement_atomic(pending_transaction_chunks.clone());
+                                decrement_pending_data_chunks(pending_transaction_chunks.clone());
                             }
                         },
                         Err(error) => {
                             let error = format!("Failed to execute/apply the storage data chunk! Error: {:?}", error);
                             send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
-                            decrement_atomic(pending_transaction_chunks.clone());
+                            decrement_pending_data_chunks(pending_transaction_chunks.clone());
                         }
                     }
                 }
@@ -387,6 +407,14 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     // Commit the executed chunk
                     match chunk_executor.commit_chunk() {
                         Ok((events, transactions)) => {
+                            // Update the metrics
+                            metrics::increment_gauge(
+                                &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+                                metrics::StorageSynchronizerOperations::SyncedTransactions
+                                    .get_label(),
+                                transactions.len() as u64,
+                            );
+
                             // Send a commit notification to the commit listener
                             let commit_notification = CommitNotification::new_committed_transactions(events, transactions);
                             if let Err(error) = commit_notification_sender.send(commit_notification).await {
@@ -399,7 +427,7 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
                         }
                     };
-                    decrement_atomic(pending_transaction_chunks.clone());
+                    decrement_pending_data_chunks(pending_transaction_chunks.clone());
                 }
             }
         }
@@ -443,7 +471,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
             ::futures::select! {
                 storage_data_chunk = state_snapshot_listener.select_next_some() => {
                     // We've received an account states chunk
-                    decrement_atomic(pending_transaction_chunks.clone());
+                    decrement_pending_data_chunks(pending_transaction_chunks.clone());
 
                     // Process the chunk
                     match storage_data_chunk {
@@ -458,6 +486,14 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             );
                             match commit_result {
                                 Ok(()) => {
+                                    // Update the metrics
+                                    metrics::set_gauge(
+                                        &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+                                        metrics::StorageSynchronizerOperations::SyncedAccounts
+                                            .get_label(),
+                                        last_committed_account_index as u64,
+                                    );
+
                                     if !all_accounts_synced {
                                         // Send a commit notification to the listener
                                         let commit_notification = CommitNotification::new_committed_accounts(all_accounts_synced, last_committed_account_index, None);
@@ -487,6 +523,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                     } else if let Err(error) = commit_notification_sender.send(commit_notification).await {
                                        Err(format!("Failed to send the final account commit notification! Error: {:?}", error))
                                     } else {
+                                        initialize_snapshot_version_gauges(version);
                                         Ok(())
                                     };
 
@@ -551,14 +588,26 @@ fn spawn(runtime: Option<Handle>, future: impl Future<Output = ()> + Send + 'sta
     }
 }
 
-/// Increments the given atomic u64
-fn increment_atomic(atomic_u64: Arc<AtomicU64>) {
-    atomic_u64.fetch_add(1, Ordering::Relaxed);
+/// Increments the pending data chunks
+fn increment_pending_data_chunks(pending_data_chunks: Arc<AtomicU64>) {
+    let delta = 1;
+    pending_data_chunks.fetch_add(delta, Ordering::Relaxed);
+    metrics::increment_gauge(
+        &metrics::STORAGE_SYNCHRONIZER_GAUGES,
+        metrics::STORAGE_SYNCHRONIZER_PENDING_DATA,
+        delta,
+    );
 }
 
-/// Decrements the given atomic u64
-fn decrement_atomic(atomic_u64: Arc<AtomicU64>) {
-    atomic_u64.fetch_sub(1, Ordering::Relaxed);
+/// Decrements the pending data chunks
+fn decrement_pending_data_chunks(atomic_u64: Arc<AtomicU64>) {
+    let delta = 1;
+    atomic_u64.fetch_sub(delta, Ordering::Relaxed);
+    metrics::decrement_gauge(
+        &metrics::STORAGE_SYNCHRONIZER_GAUGES,
+        metrics::STORAGE_SYNCHRONIZER_PENDING_DATA,
+        delta,
+    );
 }
 
 /// Sends an error notification to the notification listener
@@ -571,11 +620,33 @@ async fn send_storage_synchronizer_error(
     error!(LogSchema::new(LogEntry::StorageSynchronizer).message(&error_message));
 
     // Send an error notification
+    let error = Error::UnexpectedError(error_message);
     let error_notification = ErrorNotification {
-        error: Error::UnexpectedError(error_message),
+        error: error.clone(),
         notification_id,
     };
     if let Err(error) = error_notification_sender.send(error_notification).await {
         panic!("Failed to send error notification! Error: {:?}", error);
+    }
+
+    // Update the metrics
+    metrics::increment_counter(&metrics::STORAGE_SYNCHRONIZER_ERRORS, error.get_label());
+}
+
+/// Initializes all relevant metric gauges after an account state
+/// snapshot has been restored to the database.
+fn initialize_snapshot_version_gauges(version: Version) {
+    let metrics = [
+        metrics::StorageSynchronizerOperations::AppliedTransactionOutputs,
+        metrics::StorageSynchronizerOperations::ExecutedTransactions,
+        metrics::StorageSynchronizerOperations::SyncedTransactions,
+    ];
+
+    for metric in metrics {
+        metrics::set_gauge(
+            &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+            metric.get_label(),
+            version,
+        );
     }
 }

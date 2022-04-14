@@ -7,6 +7,7 @@ use crate::{
     driver_client::{ClientNotificationListener, DriverNotification},
     error::Error,
     logging::{LogEntry, LogSchema},
+    metrics,
     notification_handlers::{
         CommitNotification, CommitNotificationListener, CommittedAccounts, CommittedTransactions,
         ConsensusNotificationHandler, ErrorNotification, ErrorNotificationListener,
@@ -246,6 +247,10 @@ impl<
                 consensus_commit_notification.reconfiguration_events.len()
             ))
         );
+        metrics::increment_counter(
+            &metrics::DRIVER_COUNTERS,
+            metrics::DRIVER_CONSENSUS_COMMIT_NOTIFICATION,
+        );
 
         // TODO(joshlind): can we get consensus to forward the events?
 
@@ -285,6 +290,10 @@ impl<
             sync_notification.target, latest_synced_version,
             ))
         );
+        metrics::increment_counter(
+            &metrics::DRIVER_COUNTERS,
+            metrics::DRIVER_CONSENSUS_SYNC_NOTIFICATION,
+        );
 
         // Initialize a new sync request
         let latest_synced_ledger_info =
@@ -298,6 +307,10 @@ impl<
     fn handle_client_notification(&mut self, notification: DriverNotification) {
         debug!(LogSchema::new(LogEntry::ClientNotification)
             .message("Received a notify bootstrap notification from the client!"));
+        metrics::increment_counter(
+            &metrics::DRIVER_COUNTERS,
+            metrics::DRIVER_CLIENT_NOTIFICATION,
+        );
 
         // TODO(joshlind): refactor this if the client only supports one notification type!
         // Extract the bootstrap notifier channel
@@ -557,11 +570,13 @@ impl<
                 error!(LogSchema::new(LogEntry::Driver)
                     .error(&error)
                     .message("Error found when driving progress of the continuous syncer!"));
+                metrics::increment_counter(&metrics::CONTINUOUS_SYNCER_ERRORS, error.get_label());
             }
         } else if let Err(error) = self.bootstrapper.drive_progress(&global_data_summary).await {
             error!(LogSchema::new(LogEntry::Driver)
                 .error(&error)
                 .message("Error found when checking the bootstrapper progress!"));
+            metrics::increment_counter(&metrics::BOOTSTRAPPER_ERRORS, error.get_label());
         };
     }
 }
