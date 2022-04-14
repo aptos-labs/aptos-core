@@ -9,9 +9,7 @@ use crate::{
     CliResult,
 };
 use aptos_config::config::{Peer, PeerRole};
-use aptos_crypto::{
-    ed25519, ed25519::Ed25519PrivateKey, x25519, PrivateKey, Uniform, ValidCryptoMaterial,
-};
+use aptos_crypto::{ed25519, x25519, PrivateKey, Uniform, ValidCryptoMaterial};
 use aptos_types::account_address::{from_identity_public_key, AccountAddress};
 use clap::{Parser, Subcommand};
 use rand::SeedableRng;
@@ -61,7 +59,7 @@ impl ExtractPeer {
         // Load key based on public or private
         let public_key = self
             .key_input_options
-            .extract_public_key(self.encoding_options.encoding)?;
+            .extract_x25519_public_key(self.encoding_options.encoding)?;
 
         // Build peer info
         // TODO: Take in an address?
@@ -158,7 +156,7 @@ impl GenerateKey {
     /// Generates an `Ed25519PrivateKey` without saving it to disk
     pub fn generate_ed25519_in_memory() -> ed25519::Ed25519PrivateKey {
         let mut rng = rand::rngs::StdRng::from_entropy();
-        Ed25519PrivateKey::generate(&mut rng)
+        ed25519::Ed25519PrivateKey::generate(&mut rng)
     }
 
     pub fn generate_x25519_in_memory() -> Result<x25519::PrivateKey, Error> {

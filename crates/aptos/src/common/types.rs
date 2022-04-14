@@ -1,8 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_crypto::PrivateKey;
 use crate::common::utils::{check_if_file_exists, write_to_file};
-use aptos_crypto::{x25519, ValidCryptoMaterial, ValidCryptoMaterialStringExt};
+use aptos_crypto::{
+    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+    x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
+};
 use aptos_logger::{debug, info};
 use clap::{ArgEnum, Parser};
 use serde::{Deserialize, Serialize};
@@ -54,7 +58,7 @@ pub enum Error {
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct CliConfig {
     /// Private key for commands.  TODO: Add vault functionality
-    pub private_key: Option<x25519::PrivateKey>,
+    pub private_key: Option<Ed25519PrivateKey>,
 }
 
 impl CliConfig {
@@ -232,7 +236,7 @@ impl PrivateKeyInputOptions {
     pub fn extract_private_key(
         &self,
         encoding: EncodingType,
-    ) -> Result<Option<x25519::PrivateKey>, Error> {
+    ) -> Result<Option<Ed25519PrivateKey>, Error> {
         if let Some(ref file) = self.private_key_file {
             encoding.load_key(file.as_path()).map(Some)
         } else if let Some(ref key) = self.private_key {
@@ -258,7 +262,7 @@ impl PublicKeyInputOptions {
     pub fn extract_public_key(
         &self,
         encoding: EncodingType,
-    ) -> Result<Option<x25519::PublicKey>, Error> {
+    ) -> Result<Option<Ed25519PublicKey>, Error> {
         if let Some(ref file) = self.public_key_file {
             encoding.load_key(file.as_path()).map(Some)
         } else if let Some(ref key) = self.public_key {
@@ -280,7 +284,7 @@ pub struct KeyInputOptions {
 
 impl KeyInputOptions {
     /// Extracts public key from either private or public key options
-    pub fn extract_public_key(&self, encoding: EncodingType) -> Result<x25519::PublicKey, Error> {
+    pub fn extract_public_key(&self, encoding: EncodingType) -> Result<Ed25519PublicKey, Error> {
         let private_key_result = self.private_key_options.extract_private_key(encoding)?;
         let public_key_result = self.public_key_options.extract_public_key(encoding)?;
 
@@ -297,6 +301,16 @@ impl KeyInputOptions {
                 Err(Error::CommandArgumentError("One of ['--private-key', '--private-key-file', '--public-key', '--public-key-file'] must be used".to_string()))
             }
         }
+    }
+
+    pub fn extract_x25519_public_key(
+        &self,
+        encoding: EncodingType,
+    ) -> Result<x25519::PublicKey, Error> {
+        let key = self.extract_public_key(encoding)?;
+        x25519::PublicKey::from_ed25519_public_bytes(&key.to_bytes()).map_err(|err| {
+            Error::UnexpectedError(format!("Failed to convert ed25519 to x25519 {:?}", err))
+        })
     }
 }
 

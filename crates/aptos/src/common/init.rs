@@ -9,7 +9,7 @@ use crate::{
     op::key::GenerateKey,
     CliResult, Error,
 };
-use aptos_crypto::{x25519::PrivateKey, ValidCryptoMaterialStringExt};
+use aptos_crypto::{ed25519::Ed25519PrivateKey, ValidCryptoMaterialStringExt};
 use clap::Parser;
 
 /// Tool to initialize current directory for the aptos tool
@@ -39,9 +39,9 @@ impl InitTool {
         let input = input.trim();
         let private_key = if input.is_empty() {
             eprintln!("No key given, generating key...");
-            GenerateKey::generate_x25519_in_memory()?
+            GenerateKey::generate_ed25519_in_memory()
         } else {
-            PrivateKey::from_encoded_string(input)
+            Ed25519PrivateKey::from_encoded_string(input)
                 .map_err(|err| Error::UnableToParse("PrivateKey", err.to_string()))?
         };
         config.private_key = Some(private_key);
