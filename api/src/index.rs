@@ -8,7 +8,7 @@ use crate::{
     failpoint::fail_point,
     log,
     metrics::{metrics, status_metrics},
-    state, transactions,
+    transactions,
 };
 use aptos_api_types::{Error, Response};
 
@@ -30,9 +30,9 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         .or(openapi_spec())
         .or(accounts::get_account(context.clone()))
         .or(accounts::get_account_resources(context.clone()))
+        .or(accounts::get_account_resource(context.clone()))
         .or(accounts::get_account_modules(context.clone()))
         .or(accounts::get_account_state_blob(context.clone()))
-        .or(state::query_resource(context.clone()))
         .or(transactions::get_transaction(context.clone()))
         .or(transactions::get_transactions(context.clone()))
         .or(transactions::get_account_transactions(context.clone()))

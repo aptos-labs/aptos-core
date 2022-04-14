@@ -1,56 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    context::Context,
-    metrics::metrics,
-    param::{AddressParam, LedgerVersionParam, MoveStructTagParam},
-    version::Version,
-};
+use crate::{context::Context, param::LedgerVersionParam};
 use aptos_api_types::{AsConverter, Error, LedgerInfo, Response, TransactionId};
 use aptos_state_view::StateView;
 use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
 use aptos_vm::data_cache::AsMoveResolver;
-use fail::fail_point;
-use hyper::StatusCode;
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ResourceKey, StructTag},
 };
-use std::convert::TryInto;
 use storage_interface::state_view::DbStateView;
-use warp::{filters::BoxedFilter, Filter, Rejection, Reply};
-
-// GET state/resource/<address>/<resource_type>
-pub fn query_resource(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("state" / "resource" / AddressParam / MoveStructTagParam)
-        .and(warp::get())
-        .and(context.filter())
-        .and(warp::query::<Version>())
-        .map(|address, struct_tag, ctx, version: Version| {
-            (version.version, address, struct_tag, ctx)
-        })
-        .untuple_one()
-        .and_then(handle_query_resource)
-        .with(metrics("query_resource"))
-        .boxed()
-}
-
-async fn handle_query_resource(
-    ledger_version: Option<LedgerVersionParam>,
-    address: AddressParam,
-    struct_tag: MoveStructTagParam,
-    context: Context,
-) -> Result<impl Reply, Rejection> {
-    fail_point!("endpoint_query_resource");
-    Ok(State::new(ledger_version, context)?.resource(
-        address.parse("account address")?.into(),
-        struct_tag
-            .parse("struct tag")?
-            .try_into()
-            .map_err(|e| Error::from_anyhow_error(StatusCode::BAD_REQUEST, e))?,
-    )?)
-}
+use warp::Reply;
 
 pub(crate) struct State {
     state_view: DbStateView,
