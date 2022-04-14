@@ -108,11 +108,12 @@ jobs:
           shell: /bin/bash
           command: |
             ret=0
-            for img in "${DOCKERHUB_IMAGES[@]}"
+            for img in "${AWS_ECR_IMAGES[@]}"
             do
               docker pull "${AWS_ECR_ACCOUNT_URL}/aptos/${img}:${IMAGE_TAG}" || ret=$?
             done
             exit $ret
+      - dockerhub-setup
       - run:
           name: Tag image
           shell: /bin/bash
@@ -124,7 +125,6 @@ jobs:
               docker tag "${AWS_ECR_ACCOUNT_URL}/aptos/${img}:${IMAGE_TAG}" "${DOCKERHUB_ORG}/${img}:${ADDL_IMAGE_TAG}" || ret=$?
             done
             exit $ret
-      - dockerhub-setup
       - run:
           name: Push image to Dockerhub
           shell: /bin/bash
