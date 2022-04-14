@@ -125,6 +125,7 @@ jobs:
             for img in "${DOCKERHUB_IMAGES[@]}"
             do
               docker tag "${AWS_ECR_ACCOUNT_URL}/aptos/${img}:${IMAGE_TAG}" "${DOCKERHUB_ORG}/${img}:${IMAGE_TAG}"
+              docker tag "${AWS_ECR_ACCOUNT_URL}/aptos/${img}:${IMAGE_TAG}" "${DOCKERHUB_ORG}/${img}:<<parameters.addl_tag>>"
               docker tag "${AWS_ECR_ACCOUNT_URL}/aptos/${img}:${IMAGE_TAG}" "${DOCKERHUB_ORG}/${img}:${ADDL_IMAGE_TAG}" || ret=$?
             done
             exit $ret
@@ -136,6 +137,7 @@ jobs:
             for img in "${DOCKERHUB_IMAGES[@]}"
             do
               docker push "${DOCKERHUB_ORG}/${img}:${IMAGE_TAG}"
+              docker push "${DOCKERHUB_ORG}/${img}:<<parameters.addl_tag>>"
               docker push "${DOCKERHUB_ORG}/${img}:${ADDL_IMAGE_TAG}" || ret=$?
             done
             exit $ret
