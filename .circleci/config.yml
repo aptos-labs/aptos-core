@@ -4,6 +4,7 @@ orbs:
   aws-cli: circleci/aws-cli@2.1.0
   aws-ecr: circleci/aws-ecr@7.3.0
   kubernetes: circleci/kubernetes@1.3.0
+  slack: circleci/slack@4.9.3
 
 executors:
   ubuntu-medium:
@@ -153,7 +154,7 @@ jobs:
             FGI_REPRO_CMD="./scripts/fgi/run --tag $IMAGE_TAG --suite land_blocking --report forge_report.json"
             eval $FGI_REPRO_CMD
             FGI_EXIT_CODE=$?
-            echo "export FGI_REPRO_CMD=$FGI_REPRO_CMD" >> $BASH_ENV
+            echo "export FGI_REPRO_CMD='$FGI_REPRO_CMD'" >> $BASH_ENV
             echo "export FGI_EXIT_CODE=$FGI_EXIT_CODE" >> $BASH_ENV
       - run:
           name: Post Forge test results
@@ -163,18 +164,34 @@ jobs:
             PR_NUMBER=$(echo "${commit_message}" | grep 'Closes: #' | tail -1 | sed 's/Closes: #//')
 
             echo "Repro: $FGI_REPRO_CMD"
+            FORGE_REPORT_TXT=$(cat forge_report.json | jq -r .text)
+            echo "export FORGE_REPORT_TXT='$FORGE_REPORT_TXT'" >> $BASH_ENV
 
             cat \<<EOF > forge_comment.txt
             Forge run: ${CIRCLE_BUILD_URL}
-            Forge Test Result: \`$(cat forge_report.json | jq -r .text)\`
+            Forge Test Result: \`${FORGE_REPORT_TXT}\`
             EOF
             # replace all newlines
             FORGE_COMMENT=$(awk '{printf "%s\\n", $0}' forge_comment.txt)
 
+            # post github comment on the PR
             curl -s -H "Authorization: token ${FORGE_GH_TOKEN}" \
             -X POST -d "{\"body\": \"${FORGE_COMMENT}\"}" \
             "https://api.github.com/repos/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/issues/${PR_NUMBER}/comments"
             exit 0
+      - slack/notify:
+          custom: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "[fgi($FGI_EXIT_CODE)] <$CIRCLE_BUILD_URL|Forge run> for $IMAGE_TAG: `$FORGE_REPORT_TXT`"
+                  }
+                }
+              ]
+            }
   docker-compose-test:
     executor: ubuntu-medium
     steps:

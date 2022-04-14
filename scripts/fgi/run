@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from datetime import datetime
 
 from kube import (
     kube_init_context,
@@ -25,9 +26,10 @@ TAG = ""
 BASE_TAG = ""
 WORKSPACE = ""
 REPORT = ""
-DEFL_TIMEOUT_SECS = 2700  # Default timeout is 45 mins
+DEFL_TIMEOUT_SECS = 1800  # Default timeout is 30 mins
 USER = getpass.getuser()  # Use the current user for naming
 OUTPUT_TEE = os.getenv("FGI_OUTPUT_LOG", tempfile.mkstemp()[1])
+TIME_FMT = '%Y-%m-%dT%H:%M:%S.000Z'
 
 HEADER = "\033[95m"
 OKBLUE = "\033[94m"
@@ -90,6 +92,10 @@ def cli_tool_installed(tool_name):
         ["which", tool_name], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
     )
     return ret.returncode == 0
+
+
+def get_opensearch_time(timestamp_ms):
+    return datetime.fromtimestamp(timestamp_ms/1000).strftime(TIME_FMT)
 
 
 # ================ Parse the args ================
@@ -229,14 +235,17 @@ except Exception as e:
 
 end_ts_ms = int(time.time() * 1000)
 DASHBOARD_LINK = f"{grafana_url}/d/overview/overview?from={start_ts_ms}&to={end_ts_ms}&orgId=1"
-LOGGING_LINK = "https://es.forge.aptosdev.com/_dashboards/app/discover#/?_g=(filters:!()," \
-               "refreshInterval:(pause:!t,value:0),time:(from:now-15m,to:now))&_a=(columns:!(),filters:!()," \
-               "index:'2da2a6e0-f70a-11eb-ad53-b979a6c9b83a',interval:auto,query:(language:kuery,query:'')," \
-               "sort:!(!('@timestamp',desc)))"
-print("\n**********")
-print(
-    f"{OKBLUE}Dashboard snapshot:{RESTORE} {DASHBOARD_LINK}"
+LOGGING_LINK = (
+    "https://es.devinfra.aptosdev.com/_dashboards/app/discover#/?_g=(filters:!(),"
+    f"refreshInterval:(pause:!t,value:0),time:(from:'{get_opensearch_time(start_ts_ms)}',to:'{get_opensearch_time(end_ts_ms)}'))&_a=(columns:!(_source),filters:!,"
+    "(('$state':(store:appState),meta:(alias:!n,disabled:!f,index:ac3499a0-abc8-11ec-9a50-89b84ac337af,"
+    f"key:chain_name,negate:!f,params:(query:aptos-{workspace}),type:phrase),query:(match_phrase:(chain_name:aptos-{workspace})))),"
+    "index:ac3499a0-abc8-11ec-9a50-89b84ac337af,interval:auto,query:(language:kuery,query:''),sort:!())"
 )
+
+print("\n**********")
+print(f"{OKBLUE}Dashboard snapshot:{RESTORE} {DASHBOARD_LINK}")
+print(f"{OKBLUE}Logs snapshot:{RESTORE} {LOGGING_LINK}")
 print("**********\n")
 
 test_res = 'failed'
@@ -245,11 +254,14 @@ test_report = []
 read_lines = False
 with open(f"{OUTPUT_TEE}", 'r') as file:
     for line in file.readlines():
-        if 'json-report-end' in line: read_lines = False
+        if 'json-report-end' in line:
+            read_lines = False
         if read_lines:
             test_report.append(line)
-        if 'json-report-begin' in line: read_lines = True
-        if 'test result: ok' in line: test_res = 'passed'
+        if 'json-report-begin' in line:
+            read_lines = True
+        if 'test result: ok' in line:
+            test_res = 'passed'
 if len(test_report) == 0:
     test_report.append("{\"text\": \"Forge test runner is terminated\"}")
 temp = json.loads(''.join(test_report))
