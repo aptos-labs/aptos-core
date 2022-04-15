@@ -334,3 +334,13 @@ impl SaveFile {
         write_to_file(self.output_file.as_path(), name, bytes)
     }
 }
+
+#[derive(Debug, Parser)]
+pub struct NodeOptions {
+    #[clap(
+        long,
+        parse(try_from_str),
+        default_value = "https://fullnode.devnet.aptoslabs.com"
+    )]
+    pub url: reqwest::Url,
+}

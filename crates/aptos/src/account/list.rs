@@ -6,7 +6,10 @@
 //! TODO: Examples
 //!
 
-use crate::{common::utils::to_common_result, CliResult, Error};
+use crate::{
+    common::{types::NodeOptions, utils::to_common_result},
+    CliResult, Error,
+};
 use aptos_types::account_address::AccountAddress;
 use clap::Parser;
 use reqwest;
@@ -15,17 +18,18 @@ use reqwest;
 ///
 #[derive(Debug, Parser)]
 pub struct ListResources {
+    #[clap(flatten)]
+    node: NodeOptions,
+
     /// Address of account you want to list resources for
     account: AccountAddress,
-    #[clap(long, default_value = "https://fullnode.devnet.aptoslabs.com")]
-    node_url: String,
 }
 
 impl ListResources {
     async fn get_resources(self) -> Result<Vec<serde_json::Value>, reqwest::Error> {
         reqwest::get(format!(
             "{}/accounts/{}/resources",
-            self.node_url, self.account
+            self.node.url, self.account
         ))
         .await?
         .json()

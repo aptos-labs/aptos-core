@@ -7,7 +7,7 @@
 //!
 
 use crate::{
-    common::types::{EncodingOptions, PrivateKeyInputOptions},
+    common::types::{EncodingOptions, NodeOptions, PrivateKeyInputOptions},
     CliResult, Error as CommonError,
 };
 use anyhow::Error;
@@ -31,17 +31,18 @@ use reqwest;
 pub struct CreateAccount {
     #[clap(flatten)]
     private_key_input_options: PrivateKeyInputOptions,
+    
     #[clap(flatten)]
     encoding_options: EncodingOptions,
+
+    #[clap(flatten)]
+    node: NodeOptions,
+
     /// Public Key of account you want to create
     public_key: String,
+    
     /// Chain ID
     chain_id: u8,
-    #[clap(
-        parse(try_from_str),
-        default_value = "https://fullnode.devnet.aptoslabs.com"
-    )]
-    node_url: reqwest::Url,
 }
 
 impl CreateAccount {
@@ -49,7 +50,7 @@ impl CreateAccount {
         &self,
         account: AccountAddress,
     ) -> Result<serde_json::Value, reqwest::Error> {
-        reqwest::get(format!("{}accounts/{}", self.node_url, account))
+        reqwest::get(format!("{}accounts/{}", self.node.url, account))
             .await?
             .json()
             .await
@@ -85,7 +86,7 @@ impl CreateAccount {
         sender_address: AccountAddress,
         sequence_number: u64,
     ) -> Result<Response<Transaction>, Error> {
-        let client = RestClient::new(reqwest::Url::clone(&self.node_url));
+        let client = RestClient::new(reqwest::Url::clone(&self.node.url));
         let chain_id = ChainId::new(self.chain_id);
         let transaction_factory = TransactionFactory::new(chain_id)
             .with_gas_unit_price(1)
