@@ -5,6 +5,7 @@ use crate::{
     account_resource::SimplifiedAccountResource, validator_config::DecodedValidatorConfig,
     validator_set::DecryptedValidatorInfo, validator_state::VerifyValidatorStateResult,
     TransactionContext,
+    ars_account::ArsAccountAddressResource,
 };
 use aptos_config::config::Peer;
 use aptos_crypto::{ed25519::Ed25519PublicKey, x25519};
@@ -75,6 +76,8 @@ pub enum Command {
     ValidatorSet(crate::validator_set::ValidatorSet),
     #[structopt(about = "Compare the local validator state to the state held on-chain")]
     VerifyValidatorState(crate::validator_state::VerifyValidatorState),
+
+    ArsAccountAddress(crate::ars_account::ArsAccountAddress),
 }
 
 #[derive(Debug, PartialEq)]
@@ -107,6 +110,7 @@ pub enum CommandName {
     ValidatorConfig,
     ValidatorSet,
     VerifyValidatorState,
+    ArsAccountAddress,
 }
 
 impl From<&Command> for CommandName {
@@ -140,6 +144,7 @@ impl From<&Command> for CommandName {
             Command::ValidatorConfig(_) => CommandName::ValidatorConfig,
             Command::ValidatorSet(_) => CommandName::ValidatorSet,
             Command::VerifyValidatorState(_) => CommandName::VerifyValidatorState,
+            Command::ArsAccountAddress(_) => CommandName::ArsAccountAddress
         }
     }
 }
@@ -175,6 +180,7 @@ impl std::fmt::Display for CommandName {
             CommandName::ValidatorConfig => "validator-config",
             CommandName::ValidatorSet => "validator-set",
             CommandName::VerifyValidatorState => "verify-validator-state",
+            CommandName::ArsAccountAddress => "ars-account-address",
         };
         write!(f, "{}", name)
     }
@@ -230,7 +236,10 @@ impl Command {
             Command::ValidatorSet(cmd) => Self::pretty_print(cmd.execute().await),
             Command::VerifyValidatorState(cmd) => {
                 Self::print_verify_validator_state_result(cmd.execute().await)
-            }
+            },
+            Command::ArsAccountAddress(cmd) => {
+                Self::print_ars_account_address(cmd.execute().await)
+            },
         }
     }
 
@@ -459,6 +468,20 @@ impl Command {
             CommandName::VerifyValidatorState
         )
     }
+
+    /// Show VerifyValidatorState result
+    fn print_ars_account_address(
+        result: Result<ArsAccountAddressResource, Error>,
+    ) -> Result<String, Error> {
+        match &result {
+            Ok(verify_result) => Self::pretty_print(Ok(format!("{:?}", verify_result))),
+            Err(_) => Self::pretty_print(result),
+        }
+    }
+
+    // pub async fn print_ars_account_address_result(self) -> Result<ArsAccountAddressResource, Error> {
+    //     execute_command_await!(self, Command::ArsAccountAddress, CommandName::ArsAccountAddress)
+    // }
 }
 
 /// A result wrapper for displaying either a correct execution result or an error.

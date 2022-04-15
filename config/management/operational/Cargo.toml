@@ -42,6 +42,10 @@ netcore = { path = "../../../network/netcore" }
 network = { path = "../../../network" }
 aptos-transaction-builder = { path = "../../../sdk/transaction-builder" }
 
+ed25519-dalek = { version = "0.1.0", package = "ed25519-dalek-fiat", default-features = false, features = ["std", "serde", "fiat_u64_backend"] }
+tiny-keccak = { version = "2.0.2", default-features = false, features = ["sha3"] }
+reqwest = { version = "0.11.2", features = ["blocking", "json"] }
+
 [features]
 testing = []
 fuzzing = ["aptos-config/fuzzing"]

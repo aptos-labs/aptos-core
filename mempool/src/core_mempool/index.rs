@@ -109,6 +109,11 @@ impl Ord for OrderedQueueKey {
 /// removed. Index is represented as `BTreeSet<TTLOrderingKey>`, where `TTLOrderingKey`
 /// is a logical reference to TxnInfo.
 /// Index is ordered by `TTLOrderingKey::expiration_time`.
+///
+/// TTLIndex用于对Mempool中的旧事务进行垃圾回收。
+/// 类似GC的工作会定期查询这个索引，找出需要删除的事务。
+/// 索引表示为`BTreeSet<TTLOrderingKey>`，其中`TTLOrderingKey`是对TxnInfo的一个逻辑引用。
+/// 索引按`TTLOrderingKey::expiration_time'排序。
 pub struct TTLIndex {
     data: BTreeSet<TTLOrderingKey>,
     get_expiration_time: Box<dyn Fn(&MempoolTransaction) -> Duration + Send + Sync>,
@@ -140,7 +145,8 @@ impl TTLIndex {
             address: AccountAddress::ZERO,
             sequence_number: 0,
         };
-
+        // 按照当前ttl_key 拆分成两组。
+        // 大于 ttl_key.expiration_time 时为活跃（active）的交易
         let mut active = self.data.split_off(&ttl_key);
         let ttl_transactions = self.data.iter().cloned().collect();
         self.data.clear();

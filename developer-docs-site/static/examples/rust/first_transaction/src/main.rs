@@ -8,6 +8,10 @@ fn main() -> () {
     let rest_client = RestClient::new(TESTNET_URL.to_string());
     let faucet_client = FaucetClient::new(FAUCET_URL.to_string(), rest_client.clone());
 
+    let st = hex::decode("C831F195E2ED2CBF447FC10BCB043820DFCC9883C814F21DD874F5BCC1E1FD4A").expect("Decoding failed");
+    let kip = Account::new(Some(st));
+    faucet_client.fund_account(&kip.auth_key().as_str(), 1_000_000);
+
     // Create two accounts, Alice and Bob, and fund Alice but not Bob
     let mut alice = Account::new(None);
     let bob = Account::new(None);

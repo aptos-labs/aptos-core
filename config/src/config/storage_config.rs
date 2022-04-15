@@ -59,10 +59,15 @@ pub const NO_OP_STORAGE_PRUNER_CONFIG: StoragePrunerConfig = StoragePrunerConfig
 pub struct StoragePrunerConfig {
     /// None disables pruning. The size of the window should be calculated based on disk space
     /// availability and system TPS.
+    ///
+    /// None 禁用修剪。窗口大小应根据磁盘空间可用性和系统 TPS 计算。
     pub state_store_prune_window: Option<u64>,
     /// This is the default pruning window for any other store except for state store. State store
     /// being big in size, we might want to configure a smaller window for state store vs other
     /// store.
+    ///
+    /// 这是除state store以外的任何其他商店的默认修剪窗口。
+    /// 状态存储由于尺寸较大，我们可能想为状态存储和其他存储配置一个较小的窗口
     pub default_prune_window: Option<u64>,
 
     /// Maximum version to prune per batch, should not be too large to avoid spike in disk IO caused

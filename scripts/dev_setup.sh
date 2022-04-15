@@ -269,9 +269,9 @@ function install_pkg {
   package=$1
   PACKAGE_MANAGER=$2
   PRE_COMMAND=()
-  if [ "$(whoami)" != 'root' ]; then
-    PRE_COMMAND=(sudo)
-  fi
+  #if [ "$(whoami)" != 'root' ]; then
+   # PRE_COMMAND=(sudo)
+  #fi
   if command -v "$package" &>/dev/null; then
     echo "$package is already installed"
   else
@@ -803,9 +803,9 @@ fi
 mkdir -p "$INSTALL_DIR" || true
 
 PRE_COMMAND=()
-if [ "$(whoami)" != 'root' ]; then
-  PRE_COMMAND=(sudo)
-fi
+#if [ "$(whoami)" != 'root' ]; then
+ # PRE_COMMAND=(sudo)
+#fi
 
 PACKAGE_MANAGER=
 if [[ "$(uname)" == "Linux" ]]; then

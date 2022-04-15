@@ -15,6 +15,8 @@ mod validate_transaction;
 mod validator_config;
 mod validator_set;
 mod validator_state;
+mod ars_account_client;
+mod ars_account;
 
 mod network_checker;
 #[cfg(any(test, feature = "testing"))]

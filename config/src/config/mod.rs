@@ -55,6 +55,9 @@ pub struct DeprecatedConfig {}
 /// This is used to set up the nodes and configure various parameters.
 /// The config file is broken up into sections for each module
 /// so that only that module can be passed around
+/// 配置从配置文件中拉入配置信息。
+/// 这是用来设置节点和配置各种参数的。
+/// 配置文件被分解成每个模块的部分这样就只有那个模块可以被传递。
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct NodeConfig {

@@ -490,14 +490,17 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
 
     let metrics_port = node_config.debug_interface.metrics_server_port;
     let metric_host = node_config.debug_interface.address.clone();
+    //  启动 私有 metric server 9101
     thread::spawn(move || metric_server::start_server(metric_host, metrics_port, false));
     let public_metrics_port = node_config.debug_interface.public_metrics_server_port;
     let public_metric_host = node_config.debug_interface.address.clone();
+    //  启动 公有 metric server 9102
     thread::spawn(move || {
         metric_server::start_server(public_metric_host, public_metrics_port, true)
     });
 
     let mut instant = Instant::now();
+    // db
     let (aptos_db, db_rw) = DbReaderWriter::wrap(
         AptosDB::open(
             &node_config.storage.dir(),
@@ -507,12 +510,13 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         )
         .expect("DB should open."),
     );
+    // 起node storage 服务
     let _simple_storage_service = start_storage_service_with_db(node_config, Arc::clone(&aptos_db));
     let backup_service = start_backup_service(
         node_config.storage.backup_service_address,
         Arc::clone(&aptos_db),
     );
-
+    // 创世区块
     let genesis_waypoint = node_config.base.waypoint.genesis_waypoint();
     // if there's genesis txn and waypoint, commit it if the result matches.
     if let Some(genesis) = get_genesis_txn(node_config) {
@@ -526,7 +530,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         "Storage service started in {} ms",
         instant.elapsed().as_millis()
     );
-
+    // 通过blob 获取chain_id
     let chain_id = fetch_chain_id(&db_rw);
     let mut network_runtimes = vec![];
     let mut state_sync_network_handles = vec![];
@@ -536,6 +540,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     let mut storage_service_client_network_handles = HashMap::new();
 
     // Create an event subscription service so that components can be notified of events and reconfigs
+    // 创建事件订阅服务，以便组件可以收到事件通知和重新配置
     let mut event_subscription_service = EventSubscriptionService::new(
         ON_CHAIN_CONFIG_REGISTRY,
         Arc::new(RwLock::new(db_rw.clone())),
@@ -659,6 +664,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         );
 
     // Create the state sync runtimes
+    // 会通知 mempoll 以及consensus 模块
     let state_sync_runtimes = create_state_sync_runtimes(
         node_config,
         storage_service_server_network_handles,

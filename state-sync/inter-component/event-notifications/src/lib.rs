@@ -159,6 +159,10 @@ impl EventSubscriptionService {
     /// begins. Note: if the notification buffer fills up too quickly, older
     /// notifications will be dropped. As such, it is the responsibility of the
     /// subscriber to ensure notifications are processed in a timely manner.
+    /// 返回一个ReconfigNotificationListener，它可以被监测到重新配置事件。
+    /// 每当一个新的纪元开始时，订阅者将被发送一个通知包含所有新的链上配置值。
+    /// 注意：如果通知缓冲区填充得太快，旧的通知将被放弃。
+    /// 因此，确保通知被及时处理是订户的责任。
     pub fn subscribe_to_reconfigurations(&mut self) -> Result<ReconfigNotificationListener, Error> {
         let (notification_sender, notification_receiver) =
             aptos_channel::new(QueueStyle::KLAST, RECONFIG_NOTIFICATION_CHANNEL_SIZE, None);
