@@ -489,9 +489,6 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
         loop {
             ::futures::select! {
                 storage_data_chunk = state_snapshot_listener.select_next_some() => {
-                    // We've received an account states chunk
-                    decrement_pending_data_chunks(pending_transaction_chunks.clone());
-
                     // Process the chunk
                     match storage_data_chunk {
                         StorageDataChunk::Accounts(notification_id, account_states_with_proof) => {
@@ -521,6 +518,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                             send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
                                         }
 
+                                        decrement_pending_data_chunks(pending_transaction_chunks.clone());
                                         continue; // Wait for the next chunk
                                     }
 
@@ -551,6 +549,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                     if let Err(error) = finalized_result {
                                       send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
                                     }
+                                    decrement_pending_data_chunks(pending_transaction_chunks.clone());
                                     return; // There's nothing left to do!
                                 },
                                 Err(error) => {
@@ -563,6 +562,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             panic!("Invalid storage data chunk sent to state snapshot receiver: {:?}", storage_data_chunk);
                         }
                     }
+                    decrement_pending_data_chunks(pending_transaction_chunks.clone());
                 }
             }
         }

@@ -34,7 +34,10 @@ mempool-notifications = { path = "../../inter-component/mempool-notifications" }
 storage-interface = { path = "../../../storage/storage-interface" }
 
 [dev-dependencies]
+anyhow = "1.0.52"
+bcs = "0.1.2"
 claim = "0.5.0"
+mockall = "0.11.0"
 
 channel = { path = "../../../crates/channel" }
 aptosdb = { path = "../../../storage/aptosdb" }
@@ -43,6 +46,7 @@ aptos-temppath = { path = "../../../crates/aptos-temppath" }
 aptos-time-service = { path = "../../../crates/aptos-time-service", features = ["async", "testing"] }
 aptos-vm = { path = "../../../aptos-move/aptos-vm" }
 executor-test-helpers = { path = "../../../execution/executor-test-helpers" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6", features=["address32"] }
 network = { path = "../../../network", features = ["fuzzing"] }
 storage-service-client = { path = "../../storage-service/client" }
 vm-genesis = { path = "../../../aptos-move/vm-genesis", features = ["fuzzing"] }

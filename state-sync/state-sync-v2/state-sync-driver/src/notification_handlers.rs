@@ -49,7 +49,7 @@ pub struct CommittedAccounts {
 }
 
 /// A commit notification for new transactions
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CommittedTransactions {
     pub events: Vec<ContractEvent>,
     pub transactions: Vec<Transaction>,

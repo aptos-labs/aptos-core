@@ -2,4 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod driver;
+mod mocks;
+mod storage_synchronizer;
 mod utils;
