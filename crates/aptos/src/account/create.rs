@@ -31,7 +31,7 @@ use reqwest;
 pub struct CreateAccount {
     #[clap(flatten)]
     private_key_input_options: PrivateKeyInputOptions,
-    
+
     #[clap(flatten)]
     encoding_options: EncodingOptions,
 
@@ -40,7 +40,7 @@ pub struct CreateAccount {
 
     /// Public Key of account you want to create
     public_key: String,
-    
+
     /// Chain ID
     chain_id: u8,
 }

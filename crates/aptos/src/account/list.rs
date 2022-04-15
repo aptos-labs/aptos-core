@@ -8,11 +8,12 @@
 
 use crate::{
     common::{types::NodeOptions, utils::to_common_result},
-    CliResult, Error,
+    CliResult, Error as CommonError,
 };
+use anyhow::Error;
+use aptos_rest_client::{types::Resource, Client};
 use aptos_types::account_address::AccountAddress;
 use clap::Parser;
-use reqwest;
 
 /// Command to list resources owned by an address
 ///
@@ -26,14 +27,16 @@ pub struct ListResources {
 }
 
 impl ListResources {
-    async fn get_resources(self) -> Result<Vec<serde_json::Value>, reqwest::Error> {
-        reqwest::get(format!(
-            "{}/accounts/{}/resources",
-            self.node.url, self.account
-        ))
-        .await?
-        .json()
-        .await
+    async fn get_resources(self) -> Result<Vec<serde_json::Value>, Error> {
+        let client = Client::new(self.node.url);
+        let response: Vec<Resource> = client
+            .get_account_resources(self.account)
+            .await?
+            .into_inner();
+        Ok(response
+            .iter()
+            .map(|json| json.data.clone())
+            .collect::<Vec<serde_json::Value>>())
     }
 
     // TODO: Format this in a reasonable way while providing all information
@@ -42,7 +45,7 @@ impl ListResources {
         let result = self
             .get_resources()
             .await
-            .map_err(|err| Error::UnexpectedError(err.to_string()));
+            .map_err(|err| CommonError::UnexpectedError(err.to_string()));
         to_common_result(result)
     }
 }
