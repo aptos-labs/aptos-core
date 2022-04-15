@@ -30,7 +30,7 @@ use std::{
 use storage_interface::DbReaderWriter;
 use tokio::{
     runtime::{Handle, Runtime},
-    task::yield_now,
+    task::{yield_now, JoinHandle},
 };
 
 /// Synchronizes the storage of the node by verifying and storing new data
@@ -60,7 +60,7 @@ pub trait StorageSynchronizerInterface {
 
     /// Initializes an account synchronizer with the specified
     /// `target_ledger_info` and `target_output_with_proof` at the target
-    /// syncing version. Also, writes all `epoch_change_proofs` to storage.
+    /// syncing version. Returns a join handle to the account synchronizer.
     ///
     /// Note: this assumes that `epoch_change_proofs`, `target_ledger_info`,
     /// and `target_output_with_proof` have already been verified.
@@ -69,7 +69,7 @@ pub trait StorageSynchronizerInterface {
         epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
         target_ledger_info: LedgerInfoWithSignatures,
         target_output_with_proof: TransactionOutputListWithProof,
-    ) -> Result<(), Error>;
+    ) -> Result<JoinHandle<()>, Error>;
 
     /// Returns true iff there is storage data that is still waiting
     /// to be executed/applied or committed.
@@ -135,6 +135,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> Clone for StorageSynchronizer<
 }
 
 impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecutor> {
+    /// Returns a new storage synchronizer alongside the executor and committer handles
     pub fn new(
         driver_config: StateSyncDriverConfig,
         chunk_executor: Arc<ChunkExecutor>,
@@ -142,7 +143,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
         error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
         storage: DbReaderWriter,
         runtime: Option<&Runtime>,
-    ) -> Self {
+    ) -> (Self, JoinHandle<()>, JoinHandle<()>) {
         // Create a channel to notify the executor when data chunks are ready
         let max_pending_data_chunks = driver_config.max_pending_data_chunks as usize;
         let (executor_notifier, executor_listener) = mpsc::channel(max_pending_data_chunks);
@@ -155,7 +156,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
 
         // Spawn the executor that executes/applies storage data chunks
         let runtime = runtime.map(|runtime| runtime.handle().clone());
-        spawn_executor(
+        let executor_handle = spawn_executor(
             chunk_executor.clone(),
             error_notification_sender.clone(),
             executor_listener,
@@ -166,7 +167,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
         );
 
         // Spawn the committer that commits executed (but pending) chunks
-        spawn_committer(
+        let committer_handle = spawn_committer(
             chunk_executor.clone(),
             committer_listener,
             commit_notification_sender.clone(),
@@ -179,7 +180,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
         utils::initialize_sync_version_gauges(storage.reader.clone())
             .expect("Failed to initialize the metric gauges!");
 
-        Self {
+        let storage_synchronizer = Self {
             chunk_executor,
             commit_notification_sender,
             driver_config,
@@ -189,7 +190,9 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
             runtime,
             state_snapshot_notifier: None,
             storage,
-        }
+        };
+
+        (storage_synchronizer, executor_handle, committer_handle)
     }
 
     /// Notifies the executor of new data chunks
@@ -246,14 +249,14 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizerInterface
         epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
         target_ledger_info: LedgerInfoWithSignatures,
         target_output_with_proof: TransactionOutputListWithProof,
-    ) -> Result<(), Error> {
+    ) -> Result<JoinHandle<()>, Error> {
         // Create a channel to notify the state snapshot receiver when data chunks are ready
         let max_pending_data_chunks = self.driver_config.max_pending_data_chunks as usize;
         let (state_snapshot_notifier, state_snapshot_listener) =
             mpsc::channel(max_pending_data_chunks);
 
         // Spawn the state snapshot receiver that commits account states
-        spawn_state_snapshot_receiver(
+        let receiver_handle = spawn_state_snapshot_receiver(
             self.chunk_executor.clone(),
             state_snapshot_listener,
             self.commit_notification_sender.clone(),
@@ -267,7 +270,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizerInterface
         );
         self.state_snapshot_notifier = Some(state_snapshot_notifier);
 
-        Ok(())
+        Ok(receiver_handle)
     }
 
     fn pending_storage_data(&self) -> bool {
@@ -326,7 +329,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
     pending_transaction_chunks: Arc<AtomicU64>,
     max_pending_data_chunks: u64,
     runtime: Option<Handle>,
-) {
+) -> JoinHandle<()> {
     // Create an executor
     let executor = async move {
         loop {
@@ -402,7 +405,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
     };
 
     // Spawn the executor
-    spawn(runtime, executor);
+    spawn(runtime, executor)
 }
 
 /// Spawns a dedicated committer that commits executed (but pending) chunks
@@ -413,7 +416,7 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
     pending_transaction_chunks: Arc<AtomicU64>,
     runtime: Option<Handle>,
-) {
+) -> JoinHandle<()> {
     // Create a committer
     let committer = async move {
         loop {
@@ -449,7 +452,7 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
     };
 
     // Spawn the committer
-    spawn(runtime, committer);
+    spawn(runtime, committer)
 }
 
 /// Spawns a dedicated receiver that commits accounts from a state snapshot
@@ -464,7 +467,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
     target_ledger_info: LedgerInfoWithSignatures,
     target_output_with_proof: TransactionOutputListWithProof,
     runtime: Option<Handle>,
-) {
+) -> JoinHandle<()> {
     // Create a state snapshot receiver
     let receiver = async move {
         // Get the target version and expected root hash
@@ -495,7 +498,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             let all_accounts_synced = account_states_with_proof.is_last_chunk();
                             let last_committed_account_index = account_states_with_proof.last_index;
 
-                            // Attempt to the commit the chunk
+                            // Attempt to commit the chunk
                             let commit_result = state_snapshot_receiver.add_chunk(
                                 account_states_with_proof.raw_values,
                                 account_states_with_proof.proof.clone(),
@@ -566,7 +569,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
     };
 
     // Spawn the receiver
-    spawn(runtime, receiver);
+    spawn(runtime, receiver)
 }
 
 /// Creates a final commit notification for the last account states chunk
@@ -597,11 +600,14 @@ fn create_final_commit_notification(
 
 /// Spawns a future on a specified runtime. If no runtime is specified, uses
 /// the current runtime.
-fn spawn(runtime: Option<Handle>, future: impl Future<Output = ()> + Send + 'static) {
+fn spawn(
+    runtime: Option<Handle>,
+    future: impl Future<Output = ()> + Send + 'static,
+) -> JoinHandle<()> {
     if let Some(runtime) = runtime {
-        runtime.spawn(future);
+        runtime.spawn(future)
     } else {
-        tokio::spawn(future);
+        tokio::spawn(future)
     }
 }
 
