@@ -187,7 +187,7 @@ Struct type value examples:
 Note:
   1. Empty chars should be ignored when comparing 2 struct tag ids.
   2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
-* @pattern ^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<>]+)$
+* @pattern ^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+)$
 * @example 0x1::XUS::XUS
 */
 export type MoveTypeTagId = string;
@@ -254,7 +254,7 @@ the `CoinType` in the Move source code.
 Note:
   1. Empty chars should be ignored when comparing 2 struct tag ids.
   2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
-* @pattern ^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<>]+|^&(mut )?.+$|T\d+)$
+* @pattern ^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+|^&(mut )?.+$|T\d+)$
 * @example 0x1::AptosAccount::Balance<0x1::XUS::XUS>
 */
 export type MoveTypeId = string;
@@ -423,7 +423,7 @@ Format: "{address}::{module name}"
 `address` should be hex-encoded 16 bytes account address
 that is prefixed with `0x` and leading zeros are trimmed.
 
-Module name is case sensitive.
+Module name is case-sensitive.
 
 See [doc](https://diem.github.io/move/modules-and-scripts.html#modules) for more details.
 * @example 0x1::Aptos
@@ -571,7 +571,7 @@ export interface ScriptFunctionPayload {
 
 Format: `{address}::{module name}::{function name}`
 
-Both `module name` and `function name` are case sensitive.
+Both `module name` and `function name` are case-sensitive.
 * @example 0x1::PaymentScripts::peer_to_peer_with_metadata
 */
 export type ScriptFunctionId = string;
@@ -639,7 +639,7 @@ export interface DeleteModule {
    * Format: "{address}::{module name}"
    * `address` should be hex-encoded 16 bytes account address
    * that is prefixed with `0x` and leading zeros are trimmed.
-   * Module name is case sensitive.
+   * Module name is case-sensitive.
    * See [doc](https://diem.github.io/move/modules-and-scripts.html#modules) for more details.
    */
   module: MoveModuleId;
