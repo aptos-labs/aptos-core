@@ -185,7 +185,7 @@ async fn test_get_transactions_output_user_transaction_with_write_set_payload() 
                         code_address,
                         bcs::to_bytes(&Path::Code(ModuleId::new(
                             code_address,
-                            Identifier::new("AptosAccount").unwrap(),
+                            Identifier::new("Account").unwrap(),
                         )))
                         .unwrap(),
                     )),
@@ -504,7 +504,7 @@ async fn test_signing_message_with_script_function_payload() {
 
     let payload = json!({
         "type": "script_function_payload",
-        "function": "0x1::AptosAccount::create_account",
+        "function": "0x1::Account::create_account",
         "type_arguments": [
         ],
         "arguments": [
@@ -553,7 +553,7 @@ async fn test_signing_message_with_write_set_payload() {
                             code_address,
                             bcs::to_bytes(&Path::Code(ModuleId::new(
                                 code_address,
-                                Identifier::new("AptosAccount").unwrap(),
+                                Identifier::new("Account").unwrap(),
                             )))
                             .unwrap(),
                         )),
@@ -587,7 +587,7 @@ async fn test_signing_message_with_write_set_payload() {
                 {
                     "type": "delete_module",
                     "address": "0x1",
-                    "module": "0x1::AptosAccount"
+                    "module": "0x1::Account"
                 },
                 {
                     "type": "delete_resource",
@@ -812,7 +812,7 @@ async fn test_get_txn_execute_failed_by_invalid_write_set_payload() {
                     code_address,
                     bcs::to_bytes(&Path::Code(ModuleId::new(
                         code_address,
-                        Identifier::new("AptosAccount").unwrap(),
+                        Identifier::new("Account").unwrap(),
                     )))
                     .unwrap(),
                 )),

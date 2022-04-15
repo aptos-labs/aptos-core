@@ -52,7 +52,7 @@ impl ValidatorSet {
 
 impl OnChainConfig for ValidatorSet {
     // validator_set_address
-    const IDENTIFIER: &'static str = "ValidatorSystem";
+    const IDENTIFIER: &'static str = "ValidatorSet";
 }
 
 impl IntoIterator for ValidatorSet {

@@ -4,17 +4,12 @@
 /// struct (the `Self::ValidatorConfig` in a `Reconfiguration::ValidatorInfo` which is a member
 /// of the `ValidatorSystem::ValidatorSystem.validators` vector).
 module AptosFramework::ValidatorConfig {
-    use Std::Capability::Cap;
     use Std::Errors;
     use Std::Option::{Self, Option};
     use Std::Signer;
     use AptosFramework::Timestamp;
     use AptosFramework::ValidatorOperatorConfig;
     use AptosFramework::Signature;
-    use AptosFramework::SystemAddresses;
-
-    /// Marker to be stored under @CoreResources during genesis
-    struct ValidatorConfigChainMarker<phantom T> has key {}
 
     struct Config has copy, drop, store {
         consensus_pubkey: vector<u8>,
@@ -40,19 +35,6 @@ module AptosFramework::ValidatorConfig {
     const EINVALID_CONSENSUS_KEY: u64 = 2;
     /// Tried to set an account without the correct operator role as a Validator Operator
     const ENOT_A_VALIDATOR_OPERATOR: u64 = 3;
-    /// The `ValidatorSetChainMarker` resource was not in the required state
-    const ECHAIN_MARKER: u64 = 9;
-
-    public fun initialize<T>(account: &signer) {
-        Timestamp::assert_genesis();
-        SystemAddresses::assert_core_resource(account);
-
-        assert!(
-            !exists<ValidatorConfigChainMarker<T>>(@CoreResources),
-            Errors::already_published(ECHAIN_MARKER)
-        );
-        move_to(account, ValidatorConfigChainMarker<T>{});
-    }
 
     ///////////////////////////////////////////////////////////////////////////
     // Validator setup methods
@@ -61,16 +43,11 @@ module AptosFramework::ValidatorConfig {
     /// Publishes a mostly empty ValidatorConfig struct. Eventually, it
     /// will have critical info such as keys, network addresses for validators,
     /// and the address of the validator operator.
-    public fun publish<T>(
+    public fun publish(
         validator_account: &signer,
         human_name: vector<u8>,
-        _cap: Cap<T>
     ) {
         Timestamp::assert_operating();
-        assert!(
-            exists<ValidatorConfigChainMarker<T>>(@CoreResources),
-            Errors::not_published(ECHAIN_MARKER)
-        );
 
         assert!(
             !exists<ValidatorConfig>(Signer::address_of(validator_account)),

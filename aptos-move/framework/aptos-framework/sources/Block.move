@@ -2,7 +2,7 @@
 module AptosFramework::Block {
     use Std::Errors;
     use Std::Event;
-    use AptosFramework::ValidatorSystem;
+    use AptosFramework::ValidatorSet;
     use AptosFramework::Timestamp;
     use AptosFramework::SystemAddresses;
 
@@ -64,7 +64,7 @@ module AptosFramework::Block {
 
         // Authorization
         assert!(
-            proposer == @VMReserved || ValidatorSystem::is_validator(proposer),
+            proposer == @VMReserved || ValidatorSet::is_validator(proposer),
             Errors::requires_address(EVM_OR_VALIDATOR)
         );
 

@@ -2,21 +2,19 @@ module AptosFramework::Genesis {
     use Std::Signer;
     use Std::Event;
     use Std::Vector;
-    use AptosFramework::CoreGenesis;
-    use AptosFramework::AptosAccount;
-
-    // Config imports
+    use AptosFramework::Account;
+    use AptosFramework::ConsensusConfig;
+    use AptosFramework::TransactionPublishingOption;
+    use AptosFramework::ValidatorSet;
+    use AptosFramework::Version;
+    use AptosFramework::Block;
+    use AptosFramework::ChainId;
+    use AptosFramework::Reconfiguration;
+    use AptosFramework::TestCoin;
+    use AptosFramework::Timestamp;
     use AptosFramework::ValidatorConfig;
     use AptosFramework::ValidatorOperatorConfig;
-    use AptosFramework::AptosConsensusConfig;
-    use AptosFramework::AptosTransactionPublishingOption;
-    use AptosFramework::AptosValidatorConfig;
-    use AptosFramework::AptosValidatorOperatorConfig;
-    use AptosFramework::AptosValidatorSet;
-    use AptosFramework::AptosVersion;
-    use AptosFramework::AptosVMConfig;
-    use AptosFramework::Marker;
-    use AptosFramework::TestCoin;
+    use AptosFramework::VMConfig;
 
     fun initialize(
         core_resource_account: signer,
@@ -56,33 +54,40 @@ module AptosFramework::Genesis {
         consensus_config: vector<u8>,
         min_price_per_gas_unit: u64,
     ) {
-        // initialize the chain marker first
-        Marker::initialize(core_resource_account);
         // initialize the core resource account
-        AptosAccount::initialize(core_resource_account);
-        AptosAccount::create_account_internal(Signer::address_of(core_resource_account));
-        AptosAccount::rotate_authentication_key_internal(core_resource_account, copy core_resource_account_auth_key);
+        Account::initialize(
+            core_resource_account,
+            @AptosFramework,
+            b"Account",
+            b"script_prologue",
+            b"module_prologue",
+            b"writeset_prologue",
+            b"script_prologue",
+            b"epilogue",
+            b"writeset_epilogue",
+            false,
+        );
+        Account::create_account_internal(Signer::address_of(core_resource_account));
+        Account::rotate_authentication_key_internal(core_resource_account, copy core_resource_account_auth_key);
         // initialize the core framework account
-        let core_framework_account = AptosAccount::create_core_framework_account();
-        AptosAccount::rotate_authentication_key_internal(&core_framework_account, core_resource_account_auth_key);
+        let core_framework_account = Account::create_core_framework_account();
+        Account::rotate_authentication_key_internal(&core_framework_account, core_resource_account_auth_key);
 
         // Consensus config setup
-        AptosConsensusConfig::initialize(core_resource_account);
-        AptosValidatorSet::initialize_validator_set(core_resource_account);
-        AptosVersion::initialize(core_resource_account, initial_version);
+        ConsensusConfig::initialize(core_resource_account);
+        ValidatorSet::initialize_validator_set(core_resource_account);
+        Version::initialize(core_resource_account, initial_version);
 
-        AptosVMConfig::initialize(
+        VMConfig::initialize(
             core_resource_account,
             instruction_schedule,
             native_schedule,
             min_price_per_gas_unit,
         );
 
-        AptosConsensusConfig::set(core_resource_account, consensus_config);
+        ConsensusConfig::set(core_resource_account, consensus_config);
 
-        AptosValidatorConfig::initialize(core_resource_account);
-        AptosValidatorOperatorConfig::initialize(core_resource_account);
-        AptosTransactionPublishingOption::initialize(core_resource_account, initial_script_allow_list, is_open_module);
+        TransactionPublishingOption::initialize(core_resource_account, initial_script_allow_list, is_open_module);
 
         TestCoin::initialize(core_resource_account, 1000000);
         TestCoin::mint_internal(core_resource_account, Signer::address_of(core_resource_account), 18446744073709551615);
@@ -94,7 +99,10 @@ module AptosFramework::Genesis {
         Event::destroy_handle(Event::new_event_handle<u64>(core_resource_account));
 
         // this needs to be called at the very end
-        CoreGenesis::init(core_resource_account, chain_id);
+        ChainId::initialize(core_resource_account, chain_id);
+        Reconfiguration::initialize(core_resource_account);
+        Block::initialize_block_metadata(core_resource_account);
+        Timestamp::set_time_has_started(core_resource_account);
     }
 
     /// Sets up the initial validator set for the network.
@@ -141,23 +149,23 @@ module AptosFramework::Genesis {
             let owner_address = Signer::address_of(owner);
             let owner_name = *Vector::borrow(&owner_names, i);
             // create each validator account and rotate its auth key to the correct value
-            AptosAccount::create_validator_account_internal(
+            Account::create_validator_account_internal(
                 &core_resource_account, owner_address, owner_name
             );
 
             let owner_auth_key = *Vector::borrow(&owner_auth_keys, i);
-            AptosAccount::rotate_authentication_key_internal(owner, owner_auth_key);
+            Account::rotate_authentication_key_internal(owner, owner_auth_key);
 
             let operator = Vector::borrow(&operators, i);
             let operator_address = Signer::address_of(operator);
             let operator_name = *Vector::borrow(&operator_names, i);
             // create the operator account + rotate its auth key if it does not already exist
-            if (!AptosAccount::exists_at(operator_address)) {
-                AptosAccount::create_validator_operator_account_internal(
+            if (!Account::exists_at(operator_address)) {
+                Account::create_validator_operator_account_internal(
                     &core_resource_account, operator_address, copy operator_name
                 );
                 let operator_auth_key = *Vector::borrow(&operator_auth_keys, i);
-                AptosAccount::rotate_authentication_key_internal(operator, operator_auth_key);
+                Account::rotate_authentication_key_internal(operator, operator_auth_key);
             };
             // assign the operator to its validator
             assert!(ValidatorOperatorConfig::get_human_name(operator_address) == operator_name, 0);
@@ -176,7 +184,7 @@ module AptosFramework::Genesis {
             );
 
             // finally, add this validator to the validator set
-            AptosValidatorSet::add_validator_internal(&core_resource_account, owner_address);
+            ValidatorSet::add_validator_internal(&core_resource_account, owner_address);
 
             i = i + 1;
         }

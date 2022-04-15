@@ -4,19 +4,15 @@
 ///
 /// > Note: When trying to understand this code, it's important to know that "config"
 /// and "configuration" are used for several distinct concepts.
-module AptosFramework::ValidatorSystem {
-    use Std::Capability::Cap;
+module AptosFramework::ValidatorSet {
     use Std::Errors;
     use Std::Option::{Self, Option};
     use Std::Signer;
     use Std::Vector;
     use AptosFramework::Reconfiguration;
-    use AptosFramework::Timestamp;
     use AptosFramework::SystemAddresses;
+    use AptosFramework::Timestamp;
     use AptosFramework::ValidatorConfig;
-
-    /// Marker to be stored under @CoreResources during genesis
-    struct ValidatorSetChainMarker<phantom T> has key {}
 
     /// Information about a Validator Owner.
     struct ValidatorInfo has copy, drop, store {
@@ -33,17 +29,17 @@ module AptosFramework::ValidatorSystem {
         last_config_update_time: u64,
     }
 
-    /// The ValidatorSystem struct stores the validator set and crypto scheme in
-    /// Reconfiguration. The ValidatorSystem struct is stored by Reconfiguration, which publishes a
-    /// Reconfiguration<ValidatorSystem> resource.
-    struct ValidatorSystem has key, copy, drop {
+    /// The ValidatorSet struct stores the validator set and crypto scheme in
+    /// Reconfiguration. The ValidatorSet struct is stored by Reconfiguration, which publishes a
+    /// Reconfiguration<ValidatorSet> resource.
+    struct ValidatorSet has key, copy, drop {
         /// The current consensus crypto scheme.
         scheme: u8,
         /// The current validator set.
         validators: vector<ValidatorInfo>,
     }
 
-    /// The `ValidatorSystem` resource was not in the required state
+    /// The `ValidatorSet` resource was not in the required state
     const ECONFIG: u64 = 0;
     /// Tried to add a validator with an invalid state to the validator set
     const EINVALID_PROSPECTIVE_VALIDATOR: u64 = 1;
@@ -61,8 +57,6 @@ module AptosFramework::ValidatorSystem {
     const EMAX_VALIDATORS: u64 = 7;
     /// Validator config update time overflows
     const ECONFIG_UPDATE_TIME_OVERFLOWS: u64 = 8;
-    /// The `ValidatorSetChainMarker` resource was not in the required state
-    const ECHAIN_MARKER: u64 = 9;
 
     /// Number of microseconds in 5 minutes
     const FIVE_MINUTES: u64 = 300000000;
@@ -78,36 +72,34 @@ module AptosFramework::ValidatorSystem {
     ///////////////////////////////////////////////////////////////////////////
 
 
-    /// Publishes the ValidatorSystem struct, which contains the current validator set.
+    /// Publishes the ValidatorSet struct, which contains the current validator set.
     /// Must be invoked by @CoreResources a single time in Genesis.
-    public fun initialize_validator_set<T>(
+    public fun initialize_validator_set(
         account: &signer,
     ) {
         Timestamp::assert_genesis();
         SystemAddresses::assert_core_resource(account);
 
-        assert!(!exists<ValidatorSetChainMarker<T>>(@CoreResources), Errors::already_published(ECHAIN_MARKER));
-        assert!(!exists<ValidatorSystem>(@CoreResources), Errors::already_published(ECONFIG));
-        move_to(account, ValidatorSetChainMarker<T>{});
+        assert!(!exists<ValidatorSet>(@CoreResources), Errors::already_published(ECONFIG));
         move_to(
             account,
-            ValidatorSystem {
+            ValidatorSet {
                 scheme: 0,
                 validators: Vector::empty(),
             },
         );
     }
 
-    /// Copies a ValidatorSystem struct into the ValidatorSystem resource
+    /// Copies a ValidatorSet struct into the ValidatorSet resource
     /// Called by the add, remove, and update functions.
-    fun set_validator_system_config(value: ValidatorSystem) acquires ValidatorSystem {
+    fun set_validator_system_config(value: ValidatorSet) acquires ValidatorSet {
         Timestamp::assert_operating();
         assert!(
-            exists<ValidatorSystem>(@CoreResources),
+            exists<ValidatorSet>(@CoreResources),
             Errors::not_published(ECONFIG)
         );
-        // Updates the ValidatorSystem and emits a reconfigure event.
-        let config_ref = borrow_global_mut<ValidatorSystem>(@CoreResources);
+        // Updates the ValidatorSet and emits a reconfigure event.
+        let config_ref = borrow_global_mut<ValidatorSet>(@CoreResources);
         *config_ref = value;
         Reconfiguration::reconfigure();
     }
@@ -117,12 +109,19 @@ module AptosFramework::ValidatorSystem {
     ///////////////////////////////////////////////////////////////////////////
 
     /// Adds a new validator to the validator set.
-    public fun add_validator<T>(
+    public(script) fun add_validator(
+        account: signer,
         validator_addr: address,
-        _cap: Cap<T>
-    ) acquires ValidatorSystem {
+    ) acquires ValidatorSet {
+        add_validator_internal(&account, validator_addr);
+    }
+
+    public fun add_validator_internal(
+        account: &signer,
+        validator_addr: address,
+    ) acquires ValidatorSet {
         Timestamp::assert_operating();
-        assert_chain_marker_is_published<T>();
+        SystemAddresses::assert_core_resource(account);
 
         // A prospective validator must have a validator config resource
         assert!(
@@ -157,12 +156,22 @@ module AptosFramework::ValidatorSystem {
     }
 
     /// Removes a validator, aborts unless called by root account
-    public fun remove_validator<T>(
+    public(script) fun remove_validator(
+        account: signer,
         validator_addr: address,
-        _cap: Cap<T>
-    ) acquires ValidatorSystem {
+    ) acquires ValidatorSet {
+        remove_validator_internal(
+            &account,
+            validator_addr,
+        );
+    }
+
+    public fun remove_validator_internal(
+        account: &signer,
+        validator_addr: address,
+    ) acquires ValidatorSet {
         Timestamp::assert_operating();
-        assert_chain_marker_is_published<T>();
+        SystemAddresses::assert_core_resource(account);
 
         let validator_system_config = get_validator_system_config();
         // Ensure that this address is an active validator
@@ -177,12 +186,12 @@ module AptosFramework::ValidatorSystem {
 
     /// Copy the information from ValidatorConfig into the validator set.
     /// This function makes no changes to the size or the members of the set.
-    /// If the config in the ValidatorSet changes, it stores the new ValidatorSystem
+    /// If the config in the ValidatorSet changes, it stores the new ValidatorSet
     /// and emits a reconfigurationevent.
     public fun update_config_and_reconfigure(
         validator_operator_account: &signer,
         validator_addr: address,
-    ) acquires ValidatorSystem {
+    ) acquires ValidatorSet {
         Timestamp::assert_operating();
         assert!(
             ValidatorConfig::get_operator(validator_addr) == Signer::address_of(validator_operator_account),
@@ -212,18 +221,18 @@ module AptosFramework::ValidatorSystem {
     // Publicly callable APIs: getters
     ///////////////////////////////////////////////////////////////////////////
 
-    /// Get the ValidatorSystem configuration from Reconfiguration
-    public fun get_validator_system_config(): ValidatorSystem acquires ValidatorSystem {
-        *borrow_global<ValidatorSystem>(@CoreResources)
+    /// Get the ValidatorSet configuration from Reconfiguration
+    public fun get_validator_system_config(): ValidatorSet acquires ValidatorSet {
+        *borrow_global<ValidatorSet>(@CoreResources)
     }
 
     /// Return true if `addr` is in the current validator set
-    public fun is_validator(addr: address): bool acquires ValidatorSystem {
+    public fun is_validator(addr: address): bool acquires ValidatorSet {
         is_validator_(addr, &get_validator_system_config().validators)
     }
 
     /// Returns validator config. Aborts if `addr` is not in the validator set.
-    public fun get_validator_config(addr: address): ValidatorConfig::Config acquires ValidatorSystem {
+    public fun get_validator_config(addr: address): ValidatorConfig::Config acquires ValidatorSet {
         let validator_system_config = get_validator_system_config();
         let validator_index_vec = get_validator_index_(&validator_system_config.validators, addr);
         assert!(Option::is_some(&validator_index_vec), Errors::invalid_argument(ENOT_AN_ACTIVE_VALIDATOR));
@@ -231,12 +240,12 @@ module AptosFramework::ValidatorSystem {
     }
 
     /// Return the size of the current validator set
-    public fun validator_set_size(): u64 acquires ValidatorSystem {
+    public fun validator_set_size(): u64 acquires ValidatorSet {
         Vector::length(&get_validator_system_config().validators)
     }
 
     /// Get the `i`'th validator address in the validator set.
-    public fun get_ith_validator_address(i: u64): address acquires ValidatorSystem{
+    public fun get_ith_validator_address(i: u64): address acquires ValidatorSet{
         assert!(i < validator_set_size(), Errors::invalid_argument(EVALIDATOR_INDEX));
         Vector::borrow(&get_validator_system_config().validators, i).addr
     }
@@ -244,11 +253,6 @@ module AptosFramework::ValidatorSystem {
     ///////////////////////////////////////////////////////////////////////////
     // Private functions
     ///////////////////////////////////////////////////////////////////////////
-
-    fun assert_chain_marker_is_published<T>() {
-        assert!(exists<ValidatorSetChainMarker<T>>(@CoreResources), Errors::not_published(ECHAIN_MARKER));
-    }
-
 
     /// Get the index of the validator by address in the `validators` vector
     /// It has a loop, so there are spec blocks in the code to assert loop invariants.

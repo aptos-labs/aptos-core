@@ -2,10 +2,8 @@
 /// It interacts with the other modules in the following ways:
 ///
 /// * Genesis: to initialize the timestamp
-/// * VASP: to keep track of when credentials expire
 /// * ValidatorSystem, DiemAccount, Reconfiguration: to check if the current state is in the genesis state
 /// * Block: to reach consensus on the global wall clock time
-/// * AccountLimits: to limit the time of account limits
 ///
 /// This module moreover enables code to assert that it is running in genesis (`Self::assert_genesis`) or after
 /// genesis (`Self::assert_operating`). These are essentially distinct states of the system. Specifically,
@@ -16,7 +14,7 @@ module AptosFramework::Timestamp {
     use Std::Signer;
     use Std::Errors;
 
-    friend AptosFramework::CoreGenesis;
+    friend AptosFramework::Genesis;
 
     /// A singleton resource holding the current Unix time in microseconds
     struct CurrentTimeMicroseconds has key {
@@ -35,11 +33,11 @@ module AptosFramework::Timestamp {
 
     /// Marks that time has started and genesis has finished. This can only be called from genesis and with the root
     /// account.
-    public(friend) fun set_time_has_started(dr_account: &signer) {
+    public(friend) fun set_time_has_started(root_account: &signer) {
         assert_genesis();
-        SystemAddresses::assert_core_resource(dr_account);
+        SystemAddresses::assert_core_resource(root_account);
         let timer = CurrentTimeMicroseconds { microseconds: 0 };
-        move_to(dr_account, timer);
+        move_to(root_account, timer);
     }
      spec set_time_has_started {
         /// This function can't be verified on its own and has to be verified in the context of Genesis execution.
@@ -48,7 +46,7 @@ module AptosFramework::Timestamp {
         /// and need to hold.
         pragma delegate_invariants_to_caller;
         include AbortsIfNotGenesis;
-        include SystemAddresses::AbortsIfNotCoreResource{addr: Signer::address_of(dr_account)};
+        include SystemAddresses::AbortsIfNotCoreResource{addr: Signer::address_of(root_account)};
         ensures is_operating();
     }
 
@@ -58,8 +56,8 @@ module AptosFramework::Timestamp {
     //   temporary function will stay here.
     // - this is also needed for framework unit test `TimestampTests`. And once the above issue for af-cli is
     //   resolved, we can mark this function #[test_only]
-    public fun set_time_has_started_for_testing(dr_account: &signer) {
-        set_time_has_started(dr_account);
+    public fun set_time_has_started_for_testing(root_account: &signer) {
+        set_time_has_started(root_account);
     }
     spec set_time_has_started_for_testing {
         pragma verify = false;

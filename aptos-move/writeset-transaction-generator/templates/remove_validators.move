@@ -1,8 +1,8 @@
 script {
-    use DiemFramework::ValidatorSystem;
+    use DiemFramework::ValidatorSet;
     fun main(diem_root: signer) {
         {{#each addresses}}
-        ValidatorSystem::remove_validator(&diem_root, @0x{{this}});
+        ValidatorSet::remove_validator(&diem_root, @0x{{this}});
         {{/each}}
     }
 }
