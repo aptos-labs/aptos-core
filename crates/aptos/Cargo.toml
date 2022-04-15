@@ -20,6 +20,7 @@ serde = "1.0.124"
 serde_json = "1.0.64"
 serde_yaml = "0.8.17"
 thiserror = "1.0.24"
+tempfile = "3.2.0"
 tokio = { version = "1.8.1", features = ["full"] }
 tokio-util = { version = "0.6.4", features = ["compat"] }
 
@@ -36,8 +37,11 @@ aptos-rest-client = { path = "../../crates/aptos-rest-client"}
 aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 bcs = "0.1.2"
-move-cli = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 short-hex-str = { path = "../short-hex-str" }
 cached-framework-packages =  { path = "../../aptos-move/framework/cached-packages" }
+move-binary-format = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
+move-cli = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 move-core-types = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa", features=["address32"] }
+move-package = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
+move-unit-test = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
 move-vm-types = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }

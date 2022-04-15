@@ -52,6 +52,8 @@ pub enum Error {
     UnexpectedError(String),
     #[error("Aborted command")]
     AbortedError,
+    #[error("Move compiliation failed: {0}")]
+    MoveCompiliationError(String),
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -343,4 +345,15 @@ pub struct NodeOptions {
         default_value = "https://fullnode.devnet.aptoslabs.com"
     )]
     pub url: reqwest::Url,
+}
+
+/// Options for a move package dir
+#[derive(Debug, Parser)]
+pub struct MovePackageDir {
+    /// Path to a move package (the folder with a Move.toml file)
+    #[clap(long, parse(from_os_str))]
+    pub package_dir: PathBuf,
+    /// Path to save the compiled move package
+    #[clap(long, parse(from_os_str))]
+    pub output_dir: Option<PathBuf>,
 }
