@@ -6,6 +6,7 @@ use crate::{
     logging::{LogEntry, LogSchema},
     metrics,
     notification_handlers::{CommitNotification, CommittedTransactions, ErrorNotification},
+    utils,
 };
 use aptos_config::config::StateSyncDriverConfig;
 use aptos_logger::prelude::*;
@@ -14,7 +15,6 @@ use aptos_types::{
     state_store::state_value::StateValueChunkWithProof,
     transaction::{
         Transaction, TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        Version,
     },
 };
 use data_streaming_service::data_notification::NotificationId;
@@ -27,7 +27,7 @@ use std::{
         Arc,
     },
 };
-use storage_interface::DbWriter;
+use storage_interface::DbReaderWriter;
 use tokio::runtime::{Handle, Runtime};
 
 /// Synchronizes the storage of the node by verifying and storing new data
@@ -109,8 +109,8 @@ pub struct StorageSynchronizer<ChunkExecutor> {
     // The channel through which to notify the state snapshot receiver of new data chunks
     state_snapshot_notifier: Option<mpsc::Sender<StorageDataChunk>>,
 
-    // The writer to storage (required for account state syncing)
-    storage: Arc<dyn DbWriter>,
+    // The reader and writer for storage (required for account syncing)
+    storage: DbReaderWriter,
 }
 
 // TODO(joshlind): this cannot currently be derived because of limitations around
@@ -137,7 +137,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
         chunk_executor: Arc<ChunkExecutor>,
         commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
         error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
-        storage: Arc<dyn DbWriter>,
+        storage: DbReaderWriter,
         runtime: Option<&Runtime>,
     ) -> Self {
         // Create a channel to notify the executor when data chunks are ready
@@ -170,6 +170,10 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
             pending_transaction_chunks.clone(),
             runtime.clone(),
         );
+
+        // Initialize the metric gauges
+        utils::initialize_sync_version_gauges(storage.reader.clone())
+            .expect("Failed to initialize the metric gauges!");
 
         Self {
             chunk_executor,
@@ -444,7 +448,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
     mut commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
     pending_transaction_chunks: Arc<AtomicU64>,
-    storage: Arc<dyn DbWriter>,
+    storage: DbReaderWriter,
     epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
     target_ledger_info: LedgerInfoWithSignatures,
     target_output_with_proof: TransactionOutputListWithProof,
@@ -463,6 +467,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
 
         // Create the snapshot receiver
         let mut state_snapshot_receiver = storage
+            .writer
             .get_state_snapshot_receiver(version, expected_root_hash)
             .expect("Failed to initialize the state snapshot receiver!");
 
@@ -512,18 +517,19 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                     // notification to the listener.
                                     let finalized_result = if let Err(error) = state_snapshot_receiver.finish_box() {
                                         Err(format!("Failed to finish the account states synchronization! Error: {:?}", error))
-                                    } else if let Err(error) = storage.finalize_state_snapshot(version, target_output_with_proof) {
+                                    } else if let Err(error) = storage.writer.finalize_state_snapshot(version, target_output_with_proof) {
                                         Err(format!("Failed to finalize the state snapshot! Error: {:?}", error))
-                                    } else if let Err(error) = storage.save_ledger_infos(&epoch_change_proofs) {
+                                    } else if let Err(error) = storage.writer.save_ledger_infos(&epoch_change_proofs) {
                                         Err(format!("Failed to save all epoch ending ledger infos! Error: {:?}", error))
-                                    } else if let Err(error) = storage.delete_genesis() {
+                                    } else if let Err(error) = storage.writer.delete_genesis() {
                                         Err(format!("Failed to delete the genesis transaction! Error: {:?}", error))
                                     } else if let Err(error) = chunk_executor.reset() {
                                         Err(format!("Failed to reset the chunk executor after account states synchronization! Error: {:?}", error))
                                     } else if let Err(error) = commit_notification_sender.send(commit_notification).await {
                                        Err(format!("Failed to send the final account commit notification! Error: {:?}", error))
+                                    } else if let Err(error) = utils::initialize_sync_version_gauges(storage.reader) {
+                                       Err(format!("Failed to initialize the state sync version gauges! Error: {:?}", error))
                                     } else {
-                                        initialize_snapshot_version_gauges(version);
                                         Ok(())
                                     };
 
@@ -631,22 +637,4 @@ async fn send_storage_synchronizer_error(
 
     // Update the metrics
     metrics::increment_counter(&metrics::STORAGE_SYNCHRONIZER_ERRORS, error.get_label());
-}
-
-/// Initializes all relevant metric gauges after an account state
-/// snapshot has been restored to the database.
-fn initialize_snapshot_version_gauges(version: Version) {
-    let metrics = [
-        metrics::StorageSynchronizerOperations::AppliedTransactionOutputs,
-        metrics::StorageSynchronizerOperations::ExecutedTransactions,
-        metrics::StorageSynchronizerOperations::SyncedTransactions,
-    ];
-
-    for metric in metrics {
-        metrics::set_gauge(
-            &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-            metric.get_label(),
-            version,
-        );
-    }
 }

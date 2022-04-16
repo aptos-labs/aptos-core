@@ -4,6 +4,7 @@
 use crate::{
     error::Error,
     logging::{LogEntry, LogSchema},
+    metrics,
 };
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -204,4 +205,25 @@ fn fetch_startup_info(storage: Arc<dyn DbReader>) -> Result<StartupInfo, Error> 
         ))
     })?;
     startup_info.ok_or_else(|| Error::StorageError("Missing startup info from storage".into()))
+}
+
+/// Initializes all relevant metric gauges (e.g., after a reboot
+/// or after an account state snapshot has been restored).
+pub fn initialize_sync_version_gauges(storage: Arc<dyn DbReader>) -> Result<(), Error> {
+    let highest_synced_version = fetch_latest_synced_version(storage)?;
+    let metrics = [
+        metrics::StorageSynchronizerOperations::AppliedTransactionOutputs,
+        metrics::StorageSynchronizerOperations::ExecutedTransactions,
+        metrics::StorageSynchronizerOperations::SyncedTransactions,
+    ];
+
+    for metric in metrics {
+        metrics::set_gauge(
+            &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+            metric.get_label(),
+            highest_synced_version,
+        );
+    }
+
+    Ok(())
 }

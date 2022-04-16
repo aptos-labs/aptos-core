@@ -77,7 +77,7 @@ impl DriverFactory {
             chunk_executor,
             commit_notification_sender,
             error_notification_sender,
-            storage.writer,
+            storage.clone(),
             driver_runtime.as_ref(),
         );
 
