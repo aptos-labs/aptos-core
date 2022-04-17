@@ -28,7 +28,10 @@ use std::{
     },
 };
 use storage_interface::DbReaderWriter;
-use tokio::runtime::{Handle, Runtime};
+use tokio::{
+    runtime::{Handle, Runtime},
+    task::yield_now,
+};
 
 /// Synchronizes the storage of the node by verifying and storing new data
 /// (e.g., transactions and outputs).
@@ -158,6 +161,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
             executor_listener,
             committer_notifier,
             pending_transaction_chunks.clone(),
+            max_pending_data_chunks as u64,
             runtime.clone(),
         );
 
@@ -267,7 +271,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizerInterface
     }
 
     fn pending_storage_data(&self) -> bool {
-        self.pending_data_chunks.load(Ordering::Relaxed) > 0
+        load_pending_data_chunks(self.pending_data_chunks.clone()) > 0
     }
 
     fn save_account_states(
@@ -320,6 +324,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
     mut executor_listener: mpsc::Receiver<StorageDataChunk>,
     mut committer_notifier: mpsc::Sender<NotificationId>,
     pending_transaction_chunks: Arc<AtomicU64>,
+    max_pending_data_chunks: u64,
     runtime: Option<Handle>,
 ) {
     // Create an executor
@@ -384,6 +389,12 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
                             decrement_pending_data_chunks(pending_transaction_chunks.clone());
                         }
+                    }
+
+                    // If the executor begins running too far ahead of the committer
+                    // let's force more yields to avoid unnecessary back pressure.
+                    if load_pending_data_chunks(pending_transaction_chunks.clone()) > max_pending_data_chunks / 2 {
+                        yield_now().await;
                     }
                 }
             }
@@ -592,6 +603,11 @@ fn spawn(runtime: Option<Handle>, future: impl Future<Output = ()> + Send + 'sta
     } else {
         tokio::spawn(future);
     }
+}
+
+/// Returns the value currently held by the pending chunk counter
+fn load_pending_data_chunks(pending_data_chunks: Arc<AtomicU64>) -> u64 {
+    pending_data_chunks.load(Ordering::Relaxed)
 }
 
 /// Increments the pending data chunks
