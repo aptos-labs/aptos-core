@@ -74,7 +74,6 @@ mod node;
 mod updater;
 mod utils;
 
-pub mod batches_update;
 #[cfg(test)]
 mod sparse_merkle_test;
 #[cfg(any(test, feature = "bench", feature = "fuzzing"))]
@@ -289,13 +288,6 @@ pub struct SparseMerkleTree<V> {
     inner: Arc<Inner<V>>,
 }
 
-/// A type for tracking intermediate hashes at sparse merkle tree nodes in between batch
-/// updates by transactions. It contains tuple (txn_id, hash_value, single_new_leaf), where
-/// hash_value is the value after all the updates by transaction txn_id (txn_id-th batch)
-/// and single_new_leaf is a bool that's true if the node subtree contains one new leaf.
-/// (this is needed to recursively merge IntermediateHashes).
-type IntermediateHashes = Vec<(usize, HashValue, bool)>;
-
 impl<V> SparseMerkleTree<V>
 where
     V: Clone + CryptoHash + Send + Sync,
@@ -448,8 +440,7 @@ where
     /// times with the `batch_update`. The function will return the root hash after each
     /// update and a Sparse Merkle Tree of the final state.
     ///
-    /// The `serial_update` applies `batch_update' method many times, unlike a more optimized
-    /// (and parallelizable) `batches_update' implementation below. It takes in a reference of
+    /// The `serial_update` applies `batch_update' method many times. It takes in a reference of
     /// value instead of an owned instance to be consistent with the `batches_update' interface.
     pub fn serial_update(
         &self,
@@ -570,8 +561,8 @@ where
     }
 
     /// Constructs a new Sparse Merkle Tree by applying `updates`, which are considered to happen
-    /// all at once. See `serial_update` and `batches_update` which take in multiple batches
-    /// of updates and yields intermediate results.
+    /// all at once. See `serial_update` which take in multiple batches of updates and yields
+    /// intermediate results.
     /// Since the tree is immutable, existing tree remains the same and may share parts with the
     /// new, returned tree.
     pub fn batch_update(
@@ -631,7 +622,7 @@ where
                                     }
                                 } else {
                                     StateStoreStatus::DoesNotExist
-                                }
+                                };
                             } // end NodeInner::Leaf
                         }, // end Some(node) got from mem
                     }

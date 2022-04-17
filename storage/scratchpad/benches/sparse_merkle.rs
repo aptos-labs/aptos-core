@@ -60,37 +60,6 @@ impl Group {
                     BatchSize::LargeInput,
                 )
             });
-            group.bench_function(BenchmarkId::new("batches_update", block_size), |b| {
-                b.iter_batched(
-                    || small_batches.clone(),
-                    // return the resulting smt so the cost of Dropping it is not counted
-                    |small_batches| -> SparseMerkleTree<AccountStateBlob> {
-                        block
-                            .smt
-                            .batches_update(small_batches, &block.proof_reader)
-                            .unwrap()
-                            .1
-                    },
-                    BatchSize::LargeInput,
-                )
-            });
-            group.bench_function(
-                BenchmarkId::new("batches_update__flat_batch", block_size),
-                |b| {
-                    b.iter_batched(
-                        || one_large_batch.clone(),
-                        // return the resulting smt so the cost of Dropping it is not counted
-                        |one_large_batch| -> SparseMerkleTree<AccountStateBlob> {
-                            block
-                                .smt
-                                .batches_update(vec![one_large_batch], &block.proof_reader)
-                                .unwrap()
-                                .1
-                        },
-                        BatchSize::LargeInput,
-                    )
-                },
-            );
             group.bench_function(BenchmarkId::new("batch_update", block_size), |b| {
                 b.iter_batched(
                     || one_large_batch.clone(),
