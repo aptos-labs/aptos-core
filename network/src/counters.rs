@@ -8,9 +8,19 @@ use aptos_metrics::{
     Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
 use aptos_types::PeerId;
+use flate2::{
+    write::{DeflateDecoder, DeflateEncoder, GzDecoder, GzEncoder, ZlibDecoder, ZlibEncoder},
+    Compression,
+};
+use miniz_oxide::{deflate::compress_to_vec, inflate::decompress_to_vec};
 use netcore::transport::ConnectionOrigin;
 use once_cell::sync::Lazy;
 use short_hex_str::AsShortHexStr;
+use snap::{read, write};
+use std::{
+    io::{Read, Write},
+    time::{Duration, Instant},
+};
 
 // some type labels
 pub const REQUEST_LABEL: &str = "request";
@@ -493,8 +503,11 @@ pub static NETWORK_APPLICATION_INBOUND_METRIC: Lazy<HistogramVec> = Lazy::new(||
 pub fn network_application_inbound_traffic(
     network_context: NetworkContext,
     protocol_id: ProtocolId,
+    data: Vec<u8>,
     size: u64,
 ) {
+    analyze_compression(data);
+
     NETWORK_APPLICATION_INBOUND_METRIC
         .with_label_values(&[
             network_context.role().as_str(),
@@ -504,6 +517,202 @@ pub fn network_application_inbound_traffic(
             "size",
         ])
         .observe(size as f64);
+}
+
+/// Compresses and decompresses data using different libraries
+/// to identify operational time and data size reduction.
+fn analyze_compression(data: Vec<u8>) {
+    // This is a cheap and dirty hack for emulating larger data sizes
+    let data_amplifier = 1;
+    let mut amplified_data = data.clone();
+    for _ in 0..data_amplifier - 1 {
+        amplified_data.append(&mut data.clone());
+    }
+    let data = amplified_data;
+
+    let raw_data_length = data.len();
+    println!("RAW DATA LENGTH: {:?}", raw_data_length);
+
+    // Analyze minize oxide
+    for compression_level in 1..10 {
+        let (compress_time, decompress_time, relative_size) =
+            analyze_miniz_oxide_compression(data.clone(), compression_level);
+        println!("{:?} >>>>> Minize oxide level: {:?}, Compress time: {:?}, Decompress time: {:?}, Resulting data size (%): {:?}", raw_data_length, compression_level, compress_time, decompress_time, relative_size);
+    }
+
+    // Analyze zlib
+    for compression_level in 1..9 {
+        let (compress_time, decompress_time, relative_size) =
+            analyze_flate_2_zlib(data.clone(), compression_level);
+        println!(
+            "{:?} >>>>> Flate 2 zlib level: {:?}, Compress time: {:?}, Decompress time: {:?}, Resulting data size (%): {:?}",
+            raw_data_length, compression_level, compress_time, decompress_time, relative_size
+        );
+    }
+
+    // Analyze deflate
+    for compression_level in 1..9 {
+        let (compress_time, decompress_time, relative_size) =
+            analyze_flate_2_deflate(data.clone(), compression_level);
+        println!(
+            "{:?} >>>>> Flate 2 deflate level: {:?}, Compress time: {:?}, Decompress time: {:?}, Resulting data size (%): {:?}",
+            raw_data_length, compression_level, compress_time, decompress_time, relative_size
+        );
+    }
+
+    // Analyze gz
+    for compression_level in 1..9 {
+        let (compress_time, decompress_time, relative_size) =
+            analyze_flate_2_gz(data.clone(), compression_level);
+        println!(
+            "{:?} >>>>> Flate 2 gz level: {:?}, Compress time: {:?}, Decompress time: {:?}, Resulting data size (%) : {:?}",
+            raw_data_length, compression_level, compress_time, decompress_time, relative_size
+        );
+    }
+
+    // Analyze snappy
+    let (compress_time, decompress_time, relative_size) = analyze_snappy(data);
+    println!(
+        "{:?} >>>>> Snappy: Compress time: {:?}, Decompress time: {:?}, Resulting data size (%): {:?}",
+        raw_data_length, compress_time, decompress_time, relative_size
+    );
+}
+
+fn analyze_miniz_oxide_compression(
+    raw_data: Vec<u8>,
+    compression_level: u8,
+) -> (Duration, Duration, f64) {
+    let raw_data_length = raw_data.len();
+
+    // Compress the input
+    let compress_start = Instant::now();
+    let compressed = compress_to_vec(&raw_data, compression_level);
+    let compress_duration = compress_start.elapsed();
+    let compressed_data_length = compressed.len();
+
+    // println!("COMPRESSED DATA LENGTH: {:?}", compressed.len());
+
+    // Decompress the compressed input
+    let decompress_start = Instant::now();
+    let decompressed = decompress_to_vec(compressed.as_slice()).expect("Failed to decompress!");
+    let decompress_duration = decompress_start.elapsed();
+    let relative_size = (compressed_data_length as f64 / raw_data_length as f64) * 100.0;
+
+    // Verify operations
+    assert_eq!(raw_data, decompressed);
+
+    (compress_duration, decompress_duration, relative_size)
+}
+
+fn analyze_flate_2_zlib(raw_data: Vec<u8>, compression_level: u32) -> (Duration, Duration, f64) {
+    let raw_data_length = raw_data.len();
+
+    // Compress the input
+    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::new(compression_level));
+    let compress_start = Instant::now();
+    encoder.write_all(&raw_data).unwrap();
+    let compressed = encoder.finish().unwrap();
+    let compress_duration = compress_start.elapsed();
+    let compressed_data_length = compressed.len();
+
+    // println!("COMPRESSED DATA LENGTH: {:?}", compressed.len());
+
+    // Decompress the compressed input
+    let mut decompressed = Vec::new();
+    let mut decoder = ZlibDecoder::new(decompressed);
+    let decompress_start = Instant::now();
+    decoder.write_all(&compressed).unwrap();
+    decompressed = decoder.finish().unwrap();
+    let decompress_duration = decompress_start.elapsed();
+    let relative_size = (compressed_data_length as f64 / raw_data_length as f64) * 100.0;
+
+    // Verify operations
+    assert_eq!(raw_data, decompressed);
+
+    (compress_duration, decompress_duration, relative_size)
+}
+
+fn analyze_flate_2_deflate(raw_data: Vec<u8>, compression_level: u32) -> (Duration, Duration, f64) {
+    let raw_data_length = raw_data.len();
+
+    // Compress the input
+    let mut encoder = DeflateEncoder::new(Vec::new(), Compression::new(compression_level));
+    let compress_start = Instant::now();
+    encoder.write_all(&raw_data).unwrap();
+    let compressed = encoder.finish().unwrap();
+    let compress_duration = compress_start.elapsed();
+    let compressed_data_length = compressed.len();
+
+    // println!("COMPRESSED DATA LENGTH: {:?}", compressed.len());
+
+    // Decompress the compressed input
+    let mut decompressed = Vec::new();
+    let mut decoder = DeflateDecoder::new(decompressed);
+    let decompress_start = Instant::now();
+    decoder.write_all(&compressed).unwrap();
+    decompressed = decoder.finish().unwrap();
+    let decompress_duration = decompress_start.elapsed();
+    let relative_size = (compressed_data_length as f64 / raw_data_length as f64) * 100.0;
+
+    // Verify operations
+    assert_eq!(raw_data, decompressed);
+
+    (compress_duration, decompress_duration, relative_size)
+}
+
+fn analyze_flate_2_gz(raw_data: Vec<u8>, compression_level: u32) -> (Duration, Duration, f64) {
+    let raw_data_length = raw_data.len();
+
+    // Compress the input
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::new(compression_level));
+    let compress_start = Instant::now();
+    encoder.write_all(&raw_data).unwrap();
+    let compressed = encoder.finish().unwrap();
+    let compress_duration = compress_start.elapsed();
+    let compressed_data_length = compressed.len();
+
+    // println!("COMPRESSED DATA LENGTH: {:?}", compressed.len());
+
+    // Decompress the compressed input
+    let mut decompressed = Vec::new();
+    let mut decoder = GzDecoder::new(decompressed);
+    let decompress_start = Instant::now();
+    decoder.write_all(&compressed).unwrap();
+    decompressed = decoder.finish().unwrap();
+    let decompress_duration = decompress_start.elapsed();
+    let relative_size = (compressed_data_length as f64 / raw_data_length as f64) * 100.0;
+
+    // Verify operations
+    assert_eq!(raw_data, decompressed);
+
+    (compress_duration, decompress_duration, relative_size)
+}
+
+fn analyze_snappy(raw_data: Vec<u8>) -> (Duration, Duration, f64) {
+    let raw_data_length = raw_data.len();
+
+    // Compress the input
+    let mut encoder = write::FrameEncoder::new(vec![]);
+    let compress_start = Instant::now();
+    encoder.write_all(&raw_data).unwrap();
+    let compressed = encoder.into_inner().unwrap();
+    let compress_duration = compress_start.elapsed();
+    let compressed_data_length = compressed.len();
+
+    // println!("COMPRESSED DATA LENGTH: {:?}", compressed.len());
+
+    // Decompress the compressed input
+    let mut decompressed = vec![];
+    let mut decoder = read::FrameDecoder::new(compressed.as_slice());
+    let decompress_start = Instant::now();
+    decoder.read_to_end(&mut decompressed).unwrap();
+    let decompress_duration = decompress_start.elapsed();
+    let relative_size = (compressed_data_length as f64 / raw_data_length as f64) * 100.0;
+
+    // Verify operations
+    assert_eq!(raw_data, decompressed);
+
+    (compress_duration, decompress_duration, relative_size)
 }
 
 pub static NETWORK_APPLICATION_OUTBOUND_METRIC: Lazy<HistogramVec> = Lazy::new(|| {

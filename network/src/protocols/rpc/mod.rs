@@ -235,7 +235,12 @@ impl InboundRpcs {
         // Collect counters for received request.
         counters::rpc_messages(network_context, REQUEST_LABEL, RECEIVED_LABEL).inc();
         counters::rpc_bytes(network_context, REQUEST_LABEL, RECEIVED_LABEL).inc_by(req_len);
-        network_application_inbound_traffic(self.network_context, protocol_id, req_len);
+        network_application_inbound_traffic(
+            self.network_context,
+            protocol_id,
+            request.raw_request.clone(),
+            req_len,
+        );
         let timer =
             counters::inbound_rpc_handler_latency(network_context, protocol_id).start_timer();
 
@@ -591,6 +596,7 @@ impl OutboundRpcs {
             network_application_inbound_traffic(
                 self.network_context,
                 protocol_id,
+                response.raw_response.clone(),
                 response.raw_response.len() as u64,
             );
             response_tx.send(response).is_err()

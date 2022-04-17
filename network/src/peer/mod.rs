@@ -495,7 +495,12 @@ where
         let data_len = data.len() as u64;
         counters::direct_send_messages(&self.network_context, RECEIVED_LABEL).inc();
         counters::direct_send_bytes(&self.network_context, RECEIVED_LABEL).inc_by(data_len);
-        network_application_inbound_traffic(self.network_context, message.protocol_id, data_len);
+        network_application_inbound_traffic(
+            self.network_context,
+            message.protocol_id,
+            data.clone(),
+            data_len,
+        );
 
         let notif = PeerNotification::RecvMessage(Message {
             protocol_id,
