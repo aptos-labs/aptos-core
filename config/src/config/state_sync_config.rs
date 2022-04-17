@@ -90,7 +90,7 @@ pub struct StateSyncDriverConfig {
 impl Default for StateSyncDriverConfig {
     fn default() -> Self {
         Self {
-            bootstrapping_mode: BootstrappingMode::DownloadLatestAccountStates,
+            bootstrapping_mode: BootstrappingMode::ApplyTransactionOutputsFromGenesis,
             enable_state_sync_v2: false,
             continuous_syncing_mode: ContinuousSyncingMode::ApplyTransactionOutputs,
             progress_check_interval_ms: 100,
@@ -157,9 +157,9 @@ impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
             global_summary_refresh_interval_ms: 300,
-            max_concurrent_requests: 3,
+            max_concurrent_requests: 1,
             max_data_stream_channel_sizes: 1000,
-            max_request_retry: 5,
+            max_request_retry: 3,
             max_notification_id_mappings: 2000,
             progress_check_interval_ms: 100,
         }
