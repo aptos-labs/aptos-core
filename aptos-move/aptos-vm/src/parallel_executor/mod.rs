@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-mod read_write_set_analyzer;
 mod storage_wrapper;
 mod vm_wrapper;
 
