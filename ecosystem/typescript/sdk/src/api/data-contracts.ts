@@ -526,6 +526,7 @@ export interface OnChainTransactionInfo {
    * Different with `Address` type, hex-encoded bytes should not trim any zeros.
    */
   accumulator_root_hash: HexEncodedBytes;
+  changes: WriteSetChange[];
 }
 
 export type UserTransaction = { type: string; events: Event[]; timestamp: TimestampUsec } & UserTransactionRequest &
@@ -626,6 +627,14 @@ export interface DeleteModule {
   type: string;
 
   /**
+   * All bytes data are represented as hex-encoded string prefixed with `0x` and fulfilled with
+   * two hex digits per byte.
+   *
+   * Different with `Address` type, hex-encoded bytes should not trim any zeros.
+   */
+  state_key_hash: HexEncodedBytes;
+
+  /**
    * Hex-encoded 16 bytes Aptos account address.
    *
    * Prefixed with `0x` and leading zeros are trimmed.
@@ -651,6 +660,14 @@ export interface DeleteModule {
 export interface DeleteResource {
   /** @example delete_resource */
   type: string;
+
+  /**
+   * All bytes data are represented as hex-encoded string prefixed with `0x` and fulfilled with
+   * two hex digits per byte.
+   *
+   * Different with `Address` type, hex-encoded bytes should not trim any zeros.
+   */
+  state_key_hash: HexEncodedBytes;
 
   /**
    * Hex-encoded 16 bytes Aptos account address.
@@ -686,6 +703,14 @@ export interface WriteModule {
   type: string;
 
   /**
+   * All bytes data are represented as hex-encoded string prefixed with `0x` and fulfilled with
+   * two hex digits per byte.
+   *
+   * Different with `Address` type, hex-encoded bytes should not trim any zeros.
+   */
+  state_key_hash: HexEncodedBytes;
+
+  /**
    * Hex-encoded 16 bytes Aptos account address.
    *
    * Prefixed with `0x` and leading zeros are trimmed.
@@ -701,6 +726,14 @@ export interface WriteModule {
 export interface WriteResource {
   /** @example write_resource */
   type: string;
+
+  /**
+   * All bytes data are represented as hex-encoded string prefixed with `0x` and fulfilled with
+   * two hex digits per byte.
+   *
+   * Different with `Address` type, hex-encoded bytes should not trim any zeros.
+   */
+  state_key_hash: HexEncodedBytes;
 
   /**
    * Hex-encoded 16 bytes Aptos account address.

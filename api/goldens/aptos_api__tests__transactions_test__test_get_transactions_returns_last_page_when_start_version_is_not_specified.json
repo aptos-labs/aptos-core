@@ -9,6 +9,42 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0xcdc2362e98b33d5a4cb61fcdffd8835ef21c323534b5e55605c443bd507c6a98",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
+        "data": {
+          "type": "0x1::Block::BlockMetadata",
+          "data": {
+            "height": "8",
+            "new_block_events": {
+              "counter": "8",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xa550c18",
+                    "creation_num": "5"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0xf113db06626eb7724773e4e9dacecc8a6cb3a710b8b70365768168b24fe06ce3",
+        "data": {
+          "type": "0x1::Timestamp::CurrentTimeMicroseconds",
+          "data": {
+            "microseconds": "8"
+          }
+        }
+      }
+    ],
     "id": "0x4a876b463d1297603568c40e814d9d5396d23087a0fd641e91e0e00df6c012cd",
     "round": "1",
     "previous_block_votes": [],
@@ -25,6 +61,117 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0x0d92f03efcf42e11059371b5347e6cd685ac599020252edc42d5aeee775af437",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x04a62513032e695c923632ca1b9248d11e49c9b1e83bba39974adf50bbabdd8f",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
+            "self_address": "0xa550c18",
+            "sequence_number": "8"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "18446744073709551615"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x79a08e0b94ebb66c0dae37a07c182d46387c347aeb83c07de6109b0503c3a24e",
+        "data": {
+          "type": "0x1::TestCoin::CoinInfo",
+          "data": {
+            "scaling_factor": "1000000",
+            "total_value": "18446744073709551615"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
+        "state_key_hash": "0x4c6bc7079c3fcd3d95f57b020cbbd5567bace022073a4a7e3c9aa7f929ebe65b",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
+            "self_address": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
+            "sequence_number": "0"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
+        "state_key_hash": "0xe736d87c24205efd01161184c302ddb8c26f5113a6b1d1c8b889b437882feae2",
+        "data": {
+          "type": "0x1::GUID::Generator",
+          "data": {
+            "counter": "2"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
+        "state_key_hash": "0xd4aef363298742ed031fd1d9eac686dc9dd61519ad7381f9cedbc574f5939a61",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "0"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
+        "state_key_hash": "0x147a9d87dc6f57acbb88460c29468fc6b49705f500cdda5e826adfbef50eaf2b",
+        "data": {
+          "type": "0x1::TestCoin::TransferEvents",
+          "data": {
+            "received_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
+                    "creation_num": "1"
+                  }
+                },
+                "len_bytes": 40
+              }
+            },
+            "sent_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
+                    "creation_num": "0"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      }
+    ],
     "sender": "0xa550c18",
     "sequence_number": "7",
     "max_gas_amount": "2000",
@@ -57,6 +204,42 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0x8898a3b3e5a8a11fe15a94f7ef029b33b97ef10cabac325bd32b4f02d7ad2ee7",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
+        "data": {
+          "type": "0x1::Block::BlockMetadata",
+          "data": {
+            "height": "9",
+            "new_block_events": {
+              "counter": "9",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xa550c18",
+                    "creation_num": "5"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0xf113db06626eb7724773e4e9dacecc8a6cb3a710b8b70365768168b24fe06ce3",
+        "data": {
+          "type": "0x1::Timestamp::CurrentTimeMicroseconds",
+          "data": {
+            "microseconds": "9"
+          }
+        }
+      }
+    ],
     "id": "0x464b5ca6488b897c005b2e17f00fc0bc8e7ed3f2ab59d607b0e3586bda1cda4e",
     "round": "1",
     "previous_block_votes": [],
@@ -73,6 +256,117 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0x66230a43232a481b2ff56cac3290ff376493e47b692937d22218fe8fc8b68464",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x04a62513032e695c923632ca1b9248d11e49c9b1e83bba39974adf50bbabdd8f",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
+            "self_address": "0xa550c18",
+            "sequence_number": "9"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "18446744073709551615"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x79a08e0b94ebb66c0dae37a07c182d46387c347aeb83c07de6109b0503c3a24e",
+        "data": {
+          "type": "0x1::TestCoin::CoinInfo",
+          "data": {
+            "scaling_factor": "1000000",
+            "total_value": "18446744073709551615"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x59c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
+        "state_key_hash": "0xd94b5304b1deb5ce3639e7e2cfa8c0291343ed5324abf507ab8979a4bcbb959e",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x059c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
+            "self_address": "0x59c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
+            "sequence_number": "0"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x59c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
+        "state_key_hash": "0x187fd05af857e605af2df0b18cd6f2b9726baf9a531bd1d1aa4c11d3b9e96d61",
+        "data": {
+          "type": "0x1::GUID::Generator",
+          "data": {
+            "counter": "2"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x59c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
+        "state_key_hash": "0xac1ca2bce83e8a5be3af45e0eb22a75bcaf79c272778910f9241bcf778415ff3",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "0"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x59c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
+        "state_key_hash": "0xb8ea4877d3a15d539974d5473078f32eaa65f9eddff84f526585070fdf22361f",
+        "data": {
+          "type": "0x1::TestCoin::TransferEvents",
+          "data": {
+            "received_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0x59c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
+                    "creation_num": "1"
+                  }
+                },
+                "len_bytes": 40
+              }
+            },
+            "sent_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0x59c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
+                    "creation_num": "0"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      }
+    ],
     "sender": "0xa550c18",
     "sequence_number": "8",
     "max_gas_amount": "2000",
@@ -105,6 +399,42 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0xc36f7650cc99dc69dc15e860d80d681c4a590065c2851337c6f029bb9beee613",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
+        "data": {
+          "type": "0x1::Block::BlockMetadata",
+          "data": {
+            "height": "10",
+            "new_block_events": {
+              "counter": "10",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xa550c18",
+                    "creation_num": "5"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0xf113db06626eb7724773e4e9dacecc8a6cb3a710b8b70365768168b24fe06ce3",
+        "data": {
+          "type": "0x1::Timestamp::CurrentTimeMicroseconds",
+          "data": {
+            "microseconds": "10"
+          }
+        }
+      }
+    ],
     "id": "0x19d258b113d8e3e12bca2aa612b304ece5b25988818dd7234e049913233eb918",
     "round": "1",
     "previous_block_votes": [],
@@ -121,6 +451,117 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0xbb6fcc3558ad2353c6fc8679d2e5a8aa1f052c6e4aadcc5e1b08c54d1d2bdaaa",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x04a62513032e695c923632ca1b9248d11e49c9b1e83bba39974adf50bbabdd8f",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
+            "self_address": "0xa550c18",
+            "sequence_number": "10"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "18446744073709551615"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x79a08e0b94ebb66c0dae37a07c182d46387c347aeb83c07de6109b0503c3a24e",
+        "data": {
+          "type": "0x1::TestCoin::CoinInfo",
+          "data": {
+            "scaling_factor": "1000000",
+            "total_value": "18446744073709551615"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
+        "state_key_hash": "0x0b880195fb71d40b488a550b52d17de2dd129d5f30f34855ca8b428239909fac",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
+            "self_address": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
+            "sequence_number": "0"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
+        "state_key_hash": "0x06334530a7c0cbb971583c12b2ad6fdb52c8c38cfaeea9a8d522efdbecaf942b",
+        "data": {
+          "type": "0x1::GUID::Generator",
+          "data": {
+            "counter": "2"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
+        "state_key_hash": "0x2131acd287391c8b5b57eba83c3c22d9539623fd33835cbc439dc6daa6c349ec",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "0"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
+        "state_key_hash": "0x316023da5e04ebecd7ec034437eac83eb78be7b499303274f582548c928d69ea",
+        "data": {
+          "type": "0x1::TestCoin::TransferEvents",
+          "data": {
+            "received_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
+                    "creation_num": "1"
+                  }
+                },
+                "len_bytes": 40
+              }
+            },
+            "sent_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
+                    "creation_num": "0"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      }
+    ],
     "sender": "0xa550c18",
     "sequence_number": "9",
     "max_gas_amount": "2000",
@@ -153,6 +594,42 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0x4bba3a73c7ca72403b75e45ed57785d24832ce90e27357a8b8c196e25851f8fc",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
+        "data": {
+          "type": "0x1::Block::BlockMetadata",
+          "data": {
+            "height": "11",
+            "new_block_events": {
+              "counter": "11",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xa550c18",
+                    "creation_num": "5"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0xf113db06626eb7724773e4e9dacecc8a6cb3a710b8b70365768168b24fe06ce3",
+        "data": {
+          "type": "0x1::Timestamp::CurrentTimeMicroseconds",
+          "data": {
+            "microseconds": "11"
+          }
+        }
+      }
+    ],
     "id": "0xb99003d30a245ac74a02e26e45cb80ee1b9c00a93345ce5f12bea9ffe04748d6",
     "round": "1",
     "previous_block_votes": [],
@@ -169,6 +646,117 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0x55f5fd9f775a861e52476b17f09384deca212777221d84e77c653de5e5e75dff",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x04a62513032e695c923632ca1b9248d11e49c9b1e83bba39974adf50bbabdd8f",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
+            "self_address": "0xa550c18",
+            "sequence_number": "11"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "18446744073709551615"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x79a08e0b94ebb66c0dae37a07c182d46387c347aeb83c07de6109b0503c3a24e",
+        "data": {
+          "type": "0x1::TestCoin::CoinInfo",
+          "data": {
+            "scaling_factor": "1000000",
+            "total_value": "18446744073709551615"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
+        "state_key_hash": "0xa5c1c65631f4efeb904f7b0efea19b978a2c52924378c71777ead38e15fc7b03",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
+            "self_address": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
+            "sequence_number": "0"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
+        "state_key_hash": "0x764a717688baeecf53d40ed0ba3279cea14d0f8951a1d9c1507a319a80b1ac62",
+        "data": {
+          "type": "0x1::GUID::Generator",
+          "data": {
+            "counter": "2"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
+        "state_key_hash": "0x2e288c3d05b00045585128368b18d7619a65b275312aee7e4ad767f26bb6a6f1",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "0"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
+        "state_key_hash": "0x2a5e591719799823be3bb152f3033dd6c38a1a044641b24b569623c98bafabb6",
+        "data": {
+          "type": "0x1::TestCoin::TransferEvents",
+          "data": {
+            "received_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
+                    "creation_num": "1"
+                  }
+                },
+                "len_bytes": 40
+              }
+            },
+            "sent_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
+                    "creation_num": "0"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      }
+    ],
     "sender": "0xa550c18",
     "sequence_number": "10",
     "max_gas_amount": "2000",
@@ -201,6 +789,42 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0xa2dd7ab0b516370d2b6b31b0cdcb321de16ba7bd744d9e3c08a554604d7a5024",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
+        "data": {
+          "type": "0x1::Block::BlockMetadata",
+          "data": {
+            "height": "12",
+            "new_block_events": {
+              "counter": "12",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xa550c18",
+                    "creation_num": "5"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0xf113db06626eb7724773e4e9dacecc8a6cb3a710b8b70365768168b24fe06ce3",
+        "data": {
+          "type": "0x1::Timestamp::CurrentTimeMicroseconds",
+          "data": {
+            "microseconds": "12"
+          }
+        }
+      }
+    ],
     "id": "0xea95b8f9082c10620c0d6e3fc9596b4538d0dc24bec371bb3e4634561f8892e6",
     "round": "1",
     "previous_block_votes": [],
@@ -217,6 +841,117 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0x1277a6d3229408441951abed8949a2004ef11659dd2f060697bad92333485e33",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x04a62513032e695c923632ca1b9248d11e49c9b1e83bba39974adf50bbabdd8f",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
+            "self_address": "0xa550c18",
+            "sequence_number": "12"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "18446744073709551615"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x79a08e0b94ebb66c0dae37a07c182d46387c347aeb83c07de6109b0503c3a24e",
+        "data": {
+          "type": "0x1::TestCoin::CoinInfo",
+          "data": {
+            "scaling_factor": "1000000",
+            "total_value": "18446744073709551615"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
+        "state_key_hash": "0xd5d96a542a0cf17d7352e49e09163007b8747453f0b64147a5b58426ddec9e61",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
+            "self_address": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
+            "sequence_number": "0"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
+        "state_key_hash": "0x68848c0224e2be75854b8a5f75c7ec0cb2941d61b22a9e8e4a946717a435be60",
+        "data": {
+          "type": "0x1::GUID::Generator",
+          "data": {
+            "counter": "2"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
+        "state_key_hash": "0x61edbd7b8d9472fba6aca1bbe56a8596b46f5424d3228573ab952a7e40b477dc",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "0"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
+        "state_key_hash": "0xaf80147f6422bad3603f1d4a77e37db1740bef9215166da55e2ef208495b5ad0",
+        "data": {
+          "type": "0x1::TestCoin::TransferEvents",
+          "data": {
+            "received_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
+                    "creation_num": "1"
+                  }
+                },
+                "len_bytes": 40
+              }
+            },
+            "sent_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
+                    "creation_num": "0"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      }
+    ],
     "sender": "0xa550c18",
     "sequence_number": "11",
     "max_gas_amount": "2000",
@@ -249,6 +984,42 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0x1a6b9fd914f8c372e7691f3d4928119ce0441e1ac0771d4d1fb4ce58fa2a0d39",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
+        "data": {
+          "type": "0x1::Block::BlockMetadata",
+          "data": {
+            "height": "13",
+            "new_block_events": {
+              "counter": "13",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xa550c18",
+                    "creation_num": "5"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0xf113db06626eb7724773e4e9dacecc8a6cb3a710b8b70365768168b24fe06ce3",
+        "data": {
+          "type": "0x1::Timestamp::CurrentTimeMicroseconds",
+          "data": {
+            "microseconds": "13"
+          }
+        }
+      }
+    ],
     "id": "0xa229ec3dd885442b44972526c4e8ce25a0416c3955d818bb1ab0e832877d6282",
     "round": "1",
     "previous_block_votes": [],
@@ -265,6 +1036,117 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0x804c4bc5532dacd39a7162423389eb302a791435df97a2030bbc26549e972208",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x04a62513032e695c923632ca1b9248d11e49c9b1e83bba39974adf50bbabdd8f",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
+            "self_address": "0xa550c18",
+            "sequence_number": "13"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "18446744073709551615"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x79a08e0b94ebb66c0dae37a07c182d46387c347aeb83c07de6109b0503c3a24e",
+        "data": {
+          "type": "0x1::TestCoin::CoinInfo",
+          "data": {
+            "scaling_factor": "1000000",
+            "total_value": "18446744073709551615"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
+        "state_key_hash": "0xd9ab3694152a58d553d0d5637b47e9b23d0d958a680176a7a2ecdd85331f4af4",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x0811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
+            "self_address": "0x811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
+            "sequence_number": "0"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
+        "state_key_hash": "0x7bf634e0094c63625d5bdacc800052aafa345f0d5d184b056210d7d8336f618f",
+        "data": {
+          "type": "0x1::GUID::Generator",
+          "data": {
+            "counter": "2"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
+        "state_key_hash": "0x5d623fecd4de200f72972d59f569cdd18016978934984af1929243431d926922",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "0"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
+        "state_key_hash": "0x70aad05c2708467f63fb8be86d74bdc0541e234ae14dc47752fac7aaab09765f",
+        "data": {
+          "type": "0x1::TestCoin::TransferEvents",
+          "data": {
+            "received_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0x811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
+                    "creation_num": "1"
+                  }
+                },
+                "len_bytes": 40
+              }
+            },
+            "sent_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0x811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
+                    "creation_num": "0"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      }
+    ],
     "sender": "0xa550c18",
     "sequence_number": "12",
     "max_gas_amount": "2000",
@@ -297,6 +1179,42 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0xd2c246c6946f9a34f6d6a60d9c991cfa226b036cad8d65c3ba59b0d02eec56bb",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
+        "data": {
+          "type": "0x1::Block::BlockMetadata",
+          "data": {
+            "height": "14",
+            "new_block_events": {
+              "counter": "14",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xa550c18",
+                    "creation_num": "5"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0xf113db06626eb7724773e4e9dacecc8a6cb3a710b8b70365768168b24fe06ce3",
+        "data": {
+          "type": "0x1::Timestamp::CurrentTimeMicroseconds",
+          "data": {
+            "microseconds": "14"
+          }
+        }
+      }
+    ],
     "id": "0x80ec4f332f4d1a6742c537f2bb32473b01b1dcb1caac942722a4787bb185e479",
     "round": "1",
     "previous_block_votes": [],
@@ -313,6 +1231,117 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0xe18ac9cee3e8d7e00f4f3477251505d992eae571dbfb524338c5d04e4faab88e",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x04a62513032e695c923632ca1b9248d11e49c9b1e83bba39974adf50bbabdd8f",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
+            "self_address": "0xa550c18",
+            "sequence_number": "14"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "18446744073709551615"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x79a08e0b94ebb66c0dae37a07c182d46387c347aeb83c07de6109b0503c3a24e",
+        "data": {
+          "type": "0x1::TestCoin::CoinInfo",
+          "data": {
+            "scaling_factor": "1000000",
+            "total_value": "18446744073709551615"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
+        "state_key_hash": "0x61414a3b1ca6a2d6e51e76714fbac40c31c015c8249de83f6dad286a2a04de8a",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
+            "self_address": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
+            "sequence_number": "0"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
+        "state_key_hash": "0x88610d45620bbe0f1ab52382c7ceb3b4b73624cda9af8b76a19cd6259ae4cbc8",
+        "data": {
+          "type": "0x1::GUID::Generator",
+          "data": {
+            "counter": "2"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
+        "state_key_hash": "0xa7fe3341cb8ca11f4c583022ac3a42f59194744b922c3323fead4f80cb70c2ba",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "0"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
+        "state_key_hash": "0x9be88cb4b760d26470fc19921ad50711193f57a11cb04285dfea183d27652e83",
+        "data": {
+          "type": "0x1::TestCoin::TransferEvents",
+          "data": {
+            "received_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
+                    "creation_num": "1"
+                  }
+                },
+                "len_bytes": 40
+              }
+            },
+            "sent_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
+                    "creation_num": "0"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      }
+    ],
     "sender": "0xa550c18",
     "sequence_number": "13",
     "max_gas_amount": "2000",
@@ -345,6 +1374,42 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0x635104c5a03015f1636f986e5d164f252513cb0d9ee82fe23d3ecffdfbcf1f57",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
+        "data": {
+          "type": "0x1::Block::BlockMetadata",
+          "data": {
+            "height": "15",
+            "new_block_events": {
+              "counter": "15",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xa550c18",
+                    "creation_num": "5"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0xf113db06626eb7724773e4e9dacecc8a6cb3a710b8b70365768168b24fe06ce3",
+        "data": {
+          "type": "0x1::Timestamp::CurrentTimeMicroseconds",
+          "data": {
+            "microseconds": "15"
+          }
+        }
+      }
+    ],
     "id": "0x842f736ab973e87f53b4857842789a1dd59167629b3c5cabe47dbf48827ec081",
     "round": "1",
     "previous_block_votes": [],
@@ -361,6 +1426,117 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0x3b0c619707b48f46346bcaf3a59b3d460aa6109752d5d7ef9e980b33da6f22da",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x04a62513032e695c923632ca1b9248d11e49c9b1e83bba39974adf50bbabdd8f",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
+            "self_address": "0xa550c18",
+            "sequence_number": "15"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "18446744073709551615"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x79a08e0b94ebb66c0dae37a07c182d46387c347aeb83c07de6109b0503c3a24e",
+        "data": {
+          "type": "0x1::TestCoin::CoinInfo",
+          "data": {
+            "scaling_factor": "1000000",
+            "total_value": "18446744073709551615"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
+        "state_key_hash": "0x45aea3b168f3577a08e719429c5a7fdcc4551f2a460610ff1a33711cb36da87e",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
+            "self_address": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
+            "sequence_number": "0"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
+        "state_key_hash": "0xa1a90426d80a7f12bdda5255e87c9862e29c60ecf8b0355b4e8a79fdd507ebd7",
+        "data": {
+          "type": "0x1::GUID::Generator",
+          "data": {
+            "counter": "2"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
+        "state_key_hash": "0x32423c797d019e8ace8c33d9dcf7f3e83c77692d756f7dba454d14a74dec91b8",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "0"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
+        "state_key_hash": "0xb2ae44fa9e703fb9dab2e8bddcb2d90bf9d7fdc4217ce02221c3d0632936b9c0",
+        "data": {
+          "type": "0x1::TestCoin::TransferEvents",
+          "data": {
+            "received_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
+                    "creation_num": "1"
+                  }
+                },
+                "len_bytes": 40
+              }
+            },
+            "sent_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
+                    "creation_num": "0"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      }
+    ],
     "sender": "0xa550c18",
     "sequence_number": "14",
     "max_gas_amount": "2000",
@@ -393,6 +1569,42 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0x89fe729368fd5a553780b338ba46a3c17c6cb04a2378ba082f2c3a214989383c",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
+        "data": {
+          "type": "0x1::Block::BlockMetadata",
+          "data": {
+            "height": "16",
+            "new_block_events": {
+              "counter": "16",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xa550c18",
+                    "creation_num": "5"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0xf113db06626eb7724773e4e9dacecc8a6cb3a710b8b70365768168b24fe06ce3",
+        "data": {
+          "type": "0x1::Timestamp::CurrentTimeMicroseconds",
+          "data": {
+            "microseconds": "16"
+          }
+        }
+      }
+    ],
     "id": "0x3beda43d6e9f9b1b1bc44cdfce3574e7f7f0b2de2323a06ebc356bad614726b3",
     "round": "1",
     "previous_block_votes": [],
@@ -409,6 +1621,117 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0x0a961e84d8070b366e223ed8ba296ea9e14f1fcad871c9f85537bc5f1dece4a1",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x04a62513032e695c923632ca1b9248d11e49c9b1e83bba39974adf50bbabdd8f",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
+            "self_address": "0xa550c18",
+            "sequence_number": "16"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "18446744073709551615"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x79a08e0b94ebb66c0dae37a07c182d46387c347aeb83c07de6109b0503c3a24e",
+        "data": {
+          "type": "0x1::TestCoin::CoinInfo",
+          "data": {
+            "scaling_factor": "1000000",
+            "total_value": "18446744073709551615"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
+        "state_key_hash": "0x3819e0e8a8023180f83e13e502ee13d9b6dc4d92ed033b8636da002212a738fe",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
+            "self_address": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
+            "sequence_number": "0"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
+        "state_key_hash": "0xb4e72aa2f6c0b0f09a05ee41f8d72c11d6a8171a96f21d620d92f32f2b3b9faf",
+        "data": {
+          "type": "0x1::GUID::Generator",
+          "data": {
+            "counter": "2"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
+        "state_key_hash": "0x23bd1e4e6ba3f68605ca6eb959cb560f6ea2736a771d92e522e4bb2af639651c",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "0"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
+        "state_key_hash": "0xa990e18349ef4a927f462c4777c3eefb44911116b81e4c0b9e2d5139e05a824c",
+        "data": {
+          "type": "0x1::TestCoin::TransferEvents",
+          "data": {
+            "received_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
+                    "creation_num": "1"
+                  }
+                },
+                "len_bytes": 40
+              }
+            },
+            "sent_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
+                    "creation_num": "0"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      }
+    ],
     "sender": "0xa550c18",
     "sequence_number": "15",
     "max_gas_amount": "2000",
@@ -441,6 +1764,42 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0xe9f990cfe150678d97e4ecf14d4a0dd8cd5d592d1fb45774697025eb7bb007b3",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
+        "data": {
+          "type": "0x1::Block::BlockMetadata",
+          "data": {
+            "height": "17",
+            "new_block_events": {
+              "counter": "17",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xa550c18",
+                    "creation_num": "5"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0xf113db06626eb7724773e4e9dacecc8a6cb3a710b8b70365768168b24fe06ce3",
+        "data": {
+          "type": "0x1::Timestamp::CurrentTimeMicroseconds",
+          "data": {
+            "microseconds": "17"
+          }
+        }
+      }
+    ],
     "id": "0x755687120a7c6df2389c373c8fbe06bda7a61120652668dd5687fee73fac7a2c",
     "round": "1",
     "previous_block_votes": [],
@@ -457,6 +1816,117 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0xf7d811f2df2a6c28b925cff2d873fdd17053c6163ffee76192f2d861a2a1bd77",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x04a62513032e695c923632ca1b9248d11e49c9b1e83bba39974adf50bbabdd8f",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
+            "self_address": "0xa550c18",
+            "sequence_number": "17"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "18446744073709551615"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x79a08e0b94ebb66c0dae37a07c182d46387c347aeb83c07de6109b0503c3a24e",
+        "data": {
+          "type": "0x1::TestCoin::CoinInfo",
+          "data": {
+            "scaling_factor": "1000000",
+            "total_value": "18446744073709551615"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
+        "state_key_hash": "0xc6a9f922ee3f04606940a0747a8949779b2bdcdb87c2a7b289414bfe7fe19d6f",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
+            "self_address": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
+            "sequence_number": "0"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
+        "state_key_hash": "0x1468bec76352b89911522a46dfaf4e3c3ddb5ed723e1bc6a4735d4f485ba5a6b",
+        "data": {
+          "type": "0x1::GUID::Generator",
+          "data": {
+            "counter": "2"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
+        "state_key_hash": "0x1c36af51ff2cdeb39f0e7c7bc745c7cf2ac09bbb37d928be4c656643a5ad0df9",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "0"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
+        "state_key_hash": "0x9aa92243c259ba084b042d14fb25f4125da7a080ed1e157d4c0714815923c1e3",
+        "data": {
+          "type": "0x1::TestCoin::TransferEvents",
+          "data": {
+            "received_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
+                    "creation_num": "1"
+                  }
+                },
+                "len_bytes": 40
+              }
+            },
+            "sent_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
+                    "creation_num": "0"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      }
+    ],
     "sender": "0xa550c18",
     "sequence_number": "16",
     "max_gas_amount": "2000",
@@ -489,6 +1959,42 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0x678967f836f9bfff96115a2b2e9a1bc71ce3699669375510498c261e8fd1cf60",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
+        "data": {
+          "type": "0x1::Block::BlockMetadata",
+          "data": {
+            "height": "18",
+            "new_block_events": {
+              "counter": "18",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xa550c18",
+                    "creation_num": "5"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0xf113db06626eb7724773e4e9dacecc8a6cb3a710b8b70365768168b24fe06ce3",
+        "data": {
+          "type": "0x1::Timestamp::CurrentTimeMicroseconds",
+          "data": {
+            "microseconds": "18"
+          }
+        }
+      }
+    ],
     "id": "0x430d191fbc937d42f74104aa291871f4b9d120f76583a1da5d1123f2b8a0ac60",
     "round": "1",
     "previous_block_votes": [],
@@ -505,6 +2011,117 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0x8a5d4651a5092f1e86a50b9f5defb2acdaf83af1c9628c9e50b9d2d6aa33e077",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x04a62513032e695c923632ca1b9248d11e49c9b1e83bba39974adf50bbabdd8f",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
+            "self_address": "0xa550c18",
+            "sequence_number": "18"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "18446744073709551615"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x79a08e0b94ebb66c0dae37a07c182d46387c347aeb83c07de6109b0503c3a24e",
+        "data": {
+          "type": "0x1::TestCoin::CoinInfo",
+          "data": {
+            "scaling_factor": "1000000",
+            "total_value": "18446744073709551615"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
+        "state_key_hash": "0x359c40737b2d00ee37b472fe5a03abdb7283264c1e21fe20601c9629b2b35827",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
+            "self_address": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
+            "sequence_number": "0"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
+        "state_key_hash": "0xb09a8029dfa274b90b59264458cd74e36ec27c157374bb20bfad812a29b042b5",
+        "data": {
+          "type": "0x1::GUID::Generator",
+          "data": {
+            "counter": "2"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
+        "state_key_hash": "0x5b9cc988bf95904ebec9e4a6fdde8c970d13d7d81256359c3a9a8611c14d353f",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "0"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
+        "state_key_hash": "0x594be380e6b9da07e429d9a2e988cedc52bbcf9610456ff113d84f1f8e249142",
+        "data": {
+          "type": "0x1::TestCoin::TransferEvents",
+          "data": {
+            "received_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
+                    "creation_num": "1"
+                  }
+                },
+                "len_bytes": 40
+              }
+            },
+            "sent_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
+                    "creation_num": "0"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      }
+    ],
     "sender": "0xa550c18",
     "sequence_number": "17",
     "max_gas_amount": "2000",
@@ -537,6 +2154,42 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0xef8756466bdbbd663792456ec10bbe6399f7ff1ef34a3bac09ca9d212f8c825d",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
+        "data": {
+          "type": "0x1::Block::BlockMetadata",
+          "data": {
+            "height": "19",
+            "new_block_events": {
+              "counter": "19",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xa550c18",
+                    "creation_num": "5"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0xf113db06626eb7724773e4e9dacecc8a6cb3a710b8b70365768168b24fe06ce3",
+        "data": {
+          "type": "0x1::Timestamp::CurrentTimeMicroseconds",
+          "data": {
+            "microseconds": "19"
+          }
+        }
+      }
+    ],
     "id": "0x2af5203112331adc2ed6f402dca396bfe6dfa3ac8a57ea08860870fd515cf7ca",
     "round": "1",
     "previous_block_votes": [],
@@ -553,6 +2206,117 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0xd54c7ee604cf36d53fca8c7934f02eaf0dca275a3e2a8b9068c3d9dcef9df600",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x04a62513032e695c923632ca1b9248d11e49c9b1e83bba39974adf50bbabdd8f",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
+            "self_address": "0xa550c18",
+            "sequence_number": "19"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "18446744073709551615"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x79a08e0b94ebb66c0dae37a07c182d46387c347aeb83c07de6109b0503c3a24e",
+        "data": {
+          "type": "0x1::TestCoin::CoinInfo",
+          "data": {
+            "scaling_factor": "1000000",
+            "total_value": "18446744073709551615"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
+        "state_key_hash": "0x5160d31838ae39a6662560e18ac5ea3e799aae7121ce5834b9cf18c16c8c6567",
+        "data": {
+          "type": "0x1::Account::Account",
+          "data": {
+            "authentication_key": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
+            "self_address": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
+            "sequence_number": "0"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
+        "state_key_hash": "0x9aceb3bcb6619623a666f0ee8a80d220856ee7d528dc31ee7689b3baaced8b22",
+        "data": {
+          "type": "0x1::GUID::Generator",
+          "data": {
+            "counter": "2"
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
+        "state_key_hash": "0x0dd97334721ea9f3cc79c1cf2af38ce3caab0eb99867b585c1dcded1ee481404",
+        "data": {
+          "type": "0x1::TestCoin::Balance",
+          "data": {
+            "coin": {
+              "value": "0"
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
+        "state_key_hash": "0x2b0c63c7fdbed0267adc655340afe638b98c06ae9e0c4696eb0d81435851a22d",
+        "data": {
+          "type": "0x1::TestCoin::TransferEvents",
+          "data": {
+            "received_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
+                    "creation_num": "1"
+                  }
+                },
+                "len_bytes": 40
+              }
+            },
+            "sent_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
+                    "creation_num": "0"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      }
+    ],
     "sender": "0xa550c18",
     "sequence_number": "18",
     "max_gas_amount": "2000",
@@ -585,6 +2349,42 @@
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "0x3be9f7a0cd27dbb70beabe9e27ed2508ef0184715bc64626c121d8ca34067768",
+    "changes": [
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
+        "data": {
+          "type": "0x1::Block::BlockMetadata",
+          "data": {
+            "height": "20",
+            "new_block_events": {
+              "counter": "20",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xa550c18",
+                    "creation_num": "5"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "write_resource",
+        "address": "0xa550c18",
+        "state_key_hash": "0xf113db06626eb7724773e4e9dacecc8a6cb3a710b8b70365768168b24fe06ce3",
+        "data": {
+          "type": "0x1::Timestamp::CurrentTimeMicroseconds",
+          "data": {
+            "microseconds": "20"
+          }
+        }
+      }
+    ],
     "id": "0xe451cd3c364076623c0231898be0722c08e4eb229c44cb957d29cf7370af8a1b",
     "round": "1",
     "previous_block_votes": [],

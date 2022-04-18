@@ -134,6 +134,9 @@ impl Context {
         let data = self
             .db
             .get_transactions(start_version, limit as u64, ledger_version, true)?;
+        let tx_outputs =
+            self.db
+                .get_transaction_outputs(start_version, limit as u64, ledger_version)?;
 
         let txn_start_version = data
             .first_transaction_version
@@ -148,23 +151,29 @@ impl Context {
         let txns = data.transactions;
         let infos = data.proof.transaction_infos;
         let events = data.events.unwrap_or_default();
-
+        let changes: Vec<aptos_types::write_set::WriteSet> = tx_outputs
+            .transactions_and_outputs
+            .into_iter()
+            .map(|txo| txo.1.unpack().0)
+            .collect();
         ensure!(
-            txns.len() == infos.len() && txns.len() == events.len(),
-            "invalid data size from database: {}, {}, {}",
+            txns.len() == infos.len() && txns.len() == events.len() && txns.len() == changes.len(),
+            "invalid data size from database: {}, {}, {}, {}",
             txns.len(),
             infos.len(),
-            events.len()
+            events.len(),
+            changes.len(),
         );
 
         txns.into_iter()
             .zip(infos.into_iter())
             .zip(events.into_iter())
+            .zip(changes.into_iter())
             .enumerate()
-            .map(|(i, ((txn, info), events))| {
+            .map(|(i, (((txn, info), events), write_set))| {
                 let version = start_version + i as u64;
                 self.get_accumulator_root_hash(version)
-                    .map(|h| (version, txn, info, events, h).into())
+                    .map(|h| (version, txn, info, events, h, write_set).into())
             })
             .collect()
     }
@@ -235,8 +244,12 @@ impl Context {
         &self,
         txn: TransactionWithProof,
     ) -> Result<TransactionOnChainData> {
+        let tx_outputs = self
+            .db
+            .get_transaction_outputs(txn.version, 1, txn.version)?;
+
         self.get_accumulator_root_hash(txn.version)
-            .map(|h| (txn, h).into())
+            .map(|h| (txn, h, tx_outputs).into())
     }
 
     pub fn get_events(

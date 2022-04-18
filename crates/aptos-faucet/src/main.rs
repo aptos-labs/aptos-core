@@ -245,6 +245,7 @@ mod tests {
                     success: true,
                     vm_status: "Executed".to_string(),
                     accumulator_root_hash: HashValue::zero().into(),
+                    changes: vec![],
                 };
                 let serializable_txn: aptos_rest_client::aptos_api_types::Transaction = (
                     txn.as_signed_user_txn().unwrap(),
