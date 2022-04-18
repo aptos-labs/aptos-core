@@ -7,6 +7,7 @@ use aptos_crypto::{
 };
 use aptos_logger::info;
 use aptos_sdk::transaction_builder::TransactionFactory;
+use aptos_sdk::types::LocalAccount;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{aptos_root_address, AccountResource},
@@ -15,8 +16,6 @@ use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{RawTransaction, SignedTransaction, Transaction, Version},
 };
-use aptos_sdk::types::LocalAccount;
-
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
 use rand::{rngs::StdRng, SeedableRng};
@@ -60,31 +59,18 @@ struct P2pTestCase {
     num_accounts: usize,
 }
 
-// TODO: use LocalAccount instead
-fn LocalAccountGenerator(){
-    
-    let mut account = LocalAccount::generate;
-    let txn = account.sign_with_transaction_builder(
-        txn_factory.payload(
-        encode_..._script_function(...),
-    )
-    );
-}
+struct LocalAccountData {
+    private_key: LocalAccount
+    public_key: LocalAccount
+    address: LocalAccount
+    sequence_number: u64
 
-
-
-#[derive(Deserialize, Serialize)]
-struct AccountData {
-    private_key: Ed25519PrivateKey,
-    public_key: Ed25519PublicKey,
-    address: AccountAddress,
-    sequence_number: u64,
 }
 
 pub struct TransactionGenerator {
     /// The current state of the accounts. The main purpose is to keep track of the sequence number
     /// so generated transactions are guaranteed to be successfully executed.
-    accounts_cache: Vec<AccountData>,
+    accounts_cache: Vec<LocalAccountData>,
 
     /// Total number of accounts in the DB
     num_accounts: usize,
@@ -133,7 +119,7 @@ impl TransactionGenerator {
         }
     }
 
-    fn gen_account_cache(num_accounts: usize) -> Vec<AccountData> {
+    fn gen_account_cache(num_accounts: usize) -> Vec<LocalAccountData> {
         let start = Instant::now();
         let seed = [1u8; 32];
         let mut rng = StdRng::from_seed(seed);
@@ -145,7 +131,7 @@ impl TransactionGenerator {
             let private_key = Ed25519PrivateKey::generate(&mut rng);
             let public_key = private_key.public_key();
             let address = aptos_types::account_address::from_public_key(&public_key);
-            let account = AccountData {
+            let account = LocalAccountData {
                 private_key,
                 public_key,
                 address,
@@ -354,12 +340,13 @@ impl TransactionGenerator {
         let bar = get_progress_bar(self.accounts_cache.len());
         for account in &self.accounts_cache {
             let address = account.address;
-            let state_store_value = db
+            let state_value = db
                 .get_latest_state_value(StateKey::AccountAddressKey(address))
                 .expect("Failed to query storage.")
                 .expect("Account must exist.");
             let account_resource =
-                AccountResource::try_from(&AccountStateBlob::from(state_store_value)).unwrap();
+                AccountResource::try_from(&AccountStateBlob::try_from(state_value).unwrap())
+                    .unwrap();
             assert_eq!(account_resource.sequence_number(), account.sequence_number);
             bar.inc(1);
         }

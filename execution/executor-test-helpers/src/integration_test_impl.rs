@@ -62,21 +62,21 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account1 = account1_auth_key.derived_address();
 
     let local_account2 = LocalAccount::generate(&mut rng);
-    let privkey2 = local_account1.private_key();
-    let pubkey2 = local_account1.public_key();
-    let account2_auth_key = local_account1.authentication_key();
+    let privkey2 = local_account2.private_key();
+    let pubkey2 = local_account2.public_key();
+    let account2_auth_key = local_account2.authentication_key();
     let account2 = account2_auth_key.derived_address();
 
     let local_account3 = LocalAccount::generate(&mut rng);
-    let privkey3 = local_account1.private_key();
-    let pubkey3 = local_account1.public_key();
-    let account3_auth_key = local_account1.authentication_key();
+    let privkey3 = local_account3.private_key();
+    let pubkey3 = local_account3.public_key();
+    let account3_auth_key = local_account3.authentication_key();
     let account3 = account3_auth_key.derived_address();
 
     let local_account4 = LocalAccount::generate(&mut rng);
-    let privkey4 = local_account1.private_key();
-    let pubkey4 = local_account1.public_key();
-    let account4_auth_key = local_account1.authentication_key();
+    let privkey4 = local_account4.private_key();
+    let pubkey4 = local_account4.public_key();
+    let account4_auth_key = local_account4.authentication_key();
     let account4 = account4_auth_key.derived_address();
     let genesis_account = testnet_dd_account_address();
     let tc_account = treasury_compliance_account_address();
@@ -173,7 +173,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     // Transfer 20k coins from account1 to account2.
     // balance: <1.98M, 1.22M, 1M
-    let txn4 = get_test_signed_transaction(
+    let txn4 = local_account1.sign_with_transaction_builder(
         account1,
         /* sequence_number = */ 0,
         privkey1.clone(),
@@ -186,10 +186,9 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             vec![],
         )),
     );
-
     // Transfer 10k coins from account2 to account3.
     // balance: <1.98M, <1.21M, 1.01M
-    let txn5 = get_test_signed_transaction(
+    let txn5 = local_account2.sign_with_transaction_builder(
         account2,
         /* sequence_number = */ 0,
         privkey2.clone(),
@@ -205,7 +204,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     // Transfer 70k coins from account1 to account3.
     // balance: <1.91M, <1.21M, 1.08M
-    let txn6 = get_test_signed_transaction(
+    let txn6 = local_account1.sign_with_transaction_builder(
         account1,
         /* sequence_number = */ 1,
         privkey1.clone(),
