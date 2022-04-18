@@ -23,6 +23,11 @@ variable "reset_safety_data" {
   default     = true
 }
 
+variable "deletion_allowed" {
+  description = "Allow deleting keys"
+  default     = false
+}
+
 resource "vault_mount" "secret" {
   count = var.mount_engines ? 1 : 0
   path  = var.kv_v2_mount
@@ -52,7 +57,7 @@ resource "vault_generic_secret" "safety_data" {
       last_vote        = null
     }
   })
-  disable_read = ! var.reset_safety_data
+  disable_read = !var.reset_safety_data
   depends_on   = [null_resource.mounts_created]
 }
 
@@ -71,61 +76,67 @@ resource "vault_generic_secret" "operator_account" {
 }
 
 resource "vault_transit_secret_backend_key" "owner" {
-  backend    = var.transit_mount
-  name       = "${var.namespace}__owner"
-  type       = "ed25519"
-  depends_on = [null_resource.mounts_created]
+  backend          = var.transit_mount
+  name             = "${var.namespace}__owner"
+  type             = "ed25519"
+  deletion_allowed = var.deletion_allowed
+  depends_on       = [null_resource.mounts_created]
 }
 
 resource "vault_transit_secret_backend_key" "operator" {
-  backend    = var.transit_mount
-  name       = "${var.namespace}__operator"
-  type       = "ed25519"
-  depends_on = [null_resource.mounts_created]
+  backend          = var.transit_mount
+  name             = "${var.namespace}__operator"
+  type             = "ed25519"
+  deletion_allowed = var.deletion_allowed
+  depends_on       = [null_resource.mounts_created]
   lifecycle {
     ignore_changes = [min_decryption_version, min_encryption_version]
   }
 }
 
 resource "vault_transit_secret_backend_key" "consensus" {
-  backend    = var.transit_mount
-  name       = "${var.namespace}__consensus"
-  type       = "ed25519"
-  exportable = true
-  depends_on = [null_resource.mounts_created]
+  backend          = var.transit_mount
+  name             = "${var.namespace}__consensus"
+  type             = "ed25519"
+  exportable       = true
+  deletion_allowed = var.deletion_allowed
+  depends_on       = [null_resource.mounts_created]
   lifecycle {
     ignore_changes = [min_decryption_version, min_encryption_version]
   }
 }
 
 resource "vault_transit_secret_backend_key" "execution" {
-  backend    = var.transit_mount
-  name       = "${var.namespace}__execution"
-  type       = "ed25519"
-  exportable = true
-  depends_on = [null_resource.mounts_created]
+  backend          = var.transit_mount
+  name             = "${var.namespace}__execution"
+  type             = "ed25519"
+  exportable       = true
+  deletion_allowed = var.deletion_allowed
+  depends_on       = [null_resource.mounts_created]
   lifecycle {
     ignore_changes = [min_decryption_version, min_encryption_version]
   }
 }
 
 resource "vault_transit_secret_backend_key" "validator_network" {
-  backend    = var.transit_mount
-  name       = "${var.namespace}__validator_network"
-  type       = "ed25519"
-  exportable = true
-  depends_on = [null_resource.mounts_created]
+  backend          = var.transit_mount
+  name             = "${var.namespace}__validator_network"
+  type             = "ed25519"
+  exportable       = true
+  deletion_allowed = var.deletion_allowed
+  depends_on       = [null_resource.mounts_created]
   lifecycle {
     ignore_changes = [min_decryption_version, min_encryption_version]
   }
 }
 
 resource "vault_transit_secret_backend_key" "fullnode_network" {
-  backend    = var.transit_mount
-  name       = "${var.namespace}__fullnode_network"
-  type       = "ed25519"
-  exportable = true
-  depends_on = [null_resource.mounts_created]
+  backend          = var.transit_mount
+  name             = "${var.namespace}__fullnode_network"
+  type             = "ed25519"
+  exportable       = true
+  deletion_allowed = var.deletion_allowed
+  depends_on       = [null_resource.mounts_created]
   lifecycle {
     ignore_changes = [min_decryption_version, min_encryption_version]
   }
