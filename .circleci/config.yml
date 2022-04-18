@@ -144,6 +144,14 @@ jobs:
   forge-k8s-test:
     executor: ubuntu-medium
     steps:
+      - run:
+          name: Check Forge killswitch
+          shell: /bin/bash
+          command: |
+            if [ -n "$FORGE_ENABLED" ]; then
+              exit 0
+            fi
+            circleci-agent step halt
       - checkout
       - aws-setup
       - deploy-setup
@@ -173,8 +181,9 @@ jobs:
 
             cat \<<EOF > forge_comment.txt
             Forge run: ${CIRCLE_BUILD_URL}
-            Forge Test Result: \`${FORGE_REPORT_TXT}\`
+            Forge test result: \`${FORGE_REPORT_TXT}\`
             EOF
+
             # replace all newlines
             FORGE_COMMENT=$(awk '{printf "%s\\n", $0}' forge_comment.txt)
 
@@ -196,6 +205,14 @@ jobs:
                 }
               ]
             }
+      - run:
+          name: Check Forge status
+          shell: /bin/bash
+          command: |
+            if [ -n "$FORGE_BLOCKING" ]; then
+              exit $FGI_EXIT_CODE
+            fi
+            exit 0
   docker-compose-test:
     executor: ubuntu-medium
     steps:

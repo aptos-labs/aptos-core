@@ -19,6 +19,7 @@ metadata:
     {{- include "forge.labels" . | nindent 4 }}
     app.kubernetes.io/name: forge-debug
 spec:
+  backoffLimit: 0
   template:
     metadata:
       labels:
