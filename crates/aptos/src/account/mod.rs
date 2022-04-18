@@ -12,7 +12,7 @@ use clap::Subcommand;
 pub mod create;
 pub mod list;
 
-/// Command to create a new account on-chain
+/// CLI tool for interacting with accounts
 ///
 #[derive(Debug, Subcommand)]
 pub enum AccountTool {
