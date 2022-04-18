@@ -565,11 +565,9 @@ impl<'a> AptosTestAdapter<'a> {
 
         validator_private_key: Ed25519PrivateKey,
         validator_account_addr: AccountAddress,
-        _validator_auth_key_prefix: Vec<u8>,
 
         operator_private_key: Ed25519PrivateKey,
         operator_account_addr: AccountAddress,
-        _operator_auth_key_prefix: Vec<u8>,
     ) {
         // Step 1. Create validator account.
         let parameters = self
@@ -695,7 +693,6 @@ impl<'a> AptosTestAdapter<'a> {
     fn create_parent_vasp_account(
         &mut self,
         _validator_name: Identifier,
-        _auth_key_prefix: Vec<u8>,
         account_addr: AccountAddress,
         _currency_type_name: TypeName,
     ) {
@@ -810,10 +807,10 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                         )
                     }
 
-                    let (validator_private_key, validator_auth_key_prefix, validator_account_addr) =
+                    let (validator_private_key, _, validator_account_addr) =
                         keygen.generate_credentials_for_account_creation();
 
-                    let (operator_private_key, operator_auth_key_prefix, operator_account_addr) =
+                    let (operator_private_key, _, operator_account_addr) =
                         keygen.generate_credentials_for_account_creation();
 
                     named_address_mapping.insert(
@@ -833,10 +830,8 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                         validator_name,
                         validator_private_key,
                         validator_account_addr,
-                        validator_auth_key_prefix,
                         operator_private_key,
                         operator_account_addr,
-                        operator_auth_key_prefix,
                     ));
                 }
             }
@@ -858,7 +853,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                         )
                     }
 
-                    let (private_key, auth_key_prefix, account_addr) =
+                    let (private_key, _, account_addr) =
                         keygen.generate_credentials_for_account_creation();
                     named_address_mapping.insert(
                         parent_vasp_name.to_string(),
@@ -871,7 +866,6 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     // only available after the AptosTestAdapter has been fully initialized.
                     parent_vasps_to_create.push((
                         parent_vasp_name,
-                        auth_key_prefix,
                         account_addr,
                         parent_vasp_init_args.currency_type,
                     ));
@@ -891,33 +885,22 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             validator_name,
             validator_private_key,
             validator_account_addr,
-            validator_auth_key_prefix,
             operator_private_key,
             operator_account_addr,
-            operator_auth_key_prefix,
         ) in validators_to_create
         {
             adapter.create_validator_account(
                 validator_name,
                 validator_private_key,
                 validator_account_addr,
-                validator_auth_key_prefix,
                 operator_private_key,
                 operator_account_addr,
-                operator_auth_key_prefix,
             );
         }
 
         // Create parent vasp accounts
-        for (parent_vasp_name, auth_key_prefix, account_addr, currency_type_name) in
-            parent_vasps_to_create
-        {
-            adapter.create_parent_vasp_account(
-                parent_vasp_name,
-                auth_key_prefix,
-                account_addr,
-                currency_type_name,
-            );
+        for (parent_vasp_name, account_addr, currency_type_name) in parent_vasps_to_create {
+            adapter.create_parent_vasp_account(parent_vasp_name, account_addr, currency_type_name);
         }
 
         adapter

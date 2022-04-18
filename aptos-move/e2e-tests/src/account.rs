@@ -175,11 +175,6 @@ impl Account {
         AuthenticationKey::ed25519(&self.pubkey).to_vec()
     }
 
-    /// Return the first 16 bytes of the account's auth key
-    pub fn auth_key_prefix(&self) -> Vec<u8> {
-        AuthenticationKey::ed25519(&self.pubkey).prefix().to_vec()
-    }
-
     pub fn transaction(&self) -> TransactionBuilder {
         TransactionBuilder::new(self.clone())
     }
