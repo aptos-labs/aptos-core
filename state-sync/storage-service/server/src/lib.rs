@@ -41,7 +41,7 @@ mod tests;
 
 /// Storage server constants.
 pub const STORAGE_SERVER_VERSION: u64 = 1;
-const SUMMARY_LOG_FREQUENCY_SECS: u64 = 5;
+const SUMMARY_LOG_FREQUENCY_SECS: u64 = 3;
 
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
 pub enum Error {
