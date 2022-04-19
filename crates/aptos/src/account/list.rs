@@ -23,6 +23,7 @@ pub struct ListResources {
     node: NodeOptions,
 
     /// Address of account you want to list resources for
+    #[clap(long)]
     account: AccountAddress,
 }
 

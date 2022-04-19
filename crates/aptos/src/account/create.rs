@@ -6,11 +6,11 @@
 //! TODO: Examples
 //!
 
-use crate::common::types::{
-    account_address_from_public_key, ExtractPublicKey, PublicKeyInputOptions,
-};
 use crate::{
-    common::types::{EncodingOptions, NodeOptions, PrivateKeyInputOptions},
+    common::types::{
+        account_address_from_public_key, EncodingOptions, ExtractPublicKey, NodeOptions,
+        PrivateKeyInputOptions, PublicKeyInputOptions,
+    },
     CliResult, Error as CommonError,
 };
 use anyhow::Error;
@@ -42,6 +42,7 @@ pub struct CreateAccount {
     public_key_input_options: PublicKeyInputOptions,
 
     /// Chain ID
+    #[clap(long)]
     chain_id: u8,
 }
 

@@ -1,10 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{ExtractPublicKey, PrivateKeyInputOptions};
 use crate::{
     common::{
-        types::{EncodingOptions, EncodingType, Error, KeyType, SaveFile},
+        types::{
+            EncodingOptions, EncodingType, Error, ExtractPublicKey, KeyType,
+            PrivateKeyInputOptions, SaveFile,
+        },
         utils::{append_file_extension, check_if_file_exists, to_common_result, write_to_file},
     },
     CliResult,
