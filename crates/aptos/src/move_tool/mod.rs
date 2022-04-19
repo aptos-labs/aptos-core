@@ -60,7 +60,6 @@ impl CompilePackage {
             ..Default::default()
         };
         let compiled_package = compile_move(build_config, self.move_options.package_dir.as_path())?;
-        // TODO: This can be serialized once move is updated
         let mut ids = Vec::new();
         compiled_package
             .compiled_modules()
@@ -123,6 +122,8 @@ pub struct PublishPackage {
     node_options: NodeOptions,
     #[clap(long)]
     chain_id: ChainId,
+    #[clap(long, default = 1000)]
+    max_gas: u64,
 }
 
 impl PublishPackage {
@@ -155,10 +156,9 @@ impl PublishPackage {
             .map_err(|err| Error::UnexpectedError(err.to_string()))?;
         let account = account_response.inner();
 
-        // TODO: Make gas configurable
         let transaction_factory = TransactionFactory::new(self.chain_id)
             .with_gas_unit_price(1)
-            .with_max_gas_amount(1000);
+            .with_max_gas_amount(self.max_gas);
         let sender_account =
             &mut LocalAccount::new(sender_address, sender_key, account.sequence_number);
 
