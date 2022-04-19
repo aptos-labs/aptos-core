@@ -6,7 +6,7 @@ import { UserTransaction } from "./api/data-contracts";
 
 import { NODE_URL, FAUCET_URL } from "./util.test";
 
-test.skip(
+test(
   "full tutorial faucet flow",
   async () => {
     const client = new AptosClient(NODE_URL);
