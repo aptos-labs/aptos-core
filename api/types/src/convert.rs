@@ -2,17 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    transaction::{ModuleBundlePayload, StateCheckpointTransaction},
     Bytecode, DirectWriteSet, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode,
     MoveResource, MoveScriptBytecode, MoveType, MoveValue, ScriptFunctionId, ScriptFunctionPayload,
     ScriptPayload, ScriptWriteSet, Transaction, TransactionInfo, TransactionOnChainData,
     TransactionPayload, UserTransactionRequest, WriteSet, WriteSetChange, WriteSetPayload,
 };
-use aptos_crypto::HashValue;
+use anyhow::{bail, ensure, format_err, Result};
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_transaction_builder::error_explain;
 use aptos_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
     contract_event::ContractEvent,
+    state_store::state_key::StateKey,
     transaction::{ModuleBundle, RawTransaction, Script, ScriptFunction, SignedTransaction},
     vm_status::{AbortLocation, KeptVMStatus},
     write_set::WriteOp,
@@ -21,14 +24,10 @@ use move_binary_format::file_format::FunctionHandleIndex;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag},
+    resolver::MoveResolver,
+    value::{MoveStructLayout, MoveTypeLayout},
 };
 use move_resource_viewer::MoveValueAnnotator;
-
-use crate::transaction::{ModuleBundlePayload, StateCheckpointTransaction};
-use anyhow::{ensure, format_err, Result};
-use aptos_crypto::hash::CryptoHash;
-use aptos_types::state_store::state_key::StateKey;
-use move_core_types::resolver::MoveResolver;
 use serde_json::Value;
 use std::{
     convert::{TryFrom, TryInto},
@@ -435,54 +434,101 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             .collect::<Result<_>>()
     }
 
+    // Converts JSON object to `MoveValue`, which can be bcs serialized into the same
+    // representation in the DB.
+    // Notice that structs are of the `MoveStruct::Runtime` flavor, matching the representation in
+    // DB.
     pub fn try_into_move_value(
         &self,
         typ: &MoveType,
         val: Value,
     ) -> Result<move_core_types::value::MoveValue> {
+        let type_tag = typ.clone().try_into()?;
+        let layout = self.inner.get_type_layout_with_fields(&type_tag)?;
+
+        self.try_into_move_value_from_layout(&layout, val)
+    }
+
+    fn try_into_move_value_from_layout(
+        &self,
+        layout: &MoveTypeLayout,
+        val: Value,
+    ) -> Result<move_core_types::value::MoveValue> {
         use move_core_types::value::MoveValue::*;
 
-        Ok(match typ {
-            MoveType::Bool => Bool(serde_json::from_value::<bool>(val)?),
-            MoveType::U8 => U8(serde_json::from_value::<u8>(val)?),
-            MoveType::U64 => serde_json::from_value::<crate::U64>(val)?.into(),
-            MoveType::U128 => serde_json::from_value::<crate::U128>(val)?.into(),
-            MoveType::Address => serde_json::from_value::<crate::Address>(val)?.into(),
-            MoveType::Vector { items } => self.try_into_move_value_vector(&*items, val)?,
-            MoveType::Signer
-            | MoveType::Struct(_)
-            | MoveType::GenericTypeParam { index: _ }
-            | MoveType::Reference { mutable: _, to: _ } => {
-                return Err(format_err!(
-                    "unexpected move type {:?} for value {:?}",
-                    &typ,
-                    &val
-                ))
+        Ok(match layout {
+            MoveTypeLayout::Bool => Bool(serde_json::from_value::<bool>(val)?),
+            MoveTypeLayout::U8 => U8(serde_json::from_value::<u8>(val)?),
+            MoveTypeLayout::U64 => serde_json::from_value::<crate::U64>(val)?.into(),
+            MoveTypeLayout::U128 => serde_json::from_value::<crate::U128>(val)?.into(),
+            MoveTypeLayout::Address => serde_json::from_value::<crate::Address>(val)?.into(),
+            MoveTypeLayout::Vector(item_layout) => {
+                self.try_into_move_value_vector(item_layout.as_ref(), val)?
+            }
+            MoveTypeLayout::Struct(struct_layout) => {
+                self.try_into_move_value_struct(struct_layout, val)?
+            }
+            MoveTypeLayout::Signer => {
+                bail!("unexpected move type {:?} for value {:?}", layout, val)
             }
         })
     }
 
     pub fn try_into_move_value_vector(
         &self,
-        typ: &MoveType,
+        layout: &MoveTypeLayout,
         val: Value,
     ) -> Result<move_core_types::value::MoveValue> {
-        if matches!(typ, MoveType::U8) {
+        if matches!(layout, MoveTypeLayout::U8) {
             Ok(serde_json::from_value::<HexEncodedBytes>(val)?.into())
         } else if let Value::Array(list) = val {
             let vals = list
                 .into_iter()
-                .map(|v| self.try_into_move_value(typ, v))
+                .map(|v| self.try_into_move_value_from_layout(layout, v))
                 .collect::<Result<_>>()?;
 
             Ok(move_core_types::value::MoveValue::Vector(vals))
         } else {
-            Err(format_err!(
-                "expected vector<{:?}>, but got: {:?}",
-                typ,
-                &val
-            ))
+            bail!("expected vector<{:?}>, but got: {:?}", layout, val)
         }
+    }
+
+    pub fn try_into_move_value_struct(
+        &self,
+        layout: &MoveStructLayout,
+        val: Value,
+    ) -> Result<move_core_types::value::MoveValue> {
+        let field_layouts = if let MoveStructLayout::WithFields(fields) = layout {
+            fields
+        } else {
+            bail!(
+                "Expecting `MoveStructLayout::WithFields, getting {:?}",
+                layout
+            );
+        };
+
+        let mut field_values = if let Value::Object(fields) = val {
+            fields
+        } else {
+            bail!("Expecting a JSON Map for struct.");
+        };
+
+        let fields = field_layouts
+            .iter()
+            .map(|field_layout| {
+                let name = field_layout.name.as_str();
+                let value = field_values
+                    .remove(name)
+                    .ok_or_else(|| format_err!("field {} not found.", name))?;
+                let move_value =
+                    self.try_into_move_value_from_layout(&field_layout.layout, value)?;
+                Ok(move_value)
+            })
+            .collect::<Result<_>>()?;
+
+        Ok(move_core_types::value::MoveValue::Struct(
+            move_core_types::value::MoveStruct::Runtime(fields),
+        ))
     }
 
     fn explain_vm_status(&self, status: &KeptVMStatus) -> String {

@@ -43,6 +43,7 @@ use executor::block_executor::BlockExecutor;
 use rand::SeedableRng;
 use serde_json::{json, Value};
 use std::{boxed::Box, collections::BTreeMap, sync::Arc};
+use storage_interface::state_view::DbStateView;
 use vm_validator::vm_validator::VMValidator;
 use warp::http::header::CONTENT_TYPE;
 
@@ -142,6 +143,12 @@ impl TestContext {
 
     pub fn root_account(&self) -> LocalAccount {
         LocalAccount::new(aptos_root_address(), self.root_keys.root_key.clone(), 0)
+    }
+
+    pub fn latest_state_view(&self) -> DbStateView {
+        self.context
+            .state_view_at_version(self.get_latest_ledger_info().version())
+            .unwrap()
     }
 
     pub fn gen_account(&mut self) -> LocalAccount {
