@@ -1,0 +1,8 @@
+apiVersion: v2
+name: aptos-validator-lite
+version: 0.1.0
+appVersion: 0.1.0
+description: Aptos blockchain validator deployment with minimal components
+home: https://aptoslabs.com/
+sources:
+- https://github.com/aptos-labs/aptos-core

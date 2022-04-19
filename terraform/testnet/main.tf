@@ -41,7 +41,10 @@ module "validator" {
   ssh_pub_key        = var.ssh_pub_key
 
   max_node_pool_surge = var.enable_forge ? 2 : 1
-  node_pool_sizes = {
+  node_pool_sizes = var.validator_lite_mode ? {
+    utilities  = var.num_utilities_instance > 0 ? var.num_utilities_instance : 3
+    validators = var.num_validator_instance > 0 ? var.num_validator_instance : var.num_validators + var.num_public_fullnodes
+  } : {
     utilities  = var.num_utilities_instance > 0 ? var.num_utilities_instance : 3 * var.num_validators
     validators = var.num_validator_instance > 0 ? var.num_validator_instance : 3 * var.num_validators + var.num_public_fullnodes + 1
   }
@@ -82,6 +85,7 @@ resource "helm_release" "testnet" {
   values = [
     jsonencode({
       imageTag          = local.image_tag
+      validatorLite     = var.validator_lite_mode
       localVaultBackend = var.enable_dev_vault # Toggle dev vault mode
       genesis = {
         numValidators      = var.num_validators
@@ -137,7 +141,7 @@ resource "helm_release" "testnet" {
 resource "helm_release" "validator" {
   count       = var.num_validators
   name        = "val${count.index}"
-  chart       = "${path.module}/../helm/validator"
+  chart       = var.validator_lite_mode ? "${path.module}/../helm/validator-lite" : "${path.module}/../helm/validator"
   max_history = var.enable_forge ? 2 : 10
   wait        = false
 

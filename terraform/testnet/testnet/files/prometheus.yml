@@ -16,6 +16,17 @@ rule_files:
 {{- end }}
 
 scrape_configs:
+{{- if .Values.validatorLite }}
+- job_name: 'validator-lite'
+
+  static_configs:
+  {{- range $i, $e := .Values.genesis.numValidators | int | until }}
+  - targets: {{ printf "val%d-aptos-validator-validator-lb:9101" $i | quote | list }}
+    labels:
+      owner: {{ printf "val%d" $i | quote }}
+  {{- end }}
+
+{{- else }}
 - job_name: 'validators'
   scheme: {{ ternary "https" "http" $.Values.monitoring.prometheus.useHttps }}
   tls_config:
@@ -34,6 +45,7 @@ scrape_configs:
     labels:
       owner: {{ printf "val%d" $i | quote }}
   {{- end }}
+{{- end }}
 
 - job_name: 'public-fullnodes'
 

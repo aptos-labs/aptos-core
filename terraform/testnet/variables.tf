@@ -54,6 +54,11 @@ variable "ssh_pub_key" {
   description = "SSH public key to configure for bastion and vault access"
 }
 
+variable "validator_lite_mode" {
+  description = "Run validator lite deployment"
+  default = false
+}
+
 variable "num_validators" {
   default = 4
 }

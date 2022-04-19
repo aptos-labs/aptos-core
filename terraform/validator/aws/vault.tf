@@ -114,10 +114,6 @@ resource "aws_kms_key" "vault" {
   tags = merge(local.default_tags, {
     Name = "aptos-${local.workspace_name}/vault"
   })
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 data "aws_iam_policy_document" "vault" {

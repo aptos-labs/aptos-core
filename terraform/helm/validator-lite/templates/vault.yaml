@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "aptos-validator.fullname" . }}-vault
+  labels:
+    {{- include "aptos-validator.labels" . | nindent 4 }}
+data:
+  validator.json: |-
+    {{- tpl (.Files.Get "files/vault.json") . | replace "<role>" "validator" | nindent 4 }}
+  fullnode.json: |-
+    {{- tpl (.Files.Get "files/vault.json") . | replace "<role>" "fullnode" | nindent 4 }}
+{{- if .Values.vault.tls }}
+{{ .Values.vault.tls | toYaml | indent 2 }}
+{{- end }}
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: {{ include "aptos-validator.fullname" . }}-tokenreview
+  labels:
+    {{- include "aptos-validator.labels" . | nindent 4 }}
+rules:
+- apiGroups: ["authentication.k8s.io"]
+  resources: ["tokenreviews"]
+  verbs: ["create"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "aptos-validator.fullname" . }}-tokenreview
+  labels:
+    {{- include "aptos-validator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "aptos-validator.fullname" . }}-tokenreview
+subjects:
+- kind: ServiceAccount
+  name: {{ include "aptos-validator.fullname" . }}-validator
+  namespace: {{ .Release.Namespace }}
+- kind: ServiceAccount
+  name: {{ include "aptos-validator.fullname" . }}-fullnode
+  namespace: {{ .Release.Namespace }}
