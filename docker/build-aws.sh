@@ -23,10 +23,13 @@ BUILD_PROJECTS=()
 
 while [[ "$1" =~ ^- ]]; do case $1 in
   --build-all )
-    BUILD_PROJECTS=(aptos-validator aptos-init aptos-faucet aptos-safety-rules aptos-tools aptos-forge aptos-txn-emitter)
+    BUILD_PROJECTS=(aptos-validator aptos-init aptos-faucet aptos-safety-rules aptos-tools aptos-forge aptos-txn-emitter aptos-indexer)
     ;;
   --build-validator )
     BUILD_PROJECTS=(aptos-validator)
+    ;;
+  --build-indexer )
+    BUILD_PROJECTS=(aptos-indexer)
     ;;
   --build-init )
     BUILD_PROJECTS=(aptos-init)

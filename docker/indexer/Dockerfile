@@ -24,25 +24,15 @@ RUN IMAGE_TARGETS="release" ./docker/build-common.sh
 ### Production Image ###
 FROM debian-base AS pre-prod
 
-RUN apt-get update && apt-get -y install libssl1.1 wget busybox gettext-base && apt-get clean && rm -r /var/lib/apt/lists/*
-RUN cd /usr/local/bin && wget "https://storage.googleapis.com/kubernetes-release/release/v1.18.6/bin/linux/amd64/kubectl" -O kubectl && chmod +x kubectl
-RUN cd /usr/local/bin && wget "https://releases.hashicorp.com/vault/1.5.0/vault_1.5.0_linux_amd64.zip" -O- | busybox unzip - && chmod +x vault
+RUN apt-get update && apt-get install -y libssl1.1 net-tools tcpdump iproute2 netcat libpq-dev \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
 
 RUN mkdir -p /opt/aptos/bin
-COPY --from=builder /aptos/target/release/aptos-genesis-tool /usr/local/bin
-COPY --from=builder /aptos/target/release/aptos-operational-tool /usr/local/bin
-
-### Get Aptos Move modules bytecodes for genesis ceremony
-RUN mkdir -p /aptos-framework/move/build
-RUN mkdir -p /aptos-framework/move/modules
-COPY --from=builder /aptos/aptos-framework/releases/artifacts/current/build /aptos-framework/move/build
-RUN mv /aptos-framework/move/build/**/bytecode_modules/*.mv /aptos-framework/move/modules
-RUN rm -rf /aptos-framework/move/build
+COPY --from=builder /aptos/target/release/aptos-indexer /usr/local/bin
 
 FROM pre-prod as testing
 
-RUN /usr/local/bin/aptos-genesis-tool -h
-RUN /usr/local/bin/aptos-operational-tool -h
+RUN /usr/local/bin/aptos-indexer -h
 
 FROM pre-prod as prod
 
