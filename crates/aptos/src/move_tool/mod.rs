@@ -11,8 +11,9 @@ use crate::{
     common::{types::MovePackageDir, utils::to_common_result},
     CliResult, Error,
 };
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::PrivateKey;
-use aptos_rest_client::Client;
+use aptos_rest_client::{Client, Transaction};
 use aptos_sdk::transaction_builder::TransactionFactory;
 use aptos_sdk::types::LocalAccount;
 use aptos_types::chain_id::ChainId;
@@ -24,6 +25,7 @@ use move_cli::package::cli::{run_move_unit_tests, UnitTestResult};
 use move_core_types::account_address::AccountAddress;
 use move_package::{compilation::compiled_package::CompiledPackage, BuildConfig};
 use move_unit_test::UnitTestingConfig;
+use reqwest::Url;
 use std::path::Path;
 
 /// CLI tool for performing Move tasks
@@ -122,7 +124,7 @@ pub struct PublishPackage {
     node_options: NodeOptions,
     #[clap(long)]
     chain_id: ChainId,
-    #[clap(long, default = 1000)]
+    #[clap(long, default_value_t = 1000)]
     max_gas: u64,
 }
 
@@ -135,9 +137,14 @@ impl PublishPackage {
             ..Default::default()
         };
         let package = compile_move(build_config, self.move_options.package_dir.as_path())?;
+        let compiled_units: Vec<Vec<u8>> = package
+            .compiled_units
+            .iter()
+            .map(|unit_with_source| unit_with_source.unit.serialize())
+            .collect();
+        let compiled_payload = TransactionPayload::ModuleBundle(ModuleBundle::new(compiled_units));
 
         // Now that it's compiled, lets send it
-        let client = Client::new(self.node_options.url.clone());
         let sender_key = if let Some(private_key) = self
             .private_key_options
             .extract_private_key(self.encoding_options.encoding)?
@@ -147,35 +154,49 @@ impl PublishPackage {
             let config = CliConfig::load()?;
             config.private_key.unwrap()
         };
-        let sender_address = AuthenticationKey::ed25519(&sender_key.public_key()).derived_address();
-        let sender_address = AccountAddress::new(*sender_address);
 
-        let account_response = client
-            .get_account(sender_address)
-            .await
-            .map_err(|err| Error::UnexpectedError(err.to_string()))?;
-        let account = account_response.inner();
-
-        let transaction_factory = TransactionFactory::new(self.chain_id)
-            .with_gas_unit_price(1)
-            .with_max_gas_amount(self.max_gas);
-        let sender_account =
-            &mut LocalAccount::new(sender_address, sender_key, account.sequence_number);
-
-        let compiled_units: Vec<Vec<u8>> = package
-            .compiled_units
-            .iter()
-            .map(|unit_with_source| unit_with_source.unit.serialize())
-            .collect();
-
-        let payload = TransactionPayload::ModuleBundle(ModuleBundle::new(compiled_units));
-        let transaction =
-            sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
-        let response = client
-            .submit_and_wait(&transaction)
-            .await
-            .map_err(|err| Error::UnexpectedError(err.to_string()))?;
-
-        Ok(response.inner().clone())
+        submit_transaction(
+            self.node_options.url.clone(),
+            self.chain_id,
+            sender_key,
+            compiled_payload,
+            self.max_gas,
+        ).await
     }
+}
+
+/// Submits a [`TransactionPayload`] as signed by the `sender_key`
+async fn submit_transaction(
+    url: Url,
+    chain_id: ChainId,
+    sender_key: Ed25519PrivateKey,
+    payload: TransactionPayload,
+    max_gas: u64,
+) -> Result<Transaction, Error> {
+    let client = Client::new(url);
+
+    // Get sender address
+    let sender_address = AuthenticationKey::ed25519(&sender_key.public_key()).derived_address();
+    let sender_address = AccountAddress::new(*sender_address);
+
+    // Get account to get the sequence number
+    let account_response = client
+        .get_account(sender_address)
+        .await
+        .map_err(|err| Error::UnexpectedError(err.to_string()))?;
+    let account = account_response.inner();
+    let sequence_number = account.sequence_number;
+
+    let transaction_factory = TransactionFactory::new(chain_id)
+        .with_gas_unit_price(1)
+        .with_max_gas_amount(max_gas);
+    let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
+    let transaction =
+        sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
+    let response = client
+        .submit_and_wait(&transaction)
+        .await
+        .map_err(|err| Error::UnexpectedError(err.to_string()))?;
+
+    Ok(response.inner().clone())
 }
