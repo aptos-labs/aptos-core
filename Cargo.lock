@@ -170,6 +170,7 @@ dependencies = [
  "cached-framework-packages",
  "clap 3.1.9",
  "hex",
+ "itertools",
  "move-binary-format",
  "move-cli",
  "move-core-types",
