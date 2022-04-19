@@ -87,7 +87,19 @@ impl TransactionValidation for VMValidator {
         });
         use aptos_vm::VMValidator;
 
-        Ok(self.vm.validate_transaction(txn, &self.cached_state_view))
+        // We try to validate the transaction using the cached state view. If this
+        // fails we refresh the state view and try again (e.g., in case the transaction
+        // requires the latest state view).
+        let vm_validator_result = self
+            .vm
+            .validate_transaction(txn.clone(), &&self.cached_state_view);
+        if vm_validator_result.status().is_some() {
+            // The transaction failed validation
+            let latest_state_view = latest_state_view(&self.db_reader);
+            Ok(self.vm.validate_transaction(txn, &latest_state_view))
+        } else {
+            Ok(vm_validator_result)
+        }
     }
 
     fn restart(&mut self, _config: OnChainConfigPayload) -> Result<()> {

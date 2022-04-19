@@ -339,6 +339,7 @@ impl AptosData {
         Self::builder()
             .is_async(false)
             .enable_backtrace()
+            .level(Level::Debug)
             .printer(Box::new(StderrWriter))
             .build();
     }
