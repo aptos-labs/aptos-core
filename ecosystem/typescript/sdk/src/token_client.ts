@@ -1,6 +1,7 @@
 import { AptosAccount } from "./aptos_account";
 import { AptosClient } from "./aptos_client";
 import { Types } from "./types";
+import { MaybeHexString } from "./hex_string";
 
 export class TokenClient {
     aptosClient: AptosClient;
@@ -19,8 +20,8 @@ export class TokenClient {
         return Promise.resolve(res["hash"])
     }
 
-    /** Creates a new collection within the specified account */
-    async createCollection(account: AptosAccount, description: string, name: string, uri: string) {
+    // Creates a new collection within the specified account 
+    async createCollection(account: AptosAccount, description: string, name: string, uri: string): Promise<Types.HexEncodedBytes> {
         const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
             type: "script_function_payload",
             function: "0x1::Token::create_unlimited_collection_script",
@@ -34,14 +35,14 @@ export class TokenClient {
         return await this.submitTransactionHelper(account, payload);
     }
 
-    /** Creates a new token within the specified account */
+    // Creates a new token within the specified account 
     async createToken(
         account: AptosAccount,
         collection_name: string,
         description: string,
         name: string,
         supply: number,
-        uri: string) {
+        uri: string): Promise<Types.HexEncodedBytes> {
         const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
             type: "script_function_payload",
             function: "0x1::Token::create_token_script",
@@ -57,13 +58,13 @@ export class TokenClient {
         return await this.submitTransactionHelper(account, payload);
     }
 
-    /** Offer token to another account */
+    // Offer token to another account 
     async offerToken(
         account: AptosAccount,
-        receiver: string,
-        creator: string,
+        receiver: MaybeHexString,
+        creator: MaybeHexString,
         token_creation_num: number,
-        amount: number) {
+        amount: number): Promise<Types.HexEncodedBytes> {
         const payload: Types.TransactionPayload = {
             type: "script_function_payload",
             function: "0x1::TokenTransfers::offer_script",
@@ -78,12 +79,12 @@ export class TokenClient {
         return await this.submitTransactionHelper(account, payload);
     }
 
-    /** Claim token */
+    // Claim token 
     async claimToken(
         account: AptosAccount,
-        sender: string,
-        creator: string,
-        token_creation_num: number) {
+        sender: MaybeHexString,
+        creator: MaybeHexString,
+        token_creation_num: number): Promise<Types.HexEncodedBytes> {
         const payload: Types.TransactionPayload = {
             type: "script_function_payload",
             function: "0x1::TokenTransfers::claim_script",
@@ -97,12 +98,12 @@ export class TokenClient {
         return await this.submitTransactionHelper(account, payload);
     }
 
-    /** Cancel token */
+    // Cancel token 
     async cancelTokenOffer(
         account: AptosAccount,
-        receiver: string,
-        creator: string,
-        token_creation_num: number) {
+        receiver: MaybeHexString,
+        creator: MaybeHexString,
+        token_creation_num: number): Promise<Types.HexEncodedBytes> {
         const payload: Types.TransactionPayload = {
             type: "script_function_payload",
             function: "0x1::TokenTransfers::cancel_offer_script",
@@ -116,8 +117,8 @@ export class TokenClient {
         return await this.submitTransactionHelper(account, payload);
     }
 
-    /** Retrieve the token's creation_num, which is useful for non-creator operations */
-    async getTokenId(creator: string, collection_name: string, token_name: string): Promise<number> {
+    // Retrieve the token's creation_num, which is useful for non-creator operations 
+    async getTokenId(creator: MaybeHexString, collection_name: string, token_name: string): Promise<number> {
         const resources = await this.aptosClient.getAccountResources(creator);
         let collections = []
         let tokens = []
