@@ -66,10 +66,25 @@ table! {
     }
 }
 
+table! {
+    write_set_changes (hash) {
+        transaction_hash -> Varchar,
+        hash -> Varchar,
+        #[sql_name = "type"]
+        type_ -> Text,
+        address -> Varchar,
+        module -> Jsonb,
+        resource -> Jsonb,
+        data -> Jsonb,
+        inserted_at -> Timestamp,
+    }
+}
+
 allow_tables_to_appear_in_same_query!(
     block_metadata_transactions,
     events,
     processor_statuses,
     transactions,
     user_transactions,
+    write_set_changes,
 );

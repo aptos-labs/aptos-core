@@ -6,7 +6,7 @@
 
 use crate::{
     database::PgPoolConnection,
-    models::events::{Event, EventModel},
+    models::{events::EventModel, write_set_changes::WriteSetChangeModel},
     schema::{block_metadata_transactions, transactions, user_transactions},
 };
 use aptos_rest_client::aptos_api_types::{
@@ -49,6 +49,7 @@ impl Transaction {
             Option<UserTransaction>,
             Option<BlockMetadataTransaction>,
             Vec<EventModel>,
+            Vec<WriteSetChangeModel>,
         )>,
     > {
         let mut txs = transactions::table
@@ -70,6 +71,11 @@ impl Transaction {
             .load::<EventModel>(connection)?
             .grouped_by(&txs);
 
+        let mut write_set_changes: Vec<Vec<WriteSetChangeModel>> =
+            WriteSetChangeModel::belonging_to(&txs)
+                .load::<WriteSetChangeModel>(connection)?
+                .grouped_by(&txs);
+
         // Convert to the nice result tuple
         let mut result = vec![];
         while !txs.is_empty() {
@@ -78,6 +84,7 @@ impl Transaction {
                 user_transactions.pop().unwrap().pop(),
                 block_metadata_transactions.pop().unwrap().pop(),
                 events.pop().unwrap(),
+                write_set_changes.pop().unwrap(),
             ))
         }
 
@@ -92,12 +99,13 @@ impl Transaction {
         Option<UserTransaction>,
         Option<BlockMetadataTransaction>,
         Vec<EventModel>,
+        Vec<WriteSetChangeModel>,
     )> {
         let transaction = transactions::table
             .filter(transactions::version.eq(version as i64))
             .first::<Transaction>(connection)?;
 
-        let (user_transaction, block_metadata_transaction, events) =
+        let (user_transaction, block_metadata_transaction, events, write_set_changes) =
             transaction.get_details_for_transaction(connection)?;
 
         Ok((
@@ -105,6 +113,7 @@ impl Transaction {
             user_transaction,
             block_metadata_transaction,
             events,
+            write_set_changes,
         ))
     }
 
@@ -116,12 +125,13 @@ impl Transaction {
         Option<UserTransaction>,
         Option<BlockMetadataTransaction>,
         Vec<EventModel>,
+        Vec<WriteSetChangeModel>,
     )> {
         let transaction = transactions::table
             .filter(transactions::hash.eq(&transaction_hash))
             .first::<Transaction>(connection)?;
 
-        let (user_transaction, block_metadata_transaction, events) =
+        let (user_transaction, block_metadata_transaction, events, write_set_changes) =
             transaction.get_details_for_transaction(connection)?;
 
         Ok((
@@ -129,6 +139,7 @@ impl Transaction {
             user_transaction,
             block_metadata_transaction,
             events,
+            write_set_changes,
         ))
     }
 
@@ -139,6 +150,7 @@ impl Transaction {
         Option<UserTransaction>,
         Option<BlockMetadataTransaction>,
         Vec<EventModel>,
+        Vec<WriteSetChangeModel>,
     )> {
         let mut user_transaction: Option<UserTransaction> = None;
         let mut block_metadata_transaction: Option<BlockMetadataTransaction> = None;
@@ -146,6 +158,10 @@ impl Transaction {
         let events = crate::schema::events::table
             .filter(crate::schema::events::transaction_hash.eq(&self.hash))
             .load::<EventModel>(connection)?;
+
+        let write_set_changes = crate::schema::write_set_changes::table
+            .filter(crate::schema::write_set_changes::transaction_hash.eq(&self.hash))
+            .load::<WriteSetChangeModel>(connection)?;
 
         match self.type_.as_str() {
             "user_transaction" => {
@@ -163,7 +179,12 @@ impl Transaction {
             "genesis_transaction" => {}
             _ => unreachable!("Unknown transaction type: {}", &self.type_),
         };
-        Ok((user_transaction, block_metadata_transaction, events))
+        Ok((
+            user_transaction,
+            block_metadata_transaction,
+            events,
+            write_set_changes,
+        ))
     }
 
     pub fn from_transaction(
@@ -171,7 +192,8 @@ impl Transaction {
     ) -> (
         Transaction,
         Option<Either<UserTransaction, BlockMetadataTransaction>>,
-        Option<Vec<Event>>,
+        Option<Vec<EventModel>>,
+        Option<Vec<WriteSetChangeModel>>,
     ) {
         match transaction {
             APITransaction::UserTransaction(tx) => (
@@ -182,6 +204,10 @@ impl Transaction {
                 ),
                 Some(Either::Left(UserTransaction::from_transaction(tx))),
                 EventModel::from_events(tx.info.hash.to_string(), &tx.events),
+                WriteSetChangeModel::from_write_set_changes(
+                    tx.info.hash.to_string(),
+                    &tx.info.changes,
+                ),
             ),
             APITransaction::GenesisTransaction(tx) => (
                 Self::from_transaction_info(
@@ -191,6 +217,10 @@ impl Transaction {
                 ),
                 None,
                 EventModel::from_events(tx.info.hash.to_string(), &tx.events),
+                WriteSetChangeModel::from_write_set_changes(
+                    tx.info.hash.to_string(),
+                    &tx.info.changes,
+                ),
             ),
             APITransaction::BlockMetadataTransaction(tx) => (
                 Self::from_transaction_info(
@@ -202,6 +232,10 @@ impl Transaction {
                     tx,
                 ))),
                 None,
+                WriteSetChangeModel::from_write_set_changes(
+                    tx.info.hash.to_string(),
+                    &tx.info.changes,
+                ),
             ),
             _ => unreachable!(),
         }

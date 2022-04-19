@@ -475,6 +475,17 @@ pub enum WriteSetChange {
     },
 }
 
+impl WriteSetChange {
+    pub fn type_str(&self) -> &'static str {
+        match self {
+            WriteSetChange::DeleteModule { .. } => "delete_module",
+            WriteSetChange::DeleteResource { .. } => "delete_resource",
+            WriteSetChange::WriteModule { .. } => "write_module",
+            WriteSetChange::WriteResource { .. } => "write_resource",
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum TransactionSignature {
