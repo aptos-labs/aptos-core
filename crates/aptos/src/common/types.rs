@@ -7,7 +7,9 @@ use aptos_crypto::{
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
 use aptos_logger::{debug, info};
+use aptos_types::transaction::authenticator::AuthenticationKey;
 use clap::{ArgEnum, Parser};
+use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::Debug,
@@ -224,87 +226,68 @@ pub struct EncodingOptions {
 }
 
 #[derive(Debug, Parser)]
+pub struct PublicKeyInputOptions {
+    /// Public key input file name
+    #[clap(long, group = "public_key_input", parse(from_os_str))]
+    public_key_file: Option<PathBuf>,
+    /// Public key encoded in a type as shown in `encoding`
+    #[clap(long, group = "public_key_input")]
+    public_key: Option<String>,
+}
+
+impl ExtractPublicKey for PublicKeyInputOptions {
+    fn extract_public_key(&self, encoding: EncodingType) -> Result<Ed25519PublicKey, Error> {
+        if let Some(ref file) = self.public_key_file {
+            encoding.load_key(file.as_path())
+        } else if let Some(ref key) = self.public_key {
+            let key = key.as_bytes().to_vec();
+            encoding.decode_key(key)
+        } else {
+            Err(Error::CommandArgumentError(
+                "One of ['--public-key', '--public-key-file'] must be used".to_string(),
+            ))
+        }
+    }
+}
+
+#[derive(Debug, Parser)]
 pub struct PrivateKeyInputOptions {
     /// Private key input file name
-    #[clap(long, group = "key_input", parse(from_os_str))]
+    #[clap(long, group = "private_key_input", parse(from_os_str))]
     private_key_file: Option<PathBuf>,
     /// Private key encoded in a type as shown in `encoding`
-    #[clap(long, group = "key_input")]
+    #[clap(long, group = "private_key_input")]
     private_key: Option<String>,
 }
 
 impl PrivateKeyInputOptions {
-    pub fn extract_private_key(
-        &self,
-        encoding: EncodingType,
-    ) -> Result<Option<Ed25519PrivateKey>, Error> {
+    pub fn extract_private_key(&self, encoding: EncodingType) -> Result<Ed25519PrivateKey, Error> {
         if let Some(ref file) = self.private_key_file {
-            encoding.load_key(file.as_path()).map(Some)
+            encoding.load_key(file.as_path())
         } else if let Some(ref key) = self.private_key {
             let key = key.as_bytes().to_vec();
-            encoding.decode_key(key).map(Some)
+            encoding.decode_key(key)
+        } else if let Some(private_key) = CliConfig::load()?.private_key {
+            Ok(private_key)
         } else {
-            Ok(None)
+            Err(Error::CommandArgumentError(
+                "One of ['--private-key', '--private-key-file'] must be used".to_string(),
+            ))
         }
     }
 }
 
-#[derive(Debug, Parser)]
-pub struct PublicKeyInputOptions {
-    /// Public key input file name.
-    #[clap(long, group = "key_input", parse(from_os_str))]
-    public_key_file: Option<PathBuf>,
-    /// Public key encoded in a type as shown in `encoding`
-    #[clap(long, group = "key_input")]
-    public_key: Option<String>,
-}
-
-impl PublicKeyInputOptions {
-    pub fn extract_public_key(
-        &self,
-        encoding: EncodingType,
-    ) -> Result<Option<Ed25519PublicKey>, Error> {
-        if let Some(ref file) = self.public_key_file {
-            encoding.load_key(file.as_path()).map(Some)
-        } else if let Some(ref key) = self.public_key {
-            let key = key.as_bytes().to_vec();
-            encoding.decode_key(key).map(Some)
-        } else {
-            Ok(None)
-        }
+impl ExtractPublicKey for PrivateKeyInputOptions {
+    fn extract_public_key(&self, encoding: EncodingType) -> Result<Ed25519PublicKey, Error> {
+        self.extract_private_key(encoding)
+            .map(|private_key| private_key.public_key())
     }
 }
 
-#[derive(Debug, Parser)]
-pub struct KeyInputOptions {
-    #[clap(flatten)]
-    pub private_key_options: PrivateKeyInputOptions,
-    #[clap(flatten)]
-    public_key_options: PublicKeyInputOptions,
-}
+pub trait ExtractPublicKey {
+    fn extract_public_key(&self, encoding: EncodingType) -> Result<Ed25519PublicKey, Error>;
 
-impl KeyInputOptions {
-    /// Extracts public key from either private or public key options
-    pub fn extract_public_key(&self, encoding: EncodingType) -> Result<Ed25519PublicKey, Error> {
-        let private_key_result = self.private_key_options.extract_private_key(encoding)?;
-        let public_key_result = self.public_key_options.extract_public_key(encoding)?;
-
-        if let Some(private_key) = private_key_result {
-            Ok(private_key.public_key())
-        } else if let Some(public_key) = public_key_result {
-            Ok(public_key)
-        } else {
-            let config = CliConfig::load()?;
-            if let Some(private_key) = config.private_key {
-                println!("Using .aptos/config.yml private key");
-                Ok(private_key.public_key())
-            } else {
-                Err(Error::CommandArgumentError("One of ['--private-key', '--private-key-file', '--public-key', '--public-key-file'] must be used".to_string()))
-            }
-        }
-    }
-
-    pub fn extract_x25519_public_key(
+    fn extract_x25519_public_key(
         &self,
         encoding: EncodingType,
     ) -> Result<x25519::PublicKey, Error> {
@@ -313,6 +296,11 @@ impl KeyInputOptions {
             Error::UnexpectedError(format!("Failed to convert ed25519 to x25519 {:?}", err))
         })
     }
+}
+
+pub fn account_address_from_public_key(public_key: &Ed25519PublicKey) -> AccountAddress {
+    let auth_key = AuthenticationKey::ed25519(public_key);
+    AccountAddress::new(*auth_key.derived_address())
 }
 
 #[derive(Debug, Parser)]

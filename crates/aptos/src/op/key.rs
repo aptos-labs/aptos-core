@@ -1,9 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::types::{ExtractPublicKey, PrivateKeyInputOptions};
 use crate::{
     common::{
-        types::{EncodingOptions, EncodingType, Error, KeyInputOptions, KeyType, SaveFile},
+        types::{EncodingOptions, EncodingType, Error, KeyType, SaveFile},
         utils::{append_file_extension, check_if_file_exists, to_common_result, write_to_file},
     },
     CliResult,
@@ -44,7 +45,7 @@ impl KeyTool {
 #[derive(Debug, Parser)]
 pub struct ExtractPeer {
     #[clap(flatten)]
-    key_input_options: KeyInputOptions,
+    private_key_input_options: PrivateKeyInputOptions,
     #[clap(flatten)]
     output_file_options: SaveFile,
     #[clap(flatten)]
@@ -58,7 +59,7 @@ impl ExtractPeer {
 
         // Load key based on public or private
         let public_key = self
-            .key_input_options
+            .private_key_input_options
             .extract_x25519_public_key(self.encoding_options.encoding)?;
 
         // Build peer info

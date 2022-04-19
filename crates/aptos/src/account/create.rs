@@ -6,19 +6,19 @@
 //! TODO: Examples
 //!
 
+use crate::common::types::{
+    account_address_from_public_key, ExtractPublicKey, PublicKeyInputOptions,
+};
 use crate::{
     common::types::{EncodingOptions, NodeOptions, PrivateKeyInputOptions},
     CliResult, Error as CommonError,
 };
 use anyhow::Error;
-use aptos_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
-    PrivateKey,
-};
+use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_rest_client::{Client as RestClient, Response, Transaction};
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
-    types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey, LocalAccount},
+    types::{chain_id::ChainId, LocalAccount},
 };
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
@@ -38,8 +38,8 @@ pub struct CreateAccount {
     #[clap(flatten)]
     node: NodeOptions,
 
-    /// Public Key of account you want to create
-    public_key: String,
+    #[clap(flatten)]
+    public_key_input_options: PublicKeyInputOptions,
 
     /// Chain ID
     chain_id: u8,
@@ -54,15 +54,6 @@ impl CreateAccount {
             .await?
             .json()
             .await
-    }
-
-    fn get_address(&self) -> Result<AccountAddress, Error> {
-        let public_key: Ed25519PublicKey = self
-            .encoding_options
-            .encoding
-            .decode_key(self.public_key.as_bytes().to_vec())?;
-        let auth_key = AuthenticationKey::ed25519(&public_key);
-        Ok(AccountAddress::new(*auth_key.derived_address()))
     }
 
     async fn get_sequence_number(&self, account: AccountAddress) -> Result<u64, CommonError> {
@@ -100,20 +91,27 @@ impl CreateAccount {
     }
 
     async fn execute_inner(self) -> Result<String, Error> {
-        let private_key = self
+        let sender_private_key = self
             .private_key_input_options
-            .extract_private_key(self.encoding_options.encoding)?
-            .unwrap();
-        let sender_address =
-            AuthenticationKey::ed25519(&private_key.public_key()).derived_address();
-        let sender_address = AccountAddress::new(*sender_address);
+            .extract_private_key(self.encoding_options.encoding)?;
+        let sender_public_key = sender_private_key.public_key();
+        let sender_address = account_address_from_public_key(&sender_public_key);
         let sequence_number = self.get_sequence_number(sender_address).await;
-        let address = self.get_address()?;
+
+        let public_key_to_create = self
+            .public_key_input_options
+            .extract_public_key(self.encoding_options.encoding)?;
+        let new_address = account_address_from_public_key(&public_key_to_create);
         match sequence_number {
             Ok(sequence_number) => self
-                .post_account(address, private_key, sender_address, sequence_number)
+                .post_account(
+                    new_address,
+                    sender_private_key,
+                    sender_address,
+                    sequence_number,
+                )
                 .await
-                .map(|_| format!("Account Created at {}", address)),
+                .map(|_| format!("Account Created at {}", new_address)),
             Err(err) => Err(Error::new(err)),
         }
     }
