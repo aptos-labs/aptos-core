@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_transaction_builder::aptos_stdlib;
-use aptos_types::account_address::AccountAddress;
 use forge::{AptosContext, AptosTest, Result, Test};
 
 pub struct NFTTransaction;
@@ -51,14 +50,11 @@ impl AptosTest for NFTTransaction {
         client.submit_and_wait(&token_txn).await?;
 
         let token_num = client
-            .get_account_resources_by_type(
-                creator.address(),
-                AccountAddress::from_hex_literal("0x1").unwrap(),
-                &"Token".parse().unwrap(),
-                &"Collections".parse().unwrap(),
-            )
+            .get_account_resource(creator.address(), "0x1::Token::Collections")
             .await?
-            .inner()[0]
+            .inner()
+            .as_ref()
+            .unwrap()
             .data["collections"]["data"][0]["value"]["tokens"]["data"][0]["value"]["id"]
             ["creation_num"]
             .as_str()

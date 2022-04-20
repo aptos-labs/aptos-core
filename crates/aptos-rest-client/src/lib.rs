@@ -5,11 +5,7 @@ use anyhow::{anyhow, Result};
 pub use aptos_api_types::{MoveModuleBytecode, PendingTransaction, Transaction};
 use aptos_crypto::HashValue;
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
-use move_core_types::{
-    ident_str,
-    identifier::Identifier,
-    language_storage::{StructTag, CORE_CODE_ADDRESS},
-};
+use move_core_types::identifier::Identifier;
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize};
 use std::time::Duration;
@@ -53,32 +49,15 @@ impl Client {
     }
 
     pub async fn get_aptos_version(&self) -> Result<Response<AptosVersion>> {
-        self.get_resource::<AptosVersion>(
-            aptos_root_address(),
-            &StructTag {
-                address: CORE_CODE_ADDRESS,
-                name: ident_str!("Version").to_owned(),
-                module: ident_str!("Version").to_owned(),
-                type_params: vec![],
-            },
-        )
-        .await
+        self.get_resource::<AptosVersion>(aptos_root_address(), "0x1::Version::Version")
+            .await
     }
 
     pub async fn get_account_balance(&self, address: AccountAddress) -> Result<Response<Balance>> {
         let resp = self
-            .get_account_resources_by_type(
-                address,
-                aptos_types::account_config::CORE_CODE_ADDRESS,
-                &ident_str!("TestCoin").to_owned(),
-                &ident_str!("Balance").to_owned(),
-            )
+            .get_account_resource(address, "0x1::TestCoin::Balance")
             .await?;
-        resp.and_then(|mut resources| {
-            let resource = resources.pop();
-            if !resources.is_empty() {
-                return Err(anyhow!("More than one data returned"));
-            }
+        resp.and_then(|resource| {
             if let Some(res) = resource {
                 Ok(serde_json::from_value::<Balance>(res.data)?)
             } else {
@@ -313,12 +292,12 @@ impl Client {
     pub async fn get_resource<T: DeserializeOwned>(
         &self,
         address: AccountAddress,
-        resource_type: &StructTag,
+        resource_type: &str,
     ) -> Result<Response<T>> {
         let resp = self.get_account_resource(address, resource_type).await?;
         resp.and_then(|conf| {
-            if let Some(val) = conf {
-                serde_json::from_value(val)
+            if let Some(res) = conf {
+                serde_json::from_value(res.data)
                     .map_err(|e| anyhow!("deserialize {} failed: {}", resource_type, e))
             } else {
                 Err(anyhow!(
@@ -333,16 +312,15 @@ impl Client {
     pub async fn get_account_resource(
         &self,
         address: AccountAddress,
-        resource_type: &StructTag,
-    ) -> Result<Response<Option<serde_json::Value>>> {
-        self.get_account_resources(address).await.map(|response| {
-            response.map(|resources| {
-                resources
-                    .into_iter()
-                    .find(|resource| &resource.resource_type == resource_type)
-                    .map(|resource| resource.data)
-            })
-        })
+        resource_type: &str,
+    ) -> Result<Response<Option<Resource>>> {
+        let url = self
+            .base_url
+            .join(&format!("accounts/{}/resource/{}", address, resource_type))?;
+
+        let response = self.inner.get(url).send().await?;
+
+        self.json(response).await
     }
 
     pub async fn get_account_modules(
@@ -372,7 +350,6 @@ impl Client {
             let error_response = response.json::<RestError>().await?;
             return Err(anyhow::anyhow!("Request failed: {:?}", error_response));
         }
-
         let state = State::from_headers(response.headers())?;
 
         Ok((response, state))
