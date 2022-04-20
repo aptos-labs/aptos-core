@@ -2,6 +2,22 @@ variable "region" {
   description = "AWS region"
 }
 
+variable "zone_id" {
+  description = "Route53 Zone ID to create records in"
+  default     = ""
+}
+
+variable "tls_sans" {
+  description = "List of Subject Alternate Names to include in TLS certificate"
+  type        = list(string)
+  default     = []
+}
+
+variable "workspace_dns" {
+  description = "Include Terraform workspace name in DNS records"
+  default     = true
+}
+
 variable "iam_path" {
   default     = "/"
   description = "Path to use when naming IAM objects"
@@ -90,22 +106,6 @@ variable "indexer_helm_values" {
   default     = {}
 }
 
-variable "zone_id" {
-  description = "Route53 Zone ID to create records in"
-  default     = ""
-}
-
-variable "tls_sans" {
-  description = "List of Subject Alternate Names to include in TLS certificate"
-  type        = list(string)
-  default     = []
-}
-
-variable "workspace_dns" {
-  description = "Include Terraform workspace name in DNS records"
-  default     = true
-}
-
 variable "enable_pfn_logger" {
   description = "Enable separate public fullnode logger pod"
   default     = false
@@ -170,6 +170,7 @@ variable "enable_indexer" {
 
 variable "indexer_db_password" {
   description = "password for indexer RDS instance"
+  default     = ""
 }
 
 variable "enable_k8s_metrics_server" {
