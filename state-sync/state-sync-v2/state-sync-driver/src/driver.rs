@@ -247,10 +247,7 @@ impl<
                 consensus_commit_notification.reconfiguration_events.len()
             ))
         );
-        metrics::increment_counter(
-            &metrics::DRIVER_COUNTERS,
-            metrics::DRIVER_CONSENSUS_COMMIT_NOTIFICATION,
-        );
+        self.update_consensus_commit_metrics(&consensus_commit_notification);
 
         // TODO(joshlind): can we get consensus to forward the events?
 
@@ -276,6 +273,30 @@ impl<
         // Check the progress of any sync requests. We need this here because
         // consensus might issue a sync request and then commit (asynchronously).
         self.check_sync_request_progress().await
+    }
+
+    /// Updates the storage synchronizer metrics based on the consensus
+    /// commit notification.
+    fn update_consensus_commit_metrics(
+        &self,
+        consensus_commit_notification: &ConsensusCommitNotification,
+    ) {
+        metrics::increment_counter(
+            &metrics::DRIVER_COUNTERS,
+            metrics::DRIVER_CONSENSUS_COMMIT_NOTIFICATION,
+        );
+
+        let operations = [
+            metrics::StorageSynchronizerOperations::ExecutedTransactions,
+            metrics::StorageSynchronizerOperations::SyncedTransactions,
+        ];
+        for operation in operations {
+            metrics::increment_gauge(
+                &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+                operation.get_label(),
+                consensus_commit_notification.transactions.len() as u64,
+            );
+        }
     }
 
     /// Handles a consensus notification to sync to a specified target
