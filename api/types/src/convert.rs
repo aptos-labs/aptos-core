@@ -577,6 +577,10 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         }
     }
 
+    pub fn try_into_move_value(&self, typ: &TypeTag, bytes: &[u8]) -> Result<MoveValue> {
+        self.inner.view_value(typ, bytes)?.try_into()
+    }
+
     fn explain_function_index(&self, module_id: &ModuleId, function: &u16) -> Result<String> {
         let code = self.inner.get_module(&module_id.clone())? as Rc<dyn Bytecode>;
         let func = code.function_handle_at(FunctionHandleIndex::new(*function));
