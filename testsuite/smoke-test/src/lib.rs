@@ -3,6 +3,7 @@
 
 // Defines Forge Tests
 pub mod aptos;
+pub mod aptos_cli;
 pub mod fullnode;
 pub mod indexer;
 pub mod nft_transaction;
