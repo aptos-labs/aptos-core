@@ -4,7 +4,7 @@
 use crate::{
     transaction::{ModuleBundlePayload, StateCheckpointTransaction},
     Bytecode, DirectWriteSet, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode,
-    MoveResource, MoveScriptBytecode, MoveType, MoveValue, ScriptFunctionId, ScriptFunctionPayload,
+    MoveResource, MoveScriptBytecode, MoveValue, ScriptFunctionId, ScriptFunctionPayload,
     ScriptPayload, ScriptWriteSet, Transaction, TransactionInfo, TransactionOnChainData,
     TransactionPayload, UserTransactionRequest, WriteSet, WriteSetChange, WriteSetPayload,
 };
@@ -23,7 +23,7 @@ use aptos_types::{
 use move_binary_format::file_format::FunctionHandleIndex;
 use move_core_types::{
     identifier::Identifier,
-    language_storage::{ModuleId, StructTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
     resolver::MoveResolver,
     value::{MoveStructLayout, MoveTypeLayout},
 };
@@ -337,7 +337,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     type_arguments.len()
                 );
                 let args = self
-                    .try_into_move_values(func, arguments)?
+                    .try_into_vm_values(func, arguments)?
                     .iter()
                     .map(bcs::to_bytes)
                     .collect::<Result<_, bcs::Error>>()?;
@@ -371,7 +371,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                 let MoveScriptBytecode { bytecode, abi } = code.try_parse_abi();
                 match abi {
                     Some(func) => {
-                        let args = self.try_into_move_values(func, arguments)?;
+                        let args = self.try_into_vm_values(func, arguments)?;
                         Target::Script(Script::new(
                             bytecode.into(),
                             type_arguments
@@ -395,7 +395,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         Ok(ret)
     }
 
-    pub fn try_into_move_values(
+    pub fn try_into_vm_values(
         &self,
         func: MoveFunction,
         args: Vec<serde_json::Value>,
@@ -422,14 +422,15 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             .zip(args.into_iter())
             .enumerate()
             .map(|(i, (arg_type, arg))| {
-                self.try_into_move_value(&arg_type, arg).map_err(|e| {
-                    format_err!(
-                        "parse arguments[{}] failed, expect {}, caused by error: {}",
-                        i,
-                        arg_type.json_type_name(),
-                        e,
-                    )
-                })
+                self.try_into_vm_value(&arg_type.clone().try_into()?, arg)
+                    .map_err(|e| {
+                        format_err!(
+                            "parse arguments[{}] failed, expect {}, caused by error: {}",
+                            i,
+                            arg_type.json_type_name(),
+                            e,
+                        )
+                    })
             })
             .collect::<Result<_>>()
     }
@@ -438,18 +439,17 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
     // representation in the DB.
     // Notice that structs are of the `MoveStruct::Runtime` flavor, matching the representation in
     // DB.
-    pub fn try_into_move_value(
+    pub fn try_into_vm_value(
         &self,
-        typ: &MoveType,
+        type_tag: &TypeTag,
         val: Value,
     ) -> Result<move_core_types::value::MoveValue> {
-        let type_tag = typ.clone().try_into()?;
-        let layout = self.inner.get_type_layout_with_fields(&type_tag)?;
+        let layout = self.inner.get_type_layout_with_fields(type_tag)?;
 
-        self.try_into_move_value_from_layout(&layout, val)
+        self.try_into_vm_value_from_layout(&layout, val)
     }
 
-    fn try_into_move_value_from_layout(
+    fn try_into_vm_value_from_layout(
         &self,
         layout: &MoveTypeLayout,
         val: Value,
@@ -463,10 +463,10 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             MoveTypeLayout::U128 => serde_json::from_value::<crate::U128>(val)?.into(),
             MoveTypeLayout::Address => serde_json::from_value::<crate::Address>(val)?.into(),
             MoveTypeLayout::Vector(item_layout) => {
-                self.try_into_move_value_vector(item_layout.as_ref(), val)?
+                self.try_into_vm_value_vector(item_layout.as_ref(), val)?
             }
             MoveTypeLayout::Struct(struct_layout) => {
-                self.try_into_move_value_struct(struct_layout, val)?
+                self.try_into_vm_value_struct(struct_layout, val)?
             }
             MoveTypeLayout::Signer => {
                 bail!("unexpected move type {:?} for value {:?}", layout, val)
@@ -474,7 +474,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         })
     }
 
-    pub fn try_into_move_value_vector(
+    pub fn try_into_vm_value_vector(
         &self,
         layout: &MoveTypeLayout,
         val: Value,
@@ -484,7 +484,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         } else if let Value::Array(list) = val {
             let vals = list
                 .into_iter()
-                .map(|v| self.try_into_move_value_from_layout(layout, v))
+                .map(|v| self.try_into_vm_value_from_layout(layout, v))
                 .collect::<Result<_>>()?;
 
             Ok(move_core_types::value::MoveValue::Vector(vals))
@@ -493,7 +493,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         }
     }
 
-    pub fn try_into_move_value_struct(
+    pub fn try_into_vm_value_struct(
         &self,
         layout: &MoveStructLayout,
         val: Value,
@@ -520,8 +520,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                 let value = field_values
                     .remove(name)
                     .ok_or_else(|| format_err!("field {} not found.", name))?;
-                let move_value =
-                    self.try_into_move_value_from_layout(&field_layout.layout, value)?;
+                let move_value = self.try_into_vm_value_from_layout(&field_layout.layout, value)?;
                 Ok(move_value)
             })
             .collect::<Result<_>>()?;

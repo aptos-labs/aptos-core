@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{current_function_name, tests::new_test_context};
-use aptos_api_types::{AsConverter, MoveConverter};
+use aptos_api_types::{AsConverter, MoveConverter, MoveType};
 use aptos_vm::data_cache::AsMoveResolver;
 use move_core_types::{
     account_address::AccountAddress,
@@ -11,6 +11,7 @@ use move_core_types::{
 };
 use serde::Serialize;
 use serde_json::json;
+use std::convert::TryInto;
 
 #[tokio::test]
 async fn test_parse_move_value() {
@@ -55,9 +56,10 @@ fn assert_parse_move_value<'r, R: MoveResolver, V: Serialize>(
     json_value: V,
     expected_move_value: VmMoveValue,
 ) {
-    let move_type = serde_json::from_value(json!(json_move_type)).unwrap();
+    let move_type: MoveType = serde_json::from_value(json!(json_move_type)).unwrap();
+    let type_tag = move_type.try_into().unwrap();
     let move_value = converter
-        .try_into_move_value(&move_type, json!(json_value))
+        .try_into_vm_value(&type_tag, json!(json_value))
         .unwrap();
     assert_eq!(move_value, expected_move_value);
 }
