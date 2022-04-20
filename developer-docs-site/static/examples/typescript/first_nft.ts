@@ -100,7 +100,7 @@ export class TokenClient {
         }
         await this.submitTransactionHelper(account, payload);
     }
-//:!:>section_5
+//<:!:section_5
 
     async cancelTokenOffer(
         account: Account,
@@ -143,7 +143,7 @@ export class TokenClient {
         }
         assert(false);
     }
-//:!:>section_3
+//<:!:section_3
   }
 
 
