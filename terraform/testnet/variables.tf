@@ -182,3 +182,8 @@ variable "enable_k8s_metrics_server" {
   description = "Installs kubernetes metrics server: https://github.com/kubernetes-sigs/metrics-server"
   default     = false
 }
+
+variable "coredns_min_replicas" {
+  description = "Minimal replica numbers for core dns"
+  default     = 2
+}
