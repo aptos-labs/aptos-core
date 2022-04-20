@@ -19,6 +19,7 @@ export class TokenClient {
         await this.restClient.waitForTransaction(res["hash"])
     }
 
+//:!:>section_1
     /** Creates a new collection within the specified account */
     async createCollection(account: Account, description: string, name: string, uri: string) {
         const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
@@ -33,7 +34,9 @@ export class TokenClient {
         };
         await this.submitTransactionHelper(account, payload);
     }
+//<:!:section_1
 
+//:!:>section_2
     async createToken(
         account: Account,
         collection_name: string,
@@ -55,7 +58,9 @@ export class TokenClient {
         }
         await this.submitTransactionHelper(account, payload);
     }
+//<:!:section_2
 
+//:!:>section_4
     async offerToken(
         account: Account,
         receiver: string,
@@ -75,7 +80,9 @@ export class TokenClient {
         }
         await this.submitTransactionHelper(account, payload);
     }
+//<:!:section_4
 
+//:!:>section_5
     async claimToken(
         account: Account,
         sender: string,
@@ -93,6 +100,7 @@ export class TokenClient {
         }
         await this.submitTransactionHelper(account, payload);
     }
+//:!:>section_5
 
     async cancelTokenOffer(
         account: Account,
@@ -112,6 +120,7 @@ export class TokenClient {
         await this.submitTransactionHelper(account, payload);
     }
 
+//:!:>section_3
     /** Retrieve the token's creation_num, which is useful for non-creator operations */
     async getTokenId(creator: string, collection_name: string, token_name: string): Promise<number> {
         const resources = await this.restClient.accountResources(creator);
@@ -134,6 +143,7 @@ export class TokenClient {
         }
         assert(false);
     }
+//:!:>section_3
   }
 
 
