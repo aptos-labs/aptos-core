@@ -1,13 +1,17 @@
 import { HexString } from "./hex_string";
 
 const withoutPrefix = "007711b4d0";
+const withoutPrefixTrimmed = "7711b4d0";
 const withPrefix = `0x${withoutPrefix}`;
+const withPrefixTrimmed = `0x${withoutPrefixTrimmed}`;
 
 function validate(hexString: HexString) {
   expect(hexString.hex()).toBe(withPrefix);
   expect(hexString.toString()).toBe(withPrefix);
   expect(`${hexString}`).toBe(withPrefix);
   expect(hexString.noPrefix()).toBe(withoutPrefix);
+  expect(hexString.hexTrimmed()).toBe(withPrefixTrimmed);
+  expect(hexString.noPrefixTrimmed()).toBe(withoutPrefixTrimmed);
 }
 
 test("from/to buffer", () => {

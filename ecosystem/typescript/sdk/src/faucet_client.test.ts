@@ -43,7 +43,7 @@ test(
 
     const res = await client.getAccountTransactions(account1.address(), { start: 0 });
     const tx = res.find((e) => e.type === "user_transaction") as UserTransaction;
-    expect(tx.sender).toBe(account1.address().hex());
+    expect(tx.sender).toBe(account1.address().hexTrimmed());
 
     const events = await client.getEventsByEventHandle(tx.sender, "0x1::TestCoin::TransferEvents", "sent_events");
     expect(events[0].type).toBe("0x1::TestCoin::SentEvent");

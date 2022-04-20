@@ -35,8 +35,16 @@ export class HexString {
     return this.hexString;
   }
 
+  hexTrimmed(): string {
+    return `0x${this.noPrefixTrimmed()}`;
+  }
+
   noPrefix(): string {
     return this.hexString.slice(2);
+  }
+
+  noPrefixTrimmed(): string {
+    return this.noPrefix().replace(/^0+/, "");
   }
 
   toString(): string {
