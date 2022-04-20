@@ -9183,6 +9183,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-logger",
  "aptos-state-view",
  "aptos-temppath",
  "aptos-transaction-builder",

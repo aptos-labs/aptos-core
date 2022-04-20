@@ -161,7 +161,6 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
             executor_listener,
             committer_notifier,
             pending_transaction_chunks.clone(),
-            max_pending_data_chunks as u64,
             runtime.clone(),
         );
 
@@ -324,7 +323,6 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
     mut executor_listener: mpsc::Receiver<StorageDataChunk>,
     mut committer_notifier: mpsc::Sender<NotificationId>,
     pending_transaction_chunks: Arc<AtomicU64>,
-    max_pending_data_chunks: u64,
     runtime: Option<Handle>,
 ) {
     // Create an executor
@@ -390,12 +388,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             decrement_pending_data_chunks(pending_transaction_chunks.clone());
                         }
                     }
-
-                    // If the executor begins running too far ahead of the committer
-                    // let's force more yields to avoid unnecessary back pressure.
-                    if load_pending_data_chunks(pending_transaction_chunks.clone()) > max_pending_data_chunks / 2 {
-                        yield_now().await;
-                    }
+                    yield_now().await;
                 }
             }
         }
@@ -443,6 +436,7 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         }
                     };
                     decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                    yield_now().await;
                 }
             }
         }
@@ -518,6 +512,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                             send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
                                         }
 
+                                        yield_now().await;
                                         continue; // Wait for the next chunk
                                     }
 

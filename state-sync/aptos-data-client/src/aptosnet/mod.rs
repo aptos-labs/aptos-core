@@ -46,7 +46,7 @@ mod state;
 mod tests;
 
 // Useful constants for the Aptos Data Client
-const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 1;
+const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 5;
 const GLOBAL_DATA_METRIC_FREQ_SECS: u64 = 1;
 const POLLER_ERROR_LOG_FREQ_SECS: u64 = 1;
 

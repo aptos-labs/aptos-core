@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
+use aptos_logger::prelude::*;
 use aptos_state_view::StateViewId;
 use aptos_types::{
     account_address::AccountAddress,
@@ -15,7 +16,11 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use executor::components::apply_chunk_output::IntoLedgerView;
 use fail::fail_point;
-use std::{convert::TryFrom, sync::Arc};
+use std::{
+    convert::TryFrom,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use storage_interface::{verified_state_view::VerifiedStateView, DbReader};
 
 #[cfg(test)]
@@ -86,6 +91,21 @@ impl TransactionValidation for VMValidator {
             ))
         });
         use aptos_vm::VMValidator;
+
+        sample!(SampleRate::Duration(Duration::from_secs(3)),
+                // Time txn validation
+                let validate_timer = Instant::now();
+                let _ = self.vm.validate_transaction(txn.clone(), &&self.cached_state_view);
+                let validate_elapsed = validate_timer.elapsed();
+
+                // Time get latest state view
+                let view_timer = Instant::now();
+                let _ = latest_state_view(&self.db_reader);
+                let view_elapsed = view_timer.elapsed();
+
+                // Log the times
+                error!("VM VALIDATOR: Time taken to validate txn: {:?}, time taken for view: {:?}", validate_elapsed, view_elapsed);
+        );
 
         // We try to validate the transaction using the cached state view. If this
         // fails we refresh the state view and try again (e.g., in case the transaction
