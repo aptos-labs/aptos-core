@@ -10,25 +10,25 @@ license = "Apache-2.0"
 publish = false
 
 [dependencies]
-move-bytecode-verifier = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
-move-abigen = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
-move-docgen = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
-move-command-line-common = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
-move-errmapgen = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
-move-compiler = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
-move-prover = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
+move-bytecode-verifier = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
+move-abigen = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
+move-docgen = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
+move-command-line-common = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
+move-errmapgen = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
+move-compiler = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
+move-prover = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
-move-binary-format = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
+move-binary-format = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
 transaction-builder-generator = { path = "../transaction-builder-generator" }
-move-stdlib = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
-move-symbol-pool = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65", features=["address32"] }
-move-vm-types = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
-move-vm-runtime = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
-move-package = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
-move-bytecode-utils = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
+move-stdlib = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
+move-symbol-pool = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646", features=["address32"] }
+move-vm-types = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
+move-vm-runtime = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
+move-package = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
+move-bytecode-utils = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
 
 bcs = "0.1.2"
 anyhow = "1.0.52"
@@ -45,8 +45,8 @@ tempfile = "3.2.0"
 [dev-dependencies]
 datatest-stable = "0.1.1"
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
-move-cli = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
-move-unit-test = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
+move-cli = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
+move-unit-test = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
 aptos-transactional-test-harness = { path = "../aptos-transactional-test-harness" }
 
 dir-diff = "0.3.2"

@@ -25,7 +25,7 @@ aptos-crypto-derive = { path = "../../crates/aptos-crypto-derive"}
 aptos-types = { path = "../../types", features=["fuzzing"] }
 aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 network = { path = "../../network" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65", features=["fuzzing", "address32"] }
+move-core-types = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646", features=["fuzzing", "address32"] }
 
 [[bin]]
 name = "compute"

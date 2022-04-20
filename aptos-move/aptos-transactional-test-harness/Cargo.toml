@@ -19,12 +19,12 @@ bcs = "0.1.2"
 hex = "0.4.3"
 
 # Move dependencies
-move-transactional-test-runner = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
-move-compiler = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
-move-binary-format = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65", features=["address32"] }
-move-command-line-common = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
-move-vm-runtime = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
+move-transactional-test-runner = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
+move-compiler = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
+move-binary-format = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646", features=["address32"] }
+move-command-line-common = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
+move-vm-runtime = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
 
 
 # Diem-Move dependencies

@@ -17,9 +17,9 @@ clap = "3.1.8"
 aptos-vm = { path = "../aptos-vm" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 cached-framework-packages =  { path = "../framework/cached-packages" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65", features=["address32"] }
-move-vm-types = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
-move-cli = { git = "https://github.com/move-language/move", rev = "43f1e151dea91ca8e8c7644557e55b8f456fbb65" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646", features=["address32"] }
+move-vm-types = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
+move-cli = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646" }
 
 [dev-dependencies]
 datatest-stable = "0.1.1"

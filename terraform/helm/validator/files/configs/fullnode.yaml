@@ -31,7 +31,7 @@ full_node_networks:
     private: "vfn"
   listen_address: "/ip4/0.0.0.0/tcp/6181"
   seeds:
-    0x00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237:
+    00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237:
       addresses:
       - "/dns4/{{ include "aptos-validator.fullname" . }}-validator/tcp/6181/ln-noise-ik/f0274c2774519281a8332d0bb9d8101bd58bc7bb154b38039bc9096ce04e1237/ln-handshake/0"
       role: "Validator"
