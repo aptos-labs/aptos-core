@@ -6,27 +6,33 @@
 //! TODO: Examples
 //!
 
-use crate::common::types::{CliConfig, EncodingOptions, NodeOptions, PrivateKeyInputOptions};
 use crate::{
-    common::{types::MovePackageDir, utils::to_common_result},
+    common::{
+        types::{EncodingOptions, MovePackageDir, NodeOptions, PrivateKeyInputOptions},
+        utils::to_common_result,
+    },
     CliResult, Error,
+    Error::CommandArgumentError,
 };
-use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_crypto::PrivateKey;
+use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_rest_client::{Client, Transaction};
-use aptos_sdk::transaction_builder::TransactionFactory;
-use aptos_sdk::types::LocalAccount;
-use aptos_types::chain_id::ChainId;
-use aptos_types::transaction::authenticator::AuthenticationKey;
-use aptos_types::transaction::{ModuleBundle, TransactionPayload};
+use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
+use aptos_types::{
+    chain_id::ChainId,
+    transaction::{
+        authenticator::AuthenticationKey, ModuleBundle, ScriptFunction, TransactionPayload,
+    },
+};
 use aptos_vm::natives::aptos_natives;
 use clap::{Parser, Subcommand};
 use move_cli::package::cli::{run_move_unit_tests, UnitTestResult};
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{
+    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+};
 use move_package::{compilation::compiled_package::CompiledPackage, BuildConfig};
 use move_unit_test::UnitTestingConfig;
 use reqwest::Url;
-use std::path::Path;
+use std::{path::Path, str::FromStr};
 
 /// CLI tool for performing Move tasks
 ///
@@ -34,6 +40,7 @@ use std::path::Path;
 pub enum MoveTool {
     Compile(CompilePackage),
     Publish(PublishPackage),
+    Run(RunFunction),
     Test(TestPackage),
 }
 
@@ -42,6 +49,7 @@ impl MoveTool {
         match self {
             MoveTool::Compile(tool) => to_common_result(tool.execute().await),
             MoveTool::Publish(tool) => to_common_result(tool.execute().await),
+            MoveTool::Run(tool) => to_common_result(tool.execute().await),
             MoveTool::Test(tool) => to_common_result(tool.execute().await),
         }
     }
@@ -145,15 +153,9 @@ impl PublishPackage {
         let compiled_payload = TransactionPayload::ModuleBundle(ModuleBundle::new(compiled_units));
 
         // Now that it's compiled, lets send it
-        let sender_key = if let Some(private_key) = self
+        let sender_key = self
             .private_key_options
-            .extract_private_key(self.encoding_options.encoding)?
-        {
-            private_key
-        } else {
-            let config = CliConfig::load()?;
-            config.private_key.unwrap()
-        };
+            .extract_private_key(self.encoding_options.encoding)?;
 
         submit_transaction(
             self.node_options.url.clone(),
@@ -161,7 +163,81 @@ impl PublishPackage {
             sender_key,
             compiled_payload,
             self.max_gas,
-        ).await
+        )
+        .await
+    }
+}
+
+/// Run a Move function
+#[derive(Parser)]
+pub struct RunFunction {
+    #[clap(flatten)]
+    encoding_options: EncodingOptions,
+    #[clap(flatten)]
+    private_key_options: PrivateKeyInputOptions,
+    #[clap(flatten)]
+    node_options: NodeOptions,
+    /// Chain id of network being used
+    #[clap(long)]
+    chain_id: ChainId,
+    /// Maximum gas willing to be spent on this transaction.
+    #[clap(long, default_value_t = 1000)]
+    max_gas: u64,
+    /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
+    ///
+    /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::Message::set_message`
+    #[clap(long)]
+    function_id: String,
+    /// Hex encoded arguments separated by spaces.
+    ///
+    /// Example: `0x01 0x02 0x03`
+    args: Vec<String>,
+}
+
+impl RunFunction {
+    pub async fn execute(&self) -> Result<aptos_rest_client::Transaction, Error> {
+        let ids: Vec<&str> = self.function_id.split_terminator("::").collect();
+        if ids.len() != 3 {
+            return Err(CommandArgumentError(
+                "--function-id is not well formed.  Must be of <address>::<module>::<function>"
+                    .to_string(),
+            ));
+        }
+
+        let address = AccountAddress::from_hex_literal(ids.get(0).unwrap()).unwrap();
+        let module = Identifier::from_str(ids.get(1).unwrap()).unwrap();
+        let function = Identifier::from_str(ids.get(2).unwrap()).unwrap();
+        let module_id = ModuleId::new(address, module);
+
+        // TODO: Support type args
+        // TODO: Take in arguments from a file instead?
+        let args: Vec<Vec<u8>> = self
+            .args
+            .iter()
+            .map(|str| {
+                if let Some(stripped_hex) = str.strip_prefix("0x") {
+                    hex::decode(stripped_hex).unwrap()
+                } else {
+                    hex::decode(str).unwrap()
+                }
+            })
+            .collect();
+
+        let script_function = ScriptFunction::new(module_id, function, Vec::new(), args);
+        println!("Encoded: {}", hex::encode("Hi Greg"));
+        println!("{:?}", serde_json::to_string(&script_function));
+        // Now that it's compiled, lets send it
+        let sender_key = self
+            .private_key_options
+            .extract_private_key(self.encoding_options.encoding)?;
+        submit_transaction(
+            self.node_options.url.clone(),
+            self.chain_id,
+            sender_key,
+            TransactionPayload::ScriptFunction(script_function),
+            self.max_gas,
+        )
+        .await
     }
 }
 
