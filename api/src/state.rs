@@ -1,7 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{context::Context, param::LedgerVersionParam};
+use crate::{
+    context::Context,
+    failpoint::fail_point,
+    metrics::metrics,
+    param::{AddressParam, LedgerVersionParam, MoveIdentifierParam, MoveStructTagParam},
+    version::Version,
+};
 use aptos_api_types::{
     AsConverter, Error, LedgerInfo, MoveModuleBytecode, Response, TransactionId,
 };
@@ -13,8 +19,67 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, ResourceKey, StructTag},
 };
+use std::convert::TryInto;
 use storage_interface::state_view::DbStateView;
-use warp::{http::StatusCode, Reply};
+use warp::{filters::BoxedFilter, Filter, Rejection, Reply};
+
+// GET /accounts/<address>/resource/<resource_type>
+pub fn get_account_resource(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("accounts" / AddressParam / "resource" / MoveStructTagParam)
+        .and(warp::get())
+        .and(context.filter())
+        .and(warp::query::<Version>())
+        .map(|address, struct_tag, ctx, version: Version| {
+            (version.version, address, struct_tag, ctx)
+        })
+        .untuple_one()
+        .and_then(handle_get_account_resource)
+        .with(metrics("get_account_resource"))
+        .boxed()
+}
+
+// GET /state/module/<address>/<module_name>
+pub fn get_account_module(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("accounts" / AddressParam / "module" / MoveIdentifierParam)
+        .and(warp::get())
+        .and(context.filter())
+        .and(warp::query::<Version>())
+        .map(|address, name, ctx, version: Version| (version.version, address, name, ctx))
+        .untuple_one()
+        .and_then(handle_get_account_module)
+        .with(metrics("get_account_module"))
+        .boxed()
+}
+
+async fn handle_get_account_resource(
+    ledger_version: Option<LedgerVersionParam>,
+    address: AddressParam,
+    struct_tag: MoveStructTagParam,
+    context: Context,
+) -> anyhow::Result<impl Reply, Rejection> {
+    fail_point("endpoint_query_resource")?;
+    let struct_tag = struct_tag.parse("struct tag")?;
+    Ok(State::new(ledger_version, context)?.resource(
+        address.parse("account address")?.into(),
+        struct_tag
+            .clone()
+            .try_into()
+            .map_err(|_| Error::invalid_param("resource_type", struct_tag))?,
+    )?)
+}
+
+async fn handle_get_account_module(
+    ledger_version: Option<LedgerVersionParam>,
+    address: AddressParam,
+    name: MoveIdentifierParam,
+    context: Context,
+) -> anyhow::Result<impl Reply, Rejection> {
+    fail_point("endpoint_get_account_module")?;
+    Ok(State::new(ledger_version, context)?.module(
+        address.parse("account address")?.into(),
+        name.parse("module name")?,
+    )?)
+}
 
 pub(crate) struct State {
     state_view: DbStateView,
@@ -81,7 +146,7 @@ impl State {
 
         let module = MoveModuleBytecode::new(bytes)
             .try_parse_abi()
-            .map_err(|e| Error::from_anyhow_error(StatusCode::INTERNAL_SERVER_ERROR, e))?;
+            .map_err(Error::internal)?;
         Response::new(self.latest_ledger_info, &module)
     }
 }

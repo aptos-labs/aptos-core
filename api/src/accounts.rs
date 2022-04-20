@@ -19,14 +19,13 @@ use aptos_types::{
     event::{EventHandle, EventKey},
 };
 
-use crate::state::State;
 use anyhow::Result;
 use move_core_types::{
     identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
     value::MoveValue,
 };
 use std::convert::TryInto;
-use warp::{filters::BoxedFilter, http::StatusCode, Filter, Rejection, Reply};
+use warp::{filters::BoxedFilter, Filter, Rejection, Reply};
 
 // GET /accounts/<address>
 pub fn get_account(context: Context) -> BoxedFilter<(impl Reply,)> {
@@ -61,21 +60,6 @@ pub fn get_account_resources(context: Context) -> BoxedFilter<(impl Reply,)> {
         .boxed()
 }
 
-// GET /accounts/<address>/resource/<resource_type>
-pub fn get_account_resource(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("accounts" / AddressParam / "resource" / MoveStructTagParam)
-        .and(warp::get())
-        .and(context.filter())
-        .and(warp::query::<Version>())
-        .map(|address, struct_tag, ctx, version: Version| {
-            (version.version, address, struct_tag, ctx)
-        })
-        .untuple_one()
-        .and_then(handle_get_account_resource)
-        .with(metrics("get_account_resource"))
-        .boxed()
-}
-
 // GET /accounts/<address>/modules
 pub fn get_account_modules(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("accounts" / AddressParam / "modules")
@@ -86,19 +70,6 @@ pub fn get_account_modules(context: Context) -> BoxedFilter<(impl Reply,)> {
         .untuple_one()
         .and_then(handle_get_account_modules)
         .with(metrics("get_account_modules"))
-        .boxed()
-}
-
-// GET /state/module/<address>/<module_name>
-pub fn get_account_module(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("accounts" / AddressParam / "module" / MoveIdentifierParam)
-        .and(warp::get())
-        .and(context.filter())
-        .and(warp::query::<Version>())
-        .map(|address, name, ctx, version: Version| (version.version, address, name, ctx))
-        .untuple_one()
-        .and_then(handle_get_account_module)
-        .with(metrics("get_account_module"))
         .boxed()
 }
 
@@ -127,22 +98,6 @@ async fn handle_get_account_resources(
     Ok(Account::new(ledger_version, address, context)?.resources()?)
 }
 
-async fn handle_get_account_resource(
-    ledger_version: Option<LedgerVersionParam>,
-    address: AddressParam,
-    struct_tag: MoveStructTagParam,
-    context: Context,
-) -> Result<impl Reply, Rejection> {
-    fail_point("endpoint_query_resource")?;
-    Ok(State::new(ledger_version, context)?.resource(
-        address.parse("account address")?.into(),
-        struct_tag
-            .parse("struct tag")?
-            .try_into()
-            .map_err(|e| Error::from_anyhow_error(StatusCode::BAD_REQUEST, e))?,
-    )?)
-}
-
 async fn handle_get_account_modules(
     ledger_version: Option<LedgerVersionParam>,
     address: AddressParam,
@@ -150,19 +105,6 @@ async fn handle_get_account_modules(
 ) -> Result<impl Reply, Rejection> {
     fail_point("endpoint_get_account_modules")?;
     Ok(Account::new(ledger_version, address, context)?.modules()?)
-}
-
-async fn handle_get_account_module(
-    ledger_version: Option<LedgerVersionParam>,
-    address: AddressParam,
-    name: MoveIdentifierParam,
-    context: Context,
-) -> Result<impl Reply, Rejection> {
-    fail_point("endpoint_get_account_module")?;
-    Ok(State::new(ledger_version, context)?.module(
-        address.parse("account address")?.into(),
-        name.parse("module name")?,
-    )?)
 }
 
 pub(crate) struct Account {
