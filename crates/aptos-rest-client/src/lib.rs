@@ -2,29 +2,27 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Result};
-pub use aptos_api_types::{MoveModuleBytecode, PendingTransaction, Transaction};
+pub use aptos_api_types::{self, MoveModuleBytecode, PendingTransaction, Transaction};
 use aptos_crypto::HashValue;
-use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
-use move_core_types::identifier::Identifier;
+use aptos_types::{
+    account_address::AccountAddress, account_config::aptos_root_address,
+    transaction::SignedTransaction,
+};
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_json::{json, Value};
+use state::State;
 use std::time::Duration;
 use url::Url;
-
-pub use aptos_api_types;
-use aptos_types::account_config::aptos_root_address;
-
 pub mod error;
 pub mod faucet;
 pub use faucet::FaucetClient;
 pub mod response;
 pub use response::Response;
 mod state;
-use state::State;
 pub mod types;
 use crate::aptos::{AptosVersion, Balance};
 pub use types::{Account, Resource, RestError};
-
 pub mod aptos;
 
 const BCS_CONTENT_TYPE: &str = "application/x.diem.signed_transaction+bcs";
@@ -268,27 +266,6 @@ impl Client {
         self.json(response).await
     }
 
-    pub async fn get_account_resources_by_type(
-        &self,
-        address: AccountAddress,
-        module_address: AccountAddress,
-        module_id: &Identifier,
-        struct_name: &Identifier,
-    ) -> Result<Response<Vec<Resource>>> {
-        self.get_account_resources(address).await.map(|resp| {
-            resp.map(|resources| {
-                resources
-                    .into_iter()
-                    .filter(|res| {
-                        res.resource_type.address == module_address
-                            && (&res.resource_type.module) == module_id
-                            && (&res.resource_type.name) == struct_name
-                    })
-                    .collect()
-            })
-        })
-    }
-
     pub async fn get_resource<T: DeserializeOwned>(
         &self,
         address: AccountAddress,
@@ -319,7 +296,6 @@ impl Client {
             .join(&format!("accounts/{}/resource/{}", address, resource_type))?;
 
         let response = self.inner.get(url).send().await?;
-
         self.json(response).await
     }
 
@@ -332,7 +308,26 @@ impl Client {
             .join(&format!("accounts/{}/modules", address))?;
 
         let response = self.inner.get(url).send().await?;
+        self.json(response).await
+    }
 
+    pub async fn get_table_item<K: Serialize>(
+        &self,
+        table_handle: u128,
+        key_type: &str,
+        value_type: &str,
+        key: K,
+    ) -> Result<Response<Value>> {
+        let url = self
+            .base_url
+            .join(&format!("tables/{}/item", table_handle))?;
+        let data = json!({
+            "key_type": key_type,
+            "value_type": value_type,
+            "key": json!(key),
+        });
+
+        let response = self.inner.post(url).json(&data).send().await?;
         self.json(response).await
     }
 

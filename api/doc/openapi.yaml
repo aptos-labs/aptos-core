@@ -460,6 +460,50 @@ paths:
           $ref: '#/components/responses/404'
         "500":
           $ref: '#/components/responses/500'
+  /tables/{table_handle}/items:
+    post:
+      summary: Get table item by handle and key.
+      description: |
+        Gets a table item for a table identified by the handle and the key for the item.
+        Key and value types need to be passed in to help with key serialization and value deserialization.
+      operationId: get_table_item
+      tags:
+        - state
+        - table
+      parameters:
+        - name: table_handle
+          in: path
+          required: true
+          schema:
+            title: Table Handle
+            type: string
+            format: uint128
+            description: the table handle
+          example: "1283023094380"
+      requestBody:
+        description: Table item request
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TableItemRequest'
+      responses:
+        "200":
+          description: Returns the table item value rendered in JSON.
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
+        "413":
+          $ref: '#/components/responses/413'
+        "415":
+          $ref: '#/components/responses/415'
+        "500":
+          $ref: '#/components/responses/500'
 components:
   parameters:
     AccountAddress:
@@ -1596,3 +1640,17 @@ components:
         - $ref: '#/components/schemas/MultiEd25519Signature'
       discriminator:
         propertyName: type
+    TableItemRequest:
+      title: Table item request
+      type: object
+      required:
+        - key_type
+        - value_type
+        - key
+      properties:
+        key_type:
+          $ref: '#/components/schemas/MoveTypeId'
+        value_type:
+          $ref: '#/components/schemas/MoveTypeId'
+        key:
+          $ref: '#/components/schemas/MoveValue'

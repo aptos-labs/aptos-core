@@ -3,6 +3,7 @@
 
 use aptos_transaction_builder::aptos_stdlib;
 use forge::{AptosContext, AptosTest, Result, Test};
+use serde_json::Value;
 
 pub struct NFTTransaction;
 
@@ -27,40 +28,55 @@ impl AptosTest for NFTTransaction {
 
         let collection_builder = ctx.transaction_factory().payload(
             aptos_stdlib::encode_create_unlimited_collection_script_script_function(
-                hex::encode("description").into_bytes(),
-                hex::encode("collection name").into_bytes(),
-                hex::encode("uri").into_bytes(),
+                "description".to_owned().into_bytes(),
+                "collection name".to_owned().into_bytes(),
+                "uri".to_owned().into_bytes(),
             ),
         );
 
         let collection_txn = creator.sign_with_transaction_builder(collection_builder);
         client.submit_and_wait(&collection_txn).await?;
 
+        println!("collection created.");
+
         let token_builder = ctx.transaction_factory().payload(
             aptos_stdlib::encode_create_token_script_script_function(
-                hex::encode("collection name").into_bytes(),
-                hex::encode("description").into_bytes(),
-                hex::encode("token name").into_bytes(),
+                "collection name".to_owned().into_bytes(),
+                "collection description".to_owned().into_bytes(),
+                "token name".to_owned().into_bytes(),
                 1,
-                hex::encode("uri").into_bytes(),
+                "uri".to_owned().into_bytes(),
             ),
         );
 
         let token_txn = creator.sign_with_transaction_builder(token_builder);
         client.submit_and_wait(&token_txn).await?;
 
-        let token_num = client
+        let resource = client
             .get_account_resource(creator.address(), "0x1::Token::Collections")
             .await?
-            .inner()
-            .as_ref()
-            .unwrap()
-            .data["collections"]["data"][0]["value"]["tokens"]["data"][0]["value"]["id"]
-            ["creation_num"]
-            .as_str()
-            .unwrap()
-            .parse::<u64>()
+            .into_inner()
             .unwrap();
+        let collections = &resource.data["collections"];
+        let collection = client
+            .get_table_item(
+                table_handle(collections),
+                "0x1::ASCII::String",
+                "0x1::Token::Collection",
+                "collection name",
+            )
+            .await?
+            .into_inner();
+        let token_data = client
+            .get_table_item(
+                table_handle(&collection["tokens"]),
+                "0x1::ASCII::String",
+                "0x1::Token::TokenData",
+                "token name",
+            )
+            .await?
+            .into_inner();
+        let token_num = token_data["id"]["creation_num"].as_str().unwrap().parse()?;
 
         let offer_builder =
             ctx.transaction_factory()
@@ -70,7 +86,6 @@ impl AptosTest for NFTTransaction {
                     token_num,
                     1,
                 ));
-
         let offer_txn = creator.sign_with_transaction_builder(offer_builder);
         client.submit_and_wait(&offer_txn).await?;
 
@@ -84,6 +99,11 @@ impl AptosTest for NFTTransaction {
 
         let claim_txn = owner.sign_with_transaction_builder(claim_builder);
         client.submit_and_wait(&claim_txn).await?;
+
         Ok(())
     }
+}
+
+fn table_handle(table: &Value) -> u128 {
+    table["handle"].as_str().unwrap().parse().unwrap()
 }

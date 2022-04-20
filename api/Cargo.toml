@@ -56,6 +56,7 @@ cached-framework-packages = { path = "../aptos-move/framework/cached-packages" }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
 mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
+move-package = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
 vm-validator = { path = "../vm-validator" }
 
 [features]

@@ -222,6 +222,7 @@ dependencies = [
  "hyper",
  "mempool-notifications",
  "move-core-types",
+ "move-package",
  "move-resource-viewer",
  "once_cell",
  "percent-encoding",
@@ -2630,7 +2631,7 @@ dependencies = [
  "diesel_derives",
  "num-bigint 0.2.6",
  "num-integer",
- "num-traits 0.1.43",
+ "num-traits 0.2.14",
  "pq-sys",
  "r2d2",
  "serde_json",
@@ -7130,7 +7131,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0bccbcf40c8938196944a3da0e133e031a33f4d6b72db3bda3cc556e361905d"
 dependencies = [
  "lazy_static 1.4.0",
- "parking_lot 0.10.2",
+ "parking_lot 0.11.2",
  "serial_test_derive",
 ]
 
@@ -7399,6 +7400,7 @@ dependencies = [
  "rand 0.8.4",
  "regex",
  "reqwest",
+ "serde_json",
  "serde_yaml",
  "tokio",
 ]
@@ -8473,7 +8475,7 @@ version = "1.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ee73e6e4924fe940354b8d4d98cad5231175d615cd855b758adc658c0aac6a0"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "static_assertions",
 ]
 
