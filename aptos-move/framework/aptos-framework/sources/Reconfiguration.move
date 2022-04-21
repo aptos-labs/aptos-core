@@ -8,7 +8,8 @@ module AptosFramework::Reconfiguration {
     use AptosFramework::SystemAddresses;
     use AptosFramework::Timestamp;
 
-    friend AptosFramework::Account;
+    friend AptosFramework::Block;
+    // TODO: migrate all to callback in block prologue
     friend AptosFramework::ConsensusConfig;
     friend AptosFramework::ValidatorSet;
     friend AptosFramework::Version;
@@ -91,6 +92,10 @@ module AptosFramework::Reconfiguration {
     /// Signal validators to start using new configuration. Must be called from friend config modules.
     public(friend) fun reconfigure() acquires Configuration {
         reconfigure_();
+    }
+
+    public fun last_reconfiguration_time(): u64 acquires Configuration {
+        borrow_global<Configuration>(@CoreResources).last_reconfiguration_time
     }
 
     /// Private function to do reconfiguration.  Updates reconfiguration status resource

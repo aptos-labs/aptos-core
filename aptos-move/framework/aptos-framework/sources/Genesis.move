@@ -10,11 +10,14 @@ module AptosFramework::Genesis {
     use AptosFramework::Block;
     use AptosFramework::ChainId;
     use AptosFramework::Reconfiguration;
+    use AptosFramework::Stake;
     use AptosFramework::TestCoin;
     use AptosFramework::Timestamp;
     use AptosFramework::ValidatorConfig;
     use AptosFramework::ValidatorOperatorConfig;
     use AptosFramework::VMConfig;
+
+    const EPOCH_INTERVAL: u64 = 86400000000; // one day in microseconds
 
     fun initialize(
         core_resource_account: signer,
@@ -77,6 +80,7 @@ module AptosFramework::Genesis {
         ConsensusConfig::initialize(core_resource_account);
         ValidatorSet::initialize_validator_set(core_resource_account);
         Version::initialize(core_resource_account, initial_version);
+        Stake::initialize_validator_set(core_resource_account, 0, 1000000000);
 
         VMConfig::initialize(
             core_resource_account,
@@ -101,7 +105,7 @@ module AptosFramework::Genesis {
         // this needs to be called at the very end
         ChainId::initialize(core_resource_account, chain_id);
         Reconfiguration::initialize(core_resource_account);
-        Block::initialize_block_metadata(core_resource_account);
+        Block::initialize_block_metadata(core_resource_account, EPOCH_INTERVAL);
         Timestamp::set_time_has_started(core_resource_account);
     }
 
