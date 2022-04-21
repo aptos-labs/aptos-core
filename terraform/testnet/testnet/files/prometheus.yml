@@ -24,6 +24,7 @@ scrape_configs:
   - targets: {{ printf "val%d-aptos-validator-validator-lb:9101" $i | quote | list }}
     labels:
       owner: {{ printf "val%d" $i | quote }}
+      role: 'validator'
   {{- end }}
 
 {{- else }}
