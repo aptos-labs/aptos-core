@@ -11,6 +11,7 @@ use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationK
 use clap::{ArgEnum, Parser};
 use itertools::Itertools;
 use move_core_types::account_address::AccountAddress;
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -266,7 +267,7 @@ pub struct PrivateKeyInputOptions {
 
 impl PrivateKeyInputOptions {
     pub fn extract_private_key(&self, encoding: EncodingType) -> CliTypedResult<Ed25519PrivateKey> {
-        if Some(private_key) = self.extract_private_key_no_config(encoding)? {
+        if let Some(private_key) = self.extract_private_key_no_config(encoding)? {
             Ok(private_key)
         } else if let Some(private_key) = CliConfig::load()?.private_key {
             Ok(private_key)
@@ -289,7 +290,7 @@ impl PrivateKeyInputOptions {
             let key = key.as_bytes().to_vec();
             encoding.decode_key("--private-key", key).map(Some)
         } else {
-            None
+            Ok(None)
         }
     }
 }
@@ -391,6 +392,17 @@ pub struct MovePackageDir {
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
     #[clap(long, parse(try_from_str = parse_map), default_value = "")]
     pub named_addresses: BTreeMap<String, AccountAddress>,
+}
+
+/// Options for using the faucet
+#[derive(Debug, Parser)]
+pub struct FaucetOptions {
+    /// URL for the faucet
+    #[clap(long, default_value = "https://faucet.devnet.aptoslabs.com")]
+    pub(crate) faucet_url: Url,
+    /// Number of coins to fund to the account
+    #[clap(long, default_value = "10000")]
+    pub(crate) num_coins: u64,
 }
 
 const PARSE_MAP_SYNTAX_MSG: &str = "Invalid syntax for map.  Example: Name=Value,Name2=Value";

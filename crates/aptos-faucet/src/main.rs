@@ -523,7 +523,7 @@ mod tests {
             "9FF98E82355EB13098F3B1157AC018A725C62C0E0820F422000814CDBA407835"
         );
 
-        let res = tokio::task::spawn_blocking(move || faucet_client.create_account(address))
+        let res = tokio::task::spawn_blocking(move || faucet_client.create_account(address).await)
             .await
             .unwrap();
         res.unwrap();
@@ -547,8 +547,8 @@ mod tests {
         let address = AuthenticationKey::ed25519(&pub_key).derived_address();
         let (res1, res2) = tokio::task::spawn_blocking(move || {
             (
-                faucet_client.create_account(address),
-                faucet_client.fund(address, 10),
+                faucet_client.create_account(address).await,
+                faucet_client.fund(address, 10).await,
             )
         })
         .await

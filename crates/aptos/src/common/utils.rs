@@ -2,9 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::types::{CliError, CliTypedResult},
+    common::types::{
+        account_address_from_public_key, CliError, CliTypedResult, EncodingOptions,
+        WriteTransactionOptions,
+    },
     CliResult,
 };
+use aptos_crypto::PrivateKey;
+use aptos_rest_client::{Client, Response, Transaction};
+use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
+use aptos_types::transaction::TransactionPayload;
+use move_core_types::account_address::AccountAddress;
 use serde::Serialize;
 use std::{
     fs::File,
@@ -117,4 +125,42 @@ pub fn append_file_extension(
     } else {
         Ok(file.with_extension(appended_extension))
     }
+}
+
+/// Retrieves the current sequence number
+pub async fn get_sequence_number(
+    rest_client: &Client,
+    account: AccountAddress,
+) -> CliTypedResult<u64> {
+    let account_response = rest_client
+        .get_account(account)
+        .await
+        .map_err(|err| CliError::ApiError(err.to_string()))?;
+    Ok(account_response.inner().sequence_number)
+}
+
+/// Sends a signed transaction and waits for a response
+pub async fn send_transaction(
+    encoding_options: EncodingOptions,
+    write_options: WriteTransactionOptions,
+    transaction_payload: TransactionPayload,
+) -> Result<Response<Transaction>, CliError> {
+    let rest_client = Client::new(write_options.rest_options.url);
+    let sender_key = write_options
+        .private_key_options
+        .extract_private_key(encoding_options.encoding)?;
+    let sender_public_key = sender_key.public_key();
+    let sender_address = account_address_from_public_key(&sender_public_key);
+    let sequence_number = get_sequence_number(&rest_client, sender_address).await?;
+
+    let transaction_factory = TransactionFactory::new(write_options.chain_id)
+        .with_gas_unit_price(1)
+        .with_max_gas_amount(write_options.max_gas);
+    let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
+    let transaction = sender_account
+        .sign_with_transaction_builder(transaction_factory.payload(transaction_payload));
+    rest_client
+        .submit_and_wait(&transaction)
+        .await
+        .map_err(|err| CliError::ApiError(err.to_string()))
 }
