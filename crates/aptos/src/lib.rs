@@ -8,7 +8,7 @@ pub mod common;
 pub mod move_tool;
 pub mod op;
 
-use crate::common::types::{CliResult, Error};
+use crate::common::types::CliResult;
 use clap::Parser;
 
 /// CLI tool for interacting with the Aptos blockchain and nodes

@@ -3,11 +3,11 @@
 
 use crate::{
     common::{
-        types::CliConfig,
+        types::{CliConfig, CliError, CliTypedResult},
         utils::{prompt_yes, to_common_success_result},
     },
     op::key::GenerateKey,
-    CliResult, Error,
+    CliResult,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, ValidCryptoMaterialStringExt};
 use clap::Parser;
@@ -21,7 +21,7 @@ impl InitTool {
         to_common_success_result(self.execute_inner().await)
     }
 
-    async fn execute_inner(&self) -> Result<(), Error> {
+    async fn execute_inner(&self) -> CliTypedResult<()> {
         let mut config = if CliConfig::config_exists()? {
             if !prompt_yes(
                 "Aptos already initialized, do you want to overwrite the existing config?",
@@ -42,7 +42,7 @@ impl InitTool {
             GenerateKey::generate_ed25519_in_memory()
         } else {
             Ed25519PrivateKey::from_encoded_string(input)
-                .map_err(|err| Error::UnableToParse("Ed25519PrivateKey", err.to_string()))?
+                .map_err(|err| CliError::UnableToParse("Ed25519PrivateKey", err.to_string()))?
         };
         config.private_key = Some(private_key);
         config.save()?;
@@ -53,11 +53,11 @@ impl InitTool {
 }
 
 /// Reads a line from input
-fn read_line(input_name: &'static str) -> Result<String, Error> {
+fn read_line(input_name: &'static str) -> CliTypedResult<String> {
     let mut input_buf = String::new();
     let _ = std::io::stdin()
         .read_line(&mut input_buf)
-        .map_err(|err| Error::IO(input_name.to_string(), err))?;
+        .map_err(|err| CliError::IO(input_name.to_string(), err))?;
 
     Ok(input_buf)
 }

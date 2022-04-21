@@ -6,11 +6,7 @@
 //! TODO: Examples
 //!
 
-use crate::{
-    common::{types::RestOptions, utils::to_common_result},
-    CliResult, Error as CommonError,
-};
-use anyhow::Error;
+use crate::common::types::{CliError, CliTypedResult, RestOptions};
 use aptos_rest_client::{types::Resource, Client};
 use aptos_types::account_address::AccountAddress;
 use clap::Parser;
@@ -28,25 +24,18 @@ pub struct ListResources {
 }
 
 impl ListResources {
-    async fn get_resources(self) -> Result<Vec<serde_json::Value>, Error> {
+    // TODO: Format this in a reasonable way while providing all information
+    // add options like --tokens --nfts etc
+    pub(crate) async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
         let client = Client::new(self.rest_options.url);
         let response: Vec<Resource> = client
             .get_account_resources(self.account)
-            .await?
+            .await
+            .map_err(|err| CliError::ApiError(err.to_string()))?
             .into_inner();
         Ok(response
             .iter()
             .map(|json| json.data.clone())
             .collect::<Vec<serde_json::Value>>())
-    }
-
-    // TODO: Format this in a reasonable way while providing all information
-    // add options like --tokens --nfts etc
-    pub async fn execute(self) -> CliResult {
-        let result = self
-            .get_resources()
-            .await
-            .map_err(|err| CommonError::ApiError(err.to_string()));
-        to_common_result(result)
     }
 }

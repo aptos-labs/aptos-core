@@ -6,13 +6,14 @@
 //! TODO: Examples
 //!
 
-use crate::common::types::WriteTransactionOptions;
 use crate::{
     common::{
-        types::{EncodingOptions, MovePackageDir},
+        types::{
+            CliError, CliTypedResult, EncodingOptions, MovePackageDir, WriteTransactionOptions,
+        },
         utils::to_common_result,
     },
-    CliResult, Error,
+    CliResult,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_rest_client::{Client, Transaction};
@@ -57,7 +58,7 @@ pub struct CompilePackage {
 }
 
 impl CompilePackage {
-    pub async fn execute(&self) -> Result<Vec<String>, Error> {
+    pub async fn execute(&self) -> CliTypedResult<Vec<String>> {
         let build_config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses.clone(),
             generate_docs: true,
@@ -83,7 +84,7 @@ pub struct TestPackage {
 }
 
 impl TestPackage {
-    pub async fn execute(&self) -> Result<&'static str, Error> {
+    pub async fn execute(&self) -> CliTypedResult<&'static str> {
         let config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses.clone(),
             test_mode: true,
@@ -97,7 +98,7 @@ impl TestPackage {
             aptos_natives(),
             false,
         )
-        .map_err(|err| Error::MoveTestError(err.to_string()))?;
+        .map_err(|err| CliError::MoveTestError(err.to_string()))?;
 
         // TODO: commit back up to the move repo
         match result {
@@ -108,11 +109,11 @@ impl TestPackage {
 }
 
 /// Compiles a Move package dir, and returns the compiled modules.
-fn compile_move(build_config: BuildConfig, package_dir: &Path) -> Result<CompiledPackage, Error> {
+fn compile_move(build_config: BuildConfig, package_dir: &Path) -> CliTypedResult<CompiledPackage> {
     // TODO: Add caching
     build_config
         .compile_package(package_dir, &mut Vec::new())
-        .map_err(|err| Error::MoveCompilationError(err.to_string()))
+        .map_err(|err| CliError::MoveCompilationError(err.to_string()))
 }
 
 /// Publishes the modules in a Move package
@@ -135,7 +136,7 @@ pub struct PublishPackage {
 }
 
 impl PublishPackage {
-    pub async fn execute(&self) -> Result<aptos_rest_client::Transaction, Error> {
+    pub async fn execute(&self) -> CliTypedResult<aptos_rest_client::Transaction> {
         let build_config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses.clone(),
             generate_abis: false,
@@ -175,7 +176,7 @@ async fn submit_transaction(
     sender_key: Ed25519PrivateKey,
     payload: TransactionPayload,
     max_gas: u64,
-) -> Result<Transaction, Error> {
+) -> CliTypedResult<Transaction> {
     let client = Client::new(url);
 
     // Get sender address
@@ -186,7 +187,7 @@ async fn submit_transaction(
     let account_response = client
         .get_account(sender_address)
         .await
-        .map_err(|err| Error::ApiError(err.to_string()))?;
+        .map_err(|err| CliError::ApiError(err.to_string()))?;
     let account = account_response.inner();
     let sequence_number = account.sequence_number;
 
@@ -199,7 +200,7 @@ async fn submit_transaction(
     let response = client
         .submit_and_wait(&transaction)
         .await
-        .map_err(|err| Error::ApiError(err.to_string()))?;
+        .map_err(|err| CliError::ApiError(err.to_string()))?;
 
     Ok(response.inner().clone())
 }
