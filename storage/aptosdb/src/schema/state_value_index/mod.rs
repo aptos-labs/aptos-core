@@ -18,11 +18,14 @@
 
 use crate::schema::{ensure_slice_len_eq, ensure_slice_len_gt, STATE_VALUE_INDEX_CF_NAME};
 use anyhow::Result;
-use aptos_types::{state_store::state_key::StateKey, transaction::Version};
+use aptos_types::{
+    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix},
+    transaction::Version,
+};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use schemadb::{
     define_schema,
-    schema::{KeyCodec, ValueCodec},
+    schema::{KeyCodec, SeekKeyCodec, ValueCodec},
 };
 use std::{io::Write, mem::size_of};
 
@@ -59,6 +62,12 @@ impl ValueCodec<StateValueIndexSchema> for u8 {
     fn decode_value(data: &[u8]) -> Result<Self> {
         ensure_slice_len_eq(data, 1)?;
         Ok(data[0])
+    }
+}
+
+impl SeekKeyCodec<StateValueIndexSchema> for &StateKeyPrefix {
+    fn encode_seek_key(&self) -> Result<Vec<u8>> {
+        self.encode()
     }
 }
 

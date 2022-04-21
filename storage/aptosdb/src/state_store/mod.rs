@@ -15,12 +15,16 @@ use crate::{
     state_value_index::StateValueIndexSchema,
     AptosDbError,
 };
+#[cfg(test)]
+use anyhow::anyhow;
 use anyhow::{ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_jellyfish_merkle::{
     iterator::JellyfishMerkleIterator, node_type::NodeKey, restore::JellyfishMerkleRestore,
     JellyfishMerkleTree, TreeReader, TreeWriter,
 };
+#[cfg(test)]
+use aptos_types::state_store::state_key_prefix::StateKeyPrefix;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProof, SparseMerkleRangeProof},
@@ -32,12 +36,17 @@ use aptos_types::{
 };
 use itertools::process_results;
 use schemadb::{SchemaBatch, DB};
+#[cfg(test)]
+use std::cmp::Ordering;
 use std::{collections::HashMap, sync::Arc};
 use storage_interface::StateSnapshotReceiver;
 
 type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKeyAndValue>;
 type Node = aptos_jellyfish_merkle::node_type::Node<StateKeyAndValue>;
 type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKeyAndValue>;
+
+#[cfg(test)]
+pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 
 #[derive(Debug)]
 pub(crate) struct StateStore {
@@ -63,6 +72,88 @@ impl StateStore {
         ))
     }
 
+    #[cfg(test)]
+    fn get_node_keys_by_key_prefix(
+        &self,
+        key_prefix: &StateKeyPrefix,
+        desired_version: Version,
+    ) -> Result<HashMap<StateKey, NodeKey>> {
+        let mut iter = self.db.iter::<StateValueIndexSchema>(Default::default())?;
+        let mut result = HashMap::new();
+        iter.seek(&(key_prefix))?;
+        while let Some(((state_key, first_version), num_nibbles)) = iter.next().transpose()? {
+            // Cursor is currently at the first available version of the state key.
+            // Check if the key_prefix is a valid prefix of the state_key we got from DB.
+
+            if !key_prefix.is_prefix(&state_key)? {
+                // No more keys matching the key_prefix, we can return the result.
+                return Ok(result);
+            }
+            match first_version.cmp(&desired_version) {
+                Ordering::Less => {
+                    iter.seek_for_prev(&(state_key.clone(), desired_version))?;
+                    let ((state_key, db_version), num_nibbles) =
+                        iter.next().transpose()?.ok_or_else(|| {
+                            anyhow!(
+                                "Failure seeking to desired version {:?} for state key {:?}",
+                                desired_version,
+                                state_key
+                            )
+                        })?;
+                    result.insert(
+                        state_key.clone(),
+                        NodeKey::new(
+                            db_version,
+                            NibblePath::new_from_state_key(&state_key, num_nibbles as usize),
+                        ),
+                    );
+                }
+
+                Ordering::Equal => {
+                    result.insert(
+                        state_key.clone(),
+                        NodeKey::new(
+                            first_version,
+                            NibblePath::new_from_state_key(&state_key, num_nibbles as usize),
+                        ),
+                    );
+                }
+                Ordering::Greater => {}
+            }
+            // We don't allow fetching arbitrarily large number of values to be fetched as this can
+            // potentially slowdown the DB.
+            if result.len() > MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX {
+                return Err(anyhow!(
+                    "Too many values requested for key_prefix {:?} - maximum allowed {:?}",
+                    key_prefix,
+                    MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX
+                ));
+            }
+            // Seek to the next key - this can be done by seeking to the current key with max version
+            iter.seek(&(state_key, u64::MAX))?;
+        }
+        Ok(result)
+    }
+
+    /// Returns the key, value pairs for a particular state key prefix at at desired version. This
+    /// API can be used to get all resources of an account by passing the account address as the
+    /// key prefix.
+    #[cfg(test)]
+    pub fn get_values_by_key_prefix(
+        &self,
+        key_prefix: &StateKeyPrefix,
+        version: Version,
+    ) -> Result<HashMap<StateKey, StateValue>> {
+        let mut result = HashMap::new();
+        for (state_key, node_key) in self.get_node_keys_by_key_prefix(key_prefix, version)? {
+            let state_value = self
+                .get_value_by_node_key(&node_key)?
+                .ok_or_else(|| anyhow!("Failure reading value for node_key {:?}", node_key))?;
+            result.insert(state_key, state_value);
+        }
+        Ok(result)
+    }
+
     /// Get the state value given the state key and root hash of state Merkle tree by using the
     /// state value index. Only used for testing for now but should replace the
     /// `get_value_with_proof_by_version` call for VM execution to fetch the value without proof.
@@ -73,19 +164,20 @@ impl StateStore {
         version: Version,
     ) -> Result<Option<StateValue>> {
         match self.get_jmt_leaf_node_key(state_key, version)? {
-            Some(node_key) => {
-                if let Some(Node::Leaf(leaf)) =
-                    self.db.get::<JellyfishMerkleNodeSchema>(&node_key)?
-                {
-                    Ok(Some(leaf.value().value.clone()))
-                } else {
-                    Err(anyhow::anyhow!(
-                        "Can't find value in JMT for state key {:?}",
-                        state_key
-                    ))
-                }
-            }
+            Some(node_key) => self.get_value_by_node_key(&node_key),
             None => Ok(None),
+        }
+    }
+
+    #[cfg(test)]
+    fn get_value_by_node_key(&self, node_key: &NodeKey) -> Result<Option<StateValue>> {
+        if let Some(Node::Leaf(leaf)) = self.db.get::<JellyfishMerkleNodeSchema>(node_key)? {
+            Ok(Some(leaf.value().value.clone()))
+        } else {
+            Err(anyhow::anyhow!(
+                "Can't find value in JMT for node key {:?}",
+                node_key
+            ))
         }
     }
 
