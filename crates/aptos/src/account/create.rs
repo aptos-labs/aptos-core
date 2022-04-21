@@ -8,18 +8,15 @@
 
 use crate::{
     common::types::{
-        account_address_from_public_key, EncodingOptions, ExtractPublicKey,
-        PublicKeyInputOptions, WriteTransactionOptions,
+        account_address_from_public_key, EncodingOptions, ExtractPublicKey, PublicKeyInputOptions,
+        WriteTransactionOptions,
     },
     CliResult, Error as CommonError,
 };
 use anyhow::Error;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_rest_client::{Client as RestClient, Response, Transaction};
-use aptos_sdk::{
-    transaction_builder::TransactionFactory,
-    types::{LocalAccount},
-};
+use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
 use clap::Parser;
@@ -62,11 +59,11 @@ impl CreateAccount {
         let account_response = self
             .get_account(account)
             .await
-            .map_err(|err| CommonError::UnexpectedError(err.to_string()))?;
+            .map_err(|err| CommonError::ApiError(err.to_string()))?;
         let sequence_number = &account_response["sequence_number"];
         match sequence_number.as_str() {
             Some(number) => Ok(number.parse::<u64>().unwrap()),
-            None => Err(CommonError::UnexpectedError(
+            None => Err(CommonError::ApiError(
                 "Sequence number not found".to_string(),
             )),
         }
@@ -104,7 +101,7 @@ impl CreateAccount {
         if response.status() == 200 {
             Ok(response.status().to_string())
         } else {
-            Err(Error::new(CommonError::UnexpectedError(format!(
+            Err(Error::new(CommonError::ApiError(format!(
                 "Faucet issue: {}",
                 response.status()
             ))))

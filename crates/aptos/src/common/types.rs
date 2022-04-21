@@ -23,41 +23,32 @@ use thiserror::Error;
 /// A common result to be returned to users
 pub type CliResult = Result<String, String>;
 
-/// TODO: Re-evaluate these errors
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Invalid key value found in backend: {0}")]
-    BackendInvalidKeyValue(String),
-    #[error("Backend is missing the backend key")]
-    BackendMissingBackendKey,
-    #[error("Backend parsing error: {0}")]
-    BackendParsingError(String),
     #[error("Invalid arguments: {0}")]
     CommandArgumentError(String),
-    #[error("Unable to load config: {0}")]
-    ConfigError(String),
+    #[error("Unable to load config: {0} {1}")]
+    ConfigLoadError(String, String),
     #[error("Unable to find config {0}, have you run `aptos init`?")]
     ConfigNotFoundError(String),
     #[error("Error accessing '{0}': {1}")]
     IO(String, #[source] std::io::Error),
     #[error("Error (de)serializing '{0}': {1}")]
-    BCS(String, #[source] bcs::Error),
-    #[error("Unable to decode network address: {0}")]
-    NetworkAddressDecodeError(String),
+    BCS(&'static str, #[source] bcs::Error),
     #[error("Unable to parse '{0}': error: {1}")]
     UnableToParse(&'static str, String),
-    #[error("Unable to parse file '{0}', error: {1}")]
-    UnableToParseFile(String, String),
     #[error("Unable to read file '{0}', error: {1}")]
     UnableToReadFile(String, String),
-    #[error("Unexpected command, expected {0}, found {1}")]
-    UnexpectedCommand(String, String),
+    #[error("API error: {0}")]
+    ApiError(String),
     #[error("Unexpected error: {0}")]
     UnexpectedError(String),
     #[error("Aborted command")]
     AbortedError,
-    #[error("Move compiliation failed: {0}")]
-    MoveCompiliationError(String),
+    #[error("Move compilation failed: {0}")]
+    MoveCompilationError(String),
+    #[error("Move unit tests failed: {0}")]
+    MoveTestError(String),
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -76,13 +67,13 @@ impl CliConfig {
     pub fn load() -> Result<Self, Error> {
         let config_file = Self::aptos_folder()?.join("config.yml");
         if !config_file.exists() {
-            return Err(Error::ConfigError(format!("{:?}", config_file)));
+            return Err(Error::ConfigNotFoundError(format!("{:?}", config_file)));
         }
 
         let bytes = std::fs::read(&config_file)
-            .map_err(|err| Error::IO(format!("Failed to read {:?}", config_file), err))?;
+            .map_err(|err| Error::ConfigLoadError(format!("{:?}", config_file), err.to_string()))?;
         serde_yaml::from_slice(&bytes)
-            .map_err(|err| Error::UnableToParseFile(format!("{:?}", config_file), err.to_string()))
+            .map_err(|err| Error::ConfigLoadError(format!("{:?}", config_file), err.to_string()))
     }
 
     /// Saves the config to ./.aptos/config.yml
@@ -155,44 +146,49 @@ impl EncodingType {
     /// Encodes `Key` into one of the `EncodingType`s
     pub fn encode_key<Key: ValidCryptoMaterial>(
         &self,
+        name: &'static str,
         key: &Key,
-        key_name: &str,
     ) -> Result<Vec<u8>, Error> {
         Ok(match self {
             EncodingType::Hex => hex::encode_upper(key.to_bytes()).into_bytes(),
-            EncodingType::BCS => {
-                bcs::to_bytes(key).map_err(|err| Error::BCS(key_name.to_string(), err))?
-            }
+            EncodingType::BCS => bcs::to_bytes(key).map_err(|err| Error::BCS(name, err))?,
             EncodingType::Base64 => base64::encode(key.to_bytes()).into_bytes(),
         })
     }
 
     /// Loads a key from a file
-    pub fn load_key<Key: ValidCryptoMaterial>(&self, path: &Path) -> Result<Key, Error> {
+    pub fn load_key<Key: ValidCryptoMaterial>(
+        &self,
+        name: &'static str,
+        path: &Path,
+    ) -> Result<Key, Error> {
         let data = std::fs::read(&path).map_err(|err| {
             Error::UnableToReadFile(path.to_str().unwrap().to_string(), err.to_string())
         })?;
 
-        self.decode_key(data)
+        self.decode_key(name, data)
     }
 
     /// Decodes an encoded key given the known encoding
-    pub fn decode_key<Key: ValidCryptoMaterial>(&self, data: Vec<u8>) -> Result<Key, Error> {
+    pub fn decode_key<Key: ValidCryptoMaterial>(
+        &self,
+        name: &'static str,
+        data: Vec<u8>,
+    ) -> Result<Key, Error> {
         match self {
-            EncodingType::BCS => {
-                bcs::from_bytes(&data).map_err(|err| Error::BCS("Key".to_string(), err))
-            }
+            EncodingType::BCS => bcs::from_bytes(&data).map_err(|err| Error::BCS(name, err)),
             EncodingType::Hex => {
                 let hex_string = String::from_utf8(data).unwrap();
                 Key::from_encoded_string(hex_string.trim())
-                    .map_err(|err| Error::UnableToParse("Key", err.to_string()))
+                    .map_err(|err| Error::UnableToParse(name, err.to_string()))
             }
             EncodingType::Base64 => {
                 let string = String::from_utf8(data).unwrap();
                 let bytes = base64::decode(string.trim())
-                    .map_err(|err| Error::UnableToParse("Key", err.to_string()))?;
-                Key::try_from(bytes.as_slice())
-                    .map_err(|err| Error::UnexpectedError(format!("Failed to parse key {}", err)))
+                    .map_err(|err| Error::UnableToParse(name, err.to_string()))?;
+                Key::try_from(bytes.as_slice()).map_err(|err| {
+                    Error::UnableToParse(name, format!("Failed to parse key {:?}", err))
+                })
             }
         }
     }
@@ -240,10 +236,10 @@ pub struct PublicKeyInputOptions {
 impl ExtractPublicKey for PublicKeyInputOptions {
     fn extract_public_key(&self, encoding: EncodingType) -> Result<Ed25519PublicKey, Error> {
         if let Some(ref file) = self.public_key_file {
-            encoding.load_key(file.as_path())
+            encoding.load_key("--public-key-file", file.as_path())
         } else if let Some(ref key) = self.public_key {
             let key = key.as_bytes().to_vec();
-            encoding.decode_key(key)
+            encoding.decode_key("--public-key", key)
         } else {
             Err(Error::CommandArgumentError(
                 "One of ['--public-key', '--public-key-file'] must be used".to_string(),
@@ -265,10 +261,10 @@ pub struct PrivateKeyInputOptions {
 impl PrivateKeyInputOptions {
     pub fn extract_private_key(&self, encoding: EncodingType) -> Result<Ed25519PrivateKey, Error> {
         if let Some(ref file) = self.private_key_file {
-            encoding.load_key(file.as_path())
+            encoding.load_key("--private-key-file", file.as_path())
         } else if let Some(ref key) = self.private_key {
             let key = key.as_bytes().to_vec();
-            encoding.decode_key(key)
+            encoding.decode_key("--private-key", key)
         } else if let Some(private_key) = CliConfig::load()?.private_key {
             Ok(private_key)
         } else {

@@ -132,8 +132,8 @@ impl GenerateKey {
         let command = GenerateKey::parse_from(args.split_whitespace());
         command.execute()?;
         Ok((
-            encoding.load_key(key_file)?,
-            encoding.load_key(&append_file_extension(key_file, PUBLIC_KEY_EXTENSION)?)?,
+            encoding.load_key("private_key", key_file)?,
+            encoding.load_key("public_key", &append_file_extension(key_file, PUBLIC_KEY_EXTENSION)?)?,
         ))
     }
 
@@ -151,8 +151,8 @@ impl GenerateKey {
         let command = GenerateKey::parse_from(args.split_whitespace());
         command.execute()?;
         Ok((
-            encoding.load_key(key_file)?,
-            encoding.load_key(&append_file_extension(key_file, PUBLIC_KEY_EXTENSION)?)?,
+            encoding.load_key("private_key", key_file)?,
+            encoding.load_key("public_key", &append_file_extension(key_file, PUBLIC_KEY_EXTENSION)?)?,
         ))
     }
 
@@ -203,11 +203,11 @@ impl SaveKey {
         key: &Key,
         key_name: &'static str,
     ) -> Result<HashMap<&'static str, PathBuf>, Error> {
-        let encoded_private_key = self.encoding_options.encoding.encode_key(key, key_name)?;
+        let encoded_private_key = self.encoding_options.encoding.encode_key(key_name, key)?;
         let encoded_public_key = self
             .encoding_options
             .encoding
-            .encode_key(&key.public_key(), key_name)?;
+            .encode_key(key_name, &key.public_key())?;
 
         // Write private and public keys to files
         let public_key_file = self.public_key_file()?;

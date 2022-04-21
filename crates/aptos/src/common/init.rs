@@ -35,14 +35,14 @@ impl InitTool {
         };
 
         eprintln!("Enter your private key as a hex literal (0x...) [No input: Generate new key]");
-        let input = read_line()?;
+        let input = read_line("Private key")?;
         let input = input.trim();
         let private_key = if input.is_empty() {
             eprintln!("No key given, generating key...");
             GenerateKey::generate_ed25519_in_memory()
         } else {
             Ed25519PrivateKey::from_encoded_string(input)
-                .map_err(|err| Error::UnableToParse("PrivateKey", err.to_string()))?
+                .map_err(|err| Error::UnableToParse("Ed25519PrivateKey", err.to_string()))?
         };
         config.private_key = Some(private_key);
         config.save()?;
@@ -53,11 +53,11 @@ impl InitTool {
 }
 
 /// Reads a line from input
-fn read_line() -> Result<String, Error> {
+fn read_line(input_name: &'static str) -> Result<String, Error> {
     let mut input_buf = String::new();
     let _ = std::io::stdin()
         .read_line(&mut input_buf)
-        .map_err(|err| Error::IO("Private key".to_string(), err))?;
+        .map_err(|err| Error::IO(input_name.to_string(), err))?;
 
     Ok(input_buf)
 }

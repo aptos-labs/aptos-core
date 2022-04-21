@@ -46,7 +46,7 @@ impl ListResources {
         let result = self
             .get_resources()
             .await
-            .map_err(|err| CommonError::UnexpectedError(err.to_string()));
+            .map_err(|err| CommonError::ApiError(err.to_string()));
         to_common_result(result)
     }
 }

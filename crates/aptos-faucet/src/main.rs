@@ -68,7 +68,7 @@ async fn main() {
     );
 
     let key: ed25519::Ed25519PrivateKey = EncodingType::BCS
-        .load_key(Path::new(&args.mint_key_file_path))
+        .load_key("Ed25519PrivateKey", Path::new(&args.mint_key_file_path))
         .unwrap();
 
     let faucet_address: AccountAddress =

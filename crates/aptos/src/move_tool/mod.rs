@@ -6,6 +6,7 @@
 //! TODO: Examples
 //!
 
+use crate::common::types::WriteTransactionOptions;
 use crate::{
     common::{
         types::{EncodingOptions, MovePackageDir},
@@ -28,7 +29,6 @@ use move_package::{compilation::compiled_package::CompiledPackage, BuildConfig};
 use move_unit_test::UnitTestingConfig;
 use reqwest::Url;
 use std::path::Path;
-use crate::common::types::WriteTransactionOptions;
 
 /// CLI tool for performing Move tasks
 ///
@@ -97,7 +97,7 @@ impl TestPackage {
             aptos_natives(),
             false,
         )
-        .map_err(|err| Error::UnexpectedError(err.to_string()))?;
+        .map_err(|err| Error::MoveTestError(err.to_string()))?;
 
         // TODO: commit back up to the move repo
         match result {
@@ -112,7 +112,7 @@ fn compile_move(build_config: BuildConfig, package_dir: &Path) -> Result<Compile
     // TODO: Add caching
     build_config
         .compile_package(package_dir, &mut Vec::new())
-        .map_err(|err| Error::MoveCompiliationError(err.to_string()))
+        .map_err(|err| Error::MoveCompilationError(err.to_string()))
 }
 
 /// Publishes the modules in a Move package
@@ -153,7 +153,8 @@ impl PublishPackage {
 
         // Now that it's compiled, lets send it
         let sender_key = self
-            .write_options.private_key_options
+            .write_options
+            .private_key_options
             .extract_private_key(self.encoding_options.encoding)?;
 
         submit_transaction(
@@ -185,7 +186,7 @@ async fn submit_transaction(
     let account_response = client
         .get_account(sender_address)
         .await
-        .map_err(|err| Error::UnexpectedError(err.to_string()))?;
+        .map_err(|err| Error::ApiError(err.to_string()))?;
     let account = account_response.inner();
     let sequence_number = account.sequence_number;
 
@@ -198,7 +199,7 @@ async fn submit_transaction(
     let response = client
         .submit_and_wait(&transaction)
         .await
-        .map_err(|err| Error::UnexpectedError(err.to_string()))?;
+        .map_err(|err| Error::ApiError(err.to_string()))?;
 
     Ok(response.inner().clone())
 }
