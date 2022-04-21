@@ -7,6 +7,7 @@ module AptosFramework::Reconfiguration {
     use Std::GUID;
     use AptosFramework::SystemAddresses;
     use AptosFramework::Timestamp;
+    use AptosFramework::Stake;
 
     friend AptosFramework::Block;
     // TODO: migrate all to callback in block prologue
@@ -91,6 +92,7 @@ module AptosFramework::Reconfiguration {
 
     /// Signal validators to start using new configuration. Must be called from friend config modules.
     public(friend) fun reconfigure() acquires Configuration {
+        Stake::on_new_epoch();
         reconfigure_();
     }
 

@@ -76,7 +76,7 @@ impl RestClient {
         match validator_set {
             Ok(Some(validator_set)) => {
                 let mut validator_infos = vec![];
-                for validator_info in validator_set.payload().iter() {
+                for validator_info in validator_set.payload() {
                     if let Some(account) = account {
                         if validator_info.account_address() == &account {
                             validator_infos.push(validator_info.clone());

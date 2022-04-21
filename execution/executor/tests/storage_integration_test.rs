@@ -92,7 +92,9 @@ fn test_reconfiguration() {
             .get_validator_set()
             .unwrap()
             .unwrap()
-            .payload()[0]
+            .payload()
+            .next()
+            .unwrap()
             .consensus_public_key(),
         &AccountState::try_from(&validator_account_state_with_proof.value.unwrap())
             .unwrap()

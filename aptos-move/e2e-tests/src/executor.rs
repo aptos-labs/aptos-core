@@ -469,7 +469,7 @@ impl FakeExecutor {
             0,
             self.block_time,
             vec![],
-            *validator_set.payload()[0].account_address(),
+            *validator_set.payload().next().unwrap().account_address(),
         );
         let output = self
             .execute_transaction_block(vec![Transaction::BlockMetadata(new_block)])

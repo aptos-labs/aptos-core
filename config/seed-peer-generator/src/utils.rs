@@ -58,7 +58,6 @@ pub(crate) fn gen_seed_peers<
 ) -> anyhow::Result<PeerSet> {
     let set = validator_set
         .payload()
-        .iter()
         .filter_map(|validator_info| {
             to_seed_peer(validator_info, role, &to_addresses).map_or_else(
                 |error| {

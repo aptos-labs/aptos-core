@@ -2,7 +2,6 @@
 module AptosFramework::Block {
     use Std::Errors;
     use Std::Event;
-    use AptosFramework::ValidatorSet;
     use AptosFramework::Timestamp;
     use AptosFramework::SystemAddresses;
     use AptosFramework::Reconfiguration;
@@ -69,7 +68,7 @@ module AptosFramework::Block {
 
         // Authorization
         assert!(
-            proposer == @VMReserved || ValidatorSet::is_validator(proposer),
+            proposer == @VMReserved || Stake::is_current_validator(proposer),
             Errors::requires_address(EVM_OR_VALIDATOR)
         );
 
@@ -87,14 +86,8 @@ module AptosFramework::Block {
         );
 
         if (timestamp - Reconfiguration::last_reconfiguration_time() > block_metadata_ref.epoch_internal) {
-            on_new_epoch();
+            Reconfiguration::reconfigure();
         }
-    }
-
-    /// Invoke all epoch callbacks.
-    fun on_new_epoch() {
-        Stake::on_new_epoch();
-        Reconfiguration::reconfigure();
     }
 
     /// Get the current block height

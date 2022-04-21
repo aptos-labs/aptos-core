@@ -302,7 +302,7 @@ impl fmt::Display for ValidatorVerifier {
 
 impl From<&ValidatorSet> for ValidatorVerifier {
     fn from(validator_set: &ValidatorSet) -> Self {
-        ValidatorVerifier::new(validator_set.payload().iter().fold(
+        ValidatorVerifier::new(validator_set.payload().fold(
             BTreeMap::new(),
             |mut map, validator| {
                 map.insert(

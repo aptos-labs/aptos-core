@@ -133,7 +133,7 @@ impl TransactionBenchState {
             0,
             1,
             vec![],
-            *validator_set.payload()[0].account_address(),
+            *validator_set.payload().next().unwrap().account_address(),
         );
 
         state
