@@ -54,6 +54,7 @@ pub enum CliError {
     MoveTestError(String),
 }
 
+/// A persistent config for defaults across the CLI
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct CliConfig {
     /// Private key for commands.  TODO: Add vault functionality
@@ -265,17 +266,30 @@ pub struct PrivateKeyInputOptions {
 
 impl PrivateKeyInputOptions {
     pub fn extract_private_key(&self, encoding: EncodingType) -> CliTypedResult<Ed25519PrivateKey> {
-        if let Some(ref file) = self.private_key_file {
-            encoding.load_key("--private-key-file", file.as_path())
-        } else if let Some(ref key) = self.private_key {
-            let key = key.as_bytes().to_vec();
-            encoding.decode_key("--private-key", key)
+        if Some(private_key) = self.extract_private_key_no_config(encoding)? {
+            Ok(private_key)
         } else if let Some(private_key) = CliConfig::load()?.private_key {
             Ok(private_key)
         } else {
             Err(CliError::CommandArgumentError(
                 "One of ['--private-key', '--private-key-file'] must be used".to_string(),
             ))
+        }
+    }
+
+    pub fn extract_private_key_no_config(
+        &self,
+        encoding: EncodingType,
+    ) -> CliTypedResult<Option<Ed25519PrivateKey>> {
+        if let Some(ref file) = self.private_key_file {
+            encoding
+                .load_key("--private-key-file", file.as_path())
+                .map(Some)
+        } else if let Some(ref key) = self.private_key {
+            let key = key.as_bytes().to_vec();
+            encoding.decode_key("--private-key", key).map(Some)
+        } else {
+            None
         }
     }
 }
