@@ -48,6 +48,10 @@ pub struct CreateAccount {
     /// Flag for using faucet
     #[clap(long)]
     use_faucet: bool,
+
+    /// Initial coins to fund when using the faucet
+    #[clap(long, default_value = "10000")]
+    initial_coins: u64,
 }
 
 impl CreateAccount {
@@ -101,7 +105,7 @@ impl CreateAccount {
             // We should make a faucet endpoint for creating an account
             .post(format!(
                 "{}/mint?amount={}&auth_key={}",
-                "https://faucet.devnet.aptoslabs.com", "0", address
+                "https://faucet.devnet.aptoslabs.com", self.initial_coins, address
             ))
             .send()
             .await?;
