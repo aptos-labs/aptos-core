@@ -38,6 +38,20 @@ pub struct CreateAccount {
 }
 
 impl CreateAccount {
+    pub async fn execute(self) -> CliTypedResult<String> {
+        let public_key_to_create = self
+            .public_key_options
+            .extract_public_key(self.encoding_options.encoding)?;
+        let address = account_address_from_public_key(&public_key_to_create);
+
+        if self.use_faucet {
+            self.create_account_with_faucet(address).await
+        } else {
+            self.create_account_with_key(address).await
+        }
+        .map(|_| format!("Account Created at {}", address))
+    }
+
     async fn get_account(
         &self,
         account: AccountAddress,
@@ -117,19 +131,5 @@ impl CreateAccount {
         self.post_account(address, sender_private_key, sender_address, sequence_number)
             .await?;
         Ok(())
-    }
-
-    pub async fn execute(self) -> CliTypedResult<String> {
-        let public_key_to_create = self
-            .public_key_options
-            .extract_public_key(self.encoding_options.encoding)?;
-        let address = account_address_from_public_key(&public_key_to_create);
-
-        if self.use_faucet {
-            self.create_account_with_faucet(address).await
-        } else {
-            self.create_account_with_key(address).await
-        }
-        .map(|_| format!("Account Created at {}", address))
     }
 }

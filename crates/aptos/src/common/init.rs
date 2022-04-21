@@ -4,10 +4,9 @@
 use crate::{
     common::{
         types::{CliConfig, CliError, CliTypedResult},
-        utils::{prompt_yes, to_common_success_result},
+        utils::prompt_yes,
     },
     op::key::GenerateKey,
-    CliResult,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, ValidCryptoMaterialStringExt};
 use clap::Parser;
@@ -17,11 +16,7 @@ use clap::Parser;
 pub struct InitTool {}
 
 impl InitTool {
-    pub async fn execute(&self) -> CliResult {
-        to_common_success_result(self.execute_inner().await)
-    }
-
-    async fn execute_inner(&self) -> CliTypedResult<()> {
+    pub async fn execute(self) -> CliTypedResult<()> {
         let mut config = if CliConfig::config_exists()? {
             if !prompt_yes(
                 "Aptos already initialized, do you want to overwrite the existing config?",

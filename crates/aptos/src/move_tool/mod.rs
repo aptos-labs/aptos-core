@@ -58,7 +58,7 @@ pub struct CompilePackage {
 }
 
 impl CompilePackage {
-    pub async fn execute(&self) -> CliTypedResult<Vec<String>> {
+    pub async fn execute(self) -> CliTypedResult<Vec<String>> {
         let build_config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses.clone(),
             generate_docs: true,
@@ -84,7 +84,7 @@ pub struct TestPackage {
 }
 
 impl TestPackage {
-    pub async fn execute(&self) -> CliTypedResult<&'static str> {
+    pub async fn execute(self) -> CliTypedResult<&'static str> {
         let config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses.clone(),
             test_mode: true,
@@ -136,7 +136,7 @@ pub struct PublishPackage {
 }
 
 impl PublishPackage {
-    pub async fn execute(&self) -> CliTypedResult<aptos_rest_client::Transaction> {
+    pub async fn execute(self) -> CliTypedResult<aptos_rest_client::Transaction> {
         let build_config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses.clone(),
             generate_abis: false,
