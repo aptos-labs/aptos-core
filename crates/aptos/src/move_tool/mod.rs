@@ -125,14 +125,6 @@ pub struct PublishPackage {
     move_options: MovePackageDir,
     #[clap(flatten)]
     write_options: WriteTransactionOptions,
-    /// ChainId for the network
-    #[clap(long)]
-    chain_id: ChainId,
-    /// Maximum gas to be used to publish the package
-    ///
-    /// Defaults to 1000 gas units
-    #[clap(long, default_value_t = 1000)]
-    max_gas: u64,
 }
 
 impl PublishPackage {
@@ -160,10 +152,10 @@ impl PublishPackage {
 
         submit_transaction(
             self.write_options.rest_options.url.clone(),
-            self.chain_id,
+            self.write_options.chain_id,
             sender_key,
             compiled_payload,
-            self.max_gas,
+            self.write_options.max_gas,
         )
         .await
     }

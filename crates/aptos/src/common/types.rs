@@ -352,6 +352,11 @@ pub struct WriteTransactionOptions {
     /// ChainId for the network
     #[clap(long)]
     pub chain_id: ChainId,
+    /// Maximum gas to be used to publish the package
+    ///
+    /// Defaults to 1000 gas units
+    #[clap(long, default_value_t = 1000)]
+    pub max_gas: u64,
 }
 
 /// Options for compiling a move package dir

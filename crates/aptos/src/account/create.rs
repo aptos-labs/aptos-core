@@ -87,7 +87,7 @@ impl CreateAccount {
         let client = RestClient::new(reqwest::Url::clone(&self.write_options.rest_options.url));
         let transaction_factory = TransactionFactory::new(self.write_options.chain_id)
             .with_gas_unit_price(1)
-            .with_max_gas_amount(1000);
+            .with_max_gas_amount(self.write_options.max_gas);
         let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
         let transaction = sender_account.sign_with_transaction_builder(
             transaction_factory
