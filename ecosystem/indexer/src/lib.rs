@@ -1,6 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+// Increase recursion limit for `serde_json::json!` macro parsing
+#![recursion_limit = "256"]
+
 #[macro_use]
 extern crate diesel_migrations;
 

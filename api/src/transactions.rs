@@ -250,12 +250,11 @@ impl Transactions {
         let first_version = data[0].version;
         let mut timestamp = self.context.get_block_timestamp(first_version)?;
         let resolver = self.context.move_resolver()?;
+        let converter = resolver.as_converter();
         let txns: Vec<Transaction> = data
             .into_iter()
             .map(|t| {
-                let txn = resolver
-                    .as_converter()
-                    .try_into_onchain_transaction(timestamp, t)?;
+                let txn = converter.try_into_onchain_transaction(timestamp, t)?;
                 // update timestamp, when txn is metadata block transaction
                 // new timestamp is used for the following transactions
                 timestamp = txn.timestamp();

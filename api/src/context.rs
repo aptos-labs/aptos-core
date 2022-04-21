@@ -133,13 +133,10 @@ impl Context {
     ) -> Result<Vec<TransactionOnChainData>> {
         let data = self
             .db
-            .get_transactions(start_version, limit as u64, ledger_version, true)?;
-        let tx_outputs =
-            self.db
-                .get_transaction_outputs(start_version, limit as u64, ledger_version)?;
+            .get_transaction_outputs(start_version, limit as u64, ledger_version)?;
 
         let txn_start_version = data
-            .first_transaction_version
+            .first_transaction_output_version
             .ok_or_else(|| format_err!("no start version from database"))?;
         ensure!(
             txn_start_version == start_version,
@@ -148,30 +145,23 @@ impl Context {
             start_version
         );
 
-        let txns = data.transactions;
         let infos = data.proof.transaction_infos;
-        let events = data.events.unwrap_or_default();
-        let changes: Vec<aptos_types::write_set::WriteSet> = tx_outputs
-            .transactions_and_outputs
-            .into_iter()
-            .map(|txo| txo.1.unpack().0)
-            .collect();
+        let transactions_and_outputs = data.transactions_and_outputs;
+
         ensure!(
-            txns.len() == infos.len() && txns.len() == events.len() && txns.len() == changes.len(),
-            "invalid data size from database: {}, {}, {}, {}",
-            txns.len(),
+            transactions_and_outputs.len() == infos.len(),
+            "invalid data size from database: {}, {}",
+            transactions_and_outputs.len(),
             infos.len(),
-            events.len(),
-            changes.len(),
         );
 
-        txns.into_iter()
+        transactions_and_outputs
+            .into_iter()
             .zip(infos.into_iter())
-            .zip(events.into_iter())
-            .zip(changes.into_iter())
             .enumerate()
-            .map(|(i, (((txn, info), events), write_set))| {
+            .map(|(i, ((txn, txn_output), info))| {
                 let version = start_version + i as u64;
+                let (write_set, events, _, _) = txn_output.unpack();
                 self.get_accumulator_root_hash(version)
                     .map(|h| (version, txn, info, events, h, write_set).into())
             })
@@ -244,12 +234,13 @@ impl Context {
         &self,
         txn: TransactionWithProof,
     ) -> Result<TransactionOnChainData> {
-        let tx_outputs = self
+        // the type is Vec<(Transaction, TransactionOutput)> - given we have one transaction here, there should only ever be one value in this array
+        let (_, txn_output) = &self
             .db
-            .get_transaction_outputs(txn.version, 1, txn.version)?;
-
+            .get_transaction_outputs(txn.version, 1, txn.version)?
+            .transactions_and_outputs[0];
         self.get_accumulator_root_hash(txn.version)
-            .map(|h| (txn, h, tx_outputs).into())
+            .map(|h| (txn, h, txn_output).into())
     }
 
     pub fn get_events(

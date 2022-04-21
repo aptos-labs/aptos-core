@@ -18,7 +18,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     transaction::{
         authenticator::{AccountAuthenticator, TransactionAuthenticator},
-        Script, SignedTransaction, TransactionOutputListWithProof, TransactionWithProof,
+        Script, SignedTransaction, TransactionOutput, TransactionWithProof,
     },
 };
 
@@ -75,17 +75,16 @@ impl
     From<(
         TransactionWithProof,
         aptos_crypto::HashValue,
-        TransactionOutputListWithProof,
+        &TransactionOutput,
     )> for TransactionOnChainData
 {
     fn from(
-        (txn, accumulator_root_hash, txn_output_list): (
+        (txn, accumulator_root_hash, txn_output): (
             TransactionWithProof,
             aptos_crypto::HashValue,
-            TransactionOutputListWithProof,
+            &TransactionOutput,
         ),
     ) -> Self {
-        let (_, txn_output) = &txn_output_list.transactions_and_outputs[0];
         Self {
             version: txn.version,
             transaction: txn.transaction,

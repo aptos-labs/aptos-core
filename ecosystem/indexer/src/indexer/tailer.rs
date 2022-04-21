@@ -1,6 +1,5 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-
 use crate::{
     database::PgDbPool,
     indexer::{
@@ -242,69 +241,195 @@ mod test {
         // An abridged genesis transaction
         let genesis_txn: Transaction = serde_json::from_value(json!(
             {
-              "type": "genesis_transaction",
-              "version": "0",
-              "hash": "0x12180a4bbccf48de4d1e23b498add134328669ffc7741c8d529c6b2e3629ac99",
-              "state_root_hash": "0xb50adef3662d77e528be9e1cb5637fe5b7afd13eea317b330799f0c559c918c1",
-              "event_root_hash": "0xcbdbb1b830d1016d45a828bb3171ea81826e8315f14140acfbd7886f49fbcb40",
-              "gas_used": "0",
-              "success": true,
-              "vm_status": "Executed successfully",
-              "accumulator_root_hash": "0x188ed588547d551e652f04fccd5434c2977d6cff9e7443eb8e7c3038408caad4",
-              "payload": {
-                "type": "write_set_payload",
-                "write_set": {
-                  "type": "direct_write_set",
-                  "changes": [],
-                  "events": []
-                }
-              },
-              "events": [
-                {
-                  "key": "0x0400000000000000000000000000000000000000000000000000000000000000000000000a550c18",
-                  "sequence_number": "0",
-                  "type": "0x1::Reconfiguration::NewEpochEvent",
-                  "data": {
-                    "epoch": "1"
-                  }
-                }
-              ],
-              "changes": [
-                {
-                  "type": "write_resource",
-                  "address": "0xa550c18",
-                  "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
-                  "data": {
-                    "type": "0x1::Block::BlockMetadata",
-                    "data": {
-                      "height": "1",
-                      "new_block_events": {
-                        "counter": "1",
-                        "guid": {
-                          "guid": {
-                            "id": {
-                              "addr": "0xa550c18",
-                              "creation_num": "5"
-                            }
-                          },
-                          "len_bytes": 40
+               "type":"genesis_transaction",
+               "version":"0",
+               "hash":"0xa4d0d270d71cf031476dd2674d1e4a247489dfc3521c871ee37f42bd71a0a234",
+               "state_root_hash":"0x27b382a98a32256a9e6403ca1f6e26998273d77afa9e8666e7ee13679af40a7a",
+               "event_root_hash":"0xcbdbb1b830d1016d45a828bb3171ea81826e8315f14140acfbd7886f49fbcb40",
+               "gas_used":"0",
+               "success":true,
+               "vm_status":"Executed successfully",
+               "accumulator_root_hash":"0x6a527d06063dfd42c6b3a862574d5f3ec1660afb8058135edda5072712bfdb51",
+               "changes":[
+                  {
+                     "type":"write_resource",
+                     "address":"0x1",
+                     "state_key_hash":"3502b05382fba777545b45a0a9d40e86cdde7c3afbde19c748ce8b5f142c2b46",
+                     "data":{
+                        "type":"0x1::Account::Account",
+                        "data":{
+                           "authentication_key":"0x1e4dcad3d5d94307f30d51ff66d2ce784e0c2822d3138766907179bcb61f9edc",
+                           "self_address":"0x1",
+                           "sequence_number":"0"
                         }
-                      }
-                    }
+                     }
+                  },
+                  {
+                     "type":"write_module",
+                     "address":"0x1",
+                     "state_key_hash":"e428253ccf0b18f3d8300c6a0d29de93abcdc526e88728abeb85d57aec558935",
+                     "data":{
+                        "bytecode":"0xa11ceb0b050000000a01000a020a04030e2305310e073f940108d3012006f3012c0a9f02050ca402370ddb020200000001000200030004000008000005000100000602000004080000000409000000030a030000020b030400010c05050000010202060c0201060c0105010307436861696e4964064572726f7273065369676e65720f53797374656d4164647265737365730954696d657374616d70036765740a696e697469616c697a65026964106173736572745f6f7065726174696e670e6173736572745f67656e65736973146173736572745f636f72655f7265736f757263650a616464726573735f6f6611616c72656164795f7075626c69736865640000000000000000000000000000000000000000000000000000000000000001030800000000000000000520000000000000000000000000000000000000000000000000000000000a550c18000201070200010001000006110207012b001000140201010000001211030a0011040a001105290020030d0b000107001106270b000b0112002d0002000000",
+                        "abi":{
+                           "address":"0x1",
+                           "name":"ChainId",
+                           "friends":[
+
+                           ],
+                           "exposed_functions":[
+                              {
+                                 "name":"get",
+                                 "visibility":"public",
+                                 "generic_type_params":[
+
+                                 ],
+                                 "params":[
+
+                                 ],
+                                 "return":[
+                                    "u8"
+                                 ]
+                              },
+                              {
+                                 "name":"initialize",
+                                 "visibility":"public",
+                                 "generic_type_params":[
+
+                                 ],
+                                 "params":[
+                                    "&signer",
+                                    "u8"
+                                 ],
+                                 "return":[
+
+                                 ]
+                              }
+                           ],
+                           "structs":[
+                              {
+                                 "name":"ChainId",
+                                 "is_native":false,
+                                 "abilities":[
+                                    "key"
+                                 ],
+                                 "generic_type_params":[
+
+                                 ],
+                                 "fields":[
+                                    {
+                                       "name":"id",
+                                       "type":"u8"
+                                    }
+                                 ]
+                              }
+                           ]
+                        }
+                     }
                   }
-                },
-                {
-                  "type": "write_resource",
-                  "address": "0xa550c18",
-                  "state_key_hash": "0xf113db06626eb7724773e4e9dacecc8a6cb3a710b8b70365768168b24fe06ce3",
-                  "data": {
-                    "type": "0x1::Timestamp::CurrentTimeMicroseconds",
-                    "data": {
-                      "microseconds": "1650419261396337"
-                    }
+               ],
+               "payload":{
+                  "type":"write_set_payload",
+                  "write_set":{
+                     "type":"direct_write_set",
+                     "changes":[
+                        {
+                           "type":"write_resource",
+                           "address":"0x1",
+                           "state_key_hash":"3502b05382fba777545b45a0a9d40e86cdde7c3afbde19c748ce8b5f142c2b46",
+                           "data":{
+                              "type":"0x1::Account::Account",
+                              "data":{
+                                 "authentication_key":"0x1e4dcad3d5d94307f30d51ff66d2ce784e0c2822d3138766907179bcb61f9edc",
+                                 "self_address":"0x1",
+                                 "sequence_number":"0"
+                              }
+                           }
+                        },
+                        {
+                           "type":"write_module",
+                           "address":"0x1",
+                           "state_key_hash":"e428253ccf0b18f3d8300c6a0d29de93abcdc526e88728abeb85d57aec558935",
+                           "data":{
+                              "bytecode":"0xa11ceb0b050000000a01000a020a04030e2305310e073f940108d3012006f3012c0a9f02050ca402370ddb020200000001000200030004000008000005000100000602000004080000000409000000030a030000020b030400010c05050000010202060c0201060c0105010307436861696e4964064572726f7273065369676e65720f53797374656d4164647265737365730954696d657374616d70036765740a696e697469616c697a65026964106173736572745f6f7065726174696e670e6173736572745f67656e65736973146173736572745f636f72655f7265736f757263650a616464726573735f6f6611616c72656164795f7075626c69736865640000000000000000000000000000000000000000000000000000000000000001030800000000000000000520000000000000000000000000000000000000000000000000000000000a550c18000201070200010001000006110207012b001000140201010000001211030a0011040a001105290020030d0b000107001106270b000b0112002d0002000000",
+                              "abi":{
+                                 "address":"0x1",
+                                 "name":"ChainId",
+                                 "friends":[
+
+                                 ],
+                                 "exposed_functions":[
+                                    {
+                                       "name":"get",
+                                       "visibility":"public",
+                                       "generic_type_params":[
+
+                                       ],
+                                       "params":[
+
+                                       ],
+                                       "return":[
+                                          "u8"
+                                       ]
+                                    },
+                                    {
+                                       "name":"initialize",
+                                       "visibility":"public",
+                                       "generic_type_params":[
+
+                                       ],
+                                       "params":[
+                                          "&signer",
+                                          "u8"
+                                       ],
+                                       "return":[
+
+                                       ]
+                                    }
+                                 ],
+                                 "structs":[
+                                    {
+                                       "name":"ChainId",
+                                       "is_native":false,
+                                       "abilities":[
+                                          "key"
+                                       ],
+                                       "generic_type_params":[
+
+                                       ],
+                                       "fields":[
+                                          {
+                                             "name":"id",
+                                             "type":"u8"
+                                          }
+                                       ]
+                                    }
+                                 ]
+                              }
+                           }
+                        }
+                     ],
+                     "events":[
+                        {
+                           "key":"0x0400000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+                           "sequence_number":"0",
+                           "type":"0x1::Reconfiguration::NewEpochEvent",
+                           "data":{
+                              "epoch":"1"
+                           }
+                        }
+                     ]
                   }
-                }
-              ]
+               },
+               "events":[
+                  {
+                     "key":"0x0400000000000000000000000000000000000000000000000000000000000000000000000a550c18",
+                     "sequence_number":"0",
+                     "type":"0x1::Reconfiguration::NewEpochEvent",
+                     "data":{
+                        "epoch":"1"
+                     }
+                  }
+               ]
             }
         )).unwrap();
 
