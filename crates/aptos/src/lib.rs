@@ -22,7 +22,7 @@ pub enum Tool {
     #[clap(subcommand)]
     Move(move_tool::MoveTool),
     #[clap(subcommand)]
-    Op(op::OpTool),
+    Key(op::key::KeyTool),
 }
 
 impl Tool {
@@ -31,7 +31,7 @@ impl Tool {
             Tool::Account(tool) => tool.execute().await,
             Tool::Init(tool) => tool.execute().await,
             Tool::Move(tool) => tool.execute().await,
-            Tool::Op(tool) => tool.execute().await,
+            Tool::Key(tool) => tool.execute().await,
         }
     }
 }
