@@ -8,7 +8,7 @@
 
 use crate::{
     common::{
-        types::{EncodingOptions, MovePackageDir, NodeOptions, PrivateKeyInputOptions},
+        types::{EncodingOptions, MovePackageDir},
         utils::to_common_result,
     },
     CliResult, Error,
@@ -28,6 +28,7 @@ use move_package::{compilation::compiled_package::CompiledPackage, BuildConfig};
 use move_unit_test::UnitTestingConfig;
 use reqwest::Url;
 use std::path::Path;
+use crate::common::types::WriteTransactionOptions;
 
 /// CLI tool for performing Move tasks
 ///
@@ -120,11 +121,9 @@ pub struct PublishPackage {
     #[clap(flatten)]
     encoding_options: EncodingOptions,
     #[clap(flatten)]
-    private_key_options: PrivateKeyInputOptions,
-    #[clap(flatten)]
     move_options: MovePackageDir,
     #[clap(flatten)]
-    node_options: NodeOptions,
+    write_options: WriteTransactionOptions,
     /// ChainId for the network
     #[clap(long)]
     chain_id: ChainId,
@@ -154,11 +153,11 @@ impl PublishPackage {
 
         // Now that it's compiled, lets send it
         let sender_key = self
-            .private_key_options
+            .write_options.private_key_options
             .extract_private_key(self.encoding_options.encoding)?;
 
         submit_transaction(
-            self.node_options.url.clone(),
+            self.write_options.rest_options.url.clone(),
             self.chain_id,
             sender_key,
             compiled_payload,

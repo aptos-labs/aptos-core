@@ -378,7 +378,9 @@ impl<'t> TxnEmitter<'t> {
         index: usize,
     ) -> Result<LocalAccount> {
         let file = "vasp".to_owned() + index.to_string().as_str() + ".key";
-        let mint_key: Ed25519PrivateKey = EncodingType::BCS.load_key(Path::new(&file)).unwrap();
+        let mint_key: Ed25519PrivateKey = EncodingType::BCS
+            .load_key("vasp private key", Path::new(&file))
+            .unwrap();
         let account_key = AccountKey::from_private_key(mint_key);
         let address = account_key.authentication_key().derived_address();
         let sequence_number = query_sequence_numbers(client, &[address])

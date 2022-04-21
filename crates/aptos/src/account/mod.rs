@@ -1,11 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! A command to create a new account on-chain
-//!
-//! TODO: Examples
-//!
-
 use crate::common::types::CliResult;
 use clap::Subcommand;
 

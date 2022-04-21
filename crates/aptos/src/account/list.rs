@@ -7,7 +7,7 @@
 //!
 
 use crate::{
-    common::{types::NodeOptions, utils::to_common_result},
+    common::{types::RestOptions, utils::to_common_result},
     CliResult, Error as CommonError,
 };
 use anyhow::Error;
@@ -20,7 +20,7 @@ use clap::Parser;
 #[derive(Debug, Parser)]
 pub struct ListResources {
     #[clap(flatten)]
-    node: NodeOptions,
+    rest_options: RestOptions,
 
     /// Address of account you want to list resources for
     #[clap(long)]
@@ -29,7 +29,7 @@ pub struct ListResources {
 
 impl ListResources {
     async fn get_resources(self) -> Result<Vec<serde_json::Value>, Error> {
-        let client = Client::new(self.node.url);
+        let client = Client::new(self.rest_options.url);
         let response: Vec<Resource> = client
             .get_account_resources(self.account)
             .await?

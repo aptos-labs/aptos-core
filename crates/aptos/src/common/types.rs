@@ -7,7 +7,7 @@ use aptos_crypto::{
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
 use aptos_logger::{debug, info};
-use aptos_types::transaction::authenticator::AuthenticationKey;
+use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
 use clap::{ArgEnum, Parser};
 use itertools::Itertools;
 use move_core_types::account_address::AccountAddress;
@@ -327,8 +327,9 @@ impl SaveFile {
     }
 }
 
+/// Options specific to using the Rest endpoint
 #[derive(Debug, Parser)]
-pub struct NodeOptions {
+pub struct RestOptions {
     /// URL to a fullnode on the network
     ///
     /// Defaults to https://fullnode.devnet.aptoslabs.com
@@ -340,7 +341,19 @@ pub struct NodeOptions {
     pub url: reqwest::Url,
 }
 
-/// Options for a move package dir
+/// Options specific to submitting a private key to the Rest endpoint
+#[derive(Debug, Parser)]
+pub struct WriteTransactionOptions {
+    #[clap(flatten)]
+    pub private_key_options: PrivateKeyInputOptions,
+    #[clap(flatten)]
+    pub rest_options: RestOptions,
+    /// ChainId for the network
+    #[clap(long)]
+    pub chain_id: ChainId,
+}
+
+/// Options for compiling a move package dir
 #[derive(Debug, Parser)]
 pub struct MovePackageDir {
     /// Path to a move package (the folder with a Move.toml file)

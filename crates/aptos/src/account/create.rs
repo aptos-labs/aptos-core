@@ -8,8 +8,8 @@
 
 use crate::{
     common::types::{
-        account_address_from_public_key, EncodingOptions, ExtractPublicKey, NodeOptions,
-        PrivateKeyInputOptions, PublicKeyInputOptions,
+        account_address_from_public_key, EncodingOptions, ExtractPublicKey,
+        PublicKeyInputOptions, WriteTransactionOptions,
     },
     CliResult, Error as CommonError,
 };
@@ -18,7 +18,7 @@ use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_rest_client::{Client as RestClient, Response, Transaction};
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
-    types::{chain_id::ChainId, LocalAccount},
+    types::{LocalAccount},
 };
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
@@ -30,22 +30,12 @@ use reqwest;
 #[derive(Debug, Parser)]
 pub struct CreateAccount {
     #[clap(flatten)]
-    private_key_input_options: PrivateKeyInputOptions,
-
-    #[clap(flatten)]
     encoding_options: EncodingOptions,
-
     #[clap(flatten)]
-    node: NodeOptions,
-
+    write_options: WriteTransactionOptions,
     #[clap(flatten)]
-    public_key_input_options: PublicKeyInputOptions,
-
-    /// Chain ID
-    #[clap(long)]
-    chain_id: u8,
-
-    /// Flag for using faucet
+    public_key_options: PublicKeyInputOptions,
+    /// Flag for using faucet to create the account
     #[clap(long)]
     use_faucet: bool,
 
@@ -59,10 +49,13 @@ impl CreateAccount {
         &self,
         account: AccountAddress,
     ) -> Result<serde_json::Value, reqwest::Error> {
-        reqwest::get(format!("{}accounts/{}", self.node.url, account))
-            .await?
-            .json()
-            .await
+        reqwest::get(format!(
+            "{}accounts/{}",
+            self.write_options.rest_options.url, account
+        ))
+        .await?
+        .json()
+        .await
     }
 
     async fn get_sequence_number(&self, account: AccountAddress) -> Result<u64, CommonError> {
@@ -86,9 +79,8 @@ impl CreateAccount {
         sender_address: AccountAddress,
         sequence_number: u64,
     ) -> Result<Response<Transaction>, Error> {
-        let client = RestClient::new(reqwest::Url::clone(&self.node.url));
-        let chain_id = ChainId::new(self.chain_id);
-        let transaction_factory = TransactionFactory::new(chain_id)
+        let client = RestClient::new(reqwest::Url::clone(&self.write_options.rest_options.url));
+        let transaction_factory = TransactionFactory::new(self.write_options.chain_id)
             .with_gas_unit_price(1)
             .with_max_gas_amount(1000);
         let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
@@ -121,7 +113,8 @@ impl CreateAccount {
 
     async fn create_account_with_key(self, address: AccountAddress) -> Result<String, Error> {
         let sender_private_key = self
-            .private_key_input_options
+            .write_options
+            .private_key_options
             .extract_private_key(self.encoding_options.encoding)?;
         let sender_public_key = sender_private_key.public_key();
         let sender_address = account_address_from_public_key(&sender_public_key);
@@ -145,7 +138,7 @@ impl CreateAccount {
 
     pub async fn execute(self) -> CliResult {
         let public_key_to_create = self
-            .public_key_input_options
+            .public_key_options
             .extract_public_key(self.encoding_options.encoding)
             .map_err(|err| err.to_string())?;
         let new_address = account_address_from_public_key(&public_key_to_create);
