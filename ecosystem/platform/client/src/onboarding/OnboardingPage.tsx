@@ -1,8 +1,12 @@
 import * as React from "react";
+import {GitHubSignIn} from "./GitHubSignIn";
 import {OnboardingForm} from "./OnboardingForm";
 import {Identity} from "./types";
+import {useAuth} from "auth";
 
 export function OnboardingPage() {
+  const {isSignedIn} = useAuth();
+
   const handleSubmit = (identity: Identity) => {
     console.log(identity);
   };
@@ -13,12 +17,17 @@ export function OnboardingPage() {
         <div className="px-4 sm:px-6">
           <h3 className="text-lg font-medium leading-6 text-gray-900">Aptos</h3>
           <p className="mt-1 text-sm text-gray-600">
-            In order to participate in the incentivized testnet, please sign in
-            with GitHub and complete this form.
+            {isSignedIn
+              ? "Tell us your address so you can get paid."
+              : "Sign in with GitHub to get started."}
           </p>
         </div>
         <div className="px-4 py-5 sm:p-6">
-          <OnboardingForm onSubmit={handleSubmit} />
+          {isSignedIn ? (
+            <OnboardingForm onSubmit={handleSubmit} />
+          ) : (
+            <GitHubSignIn />
+          )}
         </div>
       </div>
     </div>
