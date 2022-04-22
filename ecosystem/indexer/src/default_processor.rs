@@ -10,6 +10,7 @@ use crate::{
     models::{
         events::EventModel,
         transactions::{BlockMetadataTransactionModel, TransactionModel, UserTransactionModel},
+        write_set_changes::WriteSetChangeModel,
     },
     schema,
 };
@@ -45,6 +46,16 @@ fn insert_events(conn: &PgPoolConnection, events: &Vec<EventModel>) {
         conn,
         diesel::insert_into(schema::events::table)
             .values(events)
+            .on_conflict_do_nothing(),
+    )
+    .expect("Error inserting row into database");
+}
+
+fn insert_write_set_changes(conn: &PgPoolConnection, write_set_changes: &Vec<WriteSetChangeModel>) {
+    execute_with_better_error(
+        conn,
+        diesel::insert_into(schema::write_set_changes::table)
+            .values(write_set_changes)
             .on_conflict_do_nothing(),
     )
     .expect("Error inserting row into database");
@@ -123,7 +134,7 @@ impl TransactionProcessor for DefaultTransactionProcessor {
     ) -> Result<ProcessingResult, TransactionProcessingError> {
         let version = transaction.version().unwrap_or(0);
 
-        let (transaction_model, maybe_details_model, maybe_events) =
+        let (transaction_model, maybe_details_model, maybe_events, maybe_write_set_changes) =
             TransactionModel::from_transaction(&transaction);
 
         let conn = self.get_conn();
@@ -153,6 +164,9 @@ impl TransactionProcessor for DefaultTransactionProcessor {
 
             if let Some(events) = maybe_events {
                 insert_events(&conn, &events);
+            };
+            if let Some(write_set_changes) = maybe_write_set_changes {
+                insert_write_set_changes(&conn, &write_set_changes);
             };
             Ok(())
         });

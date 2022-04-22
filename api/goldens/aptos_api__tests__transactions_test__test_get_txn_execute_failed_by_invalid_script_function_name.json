@@ -2,12 +2,52 @@
   "type": "user_transaction",
   "version": "2",
   "hash": "0xfb4cb05816a067c3dc02df8b628a2924c030937599565fb317de48736cd98b4d",
-  "state_root_hash": "0x35704a7851c5e2da0ef26eae6d11826060066f9c09365ba1cd3a037ee9c5fb7b",
+  "state_root_hash": "0x613919682e21fac2dfeb169c98f88a8e265b2cc107c529e55c5cc393e73413e1",
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "1",
   "success": false,
   "vm_status": "Move bytecode deserialization / verification failed, including script function not found or invalid arguments",
-  "accumulator_root_hash": "0xb46de4961ff46248e9a23865bf81f7a9d86cb81f22e55725dd5622d5cc0c1444",
+  "accumulator_root_hash": "0x43559a00947d0b2e0a0037c9e27890e5850d4fb450b160179dd21e6657ec2038",
+  "changes": [
+    {
+      "type": "write_resource",
+      "address": "0xa550c18",
+      "state_key_hash": "0x04a62513032e695c923632ca1b9248d11e49c9b1e83bba39974adf50bbabdd8f",
+      "data": {
+        "type": "0x1::Account::Account",
+        "data": {
+          "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
+          "self_address": "0xa550c18",
+          "sequence_number": "1"
+        }
+      }
+    },
+    {
+      "type": "write_resource",
+      "address": "0xa550c18",
+      "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
+      "data": {
+        "type": "0x1::TestCoin::Balance",
+        "data": {
+          "coin": {
+            "value": "18446744073709551615"
+          }
+        }
+      }
+    },
+    {
+      "type": "write_resource",
+      "address": "0xa550c18",
+      "state_key_hash": "0x79a08e0b94ebb66c0dae37a07c182d46387c347aeb83c07de6109b0503c3a24e",
+      "data": {
+        "type": "0x1::TestCoin::CoinInfo",
+        "data": {
+          "scaling_factor": "1000000",
+          "total_value": "18446744073709551615"
+        }
+      }
+    }
+  ],
   "sender": "0xa550c18",
   "sequence_number": "0",
   "max_gas_amount": "2000",

@@ -40,7 +40,7 @@ use aptos_types::{
     write_set::{WriteSet, WriteSetMut},
 };
 use fail::fail_point;
-use move_binary_format::errors::VMResult;
+use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     gas_schedule::{GasAlgebra, GasUnits},
@@ -50,10 +50,12 @@ use move_core_types::{
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
-use move_vm_types::gas_schedule::GasStatus;
+use move_vm_runtime::session::LoadedFunctionInstantiation;
+use move_vm_types::{gas_schedule::GasStatus, loaded_data::runtime_types::Type};
 use std::{
     collections::HashSet,
     convert::{AsMut, AsRef},
+    sync::Arc,
 };
 
 #[derive(Clone)]
@@ -84,12 +86,85 @@ impl AptosVM {
             publishing_option,
         ))
     }
+
     pub fn internals(&self) -> AptosVMInternals {
         AptosVMInternals::new(&self.0)
     }
 
+    fn is_valid_for_constant_type(typ: &Type) -> bool {
+        use move_vm_types::loaded_data::runtime_types::Type::*;
+        match typ {
+            Bool | U8 | U64 | U128 | Address => true,
+            Vector(inner) => AptosVM::is_valid_for_constant_type(&(*inner)),
+            Signer
+            | Struct(_)
+            | StructInstantiation(_, _)
+            | Reference(_)
+            | MutableReference(_)
+            | TyParam(_) => false,
+        }
+    }
+
+    /// validation and generate args for entry function
+    /// validation includes:
+    /// 1. return signature is empty
+    /// 2. number of signers is same as the number of senders
+    /// 3. check args are no resource after signers
+    ///
+    /// after validation, add senders and non-signer arguments to generate the final args
+    fn validate_combine_signer_and_txn_args(
+        senders: Vec<AccountAddress>,
+        args: Vec<Vec<u8>>,
+        func: &LoadedFunctionInstantiation,
+    ) -> Result<Vec<Vec<u8>>, VMStatus> {
+        // entry function should not return
+        if !func.return_.is_empty() {
+            return Err(VMStatus::Error(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE));
+        }
+        let mut signer_param_cnt = 0;
+        // find all signer params at the beginning
+        for ty in func.parameters.iter() {
+            if matches!(ty, Type::Signer) {
+                signer_param_cnt += 1;
+            }
+        }
+        // validate all non_signer params
+        for ty in func.parameters[signer_param_cnt..].iter() {
+            if !AptosVM::is_valid_for_constant_type(ty) || matches!(ty, Type::Signer) {
+                return Err(VMStatus::Error(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE));
+            }
+        }
+
+        if (signer_param_cnt + args.len()) != func.parameters.len() {
+            return Err(VMStatus::Error(StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH));
+        }
+        // if function doesn't require signer, we reuse txn args
+        // if the function require signer, we check senders number same as signers
+        // and then combine senders with txn args.
+        let combined_args = if signer_param_cnt == 0 {
+            args
+        } else {
+            // the number of txn senders should be the same number of signers
+            if senders.len() != signer_param_cnt {
+                return Err(VMStatus::Error(
+                    StatusCode::NUMBER_OF_SIGNER_ARGUMENTS_MISMATCH,
+                ));
+            }
+            senders
+                .into_iter()
+                .map(|s| MoveValue::Signer(s).simple_serialize().unwrap())
+                .chain(args)
+                .collect()
+        };
+        Ok(combined_args)
+    }
+
     /// Load a module into its internal MoveVM's code cache.
-    pub fn load_module<S: MoveResolver>(&self, module_id: &ModuleId, state: &S) -> VMResult<()> {
+    pub fn load_module<S: MoveResolver>(
+        &self,
+        module_id: &ModuleId,
+        state: &S,
+    ) -> VMResult<Arc<CompiledModule>> {
         self.0.load_module(module_id, state)
     }
 
@@ -215,35 +290,51 @@ impl AptosVM {
                     let remapped_script = script_to_script_function::remapping(script.code());
                     let mut senders = vec![txn_data.sender()];
                     senders.extend(txn_data.secondary_signers());
+                    let loaded_func =
+                        session.load_script(script.code(), script.ty_args().to_vec())?;
+                    let args = AptosVM::validate_combine_signer_and_txn_args(
+                        senders,
+                        convert_txn_args(script.args()),
+                        &loaded_func,
+                    )?;
                     match remapped_script {
                         // We are in this case before VERSION_2
                         // or if there is no remapping for the script
                         None => session.execute_script(
-                            script.code().to_vec(),
+                            script.code(),
                             script.ty_args().to_vec(),
-                            convert_txn_args(script.args()),
-                            senders,
+                            args,
                             gas_status,
                         ),
-                        Some((module, function)) => session.execute_script_function(
+                        Some((module, function)) => session.execute_entry_function(
                             module,
                             function,
                             script.ty_args().to_vec(),
-                            convert_txn_args(script.args()),
-                            senders,
+                            args,
                             gas_status,
                         ),
                     }
                 }
                 TransactionPayload::ScriptFunction(script_fn) => {
                     let mut senders = vec![txn_data.sender()];
+
                     senders.extend(txn_data.secondary_signers());
-                    session.execute_script_function(
+
+                    let function = session.load_function(
+                        script_fn.module(),
+                        script_fn.function(),
+                        script_fn.ty_args(),
+                    )?;
+                    let args = AptosVM::validate_combine_signer_and_txn_args(
+                        senders,
+                        script_fn.args().to_vec(),
+                        &function,
+                    )?;
+                    session.execute_entry_function(
                         script_fn.module(),
                         script_fn.function(),
                         script_fn.ty_args().to_vec(),
-                        script_fn.args().to_vec(),
-                        senders,
+                        args,
                         gas_status,
                     )
                 }
@@ -320,7 +411,6 @@ impl AptosVM {
                 }
             };
         }
-
         let account_currency_symbol = match get_gas_currency_code(txn) {
             Ok(symbol) => symbol,
             Err(err) => {
@@ -417,23 +507,30 @@ impl AptosVM {
                     None => vec![*execute_as],
                     Some(sender) => vec![sender, *execute_as],
                 };
+                let loaded_func = tmp_session
+                    .load_script(script.code(), script.ty_args().to_vec())
+                    .map_err(|e| Err(e.into_vm_status()))?;
+                let args = AptosVM::validate_combine_signer_and_txn_args(
+                    senders,
+                    convert_txn_args(script.args()),
+                    &loaded_func,
+                )
+                .map_err(Err)?;
                 let remapped_script = script_to_script_function::remapping(script.code());
                 let execution_result = match remapped_script {
                     // We are in this case before VERSION_2
                     // or if there is no remapping for the script
                     None => tmp_session.execute_script(
-                        script.code().to_vec(),
+                        script.code(),
                         script.ty_args().to_vec(),
-                        convert_txn_args(script.args()),
-                        senders,
+                        args,
                         &mut gas_status,
                     ),
-                    Some((module, function)) => tmp_session.execute_script_function(
+                    Some((module, function)) => tmp_session.execute_entry_function(
                         module,
                         function,
                         script.ty_args().to_vec(),
-                        convert_txn_args(script.args()),
-                        senders,
+                        args,
                         &mut gas_status,
                     ),
                 }
@@ -520,7 +617,13 @@ impl AptosVM {
             MoveValue::Address(proposer),
         ]);
         session
-            .execute_function(&BLOCK_MODULE, BLOCK_PROLOGUE, vec![], args, &mut gas_status)
+            .execute_function_bypass_visibility(
+                &BLOCK_MODULE,
+                BLOCK_PROLOGUE,
+                vec![],
+                args,
+                &mut gas_status,
+            )
             .map(|_return_vals| ())
             .or_else(|e| {
                 expect_only_successful_execution(e, BLOCK_PROLOGUE.as_str(), log_context)

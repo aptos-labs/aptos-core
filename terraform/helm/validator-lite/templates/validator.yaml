@@ -1,0 +1,202 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "aptos-validator.fullname" . }}-validator
+  labels:
+    {{- include "aptos-validator.labels" . | nindent 4 }}
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "aptos-validator.fullname" . }}-validator-e{{ .Values.chain.era }}
+  labels:
+    {{- include "aptos-validator.labels" . | nindent 4 }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: {{ .Values.validator.storage.class }}
+  resources:
+    requests:
+      storage: {{ .Values.validator.storage.size }}
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "aptos-validator.fullname" . }}
+  labels:
+    {{- include "aptos-validator.labels" . | nindent 4 }}
+data:
+{{ tpl (.Files.Glob "files/configs/*.yaml").AsConfig . | indent 2 }}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "aptos-validator.fullname" . }}-validator-lb
+  labels:
+    {{- include "aptos-validator.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "aptos-validator.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: validator
+  ports:
+  - name: validator
+    port: 6180
+  - name: fullnode
+    port: 6182
+  - name: metrics
+    port: 9101
+  {{- if .Values.exposeValidatorRestApi }}
+  - name: api
+    port: 80
+    targetPort: 8080
+  {{- end }}
+
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "aptos-validator.fullname" . }}-validator
+  labels:
+    {{- include "aptos-validator.labels" . | nindent 4 }}
+    app.kubernetes.io/name: validator
+spec:
+  serviceName: {{ include "aptos-validator.fullname" . }}-validator
+  replicas: 1
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "aptos-validator.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: validator
+  template:
+    metadata:
+      labels:
+        {{- include "aptos-validator.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: validator
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: runtime/default
+        checksum/validator.yaml: {{ tpl (.Files.Get "files/configs/validator.yaml") . | sha256sum }}
+        checksum/vault.json: {{ tpl (.Files.Get "files/vault.json") . | sha256sum }}
+    spec:
+      terminationGracePeriodSeconds: 0
+      containers:
+      - name: validator
+        image: {{ .Values.validator.image.repo }}:{{ .Values.validator.image.tag | default .Values.imageTag }}
+      {{- with .Values.validator }}
+        imagePullPolicy: {{ .image.pullPolicy }}
+        command:
+        - bash
+        - -c
+        - |-
+          set -ex
+          while [ ! -e /opt/vault/token ] && [ $SECONDS -lt 30 ]; do sleep 1; done
+          exec /opt/aptos/bin/aptos-node -f /opt/aptos/etc/validator.yaml
+        resources:
+          {{- toYaml .resources | nindent 10 }}
+        env:
+        - name: RUST_LOG
+          value: {{ .rust_log }}
+        - name: RUST_LOG_REMOTE
+          value: {{ .rust_log_remote }}
+      {{- end }}
+        - name: RUST_BACKTRACE
+          value: "1"
+        volumeMounts:
+        - name: aptos-config
+          mountPath: /opt/aptos/etc
+        - name: genesis-config
+          mountPath: /opt/aptos/genesis
+        - name: aptos-data
+          mountPath: /opt/aptos/data
+        - name: vault-config
+          mountPath: /etc/vault
+        - name: vault-token
+          mountPath: /opt/vault
+        ports:
+        - containerPort: 6180
+        - containerPort: 6181  # VFN
+        - containerPort: 6182  # Public
+        - containerPort: 8080
+        - containerPort: 9101
+        livenessProbe:
+          tcpSocket:
+            port: 9101
+          initialDelaySeconds: 30
+        readinessProbe:
+          tcpSocket:
+            port: 6180
+        securityContext:
+          {{- if $.Values.enablePrivilegedMode }}
+          privileged: true
+          {{- else }}
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          {{- end }}
+      {{- with .Values.vault }}
+      - name: vault
+        image: {{ .image.repo }}:{{ .image.tag }}
+        imagePullPolicy: {{ .image.pullPolicy }}
+        command: ["vault", "agent", "-config=/etc/vault/validator.json"]
+        resources:
+          {{- toYaml .resources | nindent 10 }}
+        volumeMounts:
+        - name: vault-config
+          mountPath: /etc/vault
+        - name: vault-token
+          mountPath: /opt/vault
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      {{- end }}
+      {{- with .Values.validator }}
+      {{- with .nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 6180
+        runAsGroup: 6180
+        fsGroup: 6180
+      {{- end }}
+      volumes:
+      - name: aptos-config
+        configMap:
+          name: {{ include "aptos-validator.fullname" . }}
+      - name: genesis-config
+        configMap:
+          name: {{ include "aptos-validator.fullname" . }}-genesis-e{{ .Values.chain.era }}
+      - name: aptos-data
+        persistentVolumeClaim:
+          claimName: {{ include "aptos-validator.fullname" . }}-validator-e{{ .Values.chain.era }}
+      - name: vault-config
+        configMap:
+          name: {{ include "aptos-validator.fullname" . }}-vault
+      - name: vault-token
+        emptyDir:
+          medium: Memory
+      serviceAccountName: {{ include "aptos-validator.fullname" . }}-validator
+      {{- if .Values.imagePullSecret }}
+      imagePullSecrets:
+      - name: {{.Values.imagePullSecret}}
+      {{- end }}

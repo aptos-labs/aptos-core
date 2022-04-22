@@ -26,11 +26,13 @@ use move_resource_viewer::MoveValueAnnotator;
 
 use crate::transaction::{ModuleBundlePayload, StateCheckpointTransaction};
 use anyhow::{ensure, format_err, Result};
+use aptos_crypto::hash::CryptoHash;
 use aptos_types::state_store::state_key::StateKey;
 use move_core_types::resolver::MoveResolver;
 use serde_json::Value;
 use std::{
     convert::{TryFrom, TryInto},
+    iter::IntoIterator,
     rc::Rc,
 };
 
@@ -76,7 +78,12 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         data: TransactionOnChainData,
     ) -> Result<Transaction> {
         use aptos_types::transaction::Transaction::*;
-        let info = self.into_transaction_info(data.version, &data.info, data.accumulator_root_hash);
+        let info = self.into_transaction_info(
+            data.version,
+            &data.info,
+            data.accumulator_root_hash,
+            data.changes,
+        );
         let events = self.try_into_events(&data.events)?;
         Ok(match data.transaction {
             UserTransaction(txn) => {
@@ -102,6 +109,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         version: u64,
         info: &aptos_types::transaction::TransactionInfo,
         accumulator_root_hash: HashValue,
+        write_set: aptos_types::write_set::WriteSet,
     ) -> TransactionInfo {
         TransactionInfo {
             version: version.into(),
@@ -112,6 +120,11 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             success: info.status().is_success(),
             vm_status: self.explain_vm_status(info.status()),
             accumulator_root_hash: accumulator_root_hash.into(),
+            // TODO: the resource value is interpreted by the type definition at the version of the converter, not the version of the tx: must be fixed before we allow module updates
+            changes: write_set
+                .into_iter()
+                .filter_map(|(sk, wo)| self.try_into_write_set_change(sk, wo).ok())
+                .collect(),
         }
     }
 
@@ -174,6 +187,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                 let (write_set, events) = d.into_inner();
                 WriteSetPayload {
                     write_set: WriteSet::DirectWriteSet(DirectWriteSet {
+                        // TODO: the resource value is interpreted by the type definition at the version of the converter, not the version of the tx: must be fixed before we allow module updates
                         changes: write_set
                             .into_iter()
                             .map(|(state_key, op)| self.try_into_write_set_change(state_key, op))
@@ -212,24 +226,31 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         access_path: AccessPath,
         op: WriteOp,
     ) -> Result<WriteSetChange> {
+        let state_key_hash = StateKey::AccessPath(access_path.clone())
+            .hash()
+            .to_hex_literal();
         let ret = match op {
             WriteOp::Deletion => match access_path.get_path() {
                 Path::Code(module_id) => WriteSetChange::DeleteModule {
                     address: access_path.address.into(),
+                    state_key_hash,
                     module: module_id.into(),
                 },
                 Path::Resource(typ) => WriteSetChange::DeleteResource {
                     address: access_path.address.into(),
+                    state_key_hash,
                     resource: typ.into(),
                 },
             },
             WriteOp::Value(val) => match access_path.get_path() {
                 Path::Code(_) => WriteSetChange::WriteModule {
                     address: access_path.address.into(),
+                    state_key_hash,
                     data: MoveModuleBytecode::new(val).try_parse_abi()?,
                 },
                 Path::Resource(typ) => WriteSetChange::WriteResource {
                     address: access_path.address.into(),
+                    state_key_hash,
                     data: self.try_into_resource(&typ, &val)?,
                 },
             },
@@ -281,7 +302,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         Ok(RawTransaction::new(
             sender.into(),
             sequence_number.into(),
-            self.try_into_diem_core_transaction_payload(payload)?,
+            self.try_into_aptos_core_transaction_payload(payload)?,
             max_gas_amount.into(),
             gas_unit_price.into(),
             gas_currency_code,
@@ -290,7 +311,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         ))
     }
 
-    pub fn try_into_diem_core_transaction_payload(
+    pub fn try_into_aptos_core_transaction_payload(
         &self,
         payload: TransactionPayload,
     ) -> Result<aptos_types::transaction::TransactionPayload> {

@@ -162,7 +162,7 @@ fn exec_function(
     args: Vec<Vec<u8>>,
 ) {
     session
-        .execute_function(
+        .execute_function_bypass_visibility(
             &ModuleId::new(
                 account_config::CORE_CODE_ADDRESS,
                 Identifier::new(module_name).unwrap(),

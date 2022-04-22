@@ -20,6 +20,7 @@ use move_core_types::{
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
+use move_vm_runtime::session::SerializedReturnValues;
 use move_vm_types::gas_schedule::GasStatus;
 
 pub struct GenesisSession<'r, 'l, S>(SessionExt<'r, 'l, S>);
@@ -33,7 +34,7 @@ impl<'r, 'l, S: MoveResolver> GenesisSession<'r, 'l, S> {
         args: Vec<Vec<u8>>,
     ) {
         self.0
-            .execute_function(
+            .execute_function_bypass_visibility(
                 &ModuleId::new(
                     account_config::CORE_CODE_ADDRESS,
                     Identifier::new(module_name).unwrap(),
@@ -53,13 +54,18 @@ impl<'r, 'l, S: MoveResolver> GenesisSession<'r, 'l, S> {
             });
     }
 
-    pub fn exec_script(&mut self, sender: AccountAddress, script: &Script) {
+    pub fn exec_script(
+        &mut self,
+        sender: AccountAddress,
+        script: &Script,
+    ) -> SerializedReturnValues {
+        let mut temp = vec![sender.to_vec()];
+        temp.extend(convert_txn_args(script.args()));
         self.0
             .execute_script(
                 script.code().to_vec(),
                 script.ty_args().to_vec(),
-                convert_txn_args(script.args()),
-                vec![sender],
+                temp,
                 &mut GasStatus::new_unmetered(),
             )
             .unwrap()
@@ -100,8 +106,8 @@ where
     F: FnOnce(&mut GenesisSession<RemoteStorage<S>>),
 {
     let move_vm = MoveVmExt::new().unwrap();
+    let state_view_storage = RemoteStorage::new(state_view);
     let session_out = {
-        let state_view_storage = RemoteStorage::new(state_view);
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();
         let mut session = GenesisSession(

@@ -233,7 +233,7 @@ impl fmt::Display for TransactionAuthenticator {
 /// (1) How to check its signature against a message and public key
 /// (2) How to convert its public key into an `AuthenticationKeyPreimage` structured as
 /// (public_key | signaure_scheme_id).
-/// Each on-chain `AptosAccount` must store an `AuthenticationKey` (computed via a sha3 hash of an
+/// Each on-chain `Account` must store an `AuthenticationKey` (computed via a sha3 hash of an
 /// `AuthenticationKeyPreimage`).
 
 // TODO: in the future, can tie these to the AccountAuthenticator enum directly with https://github.com/rust-lang/rust/issues/60553

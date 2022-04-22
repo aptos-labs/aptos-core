@@ -1,21 +1,15 @@
 /// This module defines structs and methods to initialize VM configurations,
 /// including different costs of running the VM.
 module AptosFramework::VMConfig {
-    use Std::Capability::Cap;
     use Std::Errors;
     use AptosFramework::Reconfiguration;
-    use AptosFramework::Timestamp;
     use AptosFramework::SystemAddresses;
+    use AptosFramework::Timestamp;
 
-    /// Error with chain marker
-    const ECHAIN_MARKER: u64 = 0;
     /// Error with config
-    const ECONFIG: u64 = 1;
+    const ECONFIG: u64 = 0;
     /// The provided gas constants were inconsistent.
-    const EGAS_CONSTANT_INCONSISTENCY: u64 = 2;
-
-    /// Marker to be stored under @CoreResources during genesis
-    struct VMConfigChainMarker<phantom T> has key {}
+    const EGAS_CONSTANT_INCONSISTENCY: u64 = 1;
 
     /// The struct to hold config data needed to operate the VM.
     struct VMConfig has key {
@@ -78,7 +72,7 @@ module AptosFramework::VMConfig {
     }
 
     /// Initialize the table under the root account
-    public fun initialize<T>(
+    public fun initialize(
         account: &signer,
         instruction_schedule: vector<u8>,
         native_schedule: vector<u8>,
@@ -89,16 +83,9 @@ module AptosFramework::VMConfig {
         SystemAddresses::assert_core_resource(account);
 
         assert!(
-            !exists<VMConfigChainMarker<T>>(@CoreResources),
-            Errors::already_published(ECHAIN_MARKER)
-        );
-
-        assert!(
             !exists<VMConfig>(@CoreResources),
             Errors::already_published(ECONFIG)
         );
-
-        move_to(account, VMConfigChainMarker<T>{});
 
         let gas_constants = GasConstants {
             global_memory_per_byte_cost: 4,
@@ -126,7 +113,8 @@ module AptosFramework::VMConfig {
         );
     }
 
-    public fun set_gas_constants<T>(
+    public(script) fun set_gas_constants(
+        account: signer,
         global_memory_per_byte_cost: u64,
         global_memory_per_byte_write_cost: u64,
         min_transaction_gas_units: u64,
@@ -138,11 +126,9 @@ module AptosFramework::VMConfig {
         max_transaction_size_in_bytes: u64,
         gas_unit_scaling_factor: u64,
         default_account_size: u64,
-        _cap: &Cap<T>
     ) acquires VMConfig {
         Timestamp::assert_operating();
-
-        assert!(exists<VMConfigChainMarker<T>>(@CoreResources), Errors::not_published(ECHAIN_MARKER));
+        SystemAddresses::assert_core_resource(&account);
 
         assert!(
             min_price_per_gas_unit <= max_price_per_gas_unit,

@@ -102,6 +102,8 @@ spec:
             aptos-genesis-tool operator-key --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N"
             {{- if .Values.service.fullnode.enableOnchainDiscovery }}
             aptos-genesis-tool validator-config --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N" --validator-address "/dns4/val$N-aptos-validator-validator-lb/tcp/6180" --fullnode-address "/dns4/fn$N.{{.Values.service.domain}}/tcp/6182" --owner-name "val$N" --chain-id "{{ .Values.genesis.chain_id | default .Values.genesis.era }}"
+            {{- else if .Values.validatorLite}}
+            aptos-genesis-tool validator-config --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N" --validator-address "/dns4/val$N-aptos-validator-validator-lb/tcp/6180" --fullnode-address "/dns4/val$N-aptos-validator-validator-lb/tcp/6182" --owner-name "val$N" --chain-id "{{ .Values.genesis.chain_id | default .Values.genesis.era }}"
             {{- else }}
             aptos-genesis-tool validator-config --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N" --validator-address "/dns4/val$N-aptos-validator-validator-lb/tcp/6180" --fullnode-address "/dns4/val$N-aptos-validator-fullnode-lb/tcp/6182" --owner-name "val$N" --chain-id "{{ .Values.genesis.chain_id | default .Values.genesis.era }}"
             {{- end }}

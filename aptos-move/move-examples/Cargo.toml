@@ -12,11 +12,11 @@ edition = "2018"
 aptos-vm = { path = "../aptos-vm" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 structopt = "0.3.21"
-move-compiler = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
-move-package = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
-move-stdlib = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
-move-unit-test = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
+move-compiler = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
+move-package = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
+move-stdlib = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
+move-unit-test = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
 
 [dev-dependencies]
-move-cli = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
+move-cli = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
 tempfile = "3.2.0"

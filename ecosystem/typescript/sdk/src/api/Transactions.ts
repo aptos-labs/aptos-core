@@ -34,10 +34,6 @@ export class Transactions<SecurityDataType = unknown> {
    * @name GetTransactions
    * @summary Get transactions
    * @request GET:/transactions
-   * @response `200` `(OnChainTransaction)[]` Returns on-chain transactions, paginated.
-   * @response `400` `(AptosError)`
-   * @response `404` `(AptosError)`
-   * @response `500` `(AptosError)`
    */
   getTransactions = (query?: { start?: number; limit?: number }, params: RequestParams = {}) =>
     this.http.request<OnChainTransaction[], AptosError>({
@@ -54,11 +50,6 @@ export class Transactions<SecurityDataType = unknown> {
    * @name SubmitTransaction
    * @summary Submit transaction
    * @request POST:/transactions
-   * @response `202` `PendingTransaction` Transaction is accepted and submitted to mempool.
-   * @response `400` `(AptosError)`
-   * @response `413` `(AptosError)`
-   * @response `415` `(AptosError)`
-   * @response `500` `(AptosError)`
    */
   submitTransaction = (data: SubmitTransactionRequest, params: RequestParams = {}) =>
     this.http.request<PendingTransaction, AptosError>({
@@ -76,10 +67,6 @@ export class Transactions<SecurityDataType = unknown> {
    * @name GetTransaction
    * @summary Get transaction
    * @request GET:/transactions/{txn_hash_or_version}
-   * @response `200` `Transaction` Returns a pending / on-chain transaction.
-   * @response `400` `(AptosError)`
-   * @response `404` `(AptosError)`
-   * @response `500` `(AptosError)`
    */
   getTransaction = (txnHashOrVersion: string, params: RequestParams = {}) =>
     this.http.request<Transaction, AptosError>({
@@ -95,12 +82,6 @@ export class Transactions<SecurityDataType = unknown> {
    * @name CreateSigningMessage
    * @summary Create transaction signing message
    * @request POST:/transactions/signing_message
-   * @response `200` `{ message: HexEncodedBytes }` Returns hex-encoded transaction signing message bytes.
-   * @response `400` `(AptosError)`
-   * @response `404` `(AptosError)`
-   * @response `413` `(AptosError)`
-   * @response `415` `(AptosError)`
-   * @response `500` `(AptosError)`
    */
   createSigningMessage = (data: UserTransactionRequest, params: RequestParams = {}) =>
     this.http.request<{ message: HexEncodedBytes }, AptosError>({

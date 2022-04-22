@@ -21,6 +21,7 @@ impl Test for Indexer {
 
 pub fn wipe_database(conn: &PgPoolConnection) {
     for table in [
+        "write_set_changes",
         "events",
         "user_transactions",
         "block_metadata_transactions",
@@ -93,23 +94,25 @@ impl AptosTest for Indexer {
             tailer.process_next_batch((version + 1) as u8).await;
 
             // This is the genesis transaction
-            let (tx0, ut0, bmt0, events0) =
+            let (tx0, ut0, bmt0, events0, wsc0) =
                 TransactionModel::get_by_version(0, &conn_pool.get()?).unwrap();
             assert_eq!(tx0.type_, "genesis_transaction");
             assert!(ut0.is_none());
             assert!(bmt0.is_none());
             assert_eq!(events0.len(), 1);
+            assert_eq!(wsc0.len(), 58);
 
             // This is a block metadata transaction
-            let (tx1, ut1, bmt1, events1) =
+            let (tx1, ut1, bmt1, events1, wsc1) =
                 TransactionModel::get_by_version(3, &conn_pool.get()?).unwrap();
             assert_eq!(tx1.type_, "block_metadata_transaction");
             assert!(ut1.is_none());
             assert!(bmt1.is_some());
             assert_eq!(events1.len(), 0);
+            assert_eq!(wsc1.len(), 2);
 
             // This is the transfer
-            let (tx2, ut2, bmt2, events2) =
+            let (tx2, ut2, bmt2, events2, wsc2) =
                 TransactionModel::get_by_hash(t_tx.hash.to_string().as_str(), &conn_pool.get()?)
                     .unwrap();
 
@@ -118,6 +121,7 @@ impl AptosTest for Indexer {
             // This is a user transaction, so the bmt should be None
             assert!(ut2.is_some());
             assert!(bmt2.is_none());
+            assert_eq!(wsc2.len(), 6);
 
             assert_eq!(events2.len(), 2);
             assert_eq!(events2.get(0).unwrap().type_, "0x1::TestCoin::SentEvent");

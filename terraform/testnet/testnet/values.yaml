@@ -1,4 +1,5 @@
 imageTag: latest
+validatorLite: false
 
 genesis:
   numValidators: 1

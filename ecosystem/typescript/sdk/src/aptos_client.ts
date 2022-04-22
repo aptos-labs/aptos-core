@@ -94,12 +94,38 @@ export class AptosClient {
     return response.data;
   }
 
+  /** Returns the module identified by address and module name */
+  async getAccountModule(
+    accountAddress: MaybeHexString,
+    moduleName: string,
+    query?: { version?: Types.LedgerVersion },
+  ): Promise<Types.MoveModule> {
+    const response = await this.accounts.getAccountModule(HexString.ensure(accountAddress).hex(), moduleName, query);
+    raiseForStatus(200, response);
+    return response.data;
+  }
+
   /** Returns all resources associated with the account */
   async getAccountResources(
     accountAddress: MaybeHexString,
     query?: { version?: Types.LedgerVersion },
   ): Promise<Types.AccountResource[]> {
     const response = await this.accounts.getAccountResources(HexString.ensure(accountAddress).hex(), query);
+    raiseForStatus(200, response);
+    return response.data;
+  }
+
+  /** Returns the resource by the address and resource type */
+  async getAccountResource(
+    accountAddress: MaybeHexString,
+    resourceType: string,
+    query?: { version?: Types.LedgerVersion },
+  ): Promise<Types.AccountResource> {
+    const response = await this.accounts.getAccountResource(
+      HexString.ensure(accountAddress).hex(),
+      resourceType,
+      query,
+    );
     raiseForStatus(200, response);
     return response.data;
   }

@@ -1,27 +1,7 @@
-module AptosFramework::AptosValidatorConfig {
-    use Std::Capability;
+module AptosFramework::ValidatorSetScript {
     use AptosFramework::ValidatorConfig;
     use AptosFramework::ValidatorOperatorConfig;
-    use AptosFramework::ValidatorSystem;
-    use AptosFramework::Marker;
-
-    friend AptosFramework::AptosAccount;
-
-    public fun initialize(account: &signer) {
-        ValidatorConfig::initialize<Marker::ChainMarker>(account);
-    }
-
-    public(friend) fun publish(
-        root_account: &signer,
-        validator_account: &signer,
-        human_name: vector<u8>,
-    ) {
-        ValidatorConfig::publish(
-            validator_account,
-            human_name,
-            Capability::acquire(root_account, &Marker::get())
-        );
-    }
+    use AptosFramework::ValidatorSet;
 
     public(script) fun register_validator_config(
         validator_operator_account: signer,
@@ -62,6 +42,6 @@ module AptosFramework::AptosValidatorConfig {
             validator_network_addresses,
             fullnode_network_addresses
         );
-        ValidatorSystem::update_config_and_reconfigure(&validator_operator_account, validator_account);
+        ValidatorSet::update_config_and_reconfigure(&validator_operator_account, validator_account);
     }
 }

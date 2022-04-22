@@ -65,7 +65,7 @@ impl std::fmt::Display for Response {
 #[derive(Deserialize, Debug)]
 pub struct MintParams {
     pub amount: u64,
-    pub auth_key: Option<AccountAddress>,
+    pub auth_key: Option<String>,
     pub address: Option<String>,
     pub pub_key: Option<Ed25519PublicKey>,
     pub return_txns: Option<bool>,
@@ -79,8 +79,14 @@ impl std::fmt::Display for MintParams {
 
 impl MintParams {
     fn receiver(&self) -> Option<AccountAddress> {
-        if let Some(auth_key) = self.auth_key {
-            return Some(auth_key);
+        if let Some(auth_key) = self.auth_key.as_ref() {
+            return match AccountAddress::from_hex_literal(auth_key) {
+                Ok(auth_key) => Some(auth_key),
+                Err(_) => match AccountAddress::from_hex(auth_key) {
+                    Ok(auth_key) => Some(auth_key),
+                    Err(_) => None,
+                },
+            };
         }
         if let Some(address) = self.address.as_ref() {
             return match AccountAddress::from_hex_literal(address) {

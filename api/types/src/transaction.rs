@@ -18,7 +18,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     transaction::{
         authenticator::{AccountAuthenticator, TransactionAuthenticator},
-        Script, SignedTransaction, TransactionWithProof,
+        Script, SignedTransaction, TransactionOutput, TransactionWithProof,
     },
 };
 
@@ -55,6 +55,7 @@ pub struct TransactionOnChainData {
     pub info: aptos_types::transaction::TransactionInfo,
     pub events: Vec<ContractEvent>,
     pub accumulator_root_hash: aptos_crypto::HashValue,
+    pub changes: aptos_types::write_set::WriteSet,
 }
 
 impl From<(TransactionWithProof, aptos_crypto::HashValue)> for TransactionOnChainData {
@@ -65,6 +66,32 @@ impl From<(TransactionWithProof, aptos_crypto::HashValue)> for TransactionOnChai
             info: txn.proof.transaction_info,
             events: txn.events.unwrap_or_default(),
             accumulator_root_hash,
+            changes: Default::default(),
+        }
+    }
+}
+
+impl
+    From<(
+        TransactionWithProof,
+        aptos_crypto::HashValue,
+        &TransactionOutput,
+    )> for TransactionOnChainData
+{
+    fn from(
+        (txn, accumulator_root_hash, txn_output): (
+            TransactionWithProof,
+            aptos_crypto::HashValue,
+            &TransactionOutput,
+        ),
+    ) -> Self {
+        Self {
+            version: txn.version,
+            transaction: txn.transaction,
+            info: txn.proof.transaction_info,
+            events: txn.events.unwrap_or_default(),
+            accumulator_root_hash,
+            changes: txn_output.write_set().clone(),
         }
     }
 }
@@ -76,15 +103,17 @@ impl
         aptos_types::transaction::TransactionInfo,
         Vec<ContractEvent>,
         aptos_crypto::HashValue,
+        aptos_types::write_set::WriteSet,
     )> for TransactionOnChainData
 {
     fn from(
-        (version, transaction, info, events, accumulator_root_hash): (
+        (version, transaction, info, events, accumulator_root_hash, write_set): (
             u64,
             aptos_types::transaction::Transaction,
             aptos_types::transaction::TransactionInfo,
             Vec<ContractEvent>,
             aptos_crypto::HashValue,
+            aptos_types::write_set::WriteSet,
         ),
     ) -> Self {
         Self {
@@ -93,6 +122,7 @@ impl
             info,
             events,
             accumulator_root_hash,
+            changes: write_set,
         }
     }
 }
@@ -264,6 +294,7 @@ pub struct TransactionInfo {
     pub success: bool,
     pub vm_status: String,
     pub accumulator_root_hash: HashValue,
+    pub changes: Vec<WriteSetChange>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -423,20 +454,35 @@ pub struct DirectWriteSet {
 pub enum WriteSetChange {
     DeleteModule {
         address: Address,
+        state_key_hash: String,
         module: MoveModuleId,
     },
     DeleteResource {
         address: Address,
+        state_key_hash: String,
         resource: MoveStructTag,
     },
     WriteModule {
         address: Address,
+        state_key_hash: String,
         data: MoveModuleBytecode,
     },
     WriteResource {
         address: Address,
+        state_key_hash: String,
         data: MoveResource,
     },
+}
+
+impl WriteSetChange {
+    pub fn type_str(&self) -> &'static str {
+        match self {
+            WriteSetChange::DeleteModule { .. } => "delete_module",
+            WriteSetChange::DeleteResource { .. } => "delete_resource",
+            WriteSetChange::WriteModule { .. } => "write_module",
+            WriteSetChange::WriteResource { .. } => "write_resource",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

@@ -24,10 +24,22 @@ test("gets genesis resources", async () => {
   expect((accountResource.data as AnyObject)["self_address"]).toBe("0x1");
 });
 
+test("gets the Account resource", async () => {
+  const client = new AptosClient(NODE_URL);
+  const accountResource = await client.getAccountResource("0x1", "0x1::Account::Account");
+  expect((accountResource.data as AnyObject)["self_address"]).toBe("0x1");
+});
+
 test("gets account modules", async () => {
   const client = new AptosClient(NODE_URL);
   const modules = await client.getAccountModules("0x1");
   const module = modules.find((r) => r.abi.name === "TestCoin");
+  expect(module.abi.address).toBe("0x1");
+});
+
+test("gets the TestCoin module", async () => {
+  const client = new AptosClient(NODE_URL);
+  const module = await client.getAccountModule("0x1", "TestCoin");
   expect(module.abi.address).toBe("0x1");
 });
 

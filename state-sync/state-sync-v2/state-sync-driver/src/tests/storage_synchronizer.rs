@@ -1,0 +1,598 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::{
+    error::Error,
+    notification_handlers::{
+        CommitNotification, CommitNotificationListener, CommittedTransactions,
+        ErrorNotificationListener,
+    },
+    storage_synchronizer::{StorageSynchronizer, StorageSynchronizerInterface},
+    tests::{
+        mocks::{
+            create_mock_db_writer, create_mock_executor, create_mock_reader_writer,
+            create_mock_receiver, MockChunkExecutor,
+        },
+        utils::{
+            create_epoch_ending_ledger_info, create_event, create_output_list_with_proof,
+            create_state_value_chunk_with_proof, create_transaction,
+            create_transaction_list_with_proof,
+        },
+    },
+};
+use anyhow::format_err;
+use aptos_config::config::StateSyncDriverConfig;
+use aptos_types::{
+    contract_event::ContractEvent, ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
+};
+use claim::assert_matches;
+use data_streaming_service::data_notification::NotificationId;
+use futures::StreamExt;
+use mockall::predicate::{always, eq};
+use std::{sync::Arc, time::Duration};
+use storage_interface::DbReaderWriter;
+use tokio::task::JoinHandle;
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_apply_transaction_outputs() {
+    // Create test data
+    let transaction_to_commit = create_transaction();
+    let event_to_commit = create_event();
+
+    // Setup the mock executor
+    let mut chunk_executor = create_mock_executor();
+    chunk_executor
+        .expect_apply_chunk()
+        .with(always(), always(), always())
+        .returning(|_, _, _| Ok(()));
+    let expected_commit_return = Ok((
+        vec![event_to_commit.clone()],
+        vec![transaction_to_commit.clone()],
+    ));
+    chunk_executor
+        .expect_commit_chunk()
+        .return_once(move || expected_commit_return);
+
+    // Create the storage synchronizer
+    let (mut commit_listener, _, mut storage_synchronizer, _, _) =
+        create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
+
+    // Attempt to apply a chunk of outputs
+    storage_synchronizer
+        .apply_transaction_outputs(
+            0,
+            create_output_list_with_proof(),
+            create_epoch_ending_ledger_info(),
+            None,
+        )
+        .unwrap();
+
+    // Verify we get a commit notification and that there's no pending data
+    verify_transaction_commit_notification(
+        &mut commit_listener,
+        vec![transaction_to_commit],
+        vec![event_to_commit],
+    )
+    .await;
+    verify_no_pending_data(&storage_synchronizer);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_apply_transaction_outputs_error() {
+    // Setup the mock executor
+    let mut chunk_executor = create_mock_executor();
+    chunk_executor
+        .expect_apply_chunk()
+        .with(always(), always(), always())
+        .returning(|_, _, _| Err(format_err!("Failed to apply chunk!")));
+
+    // Create the storage synchronizer
+    let (_, mut error_listener, mut storage_synchronizer, _, _) =
+        create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
+
+    // Attempt to apply a chunk of outputs
+    let notification_id = 100;
+    storage_synchronizer
+        .apply_transaction_outputs(
+            notification_id,
+            create_output_list_with_proof(),
+            create_epoch_ending_ledger_info(),
+            None,
+        )
+        .unwrap();
+
+    // Verify we get an error notification and that there's no pending data
+    verify_error_notification(&mut error_listener, notification_id).await;
+    verify_no_pending_data(&storage_synchronizer);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_commit_chunk_error() {
+    // Setup the mock executor
+    let mut chunk_executor = create_mock_executor();
+    chunk_executor
+        .expect_execute_chunk()
+        .with(always(), always(), always())
+        .returning(|_, _, _| Ok(()));
+    chunk_executor
+        .expect_commit_chunk()
+        .return_once(|| Err(format_err!("Failed to commit chunk!")));
+
+    // Create the storage synchronizer
+    let (_, mut error_listener, mut storage_synchronizer, _, _) =
+        create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
+
+    // Attempt to execute a chunk of transactions
+    let notification_id = 100;
+    storage_synchronizer
+        .execute_transactions(
+            notification_id,
+            create_transaction_list_with_proof(),
+            create_epoch_ending_ledger_info(),
+            None,
+        )
+        .unwrap();
+
+    // Verify we get an error notification and that there's no pending data
+    verify_error_notification(&mut error_listener, notification_id).await;
+    verify_no_pending_data(&storage_synchronizer);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_execute_transactions() {
+    // Create test data
+    let transaction_to_commit = create_transaction();
+    let event_to_commit = create_event();
+
+    // Setup the mock executor
+    let mut chunk_executor = create_mock_executor();
+    chunk_executor
+        .expect_execute_chunk()
+        .with(always(), always(), always())
+        .returning(|_, _, _| Ok(()));
+    let expected_execute_return = Ok((
+        vec![event_to_commit.clone()],
+        vec![transaction_to_commit.clone()],
+    ));
+    chunk_executor
+        .expect_commit_chunk()
+        .return_once(move || expected_execute_return);
+
+    // Create the storage synchronizer
+    let (mut commit_listener, _, mut storage_synchronizer, _, _) =
+        create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
+
+    // Attempt to execute a chunk of transactions
+    storage_synchronizer
+        .execute_transactions(
+            0,
+            create_transaction_list_with_proof(),
+            create_epoch_ending_ledger_info(),
+            None,
+        )
+        .unwrap();
+
+    // Verify we get a commit notification and that there's no pending data
+    verify_transaction_commit_notification(
+        &mut commit_listener,
+        vec![transaction_to_commit],
+        vec![event_to_commit],
+    )
+    .await;
+    verify_no_pending_data(&storage_synchronizer);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_execute_transactions_error() {
+    // Setup the mock executor
+    let mut chunk_executor = create_mock_executor();
+    chunk_executor
+        .expect_execute_chunk()
+        .with(always(), always(), always())
+        .returning(|_, _, _| Err(format_err!("Failed to execute chunk!")));
+
+    // Create the storage synchronizer
+    let (_, mut error_listener, mut storage_synchronizer, _, _) =
+        create_storage_synchronizer(chunk_executor, create_mock_reader_writer(None, None));
+
+    // Attempt to execute a chunk of transactions
+    let notification_id = 100;
+    storage_synchronizer
+        .execute_transactions(
+            notification_id,
+            create_transaction_list_with_proof(),
+            create_epoch_ending_ledger_info(),
+            None,
+        )
+        .unwrap();
+
+    // Verify we get an error notification and that there's no pending data
+    verify_error_notification(&mut error_listener, notification_id).await;
+    verify_no_pending_data(&storage_synchronizer);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_initialize_account_synchronizer() {
+    // Create test data
+    let target_ledger_info = create_epoch_ending_ledger_info();
+    let output_list_with_proof = create_output_list_with_proof();
+
+    // Setup the mock snapshot receiver
+    let mut snapshot_receiver = create_mock_receiver();
+    snapshot_receiver
+        .expect_add_chunk()
+        .with(always(), always())
+        .returning(|_, _| Ok(()));
+
+    // Setup the mock db writer
+    let mut db_writer = create_mock_db_writer();
+    db_writer
+        .expect_get_state_snapshot_receiver()
+        .with(
+            eq(target_ledger_info.ledger_info().version()),
+            eq(output_list_with_proof.proof.transaction_infos[0].state_change_hash()),
+        )
+        .return_once(move |_, _| Ok(Box::new(snapshot_receiver)));
+
+    // Create the storage synchronizer
+    let (mut commit_listener, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
+        create_mock_executor(),
+        create_mock_reader_writer(None, Some(db_writer)),
+    );
+
+    // Initialize the account synchronizer
+    let _ = storage_synchronizer
+        .initialize_account_synchronizer(
+            vec![target_ledger_info.clone()],
+            target_ledger_info,
+            output_list_with_proof,
+        )
+        .unwrap();
+
+    // Save an account states chunk and verify we get a commit notification
+    storage_synchronizer
+        .save_account_states(0, create_state_value_chunk_with_proof(false))
+        .unwrap();
+    assert_matches!(
+        commit_listener.select_next_some().await,
+        CommitNotification::CommittedAccounts(_)
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[should_panic]
+async fn test_initialize_account_synchronizer_missing_info() {
+    // Create test data that is missing transaction infos
+    let mut output_list_with_proof = create_output_list_with_proof();
+    output_list_with_proof.proof.transaction_infos = vec![]; // This is invalid!
+
+    // Create the storage synchronizer
+    let (_, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
+        create_mock_executor(),
+        create_mock_reader_writer(None, None),
+    );
+
+    // Initialize the account synchronizer
+    let account_synchronizer_handle = storage_synchronizer
+        .initialize_account_synchronizer(
+            vec![create_epoch_ending_ledger_info()],
+            create_epoch_ending_ledger_info(),
+            output_list_with_proof,
+        )
+        .unwrap();
+
+    // The handler should panic as it was given invalid data
+    account_synchronizer_handle.await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[should_panic]
+async fn test_initialize_account_synchronizer_receiver_error() {
+    // Setup the mock db writer. The db writer should always fail.
+    let mut db_writer = create_mock_db_writer();
+    db_writer
+        .expect_get_state_snapshot_receiver()
+        .returning(|_, _| Err(format_err!("Failed to get snapshot receiver!")));
+
+    // Create the storage synchronizer
+    let (_, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
+        create_mock_executor(),
+        create_mock_reader_writer(None, Some(db_writer)),
+    );
+
+    // Initialize the account synchronizer
+    let account_synchronizer_handle = storage_synchronizer
+        .initialize_account_synchronizer(
+            vec![create_epoch_ending_ledger_info()],
+            create_epoch_ending_ledger_info(),
+            create_output_list_with_proof(),
+        )
+        .unwrap();
+
+    // The handler should panic as storage failed to return a snapshot receiver
+    account_synchronizer_handle.await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_save_account_states_completion() {
+    // Create test data
+    let target_ledger_info = create_epoch_ending_ledger_info();
+    let epoch_change_proofs = [
+        create_epoch_ending_ledger_info(),
+        create_epoch_ending_ledger_info(),
+        target_ledger_info.clone(),
+    ];
+    let output_list_with_proof = create_output_list_with_proof();
+
+    // Setup the mock snapshot receiver
+    let mut snapshot_receiver = create_mock_receiver();
+    snapshot_receiver
+        .expect_add_chunk()
+        .with(always(), always())
+        .returning(|_, _| Ok(()));
+    snapshot_receiver.expect_finish_box().returning(|| Ok(()));
+
+    // Setup the mock executor
+    let mut chunk_executor = create_mock_executor();
+    chunk_executor.expect_reset().returning(|| Ok(()));
+
+    // Setup the mock db writer
+    let mut db_writer = create_mock_db_writer();
+    db_writer
+        .expect_get_state_snapshot_receiver()
+        .with(always(), always())
+        .return_once(move |_, _| Ok(Box::new(snapshot_receiver)));
+    db_writer
+        .expect_finalize_state_snapshot()
+        .with(
+            eq(target_ledger_info.ledger_info().version()),
+            eq(output_list_with_proof.clone()),
+        )
+        .returning(|_, _| Ok(()));
+    let epoch_change_proofs_clone = epoch_change_proofs.clone();
+    db_writer
+        .expect_save_ledger_infos()
+        .withf(move |ledger_infos: &[LedgerInfoWithSignatures]| {
+            ledger_infos == epoch_change_proofs_clone
+        })
+        .returning(|_| Ok(()));
+    db_writer.expect_delete_genesis().returning(|| Ok(()));
+
+    // Create the storage synchronizer
+    let (mut commit_listener, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
+        chunk_executor,
+        create_mock_reader_writer(None, Some(db_writer)),
+    );
+
+    // Initialize the account synchronizer
+    let account_synchronizer_handle = storage_synchronizer
+        .initialize_account_synchronizer(
+            epoch_change_proofs.to_vec(),
+            target_ledger_info,
+            output_list_with_proof.clone(),
+        )
+        .unwrap();
+
+    // Save an account states chunk and verify we get a commit notification
+    storage_synchronizer
+        .save_account_states(0, create_state_value_chunk_with_proof(false))
+        .unwrap();
+    verify_account_commit_notification(&mut commit_listener, false, None).await;
+
+    // Save an account states chunk that is the last chunk
+    storage_synchronizer
+        .save_account_states(1, create_state_value_chunk_with_proof(true))
+        .unwrap();
+    let expected_committed_transactions = CommittedTransactions {
+        events: vec![],
+        transactions: vec![output_list_with_proof.transactions_and_outputs[0].0.clone()],
+    };
+    verify_account_commit_notification(
+        &mut commit_listener,
+        true,
+        Some(expected_committed_transactions),
+    )
+    .await;
+
+    // The handler should return as we've finished writing all states
+    account_synchronizer_handle.await.unwrap();
+    verify_no_pending_data(&storage_synchronizer);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[should_panic]
+async fn test_save_account_states_dropped_error_listener() {
+    // Setup the mock snapshot receiver
+    let mut snapshot_receiver = create_mock_receiver();
+    snapshot_receiver
+        .expect_add_chunk()
+        .with(always(), always())
+        .returning(|_, _| Ok(()));
+
+    // Setup the mock db writer
+    let mut db_writer = create_mock_db_writer();
+    db_writer
+        .expect_get_state_snapshot_receiver()
+        .with(always(), always())
+        .return_once(move |_, _| Ok(Box::new(snapshot_receiver)));
+
+    // Create the storage synchronizer (drop all listeners)
+    let (_, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
+        create_mock_executor(),
+        create_mock_reader_writer(None, Some(db_writer)),
+    );
+
+    // Initialize the account synchronizer
+    let account_synchronizer_handle = storage_synchronizer
+        .initialize_account_synchronizer(
+            vec![create_epoch_ending_ledger_info()],
+            create_epoch_ending_ledger_info(),
+            create_output_list_with_proof(),
+        )
+        .unwrap();
+
+    // Save an account states chunk
+    let notification_id = 0;
+    storage_synchronizer
+        .save_account_states(notification_id, create_state_value_chunk_with_proof(false))
+        .unwrap();
+
+    // The handler should panic as the commit listener was dropped
+    account_synchronizer_handle.await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_save_account_states_invalid_chunk() {
+    // Setup the mock snapshot receiver to always return errors
+    let mut snapshot_receiver = create_mock_receiver();
+    snapshot_receiver
+        .expect_add_chunk()
+        .with(always(), always())
+        .returning(|_, _| Err(format_err!("Invalid chunk!")));
+
+    // Setup the mock db writer
+    let mut db_writer = create_mock_db_writer();
+    db_writer
+        .expect_get_state_snapshot_receiver()
+        .with(always(), always())
+        .return_once(move |_, _| Ok(Box::new(snapshot_receiver)));
+
+    // Create the storage synchronizer
+    let (_, mut error_listener, mut storage_synchronizer, _, _) = create_storage_synchronizer(
+        create_mock_executor(),
+        create_mock_reader_writer(None, Some(db_writer)),
+    );
+
+    // Initialize the account synchronizer
+    let _ = storage_synchronizer
+        .initialize_account_synchronizer(
+            vec![create_epoch_ending_ledger_info()],
+            create_epoch_ending_ledger_info(),
+            create_output_list_with_proof(),
+        )
+        .unwrap();
+
+    // Save an account states chunk and verify we get an error notification
+    let notification_id = 0;
+    storage_synchronizer
+        .save_account_states(notification_id, create_state_value_chunk_with_proof(false))
+        .unwrap();
+    verify_error_notification(&mut error_listener, notification_id).await;
+}
+
+#[test]
+#[should_panic]
+fn test_save_account_states_without_initialize() {
+    // Create the storage synchronizer
+    let (_, _, mut storage_synchronizer, _, _) = create_storage_synchronizer(
+        create_mock_executor(),
+        create_mock_reader_writer(None, None),
+    );
+
+    // Attempting to save the account states should panic as the account
+    // synchronizer was not initialized!
+    let _ = storage_synchronizer.save_account_states(0, create_state_value_chunk_with_proof(false));
+}
+
+/// Creates a storage synchronizer for testing
+fn create_storage_synchronizer(
+    mock_chunk_executor: MockChunkExecutor,
+    mock_reader_writer: DbReaderWriter,
+) -> (
+    CommitNotificationListener,
+    ErrorNotificationListener,
+    StorageSynchronizer<MockChunkExecutor>,
+    JoinHandle<()>,
+    JoinHandle<()>,
+) {
+    aptos_logger::Logger::init_for_testing();
+
+    // Create the notification channels
+    let (commit_notification_sender, commit_notification_listener) =
+        CommitNotificationListener::new();
+    let (error_notification_sender, error_notification_listener) = ErrorNotificationListener::new();
+
+    // Create the storage synchronizer
+    let (storage_synchronizer, executor_handle, committer_handle) = StorageSynchronizer::new(
+        StateSyncDriverConfig::default(),
+        Arc::new(mock_chunk_executor),
+        commit_notification_sender,
+        error_notification_sender,
+        mock_reader_writer,
+        None,
+    );
+
+    (
+        commit_notification_listener,
+        error_notification_listener,
+        storage_synchronizer,
+        executor_handle,
+        committer_handle,
+    )
+}
+
+/// Verifies that the expected account commit notification is received by the listener
+async fn verify_account_commit_notification(
+    commit_listener: &mut CommitNotificationListener,
+    expected_all_accounts_synced: bool,
+    expected_committed_transactions: Option<CommittedTransactions>,
+) {
+    match commit_listener.select_next_some().await {
+        CommitNotification::CommittedAccounts(committed_accounts) => {
+            assert_eq!(
+                committed_accounts.all_accounts_synced,
+                expected_all_accounts_synced
+            );
+            assert_eq!(
+                committed_accounts.committed_transaction,
+                expected_committed_transactions
+            );
+        }
+        commit_notification => panic!(
+            "Invalid commit notification received: {:?}",
+            commit_notification
+        ),
+    }
+}
+
+/// Verifies that the expected transaction commit notification is received by the listener
+async fn verify_transaction_commit_notification(
+    commit_listener: &mut CommitNotificationListener,
+    expected_transactions: Vec<Transaction>,
+    expected_events: Vec<ContractEvent>,
+) {
+    match commit_listener.select_next_some().await {
+        CommitNotification::CommittedTransactions(committed_transactions) => {
+            assert_eq!(committed_transactions.transactions, expected_transactions);
+            assert_eq!(committed_transactions.events, expected_events);
+        }
+        commit_notification => panic!(
+            "Invalid commit notification received: {:?}",
+            commit_notification
+        ),
+    }
+}
+
+/// Verifies that the expected error notification is received by the listener
+async fn verify_error_notification(
+    error_listener: &mut ErrorNotificationListener,
+    expected_notification_id: NotificationId,
+) {
+    let error_notification = error_listener.select_next_some().await;
+    assert_eq!(error_notification.notification_id, expected_notification_id);
+    assert_matches!(error_notification.error, Error::UnexpectedError(_));
+}
+
+/// Verifies that no pending data remains in the storage synchronizer.
+/// Note: due to asynchronous execution, we might need to wait some
+/// time for the pipelines to drain.
+fn verify_no_pending_data(storage_synchronizer: &StorageSynchronizer<MockChunkExecutor>) {
+    let max_drain_time_secs = 10;
+    for _ in 0..max_drain_time_secs {
+        if !storage_synchronizer.pending_storage_data() {
+            return;
+        }
+        std::thread::sleep(Duration::from_secs(1));
+    }
+    panic!("Timed-out waiting for the storage synchronizer to drain!");
+}

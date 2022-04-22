@@ -19,11 +19,13 @@ bcs = "0.1.2"
 hex = "0.4.3"
 
 # Move dependencies
-move-transactional-test-runner = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
-move-compiler = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
-move-binary-format = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
-move-core-types = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa", features=["address32"] }
-move-command-line-common = { git = "https://github.com/diem/move", rev = "3fe033b112eae7df2d15ab3467624165ae510caa" }
+move-transactional-test-runner = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
+move-compiler = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
+move-binary-format = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6", features=["address32"] }
+move-command-line-common = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
+move-vm-runtime = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
+
 
 # Diem-Move dependencies
 aptos-keygen = { path = "../aptos-keygen" }

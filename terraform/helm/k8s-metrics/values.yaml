@@ -1,2 +1,3 @@
 coredns:
   maxReplicas: 2
+  minReplicas: 2

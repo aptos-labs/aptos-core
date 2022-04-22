@@ -34,6 +34,7 @@ if [ "$IMAGE_TARGETS" = "release" ] || [ "$IMAGE_TARGETS" = "all" ]; then
           -p aptos-transaction-replay \
           -p aptos-writeset-generator \
           -p transaction-emitter \
+          -p aptos-indexer \
           "$@"
 
   # Build our core modules!

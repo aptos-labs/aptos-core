@@ -112,10 +112,7 @@ mod tests {
         let address: Address = serde_json::from_value(json!("0x1")).unwrap();
 
         let account_address: AccountAddress = address.into();
-        assert_eq!(
-            account_address.to_string(),
-            AccountAddress::ONE.to_hex().as_str()
-        );
+        assert_eq!(account_address, AccountAddress::ONE);
 
         let new_address: Address = account_address.into();
         assert_eq!(new_address, address);
@@ -126,10 +123,7 @@ mod tests {
         let address: Address = serde_json::from_value(json!("0x1")).unwrap();
 
         let account_address: AccountAddress = (&address).into();
-        assert_eq!(
-            account_address.to_string(),
-            AccountAddress::ONE.to_hex().as_str()
-        );
+        assert_eq!(account_address, AccountAddress::ONE);
 
         let new_address: Address = account_address.into();
         assert_eq!(new_address, address);

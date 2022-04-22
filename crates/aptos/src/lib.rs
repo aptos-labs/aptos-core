@@ -8,7 +8,7 @@ pub mod common;
 pub mod move_tool;
 pub mod op;
 
-use crate::common::types::{CliResult, Error};
+use crate::common::{types::CliResult, utils::to_common_success_result};
 use clap::Parser;
 
 /// CLI tool for interacting with the Aptos blockchain and nodes
@@ -22,16 +22,16 @@ pub enum Tool {
     #[clap(subcommand)]
     Move(move_tool::MoveTool),
     #[clap(subcommand)]
-    Op(op::OpTool),
+    Key(op::key::KeyTool),
 }
 
 impl Tool {
     pub async fn execute(self) -> CliResult {
         match self {
             Tool::Account(tool) => tool.execute().await,
-            Tool::Init(tool) => tool.execute().await,
+            Tool::Init(tool) => to_common_success_result(tool.execute().await),
             Tool::Move(tool) => tool.execute().await,
-            Tool::Op(tool) => tool.execute().await,
+            Tool::Key(tool) => tool.execute().await,
         }
     }
 }

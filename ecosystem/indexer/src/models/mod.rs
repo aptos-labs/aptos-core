@@ -4,3 +4,4 @@
 pub mod events;
 pub mod processor_statuses;
 pub mod transactions;
+pub mod write_set_changes;

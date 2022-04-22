@@ -24,12 +24,6 @@
     }
   },
   {
-    "type": "0x1::Account::Marker<0x1::Marker::ChainMarker>",
-    "data": {
-      "dummy_field": false
-    }
-  },
-  {
     "type": "0x1::Account::Account",
     "data": {
       "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
@@ -42,7 +36,7 @@
     "data": {
       "currency_code_required": false,
       "module_addr": "0x1",
-      "module_name": "0x4170746f734163636f756e74",
+      "module_name": "0x4163636f756e74",
       "module_prologue_name": "0x6d6f64756c655f70726f6c6f677565",
       "multi_agent_prologue_name": "0x7363726970745f70726f6c6f677565",
       "script_prologue_name": "0x7363726970745f70726f6c6f677565",
@@ -61,12 +55,6 @@
     "type": "0x1::Version::Version",
     "data": {
       "major": "4"
-    }
-  },
-  {
-    "type": "0x1::Version::VersionChainMarker<0x1::Marker::ChainMarker>",
-    "data": {
-      "dummy_field": false
     }
   },
   {
@@ -154,33 +142,33 @@
     }
   },
   {
-    "type": "0x1::VMConfig::VMConfigChainMarker<0x1::Marker::ChainMarker>",
-    "data": {
-      "dummy_field": false
-    }
-  },
-  {
     "type": "0x1::Timestamp::CurrentTimeMicroseconds",
     "data": {
       "microseconds": "0"
     }
   },
   {
-    "type": "0x1::Capability::CapState<0x1::Marker::ChainMarker>",
+    "type": "0x1::ValidatorSet::ValidatorSet",
     "data": {
-      "delegates": []
+      "scheme": 0,
+      "validators": [
+        {
+          "addr": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
+          "config": {
+            "consensus_pubkey": "0xcc62332e34bb2d5cd69f60efbb2a36cb916c7eb458301ea36636c4dbb012bd88",
+            "fullnode_network_addresses": "0x012d040000000000050c1c07203432fbf5b666fa771269cc7eb227146d3b16858f177a317ae8c349db210feb780800",
+            "validator_network_addresses": "0x012d0400000000000524180720d5db8911156f3441c0757d97b8580cb639853454ec1a560f4927cf4acdfbd1080800"
+          },
+          "consensus_voting_power": "1",
+          "last_config_update_time": "0"
+        }
+      ]
     }
   },
   {
     "type": "0x1::ConsensusConfig::ConsensusConfig",
     "data": {
       "config": "0x0101010a000000000000001400000000000000"
-    }
-  },
-  {
-    "type": "0x1::ConsensusConfig::ConsensusConfigChainMarker<0x1::Marker::ChainMarker>",
-    "data": {
-      "dummy_field": false
     }
   },
   {
@@ -200,48 +188,6 @@
         }
       },
       "last_reconfiguration_time": "0"
-    }
-  },
-  {
-    "type": "0x1::ValidatorConfig::ValidatorConfigChainMarker<0x1::Marker::ChainMarker>",
-    "data": {
-      "dummy_field": false
-    }
-  },
-  {
-    "type": "0x1::ValidatorSystem::ValidatorSystem",
-    "data": {
-      "scheme": 0,
-      "validators": [
-        {
-          "addr": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
-          "config": {
-            "consensus_pubkey": "0xcc62332e34bb2d5cd69f60efbb2a36cb916c7eb458301ea36636c4dbb012bd88",
-            "fullnode_network_addresses": "0x012d040000000000050c1c07203432fbf5b666fa771269cc7eb227146d3b16858f177a317ae8c349db210feb780800",
-            "validator_network_addresses": "0x012d0400000000000524180720d5db8911156f3441c0757d97b8580cb639853454ec1a560f4927cf4acdfbd1080800"
-          },
-          "consensus_voting_power": "1",
-          "last_config_update_time": "0"
-        }
-      ]
-    }
-  },
-  {
-    "type": "0x1::ValidatorSystem::ValidatorSetChainMarker<0x1::Marker::ChainMarker>",
-    "data": {
-      "dummy_field": false
-    }
-  },
-  {
-    "type": "0x1::ValidatorOperatorConfig::ValidatorOperatorConfigChainMarker<0x1::Marker::ChainMarker>",
-    "data": {
-      "dummy_field": false
-    }
-  },
-  {
-    "type": "0x1::TransactionPublishingOption::ChainMarker<0x1::Marker::ChainMarker>",
-    "data": {
-      "dummy_field": false
     }
   },
   {

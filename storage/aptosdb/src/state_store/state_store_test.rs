@@ -10,7 +10,10 @@ use proptest::{
 
 use aptos_jellyfish_merkle::restore::JellyfishMerkleRestore;
 use aptos_temppath::TempPath;
-use aptos_types::{account_address::AccountAddress, account_state_blob::AccountStateBlob};
+use aptos_types::{
+    access_path::AccessPath, account_address::AccountAddress, account_state_blob::AccountStateBlob,
+    state_store::state_key::StateKeyTag,
+};
 use storage_interface::StateSnapshotReceiver;
 
 use crate::{pruner, AptosDB};
@@ -55,6 +58,24 @@ fn put_account_state_set(
     );
 
     store.db.write_schemas(cs.batch).unwrap();
+    root
+}
+
+fn put_value_set(
+    state_store: &StateStore,
+    value_set: Vec<(StateKey, StateValue)>,
+    version: Version,
+) -> HashValue {
+    let mut cs = ChangeSet::new();
+    let value_set: HashMap<_, _> = value_set
+        .iter()
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect();
+
+    let root = state_store
+        .put_value_sets(vec![&value_set], None, version, &mut cs)
+        .unwrap()[0];
+    state_store.db.write_schemas(cs.batch).unwrap();
     root
 }
 
@@ -184,6 +205,95 @@ fn test_state_store_reader_writer() {
     verify_value_and_proof(store, address1, Some(&value1_update), 1, root);
     verify_value_and_proof(store, address2, Some(&value2), 1, root);
     verify_value_and_proof(store, address3, Some(&value3), 1, root);
+}
+
+#[test]
+fn test_get_values_by_key_prefix() {
+    let tmp_dir = TempPath::new();
+    let db = AptosDB::new_for_test(&tmp_dir);
+    let store = &db.state_store;
+    let address = AccountAddress::new([12u8; AccountAddress::LENGTH]);
+
+    let key1 = StateKey::AccessPath(AccessPath::new(address, b"state_key1".to_vec()));
+    let key2 = StateKey::AccessPath(AccessPath::new(address, b"state_key2".to_vec()));
+
+    let value1_v0 = StateValue::from(String::from("value1_v0").into_bytes());
+    let value2_v0 = StateValue::from(String::from("value2_v0").into_bytes());
+
+    let account_key_prefx = StateKeyPrefix::new(StateKeyTag::AccessPath, address.to_vec());
+
+    put_value_set(
+        store,
+        vec![
+            (key1.clone(), value1_v0.clone()),
+            (key2.clone(), value2_v0.clone()),
+        ],
+        0,
+    );
+
+    let key_value_map = store
+        .get_values_by_key_prefix(&account_key_prefx, 0)
+        .unwrap();
+    assert_eq!(key_value_map.len(), 2);
+    assert_eq!(*key_value_map.get(&key1).unwrap(), value1_v0);
+    assert_eq!(*key_value_map.get(&key2).unwrap(), value2_v0);
+
+    let key4 = StateKey::AccessPath(AccessPath::new(address, b"state_key4".to_vec()));
+
+    let value2_v1 = StateValue::from(String::from("value2_v1").into_bytes());
+    let value4_v1 = StateValue::from(String::from("value4_v1").into_bytes());
+
+    put_value_set(
+        store,
+        vec![
+            (key2.clone(), value2_v1.clone()),
+            (key4.clone(), value4_v1.clone()),
+        ],
+        1,
+    );
+
+    // Ensure that we still get only values for key1 and key2 for version 0 after the update
+    let key_value_map = store
+        .get_values_by_key_prefix(&account_key_prefx, 0)
+        .unwrap();
+    assert_eq!(key_value_map.len(), 2);
+    assert_eq!(*key_value_map.get(&key1).unwrap(), value1_v0);
+    assert_eq!(*key_value_map.get(&key2).unwrap(), value2_v0);
+
+    // Ensure that key value map for version 1 returns value for key1 at version 0.
+    let key_value_map = store
+        .get_values_by_key_prefix(&account_key_prefx, 1)
+        .unwrap();
+    assert_eq!(key_value_map.len(), 3);
+    assert_eq!(*key_value_map.get(&key1).unwrap(), value1_v0);
+    assert_eq!(*key_value_map.get(&key2).unwrap(), value2_v1);
+    assert_eq!(*key_value_map.get(&key4).unwrap(), value4_v1);
+
+    // Add values for one more account and verify the state
+    let address1 = AccountAddress::new([22u8; AccountAddress::LENGTH]);
+    let key5 = StateKey::AccessPath(AccessPath::new(address1, b"state_key5".to_vec()));
+    let value5_v2 = StateValue::from(String::from("value5_v2").into_bytes());
+
+    let account1_key_prefx = StateKeyPrefix::new(StateKeyTag::AccessPath, address1.to_vec());
+
+    put_value_set(store, vec![(key5.clone(), value5_v2.clone())], 2);
+
+    // address1 did not exist in version 0 and 1.
+    let key_value_map = store
+        .get_values_by_key_prefix(&account1_key_prefx, 0)
+        .unwrap();
+    assert_eq!(key_value_map.len(), 0);
+
+    let key_value_map = store
+        .get_values_by_key_prefix(&account1_key_prefx, 1)
+        .unwrap();
+    assert_eq!(key_value_map.len(), 0);
+
+    let key_value_map = store
+        .get_values_by_key_prefix(&account1_key_prefx, 2)
+        .unwrap();
+    assert_eq!(key_value_map.len(), 1);
+    assert_eq!(*key_value_map.get(&key5).unwrap(), value5_v2);
 }
 
 #[test]

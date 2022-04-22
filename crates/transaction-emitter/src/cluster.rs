@@ -55,7 +55,7 @@ impl Cluster {
         } else {
             KeyPair::from(
                 EncodingType::BCS
-                    .load_key::<ed25519::Ed25519PrivateKey>(Path::new(mint_file))
+                    .load_key::<ed25519::Ed25519PrivateKey>("mint key pair", Path::new(mint_file))
                     .unwrap(),
             )
         };

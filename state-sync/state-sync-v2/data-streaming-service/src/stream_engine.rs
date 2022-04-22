@@ -560,7 +560,7 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
                     },
                 )]);
             } else {
-                info!(
+                debug!(
                     (LogSchema::new(LogEntry::ReceivedDataResponse)
                         .event(LogEvent::Success)
                         .message(&format!(

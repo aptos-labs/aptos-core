@@ -1,5 +1,5 @@
 /// This module defines a minimal and generic Coin and Balance.
-/// modified from https://github.com/diem/move/tree/main/language/documentation/tutorial
+/// modified from https://github.com/move-language/move/tree/main/language/documentation/tutorial
 module AptosFramework::TestCoin {
     use Std::Errors;
     use Std::Signer;

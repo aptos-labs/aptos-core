@@ -1,18 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! A command to create a new account on-chain
-//!
-//! TODO: Examples
-//!
-
-use crate::common::types::CliResult;
+use crate::common::{types::CliResult, utils::to_common_result};
 use clap::Subcommand;
 
 pub mod create;
 pub mod list;
 
-/// Command to create a new account on-chain
+/// CLI tool for interacting with accounts
 ///
 #[derive(Debug, Subcommand)]
 pub enum AccountTool {
@@ -23,8 +18,8 @@ pub enum AccountTool {
 impl AccountTool {
     pub async fn execute(self) -> CliResult {
         match self {
-            AccountTool::Create(tool) => tool.execute().await,
-            AccountTool::List(tool) => tool.execute().await,
+            AccountTool::Create(tool) => to_common_result(tool.execute().await),
+            AccountTool::List(tool) => to_common_result(tool.execute().await),
         }
     }
 }

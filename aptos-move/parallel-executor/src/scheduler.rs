@@ -152,7 +152,7 @@ impl Scheduler {
             num_active_tasks: AtomicUsize::new(0),
             done_marker: AtomicBool::new(false),
             stop_idx: AtomicUsize::new(num_txns),
-            drain_idx: AtomicUsize::new(1),
+            drain_idx: AtomicUsize::new(0),
             txn_dependency: (0..num_txns)
                 .map(|_| CachePadded::new(Mutex::new(Vec::new())))
                 .collect(),

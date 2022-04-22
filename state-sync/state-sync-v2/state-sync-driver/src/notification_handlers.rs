@@ -25,11 +25,9 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
-    time::{Duration, SystemTime},
 };
 
 // TODO(joshlind): make these configurable!
-const CONSENSUS_SYNC_REQUEST_TIMEOUT_MS: u64 = 60000; // 1 minute
 const MEMPOOL_COMMIT_ACK_TIMEOUT_MS: u64 = 5000; // 5 seconds
 
 /// A notification for new data that has been committed to storage
@@ -51,7 +49,7 @@ pub struct CommittedAccounts {
 }
 
 /// A commit notification for new transactions
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CommittedTransactions {
     pub events: Vec<ContractEvent>,
     pub transactions: Vec<Transaction>,
@@ -157,23 +155,13 @@ impl FusedStream for CommitNotificationListener {
 /// A consensus sync request for a specified target ledger info
 pub struct ConsensusSyncRequest {
     consensus_sync_notification: ConsensusSyncNotification,
-    last_commit_timestamp: SystemTime,
 }
 
 impl ConsensusSyncRequest {
     pub fn new(consensus_sync_notification: ConsensusSyncNotification) -> Self {
         Self {
             consensus_sync_notification,
-            last_commit_timestamp: SystemTime::now(),
         }
-    }
-
-    pub fn update_last_commit_timestamp(&mut self) {
-        self.last_commit_timestamp = SystemTime::now();
-    }
-
-    pub fn get_last_commit_timestamp(&self) -> SystemTime {
-        self.last_commit_timestamp
     }
 
     pub fn get_sync_target(&self) -> LedgerInfoWithSignatures {
@@ -284,39 +272,6 @@ impl ConsensusNotificationHandler {
                     .await?;
                 }
                 return Ok(());
-            }
-
-            // Check if the commit deadline has been exceeded (timed out since the last commit)
-            let max_time_between_commits = Duration::from_millis(CONSENSUS_SYNC_REQUEST_TIMEOUT_MS);
-            let last_commit_timestamp = self
-                .get_consensus_sync_request()
-                .lock()
-                .as_ref()
-                .expect("The sync request should exist!")
-                .get_last_commit_timestamp();
-            let next_commit_deadline = last_commit_timestamp
-                .checked_add(max_time_between_commits)
-                .ok_or_else(|| {
-                    Error::IntegerOverflow("The new commit deadline has overflown!".into())
-                })?;
-            if SystemTime::now()
-                .duration_since(next_commit_deadline)
-                .is_ok()
-            {
-                // Remove the sync request and notify consensus that the request timed out
-                let error = Error::UnexpectedError(format!(
-                    "Sync request timed out! Hit the max time between commits: {:?}",
-                    max_time_between_commits
-                ));
-                let consensus_sync_request = self.get_consensus_sync_request().lock().take();
-                if let Some(consensus_sync_request) = consensus_sync_request {
-                    self.respond_to_sync_notification(
-                        consensus_sync_request.consensus_sync_notification,
-                        Err(error.clone()),
-                    )
-                    .await?;
-                }
-                return Err(error);
             }
         }
 

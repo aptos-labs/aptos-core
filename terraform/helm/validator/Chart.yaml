@@ -3,6 +3,6 @@ name: aptos-validator
 version: 1.5.0-rc.1
 appVersion: 1.5.0-rc.1
 description: Aptos blockchain validator
-home: https://aptos.com/
+home: https://aptoslabs.com/
 sources:
-- https://github.com/aptos/aptos
+- https://github.com/aptos-labs/aptos-core

@@ -44,6 +44,11 @@ data "vault_policy_document" "validator" {
     capabilities = ["read"]
     description  = "Allow reading the execution public key"
   }
+  rule {
+    path         = "${var.transit_mount}/export/signing-key/${vault_transit_secret_backend_key.fullnode_network.name}"
+    capabilities = ["read"]
+    description  = "Allow reading the fullnode_network private key"
+  }
 }
 
 resource "vault_policy" "validator" {

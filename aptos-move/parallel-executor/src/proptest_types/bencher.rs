@@ -28,7 +28,7 @@ pub struct Bencher<K, V> {
 
 pub(crate) struct BencherState<K, V> {
     transactions: Vec<Transaction<K, V>>,
-    expected_output: Option<ExpectedOutput<V>>,
+    expected_output: ExpectedOutput<V>,
 }
 
 impl<K, V> Bencher<K, V>
@@ -53,7 +53,6 @@ where
                     vec(key_strategy, self.universe_size),
                     self.transaction_size,
                     self.transaction_gen_param,
-                    true,
                 )
             },
             |state| state.run(),
@@ -74,7 +73,6 @@ where
         universe_strategy: impl Strategy<Value = Vec<K>>,
         num_transactions: usize,
         transaction_params: TransactionGenParams,
-        check_correctness: bool,
     ) -> Self {
         let mut runner = TestRunner::default();
         let key_universe = universe_strategy
@@ -95,11 +93,7 @@ where
             .map(|txn_gen| txn_gen.materialize(&key_universe))
             .collect();
 
-        let expected_output = if check_correctness {
-            Some(ExpectedOutput::generate_baseline(&transactions))
-        } else {
-            None
-        };
+        let expected_output = ExpectedOutput::generate_baseline(&transactions);
 
         Self {
             transactions,
@@ -109,10 +103,8 @@ where
 
     pub(crate) fn run(self) {
         let output = ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new()
-            .execute_transactions_parallel((), self.transactions);
+            .execute_transactions_parallel((), self.transactions.clone());
 
-        if let Some(expected_output) = self.expected_output {
-            assert!(expected_output.check_output(&output))
-        }
+        assert!(self.expected_output.check_output(&output));
     }
 }

@@ -34,7 +34,7 @@ struct Args {
     #[structopt(short = "m", long, default_value = "/opt/aptos/etc/mint.key")]
     pub mint_key_file_path: String,
     /// Address of the account to send transactions from.
-    /// On Testnet, for example, this is 0xa550c18.
+    /// On Testnet, for example, this is a550c18.
     /// If not present, the mint key's address is used
     #[structopt(short = "t", long, parse(try_from_str = AccountAddress::from_hex_literal))]
     pub mint_account_address: Option<AccountAddress>,
@@ -68,7 +68,7 @@ async fn main() {
     );
 
     let key: ed25519::Ed25519PrivateKey = EncodingType::BCS
-        .load_key(Path::new(&args.mint_key_file_path))
+        .load_key("Ed25519PrivateKey", Path::new(&args.mint_key_file_path))
         .unwrap();
 
     let faucet_address: AccountAddress =
@@ -211,10 +211,12 @@ mod tests {
         accounts: AccountStates,
     ) -> Result<impl Reply, Rejection> {
         let reader = accounts.read();
-        let account = AccountAddress::try_from(address)
-            .ok()
-            .and_then(|address| reader.get(&address));
-
+        let account = match AccountAddress::try_from(address.clone())
+            .or_else(|_e| AccountAddress::from_hex(address.clone()))
+        {
+            Ok(addr) => reader.get(&addr),
+            _ => None,
+        };
         if let Some(account) = account {
             let auth_vec: Vec<u8> = account.authentication_key.as_ref().into();
             let account_data = AccountData {
@@ -243,6 +245,7 @@ mod tests {
                     success: true,
                     vm_status: "Executed".to_string(),
                     accumulator_root_hash: HashValue::zero().into(),
+                    changes: vec![],
                 };
                 let serializable_txn: aptos_rest_client::aptos_api_types::Transaction = (
                     txn.as_signed_user_txn().unwrap(),
@@ -327,7 +330,6 @@ mod tests {
     async fn test_mint_auth_key() {
         let (accounts, service) = setup(None);
         let filter = routes(service);
-
         let auth_key = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
         let amount = 13345;
         let resp = warp::test::request()
@@ -398,7 +400,7 @@ mod tests {
         let (accounts, service) = setup(None);
         let filter = routes(service);
 
-        let address = "0x459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
+        let address = "459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d";
         let amount = 13345;
         let resp = warp::test::request()
             .method("POST")
@@ -474,7 +476,10 @@ mod tests {
             .path(format!("/mint?auth_key={}&amount=1000000", auth_key).as_str())
             .reply(&filter)
             .await;
-        assert_eq!(resp.body(), "Invalid query string");
+        assert_eq!(
+            resp.body(),
+            "You must provide 'address' (preferred), 'pub_key', or 'auth_key'"
+        );
     }
 
     #[tokio::test]

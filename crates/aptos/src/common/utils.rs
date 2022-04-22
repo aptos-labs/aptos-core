@@ -1,7 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{CliResult, Error};
+use crate::{
+    common::types::{CliError, CliTypedResult},
+    CliResult,
+};
 use serde::Serialize;
 use std::{
     fs::File,
@@ -31,12 +34,12 @@ pub fn prompt_yes(prompt: &str) -> bool {
 }
 
 /// Convert an empty response to Success
-pub fn to_common_success_result(result: Result<(), Error>) -> CliResult {
+pub fn to_common_success_result(result: CliTypedResult<()>) -> CliResult {
     to_common_result(result.map(|()| "Success"))
 }
 
 /// For pretty printing outputs in JSON
-pub fn to_common_result<T: Serialize>(result: Result<T, Error>) -> CliResult {
+pub fn to_common_result<T: Serialize>(result: CliTypedResult<T>) -> CliResult {
     let is_err = result.is_err();
     let result: ResultWrapper<T> = result.into();
     let string = serde_json::to_string_pretty(&result).unwrap();
@@ -67,8 +70,8 @@ enum ResultWrapper<T> {
     Error(String),
 }
 
-impl<T> From<Result<T, Error>> for ResultWrapper<T> {
-    fn from(result: Result<T, Error>) -> Self {
+impl<T> From<CliTypedResult<T>> for ResultWrapper<T> {
+    fn from(result: CliTypedResult<T>) -> Self {
         match result {
             Ok(inner) => ResultWrapper::Result(inner),
             Err(inner) => ResultWrapper::Error(inner.to_string()),
@@ -77,7 +80,7 @@ impl<T> From<Result<T, Error>> for ResultWrapper<T> {
 }
 
 /// Checks if a file exists, being overridden by `--assume-yes`
-pub fn check_if_file_exists(file: &Path, assume_yes: bool) -> Result<(), Error> {
+pub fn check_if_file_exists(file: &Path, assume_yes: bool) -> CliTypedResult<()> {
     if file.exists()
         && !assume_yes
         && !prompt_yes(
@@ -88,24 +91,24 @@ pub fn check_if_file_exists(file: &Path, assume_yes: bool) -> Result<(), Error> 
             .as_str(),
         )
     {
-        Err(Error::AbortedError)
+        Err(CliError::AbortedError)
     } else {
         Ok(())
     }
 }
 
 /// Write a `&[u8]` to a file
-pub fn write_to_file(path: &Path, name: &str, bytes: &[u8]) -> Result<(), Error> {
-    let mut file = File::create(path).map_err(|e| Error::IO(name.to_string(), e))?;
+pub fn write_to_file(path: &Path, name: &str, bytes: &[u8]) -> CliTypedResult<()> {
+    let mut file = File::create(path).map_err(|e| CliError::IO(name.to_string(), e))?;
     file.write_all(bytes)
-        .map_err(|e| Error::IO(name.to_string(), e))
+        .map_err(|e| CliError::IO(name.to_string(), e))
 }
 
 /// Appends a file extension to a `Path` without overwriting the original extension.
 pub fn append_file_extension(
     file: &Path,
     appended_extension: &'static str,
-) -> Result<PathBuf, Error> {
+) -> CliTypedResult<PathBuf> {
     let extension = file
         .extension()
         .map(|extension| extension.to_str().unwrap_or_default());

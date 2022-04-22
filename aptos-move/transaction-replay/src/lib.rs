@@ -26,7 +26,7 @@ use move_binary_format::{errors::VMResult, file_format::CompiledModule};
 use move_cli::sandbox::utils::on_disk_state_view::OnDiskStateView;
 use move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags};
 use move_core_types::{effects::ChangeSet as MoveChanges, language_storage::TypeTag};
-use move_vm_runtime::session::Session;
+use move_vm_runtime::session::{SerializedReturnValues, Session};
 use move_vm_test_utils::DeltaStorage;
 use move_vm_types::gas_schedule::GasStatus;
 use std::{
@@ -323,7 +323,9 @@ impl AptosDebugger {
         f: F,
     ) -> Result<ChangeSet>
     where
-        F: FnOnce(&mut Session<DeltaStorage<RemoteStorage<DebuggerStateView>>>) -> VMResult<()>,
+        F: FnOnce(
+            &mut Session<DeltaStorage<RemoteStorage<DebuggerStateView>>>,
+        ) -> VMResult<SerializedReturnValues>,
     {
         let move_vm = MoveVmExt::new().unwrap();
         let state_view = DebuggerStateView::new(&*self.debugger, version.checked_sub(1));
@@ -357,8 +359,7 @@ impl AptosDebugger {
                 session.execute_script(
                     predicate.clone(),
                     vec![],
-                    vec![],
-                    vec![aptos_root_address(), sender],
+                    vec![aptos_root_address().to_vec(), sender.to_vec()],
                     &mut gas_status,
                 )
             })

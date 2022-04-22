@@ -1,12 +1,19 @@
 module AptosFramework::Account {
     use Std::BCS;
     use Std::Errors;
-    use Std::Signer;
     use Std::Hash;
+    use Std::Signer;
     use Std::Vector;
     use AptosFramework::ChainId;
-    use AptosFramework::Reconfiguration;
     use AptosFramework::SystemAddresses;
+    use AptosFramework::TestCoin;
+    use AptosFramework::Timestamp;
+    use AptosFramework::TransactionFee;
+    use AptosFramework::TransactionPublishingOption;
+    use AptosFramework::ValidatorConfig;
+    use AptosFramework::ValidatorOperatorConfig;
+
+    friend AptosFramework::Genesis;
 
     /// Resource representing an account.
     struct Account has key, store {
@@ -14,9 +21,6 @@ module AptosFramework::Account {
         sequence_number: u64,
         self_address: address,
     }
-
-    /// A marker resource that registers the type `T` as the system marker for BasicAccount at genesis.
-    struct Marker<phantom T> has key { }
 
     /// This holds information that will be picked up by the VM to call the
     /// correct chain-specific prologue and epilogue functions
@@ -40,21 +44,36 @@ module AptosFramework::Account {
     const ESEQUENCE_NUMBER_TOO_BIG: u64 = 1;
     /// The address provided didn't match the `AptosFramework` address.
     const ENOT_APTOS_FRAMEWORK: u64 = 2;
-    /// The marker type provided is not the registered type for `Account`.
-    const ENOT_MARKER_TYPE: u64 = 3;
     /// The provided authentication had an invalid length
-    const EMALFORMED_AUTHENTICATION_KEY: u64 = 4;
+    const EMALFORMED_AUTHENTICATION_KEY: u64 = 3;
 
+    const ECANNOT_CREATE_AT_VM_RESERVED: u64 = 4;
+    const EGAS: u64 = 5;
+    const ECANNOT_CREATE_AT_CORE_CODE: u64 = 6;
+    const EADDR_NOT_MATCH_PREIMAGE: u64 = 7;
+    const EWRITESET_NOT_ALLOWED: u64 = 8;
+    const EMULTI_AGENT_NOT_SUPPORTED: u64 = 9;
+    const EMODULE_NOT_ALLOWED: u64 = 10;
+    const ESCRIPT_NOT_ALLOWED: u64 = 11;
+
+    /// Prologue errors. These are separated out from the other errors in this
+    /// module since they are mapped separately to major VM statuses, and are
+    /// important to the semantics of the system.
     const PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY: u64 = 1001;
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD: u64 = 1002;
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW: u64 = 1003;
     const PROLOGUE_EACCOUNT_DNE: u64 = 1004;
+    const PROLOGUE_ECANT_PAY_GAS_DEPOSIT: u64 = 1005;
+    const PROLOGUE_ETRANSACTION_EXPIRED: u64 = 1006;
     const PROLOGUE_EBAD_CHAIN_ID: u64 = 1007;
+    const PROLOGUE_ESCRIPT_NOT_ALLOWED: u64 = 1008;
+    const PROLOGUE_EMODULE_NOT_ALLOWED: u64 = 1009;
+    const PROLOGUE_EINVALID_WRITESET_SENDER: u64 = 1010;
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1011;
 
     native fun create_signer(addr: address): signer;
 
-    public fun initialize<T>(account: &signer,
+    public fun initialize(account: &signer,
         module_addr: address,
         module_name: vector<u8>,
         script_prologue_name: vector<u8>,
@@ -66,7 +85,6 @@ module AptosFramework::Account {
         currency_code_required: bool,
     ) {
         assert!(Signer::address_of(account) == @CoreResources, Errors::requires_address(ENOT_APTOS_FRAMEWORK));
-        move_to(account, Marker<T> {});
         move_to(account, ChainSpecificAccountInfo {
             module_addr,
             module_name,
@@ -78,10 +96,6 @@ module AptosFramework::Account {
             writeset_epilogue_name,
             currency_code_required,
         });
-    }
-
-    fun assert_is_marker<T>() {
-        assert!(exists<Marker<T>>(@CoreResources), Errors::invalid_argument(ENOT_MARKER_TYPE))
     }
 
     /// Construct an authentication key, aborting if the prefix is not valid.
@@ -96,38 +110,30 @@ module AptosFramework::Account {
         );
         authentication_key
     }
-    // spec create_authentication_key {
-    //     /// The specification of this function is abstracted to avoid the complexity of
-    //     /// vector concatenation of serialization results. The actual value of the key
-    //     /// is assumed to be irrelevant for callers. Instead the uninterpreted function
-    //     /// `spec_abstract_create_authentication_key` is used to represent the key value.
-    //     /// The aborts behavior is, however, preserved: the caller must provide a
-    //     /// key prefix of a specific length.
-    //     pragma opaque;
-    //     include [abstract] CreateAuthenticationKeyAbortsIf;
-    //     ensures [abstract]
-    //         result == spec_abstract_create_authentication_key(auth_key_prefix) &&
-    //         len(result) == 32;
-    // }
-    // spec schema CreateAuthenticationKeyAbortsIf {
-    //     auth_key_prefix: vector<u8>;
-    //     aborts_if 16 + len(auth_key_prefix) != 32 with Errors::INVALID_ARGUMENT;
-    // }
-    // spec fun spec_abstract_create_authentication_key(auth_key_prefix: vector<u8>): vector<u8>;
 
     /// Publishes a new `Account` resource under `new_address`.
     /// A signer representing `new_address` is returned. This way, the caller of this function
     /// can publish additional resources under `new_address`.
     /// The `_witness` guarantees that owner the registered caller of this function can call it.
     /// authentication key returned is `auth_key_prefix` | `fresh_address`.
-    public fun create_account<T>(
+    public fun create_account_internal(
         new_address: address,
-        _witness: &T,
     ): (signer, vector<u8>) {
-        assert_is_marker<T>();
         // there cannot be an Account resource under new_addr already.
         assert!(!exists<Account>(new_address), Errors::already_published(EACCOUNT));
+        assert!(
+            new_address != @VMReserved,
+            Errors::invalid_argument(ECANNOT_CREATE_AT_VM_RESERVED)
+        );
+        assert!(
+            new_address != @AptosFramework,
+            Errors::invalid_argument(ECANNOT_CREATE_AT_CORE_CODE)
+        );
 
+        create_account_unchecked(new_address)
+    }
+
+    fun create_account_unchecked(new_address: address): (signer, vector<u8>) {
         let new_account = create_signer(new_address);
         let authentication_key = BCS::to_bytes(&new_address);
         assert!(
@@ -158,7 +164,11 @@ module AptosFramework::Account {
         *&borrow_global<Account>(addr).authentication_key
     }
 
-    public fun rotate_authentication_key(
+    public(script) fun rotate_authentication_key(account: signer, new_auth_key: vector<u8>) acquires Account {
+        rotate_authentication_key_internal(&account, new_auth_key);
+    }
+
+    public fun rotate_authentication_key_internal(
         account: &signer,
         new_auth_key: vector<u8>,
     ) acquires Account {
@@ -172,13 +182,20 @@ module AptosFramework::Account {
         account_resource.authentication_key = new_auth_key;
     }
 
-    public fun prologue(
-        account: &signer,
+    fun prologue_common(
+        sender: signer,
         txn_sequence_number: u64,
         txn_public_key: vector<u8>,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
         chain_id: u8,
     ) acquires Account {
-        let transaction_sender = Signer::address_of(account);
+        assert!(
+            Timestamp::now_seconds() < txn_expiration_time,
+            Errors::invalid_argument(PROLOGUE_ETRANSACTION_EXPIRED),
+        );
+        let transaction_sender = Signer::address_of(&sender);
         assert!(ChainId::get() == chain_id, Errors::invalid_argument(PROLOGUE_EBAD_CHAIN_ID));
         assert!(exists<Account>(transaction_sender), Errors::invalid_argument(PROLOGUE_EACCOUNT_DNE));
         let sender_account = borrow_global<Account>(transaction_sender);
@@ -202,13 +219,95 @@ module AptosFramework::Account {
             txn_sequence_number == sender_account.sequence_number,
             Errors::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
         );
+        let max_transaction_fee = txn_gas_price * txn_max_gas_units;
+        assert!(TestCoin::exists_at(transaction_sender), Errors::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
+        let balance = TestCoin::balance_of(transaction_sender);
+        assert!(balance >= max_transaction_fee, Errors::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Prologues and epilogues
+    ///////////////////////////////////////////////////////////////////////////
+    fun module_prologue(
+        sender: signer,
+        txn_sequence_number: u64,
+        txn_public_key: vector<u8>,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+    ) acquires Account {
+        assert!(TransactionPublishingOption::is_module_allowed(), Errors::invalid_state(PROLOGUE_EMODULE_NOT_ALLOWED));
+        prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
+    }
+
+    fun script_prologue(
+        sender: signer,
+        txn_sequence_number: u64,
+        txn_public_key: vector<u8>,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+        script_hash: vector<u8>,
+    ) acquires Account {
+        assert!(TransactionPublishingOption::is_script_allowed(&script_hash), Errors::invalid_state(PROLOGUE_ESCRIPT_NOT_ALLOWED));
+        prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
+    }
+
+    fun writeset_prologue(
+        _sender: signer,
+        _txn_sequence_number: u64,
+        _txn_public_key: vector<u8>,
+        _txn_expiration_time: u64,
+        _chain_id: u8,
+    ) {
+        assert!(false, Errors::invalid_argument(PROLOGUE_EINVALID_WRITESET_SENDER));
+    }
+
+    fun multi_agent_script_prologue(
+        _sender: signer,
+        _txn_sequence_number: u64,
+        _txn_sender_public_key: vector<u8>,
+        _secondary_signer_addresses: vector<address>,
+        _secondary_signer_public_key_hashes: vector<vector<u8>>,
+        _txn_gas_price: u64,
+        _txn_max_gas_units: u64,
+        _txn_expiration_time: u64,
+        _chain_id: u8,
+    ) {
+        assert!(false, Errors::invalid_argument(EMULTI_AGENT_NOT_SUPPORTED));
+    }
+
+    fun writeset_epilogue(
+        _core_resource: signer,
+        _txn_sequence_number: u64,
+        _should_trigger_reconfiguration: bool,
+    ) {
+        assert!(false, Errors::invalid_argument(EWRITESET_NOT_ALLOWED));
     }
 
     /// Epilogue function is run after a transaction is successfully executed.
-    /// Called by the Adaptor
-    public fun epilogue<T>(account: &signer, _witness: &T) acquires Account {
-        assert_is_marker<T>();
-        let addr = Signer::address_of(account);
+    /// Called by the Adapter
+    fun epilogue(
+        account: signer,
+        _txn_sequence_number: u64,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        gas_units_remaining: u64
+    ) acquires Account {
+        assert!(txn_max_gas_units >= gas_units_remaining, Errors::invalid_argument(EGAS));
+        let gas_used = txn_max_gas_units - gas_units_remaining;
+
+        assert!(
+            (txn_gas_price as u128) * (gas_used as u128) <= MAX_U64,
+            Errors::limit_exceeded(EGAS)
+        );
+        let transaction_fee_amount = txn_gas_price * gas_used;
+        let coin = TestCoin::withdraw(&account, transaction_fee_amount);
+        TransactionFee::burn_fee(coin);
+
+        let addr = Signer::address_of(&account);
         let old_sequence_number = get_sequence_number(addr);
 
         assert!(
@@ -221,14 +320,57 @@ module AptosFramework::Account {
         account_resource.sequence_number = old_sequence_number + 1;
     }
 
-    /// Epilogue function called after a successful writeset transaction, which can only be sent by @CoreResources.
-    public fun writeset_epilogue<T>(
-        account: &signer,
-        should_trigger_reconfiguration: bool,
-        witness: &T
-    ) acquires Account {
-        SystemAddresses::assert_core_resource(account);
-        epilogue(account, witness);
-        if (should_trigger_reconfiguration) Reconfiguration::reconfigure();
+    ///////////////////////////////////////////////////////////////////////////
+    /// Basic account creation method.
+    ///////////////////////////////////////////////////////////////////////////
+
+    public(script) fun create_account(auth_key: address) {
+        let (signer, _) = create_account_internal(auth_key);
+        TestCoin::register(&signer);
+    }
+
+    /// Create a Validator account
+    public(script) fun create_validator_account(
+        core_resource: signer,
+        new_account_address: address,
+        human_name: vector<u8>,
+    ) {
+        create_validator_account_internal(&core_resource, new_account_address, human_name);
+    }
+
+    public fun create_validator_account_internal(
+        core_resource: &signer,
+        new_account_address: address,
+        human_name: vector<u8>,
+    ) {
+        SystemAddresses::assert_core_resource(core_resource);
+        let (new_account, _) = create_account_internal(new_account_address);
+        ValidatorConfig::publish( &new_account, human_name);
+    }
+
+    /// Create a Validator Operator account
+    public(script) fun create_validator_operator_account(
+        core_resource: signer,
+        new_account_address: address,
+        human_name: vector<u8>,
+    ) {
+        create_validator_operator_account_internal(&core_resource, new_account_address, human_name)
+    }
+
+    public fun create_validator_operator_account_internal(
+        core_resource: &signer,
+        new_account_address: address,
+        human_name: vector<u8>,
+    ) {
+        SystemAddresses::assert_core_resource(core_resource);
+        let (new_account, _) = create_account_internal(new_account_address);
+        ValidatorOperatorConfig::publish(&new_account, human_name);
+    }
+
+    /// Create the account for @AptosFramework to help module upgrades on testnet.
+    public(friend) fun create_core_framework_account(): signer {
+        Timestamp::assert_genesis();
+        let (signer, _) = create_account_unchecked(@AptosFramework);
+        signer
     }
 }

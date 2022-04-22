@@ -91,7 +91,6 @@ pub fn validate_signed_transaction<A: VMAdapter>(
 ) -> VMValidatorResult {
     let _timer = TXN_VALIDATION_SECONDS.start_timer();
     let log_context = AdapterLogSchema::new(state_view.id(), 0);
-
     let txn = match A::check_signature(transaction) {
         Ok(t) => t,
         _ => {

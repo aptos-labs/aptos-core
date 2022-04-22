@@ -811,7 +811,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
             let epoch_change_proofs = self.verified_epoch_states.all_epoch_ending_ledger_infos();
 
             // Initialize the account state synchronizer
-            self.storage_synchronizer.initialize_account_synchronizer(
+            let _ = self.storage_synchronizer.initialize_account_synchronizer(
                 epoch_change_proofs,
                 ledger_info_to_sync,
                 transaction_output_to_sync.clone(),

@@ -113,6 +113,7 @@ impl<V> Node<V> {
         }
     }
 
+    #[cfg(test)]
     pub fn new_internal(left: SubTree<V>, right: SubTree<V>, generation: u64) -> Self {
         Self {
             generation,
@@ -215,6 +216,7 @@ impl<V: CryptoHash> SubTree<V> {
         }
     }
 
+    #[cfg(test)]
     pub fn new_internal(left: Self, right: Self, generation: u64) -> Self {
         let internal = Node::new_internal(left, right, generation);
 

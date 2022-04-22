@@ -147,7 +147,6 @@ where
             .into_iter()
             .flatten()
             .collect();
-
         let first_version = committed_block
             .output
             .result_view
@@ -170,7 +169,6 @@ where
             fail_point!("executor::commit_blocks", |_| {
                 Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
             });
-
             self.db.writer.save_transactions(
                 &txns_to_commit,
                 first_version,

@@ -2,6 +2,22 @@ variable "region" {
   description = "AWS region"
 }
 
+variable "zone_id" {
+  description = "Route53 Zone ID to create records in"
+  default     = ""
+}
+
+variable "tls_sans" {
+  description = "List of Subject Alternate Names to include in TLS certificate"
+  type        = list(string)
+  default     = []
+}
+
+variable "workspace_dns" {
+  description = "Include Terraform workspace name in DNS records"
+  default     = true
+}
+
 variable "iam_path" {
   default     = "/"
   description = "Path to use when naming IAM objects"
@@ -36,6 +52,11 @@ variable "k8s_admins" {
 
 variable "ssh_pub_key" {
   description = "SSH public key to configure for bastion and vault access"
+}
+
+variable "validator_lite_mode" {
+  description = "Run validator lite deployment"
+  default = false
 }
 
 variable "num_validators" {
@@ -84,20 +105,10 @@ variable "public_fullnode_helm_values" {
   default     = {}
 }
 
-variable "zone_id" {
-  description = "Route53 Zone ID to create records in"
-  default     = ""
-}
-
-variable "tls_sans" {
-  description = "List of Subject Alternate Names to include in TLS certificate"
-  type        = list(string)
-  default     = []
-}
-
-variable "workspace_dns" {
-  description = "Include Terraform workspace name in DNS records"
-  default     = true
+variable "indexer_helm_values" {
+  description = "Map of values to pass to indexer Helm"
+  type        = any
+  default     = {}
 }
 
 variable "enable_pfn_logger" {
@@ -152,20 +163,27 @@ variable "num_trusted_instance" {
   default     = 0
 }
 
-variable "explorer_image_repo" {
-  default = "ghcr.io/aptos/explorer"
-}
-
-variable "explorer_image_tag" {
-  default = "latest"
-}
-
 variable "enable_dev_vault" {
   description = "TEST ONLY: Enables Vault in Dev Mode for all validators"
   default     = false
 }
 
+variable "enable_indexer" {
+  description = "Enable Aptos indexer"
+  default     = false
+}
+
+variable "indexer_db_password" {
+  description = "password for indexer RDS instance"
+  default     = ""
+}
+
 variable "enable_k8s_metrics_server" {
   description = "Installs kubernetes metrics server: https://github.com/kubernetes-sigs/metrics-server"
   default     = false
+}
+
+variable "coredns_min_replicas" {
+  description = "Minimal replica numbers for core dns"
+  default     = 2
 }

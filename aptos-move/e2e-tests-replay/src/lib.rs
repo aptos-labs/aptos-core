@@ -60,6 +60,7 @@ use move_stackless_bytecode_interpreter::{
     shared::bridge::{adapt_move_vm_change_set, adapt_move_vm_result},
     StacklessBytecodeInterpreter,
 };
+use move_vm_runtime::session::SerializedReturnValues;
 use move_vm_types::gas_schedule::GasStatus;
 
 const MOVE_VM_TRACING_ENV_VAR_NAME: &str = "MOVE_VM_TRACE";
@@ -369,11 +370,21 @@ impl<'env> CrossRunner<'env> {
                 Some(senders),
                 &self.stackless_vm_state,
             );
-        let stackless_vm_return_values =
-            stackless_vm_return_values.map(|rets| assert!(rets.is_empty()));
 
         // compare
-        let move_vm_return_values = adapt_move_vm_result(move_vm_return_values);
+        let move_vm_return_values = match adapt_move_vm_result(move_vm_return_values) {
+            Ok(result) => {
+                let SerializedReturnValues {
+                    return_values,
+                    mutable_reference_outputs: _,
+                } = result;
+                Ok(return_values
+                    .into_iter()
+                    .map(|(bytes, _)| bytes)
+                    .collect::<Vec<_>>())
+            }
+            Err(e) => Err(e),
+        };
         let move_vm_change_set =
             adapt_move_vm_change_set(Ok(move_vm_change_set), &self.move_vm_state).unwrap();
         assert_eq!(move_vm_return_values, stackless_vm_return_values);
@@ -399,7 +410,23 @@ fn execute_function_via_session(
     args: Vec<Vec<u8>>,
 ) -> VMResult<Vec<Vec<u8>>> {
     let mut gas_status = GasStatus::new_unmetered();
-    session.execute_function(module_id, function_name, ty_args, args, &mut gas_status)
+    let vm_result = session.execute_function_bypass_visibility(
+        module_id,
+        function_name,
+        ty_args,
+        args,
+        &mut gas_status,
+    );
+    match vm_result {
+        Ok(result) => {
+            let SerializedReturnValues {
+                return_values,
+                mutable_reference_outputs: _,
+            } = result;
+            Ok(return_values.into_iter().map(|(bytes, _)| bytes).collect())
+        }
+        Err(e) => Err(e),
+    }
 }
 
 fn execute_function_via_session_and_xrunner(
@@ -423,14 +450,17 @@ fn execute_script_function_via_session(
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
     senders: Vec<AccountAddress>,
-) -> VMResult<()> {
+) -> VMResult<SerializedReturnValues> {
     let mut gas_status = GasStatus::new_unmetered();
-    session.execute_script_function(
+    session.execute_entry_function(
         module_id,
         function_name,
         ty_args,
-        args,
-        senders,
+        senders
+            .into_iter()
+            .map(|e| e.to_vec())
+            .chain(args)
+            .collect(),
         &mut gas_status,
     )
 }
@@ -443,7 +473,7 @@ fn execute_script_function_via_session_and_xrunner(
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
     senders: Vec<AccountAddress>,
-) -> VMResult<()> {
+) -> VMResult<SerializedReturnValues> {
     if let Some(runner) = xrunner {
         runner.step_script_function_and_compare(
             module_id,

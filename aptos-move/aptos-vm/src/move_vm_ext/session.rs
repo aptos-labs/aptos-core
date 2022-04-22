@@ -18,7 +18,7 @@ use move_core_types::{
     resolver::MoveResolver,
     vm_status::VMStatus,
 };
-use move_vm_runtime::{native_functions::NativeContextExtensions, session::Session};
+use move_vm_runtime::{native_extensions::NativeContextExtensions, session::Session};
 use serde::{Deserialize, Serialize};
 use std::{
     convert::TryInto,
@@ -93,7 +93,7 @@ where
         Self { inner }
     }
 
-    pub fn finish(self) -> VMResult<SessionOutput> {
+    pub fn finish(self) -> VMResult<SessionOutput<'r>> {
         let (change_set, events, extensions) = self.inner.finish_with_extensions()?;
         Ok(SessionOutput {
             change_set,
@@ -117,13 +117,13 @@ impl<'r, 'l, S> DerefMut for SessionExt<'r, 'l, S> {
     }
 }
 
-pub struct SessionOutput {
+pub struct SessionOutput<'r> {
     pub change_set: MoveChangeSet,
     pub events: Vec<MoveEvent>,
-    pub extensions: NativeContextExtensions,
+    pub extensions: NativeContextExtensions<'r>,
 }
 
-impl SessionOutput {
+impl<'r> SessionOutput<'r> {
     pub fn into_change_set<C: AccessPathCache>(
         self,
         ap_cache: &mut C,
@@ -133,7 +133,7 @@ impl SessionOutput {
             .map(|(write_set, events)| ChangeSet::new(write_set, events))
     }
 
-    pub fn unpack(self) -> (MoveChangeSet, Vec<MoveEvent>, NativeContextExtensions) {
+    pub fn unpack(self) -> (MoveChangeSet, Vec<MoveEvent>, NativeContextExtensions<'r>) {
         (self.change_set, self.events, self.extensions)
     }
 }

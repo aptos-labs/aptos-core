@@ -7,9 +7,13 @@ use aptos_crypto::{
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
 use aptos_logger::{debug, info};
+use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
 use clap::{ArgEnum, Parser};
+use itertools::Itertools;
+use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::BTreeMap,
     fmt::Debug,
     path::{Path, PathBuf},
     str::FromStr,
@@ -19,39 +23,35 @@ use thiserror::Error;
 /// A common result to be returned to users
 pub type CliResult = Result<String, String>;
 
-/// TODO: Re-evaluate these errors
+/// A common result to remove need for typing `Result<T, CliError>`
+pub type CliTypedResult<T> = Result<T, CliError>;
+
 #[derive(Debug, Error)]
-pub enum Error {
-    #[error("Invalid key value found in backend: {0}")]
-    BackendInvalidKeyValue(String),
-    #[error("Backend is missing the backend key")]
-    BackendMissingBackendKey,
-    #[error("Backend parsing error: {0}")]
-    BackendParsingError(String),
+pub enum CliError {
     #[error("Invalid arguments: {0}")]
     CommandArgumentError(String),
-    #[error("Unable to load config: {0}")]
-    ConfigError(String),
+    #[error("Unable to load config: {0} {1}")]
+    ConfigLoadError(String, String),
     #[error("Unable to find config {0}, have you run `aptos init`?")]
     ConfigNotFoundError(String),
     #[error("Error accessing '{0}': {1}")]
     IO(String, #[source] std::io::Error),
     #[error("Error (de)serializing '{0}': {1}")]
-    BCS(String, #[source] bcs::Error),
-    #[error("Unable to decode network address: {0}")]
-    NetworkAddressDecodeError(String),
+    BCS(&'static str, #[source] bcs::Error),
     #[error("Unable to parse '{0}': error: {1}")]
     UnableToParse(&'static str, String),
-    #[error("Unable to parse file '{0}', error: {1}")]
-    UnableToParseFile(String, String),
     #[error("Unable to read file '{0}', error: {1}")]
     UnableToReadFile(String, String),
-    #[error("Unexpected command, expected {0}, found {1}")]
-    UnexpectedCommand(String, String),
+    #[error("API error: {0}")]
+    ApiError(String),
     #[error("Unexpected error: {0}")]
     UnexpectedError(String),
     #[error("Aborted command")]
     AbortedError,
+    #[error("Move compilation failed: {0}")]
+    MoveCompilationError(String),
+    #[error("Move unit tests failed: {0}")]
+    MoveTestError(String),
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -62,31 +62,32 @@ pub struct CliConfig {
 
 impl CliConfig {
     /// Checks if the config exists in the current working directory
-    pub fn config_exists() -> Result<bool, Error> {
+    pub fn config_exists() -> CliTypedResult<bool> {
         Self::aptos_folder().map(|folder| folder.exists())
     }
 
     /// Loads the config from the current working directory
-    pub fn load() -> Result<Self, Error> {
+    pub fn load() -> CliTypedResult<Self> {
         let config_file = Self::aptos_folder()?.join("config.yml");
         if !config_file.exists() {
-            return Err(Error::ConfigError(format!("{:?}", config_file)));
+            return Err(CliError::ConfigNotFoundError(format!("{:?}", config_file)));
         }
 
-        let bytes = std::fs::read(&config_file)
-            .map_err(|err| Error::IO(format!("Failed to read {:?}", config_file), err))?;
+        let bytes = std::fs::read(&config_file).map_err(|err| {
+            CliError::ConfigLoadError(format!("{:?}", config_file), err.to_string())
+        })?;
         serde_yaml::from_slice(&bytes)
-            .map_err(|err| Error::UnableToParseFile(format!("{:?}", config_file), err.to_string()))
+            .map_err(|err| CliError::ConfigLoadError(format!("{:?}", config_file), err.to_string()))
     }
 
     /// Saves the config to ./.aptos/config.yml
-    pub fn save(&self) -> Result<(), Error> {
+    pub fn save(&self) -> CliTypedResult<()> {
         let aptos_folder = Self::aptos_folder()?;
 
         // Create if it doesn't exist
         if !aptos_folder.exists() {
             std::fs::create_dir(&aptos_folder).map_err(|err| {
-                Error::CommandArgumentError(format!(
+                CliError::CommandArgumentError(format!(
                     "Unable to create {:?} directory {}",
                     aptos_folder, err
                 ))
@@ -99,17 +100,18 @@ impl CliConfig {
         // Save over previous config file
         // TODO: Ask for saving over?
         let config_file = aptos_folder.join("config.yml");
-        let config_bytes = serde_yaml::to_string(&self)
-            .map_err(|err| Error::UnexpectedError(format!("Failed to serialize config {}", err)))?;
+        let config_bytes = serde_yaml::to_string(&self).map_err(|err| {
+            CliError::UnexpectedError(format!("Failed to serialize config {}", err))
+        })?;
         write_to_file(&config_file, "config.yml", config_bytes.as_bytes())?;
         Ok(())
     }
 
     /// Finds the current directory's .aptos folder
-    fn aptos_folder() -> Result<PathBuf, Error> {
+    fn aptos_folder() -> CliTypedResult<PathBuf> {
         std::env::current_dir()
             .map_err(|err| {
-                Error::UnexpectedError(format!("Unable to get current directory {}", err))
+                CliError::UnexpectedError(format!("Unable to get current directory {}", err))
             })
             .map(|dir| dir.join(".aptos"))
     }
@@ -149,44 +151,49 @@ impl EncodingType {
     /// Encodes `Key` into one of the `EncodingType`s
     pub fn encode_key<Key: ValidCryptoMaterial>(
         &self,
+        name: &'static str,
         key: &Key,
-        key_name: &str,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> CliTypedResult<Vec<u8>> {
         Ok(match self {
             EncodingType::Hex => hex::encode_upper(key.to_bytes()).into_bytes(),
-            EncodingType::BCS => {
-                bcs::to_bytes(key).map_err(|err| Error::BCS(key_name.to_string(), err))?
-            }
+            EncodingType::BCS => bcs::to_bytes(key).map_err(|err| CliError::BCS(name, err))?,
             EncodingType::Base64 => base64::encode(key.to_bytes()).into_bytes(),
         })
     }
 
     /// Loads a key from a file
-    pub fn load_key<Key: ValidCryptoMaterial>(&self, path: &Path) -> Result<Key, Error> {
+    pub fn load_key<Key: ValidCryptoMaterial>(
+        &self,
+        name: &'static str,
+        path: &Path,
+    ) -> CliTypedResult<Key> {
         let data = std::fs::read(&path).map_err(|err| {
-            Error::UnableToReadFile(path.to_str().unwrap().to_string(), err.to_string())
+            CliError::UnableToReadFile(path.to_str().unwrap().to_string(), err.to_string())
         })?;
 
-        self.decode_key(data)
+        self.decode_key(name, data)
     }
 
     /// Decodes an encoded key given the known encoding
-    pub fn decode_key<Key: ValidCryptoMaterial>(&self, data: Vec<u8>) -> Result<Key, Error> {
+    pub fn decode_key<Key: ValidCryptoMaterial>(
+        &self,
+        name: &'static str,
+        data: Vec<u8>,
+    ) -> CliTypedResult<Key> {
         match self {
-            EncodingType::BCS => {
-                bcs::from_bytes(&data).map_err(|err| Error::BCS("Key".to_string(), err))
-            }
+            EncodingType::BCS => bcs::from_bytes(&data).map_err(|err| CliError::BCS(name, err)),
             EncodingType::Hex => {
                 let hex_string = String::from_utf8(data).unwrap();
                 Key::from_encoded_string(hex_string.trim())
-                    .map_err(|err| Error::UnableToParse("Key", err.to_string()))
+                    .map_err(|err| CliError::UnableToParse(name, err.to_string()))
             }
             EncodingType::Base64 => {
                 let string = String::from_utf8(data).unwrap();
                 let bytes = base64::decode(string.trim())
-                    .map_err(|err| Error::UnableToParse("Key", err.to_string()))?;
-                Key::try_from(bytes.as_slice())
-                    .map_err(|err| Error::UnexpectedError(format!("Failed to parse key {}", err)))
+                    .map_err(|err| CliError::UnableToParse(name, err.to_string()))?;
+                Key::try_from(bytes.as_slice()).map_err(|err| {
+                    CliError::UnableToParse(name, format!("Failed to parse key {:?}", err))
+                })
             }
         }
     }
@@ -222,95 +229,81 @@ pub struct EncodingOptions {
 }
 
 #[derive(Debug, Parser)]
+pub struct PublicKeyInputOptions {
+    /// Public key input file name
+    #[clap(long, group = "public_key_input", parse(from_os_str))]
+    public_key_file: Option<PathBuf>,
+    /// Public key encoded in a type as shown in `encoding`
+    #[clap(long, group = "public_key_input")]
+    public_key: Option<String>,
+}
+
+impl ExtractPublicKey for PublicKeyInputOptions {
+    fn extract_public_key(&self, encoding: EncodingType) -> CliTypedResult<Ed25519PublicKey> {
+        if let Some(ref file) = self.public_key_file {
+            encoding.load_key("--public-key-file", file.as_path())
+        } else if let Some(ref key) = self.public_key {
+            let key = key.as_bytes().to_vec();
+            encoding.decode_key("--public-key", key)
+        } else {
+            Err(CliError::CommandArgumentError(
+                "One of ['--public-key', '--public-key-file'] must be used".to_string(),
+            ))
+        }
+    }
+}
+
+#[derive(Debug, Parser)]
 pub struct PrivateKeyInputOptions {
     /// Private key input file name
-    #[clap(long, group = "key_input", parse(from_os_str))]
+    #[clap(long, group = "private_key_input", parse(from_os_str))]
     private_key_file: Option<PathBuf>,
     /// Private key encoded in a type as shown in `encoding`
-    #[clap(long, group = "key_input")]
+    #[clap(long, group = "private_key_input")]
     private_key: Option<String>,
 }
 
 impl PrivateKeyInputOptions {
-    pub fn extract_private_key(
-        &self,
-        encoding: EncodingType,
-    ) -> Result<Option<Ed25519PrivateKey>, Error> {
+    pub fn extract_private_key(&self, encoding: EncodingType) -> CliTypedResult<Ed25519PrivateKey> {
         if let Some(ref file) = self.private_key_file {
-            encoding.load_key(file.as_path()).map(Some)
+            encoding.load_key("--private-key-file", file.as_path())
         } else if let Some(ref key) = self.private_key {
             let key = key.as_bytes().to_vec();
-            encoding.decode_key(key).map(Some)
+            encoding.decode_key("--private-key", key)
+        } else if let Some(private_key) = CliConfig::load()?.private_key {
+            Ok(private_key)
         } else {
-            Ok(None)
+            Err(CliError::CommandArgumentError(
+                "One of ['--private-key', '--private-key-file'] must be used".to_string(),
+            ))
         }
     }
 }
 
-#[derive(Debug, Parser)]
-pub struct PublicKeyInputOptions {
-    /// Public key input file name.
-    #[clap(long, group = "key_input", parse(from_os_str))]
-    public_key_file: Option<PathBuf>,
-    /// Public key encoded in a type as shown in `encoding`
-    #[clap(long, group = "key_input")]
-    public_key: Option<String>,
+impl ExtractPublicKey for PrivateKeyInputOptions {
+    fn extract_public_key(&self, encoding: EncodingType) -> CliTypedResult<Ed25519PublicKey> {
+        self.extract_private_key(encoding)
+            .map(|private_key| private_key.public_key())
+    }
 }
 
-impl PublicKeyInputOptions {
-    pub fn extract_public_key(
+pub trait ExtractPublicKey {
+    fn extract_public_key(&self, encoding: EncodingType) -> CliTypedResult<Ed25519PublicKey>;
+
+    fn extract_x25519_public_key(
         &self,
         encoding: EncodingType,
-    ) -> Result<Option<Ed25519PublicKey>, Error> {
-        if let Some(ref file) = self.public_key_file {
-            encoding.load_key(file.as_path()).map(Some)
-        } else if let Some(ref key) = self.public_key {
-            let key = key.as_bytes().to_vec();
-            encoding.decode_key(key).map(Some)
-        } else {
-            Ok(None)
-        }
-    }
-}
-
-#[derive(Debug, Parser)]
-pub struct KeyInputOptions {
-    #[clap(flatten)]
-    pub private_key_options: PrivateKeyInputOptions,
-    #[clap(flatten)]
-    public_key_options: PublicKeyInputOptions,
-}
-
-impl KeyInputOptions {
-    /// Extracts public key from either private or public key options
-    pub fn extract_public_key(&self, encoding: EncodingType) -> Result<Ed25519PublicKey, Error> {
-        let private_key_result = self.private_key_options.extract_private_key(encoding)?;
-        let public_key_result = self.public_key_options.extract_public_key(encoding)?;
-
-        if let Some(private_key) = private_key_result {
-            Ok(private_key.public_key())
-        } else if let Some(public_key) = public_key_result {
-            Ok(public_key)
-        } else {
-            let config = CliConfig::load()?;
-            if let Some(private_key) = config.private_key {
-                println!("Using .aptos/config.yml private key");
-                Ok(private_key.public_key())
-            } else {
-                Err(Error::CommandArgumentError("One of ['--private-key', '--private-key-file', '--public-key', '--public-key-file'] must be used".to_string()))
-            }
-        }
-    }
-
-    pub fn extract_x25519_public_key(
-        &self,
-        encoding: EncodingType,
-    ) -> Result<x25519::PublicKey, Error> {
+    ) -> CliTypedResult<x25519::PublicKey> {
         let key = self.extract_public_key(encoding)?;
         x25519::PublicKey::from_ed25519_public_bytes(&key.to_bytes()).map_err(|err| {
-            Error::UnexpectedError(format!("Failed to convert ed25519 to x25519 {:?}", err))
+            CliError::UnexpectedError(format!("Failed to convert ed25519 to x25519 {:?}", err))
         })
     }
+}
+
+pub fn account_address_from_public_key(public_key: &Ed25519PublicKey) -> AccountAddress {
+    let auth_key = AuthenticationKey::ed25519(public_key);
+    AccountAddress::new(*auth_key.derived_address())
 }
 
 #[derive(Debug, Parser)]
@@ -325,22 +318,96 @@ pub struct SaveFile {
 
 impl SaveFile {
     /// Check if the key file exists already
-    pub fn check_file(&self) -> Result<(), Error> {
+    pub fn check_file(&self) -> CliTypedResult<()> {
         check_if_file_exists(self.output_file.as_path(), self.prompt_options.assume_yes)
     }
 
     /// Save to the `output_file`
-    pub fn save_to_file(&self, name: &str, bytes: &[u8]) -> Result<(), Error> {
+    pub fn save_to_file(&self, name: &str, bytes: &[u8]) -> CliTypedResult<()> {
         write_to_file(self.output_file.as_path(), name, bytes)
     }
 }
 
+/// Options specific to using the Rest endpoint
 #[derive(Debug, Parser)]
-pub struct NodeOptions {
+pub struct RestOptions {
+    /// URL to a fullnode on the network
+    ///
+    /// Defaults to https://fullnode.devnet.aptoslabs.com
     #[clap(
         long,
         parse(try_from_str),
         default_value = "https://fullnode.devnet.aptoslabs.com"
     )]
     pub url: reqwest::Url,
+}
+
+/// Options specific to submitting a private key to the Rest endpoint
+#[derive(Debug, Parser)]
+pub struct WriteTransactionOptions {
+    #[clap(flatten)]
+    pub private_key_options: PrivateKeyInputOptions,
+    #[clap(flatten)]
+    pub rest_options: RestOptions,
+    /// ChainId for the network
+    #[clap(long)]
+    pub chain_id: ChainId,
+    /// Maximum gas to be used to publish the package
+    ///
+    /// Defaults to 1000 gas units
+    #[clap(long, default_value_t = 1000)]
+    pub max_gas: u64,
+}
+
+/// Options for compiling a move package dir
+#[derive(Debug, Parser)]
+pub struct MovePackageDir {
+    /// Path to a move package (the folder with a Move.toml file)
+    #[clap(long, parse(from_os_str))]
+    pub package_dir: PathBuf,
+    /// Path to save the compiled move package
+    ///
+    /// Defaults to `<package_dir>/build`
+    #[clap(long, parse(from_os_str))]
+    pub output_dir: Option<PathBuf>,
+    /// Named addresses for the move binary
+    ///
+    /// Example: alice=0x1234, bob=0x5678
+    ///
+    /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
+    #[clap(long, parse(try_from_str = parse_map), default_value = "")]
+    pub named_addresses: BTreeMap<String, AccountAddress>,
+}
+
+const PARSE_MAP_SYNTAX_MSG: &str = "Invalid syntax for map.  Example: Name=Value,Name2=Value";
+
+/// Parses an inline map of values
+///
+/// Example: Name=Value,Name2=Value
+pub fn parse_map<K: FromStr + Ord, V: FromStr>(str: &str) -> anyhow::Result<BTreeMap<K, V>>
+where
+    K::Err: 'static + std::error::Error + Send + Sync,
+    V::Err: 'static + std::error::Error + Send + Sync,
+{
+    let mut map = BTreeMap::new();
+
+    // Split pairs by commas
+    for pair in str.split_terminator(',') {
+        // Split pairs by = then trim off any spacing
+        let (first, second): (&str, &str) = pair
+            .split_terminator('=')
+            .collect_tuple()
+            .ok_or_else(|| anyhow::Error::msg(PARSE_MAP_SYNTAX_MSG))?;
+        let first = first.trim();
+        let second = second.trim();
+        if first.is_empty() || second.is_empty() {
+            return Err(anyhow::Error::msg(PARSE_MAP_SYNTAX_MSG));
+        }
+
+        // At this point, we just give error messages appropriate to parsing
+        let key: K = K::from_str(first)?;
+        let value: V = V::from_str(second)?;
+        map.insert(key, value);
+    }
+    Ok(map)
 }

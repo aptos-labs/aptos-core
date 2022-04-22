@@ -26,8 +26,8 @@ pub enum StateKey {
 }
 
 #[repr(u8)]
-#[derive(FromPrimitive, ToPrimitive)]
-enum StateKeyPrefix {
+#[derive(Clone, Debug, FromPrimitive, ToPrimitive)]
+pub enum StateKeyTag {
     AccountAddress,
     AccessPath,
     Raw = 255,
@@ -39,14 +39,13 @@ impl StateKey {
         let mut out = vec![];
 
         let (prefix, raw_key) = match self {
-            StateKey::AccountAddressKey(account_address) => (
-                StateKeyPrefix::AccountAddress,
-                bcs::to_bytes(account_address)?,
-            ),
-            StateKey::AccessPath(access_path) => {
-                (StateKeyPrefix::AccessPath, bcs::to_bytes(access_path)?)
+            StateKey::AccountAddressKey(account_address) => {
+                (StateKeyTag::AccountAddress, bcs::to_bytes(account_address)?)
             }
-            StateKey::Raw(raw_bytes) => (StateKeyPrefix::Raw, raw_bytes.to_vec()),
+            StateKey::AccessPath(access_path) => {
+                (StateKeyTag::AccessPath, bcs::to_bytes(access_path)?)
+            }
+            StateKey::Raw(raw_bytes) => (StateKeyTag::Raw, raw_bytes.to_vec()),
         };
         out.push(prefix as u8);
         out.extend(raw_key);
@@ -59,14 +58,14 @@ impl StateKey {
             return Err(StateKeyDecodeErr::EmptyInput.into());
         }
         let tag = val[0];
-        let state_key_tag = StateKeyPrefix::from_u8(tag)
-            .ok_or(StateKeyDecodeErr::UnknownTag { unknown_tag: tag })?;
+        let state_key_tag =
+            StateKeyTag::from_u8(tag).ok_or(StateKeyDecodeErr::UnknownTag { unknown_tag: tag })?;
         match state_key_tag {
-            StateKeyPrefix::AccountAddress => {
+            StateKeyTag::AccountAddress => {
                 Ok(StateKey::AccountAddressKey(bcs::from_bytes(&val[1..])?))
             }
-            StateKeyPrefix::AccessPath => Ok(StateKey::AccessPath(bcs::from_bytes(&val[1..])?)),
-            StateKeyPrefix::Raw => Ok(StateKey::Raw(val[1..].to_vec())),
+            StateKeyTag::AccessPath => Ok(StateKey::AccessPath(bcs::from_bytes(&val[1..])?)),
+            StateKeyTag::Raw => Ok(StateKey::Raw(val[1..].to_vec())),
         }
     }
 }

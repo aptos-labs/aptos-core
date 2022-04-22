@@ -3,27 +3,29 @@
 
 use crate::{
     context::Context,
+    failpoint::fail_point,
     metrics::metrics,
-    param::{AddressParam, LedgerVersionParam, MoveStructTagParam},
+    param::{AddressParam, LedgerVersionParam, MoveIdentifierParam, MoveStructTagParam},
     version::Version,
 };
-use aptos_api_types::{AsConverter, Error, LedgerInfo, Response, TransactionId};
+use aptos_api_types::{
+    AsConverter, Error, LedgerInfo, MoveModuleBytecode, Response, TransactionId,
+};
 use aptos_state_view::StateView;
 use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
 use aptos_vm::data_cache::AsMoveResolver;
-use fail::fail_point;
-use hyper::StatusCode;
 use move_core_types::{
     account_address::AccountAddress,
-    language_storage::{ResourceKey, StructTag},
+    identifier::Identifier,
+    language_storage::{ModuleId, ResourceKey, StructTag},
 };
 use std::convert::TryInto;
 use storage_interface::state_view::DbStateView;
 use warp::{filters::BoxedFilter, Filter, Rejection, Reply};
 
-// GET state/resource/<address>/<resource_type>
-pub fn query_resource(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("state" / "resource" / AddressParam / MoveStructTagParam)
+// GET /accounts/<address>/resource/<resource_type>
+pub fn get_account_resource(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("accounts" / AddressParam / "resource" / MoveStructTagParam)
         .and(warp::get())
         .and(context.filter())
         .and(warp::query::<Version>())
@@ -31,24 +33,51 @@ pub fn query_resource(context: Context) -> BoxedFilter<(impl Reply,)> {
             (version.version, address, struct_tag, ctx)
         })
         .untuple_one()
-        .and_then(handle_query_resource)
-        .with(metrics("query_resource"))
+        .and_then(handle_get_account_resource)
+        .with(metrics("get_account_resource"))
         .boxed()
 }
 
-async fn handle_query_resource(
+// GET /state/module/<address>/<module_name>
+pub fn get_account_module(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("accounts" / AddressParam / "module" / MoveIdentifierParam)
+        .and(warp::get())
+        .and(context.filter())
+        .and(warp::query::<Version>())
+        .map(|address, name, ctx, version: Version| (version.version, address, name, ctx))
+        .untuple_one()
+        .and_then(handle_get_account_module)
+        .with(metrics("get_account_module"))
+        .boxed()
+}
+
+async fn handle_get_account_resource(
     ledger_version: Option<LedgerVersionParam>,
     address: AddressParam,
     struct_tag: MoveStructTagParam,
     context: Context,
-) -> Result<impl Reply, Rejection> {
-    fail_point!("endpoint_query_resource");
+) -> anyhow::Result<impl Reply, Rejection> {
+    fail_point("endpoint_query_resource")?;
+    let struct_tag = struct_tag.parse("struct tag")?;
     Ok(State::new(ledger_version, context)?.resource(
         address.parse("account address")?.into(),
         struct_tag
-            .parse("struct tag")?
+            .clone()
             .try_into()
-            .map_err(|e| Error::from_anyhow_error(StatusCode::BAD_REQUEST, e))?,
+            .map_err(|_| Error::invalid_param("resource_type", struct_tag))?,
+    )?)
+}
+
+async fn handle_get_account_module(
+    ledger_version: Option<LedgerVersionParam>,
+    address: AddressParam,
+    name: MoveIdentifierParam,
+    context: Context,
+) -> anyhow::Result<impl Reply, Rejection> {
+    fail_point("endpoint_get_account_module")?;
+    Ok(State::new(ledger_version, context)?.module(
+        address.parse("account address")?.into(),
+        name.parse("module name")?,
     )?)
 }
 
@@ -104,5 +133,20 @@ impl State {
             .as_converter()
             .try_into_resource(&struct_tag, &bytes)?;
         Response::new(self.latest_ledger_info, &resource)
+    }
+
+    pub fn module(self, address: AccountAddress, name: Identifier) -> Result<impl Reply, Error> {
+        let module_id = ModuleId::new(address, name);
+        let access_path = AccessPath::code_access_path(module_id.clone());
+        let state_key = StateKey::AccessPath(access_path);
+        let bytes = self
+            .state_view
+            .get_state_value(&state_key)?
+            .ok_or_else(|| Error::not_found("Module", module_id, self.ledger_version))?;
+
+        let module = MoveModuleBytecode::new(bytes)
+            .try_parse_abi()
+            .map_err(Error::internal)?;
+        Response::new(self.latest_ledger_info, &module)
     }
 }

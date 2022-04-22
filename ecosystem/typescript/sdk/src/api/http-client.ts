@@ -108,7 +108,8 @@ export class HttpClient<SecurityDataType = unknown> {
     const requestParams = this.mergeRequestParams(params, secureParams);
     const responseFormat = (format && this.format) || void 0;
 
-    if (type === ContentType.FormData && body && typeof body === "object") {
+    // @ts-ignore
+    if (type === ContentType.FormData && body && body !== null && typeof body === "object") {
       // @ts-ignore
       requestParams.headers.common = { Accept: "*/*" };
       // @ts-ignore

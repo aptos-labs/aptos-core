@@ -13,15 +13,18 @@ edition = "2018"
 [dependencies]
 Inflector = { version = "0.11.4", features = ["heavyweight", "lazy_static", "regex"] }
 anyhow = { version = "1.0.56", features = ["backtrace", "std"] }
+arrayvec = { version = "0.5.2", features = ["array-sizes-33-128", "std"] }
 backtrace = { version = "0.3.58", features = ["addr2line", "gimli-symbolize", "miniz_oxide", "object", "serde", "std"] }
+block-buffer = { version = "0.9.0", default-features = false, features = ["block-padding"] }
+bstr = { version = "0.2.17", features = ["lazy_static", "regex-automata", "serde", "serde1", "serde1-nostd", "std", "unicode"] }
 byteorder = { version = "1.4.3", features = ["i128", "std"] }
 bytes = { version = "1.1.0", features = ["serde", "std"] }
 chrono = { version = "0.4.19", features = ["clock", "libc", "oldtime", "serde", "std", "time", "winapi"] }
 clap = { version = "2.34.0", features = ["ansi_term", "atty", "color", "strsim", "suggestions", "vec_map"] }
-crossbeam-channel = { version = "0.5.2", features = ["crossbeam-utils", "std"] }
+crossbeam-channel = { version = "0.5.4", features = ["crossbeam-utils", "std"] }
 crossbeam-deque = { version = "0.8.1", features = ["crossbeam-epoch", "crossbeam-utils", "std"] }
-crossbeam-queue = { version = "0.3.4", features = ["alloc", "std"] }
-crossbeam-utils = { version = "0.8.7", features = ["lazy_static", "std"] }
+crossbeam-queue = { version = "0.3.5", features = ["alloc", "std"] }
+crossbeam-utils = { version = "0.8.8", features = ["lazy_static", "std"] }
 diesel = { version = "1.4.8", features = ["32-column-tables", "bigdecimal", "bitflags", "chrono", "num-bigint", "num-integer", "num-traits", "numeric", "postgres", "pq-sys", "r2d2", "serde_json", "with-deprecated"] }
 either = { version = "1.6.1", features = ["use_std"] }
 futures-channel = { version = "0.3.21", features = ["alloc", "futures-sink", "sink", "std"] }
@@ -30,22 +33,22 @@ futures-io = { version = "0.3.21", features = ["std"] }
 futures-sink = { version = "0.3.21", features = ["alloc", "std"] }
 futures-util = { version = "0.3.17", features = ["alloc", "async-await", "async-await-macro", "channel", "futures-channel", "futures-io", "futures-macro", "futures-sink", "io", "memchr", "proc-macro-hack", "proc-macro-nested", "sink", "slab", "std"] }
 generic-array = { version = "0.14.5", default-features = false, features = ["more_lengths"] }
-getrandom = { version = "0.2.5", default-features = false, features = ["std"] }
-hyper = { version = "0.14.17", features = ["client", "full", "h2", "http1", "http2", "runtime", "server", "socket2", "stream", "tcp"] }
+getrandom = { version = "0.2.6", default-features = false, features = ["std"] }
+hyper = { version = "0.14.18", features = ["client", "full", "h2", "http1", "http2", "runtime", "server", "socket2", "stream", "tcp"] }
 include_dir = { version = "0.7.2", features = ["glob"] }
+indexmap = { version = "1.8.1", default-features = false, features = ["std"] }
 itertools = { version = "0.10.3", features = ["use_alloc", "use_std"] }
-libc = { version = "0.2.119", features = ["std"] }
-log = { version = "0.4.14", default-features = false, features = ["serde", "std"] }
+libc = { version = "0.2.123", features = ["std"] }
+log = { version = "0.4.16", default-features = false, features = ["serde", "std"] }
 memchr = { version = "2.4.1", features = ["std", "use_std"] }
 num-integer = { version = "0.1.44", features = ["i128", "std"] }
 num-traits = { version = "0.2.14", features = ["i128", "std"] }
 parking_lot = { version = "0.12.0", features = ["send_guard"] }
 phf_shared = { version = "0.10.0", features = ["std", "uncased"] }
-plotters = { version = "0.3.1", default-features = false, features = ["area_series", "evcxr", "histogram", "line_series", "plotters-svg", "svg_backend"] }
 rand = { version = "0.8.4", features = ["alloc", "getrandom", "libc", "rand_chacha", "rand_hc", "small_rng", "std", "std_rng"] }
 regex = { version = "1.5.5", features = ["aho-corasick", "memchr", "perf", "perf-cache", "perf-dfa", "perf-inline", "perf-literal", "std", "unicode", "unicode-age", "unicode-bool", "unicode-case", "unicode-gencat", "unicode-perl", "unicode-script", "unicode-segment"] }
-regex-automata = { version = "0.1.10", features = ["regex-syntax", "std"] }
-reqwest = { version = "0.11.9", features = ["__tls", "blocking", "cookie_crate", "cookie_store", "cookies", "default-tls", "hyper-tls", "json", "native-tls-crate", "proc-macro-hack", "serde_json", "stream", "tokio-native-tls", "tokio-util"] }
+regex-syntax = { version = "0.6.25", features = ["unicode", "unicode-age", "unicode-bool", "unicode-case", "unicode-gencat", "unicode-perl", "unicode-script", "unicode-segment"] }
+reqwest = { version = "0.11.10", features = ["__tls", "blocking", "cookie_crate", "cookie_store", "cookies", "default-tls", "hyper-tls", "json", "native-tls-crate", "proc-macro-hack", "serde_json", "stream", "tokio-native-tls", "tokio-util"] }
 rusty-fork = { version = "0.3.0", features = ["timeout", "wait-timeout"] }
 serde = { version = "1.0.136", features = ["alloc", "derive", "rc", "serde_derive", "std"] }
 serde_json = { version = "1.0.79", features = ["indexmap", "preserve_order", "std"] }
@@ -54,23 +57,27 @@ standback = { version = "0.2.17", default-features = false, features = ["std"] }
 subtle = { version = "2.4.1", default-features = false, features = ["std"] }
 tokio = { version = "1.17.0", features = ["bytes", "fs", "full", "io-std", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "socket2", "sync", "test-util", "time", "tokio-macros"] }
 tokio-util = { version = "0.6.9", features = ["codec", "compat", "futures-io", "io"] }
-tracing = { version = "0.1.32", features = ["attributes", "log", "std", "tracing-attributes"] }
+tracing = { version = "0.1.34", features = ["attributes", "log", "std", "tracing-attributes"] }
+tracing-core = { version = "0.1.26", features = ["lazy_static", "std"] }
 warp = { version = "0.3.2", features = ["multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
 zeroize = { version = "1.5.4", features = ["alloc", "zeroize_derive"] }
 
 [build-dependencies]
 Inflector = { version = "0.11.4", features = ["heavyweight", "lazy_static", "regex"] }
 anyhow = { version = "1.0.56", features = ["backtrace", "std"] }
+arrayvec = { version = "0.5.2", features = ["array-sizes-33-128", "std"] }
 backtrace = { version = "0.3.58", features = ["addr2line", "gimli-symbolize", "miniz_oxide", "object", "serde", "std"] }
+block-buffer = { version = "0.9.0", default-features = false, features = ["block-padding"] }
+bstr = { version = "0.2.17", features = ["lazy_static", "regex-automata", "serde", "serde1", "serde1-nostd", "std", "unicode"] }
 byteorder = { version = "1.4.3", features = ["i128", "std"] }
 bytes = { version = "1.1.0", features = ["serde", "std"] }
 cc = { version = "1.0.73", default-features = false, features = ["jobserver", "parallel"] }
 chrono = { version = "0.4.19", features = ["clock", "libc", "oldtime", "serde", "std", "time", "winapi"] }
 clap = { version = "2.34.0", features = ["ansi_term", "atty", "color", "strsim", "suggestions", "vec_map"] }
-crossbeam-channel = { version = "0.5.2", features = ["crossbeam-utils", "std"] }
+crossbeam-channel = { version = "0.5.4", features = ["crossbeam-utils", "std"] }
 crossbeam-deque = { version = "0.8.1", features = ["crossbeam-epoch", "crossbeam-utils", "std"] }
-crossbeam-queue = { version = "0.3.4", features = ["alloc", "std"] }
-crossbeam-utils = { version = "0.8.7", features = ["lazy_static", "std"] }
+crossbeam-queue = { version = "0.3.5", features = ["alloc", "std"] }
+crossbeam-utils = { version = "0.8.8", features = ["lazy_static", "std"] }
 diesel = { version = "1.4.8", features = ["32-column-tables", "bigdecimal", "bitflags", "chrono", "num-bigint", "num-integer", "num-traits", "numeric", "postgres", "pq-sys", "r2d2", "serde_json", "with-deprecated"] }
 either = { version = "1.6.1", features = ["use_std"] }
 futures-channel = { version = "0.3.21", features = ["alloc", "futures-sink", "sink", "std"] }
@@ -79,32 +86,33 @@ futures-io = { version = "0.3.21", features = ["std"] }
 futures-sink = { version = "0.3.21", features = ["alloc", "std"] }
 futures-util = { version = "0.3.17", features = ["alloc", "async-await", "async-await-macro", "channel", "futures-channel", "futures-io", "futures-macro", "futures-sink", "io", "memchr", "proc-macro-hack", "proc-macro-nested", "sink", "slab", "std"] }
 generic-array = { version = "0.14.5", default-features = false, features = ["more_lengths"] }
-getrandom = { version = "0.2.5", default-features = false, features = ["std"] }
-hyper = { version = "0.14.17", features = ["client", "full", "h2", "http1", "http2", "runtime", "server", "socket2", "stream", "tcp"] }
+getrandom = { version = "0.2.6", default-features = false, features = ["std"] }
+hyper = { version = "0.14.18", features = ["client", "full", "h2", "http1", "http2", "runtime", "server", "socket2", "stream", "tcp"] }
 include_dir = { version = "0.7.2", features = ["glob"] }
+indexmap = { version = "1.8.1", default-features = false, features = ["std"] }
 itertools = { version = "0.10.3", features = ["use_alloc", "use_std"] }
-libc = { version = "0.2.119", features = ["std"] }
-log = { version = "0.4.14", default-features = false, features = ["serde", "std"] }
+libc = { version = "0.2.123", features = ["std"] }
+log = { version = "0.4.16", default-features = false, features = ["serde", "std"] }
 memchr = { version = "2.4.1", features = ["std", "use_std"] }
 num-integer = { version = "0.1.44", features = ["i128", "std"] }
 num-traits = { version = "0.2.14", features = ["i128", "std"] }
 parking_lot = { version = "0.12.0", features = ["send_guard"] }
 phf_shared = { version = "0.10.0", features = ["std", "uncased"] }
-plotters = { version = "0.3.1", default-features = false, features = ["area_series", "evcxr", "histogram", "line_series", "plotters-svg", "svg_backend"] }
 rand = { version = "0.8.4", features = ["alloc", "getrandom", "libc", "rand_chacha", "rand_hc", "small_rng", "std", "std_rng"] }
 regex = { version = "1.5.5", features = ["aho-corasick", "memchr", "perf", "perf-cache", "perf-dfa", "perf-inline", "perf-literal", "std", "unicode", "unicode-age", "unicode-bool", "unicode-case", "unicode-gencat", "unicode-perl", "unicode-script", "unicode-segment"] }
-regex-automata = { version = "0.1.10", features = ["regex-syntax", "std"] }
-reqwest = { version = "0.11.9", features = ["__tls", "blocking", "cookie_crate", "cookie_store", "cookies", "default-tls", "hyper-tls", "json", "native-tls-crate", "proc-macro-hack", "serde_json", "stream", "tokio-native-tls", "tokio-util"] }
+regex-syntax = { version = "0.6.25", features = ["unicode", "unicode-age", "unicode-bool", "unicode-case", "unicode-gencat", "unicode-perl", "unicode-script", "unicode-segment"] }
+reqwest = { version = "0.11.10", features = ["__tls", "blocking", "cookie_crate", "cookie_store", "cookies", "default-tls", "hyper-tls", "json", "native-tls-crate", "proc-macro-hack", "serde_json", "stream", "tokio-native-tls", "tokio-util"] }
 rusty-fork = { version = "0.3.0", features = ["timeout", "wait-timeout"] }
 serde = { version = "1.0.136", features = ["alloc", "derive", "rc", "serde_derive", "std"] }
 serde_json = { version = "1.0.79", features = ["indexmap", "preserve_order", "std"] }
 sha-1 = { version = "0.9.8", features = ["std"] }
 standback = { version = "0.2.17", default-features = false, features = ["std"] }
 subtle = { version = "2.4.1", default-features = false, features = ["std"] }
-syn = { version = "1.0.86", features = ["clone-impls", "derive", "extra-traits", "fold", "full", "parsing", "printing", "proc-macro", "quote", "visit", "visit-mut"] }
+syn = { version = "1.0.91", features = ["clone-impls", "derive", "extra-traits", "fold", "full", "parsing", "printing", "proc-macro", "quote", "visit", "visit-mut"] }
 tokio = { version = "1.17.0", features = ["bytes", "fs", "full", "io-std", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "socket2", "sync", "test-util", "time", "tokio-macros"] }
 tokio-util = { version = "0.6.9", features = ["codec", "compat", "futures-io", "io"] }
-tracing = { version = "0.1.32", features = ["attributes", "log", "std", "tracing-attributes"] }
+tracing = { version = "0.1.34", features = ["attributes", "log", "std", "tracing-attributes"] }
+tracing-core = { version = "0.1.26", features = ["lazy_static", "std"] }
 warp = { version = "0.3.2", features = ["multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
 zeroize = { version = "1.5.4", features = ["alloc", "zeroize_derive"] }
 

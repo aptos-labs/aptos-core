@@ -65,6 +65,7 @@ paths:
       operationId: get_account
       tags:
         - accounts
+        - state
       parameters:
         - $ref: '#/components/parameters/AccountAddress'
       responses:
@@ -86,6 +87,7 @@ paths:
       operationId: get_account_resources
       tags:
         - accounts
+        - state
       parameters:
         - $ref: '#/components/parameters/AccountAddress'
         - $ref: '#/components/parameters/LedgerVersion'
@@ -110,12 +112,47 @@ paths:
           $ref: '#/components/responses/404'
         "500":
           $ref: '#/components/responses/500'
+  /accounts/{address}/resource/{resource_type}:
+    get:
+      summary: Get resource by account address and resource type.
+      operationId: get_account_resource # TODO: make it query_resource if query path is supported
+      description: |
+        This API renders a resource identified by the owner account
+        `address` and the `resource_type`, at a ledger version (AKA
+        transaction version) specified as a query param, otherwise the
+        latest version is used.
+      tags:
+        - accounts
+        - state
+      parameters:
+        - $ref: '#/components/parameters/AccountAddress'
+        - name: resource_type
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/MoveStructTagId'
+          example: "0x1::AptosAccount::AptosAccount"
+        - $ref: '#/components/parameters/LedgerVersion'
+      responses:
+        "200":
+          description: Returns a resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResource'
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/500'
   /accounts/{address}/modules:
     get:
       summary: Get account modules
       operationId: get_account_modules
       tags:
         - accounts
+        - state
       parameters:
         - $ref: '#/components/parameters/AccountAddress'
         - $ref: '#/components/parameters/LedgerVersion'
@@ -134,6 +171,42 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/MoveModule'
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/500'
+  /accounts/{address}/module/{module_name}:
+    get:
+      summary: Get module by module id.
+      operationId: get_account_module
+      description: |
+        This API renders a Move module identified by the module id. A
+        module id consists of the module owner `address` and the
+        `module_name`. The module is rendered at a ledger version (AKA
+        transaction version) specified as a query param, otherwise the
+        latest version is used.
+      tags:
+        - accounts
+        - state
+      parameters:
+        - $ref: '#/components/parameters/AccountAddress'
+        - name: module_name
+          in: path
+          required: true
+          description: The name of the module.
+          schema:
+            type: string
+          example: "GUID"
+        - $ref: '#/components/parameters/LedgerVersion'
+      responses:
+        "200":
+          description: Returns a move module.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoveModule'
         "400":
           $ref: '#/components/responses/400'
         "404":
@@ -998,6 +1071,7 @@ components:
         - success
         - vm_status
         - accumulator_root_hash
+        - changes
       properties:
         version:
           $ref: '#/components/schemas/Uint64'
@@ -1020,6 +1094,10 @@ components:
             Human readable transaction execution result message from Aptos VM.
         accumulator_root_hash:
           $ref: '#/components/schemas/HexEncodedBytes'
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/WriteSetChange'
     UserTransaction:
       title: User Transaction
       type: object
@@ -1242,12 +1320,15 @@ components:
       type: object
       required:
         - type
+        - state_key_hash
         - address
         - module
       properties:
         type:
           type: string
           example: "delete_module"
+        state_key_hash:
+          $ref: '#/components/schemas/HexEncodedBytes'
         address:
           $ref: '#/components/schemas/Address'
         module:
@@ -1258,12 +1339,15 @@ components:
       description: Delete account resource change.
       required:
         - type
+        - state_key_hash
         - address
         - resource
       properties:
         type:
           type: string
           example: "delete_resource"
+        state_key_hash:
+          $ref: '#/components/schemas/HexEncodedBytes'
         address:
           $ref: '#/components/schemas/Address'
         resource:
@@ -1274,12 +1358,15 @@ components:
       description: Write move module
       required:
         - type
+        - state_key_hash
         - address
         - data
       properties:
         type:
           type: string
           example: "write_module"
+        state_key_hash:
+          $ref: '#/components/schemas/HexEncodedBytes'
         address:
           $ref: '#/components/schemas/Address'
         data:
@@ -1290,12 +1377,15 @@ components:
       description: Write account resource
       required:
         - type
+        - state_key_hash
         - address
         - data
       properties:
         type:
           type: string
           example: "write_resource"
+        state_key_hash:
+          $ref: '#/components/schemas/HexEncodedBytes'
         address:
           $ref: '#/components/schemas/Address'
         data:

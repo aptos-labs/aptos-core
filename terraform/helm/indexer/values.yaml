@@ -1,0 +1,36 @@
+nodeUrl:
+
+indexer:
+  image:
+    repo: aptoslab/indexer
+    tag: devnet
+    pullPolicy: IfNotPresent
+
+nginx:
+  enabled: false
+  upstream:
+    main:
+  image:
+    repo: nginx
+    tag: latest
+    pullPolicy: IfNotPresent
+
+resources:
+  limits:
+    cpu: 2
+    memory: 4Gi
+  requests:
+    cpu: 2
+    memory: 4Gi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name:
+  annotations: {}

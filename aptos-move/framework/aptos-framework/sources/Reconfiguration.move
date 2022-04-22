@@ -5,15 +5,14 @@ module AptosFramework::Reconfiguration {
     use Std::Event;
     use Std::Signer;
     use Std::GUID;
-    use AptosFramework::Timestamp;
     use AptosFramework::SystemAddresses;
+    use AptosFramework::Timestamp;
 
     friend AptosFramework::Account;
     friend AptosFramework::ConsensusConfig;
-    friend AptosFramework::ValidatorSystem;
+    friend AptosFramework::ValidatorSet;
     friend AptosFramework::Version;
     friend AptosFramework::VMConfig;
-    friend AptosFramework::ParallelExecutionConfig;
     friend AptosFramework::TransactionPublishingOption;
 
     /// Event that signals consensus to start a new epoch,

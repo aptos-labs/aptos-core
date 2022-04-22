@@ -242,7 +242,11 @@ async fn test_stream_invalid_response() {
 #[tokio::test]
 async fn test_stream_out_of_order_responses() {
     // Create an epoch ending data stream
-    let streaming_service_config = DataStreamingServiceConfig::default();
+    let max_concurrent_requests = 3;
+    let streaming_service_config = DataStreamingServiceConfig {
+        max_concurrent_requests,
+        ..Default::default()
+    };
     let (mut data_stream, mut stream_listener) =
         create_epoch_ending_stream(streaming_service_config, MIN_ADVERTISED_EPOCH_END);
 
@@ -254,7 +258,10 @@ async fn test_stream_out_of_order_responses() {
 
     // Verify at least three requests have been made
     let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
-    assert_ge!(sent_requests.as_ref().unwrap().len(), 3);
+    assert_ge!(
+        sent_requests.as_ref().unwrap().len(),
+        max_concurrent_requests as usize
+    );
 
     // Set a response for the second request and verify no notifications
     set_epoch_ending_response_in_queue(&mut data_stream, 1);
@@ -309,7 +316,11 @@ async fn test_stream_out_of_order_responses() {
 #[tokio::test]
 async fn test_stream_listener_dropped() {
     // Create an epoch ending data stream
-    let streaming_service_config = DataStreamingServiceConfig::default();
+    let max_concurrent_requests = 3;
+    let streaming_service_config = DataStreamingServiceConfig {
+        max_concurrent_requests,
+        ..Default::default()
+    };
     let (mut data_stream, mut stream_listener) =
         create_epoch_ending_stream(streaming_service_config, MIN_ADVERTISED_EPOCH_END);
 
@@ -321,7 +332,10 @@ async fn test_stream_listener_dropped() {
 
     // Verify no notifications have been sent yet
     let (sent_requests, sent_notifications) = data_stream.get_sent_requests_and_notifications();
-    assert_ge!(sent_requests.as_ref().unwrap().len(), 3);
+    assert_ge!(
+        sent_requests.as_ref().unwrap().len(),
+        max_concurrent_requests as usize
+    );
     assert_eq!(sent_notifications.len(), 0);
 
     // Set a response for the first request and verify a notification is sent
