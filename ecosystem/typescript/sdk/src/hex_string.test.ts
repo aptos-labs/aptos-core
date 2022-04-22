@@ -41,3 +41,8 @@ test("ensures input when HexString", () => {
   const hs = HexString.ensure(hs1);
   validate(hs);
 });
+
+test("short address form correct", () => {
+  const hs1 = new HexString(withoutPrefix);
+  expect(hs1.toShortString()).toBe(`0x7711b4d0`);
+});

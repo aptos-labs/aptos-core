@@ -191,11 +191,13 @@ export class AptosClient {
     address: MaybeHexString,
     eventHandleStruct: Types.MoveStructTagId,
     fieldName: string,
+    query?: { start?: number; limit?: number },
   ): Promise<Types.Event[]> {
     const response = await this.accounts.getEventsByEventHandle(
       HexString.ensure(address).hex(),
       eventHandleStruct,
       fieldName,
+      query,
     );
     raiseForStatus(200, response, { address, eventHandleStruct, fieldName });
     return response.data;

@@ -442,6 +442,8 @@ paths:
           schema:
             type: string
           example: "sent_events"
+        - $ref: '#/components/parameters/EventStart'
+        - $ref: '#/components/parameters/EventLimit'
       responses:
         "200":
           description: |
@@ -485,6 +487,23 @@ components:
       in: query
       required: false
       description: The max number of transactions should be returned for the page. Default is 25.
+      example: 25
+      schema:
+        type: integer
+    EventStart:
+      name: start
+      in: query
+      required: false
+      description: |
+        The start sequence number in the EVENT STREAM, defaulting to the latest event.
+        The events are returned in the reverse order of sequence numbers.
+      schema:
+        type: integer
+    EventLimit:
+      name: limit
+      in: query
+      required: false
+      description: The number of events to be returned for the page default is 5
       example: 25
       schema:
         type: integer
