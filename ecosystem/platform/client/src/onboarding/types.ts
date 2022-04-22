@@ -4,7 +4,6 @@ export type AptosAddress = string;
 
 export type TosAcceptance = {
   date: number;
-  ip: string;
 };
 
 export type SocialAccount = {
@@ -28,7 +27,6 @@ export function isValidIdentity(
     identity.socialAccounts != null &&
     identity.socialAccounts.length > 0 &&
     identity.tosAcceptance?.date != null &&
-    identity.tosAcceptance?.ip != null &&
     identity.aptosAddress != null
   );
 }
