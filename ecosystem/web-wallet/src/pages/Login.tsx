@@ -1,22 +1,22 @@
-import React, {useState} from "react";
-import { AptosAccount } from "aptos";
+import React, { useState } from 'react'
+import { AptosAccount } from 'aptos'
 import { Buffer } from 'buffer'
-import { useNavigate } from "react-router-dom";
-import { useGlobalState } from "../GlobalState";
+import { useNavigate } from 'react-router-dom'
+import { useGlobalState } from '../GlobalState'
 
-import './App.css';
+import './App.css'
 
-export default function Login() {
-  const [key, setKey] = useState('');
-  const [, dispatch] = useGlobalState();
-  const navigate = useNavigate();
+export default function Login () {
+  const [key, setKey] = useState('')
+  const [, dispatch] = useGlobalState()
+  const navigate = useNavigate()
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    let encodedKey = Uint8Array.from(Buffer.from(key, 'hex'))
-    const account = new AptosAccount(encodedKey, undefined);
-    dispatch({account: account});
-    navigate('/wallet');
+  function handleSubmit (event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const encodedKey = Uint8Array.from(Buffer.from(key, 'hex'))
+    const account = new AptosAccount(encodedKey, undefined)
+    dispatch({ account })
+    navigate('/wallet')
   }
 
   return (
@@ -26,5 +26,5 @@ export default function Login() {
         <input onChange={(e) => setKey(e.target.value)}/>
       </form>
     </div>
-  );
+  )
 }

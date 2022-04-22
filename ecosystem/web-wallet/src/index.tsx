@@ -1,9 +1,9 @@
-import React from 'react';
-import ReactDOM from 'react-dom';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Wallet from './pages/Wallet';
-import Login from './pages/Login';
-import { GlobalStateProvider } from "./GlobalState";
+import React from 'react'
+import ReactDOM from 'react-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import Wallet from './pages/Wallet'
+import Login from './pages/Login'
+import { GlobalStateProvider } from './GlobalState'
 
 ReactDOM.render(
   <GlobalStateProvider>
@@ -15,4 +15,4 @@ ReactDOM.render(
     </BrowserRouter>
   </GlobalStateProvider>,
   document.getElementById('root')
-);
+)

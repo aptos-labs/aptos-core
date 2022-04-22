@@ -7,6 +7,9 @@ module.exports = {
     'plugin:react/recommended',
     'standard'
   ],
+  ignorePatterns: [
+    '*.css',
+  ],
   parser: '@typescript-eslint/parser',
   parserOptions: {
     ecmaFeatures: {
