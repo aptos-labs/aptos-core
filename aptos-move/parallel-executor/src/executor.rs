@@ -111,10 +111,16 @@ where
     T: Transaction,
     E: ExecutorTask<T = T>,
 {
-    pub fn new() -> Self {
+    /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
+    /// be handled by sequential execution) and that concurrency_level <= num_cpus.
+    pub fn new(concurrency_level: usize) -> Self {
+        assert!(
+            concurrency_level > 1 && concurrency_level <= num_cpus::get(),
+            "Parallel execution concurrency level {} should be between 2 and number of CPUs",
+            concurrency_level
+        );
         Self {
-            // TODO: must be a configurable parameter.
-            concurrency_level: num_cpus::get(),
+            concurrency_level,
             phantom: PhantomData,
         }
     }
@@ -306,7 +312,7 @@ where
             }
         });
 
-        // Extract outputs in parallel
+        // Extract outputs in parallel.
         let valid_results_size = scheduler.num_txn_to_execute();
         let chunk_size =
             (valid_results_size + 4 * self.concurrency_level - 1) / (4 * self.concurrency_level);

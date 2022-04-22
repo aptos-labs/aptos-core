@@ -521,6 +521,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     } else {
         info!("Genesis txn not provided, it's fine if you don't expect to apply it otherwise please double check config");
     }
+    AptosVM::set_concurrency_level_once(node_config.execution.concurrency_level as usize);
 
     debug!(
         "Storage service started in {} ms",

@@ -11,7 +11,7 @@ use crate::{
         charge_global_write_gas_usage, get_transaction_output, AptosVMImpl, AptosVMInternals,
     },
     counters::*,
-    data_cache::{RemoteStorage, StateViewCache},
+    data_cache::StateViewCache,
     errors::expect_only_successful_execution,
     logging::AdapterLogSchema,
     move_vm_ext::{SessionExt, SessionId},
@@ -27,9 +27,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
     block_metadata::BlockMetadata,
-    on_chain_config::{
-        OnChainConfig, ParallelExecutionConfig, VMConfig, VMPublishingOption, Version,
-    },
+    on_chain_config::{VMConfig, VMPublishingOption, Version},
     transaction::{
         ChangeSet, ModuleBundle, SignatureCheckedTransaction, SignedTransaction, Transaction,
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
@@ -50,11 +48,15 @@ use move_core_types::{
 };
 use move_vm_runtime::session::LoadedFunctionInstantiation;
 use move_vm_types::{gas_schedule::GasStatus, loaded_data::runtime_types::Type};
+use num_cpus;
+use once_cell::sync::OnceCell;
 use std::{
     collections::HashSet,
     convert::{AsMut, AsRef},
     sync::Arc,
 };
+
+static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 
 #[derive(Clone)]
 pub struct AptosVM(pub(crate) AptosVMImpl);
@@ -83,6 +85,26 @@ impl AptosVM {
             on_chain_config,
             publishing_option,
         ))
+    }
+
+    /// Sets execution concurrency level when invoked the first time.
+    pub fn set_concurrency_level_once(concurrency_level: usize) {
+        assert!(
+            concurrency_level > 0 && concurrency_level <= num_cpus::get(),
+            "Execution concurrency level {} should be between 1 and number of CPUs",
+            concurrency_level
+        );
+        // Only the first call succeeds, due to OnceCell semantics.
+        EXECUTION_CONCURRENCY_LEVEL.set(concurrency_level).ok();
+    }
+
+    /// Get the concurrency level if already set, otherwise return default 1
+    /// (sequential execution).
+    pub fn get_concurrency_level() -> usize {
+        match EXECUTION_CONCURRENCY_LEVEL.get() {
+            Some(concurrency_level) => *concurrency_level,
+            None => 1,
+        }
     }
 
     pub fn internals(&self) -> AptosVMInternals {
@@ -769,16 +791,13 @@ impl VMExecutor for AptosVM {
             ))
         });
 
-        // Execute transactions in parallel if on chain config is set and loaded.
-        if let Some(_read_write_set_analysis) =
-            ParallelExecutionConfig::fetch_config(&RemoteStorage::new(state_view))
-                .and_then(|config| config.read_write_analysis_result)
-                .map(|config| config.into_inner())
-        {
-            // Note that writeset transactions will be executed sequentially as it won't be inferred
-            // by the read write set analysis and thus fall into the sequential path.
-            let (result, _) =
-                crate::parallel_executor::ParallelAptosVM::execute_block(transactions, state_view)?;
+        let concurrency_level = Self::get_concurrency_level();
+        if concurrency_level > 1 {
+            let (result, _) = crate::parallel_executor::ParallelAptosVM::execute_block(
+                transactions,
+                state_view,
+                concurrency_level,
+            )?;
             Ok(result)
         } else {
             let output = Self::execute_block_and_keep_vm_status(transactions, state_view)?;

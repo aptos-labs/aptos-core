@@ -19,6 +19,7 @@ proptest = "1.0.0"
 proptest-derive = "0.3.0"
 rand = "0.8.3"
 serde = { version = "1.0.124", default-features = false }
+num_cpus = "1.13.0"
 
 ## Move dependencies
 move-binary-format = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }

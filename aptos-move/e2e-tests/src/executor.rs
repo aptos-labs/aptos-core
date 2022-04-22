@@ -45,6 +45,7 @@ use move_core_types::{
     move_resource::MoveResource,
 };
 use move_vm_types::gas_schedule::GasStatus;
+use num_cpus;
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
 
@@ -351,7 +352,8 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let (result, _) = ParallelAptosVM::execute_block(txn_block, &self.data_store)?;
+        let (result, _) =
+            ParallelAptosVM::execute_block(txn_block, &self.data_store, num_cpus::get())?;
 
         Ok(result)
     }
