@@ -442,7 +442,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         type_tag: &TypeTag,
         val: Value,
     ) -> Result<move_core_types::value::MoveValue> {
-        let layout = self.inner.get_type_layout_with_fields(type_tag)?;
+        let layout = self.inner.get_type_layout_with_types(type_tag)?;
 
         self.try_into_vm_value_from_layout(&layout, val)
     }
@@ -496,14 +496,21 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         layout: &MoveStructLayout,
         val: Value,
     ) -> Result<move_core_types::value::MoveValue> {
-        let field_layouts = if let MoveStructLayout::WithFields(fields) = layout {
-            fields
-        } else {
-            bail!(
-                "Expecting `MoveStructLayout::WithFields, getting {:?}",
-                layout
-            );
-        };
+        let (struct_tag, field_layouts) =
+            if let MoveStructLayout::WithTypes { type_, fields } = layout {
+                (type_, fields)
+            } else {
+                bail!(
+                    "Expecting `MoveStructLayout::WithTypes`, getting {:?}",
+                    layout
+                );
+            };
+        if MoveValue::is_ascii_string(struct_tag) {
+            let string = val
+                .as_str()
+                .ok_or_else(|| format_err!("failed to parse ASCII::String."))?;
+            return Ok(new_vm_ascii_string(string));
+        }
 
         let mut field_values = if let Value::Object(fields) = val {
             fields
@@ -595,4 +602,18 @@ impl<R: MoveResolver> AsConverter<R> for R {
     fn as_converter(&self) -> MoveConverter<R> {
         MoveConverter::new(self)
     }
+}
+
+pub fn new_vm_ascii_string(string: &str) -> move_core_types::value::MoveValue {
+    use move_core_types::value::{MoveStruct, MoveValue};
+
+    let byte_vector = MoveValue::Vector(
+        string
+            .as_bytes()
+            .iter()
+            .map(|byte| MoveValue::U8(*byte))
+            .collect(),
+    );
+    let move_string = MoveStruct::Runtime(vec![byte_vector]);
+    MoveValue::Struct(move_string)
 }

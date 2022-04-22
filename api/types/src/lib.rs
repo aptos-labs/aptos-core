@@ -17,7 +17,7 @@ mod transaction;
 pub use account::AccountData;
 pub use address::Address;
 pub use bytecode::Bytecode;
-pub use convert::{AsConverter, MoveConverter};
+pub use convert::{new_vm_ascii_string, AsConverter, MoveConverter};
 pub use error::Error;
 pub use event_key::EventKey;
 pub use hash::HashValue;
