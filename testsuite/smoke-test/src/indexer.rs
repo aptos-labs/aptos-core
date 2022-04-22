@@ -100,7 +100,7 @@ impl AptosTest for Indexer {
             assert!(ut0.is_none());
             assert!(bmt0.is_none());
             assert_eq!(events0.len(), 1);
-            assert_eq!(wsc0.len(), 58);
+            assert_eq!(wsc0.len(), 54);
 
             // This is a block metadata transaction
             let (tx1, ut1, bmt1, events1, wsc1) =

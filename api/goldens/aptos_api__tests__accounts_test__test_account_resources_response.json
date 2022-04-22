@@ -8,6 +8,7 @@
   {
     "type": "0x1::Block::BlockMetadata",
     "data": {
+      "epoch_internal": "86400000000",
       "height": "0",
       "new_block_events": {
         "counter": "0",
@@ -21,6 +22,27 @@
           "len_bytes": 40
         }
       }
+    }
+  },
+  {
+    "type": "0x1::Stake::ValidatorSet",
+    "data": {
+      "active_validators": [
+        {
+          "addr": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
+          "config": {
+            "consensus_pubkey": "0xcc62332e34bb2d5cd69f60efbb2a36cb916c7eb458301ea36636c4dbb012bd88",
+            "fullnode_address": "0x012d040000000000050c1c07203432fbf5b666fa771269cc7eb227146d3b16858f177a317ae8c349db210feb780800",
+            "network_address": "0x012d0400000000000524180720d5db8911156f3441c0757d97b8580cb639853454ec1a560f4927cf4acdfbd1080800"
+          },
+          "voting_power": "1"
+        }
+      ],
+      "consensus_scheme": 0,
+      "maximum_stake": "1000000",
+      "minimum_stake": "0",
+      "pending_active": [],
+      "pending_inactive": []
     }
   },
   {
@@ -61,7 +83,7 @@
     "type": "0x1::TestCoin::Balance",
     "data": {
       "coin": {
-        "value": "18446744073709551615"
+        "value": "18446744073709551614"
       }
     }
   },
@@ -145,24 +167,6 @@
     "type": "0x1::Timestamp::CurrentTimeMicroseconds",
     "data": {
       "microseconds": "0"
-    }
-  },
-  {
-    "type": "0x1::ValidatorSet::ValidatorSet",
-    "data": {
-      "scheme": 0,
-      "validators": [
-        {
-          "addr": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
-          "config": {
-            "consensus_pubkey": "0xcc62332e34bb2d5cd69f60efbb2a36cb916c7eb458301ea36636c4dbb012bd88",
-            "fullnode_network_addresses": "0x012d040000000000050c1c07203432fbf5b666fa771269cc7eb227146d3b16858f177a317ae8c349db210feb780800",
-            "validator_network_addresses": "0x012d0400000000000524180720d5db8911156f3441c0757d97b8580cb639853454ec1a560f4927cf4acdfbd1080800"
-          },
-          "consensus_voting_power": "1",
-          "last_config_update_time": "0"
-        }
-      ]
     }
   },
   {

@@ -2,12 +2,12 @@
   "type": "user_transaction",
   "version": "2",
   "hash": "0x2bf7670f9cea191af66917f1a2d3592fe82c9d004b66ab62ac8162e6d45af145",
-  "state_root_hash": "0x613919682e21fac2dfeb169c98f88a8e265b2cc107c529e55c5cc393e73413e1",
+  "state_root_hash": "0x9bcdf1518ffbac5de7d4f703c266fb87f80d1e4795f6fcf8bbad5aac9234a825",
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "1",
   "success": false,
   "vm_status": "Move bytecode deserialization / verification failed, including script function not found or invalid arguments",
-  "accumulator_root_hash": "0x49e4e43e78aeb3a52f1c524fea2c131968baa63e1b7379518743a13121f8fbc3",
+  "accumulator_root_hash": "0xb82293ca315faa6bf86c6ab5ccc9992c0403e32025443f6dd1346705df2fe373",
   "changes": [
     {
       "type": "write_resource",
@@ -30,7 +30,7 @@
         "type": "0x1::TestCoin::Balance",
         "data": {
           "coin": {
-            "value": "18446744073709551615"
+            "value": "18446744073709551614"
           }
         }
       }

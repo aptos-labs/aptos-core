@@ -43,8 +43,7 @@ pub async fn decode_validator_set(
         let config = DecodedValidatorConfig::from_validator_config(info.config())
             .map_err(|e| Error::NetworkAddressDecodeError(e.to_string()))?;
 
-        let config_resource = client.validator_config(*info.account_address()).await?;
-        let name = DecodedValidatorConfig::human_name(&config_resource.human_name);
+        let name = String::from("");
 
         let info = DecryptedValidatorInfo {
             name,
@@ -87,8 +86,7 @@ async fn validator_set_addresses<F: Fn(ValidatorInfo) -> Result<Vec<NetworkAddre
     let set = client.validator_set(account_address).await?;
     let mut decoded_set = Vec::new();
     for info in set {
-        let config_resource = client.validator_config(*info.account_address()).await?;
-        let name = DecodedValidatorConfig::human_name(&config_resource.human_name);
+        let name = String::new();
         let peer_id = *info.account_address();
         let addrs = address_accessor(info)?;
         decoded_set.push((name, peer_id, addrs));

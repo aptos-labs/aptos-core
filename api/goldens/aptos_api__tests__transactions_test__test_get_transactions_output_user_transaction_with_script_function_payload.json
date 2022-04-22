@@ -3,12 +3,12 @@
     "type": "block_metadata_transaction",
     "version": "1",
     "hash": "0xa8fc186c28fc0f95b8233651438093e8e215a51dcd16475f5e68c0a421f6305c",
-    "state_root_hash": "0xf835a02cb0000e4aff512ff859ad55cb912f2392198b4568ad7349fd8eff8105",
+    "state_root_hash": "0x95a4d2e4199528aac65e48bf24d7d68f128a8d6584017ea8720ff407fa179681",
     "event_root_hash": "0xd62c85b93234824cf825e9c028c3bcc59b06926039721bd7edd76b56ae9fcecf",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x98f45b65a2803ef4b16c97adcc3c9485b95de05be62435421b051823ce88f4b7",
+    "accumulator_root_hash": "0xa39c6cd0ae24f510f682299da92def98d4e8ef758f4c27b415805864c14bc9b6",
     "changes": [
       {
         "type": "write_resource",
@@ -17,6 +17,7 @@
         "data": {
           "type": "0x1::Block::BlockMetadata",
           "data": {
+            "epoch_internal": "86400000000",
             "height": "1",
             "new_block_events": {
               "counter": "1",
@@ -55,12 +56,12 @@
     "type": "user_transaction",
     "version": "2",
     "hash": "0x2eefdb1220b8b58b7a70f789c604ea5b95b48a60da2bd2606a0f966c85c703ad",
-    "state_root_hash": "0xece2fe110f4337d052467eb72f5ba19c74678813dc2b155bdc3cf63af90a87c5",
+    "state_root_hash": "0x91e2eee78bb77f42d99d26d17f4bd3e3499fdd18056133ffb8c3ce84e67c6ba7",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
     "gas_used": "92",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xa18468709765e5ad75940aeaed145e8af265b8f31148e5d3b860deb8e50b1c3e",
+    "accumulator_root_hash": "0x22ea81c046b56491a3fd6bd8636483d36e04395a83c262d6389ea98c3cfe859c",
     "changes": [
       {
         "type": "write_resource",
@@ -83,7 +84,7 @@
           "type": "0x1::TestCoin::Balance",
           "data": {
             "coin": {
-              "value": "18446744073709551615"
+              "value": "18446744073709551614"
             }
           }
         }

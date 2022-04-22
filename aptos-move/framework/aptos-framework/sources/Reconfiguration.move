@@ -12,7 +12,6 @@ module AptosFramework::Reconfiguration {
     friend AptosFramework::Block;
     // TODO: migrate all to callback in block prologue
     friend AptosFramework::ConsensusConfig;
-    friend AptosFramework::ValidatorSet;
     friend AptosFramework::Version;
     friend AptosFramework::VMConfig;
     friend AptosFramework::TransactionPublishingOption;

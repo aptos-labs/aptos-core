@@ -5,7 +5,6 @@ module AptosFramework::Genesis {
     use AptosFramework::Account;
     use AptosFramework::ConsensusConfig;
     use AptosFramework::TransactionPublishingOption;
-    use AptosFramework::ValidatorSet;
     use AptosFramework::Version;
     use AptosFramework::Block;
     use AptosFramework::ChainId;
@@ -83,7 +82,6 @@ module AptosFramework::Genesis {
 
         // Consensus config setup
         ConsensusConfig::initialize(core_resource_account);
-        ValidatorSet::initialize_validator_set(core_resource_account);
         Version::initialize(core_resource_account, initial_version);
         Stake::initialize_validator_set(core_resource_account, minimum_stake, maximum_stake);
 

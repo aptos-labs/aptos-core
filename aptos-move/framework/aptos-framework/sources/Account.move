@@ -5,13 +5,10 @@ module AptosFramework::Account {
     use Std::Signer;
     use Std::Vector;
     use AptosFramework::ChainId;
-    use AptosFramework::SystemAddresses;
     use AptosFramework::TestCoin;
     use AptosFramework::Timestamp;
     use AptosFramework::TransactionFee;
     use AptosFramework::TransactionPublishingOption;
-    use AptosFramework::ValidatorConfig;
-    use AptosFramework::ValidatorOperatorConfig;
 
     friend AptosFramework::Genesis;
 
@@ -327,44 +324,6 @@ module AptosFramework::Account {
     public(script) fun create_account(auth_key: address) {
         let (signer, _) = create_account_internal(auth_key);
         TestCoin::register(&signer);
-    }
-
-    /// Create a Validator account
-    public(script) fun create_validator_account(
-        core_resource: signer,
-        new_account_address: address,
-        human_name: vector<u8>,
-    ) {
-        create_validator_account_internal(&core_resource, new_account_address, human_name);
-    }
-
-    public fun create_validator_account_internal(
-        core_resource: &signer,
-        new_account_address: address,
-        human_name: vector<u8>,
-    ) {
-        SystemAddresses::assert_core_resource(core_resource);
-        let (new_account, _) = create_account_internal(new_account_address);
-        ValidatorConfig::publish( &new_account, human_name);
-    }
-
-    /// Create a Validator Operator account
-    public(script) fun create_validator_operator_account(
-        core_resource: signer,
-        new_account_address: address,
-        human_name: vector<u8>,
-    ) {
-        create_validator_operator_account_internal(&core_resource, new_account_address, human_name)
-    }
-
-    public fun create_validator_operator_account_internal(
-        core_resource: &signer,
-        new_account_address: address,
-        human_name: vector<u8>,
-    ) {
-        SystemAddresses::assert_core_resource(core_resource);
-        let (new_account, _) = create_account_internal(new_account_address);
-        ValidatorOperatorConfig::publish(&new_account, human_name);
     }
 
     /// Create the account for @AptosFramework to help module upgrades on testnet.

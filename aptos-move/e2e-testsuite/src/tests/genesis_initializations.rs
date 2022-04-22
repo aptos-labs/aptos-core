@@ -51,18 +51,20 @@ fn test_block_double_init() {
         "Block",
         "initialize_block_metadata",
         vec![],
-        serialize_values(&vec![MoveValue::Signer(
-            account_config::aptos_root_address(),
-        )]),
+        serialize_values(&vec![
+            MoveValue::Signer(account_config::aptos_root_address()),
+            MoveValue::U64(0),
+        ]),
     );
 
     let output = executor.try_exec(
         "Block",
         "initialize_block_metadata",
         vec![],
-        serialize_values(&vec![MoveValue::Signer(
-            account_config::aptos_root_address(),
-        )]),
+        serialize_values(&vec![
+            MoveValue::Signer(account_config::aptos_root_address()),
+            MoveValue::U64(0),
+        ]),
     );
 
     assert_eq!(output.unwrap_err().move_abort_code(), Some(6));

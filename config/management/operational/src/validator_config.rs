@@ -291,15 +291,10 @@ pub struct DecodedValidatorConfig {
 
 impl DecodedValidatorConfig {
     pub fn from_validator_config_resource(
-        config_resource: &aptos_types::validator_config::ValidatorConfigResource,
+        config_resource: &aptos_types::validator_config::ValidatorConfig,
     ) -> Result<Self, Error> {
-        let config = config_resource
-            .validator_config
-            .as_ref()
-            .ok_or_else(|| Error::RestReadError("validator-config", "not present".to_string()))?;
-
-        let mut value = Self::from_validator_config(config)?;
-        value.name = Self::human_name(&config_resource.human_name);
+        let mut value = Self::from_validator_config(config_resource)?;
+        value.name = String::new();
         Ok(value)
     }
 

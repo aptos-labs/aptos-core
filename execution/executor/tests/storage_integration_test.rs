@@ -101,8 +101,6 @@ fn test_reconfiguration() {
             .get_validator_config_resource()
             .unwrap()
             .unwrap()
-            .validator_config
-            .unwrap()
             .consensus_public_key
     );
 

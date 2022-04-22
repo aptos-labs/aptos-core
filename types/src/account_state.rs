@@ -18,7 +18,7 @@ use crate::{
     },
     state_store::state_value::StateValue,
     timestamp::TimestampResource,
-    validator_config::{ValidatorConfigResource, ValidatorOperatorConfigResource},
+    validator_config::{ValidatorConfig, ValidatorOperatorConfigResource},
 };
 use anyhow::{format_err, Error, Result};
 use move_core_types::{
@@ -102,8 +102,8 @@ impl AccountState {
         self.get_resource::<TimestampResource>()
     }
 
-    pub fn get_validator_config_resource(&self) -> Result<Option<ValidatorConfigResource>> {
-        self.get_resource::<ValidatorConfigResource>()
+    pub fn get_validator_config_resource(&self) -> Result<Option<ValidatorConfig>> {
+        self.get_resource::<ValidatorConfig>()
     }
 
     pub fn get_validator_operator_config_resource(
