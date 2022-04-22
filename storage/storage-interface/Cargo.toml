@@ -22,7 +22,7 @@ aptos-state-view = { path = "../state-view" }
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 scratchpad = { path = "../scratchpad" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "6a80792ecbf16d74bf1d57e48a576377f0879646", features=["address32"] }
+move-core-types = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6", features=["address32"] }
 
 [features]
 default = []
