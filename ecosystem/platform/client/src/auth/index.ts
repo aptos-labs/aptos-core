@@ -1,1 +1,0 @@
-export {GitHubLoginButton} from "./GitHubLoginButton";
