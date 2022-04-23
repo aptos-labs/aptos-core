@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_config::{AccountResource, BalanceResource, DiemAccountResource},
+    account_config::{AccountResource, AptosAccountResource, BalanceResource},
     account_state::AccountState,
     state_store::state_value::StateValue,
 };
@@ -110,13 +110,13 @@ impl TryFrom<StateValue> for AccountStateBlob {
     }
 }
 
-impl TryFrom<(&AccountResource, &DiemAccountResource, &BalanceResource)> for AccountStateBlob {
+impl TryFrom<(&AccountResource, &AptosAccountResource, &BalanceResource)> for AccountStateBlob {
     type Error = Error;
 
     fn try_from(
         (account_resource, diem_account_resource, balance_resource): (
             &AccountResource,
-            &DiemAccountResource,
+            &AptosAccountResource,
             &BalanceResource,
         ),
     ) -> Result<Self> {
@@ -128,13 +128,13 @@ impl TryFrom<(&AccountResource, &DiemAccountResource, &BalanceResource)> for Acc
     }
 }
 
-impl TryFrom<&AccountStateBlob> for DiemAccountResource {
+impl TryFrom<&AccountStateBlob> for AptosAccountResource {
     type Error = Error;
 
     fn try_from(account_state_blob: &AccountStateBlob) -> Result<Self> {
         AccountState::try_from(account_state_blob)?
             .get_diem_account_resource()?
-            .ok_or_else(|| anyhow!("DiemAccountResource not found."))
+            .ok_or_else(|| anyhow!("AptosAccountResource not found."))
     }
 }
 
@@ -158,7 +158,7 @@ impl CryptoHash for AccountStateBlob {
 
 #[cfg(any(test, feature = "fuzzing"))]
 prop_compose! {
-    fn account_state_blob_strategy()(account_resource in any::<AccountResource>(), diem_account_resource in any::<DiemAccountResource>(), balance_resource in any::<BalanceResource>()) -> AccountStateBlob {
+    fn account_state_blob_strategy()(account_resource in any::<AccountResource>(), diem_account_resource in any::<AptosAccountResource>(), balance_resource in any::<BalanceResource>()) -> AccountStateBlob {
         AccountStateBlob::try_from((&account_resource, &diem_account_resource, &balance_resource)).unwrap()
     }
 }

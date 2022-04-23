@@ -5,9 +5,7 @@ use crate::{
     access_path::Path,
     account_address::AccountAddress,
     account_config::{
-        AccountResource, BalanceResource, CRSNResource,
-        ChainIdResource,
-        DiemAccountResource,
+        AccountResource, AptosAccountResource, BalanceResource, CRSNResource, ChainIdResource,
     },
     account_state_blob::AccountStateBlob,
     block_metadata::BlockResource,
@@ -20,9 +18,7 @@ use crate::{
     validator_config::{ValidatorConfig, ValidatorOperatorConfigResource},
 };
 use anyhow::{format_err, Error, Result};
-use move_core_types::{
-    language_storage::StructTag, move_resource::MoveResource,
-};
+use move_core_types::{language_storage::StructTag, move_resource::MoveResource};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::btree_map::BTreeMap, convert::TryFrom, fmt};
 
@@ -36,17 +32,17 @@ impl AccountState {
             .map(|opt_ar| opt_ar.map(|ar| ar.address()))
     }
 
-    pub fn get_diem_account_resource(&self) -> Result<Option<DiemAccountResource>> {
-        self.get_resource::<DiemAccountResource>()
+    pub fn get_diem_account_resource(&self) -> Result<Option<AptosAccountResource>> {
+        self.get_resource::<AptosAccountResource>()
     }
 
     // Return the `AccountResource` for this blob. If the blob doesn't have an `AccountResource`
-    // then it must have a `DiemAccountResource` in which case we convert that to an
+    // then it must have a `AptosAccountResource` in which case we convert that to an
     // `AccountResource`.
     pub fn get_account_resource(&self) -> Result<Option<AccountResource>> {
         match self.get_resource::<AccountResource>()? {
             x @ Some(_) => Ok(x),
-            None => match self.get_resource::<DiemAccountResource>()? {
+            None => match self.get_resource::<AptosAccountResource>()? {
                 Some(diem_ar) => Ok(Some(AccountResource::new(
                     diem_ar.sequence_number(),
                     diem_ar.authentication_key().to_vec(),
@@ -263,13 +259,13 @@ impl TryFrom<&Vec<u8>> for AccountState {
     }
 }
 
-impl TryFrom<(&AccountResource, &DiemAccountResource, &BalanceResource)> for AccountState {
+impl TryFrom<(&AccountResource, &AptosAccountResource, &BalanceResource)> for AccountState {
     type Error = Error;
 
     fn try_from(
         (account_resource, diem_account_resource, balance_resource): (
             &AccountResource,
-            &DiemAccountResource,
+            &AptosAccountResource,
             &BalanceResource,
         ),
     ) -> Result<Self> {
@@ -279,7 +275,7 @@ impl TryFrom<(&AccountResource, &DiemAccountResource, &BalanceResource)> for Acc
             bcs::to_bytes(account_resource)?,
         );
         btree_map.insert(
-            DiemAccountResource::resource_path(),
+            AptosAccountResource::resource_path(),
             bcs::to_bytes(diem_account_resource)?,
         );
         btree_map.insert(
