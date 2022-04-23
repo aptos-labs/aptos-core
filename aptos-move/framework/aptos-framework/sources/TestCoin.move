@@ -102,8 +102,8 @@ module AptosFramework::TestCoin {
     }
 
     /// Claim the delegated mint capability and destroy the delegated token.
-    public(script) fun claim_mint_capability(account: signer) acquires Delegations {
-        claim_mint_capability_internal(&account);
+    public(script) fun claim_mint_capability(account: &signer) acquires Delegations {
+        claim_mint_capability_internal(account);
     }
 
     public fun claim_mint_capability_internal(account: &signer) acquires Delegations {
@@ -134,12 +134,12 @@ module AptosFramework::TestCoin {
 
     /// Mint coins with capability.
     public(script) fun mint(
-        account: signer,
+        account: &signer,
         mint_addr: address,
         amount: u64
     ) acquires Balance, MintCapability, CoinInfo
     {
-        mint_internal(&account, mint_addr, amount);
+        mint_internal(account, mint_addr, amount);
     }
 
     public fun mint_internal(account: &signer, mint_addr: address, amount: u64) acquires Balance, MintCapability, CoinInfo {
@@ -162,8 +162,8 @@ module AptosFramework::TestCoin {
         borrow_global<Balance>(owner).coin.value
     }
 
-    public(script) fun transfer(from: signer, to: address, amount: u64) acquires Balance, TransferEvents {
-        transfer_internal(&from, to, amount);
+    public(script) fun transfer(from: &signer, to: address, amount: u64) acquires Balance, TransferEvents {
+        transfer_internal(from, to, amount);
     }
 
     /// Transfers `amount` of tokens from `from` to `to`.
@@ -259,7 +259,7 @@ module AptosFramework::TestCoin {
     ) acquires Balance, MintCapability, CoinInfo {
         initialize(&account, 1000000);
         let addr = Signer::address_of(&account);
-        mint(account, @CoreResources, 42);
+        mint(&account, @CoreResources, 42);
         assert!(balance_of(addr) == 42, 0);
         assert!(total_supply() == 42, 0);
     }
@@ -342,7 +342,7 @@ module AptosFramework::TestCoin {
         let addr1 = Signer::address_of(&receiver);
         mint_internal(&account, addr, amount);
 
-        transfer(account, addr1, 400);
+        transfer(&account, addr1, 400);
         assert!(balance_of(addr) == 600, 0);
         assert!(balance_of(addr1) == 400, 0);
         assert!(total_supply() == 1000, 0);
@@ -369,7 +369,7 @@ module AptosFramework::TestCoin {
         initialize(&account, 1000000);
         let delegatee = @0x1234;
         delegate_mint_capability(account, delegatee);
-        claim_mint_capability(random);
+        claim_mint_capability(&random);
     }
 
     #[test(account = @CoreResources, random = @0x1)]

@@ -122,8 +122,14 @@ impl AptosVM {
         let mut signer_param_cnt = 0;
         // find all signer params at the beginning
         for ty in func.parameters.iter() {
-            if matches!(ty, Type::Signer) {
-                signer_param_cnt += 1;
+            match ty {
+                Type::Signer => signer_param_cnt += 1,
+                Type::Reference(inner_type) => {
+                    if matches!(&**inner_type, Type::Signer) {
+                        signer_param_cnt += 1;
+                    }
+                },
+                _ => ()
             }
         }
         // validate all non_signer params
