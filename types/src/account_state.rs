@@ -6,15 +6,14 @@ use crate::{
     account_address::AccountAddress,
     account_config::{
         currency_code_from_type_tag, AccountResource, AccountRole, BalanceResource, CRSNResource,
-        ChainIdResource, ChildVASP, Credential, CurrencyInfoResource, DesignatedDealer,
-        DesignatedDealerPreburns, DiemAccountResource, FreezingBit, ParentVASP,
-        PreburnQueueResource, PreburnResource,
+        ChainIdResource, ChildVASP, Credential, DesignatedDealer, DesignatedDealerPreburns,
+        DiemAccountResource, FreezingBit, ParentVASP, PreburnQueueResource, PreburnResource,
     },
     account_state_blob::AccountStateBlob,
     block_metadata::BlockResource,
     on_chain_config::{
         access_path_for_config, dpn_access_path_for_config, ConfigurationResource, OnChainConfig,
-        RegisteredCurrencies, VMPublishingOption, ValidatorSet, Version,
+        VMPublishingOption, ValidatorSet, Version,
     },
     state_store::state_value::StateValue,
     timestamp::TimestampResource,
@@ -179,25 +178,6 @@ impl AccountState {
             .map(|bytes| VMPublishingOption::deserialize_into_config(bytes))
             .transpose()
             .map_err(Into::into)
-    }
-
-    pub fn get_registered_currency_info_resources(&self) -> Result<Vec<CurrencyInfoResource>> {
-        let currencies: Option<RegisteredCurrencies> = self.get_config()?;
-        match currencies {
-            Some(currencies) => {
-                let codes = currencies.currency_codes();
-                let mut resources = vec![];
-                for code in codes {
-                    let access_path = CurrencyInfoResource::resource_path_for(code.clone());
-                    let info: CurrencyInfoResource = self
-                        .get_resource_impl(&access_path.path)?
-                        .ok_or_else(|| format_err!("currency info resource not found: {}", code))?;
-                    resources.push(info);
-                }
-                Ok(resources)
-            }
-            None => Ok(vec![]),
-        }
     }
 
     pub fn get_block_resource(&self) -> Result<Option<BlockResource>> {
