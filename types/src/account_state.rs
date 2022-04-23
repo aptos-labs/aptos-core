@@ -5,8 +5,9 @@ use crate::{
     access_path::Path,
     account_address::AccountAddress,
     account_config::{
-        currency_code_from_type_tag, AccountResource, BalanceResource, CRSNResource,
-        ChainIdResource, DiemAccountResource, PreburnQueueResource, PreburnResource,
+        AccountResource, BalanceResource, CRSNResource,
+        ChainIdResource,
+        DiemAccountResource,
     },
     account_state_blob::AccountStateBlob,
     block_metadata::BlockResource,
@@ -20,7 +21,7 @@ use crate::{
 };
 use anyhow::{format_err, Error, Result};
 use move_core_types::{
-    identifier::Identifier, language_storage::StructTag, move_resource::MoveResource,
+    language_storage::StructTag, move_resource::MoveResource,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::btree_map::BTreeMap, convert::TryFrom, fmt};
@@ -62,30 +63,6 @@ impl AccountState {
 
     pub fn get_balance_resources(&self) -> Result<Option<BalanceResource>> {
         self.get_resource::<BalanceResource>()
-    }
-
-    pub fn get_preburn_balances(&self) -> Result<BTreeMap<Identifier, PreburnResource>> {
-        self.get_resources_with_type::<PreburnResource>()
-            .map(|maybe_resource| {
-                let (struct_tag, resource) = maybe_resource?;
-                let currency_code = collect_exactly_one(struct_tag.type_params.into_iter())
-                    .ok_or_else(|| format_err!("expected one currency_code type tag"))
-                    .and_then(currency_code_from_type_tag)?;
-                Ok((currency_code, resource))
-            })
-            .collect()
-    }
-
-    pub fn get_preburn_queue_balances(&self) -> Result<BTreeMap<Identifier, PreburnQueueResource>> {
-        self.get_resources_with_type::<PreburnQueueResource>()
-            .map(|maybe_resource| {
-                let (struct_tag, resource) = maybe_resource?;
-                let currency_code = collect_exactly_one(struct_tag.type_params.into_iter())
-                    .ok_or_else(|| format_err!("expected one currency_code type tag"))
-                    .and_then(currency_code_from_type_tag)?;
-                Ok((currency_code, resource))
-            })
-            .collect()
     }
 
     pub fn get_chain_id_resource(&self) -> Result<Option<ChainIdResource>> {
@@ -311,15 +288,5 @@ impl TryFrom<(&AccountResource, &DiemAccountResource, &BalanceResource)> for Acc
         );
 
         Ok(Self(btree_map))
-    }
-}
-
-/// If an iterator contains exactly one item, then return it. Otherwise return
-/// `None` if there are no items or more than one items.
-fn collect_exactly_one<T>(iter: impl Iterator<Item = T>) -> Option<T> {
-    let mut iter = iter.fuse();
-    match (iter.next(), iter.next()) {
-        (Some(item), None) => Some(item),
-        _ => None,
     }
 }
