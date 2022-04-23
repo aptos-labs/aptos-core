@@ -6,8 +6,8 @@ use crate::{
     account_address::AccountAddress,
     account_config::{
         currency_code_from_type_tag, AccountResource, AccountRole, BalanceResource, CRSNResource,
-        ChainIdResource, ChildVASP, Credential, DesignatedDealer, DesignatedDealerPreburns,
-        DiemAccountResource, ParentVASP, PreburnQueueResource, PreburnResource,
+        ChainIdResource, ChildVASP, Credential, DiemAccountResource, ParentVASP,
+        PreburnQueueResource, PreburnResource,
     },
     account_state_blob::AccountStateBlob,
     block_metadata::BlockResource,
@@ -125,35 +125,6 @@ impl AccountState {
         } else if self.0.contains_key(&ChildVASP::resource_path()) {
             self.get_resource::<ChildVASP>()
                 .map(|r_opt| r_opt.map(AccountRole::ChildVASP))
-        } else if self.0.contains_key(&DesignatedDealer::resource_path()) {
-            match (
-                self.get_resource::<Credential>(),
-                self.get_preburn_balances(),
-                self.get_preburn_queue_balances(),
-                self.get_resource::<DesignatedDealer>(),
-            ) {
-                (
-                    Ok(Some(dd_credential)),
-                    Ok(preburn_balances),
-                    Ok(preburn_queues),
-                    Ok(Some(designated_dealer)),
-                ) => {
-                    let preburn_balances =
-                        if preburn_balances.is_empty() && !preburn_queues.is_empty() {
-                            DesignatedDealerPreburns::PreburnQueue(preburn_queues)
-                        } else if !preburn_balances.is_empty() && preburn_queues.is_empty() {
-                            DesignatedDealerPreburns::Preburn(preburn_balances)
-                        } else {
-                            return Ok(None);
-                        };
-                    Ok(Some(AccountRole::DesignatedDealer {
-                        dd_credential,
-                        preburn_balances,
-                        designated_dealer,
-                    }))
-                }
-                _ => Ok(None),
-            }
         } else {
             // TODO: add role_id to Unknown
             Ok(Some(AccountRole::Unknown))

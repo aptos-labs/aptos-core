@@ -1,9 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::account_config::resources::{
-    ChildVASP, Credential, DesignatedDealer, DesignatedDealerPreburns, ParentVASP,
-};
+use crate::account_config::resources::{ChildVASP, Credential, ParentVASP};
 use serde::{Deserialize, Serialize};
 
 /// A enum that captures the collection of role-specific resources stored under each account type
@@ -14,11 +12,6 @@ pub enum AccountRole {
         credential: Credential,
     },
     ChildVASP(ChildVASP),
-    DesignatedDealer {
-        dd_credential: Credential,
-        preburn_balances: DesignatedDealerPreburns,
-        designated_dealer: DesignatedDealer,
-    },
     TreasuryCompliance,
     Unknown,
     // TODO: add other roles
