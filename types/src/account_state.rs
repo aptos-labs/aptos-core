@@ -6,7 +6,8 @@ use crate::{
     account_address::AccountAddress,
     account_config::{
         currency_code_from_type_tag, AccountResource, AccountRole, BalanceResource, CRSNResource,
-        ChainIdResource, ChildVASP, Credential, DiemAccountResource, ParentVASP,
+        ChainIdResource,
+        DiemAccountResource,
         PreburnQueueResource, PreburnResource,
     },
     account_state_blob::AccountStateBlob,
@@ -112,23 +113,7 @@ impl AccountState {
     }
 
     pub fn get_account_role(&self) -> Result<Option<AccountRole>> {
-        if self.0.contains_key(&ParentVASP::resource_path()) {
-            match (
-                self.get_resource::<ParentVASP>(),
-                self.get_resource::<Credential>(),
-            ) {
-                (Ok(Some(vasp)), Ok(Some(credential))) => {
-                    Ok(Some(AccountRole::ParentVASP { vasp, credential }))
-                }
-                _ => Ok(None),
-            }
-        } else if self.0.contains_key(&ChildVASP::resource_path()) {
-            self.get_resource::<ChildVASP>()
-                .map(|r_opt| r_opt.map(AccountRole::ChildVASP))
-        } else {
-            // TODO: add role_id to Unknown
-            Ok(Some(AccountRole::Unknown))
-        }
+        Ok(Some(AccountRole::Unknown))
     }
 
     pub fn get_validator_set(&self) -> Result<Option<ValidatorSet>> {
