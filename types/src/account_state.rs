@@ -7,7 +7,7 @@ use crate::{
     account_config::{
         currency_code_from_type_tag, AccountResource, AccountRole, BalanceResource, CRSNResource,
         ChainIdResource, ChildVASP, Credential, DesignatedDealer, DesignatedDealerPreburns,
-        DiemAccountResource, FreezingBit, ParentVASP, PreburnQueueResource, PreburnResource,
+        DiemAccountResource, ParentVASP, PreburnQueueResource, PreburnResource,
     },
     account_state_blob::AccountStateBlob,
     block_metadata::BlockResource,
@@ -109,10 +109,6 @@ impl AccountState {
         &self,
     ) -> Result<Option<ValidatorOperatorConfigResource>> {
         self.get_resource::<ValidatorOperatorConfigResource>()
-    }
-
-    pub fn get_freezing_bit(&self) -> Result<Option<FreezingBit>> {
-        self.get_resource::<FreezingBit>()
     }
 
     pub fn get_account_role(&self) -> Result<Option<AccountRole>> {
