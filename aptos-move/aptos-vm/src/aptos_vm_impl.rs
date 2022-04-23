@@ -15,14 +15,14 @@ use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
-    account_config::{ChainSpecificAccountInfo, CurrencyInfoResource},
+    account_config::ChainSpecificAccountInfo,
     contract_event::ContractEvent,
     event::EventKey,
     on_chain_config::{
         ConfigStorage, OnChainConfig, VMConfig, VMPublishingOption, Version, APTOS_VERSION_3,
     },
     state_store::state_key::StateKey,
-    transaction::{SignedTransaction, TransactionOutput, TransactionStatus},
+    transaction::{TransactionOutput, TransactionStatus},
     vm_status::{KeptVMStatus, StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -35,8 +35,7 @@ use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet as MoveChangeSet, Event as MoveEvent},
     gas_schedule::{CostTable, GasAlgebra, GasCarrier, GasUnits, InternalGasUnits},
-    identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, TypeTag},
+    language_storage::ModuleId,
     move_resource::MoveStructType,
     resolver::{MoveResolver, ResourceResolver},
     value::{serialize_values, MoveValue},
@@ -237,27 +236,16 @@ impl AptosVMImpl {
         Ok(())
     }
 
-    fn get_gas_currency_args(&self, account_currency_symbol: &IdentStr) -> Vec<TypeTag> {
-        if self.chain_info().currency_code_required {
-            vec![account_config::type_tag_for_currency_code(
-                account_currency_symbol.to_owned(),
-            )]
-        } else {
-            vec![]
-        }
-    }
-
     /// Run the prologue of a transaction by calling into either `SCRIPT_PROLOGUE_NAME` function
     /// or `MULTI_AGENT_SCRIPT_PROLOGUE_NAME` function stored in the `ACCOUNT_MODULE` on chain.
     pub(crate) fn run_script_prologue<S: MoveResolver>(
         &self,
         session: &mut SessionExt<S>,
         txn_data: &TransactionMetadata,
-        account_currency_symbol: &IdentStr,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let chain_specific_info = self.chain_info();
-        let gas_currency = self.get_gas_currency_args(account_currency_symbol);
+        let gas_currency = vec![];
         let txn_sequence_number = txn_data.sequence_number();
         let txn_public_key = txn_data.authentication_key_preimage().to_vec();
         let txn_gas_price = txn_data.gas_unit_price().get();
@@ -319,11 +307,10 @@ impl AptosVMImpl {
         &self,
         session: &mut SessionExt<S>,
         txn_data: &TransactionMetadata,
-        account_currency_symbol: &IdentStr,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let chain_specific_info = self.chain_info();
-        let gas_currency = self.get_gas_currency_args(account_currency_symbol);
+        let gas_currency = vec![];
         let txn_sequence_number = txn_data.sequence_number();
         let txn_public_key = txn_data.authentication_key_preimage().to_vec();
         let txn_gas_price = txn_data.gas_unit_price().get();
@@ -359,7 +346,6 @@ impl AptosVMImpl {
         session: &mut SessionExt<S>,
         gas_status: &mut GasStatus,
         txn_data: &TransactionMetadata,
-        account_currency_symbol: &IdentStr,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         fail_point!("move_adapter::run_success_epilogue", |_| {
@@ -368,7 +354,7 @@ impl AptosVMImpl {
             ))
         });
 
-        let gas_currency = self.get_gas_currency_args(account_currency_symbol);
+        let gas_currency = vec![];
         let chain_specific_info = self.chain_info();
         let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price().get();
@@ -400,10 +386,9 @@ impl AptosVMImpl {
         session: &mut SessionExt<S>,
         gas_status: &mut GasStatus,
         txn_data: &TransactionMetadata,
-        account_currency_symbol: &IdentStr,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        let gas_currency = self.get_gas_currency_args(account_currency_symbol);
+        let gas_currency = vec![];
         let chain_specific_info = self.chain_info();
         let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price().get();
@@ -648,30 +633,6 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolver>(
         gas_used,
         TransactionStatus::Keep(status),
     ))
-}
-
-pub(crate) fn get_gas_currency_code(txn: &SignedTransaction) -> Result<Identifier, VMStatus> {
-    let currency_code_string = txn.gas_currency_code();
-    match account_config::from_currency_code_string(currency_code_string) {
-        Ok(code) => Ok(code),
-        Err(_) => Err(VMStatus::Error(StatusCode::INVALID_GAS_SPECIFIER)),
-    }
-}
-
-pub(crate) fn get_currency_info<S: MoveResolver>(
-    currency_code: &IdentStr,
-    remote_cache: &S,
-) -> Result<CurrencyInfoResource, VMStatus> {
-    if let Ok(Some(blob)) = remote_cache.get_resource(
-        &account_config::aptos_root_address(),
-        &CurrencyInfoResource::struct_tag_for(currency_code.to_owned()),
-    ) {
-        let x = bcs::from_bytes::<CurrencyInfoResource>(&blob)
-            .map_err(|_| VMStatus::Error(StatusCode::CURRENCY_INFO_DOES_NOT_EXIST))?;
-        Ok(x)
-    } else {
-        Err(VMStatus::Error(StatusCode::CURRENCY_INFO_DOES_NOT_EXIST))
-    }
 }
 
 #[test]
