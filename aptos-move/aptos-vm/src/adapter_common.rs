@@ -48,16 +48,6 @@ pub trait VMAdapter {
     /// Check if the transaction format is supported.
     fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus>;
 
-    /// Get the gas price for the given transaction.
-    /// TODO: remove this after making mempool interface more generic so
-    /// it ranks transactions using a provided ranker that implements PartialOrd
-    /// instead of using governance roles and gas prices.
-    fn get_gas_price<S: MoveResolver>(
-        &self,
-        txn: &SignedTransaction,
-        remote_cache: &S,
-    ) -> Result<u64, VMStatus>;
-
     /// Runs the prologue for the given transaction.
     fn run_prologue<S: MoveResolver>(
         &self,
@@ -102,30 +92,25 @@ pub fn validate_signed_transaction<A: VMAdapter>(
     let resolver = remote_cache.as_move_resolver();
     let mut session = adapter.new_session(&resolver, SessionId::txn(&txn));
 
-    let (status, gas_price) = match adapter.get_gas_price(&*txn, &resolver) {
-        Ok(price) => (None, price),
-        Err(err) => (Some(err.status_code()), 0),
-    };
-
     let validation_result =
         validate_signature_checked_transaction(adapter, &mut session, &txn, true, &log_context);
 
-    let (status, gas_price) = match (status, validation_result) {
-        (Some(_), _) => (status, 0),
-        (None, Ok(())) => (None, gas_price),
-        (None, Err(err)) => (Some(err.status_code()), 0),
-    };
-
     // Increment the counter for transactions verified.
-    let counter_label = match status {
-        None => "success",
-        Some(_) => "failure",
+    let (counter_label, result) = match validation_result {
+        Ok(_) => (
+            "success",
+            VMValidatorResult::new(None, txn.gas_unit_price()),
+        ),
+        Err(err) => (
+            "failure",
+            VMValidatorResult::new(Some(err.status_code()), 0),
+        ),
     };
     TRANSACTIONS_VALIDATED
         .with_label_values(&[counter_label])
         .inc();
 
-    VMValidatorResult::new(status, gas_price)
+    result
 }
 
 pub(crate) fn validate_signature_checked_transaction<S: MoveResolver, A: VMAdapter>(

@@ -827,14 +827,6 @@ impl VMAdapter for AptosVM {
         Ok(())
     }
 
-    fn get_gas_price<S: MoveResolver>(
-        &self,
-        txn: &SignedTransaction,
-        _remote_cache: &S,
-    ) -> Result<u64, VMStatus> {
-        Ok(txn.gas_unit_price())
-    }
-
     fn run_prologue<S: MoveResolver>(
         &self,
         session: &mut SessionExt<S>,
