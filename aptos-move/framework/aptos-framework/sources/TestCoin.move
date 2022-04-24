@@ -103,10 +103,6 @@ module AptosFramework::TestCoin {
 
     /// Claim the delegated mint capability and destroy the delegated token.
     public(script) fun claim_mint_capability(account: &signer) acquires Delegations {
-        claim_mint_capability_internal(account);
-    }
-
-    public fun claim_mint_capability_internal(account: &signer) acquires Delegations {
         let maybe_index = find_delegation(Signer::address_of(account));
         assert!(Option::is_some(&maybe_index), EDELEGATION_NOT_FOUND);
         let idx = *Option::borrow(&maybe_index);
@@ -162,12 +158,8 @@ module AptosFramework::TestCoin {
         borrow_global<Balance>(owner).coin.value
     }
 
-    public(script) fun transfer(from: &signer, to: address, amount: u64) acquires Balance, TransferEvents {
-        transfer_internal(from, to, amount);
-    }
-
     /// Transfers `amount` of tokens from `from` to `to`.
-    public fun transfer_internal(from: &signer, to: address, amount: u64) acquires Balance, TransferEvents {
+    public(script) fun transfer(from: &signer, to: address, amount: u64) acquires Balance, TransferEvents {
         let check = withdraw(from, amount);
         deposit(to, check);
         // emit events
@@ -357,9 +349,9 @@ module AptosFramework::TestCoin {
         // make sure can delegate more than one
         delegate_mint_capability(account_clone, addr1);
         delegate_mint_capability(account, addr);
-        claim_mint_capability_internal(&delegatee);
+        claim_mint_capability(&delegatee);
 
-        mint(delegatee, addr, 1000);
+        mint(&delegatee, addr, 1000);
         assert!(balance_of(addr) == 1000, 0);
     }
 

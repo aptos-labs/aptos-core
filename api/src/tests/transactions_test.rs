@@ -514,24 +514,6 @@ async fn test_signing_message_with_script_function_payload() {
     test_signing_message_with_payload(context, txn, payload).await;
 }
 
-#[tokio::test]
-async fn test_execute_entry_function_with_borrowed_signer() {
-    let mut context = new_test_context(current_function_name!());
-    let account = context.gen_account();
-    let txn = context.create_user_account(&account);
-
-    let payload = json!({
-        "type": "script_function_payload",
-        "function": "0x1::Account::create_account",
-        "type_arguments": [
-        ],
-        "arguments": [
-            account.address().to_hex_literal(), // new_account_address
-        ]
-    });
-    test_signing_message_with_payload(context, txn, payload).await;
-}
-
 // need a correct module payload
 #[ignore]
 #[tokio::test]
