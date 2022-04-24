@@ -91,7 +91,7 @@ impl Default for StateSyncDriverConfig {
     fn default() -> Self {
         Self {
             bootstrapping_mode: BootstrappingMode::ApplyTransactionOutputsFromGenesis,
-            enable_state_sync_v2: false,
+            enable_state_sync_v2: true,
             continuous_syncing_mode: ContinuousSyncingMode::ApplyTransactionOutputs,
             progress_check_interval_ms: 100,
             max_connection_deadline_secs: 10,
