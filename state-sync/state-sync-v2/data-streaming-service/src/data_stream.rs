@@ -511,7 +511,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
                     Error::IntegerOverflow("Number of entries to remove has overflown!".into())
                 })?;
 
-            info!(
+            debug!(
                 (LogSchema::new(LogEntry::StreamNotification)
                     .stream_id(self.data_stream_id)
                     .event(LogEvent::Success)

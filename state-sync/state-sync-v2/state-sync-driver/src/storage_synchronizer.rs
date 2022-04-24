@@ -169,7 +169,6 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
             executor_listener,
             committer_notifier,
             pending_transaction_chunks.clone(),
-            max_pending_data_chunks as u64,
             runtime.clone(),
         );
 
@@ -336,7 +335,6 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
     mut executor_listener: mpsc::Receiver<StorageDataChunk>,
     mut committer_notifier: mpsc::Sender<NotificationId>,
     pending_transaction_chunks: Arc<AtomicU64>,
-    max_pending_data_chunks: u64,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
     // Create an executor
@@ -402,12 +400,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             decrement_pending_data_chunks(pending_transaction_chunks.clone());
                         }
                     }
-
-                    // If the executor begins running too far ahead of the committer
-                    // let's force more yields to avoid unnecessary back pressure.
-                    if load_pending_data_chunks(pending_transaction_chunks.clone()) > max_pending_data_chunks / 2 {
-                        yield_now().await;
-                    }
+                    yield_thread().await;
                 }
             }
         }
@@ -474,6 +467,7 @@ fn spawn_committer<
                         }
                     };
                     decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                    yield_thread().await;
                 }
             }
         }
@@ -547,6 +541,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                         }
 
                                         decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                                        yield_thread().await;
                                         continue; // Wait for the next chunk
                                     }
 
@@ -687,4 +682,14 @@ async fn send_storage_synchronizer_error(
 
     // Update the metrics
     metrics::increment_counter(&metrics::STORAGE_SYNCHRONIZER_ERRORS, error.get_label());
+}
+
+/// This yields the currently executing thread. This is required
+/// to avoid starvation of other threads when the system is under
+/// very heavy load.
+///
+/// TODO(joshlind): identify a better solution. It likely requires
+/// using spawn_blocking() at a lower level, or merging runtimes.
+async fn yield_thread() {
+    sample!(SampleRate::Frequency(10), yield_now().await;);
 }
