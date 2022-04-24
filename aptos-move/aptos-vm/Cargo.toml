@@ -18,14 +18,14 @@ once_cell = "1.7.2"
 rayon = "1.5.0"
 tracing = "0.1.16"
 
-move-binary-format = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
-move-bytecode-utils = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6", features=["address32"] }
-move-stdlib = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
-move-table-extension = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
-move-vm-runtime = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
-move-vm-types = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
-read-write-set-dynamic = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6"}
+move-binary-format = { git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097" }
+move-bytecode-utils = { git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097", features=["address32"] }
+move-stdlib = { git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097" }
+move-table-extension = { git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097" }
+move-vm-runtime = { git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097" }
+move-vm-types = { git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097" }
+read-write-set-dynamic = { git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097"}
 
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-crypto-derive = { path = "../../crates/aptos-crypto-derive" }

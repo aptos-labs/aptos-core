@@ -11,9 +11,9 @@ edition = "2018"
 
 [dependencies]
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
-move-resource-viewer = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
+move-resource-viewer = { git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097" }
 aptos-types = { path = "../../types"  }
-move-core-types = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6", features=["address32"] }
-move-binary-format = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097", features=["address32"] }
+move-binary-format = { git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097" }
 
 anyhow = "1.0.52"

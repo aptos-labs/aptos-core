@@ -32,5 +32,5 @@ aptos-temppath = { path = "../../../crates/aptos-temppath" }
 aptos-vm = { path = "../../../aptos-move/aptos-vm" }
 aptosdb = { path = "../../../storage/aptosdb" }
 executor-test-helpers = { path = "../../../execution/executor-test-helpers" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6", features=["address32"] }
+move-core-types = { git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097", features=["address32"] }
 vm-genesis = { path = "../../../aptos-move/vm-genesis", features = ["fuzzing"] }

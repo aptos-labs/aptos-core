@@ -78,11 +78,11 @@ third-party = [
     # Exclude the fail crate because the failpoints feature should only be enabled
     # for certain builds.
     { name = "fail" },
-    { name = "move-binary-format", git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" },
-    { name = "move-core-types", git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6", features=["address32"] },
-    { name = "move-stdlib", git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" },
-    { name = "move-vm-runtime", git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" },
-    { name = "move-vm-types", git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" },
+    { name = "move-binary-format", git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097" },
+    { name = "move-core-types", git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097", features=["address32"] },
+    { name = "move-stdlib", git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097" },
+    { name = "move-vm-runtime", git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097" },
+    { name = "move-vm-types", git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097" },
 ]
 
 # This follows the same syntax as CargoOptionsSummary in guppy.

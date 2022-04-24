@@ -2,12 +2,12 @@
   "type": "user_transaction",
   "version": "4",
   "hash": "0x67d3d83ebf873c54ae08380b8984ee3bef0227c284117384b9e086498c52fb90",
-  "state_root_hash": "0x80dd9bb6f17a2a9832b26a7904335fd4d0795d0b7e0fcc89f7379823acb9d5eb",
+  "state_root_hash": "0xe14f67ca99fdd0e3ba126221ff7b3c10e4758517984d9452892963c1c272ea30",
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "26",
   "success": false,
   "vm_status": "Move abort by LIMIT_EXCEEDED - EINSUFFICIENT_BALANCE\n A limit on an amount, e.g. a currency, is exceeded. Example: withdrawal of money after account limits window\n is exhausted.\n Error codes",
-  "accumulator_root_hash": "0xcced2263a0b0355bd3f01611566bdfbb877bc8f72a80990cf87e6487dbce4122",
+  "accumulator_root_hash": "0xfbbbe8deee214036a4ad6261a8351bc4b49fd2a803e1d2e9ed1e1addb8ccc0e9",
   "changes": [
     {
       "type": "write_resource",
@@ -58,8 +58,8 @@
     "function": "0x1::TestCoin::transfer",
     "type_arguments": [],
     "arguments": [
-      "0xdd",
-      "123"
+      "0x00000000000000000000000000000000000000000000000000000000000000dd",
+      "0x7b00000000000000"
     ]
   },
   "signature": {
