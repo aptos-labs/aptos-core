@@ -549,7 +549,6 @@ mod test {
               "sequence_number": "21386",
               "max_gas_amount": "1000",
               "gas_unit_price": "1",
-              "gas_currency_code": "XUS",
               "expiration_timestamp_secs": "1649713172",
               "payload": {
                 "type": "script_function_payload",

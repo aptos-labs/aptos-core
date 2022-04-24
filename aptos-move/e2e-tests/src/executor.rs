@@ -225,11 +225,6 @@ impl FakeExecutor {
         AccountData::new_from_seed(&mut self.rng, balance, seq_num)
     }
 
-    /// Create one instance of [`AccountData`] with XDX balance without saving it to data store.
-    pub fn create_xdx_raw_account_data(&mut self, balance: u64, seq_num: u64) -> AccountData {
-        AccountData::new_xdx_from_seed(&mut self.rng, balance, seq_num)
-    }
-
     /// Creates a number of [`Account`] instances all with the same balance and sequence number,
     /// and publishes them to this executor's data store.
     pub fn create_accounts(&mut self, size: usize, balance: u64, seq_num: u64) -> Vec<Account> {
@@ -287,12 +282,8 @@ impl FakeExecutor {
 
     /// Reads the balance resource value for an account from this executor's data store with the
     /// given balance currency_code.
-    pub fn read_balance_resource(
-        &self,
-        account: &Account,
-        balance_currency_code: Identifier,
-    ) -> Option<BalanceResource> {
-        self.read_balance_resource_at_address(account.address(), balance_currency_code)
+    pub fn read_balance_resource(&self, account: &Account) -> Option<BalanceResource> {
+        self.read_balance_resource_at_address(account.address())
     }
 
     /// Reads the balance resource value for an account under the given address from this executor's
@@ -300,7 +291,6 @@ impl FakeExecutor {
     pub fn read_balance_resource_at_address(
         &self,
         addr: &AccountAddress,
-        _balance_currency_code: Identifier,
     ) -> Option<BalanceResource> {
         self.read_resource(addr)
     }

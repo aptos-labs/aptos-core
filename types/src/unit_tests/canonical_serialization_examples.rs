@@ -6,7 +6,6 @@
 use crate::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::XUS_NAME,
     chain_id::ChainId,
     state_store::state_key::StateKey,
     transaction::{
@@ -87,7 +86,6 @@ fn test_raw_transaction_with_a_program_canonical_serialization_example() {
         get_common_program(),
         10000,
         20000,
-        XUS_NAME.to_owned(),
         86400,
         ChainId::test(),
     );

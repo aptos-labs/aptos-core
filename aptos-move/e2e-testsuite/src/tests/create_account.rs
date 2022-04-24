@@ -1,11 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::{account_config, transaction::TransactionStatus, vm_status::KeptVMStatus};
+use aptos_types::{transaction::TransactionStatus, vm_status::KeptVMStatus};
 use language_e2e_tests::{
-    account::{self, Account},
-    common_transactions::create_account_txn,
-    current_function_name,
+    account::Account, common_transactions::create_account_txn, current_function_name,
     executor::FakeExecutor,
 };
 
@@ -20,13 +18,7 @@ fn create_account() {
 
     // define the arguments to the create account transaction
     let initial_amount = 0;
-    let txn = create_account_txn(
-        &sender,
-        &new_account,
-        0,
-        initial_amount,
-        account_config::xus_tag(),
-    );
+    let txn = create_account_txn(&sender, &new_account, 0);
 
     // execute transaction
     let output = executor.execute_transaction(txn);
@@ -42,7 +34,7 @@ fn create_account() {
         .expect("sender must exist");
 
     let updated_receiver_balance = executor
-        .read_balance_resource(&new_account, account::xus_currency_code())
+        .read_balance_resource(&new_account)
         .expect("receiver balance must exist");
     assert_eq!(initial_amount, updated_receiver_balance.coin());
     assert_eq!(1, updated_sender.sequence_number());

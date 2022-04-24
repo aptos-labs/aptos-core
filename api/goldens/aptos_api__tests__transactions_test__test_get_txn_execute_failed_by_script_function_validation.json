@@ -1,13 +1,13 @@
 {
   "type": "user_transaction",
   "version": "4",
-  "hash": "0x6bb8523ed342ba8f8142042b77e08c1d4fad3ba6673f109f37cd0865adafbd1c",
+  "hash": "0x67d3d83ebf873c54ae08380b8984ee3bef0227c284117384b9e086498c52fb90",
   "state_root_hash": "0x80dd9bb6f17a2a9832b26a7904335fd4d0795d0b7e0fcc89f7379823acb9d5eb",
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "26",
   "success": false,
   "vm_status": "Move abort by LIMIT_EXCEEDED - EINSUFFICIENT_BALANCE\n A limit on an amount, e.g. a currency, is exceeded. Example: withdrawal of money after account limits window\n is exhausted.\n Error codes",
-  "accumulator_root_hash": "0x9ab3aca5b9cb7f4b95cae3367486a31dc8b0eb4cebe36a4757d44bf77c54b0cf",
+  "accumulator_root_hash": "0xcced2263a0b0355bd3f01611566bdfbb877bc8f72a80990cf87e6487dbce4122",
   "changes": [
     {
       "type": "write_resource",
@@ -52,7 +52,6 @@
   "sequence_number": "0",
   "max_gas_amount": "2000",
   "gas_unit_price": "0",
-  "gas_currency_code": "XUS",
   "expiration_timestamp_secs": "18446744073709551615",
   "payload": {
     "type": "script_function_payload",
@@ -66,7 +65,7 @@
   "signature": {
     "type": "ed25519_signature",
     "public_key": "0xafb4905e9550cf462a82007824a055d975ae934470c477d9ddbb6d2b264c36fa",
-    "signature": "0xbf29e08e9d3ecad55cf6f00fdd1c4b9792621012a2c572509d9de53f1dd6736e2ac7df52dd617c5fc683ab1e63241833b52882d1050c41fcf9400663ddf2ce07"
+    "signature": "0x54182ebf4aef3031c730e2e63fae4363e0f15540ceb4ab9d064f7f9adc6d8c648ec6a52648097a32024509fce45767ed4aedb0ab3a719baed233633e1264b60c"
   },
   "events": [],
   "timestamp": "2"

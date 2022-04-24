@@ -610,7 +610,6 @@ fn create_test_transaction(sequence_number: u64) -> Transaction {
         transaction_payload,
         0,
         0,
-        "".into(),
         0,
         ChainId::new(10),
     );

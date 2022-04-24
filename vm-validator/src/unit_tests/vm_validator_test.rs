@@ -8,7 +8,6 @@ use aptos_transaction_builder::aptos_stdlib::{
 };
 use aptos_types::{
     account_address, account_config,
-    account_config::XUS_NAME,
     chain_id::ChainId,
     test_helpers::transaction_test_helpers,
     transaction::{Module, Script, TransactionPayload},
@@ -132,8 +131,7 @@ fn test_validate_known_script_too_large_args() {
          * longer than the
          * max size */
         0,
-        0,                   /* max gas price */
-        XUS_NAME.to_owned(), /* gas currency code */
+        0, /* max gas price */
         None,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
@@ -155,9 +153,8 @@ fn test_validate_max_gas_units_above_max() {
         vm_genesis::GENESIS_KEYPAIR.1.clone(),
         None,
         0,
-        0,                   /* max gas price */
-        XUS_NAME.to_owned(), /* gas currency code */
-        Some(u64::MAX),      // Max gas units
+        0,              /* max gas price */
+        Some(u64::MAX), // Max gas units
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(
@@ -188,9 +185,8 @@ fn test_validate_max_gas_units_below_min() {
             vec![],
         ))),
         0,
-        0,                   /* max gas price */
-        XUS_NAME.to_owned(), /* gas currency code */
-        Some(0),             // Max gas units
+        0,       /* max gas price */
+        Some(0), // Max gas units
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
     assert_eq!(
@@ -211,8 +207,7 @@ fn test_validate_max_gas_price_above_bounds() {
         vm_genesis::GENESIS_KEYPAIR.1.clone(),
         None,
         0,
-        u64::MAX,            /* max gas price */
-        XUS_NAME.to_owned(), /* gas currency code */
+        u64::MAX, /* max gas price */
         None,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
@@ -239,8 +234,7 @@ fn test_validate_max_gas_price_below_bounds() {
         Some(program),
         // Initial Time was set to 0 with a TTL 86400 secs.
         40000,
-        0,                   /* max gas price */
-        XUS_NAME.to_owned(), /* gas currency code */
+        0, /* max gas price */
         None,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
@@ -320,8 +314,7 @@ fn test_validate_account_doesnt_exist() {
         vm_genesis::GENESIS_KEYPAIR.1.clone(),
         Some(program),
         u64::MAX,
-        1,                   /* max gas price */
-        XUS_NAME.to_owned(), /* gas currency code */
+        1, /* max gas price */
         None,
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();
@@ -409,7 +402,6 @@ fn test_validate_expiration_time() {
         None, /* script */
         0,    /* expiration_time */
         0,    /* gas_unit_price */
-        XUS_NAME.to_owned(),
         None, /* max_gas_amount */
     );
     let ret = vm_validator.validate_transaction(transaction).unwrap();

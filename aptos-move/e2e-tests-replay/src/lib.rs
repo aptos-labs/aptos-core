@@ -13,10 +13,7 @@ use walkdir::WalkDir;
 use aptos_types::{
     access_path::{AccessPath, Path as AP},
     account_address::AccountAddress,
-    account_config::{
-        from_currency_code_string, reserved_vm_address, type_tag_for_currency_code,
-        APTOS_ACCOUNT_MODULE,
-    },
+    account_config::{reserved_vm_address, APTOS_ACCOUNT_MODULE},
     block_metadata::BlockMetadata,
     on_chain_config::Version,
     transaction::{
@@ -564,12 +561,8 @@ impl<'env> TraceReplayer<'env> {
         senders: Vec<AccountAddress>,
         txn_meta: TransactionMetadata,
         script_fun: ScriptFunction,
-        gas_currency: &str,
         gas_usage: u64,
     ) -> VMResult<SessionOutput> {
-        let gas_currency_ty =
-            type_tag_for_currency_code(from_currency_code_string(gas_currency).unwrap());
-
         let move_vm = MoveVmExt::new().unwrap();
         let mut session = move_vm.new_session(&self.data_store, SessionId::txn_meta(&txn_meta));
         let mut xrunner = if self.flags.xrun {
@@ -583,12 +576,7 @@ impl<'env> TraceReplayer<'env> {
         };
 
         // prologue -> main -> epilogue
-        execute_txn_user_script_prologue(
-            &mut session,
-            xrunner.as_mut(),
-            &txn_meta,
-            &gas_currency_ty,
-        )?;
+        execute_txn_user_script_prologue(&mut session, xrunner.as_mut(), &txn_meta)?;
 
         let result = execute_script_function_via_session_and_xrunner(
             &mut session,
@@ -605,7 +593,6 @@ impl<'env> TraceReplayer<'env> {
                     &mut session,
                     xrunner.as_mut(),
                     &txn_meta,
-                    &gas_currency_ty,
                     gas_usage,
                 )?;
                 session.finish()
@@ -630,7 +617,6 @@ impl<'env> TraceReplayer<'env> {
                     &mut new_session,
                     new_xrunner.as_mut(),
                     &txn_meta,
-                    &gas_currency_ty,
                     gas_usage,
                 )?;
                 new_session.finish()
@@ -705,7 +691,6 @@ impl<'env> TraceReplayer<'env> {
         senders: Vec<AccountAddress>,
         txn_meta: TransactionMetadata,
         script_fun: ScriptFunction,
-        gas_currency: &str,
         expect_output: &TransactionOutput,
     ) {
         // ignore out-of-gas cases
@@ -724,7 +709,6 @@ impl<'env> TraceReplayer<'env> {
                 senders,
                 txn_meta,
                 script_fun,
-                gas_currency,
                 expect_output.gas_used(),
             )
         };
@@ -738,7 +722,6 @@ fn execute_txn_user_script_prologue(
     session: &mut SessionExt<impl MoveResolver>,
     xrunner: Option<&mut CrossRunner>,
     txn_meta: &TransactionMetadata,
-    gas_currency_ty: &TypeTag,
 ) -> VMResult<()> {
     let TransactionMetadata {
         sender,
@@ -770,7 +753,7 @@ fn execute_txn_user_script_prologue(
         xrunner,
         &*APTOS_ACCOUNT_MODULE,
         &*SCRIPT_PROLOGUE_NAME,
-        vec![gas_currency_ty.clone()],
+        vec![],
         args,
     )?;
     assert!(rets.is_empty());
@@ -781,7 +764,6 @@ fn execute_txn_user_script_epilogue(
     session: &mut SessionExt<impl MoveResolver>,
     xrunner: Option<&mut CrossRunner>,
     txn_meta: &TransactionMetadata,
-    gas_currency_ty: &TypeTag,
     gas_usage: u64,
 ) -> VMResult<()> {
     let TransactionMetadata {
@@ -808,7 +790,7 @@ fn execute_txn_user_script_epilogue(
         xrunner,
         &*APTOS_ACCOUNT_MODULE,
         &*USER_EPILOGUE_NAME,
-        vec![gas_currency_ty.clone()],
+        vec![],
         args,
     )?;
     assert!(rets.is_empty());
@@ -1072,12 +1054,7 @@ fn replay_trace<P: AsRef<Path>>(
                         }
                         let txn_meta = TransactionMetadata::new(&signed_txn);
                         replayer.replay_txn_script_function(
-                            is_admin,
-                            senders,
-                            txn_meta,
-                            script_fun,
-                            signed_txn.gas_currency_code(),
-                            &res,
+                            is_admin, senders, txn_meta, script_fun, &res,
                         );
                         replayer.data_store.add_write_set(res.write_set());
                     }

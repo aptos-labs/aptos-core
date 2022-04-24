@@ -582,7 +582,6 @@ impl<'a> AptosTestAdapter<'a> {
             ),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
-            parameters.gas_currency_code,
             parameters.expiration_timestamp_secs,
             ChainId::test(),
         )
@@ -605,7 +604,6 @@ impl<'a> AptosTestAdapter<'a> {
             ),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
-            parameters.gas_currency_code,
             parameters.expiration_timestamp_secs,
             ChainId::test(),
         )
@@ -628,7 +626,6 @@ impl<'a> AptosTestAdapter<'a> {
             ),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
-            parameters.gas_currency_code,
             parameters.expiration_timestamp_secs,
             ChainId::test(),
         )
@@ -653,7 +650,6 @@ impl<'a> AptosTestAdapter<'a> {
             ),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
-            parameters.gas_currency_code,
             parameters.expiration_timestamp_secs,
             ChainId::test(),
         )
@@ -675,7 +671,6 @@ impl<'a> AptosTestAdapter<'a> {
             ),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
-            parameters.gas_currency_code,
             parameters.expiration_timestamp_secs,
             ChainId::test(),
         )
@@ -708,7 +703,6 @@ impl<'a> AptosTestAdapter<'a> {
             ),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
-            parameters.gas_currency_code,
             parameters.expiration_timestamp_secs,
             ChainId::test(),
         )
@@ -954,7 +948,6 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             TransactionModule::new(module_blob),
             params.max_gas_amount,
             params.gas_unit_price,
-            params.gas_currency_code,
             params.expiration_timestamp_secs,
             ChainId::test(),
         )
@@ -1102,7 +1095,6 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             ),
             params.max_gas_amount,
             params.gas_unit_price,
-            params.gas_currency_code,
             params.expiration_timestamp_secs,
             ChainId::test(),
         );

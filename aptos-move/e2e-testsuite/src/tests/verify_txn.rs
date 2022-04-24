@@ -771,7 +771,6 @@ fn verify_expiration_time() {
             None, /* script */
             0,    /* expiration_time */
             0,    /* gas_unit_price */
-            account_config::XUS_NAME.to_owned(),
             None, /* max_gas_amount */
         );
         assert_prologue_parity!(
@@ -790,7 +789,6 @@ fn verify_expiration_time() {
             None, /* script */
             0,    /* expiration_time */
             0,    /* gas_unit_price */
-            account_config::XUS_NAME.to_owned(),
             None, /* max_gas_amount */
         );
         assert_prologue_parity!(
@@ -841,7 +839,6 @@ fn verify_max_sequence_number() {
             None,     /* script */
             u64::MAX, /* expiration_time */
             0,        /* gas_unit_price */
-            "XUS".to_string(),
             None, /* max_gas_amount */
         );
         assert_prologue_parity!(

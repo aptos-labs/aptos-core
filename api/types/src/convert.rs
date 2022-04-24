@@ -293,7 +293,6 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             sequence_number,
             max_gas_amount,
             gas_unit_price,
-            gas_currency_code,
             expiration_timestamp_secs,
             payload,
             signature: _,
@@ -304,7 +303,6 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             self.try_into_aptos_core_transaction_payload(payload)?,
             max_gas_amount.into(),
             gas_unit_price.into(),
-            gas_currency_code,
             expiration_timestamp_secs.into(),
             chain_id,
         ))

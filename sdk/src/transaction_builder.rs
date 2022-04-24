@@ -2,16 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    move_types::{account_address::AccountAddress, language_storage::TypeTag},
+    move_types::account_address::AccountAddress,
     types::{
-        account_config::{xdx_type_tag, xus_tag, XDX_NAME, XUS_NAME},
         chain_id::ChainId,
         transaction::{authenticator::AuthenticationKey, RawTransaction, TransactionPayload},
     },
 };
 use aptos_crypto::ed25519::Ed25519PublicKey;
-use serde::{Deserialize, Serialize};
-use std::fmt;
 
 pub use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::transaction::{
@@ -25,7 +22,6 @@ pub struct TransactionBuilder {
     payload: TransactionPayload,
     max_gas_amount: u64,
     gas_unit_price: u64,
-    gas_currency_code: String,
     expiration_timestamp_secs: u64,
     chain_id: ChainId,
 }
@@ -51,11 +47,6 @@ impl TransactionBuilder {
         self
     }
 
-    pub fn gas_currency_code<T: Into<String>>(mut self, gas_currency_code: T) -> Self {
-        self.gas_currency_code = gas_currency_code.into();
-        self
-    }
-
     pub fn chain_id(mut self, chain_id: ChainId) -> Self {
         self.chain_id = chain_id;
         self
@@ -74,7 +65,6 @@ impl TransactionBuilder {
             self.payload,
             self.max_gas_amount,
             self.gas_unit_price,
-            self.gas_currency_code,
             self.expiration_timestamp_secs,
             self.chain_id,
         )
@@ -85,7 +75,6 @@ impl TransactionBuilder {
 pub struct TransactionFactory {
     max_gas_amount: u64,
     gas_unit_price: u64,
-    gas_currency: Currency,
     transaction_expiration_time: u64,
     chain_id: ChainId,
 }
@@ -95,7 +84,6 @@ impl TransactionFactory {
         Self {
             max_gas_amount: 2_000,
             gas_unit_price: 0,
-            gas_currency: Currency::XUS,
             transaction_expiration_time: 30,
             chain_id,
         }
@@ -171,7 +159,6 @@ impl TransactionFactory {
             payload,
             max_gas_amount: self.max_gas_amount,
             gas_unit_price: self.gas_unit_price,
-            gas_currency_code: self.gas_currency.into(),
             expiration_timestamp_secs: self.expiration_timestamp(),
             chain_id: self.chain_id,
         }
@@ -204,64 +191,5 @@ impl DualAttestationMessage {
 
     pub fn message(&self) -> &[u8] {
         &self.message
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "UPPERCASE")]
-pub enum Currency {
-    XDX,
-    XUS,
-}
-
-impl Currency {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Currency::XDX => XDX_NAME,
-            Currency::XUS => XUS_NAME,
-        }
-    }
-
-    pub fn type_tag(&self) -> TypeTag {
-        match self {
-            Currency::XDX => xdx_type_tag(),
-            Currency::XUS => xus_tag(),
-        }
-    }
-}
-
-impl PartialEq<str> for Currency {
-    fn eq(&self, other: &str) -> bool {
-        self.as_str().eq(other)
-    }
-}
-
-impl PartialEq<Currency> for str {
-    fn eq(&self, other: &Currency) -> bool {
-        other.as_str().eq(self)
-    }
-}
-
-impl PartialEq<String> for Currency {
-    fn eq(&self, other: &String) -> bool {
-        self.as_str().eq(other)
-    }
-}
-
-impl PartialEq<Currency> for String {
-    fn eq(&self, other: &Currency) -> bool {
-        other.as_str().eq(self)
-    }
-}
-
-impl From<Currency> for String {
-    fn from(currency: Currency) -> Self {
-        currency.as_str().to_owned()
-    }
-}
-
-impl fmt::Display for Currency {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
     }
 }

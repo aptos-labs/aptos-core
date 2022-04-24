@@ -7,7 +7,7 @@ use aptos_config::config::NodeConfig;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{AccountSequenceInfo, XUS_NAME},
+    account_config::AccountSequenceInfo,
     chain_id::ChainId,
     mempool_status::MempoolStatusCode,
     transaction::{RawTransaction, Script, SignedTransaction},
@@ -88,7 +88,6 @@ impl TestTransaction {
             Script::new(vec![], vec![], vec![]),
             max_gas_amount,
             self.gas_price,
-            XUS_NAME.to_owned(),
             exp_timestamp_secs,
             ChainId::test(),
         );

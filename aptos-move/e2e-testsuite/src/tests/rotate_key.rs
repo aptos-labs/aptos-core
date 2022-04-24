@@ -12,7 +12,6 @@ use aptos_types::{
     vm_status::{KeptVMStatus, StatusCode},
 };
 use language_e2e_tests::{
-    account,
     common_transactions::{raw_rotate_key_txn, rotate_key_txn},
     test_with_different_versions,
     versioning::CURRENT_RELEASE_VERSIONS,
@@ -46,7 +45,7 @@ fn rotate_ed25519_key() {
             .read_account_resource(sender.account())
             .expect("sender must exist");
         let updated_sender_balance = executor
-            .read_balance_resource(sender.account(), account::xus_currency_code())
+            .read_balance_resource(sender.account())
             .expect("sender balance must exist");
         assert_eq!(new_key_hash, updated_sender.authentication_key().to_vec());
         assert_eq!(balance, updated_sender_balance.coin());
