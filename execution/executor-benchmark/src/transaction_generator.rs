@@ -9,7 +9,6 @@ use aptos_logger::info;
 use aptos_sdk::transaction_builder::TransactionFactory;
 use aptos_sdk::types::LocalAccount;
 use aptos_types::{
-    account_address::AccountAddress,
     account_config::{aptos_root_address, AccountResource},
     account_state_blob::AccountStateBlob,
     chain_id::ChainId,
@@ -59,18 +58,10 @@ struct P2pTestCase {
     num_accounts: usize,
 }
 
-struct LocalAccountData {
-    private_key: LocalAccount
-    public_key: LocalAccount
-    address: LocalAccount
-    sequence_number: u64
-
-}
-
 pub struct TransactionGenerator {
     /// The current state of the accounts. The main purpose is to keep track of the sequence number
     /// so generated transactions are guaranteed to be successfully executed.
-    accounts_cache: Vec<LocalAccountData>,
+    accounts_cache: Vec<LocalAccount>,
 
     /// Total number of accounts in the DB
     num_accounts: usize,
@@ -119,7 +110,7 @@ impl TransactionGenerator {
         }
     }
 
-    fn gen_account_cache(num_accounts: usize) -> Vec<LocalAccountData> {
+    fn gen_account_cache(num_accounts: usize) -> Vec<LocalAccount> {
         let start = Instant::now();
         let seed = [1u8; 32];
         let mut rng = StdRng::from_seed(seed);
@@ -128,15 +119,8 @@ impl TransactionGenerator {
         println!("[{}] Generating {} accounts.", now_fmt!(), num_accounts);
         let bar = get_progress_bar(num_accounts);
         for _i in 0..num_accounts {
-            let private_key = Ed25519PrivateKey::generate(&mut rng);
-            let public_key = private_key.public_key();
-            let address = aptos_types::account_address::from_public_key(&public_key);
-            let account = LocalAccountData {
-                private_key,
-                public_key,
-                address,
-                sequence_number: 0,
-            };
+
+            let account = LocalAccount::generate(&mut rng);
             accounts.push(account);
             bar.inc(1);
         }
