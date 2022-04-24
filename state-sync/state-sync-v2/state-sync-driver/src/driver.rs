@@ -107,14 +107,13 @@ impl<
         consensus_notification_handler: ConsensusNotificationHandler,
         driver_configuration: DriverConfiguration,
         error_notification_listener: ErrorNotificationListener,
-        event_subscription_service: EventSubscriptionService,
+        event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
         mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
         storage_synchronizer: StorageSyncer,
         aptos_data_client: DataClient,
         streaming_service_client: StreamingServiceClient,
         storage: Arc<dyn DbReader>,
     ) -> Self {
-        let event_subscription_service = Arc::new(Mutex::new(event_subscription_service));
         let bootstrapper = Bootstrapper::new(
             driver_configuration.clone(),
             streaming_service_client.clone(),
@@ -252,18 +251,17 @@ impl<
         // TODO(joshlind): can we get consensus to forward the events?
 
         // Handle the commit notification
-        let latest_synced_version = utils::fetch_latest_synced_version(self.storage.clone())?;
-        let latest_synced_ledger_info =
-            utils::fetch_latest_synced_ledger_info(self.storage.clone())?;
-        CommitNotification::handle_transaction_notification(
-            consensus_commit_notification.reconfiguration_events.clone(),
-            consensus_commit_notification.transactions.clone(),
-            latest_synced_version,
-            latest_synced_ledger_info,
+        let committed_transactions = CommittedTransactions {
+            events: consensus_commit_notification.reconfiguration_events.clone(),
+            transactions: consensus_commit_notification.transactions.clone(),
+        };
+        utils::handle_committed_transactions(
+            committed_transactions,
+            self.storage.clone(),
             self.mempool_notification_handler.clone(),
             self.event_subscription_service.clone(),
         )
-        .await?;
+        .await;
 
         // Respond to consensus successfully
         self.consensus_notification_handler
@@ -348,79 +346,19 @@ impl<
         }
     }
 
-    /// Handles a commit notification sent by the storage synchronizer
+    /// Handles a commit notification sent by the storage synchronizer for new
+    /// accounts.
     async fn handle_commit_notification(&mut self, commit_notification: CommitNotification) {
-        match commit_notification {
-            CommitNotification::CommittedAccounts(committed_accounts) => {
-                debug!(
-                    LogSchema::new(LogEntry::SynchronizerNotification).message(&format!(
-                        "Received an account commit notification from the storage synchronizer. \
+        let CommitNotification::CommittedAccounts(committed_accounts) = commit_notification;
+        debug!(
+            LogSchema::new(LogEntry::SynchronizerNotification).message(&format!(
+                "Received an account commit notification from the storage synchronizer. \
                         All synced: {:?}, last committed index: {:?}.",
-                        committed_accounts.all_accounts_synced,
-                        committed_accounts.last_committed_account_index,
-                    ))
-                );
-                self.handle_committed_accounts(committed_accounts).await;
-            }
-            CommitNotification::CommittedTransactions(committed_transactions) => {
-                debug!(
-                    LogSchema::new(LogEntry::SynchronizerNotification).message(&format!(
-                        "Received a transaction commit notification from the storage synchronizer! \
-                        Transaction total: {:?}, event total: {:?}",
-                       committed_transactions.transactions.len(),
-                       committed_transactions.events.len()
-                    ))
-                );
-                self.handle_committed_transactions(committed_transactions)
-                    .await;
-            }
-        }
-    }
-
-    /// Handles a notification sent by the storage synchronizer for committed transactions
-    async fn handle_committed_transactions(
-        &mut self,
-        committed_transactions: CommittedTransactions,
-    ) {
-        // Fetch the latest synced version and ledger info from storage
-        let (latest_synced_version, latest_synced_ledger_info) =
-            match utils::fetch_latest_synced_version(self.storage.clone()) {
-                Ok(latest_synced_version) => {
-                    match utils::fetch_latest_synced_ledger_info(self.storage.clone()) {
-                        Ok(latest_synced_ledger_info) => {
-                            (latest_synced_version, latest_synced_ledger_info)
-                        }
-                        Err(error) => {
-                            error!(LogSchema::new(LogEntry::SynchronizerNotification)
-                                .error(&error)
-                                .message("Failed to fetch latest synced ledger info!"));
-                            return;
-                        }
-                    }
-                }
-                Err(error) => {
-                    error!(LogSchema::new(LogEntry::SynchronizerNotification)
-                        .error(&error)
-                        .message("Failed to fetch latest synced version!"));
-                    return;
-                }
-            };
-
-        // Handle the commit notification
-        if let Err(error) = CommitNotification::handle_transaction_notification(
-            committed_transactions.events,
-            committed_transactions.transactions,
-            latest_synced_version,
-            latest_synced_ledger_info,
-            self.mempool_notification_handler.clone(),
-            self.event_subscription_service.clone(),
-        )
-        .await
-        {
-            error!(LogSchema::new(LogEntry::SynchronizerNotification)
-                .error(&error)
-                .message("Failed to handle a transaction commit notification!"));
-        }
+                committed_accounts.all_accounts_synced,
+                committed_accounts.last_committed_account_index,
+            ))
+        );
+        self.handle_committed_accounts(committed_accounts).await;
     }
 
     /// Handles a notification sent by the storage synchronizer for committed accounts
@@ -444,8 +382,13 @@ impl<
                 .expect("Committed transaction should exist for last committed account chunk!");
 
             // Handle the commit notification
-            self.handle_committed_transactions(committed_transactions)
-                .await;
+            utils::handle_committed_transactions(
+                committed_transactions,
+                self.storage.clone(),
+                self.mempool_notification_handler.clone(),
+                self.event_subscription_service.clone(),
+            )
+            .await;
         }
     }
 

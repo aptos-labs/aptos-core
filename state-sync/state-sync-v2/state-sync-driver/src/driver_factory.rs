@@ -12,6 +12,7 @@ use crate::{
 };
 use aptos_config::config::NodeConfig;
 use aptos_data_client::aptosnet::AptosNetDataClient;
+use aptos_infallible::Mutex;
 use aptos_types::waypoint::Waypoint;
 use consensus_notifications::ConsensusNotificationListener;
 use data_streaming_service::streaming_client::StreamingServiceClient;
@@ -72,11 +73,14 @@ impl DriverFactory {
         };
 
         // Create the storage synchronizer
+        let event_subscription_service = Arc::new(Mutex::new(event_subscription_service));
         let (storage_synchronizer, _, _) = StorageSynchronizer::new(
             node_config.state_sync.state_sync_driver,
             chunk_executor,
             commit_notification_sender,
             error_notification_sender,
+            event_subscription_service.clone(),
+            mempool_notification_handler.clone(),
             storage.clone(),
             driver_runtime.as_ref(),
         );
