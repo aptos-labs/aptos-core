@@ -26,6 +26,7 @@ use aptos_types::{
 };
 use move_core_types::language_storage::TypeTag;
 use std::collections::BTreeMap;
+use storage_interface::{StartupInfo, TreeState};
 
 /// Creates a test epoch ending ledger info
 pub fn create_epoch_ending_ledger_info() -> LedgerInfoWithSignatures {
@@ -59,6 +60,40 @@ pub fn create_output_list_with_proof() -> TransactionOutputListWithProof {
         Some(0),
         transaction_info_list_with_proof,
     )
+}
+
+/// Creates a test state value chunk with proof
+pub fn create_state_value_chunk_with_proof(last_chunk: bool) -> StateValueChunkWithProof {
+    let right_siblings = if last_chunk {
+        vec![]
+    } else {
+        vec![HashValue::random()]
+    };
+    StateValueChunkWithProof {
+        first_index: 0,
+        last_index: 100,
+        first_key: HashValue::random(),
+        last_key: HashValue::random(),
+        raw_values: vec![],
+        proof: SparseMerkleRangeProof::new(right_siblings),
+        root_hash: HashValue::random(),
+    }
+}
+
+/// Creates a startup info
+pub fn create_startup_info() -> StartupInfo {
+    let committed_tree_state = TreeState {
+        num_transactions: 0,
+        ledger_frozen_subtree_hashes: vec![],
+        account_state_root_hash: Default::default(),
+    };
+
+    StartupInfo {
+        latest_ledger_info: create_ledger_info_at_version(0),
+        latest_epoch_state: None,
+        committed_tree_state,
+        synced_tree_state: None,
+    }
 }
 
 /// Creates a single test transaction
@@ -120,26 +155,8 @@ pub fn create_transaction_list_with_proof() -> TransactionListWithProof {
 pub fn create_transaction_output() -> TransactionOutput {
     TransactionOutput::new(
         WriteSet::default(),
-        vec![],
+        vec![create_event()],
         0,
         TransactionStatus::Keep(KeptVMStatus::Executed),
     )
-}
-
-/// Creates a test StateValueChunkWithProof
-pub fn create_state_value_chunk_with_proof(last_chunk: bool) -> StateValueChunkWithProof {
-    let right_siblings = if last_chunk {
-        vec![]
-    } else {
-        vec![HashValue::random()]
-    };
-    StateValueChunkWithProof {
-        first_index: 0,
-        last_index: 100,
-        first_key: HashValue::random(),
-        last_key: HashValue::random(),
-        raw_values: vec![],
-        proof: SparseMerkleRangeProof::new(right_siblings),
-        root_hash: HashValue::random(),
-    }
 }
