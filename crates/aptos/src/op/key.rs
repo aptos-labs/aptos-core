@@ -112,9 +112,9 @@ impl GenerateKey {
                 let private_key =
                     x25519::PrivateKey::from_ed25519_private_bytes(&ed25519_key.to_bytes())
                         .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
-                self.save_params.save_key(&private_key, "x22519")
+                self.save_params.save_key(&private_key, "x25519")
             }
-            KeyType::Ed25519 => self.save_params.save_key(&ed25519_key, "ed22519"),
+            KeyType::Ed25519 => self.save_params.save_key(&ed25519_key, "ed25519"),
         }
     }
 

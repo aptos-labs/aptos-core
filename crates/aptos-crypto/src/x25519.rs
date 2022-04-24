@@ -96,7 +96,7 @@ impl PrivateKey {
         shared_secret.as_bytes().to_owned()
     }
 
-    /// Deserialize an X25119 PrivateKey given the sha512 pre-image of a hash
+    /// Deserialize an X25519 PrivateKey given the sha512 pre-image of a hash
     /// whose least significant half is a canonical X25519 scalar, following
     /// the XEdDSA approach.
     ///
@@ -131,7 +131,7 @@ impl PublicKey {
         &self.0
     }
 
-    /// Deserialize an X25119 PublicKey from its representation as an
+    /// Deserialize an X25519 PublicKey from its representation as an
     /// Ed25519PublicKey, following the XEdDSA approach. This is meant to
     /// compensate for the poor key storage capabilities of key management
     /// solutions, and NOT to promote double usage of keys under several

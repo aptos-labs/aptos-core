@@ -83,14 +83,14 @@ impl GenerateKey {
                     .map_err(|err| Error::UnexpectedError(err.to_string()))?;
                 save_key(
                     &key,
-                    "x22519 PrivateKey",
+                    "x25519 PrivateKey",
                     self.key_file.as_path(),
                     self.encoding,
                 )
             }
             KeyType::Ed25519 => save_key(
                 ed25519_key,
-                "ed22519 PrivateKey",
+                "ed25519 PrivateKey",
                 self.key_file.as_path(),
                 self.encoding,
             ),
