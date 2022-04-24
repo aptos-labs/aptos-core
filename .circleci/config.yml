@@ -252,9 +252,8 @@ workflows:
   # Build the Docker images and run Forge tests
   build-test-deploy:
     when:
-      or:
-        - equal: [auto, << pipeline.git.branch >>]
-        - equal: [canary, << pipeline.git.branch >>]
+      not:
+        equal: [main, << pipeline.git.branch >>]
     jobs:
       #      - build-benchmarks
       - e2e-test
