@@ -54,6 +54,7 @@ git clone https://github.com/aptos-labs/aptos-core.git
 cd aptos-core
 ./scripts/dev_setup.sh
 source ~/.cargo/env
+git checkout origin/devnet
 ```
 
 ### Step 1.2) Review the Module
