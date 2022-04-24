@@ -3,7 +3,6 @@
 
 use crate::{
     account_address::AccountAddress,
-    account_config::XUS_NAME,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
@@ -81,10 +80,6 @@ pub struct RawTransaction {
     /// Price to be paid per gas unit.
     gas_unit_price: u64,
 
-    /// The currency code, e.g., "XUS", used to pay for gas. The `max_gas_amount`
-    /// and `gas_unit_price` values refer to units of this currency.
-    gas_currency_code: String,
-
     /// Expiration timestamp for this transaction, represented
     /// as seconds from the Unix Epoch. If the current blockchain timestamp
     /// is greater than or equal to this time, then the transaction has
@@ -107,7 +102,6 @@ impl RawTransaction {
         payload: TransactionPayload,
         max_gas_amount: u64,
         gas_unit_price: u64,
-        gas_currency_code: String,
         expiration_timestamp_secs: u64,
         chain_id: ChainId,
     ) -> Self {
@@ -117,7 +111,6 @@ impl RawTransaction {
             payload,
             max_gas_amount,
             gas_unit_price,
-            gas_currency_code,
             expiration_timestamp_secs,
             chain_id,
         }
@@ -132,7 +125,6 @@ impl RawTransaction {
         script: Script,
         max_gas_amount: u64,
         gas_unit_price: u64,
-        gas_currency_code: String,
         expiration_timestamp_secs: u64,
         chain_id: ChainId,
     ) -> Self {
@@ -142,7 +134,6 @@ impl RawTransaction {
             payload: TransactionPayload::Script(script),
             max_gas_amount,
             gas_unit_price,
-            gas_currency_code,
             expiration_timestamp_secs,
             chain_id,
         }
@@ -157,7 +148,6 @@ impl RawTransaction {
         script_function: ScriptFunction,
         max_gas_amount: u64,
         gas_unit_price: u64,
-        gas_currency_code: String,
         expiration_timestamp_secs: u64,
         chain_id: ChainId,
     ) -> Self {
@@ -167,7 +157,6 @@ impl RawTransaction {
             payload: TransactionPayload::ScriptFunction(script_function),
             max_gas_amount,
             gas_unit_price,
-            gas_currency_code,
             expiration_timestamp_secs,
             chain_id,
         }
@@ -183,7 +172,6 @@ impl RawTransaction {
         module: Module,
         max_gas_amount: u64,
         gas_unit_price: u64,
-        gas_currency_code: String,
         expiration_timestamp_secs: u64,
         chain_id: ChainId,
     ) -> Self {
@@ -193,7 +181,6 @@ impl RawTransaction {
             payload: TransactionPayload::ModuleBundle(ModuleBundle::from(module)),
             max_gas_amount,
             gas_unit_price,
-            gas_currency_code,
             expiration_timestamp_secs,
             chain_id,
         }
@@ -209,7 +196,6 @@ impl RawTransaction {
         modules: ModuleBundle,
         max_gas_amount: u64,
         gas_unit_price: u64,
-        gas_currency_code: String,
         expiration_timestamp_secs: u64,
         chain_id: ChainId,
     ) -> Self {
@@ -219,7 +205,6 @@ impl RawTransaction {
             payload: TransactionPayload::ModuleBundle(modules),
             max_gas_amount,
             gas_unit_price,
-            gas_currency_code,
             expiration_timestamp_secs,
             chain_id,
         }
@@ -252,7 +237,6 @@ impl RawTransaction {
             // Since write-set transactions bypass the VM, these fields aren't relevant.
             max_gas_amount: 0,
             gas_unit_price: 0,
-            gas_currency_code: XUS_NAME.to_owned(),
             // Write-set transactions are special and important and shouldn't expire.
             expiration_timestamp_secs: u64::max_value(),
             chain_id,
@@ -276,7 +260,6 @@ impl RawTransaction {
             // Since write-set transactions bypass the VM, these fields aren't relevant.
             max_gas_amount: 0,
             gas_unit_price: 0,
-            gas_currency_code: XUS_NAME.to_owned(),
             // Write-set transactions are special and important and shouldn't expire.
             expiration_timestamp_secs: u64::max_value(),
             chain_id,
@@ -386,7 +369,6 @@ impl RawTransaction {
              \t}}, \n\
              \tmax_gas_amount: {}, \n\
              \tgas_unit_price: {}, \n\
-             \tgas_currency_code: {}, \n\
              \texpiration_timestamp_secs: {:#?}, \n\
              \tchain_id: {},
              }}",
@@ -396,7 +378,6 @@ impl RawTransaction {
             f_args,
             self.max_gas_amount,
             self.gas_unit_price,
-            self.gas_currency_code,
             self.expiration_timestamp_secs,
             self.chain_id,
         )
@@ -623,10 +604,6 @@ impl SignedTransaction {
 
     pub fn gas_unit_price(&self) -> u64 {
         self.raw_txn.gas_unit_price
-    }
-
-    pub fn gas_currency_code(&self) -> &str {
-        &self.raw_txn.gas_currency_code
     }
 
     pub fn expiration_timestamp_secs(&self) -> u64 {

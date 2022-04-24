@@ -372,7 +372,6 @@ mod tests {
             transaction_payload,
             0,
             0,
-            "".into(),
             0,
             ChainId::new(10),
         );

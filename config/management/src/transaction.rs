@@ -22,7 +22,6 @@ pub fn build_raw_transaction(
         script,
         constants::MAX_GAS_AMOUNT,
         constants::GAS_UNIT_PRICE,
-        constants::GAS_CURRENCY_CODE.to_owned(),
         TimeService::real().now_secs() + constants::TXN_EXPIRATION_SECS,
         chain_id,
     )

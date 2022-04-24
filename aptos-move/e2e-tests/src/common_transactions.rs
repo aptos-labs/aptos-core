@@ -12,7 +12,6 @@ use aptos_types::{
     account_config,
     transaction::{RawTransaction, Script, SignedTransaction, TransactionArgument},
 };
-use move_core_types::language_storage::TypeTag;
 use move_ir_compiler::Compiler;
 use once_cell::sync::Lazy;
 
@@ -116,7 +115,6 @@ pub fn empty_txn(
     seq_num: u64,
     max_gas_amount: u64,
     gas_unit_price: u64,
-    gas_currency_code: String,
 ) -> SignedTransaction {
     sender
         .transaction()
@@ -124,7 +122,6 @@ pub fn empty_txn(
         .sequence_number(seq_num)
         .max_gas_amount(max_gas_amount)
         .gas_unit_price(gas_unit_price)
-        .gas_currency_code(&gas_currency_code)
         .sign()
 }
 
@@ -133,8 +130,6 @@ pub fn create_account_txn(
     sender: &Account,
     new_account: &Account,
     seq_num: u64,
-    _initial_amount: u64,
-    _type_tag: TypeTag,
 ) -> SignedTransaction {
     sender
         .transaction()

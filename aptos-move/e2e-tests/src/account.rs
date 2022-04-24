@@ -10,10 +10,7 @@ use aptos_keygen::KeyGen;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{
-        self, from_currency_code_string, AccountResource, BalanceResource, TransferEventsResource,
-        XDX_NAME, XUS_NAME,
-    },
+    account_config::{self, AccountResource, BalanceResource, TransferEventsResource},
     chain_id::ChainId,
     event::EventHandle,
     state_store::state_key::StateKey,
@@ -24,29 +21,16 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use move_core_types::{
-    identifier::{IdentStr, Identifier},
     language_storage::{ResourceKey, StructTag},
     move_resource::MoveStructType,
     value::{MoveStructLayout, MoveTypeLayout},
 };
 use move_vm_types::values::{Struct, Value};
-use std::{collections::BTreeMap, str::FromStr};
+use std::str::FromStr;
 use vm_genesis::GENESIS_KEYPAIR;
 
 // TTL is 86400s. Initial time was set to 0.
 pub const DEFAULT_EXPIRATION_TIME: u64 = 40_000;
-
-pub fn xus_currency_code() -> Identifier {
-    from_currency_code_string(XUS_NAME).unwrap()
-}
-
-pub fn xdx_currency_code() -> Identifier {
-    from_currency_code_string(XDX_NAME).unwrap()
-}
-
-pub fn currency_code(code: &str) -> Identifier {
-    from_currency_code_string(code).unwrap()
-}
 
 /// Details about a Diem account.
 ///
@@ -193,7 +177,6 @@ pub struct TransactionBuilder {
     pub program: Option<TransactionPayload>,
     pub max_gas_amount: Option<u64>,
     pub gas_unit_price: Option<u64>,
-    pub gas_currency_code: Option<String>,
     pub chain_id: Option<ChainId>,
     pub ttl: Option<u64>,
 }
@@ -207,7 +190,6 @@ impl TransactionBuilder {
             program: None,
             max_gas_amount: None,
             gas_unit_price: None,
-            gas_currency_code: None,
             chain_id: None,
             ttl: None,
         }
@@ -263,11 +245,6 @@ impl TransactionBuilder {
         self
     }
 
-    pub fn gas_currency_code(mut self, gas_currency_code: &str) -> Self {
-        self.gas_currency_code = Some(gas_currency_code.to_string());
-        self
-    }
-
     pub fn ttl(mut self, ttl: u64) -> Self {
         self.ttl = Some(ttl);
         self
@@ -280,8 +257,6 @@ impl TransactionBuilder {
             self.program.expect("transaction payload not set"),
             self.max_gas_amount.unwrap_or(gas_costs::TXN_RESERVED),
             self.gas_unit_price.unwrap_or(0),
-            self.gas_currency_code
-                .unwrap_or_else(|| XUS_NAME.to_owned()),
             self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
             ChainId::test(),
         )
@@ -294,8 +269,6 @@ impl TransactionBuilder {
             self.program.expect("transaction payload not set"),
             self.max_gas_amount.unwrap_or(gas_costs::TXN_RESERVED),
             self.gas_unit_price.unwrap_or(0),
-            self.gas_currency_code
-                .unwrap_or_else(|| XUS_NAME.to_owned()),
             self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
             self.chain_id.unwrap_or_else(ChainId::test),
         )
@@ -321,8 +294,6 @@ impl TransactionBuilder {
             self.program.expect("transaction payload not set"),
             self.max_gas_amount.unwrap_or(gas_costs::TXN_RESERVED),
             self.gas_unit_price.unwrap_or(0),
-            self.gas_currency_code
-                .unwrap_or_else(|| XUS_NAME.to_owned()),
             self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
             ChainId::test(),
         )
@@ -464,7 +435,7 @@ pub struct AccountData {
     sent_events: EventHandle,
     received_events: EventHandle,
 
-    balances: BTreeMap<Identifier, Balance>,
+    balance: Balance,
     account_role: AccountRole,
 }
 
@@ -480,7 +451,6 @@ impl AccountData {
         Self::with_account(
             Account::new(),
             balance,
-            xus_currency_code(),
             sequence_number,
             AccountRoleSpecifier::ParentVASP,
         )
@@ -493,20 +463,6 @@ impl AccountData {
         Self::with_account(
             Account::new_from_seed(seed),
             balance,
-            xus_currency_code(),
-            sequence_number,
-            AccountRoleSpecifier::ParentVASP,
-        )
-    }
-
-    /// Creates a new `AccountData` with a new account, with XDX balance.
-    ///
-    /// Most tests will want to use this constructor.
-    pub fn new_xdx_from_seed(seed: &mut KeyGen, balance: u64, sequence_number: u64) -> Self {
-        Self::with_account(
-            Account::new_from_seed(seed),
-            balance,
-            xdx_currency_code(),
             sequence_number,
             AccountRoleSpecifier::ParentVASP,
         )
@@ -516,14 +472,12 @@ impl AccountData {
     pub fn with_account(
         account: Account,
         balance: u64,
-        balance_currency_code: Identifier,
         sequence_number: u64,
         account_specifier: AccountRoleSpecifier,
     ) -> Self {
         Self::with_account_and_event_counts(
             account,
             balance,
-            balance_currency_code,
             sequence_number,
             0,
             0,
@@ -536,48 +490,33 @@ impl AccountData {
         privkey: Ed25519PrivateKey,
         pubkey: Ed25519PublicKey,
         balance: u64,
-        balance_currency_code: Identifier,
         sequence_number: u64,
         account_specifier: AccountRoleSpecifier,
     ) -> Self {
         let account = Account::with_keypair(privkey, pubkey);
-        Self::with_account(
-            account,
-            balance,
-            balance_currency_code,
-            sequence_number,
-            account_specifier,
-        )
+        Self::with_account(account, balance, sequence_number, account_specifier)
     }
 
     /// Creates a new `AccountData` with custom parameters.
     pub fn with_account_and_event_counts(
         account: Account,
         balance: u64,
-        balance_currency_code: Identifier,
         sequence_number: u64,
         sent_events_count: u64,
         received_events_count: u64,
         account_specifier: AccountRoleSpecifier,
     ) -> Self {
-        let mut balances = BTreeMap::new();
-        balances.insert(balance_currency_code, Balance::new(balance));
         let addr = *account.address();
         Self {
             account_role: AccountRole::new(*account.address(), account_specifier),
             withdrawal_capability: Some(WithdrawCapability::new(addr)),
             key_rotation_capability: Some(KeyRotationCapability::new(addr)),
             account,
-            balances,
+            balance: Balance::new(balance),
             sequence_number,
             sent_events: new_event_handle(sent_events_count, addr),
             received_events: new_event_handle(received_events_count, addr),
         }
-    }
-
-    /// Adds the balance held by this account to the one represented as balance_currency_code
-    pub fn add_balance_currency(&mut self, balance_currency_code: Identifier) {
-        self.balances.insert(balance_currency_code, Balance::new(0));
     }
 
     /// Changes the keys for this account to the provided ones.
@@ -606,13 +545,8 @@ impl AccountData {
     }
 
     /// Creates and returns the top-level resources to be published under the account
-    pub fn to_value(&self) -> (Value, Vec<(Identifier, Value)>, Value) {
+    pub fn to_value(&self) -> (Value, Value, Value) {
         // TODO: publish some concept of Account
-        let balances: Vec<_> = self
-            .balances
-            .iter()
-            .map(|(code, balance)| (code.clone(), balance.to_value()))
-            .collect();
         let account = Value::struct_(Struct::pack(vec![
             // TODO: this needs to compute the auth key instead
             Value::vector_u8(AuthenticationKey::ed25519(&self.account.pubkey).to_vec()),
@@ -628,7 +562,7 @@ impl AccountData {
             Value::vector_u8(self.sent_events.key().to_vec()),
         ]));
         let transfer_events = Value::struct_(Struct::pack(vec![sent_events, received_events]));
-        (account, balances, transfer_events)
+        (account, self.balance.to_value(), transfer_events)
     }
 
     /// Returns the AccessPath that describes the Account resource instance.
@@ -660,7 +594,7 @@ impl AccountData {
     /// Creates a writeset that contains the account data and can be patched to the storage
     /// directly.
     pub fn to_writeset(&self) -> WriteSet {
-        let (account_blob, balance_blobs, transfer_events) = self.to_value();
+        let (account_blob, balance_blob, transfer_events) = self.to_value();
         let mut write_set = Vec::new();
         let account = account_blob
             .value_as::<Struct>()
@@ -671,17 +605,17 @@ impl AccountData {
             StateKey::AccessPath(self.make_account_access_path()),
             WriteOp::Value(account),
         ));
-        for (_, balance_blob) in balance_blobs.into_iter() {
-            let balance = balance_blob
-                .value_as::<Struct>()
-                .unwrap()
-                .simple_serialize(&Balance::layout())
-                .unwrap();
-            write_set.push((
-                StateKey::AccessPath(self.make_balance_access_path()),
-                WriteOp::Value(balance),
-            ));
-        }
+
+        let balance = balance_blob
+            .value_as::<Struct>()
+            .unwrap()
+            .simple_serialize(&Balance::layout())
+            .unwrap();
+        write_set.push((
+            StateKey::AccessPath(self.make_balance_access_path()),
+            WriteOp::Value(balance),
+        ));
+
         let transfer = transfer_events
             .value_as::<Struct>()
             .unwrap()
@@ -714,8 +648,8 @@ impl AccountData {
     }
 
     /// Returns the initial balance.
-    pub fn balance(&self, currency_code: &IdentStr) -> u64 {
-        self.balances.get(currency_code).unwrap().coin()
+    pub fn balance(&self) -> u64 {
+        self.balance.coin()
     }
 
     /// Returns the initial sequence number.

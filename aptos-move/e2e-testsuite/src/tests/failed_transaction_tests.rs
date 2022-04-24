@@ -10,7 +10,7 @@ use aptos_vm::{
     AptosVM,
 };
 use language_e2e_tests::{
-    account, common_transactions::peer_to_peer_txn, test_with_different_versions,
+    common_transactions::peer_to_peer_txn, test_with_different_versions,
     versioning::CURRENT_RELEASE_VERSIONS,
 };
 use move_binary_format::file_format::NUMBER_OF_NATIVE_FUNCTIONS;
@@ -45,7 +45,6 @@ fn failed_transaction_cleanup_test() {
             &mut gas_status,
             &txn_data,
             &data_cache,
-            &account::xus_currency_code(),
             &log_context,
         );
         assert!(!out1.write_set().is_empty());
@@ -63,7 +62,6 @@ fn failed_transaction_cleanup_test() {
             &mut gas_status,
             &txn_data,
             &data_cache,
-            &account::xus_currency_code(),
             &log_context,
         );
         assert!(out2.write_set().is_empty());

@@ -211,9 +211,6 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
         concretize: bool,
     ) -> Result<(Vec<ResourceKey>, Vec<ResourceKey>)> {
         let signers = vec![tx.sender()];
-        let gas_currency = account_config::type_tag_for_currency_code(
-            account_config::from_currency_code_string(tx.gas_currency_code())?,
-        );
         let prologue_accesses = self.get_partially_concretized_summary(
             &account_config::constants::APTOS_ACCOUNT_MODULE,
             SCRIPT_PROLOGUE_NAME,
@@ -227,7 +224,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
                 MoveValue::U8(tx.chain_id().id()),
                 MoveValue::vector_u8(vec![]), // script_hash; it's ignored
             ]),
-            &[gas_currency.clone()],
+            &[],
             &self.module_cache,
         )?;
 
@@ -241,7 +238,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
                 MoveValue::U64(tx.max_gas_amount()),
                 MoveValue::U64(0), // gas_units_remaining
             ]),
-            &[gas_currency.clone()],
+            &[],
             &self.module_cache,
         )?;
 
@@ -279,7 +276,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
                 address: account_config::CORE_CODE_ADDRESS,
                 module: TRANSACTION_FEES_NAME.to_owned(),
                 name: TRANSACTION_FEES_NAME.to_owned(),
-                type_params: vec![gas_currency],
+                type_params: vec![],
             };
             keys_written.retain(|r| r.type_() != &tx_fees_tag);
         }

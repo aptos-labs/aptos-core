@@ -605,7 +605,6 @@ async fn test_signing_message_with_write_set_payload() {
         "sequence_number": sender.sequence_number().to_string(),
         "gas_unit_price": txn.gas_unit_price().to_string(),
         "max_gas_amount": txn.max_gas_amount().to_string(),
-        "gas_currency_code": txn.gas_currency_code(),
         "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
         "payload": payload,
     });
@@ -627,7 +626,6 @@ async fn test_signing_message_with_payload(
         "sequence_number": sender.sequence_number().to_string(),
         "gas_unit_price": txn.gas_unit_price().to_string(),
         "max_gas_amount": txn.max_gas_amount().to_string(),
-        "gas_currency_code": txn.gas_currency_code(),
         "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
         "payload": payload,
     });

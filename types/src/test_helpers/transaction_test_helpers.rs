@@ -3,7 +3,6 @@
 
 use crate::{
     account_address::AccountAddress,
-    account_config::XUS_NAME,
     chain_id::ChainId,
     transaction::{
         authenticator::AccountAuthenticator, Module, RawTransaction, RawTransactionWithData,
@@ -42,7 +41,6 @@ pub fn get_test_signed_module_publishing_transaction(
         module,
         MAX_GAS_AMOUNT,
         TEST_GAS_PRICE,
-        XUS_NAME.to_owned(),
         expiration_time,
         ChainId::test(),
     );
@@ -61,7 +59,6 @@ pub fn get_test_signed_transaction(
     payload: Option<TransactionPayload>,
     expiration_timestamp_secs: u64,
     gas_unit_price: u64,
-    gas_currency_code: String,
     max_gas_amount: Option<u64>,
 ) -> SignedTransaction {
     let raw_txn = RawTransaction::new(
@@ -72,7 +69,6 @@ pub fn get_test_signed_transaction(
         }),
         max_gas_amount.unwrap_or(MAX_GAS_AMOUNT),
         gas_unit_price,
-        gas_currency_code,
         expiration_timestamp_secs,
         ChainId::test(),
     );
@@ -91,7 +87,6 @@ pub fn get_test_unchecked_transaction(
     payload: TransactionPayload,
     expiration_time: u64,
     gas_unit_price: u64,
-    gas_currency_code: String,
     max_gas_amount: Option<u64>,
 ) -> SignedTransaction {
     get_test_unchecked_transaction_(
@@ -102,7 +97,6 @@ pub fn get_test_unchecked_transaction(
         payload,
         expiration_time,
         gas_unit_price,
-        gas_currency_code,
         max_gas_amount,
         ChainId::test(),
     )
@@ -117,7 +111,6 @@ fn get_test_unchecked_transaction_(
     payload: TransactionPayload,
     expiration_timestamp_secs: u64,
     gas_unit_price: u64,
-    gas_currency_code: String,
     max_gas_amount: Option<u64>,
     chain_id: ChainId,
 ) -> SignedTransaction {
@@ -127,7 +120,6 @@ fn get_test_unchecked_transaction_(
         payload,
         max_gas_amount.unwrap_or(MAX_GAS_AMOUNT),
         gas_unit_price,
-        gas_currency_code,
         expiration_timestamp_secs,
         chain_id,
     );
@@ -155,7 +147,6 @@ pub fn get_test_signed_txn(
         payload,
         expiration_time,
         TEST_GAS_PRICE,
-        XUS_NAME.to_owned(),
         None,
     )
 }
@@ -176,7 +167,6 @@ pub fn get_test_unchecked_txn(
         payload,
         expiration_time,
         TEST_GAS_PRICE,
-        XUS_NAME.to_owned(),
         None,
     )
 }
@@ -200,7 +190,6 @@ pub fn get_test_unchecked_multi_agent_txn(
         ),
         MAX_GAS_AMOUNT,
         TEST_GAS_PRICE,
-        XUS_NAME.to_owned(),
         expiration_time,
         ChainId::test(),
     );
@@ -241,7 +230,6 @@ pub fn get_test_txn_with_chain_id(
         Script::new(EMPTY_SCRIPT.to_vec(), vec![], Vec::new()),
         MAX_GAS_AMOUNT,
         TEST_GAS_PRICE,
-        XUS_NAME.to_owned(),
         expiration_time,
         chain_id,
     );

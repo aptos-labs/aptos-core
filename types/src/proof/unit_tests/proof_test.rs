@@ -3,7 +3,6 @@
 
 use crate::{
     account_address::AccountAddress,
-    account_config::XUS_NAME,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -367,7 +366,6 @@ fn test_verify_state_store_resource_and_event() {
             Script::new(vec![], vec![], vec![]),
             /* max_gas_amount = */ 0,
             /* gas_unit_price = */ 0,
-            /* gas_currency_code = */ XUS_NAME.to_owned(),
             /* expiration_timestamp_secs = */ 0,
             ChainId::test(),
         )

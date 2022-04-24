@@ -9,7 +9,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{aptos_root_address, validator_set_address, XUS_NAME},
+    account_config::{aptos_root_address, validator_set_address},
     chain_id::ChainId,
     contract_event::ContractEvent,
     event::EventKey,
@@ -312,16 +312,7 @@ pub fn encode_transfer_transaction(
 }
 
 fn encode_transaction(sender: AccountAddress, program: Script) -> Transaction {
-    let raw_transaction = RawTransaction::new_script(
-        sender,
-        0,
-        program,
-        0,
-        0,
-        XUS_NAME.to_owned(),
-        0,
-        ChainId::test(),
-    );
+    let raw_transaction = RawTransaction::new_script(sender, 0, program, 0, 0, 0, ChainId::test());
 
     let privkey = Ed25519PrivateKey::generate_for_testing();
     Transaction::UserTransaction(

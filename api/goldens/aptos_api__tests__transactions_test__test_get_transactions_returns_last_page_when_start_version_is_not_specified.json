@@ -8,7 +8,7 @@
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xbd144a25e2a0661d671ac1fa12eaa8cb655d3db4602f812ae554ad880f7c7133",
+    "accumulator_root_hash": "0x159f181e8609a99df2d541c6c906381d6a4ef3d92f1558092ded8544522e8a56",
     "changes": [
       {
         "type": "write_resource",
@@ -55,13 +55,13 @@
   {
     "type": "user_transaction",
     "version": "16",
-    "hash": "0x2328499876689f2755188659ff009cbbeccbb34d10cd10eda66d109f0689cc73",
+    "hash": "0x7bc390a5d4f5b88560b0494e0baac9ca723fcbac4e5265a2420dd1114c6dd64e",
     "state_root_hash": "0x6d797da2c2fb421617996ca736fb96029e72c0a15383a711fc3fbe120b8984af",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
     "gas_used": "92",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xd9d26df0fa02b7e704d206e325a815240211292df382ec7edfcaf187510e7a8a",
+    "accumulator_root_hash": "0x9d419221b7525c955585141990f7cdb3f44956664ee9b8f2c52ab3a9b220b2da",
     "changes": [
       {
         "type": "write_resource",
@@ -177,7 +177,6 @@
     "sequence_number": "7",
     "max_gas_amount": "2000",
     "gas_unit_price": "0",
-    "gas_currency_code": "XUS",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
       "type": "script_function_payload",
@@ -190,7 +189,7 @@
     "signature": {
       "type": "ed25519_signature",
       "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-      "signature": "0x0d187663a161dcb46f0b48ec84d66a237ab2e9963013da0ea91efe8a41b16e2e3e41c44b62a0f5cea3d75165cbd75a567ec542d178942617b60a6ab588b79c01"
+      "signature": "0x363190a2e317fad1b62152ec60c6966da017848b568be2a331cf538219a32cd8b637786872b50246b721e0cf15592113c71a3ac2df97496c134ed77bb52dfb06"
     },
     "events": [],
     "timestamp": "8"
@@ -204,7 +203,7 @@
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x18d9054aa827cb8d4ee35dc0f186f69f44bba3817d318cbdb4f39f7185607110",
+    "accumulator_root_hash": "0x977852c1750f9f241454843d182c8e53b1a660e8eb03e753990a532c3fbe3b00",
     "changes": [
       {
         "type": "write_resource",
@@ -251,13 +250,13 @@
   {
     "type": "user_transaction",
     "version": "18",
-    "hash": "0x63b87ea03242b488baf0ad1fb798a3f15116542239bbcde883e1d88649d5997d",
+    "hash": "0x28fb2e2dda957e42fd64e36b6df5282764ad4cf04f5b4e82e6d60706a31eef35",
     "state_root_hash": "0x2087589106cfa409630e7b7dd3fbe1b139b8ad0ff5f88a833769b62be7d46c45",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
     "gas_used": "92",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x21119b21cc842f175f69f6f4077ddcb2124c0ce2acfcb3695c34f0a2ad4e4a06",
+    "accumulator_root_hash": "0xe55e9c878592e17bf903ff1e9f8ed7808d93f3a6cf58c4d2085fa097febd9225",
     "changes": [
       {
         "type": "write_resource",
@@ -373,7 +372,6 @@
     "sequence_number": "8",
     "max_gas_amount": "2000",
     "gas_unit_price": "0",
-    "gas_currency_code": "XUS",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
       "type": "script_function_payload",
@@ -386,7 +384,7 @@
     "signature": {
       "type": "ed25519_signature",
       "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-      "signature": "0xc059e6be4a9e225a589189cad53ff2f058894e6948711f124b6eaa0e6a17582308d9b9c734b6c999145b1aa8056734da1b476250c04d33d5ea32e829f2bed10c"
+      "signature": "0xeb870e109b5544fa8562d66ffa139797e9ffd3114bf6072ce4b7b519a27e35d90a8a9356ee1be5a0a5f8b75a449080c74f75a81465f00e5d9c7fc03882372103"
     },
     "events": [],
     "timestamp": "9"
@@ -400,7 +398,7 @@
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x8b687d19c6f3a96150673bdb60e5ef86b6a040d18b857cf4de2607bba0a861dd",
+    "accumulator_root_hash": "0x8fcc4961819147b5a3c5e7f522f18d2e4c92acbc8cc55e82b8c505e786544066",
     "changes": [
       {
         "type": "write_resource",
@@ -447,13 +445,13 @@
   {
     "type": "user_transaction",
     "version": "20",
-    "hash": "0x51990f51d28a92bbb9ff53c24432da1971fb17b81b59837df1877be293341d9f",
+    "hash": "0x652f97186eb303dc48af00318aec7c9b6efbad3f8538a541d1cab6afe593d0b2",
     "state_root_hash": "0xba29b17c26da31e86e0528326718f7f9aa500035e1f311e75e9fb1baeb81b33f",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
     "gas_used": "92",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xf7d073365ec6b14ee6cea991b8cd031eb44b8f0726a68887cedf5f8dca7fe6a8",
+    "accumulator_root_hash": "0x2dabf2c5b0cc6e546654006626c2175bdf343213b9d8caab6f0b09d4c4cac172",
     "changes": [
       {
         "type": "write_resource",
@@ -569,7 +567,6 @@
     "sequence_number": "9",
     "max_gas_amount": "2000",
     "gas_unit_price": "0",
-    "gas_currency_code": "XUS",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
       "type": "script_function_payload",
@@ -582,7 +579,7 @@
     "signature": {
       "type": "ed25519_signature",
       "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-      "signature": "0xee370907c57254ab352cd7dace9be7df3fe8217315807c1a9478eef390573dd247266446eaecec462dec1f470b2b40c7b84be0678eb000a4b6976569f644d205"
+      "signature": "0x01ca10daadc3c9581236fa3e645f2888e5210e2b907f0043ee2d8ba18a06036df355d57858d03d5156266e1dad404fea4ba39e345211fc2c2e87db97f98e280d"
     },
     "events": [],
     "timestamp": "10"
@@ -596,7 +593,7 @@
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x092d0f5e375c1cc1d09e26be3ce5ff5b97944cfa3d3da8be302b74b02c903810",
+    "accumulator_root_hash": "0x76009ab363578d8480a91d4d34ab95e5f0e9e8281742b4551758a33730896de5",
     "changes": [
       {
         "type": "write_resource",
@@ -643,13 +640,13 @@
   {
     "type": "user_transaction",
     "version": "22",
-    "hash": "0x2fa90379d4ccd1e3b86cdea7517325bf17776f5a074729673a6202ce91dcc39f",
+    "hash": "0xda850e6cde9e2a036603b21f27d1aaaaabed970130deb84f624b844c422b0d86",
     "state_root_hash": "0x83856d7287d5db4a2e9d321255f82c1cac73f1f8f89cf480b4e982ca63b84bb4",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
     "gas_used": "92",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x3e071a90f8c72e7355d07a6e4b1655fe3f874308f1872512828347e88e26318f",
+    "accumulator_root_hash": "0x230c661d74c41455e0be65d4c8d6d50a2ae94760ac1fc6018ad001d6878e809f",
     "changes": [
       {
         "type": "write_resource",
@@ -765,7 +762,6 @@
     "sequence_number": "10",
     "max_gas_amount": "2000",
     "gas_unit_price": "0",
-    "gas_currency_code": "XUS",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
       "type": "script_function_payload",
@@ -778,7 +774,7 @@
     "signature": {
       "type": "ed25519_signature",
       "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-      "signature": "0xb125665bd6b21619afca8d31eaef31682cd74f0a346a8e7b06363927516a5c4e95ff2e326b5852820c8357a4eb714536877831caa375ffd0b74b9d214f25b701"
+      "signature": "0x8e3875da9c5ceb30c6ff195be69a1e461348d19eaece06e81376c5bcfcaff661b0fb1d8179241818371cc03023e517966204a87aff0d74bae2ad14c95aaedc02"
     },
     "events": [],
     "timestamp": "11"
@@ -792,7 +788,7 @@
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x2937d0e2da99823f2dd6867e86a6f1ff04a890154500a42f76759708aa828fe7",
+    "accumulator_root_hash": "0xd62f83e49338cce7517c6a239ebaf07790aff639a3cd4a20c030f104c3599225",
     "changes": [
       {
         "type": "write_resource",
@@ -839,13 +835,13 @@
   {
     "type": "user_transaction",
     "version": "24",
-    "hash": "0x815726bd587f452b6909eca5119f7ac61074834bb5a25cb86776bb1f10eaaad9",
+    "hash": "0x68cdfdeabb160917d852e8960a2588a3a8a1905707561a2a5e4b3922f2c20109",
     "state_root_hash": "0x1caec4a0df804033b8c2f8db469b06bfcaf5ccbb1d0b87d1561b872b8afc2da6",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
     "gas_used": "92",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xd88e88ddd20fdbbff76d57172f5855e563441a34924dc2b2e030a5e4d8d09a03",
+    "accumulator_root_hash": "0x453c1da7062c3b047c66c6ab70011d9136c93b7453445fba886910c84b2fdf59",
     "changes": [
       {
         "type": "write_resource",
@@ -961,7 +957,6 @@
     "sequence_number": "11",
     "max_gas_amount": "2000",
     "gas_unit_price": "0",
-    "gas_currency_code": "XUS",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
       "type": "script_function_payload",
@@ -974,7 +969,7 @@
     "signature": {
       "type": "ed25519_signature",
       "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-      "signature": "0x396159dda023d4cd5147f24c42e29540921eb65851caa2ae069f25f3dd9a51d9494d24daec8a6f51d0724847517065c21a97fbd1364c286c82f85e99ed0f0102"
+      "signature": "0xf9186af56afec6ac6623cacd4f81aae0619b4f92eec54c953019aec3f90aaa96a7e742c454268808ea92559658d30c2f39e72464a471f9455a1739759e441502"
     },
     "events": [],
     "timestamp": "12"
@@ -988,7 +983,7 @@
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x006ff4972da9dda9c971018bb0b6bc4913dd6ce2ab08774b4481c0f733ad83d9",
+    "accumulator_root_hash": "0x7f6d5b64f4669fb3d55ae2edf1a1e043f421e90afd0fc3dedbcbb65f9453b915",
     "changes": [
       {
         "type": "write_resource",
@@ -1035,13 +1030,13 @@
   {
     "type": "user_transaction",
     "version": "26",
-    "hash": "0xae751e81f2a5a18e87e2ff8170fbee80eb4e8d2af339c882ed7da3d57e2ce3e7",
+    "hash": "0x673d5dca47ffde8b99952fec38ee130fd2aa735c084402b3a8850165d467a917",
     "state_root_hash": "0x6931e79e98e99c43c3c85b4f71a7f6c930ae72104ffa760fd8d963e793dee3d6",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
     "gas_used": "92",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x6352149124f30a000571058fc70631d5d126f0a4c6c83075c740178486e03b8b",
+    "accumulator_root_hash": "0x7a7642f6faee918902d70adedf7668da5130b2701ad2bcd7662c57d8df956ba7",
     "changes": [
       {
         "type": "write_resource",
@@ -1157,7 +1152,6 @@
     "sequence_number": "12",
     "max_gas_amount": "2000",
     "gas_unit_price": "0",
-    "gas_currency_code": "XUS",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
       "type": "script_function_payload",
@@ -1170,7 +1164,7 @@
     "signature": {
       "type": "ed25519_signature",
       "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-      "signature": "0x54556499d76bfd4c44e8f2d456fe2e72219cc38d7504ec369c312c14b606b0ddfeeafee98ebe797a6e3151ca81a924736b6cfc9863217bb8106d69fb5b2dfb0a"
+      "signature": "0xa5b166a457c68022770e5b436450c07776ab95237088fd890cc8b783b783d529bce56a8777d70ab62e4483f0134e94b802c21f1fbfe47c22ae05eb010bf9a10e"
     },
     "events": [],
     "timestamp": "13"
@@ -1184,7 +1178,7 @@
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x320d105383cd09a489c94b42af874db57fc0c1ba7c68e49ef27ec623c998cba2",
+    "accumulator_root_hash": "0x492a0e83299f8359ea7bfddef819d32a97075fd13971d729e6112271e1ba1d51",
     "changes": [
       {
         "type": "write_resource",
@@ -1231,13 +1225,13 @@
   {
     "type": "user_transaction",
     "version": "28",
-    "hash": "0x1c7831db9033ce071ea503a89d29f6469225a059196d23daafbdd509859b309d",
+    "hash": "0x50b56bc5a09a095afcf38451aef0ffeeca9e8c17f538d082ccf33b4ead3d9de9",
     "state_root_hash": "0x4c747f5f57df51ef83b9c1a64bd3748a54bdca7133e2143d7196d0ed0688b9c2",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
     "gas_used": "92",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x1fd94f00aa4dbd8db10db7cffa54aaf19dfc94dbc2f54e2dc69cdbd00fe61a75",
+    "accumulator_root_hash": "0x816fe30beb777b47d4119bade2315a5bb1a67c2abf3400e192f1374922683746",
     "changes": [
       {
         "type": "write_resource",
@@ -1353,7 +1347,6 @@
     "sequence_number": "13",
     "max_gas_amount": "2000",
     "gas_unit_price": "0",
-    "gas_currency_code": "XUS",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
       "type": "script_function_payload",
@@ -1366,7 +1359,7 @@
     "signature": {
       "type": "ed25519_signature",
       "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-      "signature": "0x9965a7d8bb8126f38ffb0c99f810e5a525f39e9fc1e89fc378d1cdd7a2a9dd91964558a50a198a8f41eb72a6376be7b2c9c6f538face5eb9a5481d0a910b7209"
+      "signature": "0x134df5cd5cc5e6a2c9f4a938adb89ae2e07663a10f1c2be04647a4f79120fc2f7bed372dbbaa9bb35402230f3f4c6f2477ce6e7c37be53cbad1c06f969086e01"
     },
     "events": [],
     "timestamp": "14"
@@ -1380,7 +1373,7 @@
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x54502934b4055e56bc972420abfe2f554b164b07a022cc3989308dd488b72e41",
+    "accumulator_root_hash": "0xe2a6b31fc8ed4c6c29906108d44beb4b65584f6e244f1c5b7d7c8c4f98355c4a",
     "changes": [
       {
         "type": "write_resource",
@@ -1427,13 +1420,13 @@
   {
     "type": "user_transaction",
     "version": "30",
-    "hash": "0x9df02707c23ad9222f7d8e3c3305d2bd09fc95f530e305a626454b3e90b88e7d",
+    "hash": "0x8c9e6c04384957bd474d64147adad5e3405733aab3319e715ef116e7e60c6be4",
     "state_root_hash": "0x354abd33613f1667c4e006c578b23fd9e7f063613b49367b99a08332ce4b57ee",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
     "gas_used": "92",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x3c5c9df5f39b3df7d5ac64fb1414c2601351dbfe849938e9c443b13108c8adef",
+    "accumulator_root_hash": "0xb4fa3eb5160e479d7bea9a7ce514d12ca4bc22bc82564c31d137d408a8aa5f7a",
     "changes": [
       {
         "type": "write_resource",
@@ -1549,7 +1542,6 @@
     "sequence_number": "14",
     "max_gas_amount": "2000",
     "gas_unit_price": "0",
-    "gas_currency_code": "XUS",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
       "type": "script_function_payload",
@@ -1562,7 +1554,7 @@
     "signature": {
       "type": "ed25519_signature",
       "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-      "signature": "0xfc6b2e6a2224caa871b92e6490d1e438da475be2398003e92ae4a7065e1620e5ee47f2ce75d7e9595d5fde6622dceb49ac8cdf96e2f6b7b660d2cf413a84b600"
+      "signature": "0x0bd902e523bc9d0ba1119a42da1f191cd06e72cab2bd1089b20b331f372381cf95388345599d8d468729d6541ac9cf05566100e93594649fbb93a2435e090b0a"
     },
     "events": [],
     "timestamp": "15"
@@ -1576,7 +1568,7 @@
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x8c52b6fe7144ffdc71531cf88f21a35aef008e530eee0054559cbddb2cd56813",
+    "accumulator_root_hash": "0x44f6aed3cc92f0a04eb7d9a4c560715f44f54c0df3aaf613572610febda55331",
     "changes": [
       {
         "type": "write_resource",
@@ -1623,13 +1615,13 @@
   {
     "type": "user_transaction",
     "version": "32",
-    "hash": "0x6e62d181c5fd9dcf212beeeb2c0fbd8d07d915dbb6d812843d7721be3e0cbf82",
+    "hash": "0x0c26a52a417e88ba6bcb3c0b892ca231d8b71aed396c9d0e6ede20877c198682",
     "state_root_hash": "0xed1e5cebacb8064ff1245590e1eb0ac72d61471e3eb2338c799400f77eb51129",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
     "gas_used": "92",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xd431e90331933f42cc53d73ce95e1bb7c2ec66308a58ee04adf3215babfbf004",
+    "accumulator_root_hash": "0x935a793a78286cfb4a525ef7996283a26da1ca31bb4dc922db1999c20baa3367",
     "changes": [
       {
         "type": "write_resource",
@@ -1745,7 +1737,6 @@
     "sequence_number": "15",
     "max_gas_amount": "2000",
     "gas_unit_price": "0",
-    "gas_currency_code": "XUS",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
       "type": "script_function_payload",
@@ -1758,7 +1749,7 @@
     "signature": {
       "type": "ed25519_signature",
       "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-      "signature": "0xc9ac733aa447ff5c81708d5f48fcd42f8d57f2a0e9941de3f9f69ae738058bdaf7a4aeb342bc1f94f009bc85906d5dace010521b2b77d98f06e62586c5f5be03"
+      "signature": "0x6718ed0fa9c71bc5407d35f66540871460b34c1a93c02a8830abd5c32f567e21e5043251d628f32c27ea7b5c0efb04bdb75d19c3ffc1097a32e9f2d122225005"
     },
     "events": [],
     "timestamp": "16"
@@ -1772,7 +1763,7 @@
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x1c49fc5940ac414a7c6b5de79d81abaee829d360c3ed9ac5fa8d61a13f9d5e88",
+    "accumulator_root_hash": "0x39ac4f9d8b36ca332e5d006c12fa7f06c98e68462e36348940d20864902788d1",
     "changes": [
       {
         "type": "write_resource",
@@ -1819,13 +1810,13 @@
   {
     "type": "user_transaction",
     "version": "34",
-    "hash": "0x6469ab64f30d4b6f013d755b1b6e06daa3663b783c654bbee8c7e888d58e588e",
+    "hash": "0xf91aed259eb4db845dc1b611e2ed67ddbf5fed8966ec76dd184659493b0677fb",
     "state_root_hash": "0xc13edb519c19c8102a3618bb14a4c5e8777d3eb206fe01b8e8360d4a97fcc0dd",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
     "gas_used": "92",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x9057600c94de8ddbe5d61b5e458f9489720a5ba5c0994132ae3948945278c932",
+    "accumulator_root_hash": "0x7200f26670f092eba0bb27c37b18747201c51fda8ad77381516685bdad0c286b",
     "changes": [
       {
         "type": "write_resource",
@@ -1941,7 +1932,6 @@
     "sequence_number": "16",
     "max_gas_amount": "2000",
     "gas_unit_price": "0",
-    "gas_currency_code": "XUS",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
       "type": "script_function_payload",
@@ -1954,7 +1944,7 @@
     "signature": {
       "type": "ed25519_signature",
       "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-      "signature": "0xb42be2ff18555b9c400a1419a9dbfcfbe15bd8fd67b51f011e49fe8d77f0c6f1ab44bc7add2f5a1d0ce02f5cfc450a70d5dfd703b187a9b01154792b82cdb607"
+      "signature": "0x4f7d03e5d7b26bb76adc3b4e62c992fe0040d595259da5bc2df19555f9e0df31772424568d1dbb69ff34fda36da61b45837fcca7c3d5006714758469fffe3902"
     },
     "events": [],
     "timestamp": "17"
@@ -1968,7 +1958,7 @@
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xab51af7af7f5cc6e9906acbebdaca0ed35ae15146c0983b338670940b429dc07",
+    "accumulator_root_hash": "0x4074d23de037c9b4ed87b51f021af20c4341dc7b6c0f4a903fac3f42887eb6e9",
     "changes": [
       {
         "type": "write_resource",
@@ -2015,13 +2005,13 @@
   {
     "type": "user_transaction",
     "version": "36",
-    "hash": "0x9cad43895d817e20b939742ebcc4e0bb7314cd80a5f828dd1dd37b65fc657a5a",
+    "hash": "0xf102d60f1e2350c3491f00d87fd646d9441bc6341672c2d81c7541627958f181",
     "state_root_hash": "0xeb0d5ca30d1c76818c6fe611f698aec4cfd4db25a8dc0efc96df6a8e4055fb5d",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
     "gas_used": "92",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xd8a636007da543df0c0bdb21a94a92524c6607a136cfddd67a840e6baebdf488",
+    "accumulator_root_hash": "0xb456081800bd3c15c7e3c8c5386164d00ccd6ce24ba289830d1731793f12d1b1",
     "changes": [
       {
         "type": "write_resource",
@@ -2137,7 +2127,6 @@
     "sequence_number": "17",
     "max_gas_amount": "2000",
     "gas_unit_price": "0",
-    "gas_currency_code": "XUS",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
       "type": "script_function_payload",
@@ -2150,7 +2139,7 @@
     "signature": {
       "type": "ed25519_signature",
       "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-      "signature": "0x86b5ef64a24f2cccd5341a4ea5f717939508b396b7b0965dc9e2d922ce549efcde7c94566e8cc8c8acd1699ce4c5ea8a3fc8bf45b725a15d09459749e5099a09"
+      "signature": "0x63d8bd993dca055e6384f795542a75d00682bdd1c0523caec354a9ad384ded1977823f360be3867821eb87ba880cb5072f5b9871b07e3f205cf994730dc37100"
     },
     "events": [],
     "timestamp": "18"
@@ -2164,7 +2153,7 @@
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x1730b7962ce7623fa56e3dc48a2a7f8d9b19835f7f9e92666128d6c4d7b4cd5a",
+    "accumulator_root_hash": "0x305b1a188559251e6b6a38df6ea0290850a3c8a62eba60641814982f9b9bec13",
     "changes": [
       {
         "type": "write_resource",
@@ -2211,13 +2200,13 @@
   {
     "type": "user_transaction",
     "version": "38",
-    "hash": "0x4f22f31cbe392123f1dc13be4574c227b88c9270bbe8b2030641646d062cb565",
+    "hash": "0xd8a0e4a0854841f0a2d0ccba40b0bd4e033781b6458580e521a50286835bfcf6",
     "state_root_hash": "0x0a0203700a6bec0bb704a5c55573054b616a7ded1662278c1fa187a8e0a8c5d7",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
     "gas_used": "92",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xc083b65f6f75a8d7c602b33f632f08837e3303cac714ddb1109380fc350005f1",
+    "accumulator_root_hash": "0xee12ca6ba5437d05367df6ed217db2021a319ae8f736ad46524ea5e1584a394d",
     "changes": [
       {
         "type": "write_resource",
@@ -2333,7 +2322,6 @@
     "sequence_number": "18",
     "max_gas_amount": "2000",
     "gas_unit_price": "0",
-    "gas_currency_code": "XUS",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
       "type": "script_function_payload",
@@ -2346,7 +2334,7 @@
     "signature": {
       "type": "ed25519_signature",
       "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-      "signature": "0x6b849fbd533b60f3b0ffd63dd7b64555bbfba5b690f83077466aaec043d00f82edf756f066f7b75e509891489b9a0d7ae35580e0a332c77cb9d69f5bc8cbf702"
+      "signature": "0xb5aaff760c10f4ef0d3ffe3d2cfcb92e294aee680e2fca4c55ed8465c4d02409de0644856c298e578e1ab3b4309bec85a38c3a141b2aaf53d448fca856fb9205"
     },
     "events": [],
     "timestamp": "19"
@@ -2360,7 +2348,7 @@
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x3e9dbe9066445efaf9e6cf830616640835234846597ea0b63f72597b74753af8",
+    "accumulator_root_hash": "0x721447954b69a810cdf32876d1c8f1c61de590cb6b64aa14b62e3810ea8d02f1",
     "changes": [
       {
         "type": "write_resource",
