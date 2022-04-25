@@ -13,11 +13,11 @@ type Props = {
   [prop: string]: any;
 };
 
-function oauthUrl(service: Service): string {
+function oauthUrl(service: Service, csrfToken: string): string {
   const clientId = CLIENT_IDS[service];
   switch (service) {
     case "github":
-      return `https://github.com/login/oauth/authorize?scope=user:email&client_id=${clientId}`;
+      return `https://github.com/login/oauth/authorize?scope=user:email&client_id=${clientId}&state=${csrfToken}`;
     default:
       return assertNever(service);
   }
@@ -38,26 +38,26 @@ export class SocialLoginButtonCallbackPage extends React.Component {
   }
 }
 
+const APTOS_OAUTH_POPUP = "aptos-oauth-popup";
 let oauthPopup: Window | null = null;
 let prevUrl: string | null = null;
-let i = 0;
 
 export class SocialLoginButton extends React.Component<Props> {
-  popupId = `aptos-oauth-popup-${++i}`;
+  csrfToken = crypto.randomUUID();
 
   componentWillUnmount() {
     window.removeEventListener("message", this.handleOauthMessage);
   }
 
   openOauthPopup(service: Service) {
-    const url = oauthUrl(service);
+    const url = oauthUrl(service, this.csrfToken);
 
     window.removeEventListener("message", this.handleOauthMessage);
 
     if (oauthPopup == null || oauthPopup.closed) {
-      oauthPopup = window.open(url, this.popupId);
+      oauthPopup = window.open(url, APTOS_OAUTH_POPUP);
     } else if (prevUrl != null) {
-      oauthPopup = window.open(url, this.popupId);
+      oauthPopup = window.open(url, APTOS_OAUTH_POPUP);
       oauthPopup?.focus();
     } else {
       oauthPopup.focus();
@@ -76,7 +76,14 @@ export class SocialLoginButton extends React.Component<Props> {
       return;
     }
 
-    if (event.source?.name !== this.popupId) {
+    if (event.source?.name !== APTOS_OAUTH_POPUP) {
+      return;
+    }
+
+    const {data} = event;
+    const params = new URLSearchParams(data);
+
+    if (params.get("state") !== this.csrfToken) {
       return;
     }
 
