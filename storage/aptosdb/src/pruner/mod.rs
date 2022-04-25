@@ -52,6 +52,13 @@ pub(crate) struct Pruner {
     /// as this is accessed both by the Pruner thread and the worker thread.
     #[allow(dead_code)]
     least_readable_version: Arc<Mutex<Vec<Version>>>,
+    /// We send a batch of version to the underlying pruners for performance reason. This tracks the
+    /// last version we sent to the pruner.
+    last_version_sent_to_pruners: Arc<Mutex<Version>>,
+    /// Ideal batch size of the versions to be sent to the pruner
+    pruning_batch_size: usize,
+    /// latest version
+    latest_version: Arc<Mutex<Version>>,
 }
 
 #[cfg(test)]
@@ -108,6 +115,9 @@ impl Pruner {
             worker_thread: Some(worker_thread),
             command_sender: Mutex::new(command_sender),
             least_readable_version: worker_progress_clone,
+            last_version_sent_to_pruners: Arc::new(Mutex::new(0)),
+            pruning_batch_size: storage_pruner_config.pruning_batch_size,
+            latest_version: Arc::new(Mutex::new(0)),
         }
     }
 
@@ -116,7 +126,16 @@ impl Pruner {
     }
 
     /// Sends pruning command to the worker thread when necessary.
-    pub fn wake(&self, latest_version: Version) {
+    pub fn maybe_wake_pruner(&self, latest_version: Version) {
+        *self.latest_version.lock() = latest_version;
+        if latest_version
+            >= *self.last_version_sent_to_pruners.lock() + self.pruning_batch_size as u64
+        {
+            self.wake_pruner(latest_version)
+        }
+    }
+
+    fn wake_pruner(&self, latest_version: Version) {
         let least_readable_state_store_version =
             latest_version.saturating_sub(self.state_store_prune_window);
         let least_readable_default_store_version =
@@ -149,7 +168,7 @@ impl Pruner {
             time::{Duration, Instant},
         };
 
-        self.wake(latest_version);
+        self.maybe_wake_pruner(latest_version);
 
         if latest_version > self.state_store_prune_window
             || latest_version > self.default_prune_window

@@ -69,6 +69,7 @@ fn test_state_store_pruner() {
             state_store_prune_window: Some(0),
             default_prune_window: Some(0),
             max_version_to_prune_per_batch: Some(100),
+            pruning_batch_size: 1,
         },
         Arc::clone(transaction_store),
         Arc::clone(&aptos_db.ledger_store),
