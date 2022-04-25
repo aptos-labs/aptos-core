@@ -2,7 +2,7 @@
 title: "Accounts"
 id: "basics-accounts"
 ---
-An account represents a resource on the Aptos Blockchain that can send transactions. Each account is identified by a particular 16-byte account address and is a container for Move modules and Move resources.
+An account represents a resource on the Aptos Blockchain that can send transactions. Each account is identified by a particular 32-byte account address and is a container for Move modules and Move resources.
 
 # Introduction
 
