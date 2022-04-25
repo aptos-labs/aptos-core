@@ -5,6 +5,7 @@
 //! meant to be triggered by other threads as they commit new data to the DB.
 
 mod db_pruner;
+pub(crate) mod db_sub_pruner;
 pub(crate) mod event_store;
 mod ledger_store;
 pub(crate) mod state_store;
@@ -41,7 +42,7 @@ pub(crate) struct Pruner {
     state_store_prune_window: Version,
     /// DB version window, which dictates how many version of other stores like transaction, ledger
     /// info, events etc to keep.
-    default_prune_window: Version,
+    ledger_prune_window: Version,
     /// The worker thread handle, created upon Pruner instance construction and joined upon its
     /// destruction. It only becomes `None` after joined in `drop()`.
     worker_thread: Option<JoinHandle<()>>,
@@ -52,15 +53,19 @@ pub(crate) struct Pruner {
     /// as this is accessed both by the Pruner thread and the worker thread.
     #[allow(dead_code)]
     least_readable_version: Arc<Mutex<Vec<Version>>>,
+    /// We send a batch of version to the underlying pruners for performance reason. This tracks the
+    /// last version we sent to the pruner.
+    last_version_sent_to_pruners: Arc<Mutex<Version>>,
+    /// Ideal batch size of the versions to be sent to the pruner
+    pruning_batch_size: usize,
+    /// latest version
+    latest_version: Arc<Mutex<Version>>,
 }
 
 #[cfg(test)]
 pub enum PrunerIndex {
     StateStorePrunerIndex,
-    TransactionStorePrunerIndex,
-    _LedgerStorePrunerIndex,
-    EventStorePrunerIndex,
-    WriteSetPrunerIndex,
+    LedgerPrunerIndex,
 }
 
 impl Pruner {
@@ -89,9 +94,7 @@ impl Pruner {
             event_store,
             command_receiver,
             least_readable_version,
-            storage_pruner_config
-                .max_version_to_prune_per_batch
-                .expect("Max version to prune per batch is expected"),
+            storage_pruner_config.pruning_batch_size as u64,
         );
         let worker_thread = std::thread::Builder::new()
             .name("aptosdb_pruner".into())
@@ -102,12 +105,15 @@ impl Pruner {
             state_store_prune_window: storage_pruner_config
                 .state_store_prune_window
                 .expect("State store prune window must be specified"),
-            default_prune_window: storage_pruner_config
-                .default_prune_window
+            ledger_prune_window: storage_pruner_config
+                .ledger_prune_window
                 .expect("Default prune window must be specified"),
             worker_thread: Some(worker_thread),
             command_sender: Mutex::new(command_sender),
             least_readable_version: worker_progress_clone,
+            last_version_sent_to_pruners: Arc::new(Mutex::new(0)),
+            pruning_batch_size: storage_pruner_config.pruning_batch_size,
+            latest_version: Arc::new(Mutex::new(0)),
         }
     }
 
@@ -116,21 +122,26 @@ impl Pruner {
     }
 
     /// Sends pruning command to the worker thread when necessary.
-    pub fn wake(&self, latest_version: Version) {
+    pub fn maybe_wake_pruner(&self, latest_version: Version) {
+        *self.latest_version.lock() = latest_version;
+        if latest_version
+            >= *self.last_version_sent_to_pruners.lock() + self.pruning_batch_size as u64
+        {
+            self.wake_pruner(latest_version)
+        }
+    }
+
+    fn wake_pruner(&self, latest_version: Version) {
         let least_readable_state_store_version =
             latest_version.saturating_sub(self.state_store_prune_window);
-        let least_readable_default_store_version =
-            latest_version.saturating_sub(self.default_prune_window);
+        let least_readable_ledger_version = latest_version.saturating_sub(self.ledger_prune_window);
 
         self.command_sender
             .lock()
             .send(Command::Prune {
                 target_db_versions: vec![
                     least_readable_state_store_version,
-                    least_readable_default_store_version,
-                    least_readable_default_store_version,
-                    least_readable_default_store_version,
-                    least_readable_default_store_version,
+                    least_readable_ledger_version,
                 ],
             })
             .expect("Receiver should not destruct prematurely.");
@@ -149,10 +160,10 @@ impl Pruner {
             time::{Duration, Instant},
         };
 
-        self.wake(latest_version);
+        self.maybe_wake_pruner(latest_version);
 
         if latest_version > self.state_store_prune_window
-            || latest_version > self.default_prune_window
+            || latest_version > self.ledger_prune_window
         {
             let least_readable_state_store_version = latest_version - self.state_store_prune_window;
             // Assuming no big pruning chunks will be issued by a test.

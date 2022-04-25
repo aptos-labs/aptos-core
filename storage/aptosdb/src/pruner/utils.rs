@@ -5,13 +5,8 @@
 
 use crate::{
     pruner::{
-        db_pruner::DBPruner,
-        event_store::event_store_pruner::EventStorePruner,
-        ledger_store::ledger_store_pruner::LedgerStorePruner,
+        db_pruner::DBPruner, ledger_store::ledger_store_pruner::LedgerPruner,
         state_store::StateStorePruner,
-        transaction_store::{
-            transaction_store_pruner::TransactionStorePruner, write_set_pruner::WriteSetPruner,
-        },
     },
     EventStore, LedgerStore, TransactionStore,
 };
@@ -32,21 +27,11 @@ pub fn create_db_pruners(
             0,
             Instant::now(),
         ))),
-        Mutex::new(Arc::new(TransactionStorePruner::new(
+        Mutex::new(Arc::new(LedgerPruner::new(
             Arc::clone(&db),
             Arc::clone(&transaction_store),
-        ))),
-        Mutex::new(Arc::new(LedgerStorePruner::new(
-            Arc::clone(&db),
-            Arc::clone(&ledger_store),
-        ))),
-        Mutex::new(Arc::new(EventStorePruner::new(
-            Arc::clone(&db),
             Arc::clone(&event_store),
-        ))),
-        Mutex::new(Arc::new(WriteSetPruner::new(
-            Arc::clone(&db),
-            Arc::clone(&transaction_store),
+            Arc::clone(&ledger_store),
         ))),
     ]
 }

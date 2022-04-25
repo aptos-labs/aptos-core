@@ -650,7 +650,7 @@ impl AptosDB {
 
     fn wake_pruner(&self, latest_version: Version) {
         if let Some(pruner) = self.pruner.as_ref() {
-            pruner.wake(latest_version)
+            pruner.maybe_wake_pruner(latest_version)
         }
     }
 }

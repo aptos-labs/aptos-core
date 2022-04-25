@@ -1,43 +1,67 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    metrics::APTOS_PRUNER_LEAST_READABLE_VERSION, pruner::db_pruner::DBPruner,
-    schema::ledger_counters::LedgerCountersSchema, LedgerStore,
+    metrics::APTOS_PRUNER_LEAST_READABLE_VERSION,
+    pruner::{
+        db_pruner::DBPruner,
+        db_sub_pruner::DBSubPruner,
+        event_store::event_store_pruner::EventStorePruner,
+        ledger_store::ledger_counter_pruner::LedgerCounterPruner,
+        transaction_store::{
+            transaction_store_pruner::TransactionStorePruner, write_set_pruner::WriteSetPruner,
+        },
+    },
+    transaction::TransactionSchema,
+    EventStore, LedgerStore, TransactionStore,
 };
 use aptos_types::transaction::{AtomicVersion, Version};
 use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::sync::{atomic::Ordering, Arc};
 
-pub const LEDGER_STORE_PRUNER_NAME: &str = "ledger store pruner";
+pub const LEDGER_PRUNER_NAME: &str = "ledger pruner";
 
-pub struct LedgerStorePruner {
+pub struct LedgerPruner {
     db: Arc<DB>,
     /// Keeps track of the target version that the pruner needs to achieve.
-    ledger_store: Arc<LedgerStore>,
     target_version: AtomicVersion,
     least_readable_version: AtomicVersion,
+    transaction_store_pruner: Arc<dyn DBSubPruner + Send + Sync>,
+    event_store_pruner: Arc<dyn DBSubPruner + Send + Sync>,
+    write_set_pruner: Arc<dyn DBSubPruner + Send + Sync>,
+    ledger_counter_pruner: Arc<dyn DBSubPruner + Send + Sync>,
 }
 
-impl DBPruner for LedgerStorePruner {
+impl DBPruner for LedgerPruner {
     fn name(&self) -> &'static str {
-        LEDGER_STORE_PRUNER_NAME
+        LEDGER_PRUNER_NAME
     }
 
     fn prune(&self, db_batch: &mut SchemaBatch, max_versions: u64) -> anyhow::Result<Version> {
+        let least_readable_version = self.least_readable_version();
+        // Current target version might be less than the target version to ensure we don't prune
+        // more than max_version in one go.
         let current_target_version = self.get_currrent_batch_target(max_versions);
-        self.ledger_store.prune_ledger_couners(
-            self.least_readable_version(),
-            current_target_version,
+        self.transaction_store_pruner.prune(
             db_batch,
+            least_readable_version,
+            current_target_version,
         )?;
+        self.write_set_pruner
+            .prune(db_batch, least_readable_version, current_target_version)?;
+        self.ledger_counter_pruner.prune(
+            db_batch,
+            least_readable_version,
+            current_target_version,
+        )?;
+        self.event_store_pruner
+            .prune(db_batch, least_readable_version, current_target_version)?;
+
         self.record_progress(current_target_version);
         Ok(current_target_version)
     }
 
     fn initialize_least_readable_version(&self) -> anyhow::Result<Version> {
-        let mut iter = self
-            .db
-            .iter::<LedgerCountersSchema>(ReadOptions::default())?;
+        let mut iter = self.db.iter::<TransactionSchema>(ReadOptions::default())?;
         iter.seek_to_first();
         let version = iter.next().transpose()?.map_or(0, |(version, _)| version);
         Ok(version)
@@ -59,18 +83,28 @@ impl DBPruner for LedgerStorePruner {
         self.least_readable_version
             .store(least_readable_version, Ordering::Relaxed);
         APTOS_PRUNER_LEAST_READABLE_VERSION
-            .with_label_values(&["ledger_store"])
+            .with_label_values(&["ledger_pruner"])
             .set(least_readable_version as i64);
     }
 }
 
-impl LedgerStorePruner {
-    pub fn new(db: Arc<DB>, ledger_store: Arc<LedgerStore>) -> Self {
-        LedgerStorePruner {
+impl LedgerPruner {
+    pub(in crate::pruner) fn new(
+        db: Arc<DB>,
+        transaction_store: Arc<TransactionStore>,
+        event_store: Arc<EventStore>,
+        ledger_store: Arc<LedgerStore>,
+    ) -> Self {
+        LedgerPruner {
             db,
-            ledger_store,
             target_version: AtomicVersion::new(0),
             least_readable_version: AtomicVersion::new(0),
+            ledger_counter_pruner: Arc::new(LedgerCounterPruner::new(ledger_store)),
+            transaction_store_pruner: Arc::new(TransactionStorePruner::new(
+                transaction_store.clone(),
+            )),
+            event_store_pruner: Arc::new(EventStorePruner::new(event_store)),
+            write_set_pruner: Arc::new(WriteSetPruner::new(transaction_store)),
         }
     }
 }
