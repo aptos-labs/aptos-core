@@ -1,5 +1,5 @@
 import * as React from "react";
-import {assertNever} from "utils";
+import {assertNever, randomUUID} from "utils";
 
 const CLIENT_IDS = Object.freeze({
   github: process.env.REACT_APP_GITHUB_CLIENT_ID,
@@ -34,7 +34,7 @@ export class SocialLoginButtonCallbackPage extends React.Component {
   }
 
   render() {
-    return <p></p>;
+    return null;
   }
 }
 
@@ -43,7 +43,7 @@ let oauthPopup: Window | null = null;
 let prevUrl: string | null = null;
 
 export class SocialLoginButton extends React.Component<Props> {
-  csrfToken = crypto.randomUUID();
+  csrfToken = randomUUID();
 
   componentWillUnmount() {
     window.removeEventListener("message", this.handleOauthMessage);

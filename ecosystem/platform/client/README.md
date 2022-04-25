@@ -1,6 +1,10 @@
-# Getting Started with Create React App
+# Aptos Community Platform
+
+This directory contains the client-side portion of the Aptos Community Platform ([server-side located here](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/platform/server)). In development, any request not handled by the client will be forwarded to the server (via the `"proxy"` setting in `package.json`).
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+
+[Tailwind CSS](https://tailwindcss.com/) is included as a design system.
 
 ## Available Scripts
 

@@ -3,6 +3,7 @@ import {useAuthContext} from "auth";
 import {SocialLoginButton} from "ui";
 
 export function GitHubSignIn() {
+  // TODO: Remove fake userId once server-side is hooked up.
   const {setUserId} = useAuthContext();
   return (
     <div>
