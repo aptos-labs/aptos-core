@@ -30,7 +30,7 @@ aptos-types = { path = "../types", features = ["fuzzing"] }
 aptos-vm = { path = "../aptos-move/aptos-vm" }
 aptosdb = { path = "../storage/aptosdb", features = ["fuzzing"] }
 vm-genesis = { path = "../aptos-move/vm-genesis" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097", features=["address32"] }
+move-core-types = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e", features=["address32"] }
 
 [features]
 default = []

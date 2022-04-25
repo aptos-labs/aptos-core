@@ -128,8 +128,8 @@ impl AptosVM {
                     if matches!(&**inner_type, Type::Signer) {
                         signer_param_cnt += 1;
                     }
-                },
-                _ => ()
+                }
+                _ => (),
             }
         }
         // validate all non_signer params

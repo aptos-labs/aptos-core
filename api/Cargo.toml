@@ -35,8 +35,8 @@ aptos-vm = { path = "../aptos-move/aptos-vm" }
 aptos-workspace-hack = { version = "0.1", path = "../crates/aptos-workspace-hack" }
 aptos-api-types = { path = "./types", package = "aptos-api-types" }
 storage-interface = { path = "../storage/storage-interface" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097", version = "0.0.4", features=["address32"] }
-move-resource-viewer = { git = "https://github.com/move-language/move", rev = "a8d6aa915d4cdcdbd16151f0941b85da8c50e097" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e", version = "0.0.4", features=["address32"] }
+move-resource-viewer = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
 
 [dev-dependencies]
 goldenfile = "1.1.0"

@@ -58,8 +58,8 @@
     "function": "0x1::TestCoin::transfer",
     "type_arguments": [],
     "arguments": [
-      "0x00000000000000000000000000000000000000000000000000000000000000dd",
-      "0x7b00000000000000"
+      "0xdd",
+      "123"
     ]
   },
   "signature": {
