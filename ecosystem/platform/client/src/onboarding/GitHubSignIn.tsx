@@ -7,7 +7,7 @@ export function GitHubSignIn() {
   return (
     <div>
       <SocialLoginButton
-        onClick={() => setUserId("example")}
+        onSuccess={() => setUserId("example")}
         service="github"
         id="github"
       />
