@@ -210,12 +210,8 @@ jobs:
               exit $FGI_EXIT_CODE
             fi
             exit 0
-  docker-compose-test:
-    executor: ubuntu-medium
-    steps:
-      - docker-compose-setup
-  sdk-typescript-test:
-    executor: ubuntu-medium
+  ecosystem-test:
+    executor: ubuntu-xl
     steps:
       - docker-compose-setup
       - dev-setup
@@ -261,11 +257,7 @@ workflows:
       - unit-test
       - docker-build-push:
           context: aws-dev
-      - docker-compose-test:
-          context: aws-dev
-          requires:
-            - docker-build-push
-      - sdk-typescript-test:
+      - ecosystem-test:
           context: aws-dev
           requires:
             - docker-build-push
