@@ -255,7 +255,7 @@ mark-changed = []
 
 [[determinator.path-rule]]
 # Ignore ecosytem typescript
-globs = ["ecosystem/typescript/**/*", "ecosystem/web-wallet/**/*"]
+globs = ["ecosystem/typescript/**/*", "ecosystem/web-wallet/**/*", "ecosystem/platform/**/*"]
 mark-changed = []
 
 [[determinator.path-rule]]
