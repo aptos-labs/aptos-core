@@ -1,5 +1,5 @@
 import * as React from "react";
-import {Persona, SocialAccount, Identity} from "./types";
+import {Identity} from "./types";
 import {AptosAddressInput, Button, Checkbox} from "ui";
 
 type Props = {
@@ -14,13 +14,8 @@ export function OnboardingForm({onSubmit}: Props) {
     const {address} = Object.fromEntries(formData);
     if (typeof address !== "string") return;
 
-    const persona: Persona = "operator";
-    const account: SocialAccount = {service: "github", username: "example"};
     const identity = {
-      personas: [persona],
-      socialAccounts: [account],
-      tosAcceptance: {date: Date.now()},
-      aptosAddress: address,
+      mainnetAddress: address,
     };
 
     onSubmit(identity);
