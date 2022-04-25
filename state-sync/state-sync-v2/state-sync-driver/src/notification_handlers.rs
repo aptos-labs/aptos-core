@@ -34,7 +34,6 @@ const MEMPOOL_COMMIT_ACK_TIMEOUT_MS: u64 = 5000; // 5 seconds
 #[derive(Clone, Debug)]
 pub enum CommitNotification {
     CommittedAccounts(CommittedAccounts),
-    CommittedTransactions(CommittedTransactions),
 }
 
 /// A commit notification for new account states
@@ -67,17 +66,6 @@ impl CommitNotification {
             committed_transaction,
         };
         CommitNotification::CommittedAccounts(committed_accounts)
-    }
-
-    pub fn new_committed_transactions(
-        events: Vec<ContractEvent>,
-        transactions: Vec<Transaction>,
-    ) -> Self {
-        let committed_transactions = CommittedTransactions {
-            events,
-            transactions,
-        };
-        CommitNotification::CommittedTransactions(committed_transactions)
     }
 
     /// Handles the commit notification by notifying mempool and the event
