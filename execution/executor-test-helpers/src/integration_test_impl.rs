@@ -10,6 +10,7 @@ use aptos_transaction_builder::stdlib::{
     encode_create_parent_vasp_account_script_function,
     encode_peer_to_peer_with_metadata_script_function,
 };
+use aptos_sdk::transaction_builder::TransactionFactory;
 use aptos_types::{
     account_config::{
         from_currency_code_string, testnet_dd_account_address, treasury_compliance_account_address,
@@ -20,14 +21,15 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValueWithProof},
     transaction::{
         authenticator::AuthenticationKey, Transaction, TransactionListWithProof,
-        TransactionWithProof, WriteSetPayload,
+        TransactionWithProof, WriteSetPayload
     },
     trusted_state::{TrustedState, TrustedStateChange},
     waypoint::Waypoint,
 };
+use aptos_types::chain_id::ChainId;
 
 use aptos_sdk::types::LocalAccount;
-
+use aptos_types::transaction::Transaction::UserTransaction;
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use executor::block_executor::BlockExecutor;
@@ -51,31 +53,26 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         validators[0].key.clone(),
     );
 
+    let txn_factory = TransactionFactory::new(ChainId::new(1));
+
     // This generates accounts that do not overlap with genesis
     let seed = [3u8; 32];
     let mut rng = ::rand::rngs::StdRng::from_seed(seed);
 
-    let local_account1 = LocalAccount::generate(&mut rng);
-    let privkey1 = local_account1.private_key();
-    let pubkey1 = local_account1.public_key();
+    let mut local_account1 = LocalAccount::generate(&mut rng);
     let account1_auth_key = local_account1.authentication_key();
     let account1 = account1_auth_key.derived_address();
 
-    let local_account2 = LocalAccount::generate(&mut rng);
-    let privkey2 = local_account2.private_key();
-    let pubkey2 = local_account2.public_key();
+    let mut local_account2 = LocalAccount::generate(&mut rng);
     let account2_auth_key = local_account2.authentication_key();
     let account2 = account2_auth_key.derived_address();
 
+
     let local_account3 = LocalAccount::generate(&mut rng);
-    let privkey3 = local_account3.private_key();
-    let pubkey3 = local_account3.public_key();
     let account3_auth_key = local_account3.authentication_key();
     let account3 = account3_auth_key.derived_address();
 
     let local_account4 = LocalAccount::generate(&mut rng);
-    let privkey4 = local_account4.private_key();
-    let pubkey4 = local_account4.public_key();
     let account4_auth_key = local_account4.authentication_key();
     let account4 = account4_auth_key.derived_address();
     let genesis_account = testnet_dd_account_address();
@@ -170,55 +167,19 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             vec![],
         )),
     );
-
+    
     // Transfer 20k coins from account1 to account2.
     // balance: <1.98M, 1.22M, 1M
-    let txn4 = local_account1.sign_with_transaction_builder(
-        account1,
-        /* sequence_number = */ 0,
-        privkey1.clone(),
-        pubkey1.clone(),
-        Some(encode_peer_to_peer_with_metadata_script_function(
-            xus_tag(),
-            account2,
-            20_000,
-            vec![],
-            vec![],
-        )),
-    );
+    let txn4 = local_account1.sign_with_transaction_builder( txn_factory.transfer(account2, 20_000));
     // Transfer 10k coins from account2 to account3.
     // balance: <1.98M, <1.21M, 1.01M
-    let txn5 = local_account2.sign_with_transaction_builder(
-        account2,
-        /* sequence_number = */ 0,
-        privkey2.clone(),
-        pubkey2.clone(),
-        Some(encode_peer_to_peer_with_metadata_script_function(
-            xus_tag(),
-            account3,
-            10_000,
-            vec![],
-            vec![],
-        )),
-    );
+    let txn5 = local_account2.sign_with_transaction_builder( txn_factory.transfer(account3, 10_000));
 
     // Transfer 70k coins from account1 to account3.
     // balance: <1.91M, <1.21M, 1.08M
-    let txn6 = local_account1.sign_with_transaction_builder(
-        account1,
-        /* sequence_number = */ 1,
-        privkey1.clone(),
-        pubkey1.clone(),
-        Some(encode_peer_to_peer_with_metadata_script_function(
-            xus_tag(),
-            account3,
-            70_000,
-            vec![],
-            vec![],
-        )),
-    );
+    let txn6 = local_account1.sign_with_transaction_builder( txn_factory.transfer(account3, 70_000));
 
-    let block1 = vec![tx1, tx2, tx3, txn1, txn2, txn3, txn4, txn5, txn6];
+    let block1 = vec![tx1, tx2, tx3, txn1, txn2, txn3, UserTransaction(txn4), UserTransaction(txn5), UserTransaction(txn6)];
     let block1_id = gen_block_id(1);
 
     let mut block2 = vec![];
@@ -226,19 +187,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     // Create 14 txns transferring 10k from account1 to account3 each.
     for i in 2..=15 {
-        block2.push(get_test_signed_transaction(
-            account1,
-            /* sequence_number = */ i,
-            privkey1.clone(),
-            pubkey1.clone(),
-            Some(encode_peer_to_peer_with_metadata_script_function(
-                xus_tag(),
-                account3,
-                10_000,
-                vec![],
-                vec![],
-            )),
-        ));
+        block2.push( UserTransaction(local_account1.sign_with_transaction_builder( txn_factory.transfer(account3, 70_000))))
     }
 
     let output1 = executor
