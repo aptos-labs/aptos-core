@@ -1,9 +1,36 @@
-import React from 'react';
-import { render, screen } from '@testing-library/react';
-import App from './App';
+import * as React from "react";
+import {render, screen} from "@testing-library/react";
+import {MemoryRouter} from "react-router";
+import App from "./App";
 
-test('renders learn react link', () => {
-  render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+jest.mock("onboarding", () => {
+  return {
+    OnboardingPage: () => <p>OnboardingPage</p>,
+  };
+});
+
+jest.mock("ui", () => {
+  return {
+    SocialLoginButtonCallbackPage: () => <p>SocialLoginButtonCallbackPage</p>,
+  };
+});
+
+it("renders the OnboardingPage at /onboarding", () => {
+  render(
+    <MemoryRouter initialEntries={["/onboarding"]}>
+      <App />
+    </MemoryRouter>,
+  );
+
+  expect(screen.getByText("OnboardingPage")).toBeInTheDocument();
+});
+
+it("renders the SocialLoginButtonCallbackPage at /oauth", () => {
+  render(
+    <MemoryRouter initialEntries={["/oauth"]}>
+      <App />
+    </MemoryRouter>,
+  );
+
+  expect(screen.getByText("SocialLoginButtonCallbackPage")).toBeInTheDocument();
 });

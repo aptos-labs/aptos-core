@@ -23,7 +23,7 @@ export function useAuthContext(): AuthContextValue {
 
 type Props = {children: React.ReactNode};
 
-export function AuthContextProvider(props: Props) {
+export function AuthProvider(props: Props) {
   const [userId, setUserId] =
     React.useState<AuthContextValue["userId"]>(undefined);
   const value = React.useMemo(() => {

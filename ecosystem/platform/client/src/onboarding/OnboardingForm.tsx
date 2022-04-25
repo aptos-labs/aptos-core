@@ -7,10 +7,10 @@ type Props = {
 };
 
 export function OnboardingForm({onSubmit}: Props) {
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
 
-    const formData = new FormData(e.target as HTMLFormElement);
+    const formData = new FormData(event.target as HTMLFormElement);
     const {address} = Object.fromEntries(formData);
     if (typeof address !== "string") return;
 
@@ -53,7 +53,6 @@ export function OnboardingForm({onSubmit}: Props) {
               >
                 Terms of Service
               </a>
-              .
             </label>
           </div>
         </div>

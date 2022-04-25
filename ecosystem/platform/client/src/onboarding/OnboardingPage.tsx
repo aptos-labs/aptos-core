@@ -10,7 +10,7 @@ export function OnboardingPage() {
   const [isComplete, setIsComplete] = React.useState(false);
 
   const handleSubmit = (identity: Identity) => {
-    console.log(identity);
+    // TODO: Submit identity to server.
     setIsComplete(true);
   };
 
