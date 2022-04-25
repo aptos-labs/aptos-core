@@ -1,14 +1,29 @@
 import * as React from "react";
 import {GitHubSignIn} from "./GitHubSignIn";
 import {OnboardingForm} from "./OnboardingForm";
+import {OnboardingSuccess} from "./OnboardingSuccess";
 import {Identity} from "./types";
 import {useAuth} from "auth";
 
 export function OnboardingPage() {
   const {isSignedIn} = useAuth();
+  const [isComplete, setIsComplete] = React.useState(false);
 
   const handleSubmit = (identity: Identity) => {
     console.log(identity);
+    setIsComplete(true);
+  };
+
+  const renderContent = () => {
+    if (!isSignedIn) {
+      return <GitHubSignIn />;
+    }
+
+    if (isComplete) {
+      return <OnboardingSuccess />;
+    } else {
+      return <OnboardingForm onSubmit={handleSubmit} />;
+    }
   };
 
   return (
@@ -22,13 +37,7 @@ export function OnboardingPage() {
               : "Sign in with GitHub to get started."}
           </p>
         </div>
-        <div className="px-4 py-5 sm:p-6">
-          {isSignedIn ? (
-            <OnboardingForm onSubmit={handleSubmit} />
-          ) : (
-            <GitHubSignIn />
-          )}
-        </div>
+        <div className="px-4 py-5 sm:p-6">{renderContent()}</div>
       </div>
     </div>
   );
