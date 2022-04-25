@@ -91,9 +91,13 @@
         "textMode": "auto"
       },
       "pluginVersion": "8.4.2",
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "targets": [
         {
-          "expr": "quantile(0.67, aptos_consensus_current_epoch_validators)",
+          "expr": "quantile(0.67, aptos_consensus_current_epoch_validators{chain_name=~\"$chain_name\"})",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -144,14 +148,14 @@
         "textMode": "auto"
       },
       "pluginVersion": "8.4.2",
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
           "exemplar": false,
-          "expr": "quantile(0.67, aptos_consensus_current_round)",
+          "expr": "quantile(0.67, aptos_consensus_current_round{chain_name=~\"$chain_name\"})",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -209,14 +213,14 @@
         "textMode": "auto"
       },
       "pluginVersion": "8.4.2",
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
-          },
           "exemplar": false,
-          "expr": "irate(aptos_consensus_last_committed_version[1m])",
+          "expr": "irate(aptos_consensus_last_committed_version{chain_name=~\"$chain_name\"}[1m])",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -282,9 +286,13 @@
         "textMode": "auto"
       },
       "pluginVersion": "8.4.2",
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "targets": [
         {
-          "expr": "1 - (count(rate(aptos_consensus_current_round[10m]) > 0) OR on() vector(0)) / quantile(0.67, aptos_consensus_current_epoch_validators)",
+          "expr": "1 - (count(rate(aptos_consensus_current_round{chain_name=~\"$chain_name\"}[10m]) > 0) OR on() vector(0)) / quantile(0.67, aptos_consensus_current_epoch_validators{chain_name=~\"$chain_name\"})",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -338,9 +346,13 @@
         "showHeader": false
       },
       "pluginVersion": "8.4.2",
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "targets": [
         {
-          "expr": "up{job=\"federate\"} == 0 or up{job=\"aptos-procs\", role=\"validator\"} == 0",
+          "expr": "up{job=\"federate\", chain_name=~\"$chain_name\"} == 0 or up{job=\"aptos-procs\", role=\"validator\", chain_name=~\"$chain_name\"} == 0",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -411,9 +423,13 @@
         "showHeader": false
       },
       "pluginVersion": "8.4.2",
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "targets": [
         {
-          "expr": "rate(aptos_consensus_last_committed_round{role=\"validator\"}[1m]) == 0 OR vector(0)",
+          "expr": "rate(aptos_consensus_last_committed_round{role=\"validator\", chain_name=~\"$chain_name\"}[1m]) == 0 OR vector(0)",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -492,9 +508,13 @@
           "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
+          "datasource": {
+            "uid": "${Datasource}",
+            "type": "prometheus"
+          },
           "targets": [
             {
-              "expr": "avg_over_time(commit_uptime{owner=~\"$owner\"}[30d])",
+              "expr": "avg_over_time(commit_uptime{owner=~\"$owner\", chain_name=~\"$chain_name\"}[30d])",
               "interval": "15m",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -582,9 +602,13 @@
           "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
+          "datasource": {
+            "uid": "${Datasource}",
+            "type": "prometheus"
+          },
           "targets": [
             {
-              "expr": "avg_over_time(proposal_uptime{owner=~\"$owner\"}[30d])",
+              "expr": "avg_over_time(proposal_uptime{owner=~\"$owner\", chain_name=~\"$chain_name\"}[30d])",
               "interval": "15m",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -662,9 +686,13 @@
           "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
+          "datasource": {
+            "uid": "${Datasource}",
+            "type": "prometheus"
+          },
           "targets": [
             {
-              "expr": "avg_over_time(fullnode_uptime{owner=~\"$owner\"}[30d])",
+              "expr": "avg_over_time(fullnode_uptime{owner=~\"$owner\", chain_name=~\"$chain_name\"}[30d])",
               "interval": "15m",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -772,9 +800,13 @@
           "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
+          "datasource": {
+            "uid": "${Datasource}",
+            "type": "prometheus"
+          },
           "targets": [
             {
-              "expr": "sum by (owner)(aptos_connections{network_id=\"Validator\", role_type=\"validator\", owner=~\"$owner\"})",
+              "expr": "sum by (owner)(aptos_connections{network_id=\"Validator\", role_type=\"validator\", owner=~\"$owner\", chain_name=~\"$chain_name\"})",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -859,9 +891,13 @@
           "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
+          "datasource": {
+            "uid": "${Datasource}",
+            "type": "prometheus"
+          },
           "targets": [
             {
-              "expr": "aptos_state_sync_version{type=\"committed\", role=\"validator\", owner=~\"$owner\"}",
+              "expr": "aptos_state_sync_version{type=\"committed\", role=\"validator\", owner=~\"$owner\", chain_name=~\"$chain_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -869,7 +905,7 @@
               "refId": "A"
             },
             {
-              "expr": "aptos_state_sync_version{type=\"synced\", role=\"validator\", owner=~\"$owner\"}",
+              "expr": "aptos_state_sync_version{type=\"synced\", role=\"validator\", owner=~\"$owner\", chain_name=~\"$chain_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -954,9 +990,13 @@
           "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
+          "datasource": {
+            "uid": "${Datasource}",
+            "type": "prometheus"
+          },
           "targets": [
             {
-              "expr": "rate(aptos_consensus_last_committed_round{owner=~\"$owner\"}[1m])",
+              "expr": "rate(aptos_consensus_last_committed_round{owner=~\"$owner\", chain_name=~\"$chain_name\"}[1m])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -1068,9 +1108,13 @@
           "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
+          "datasource": {
+            "uid": "${Datasource}",
+            "type": "prometheus"
+          },
           "targets": [
             {
-              "expr": "sum by (owner, network_id)(aptos_connections{role_type=\"full_node\", owner=~\"$owner\"})",
+              "expr": "sum by (owner, network_id)(aptos_connections{role_type=\"full_node\", owner=~\"$owner\", chain_name=~\"$chain_name\"})",
               "interval": "",
               "legendFormat": "{{owner}}-{{network_id}}",
               "refId": "A"
@@ -1153,9 +1197,13 @@
           "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
+          "datasource": {
+            "uid": "${Datasource}",
+            "type": "prometheus"
+          },
           "targets": [
             {
-              "expr": "aptos_state_sync_active_upstream_peers{role=\"fullnode\", owner=~\"$owner\"}",
+              "expr": "aptos_state_sync_active_upstream_peers{role=\"fullnode\", owner=~\"$owner\", chain_name=~\"$chain_name\"}",
               "interval": "",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -1238,9 +1286,13 @@
           "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
+          "datasource": {
+            "uid": "${Datasource}",
+            "type": "prometheus"
+          },
           "targets": [
             {
-              "expr": "aptos_state_sync_version{type=\"synced\", role=\"fullnode\", owner=~\"$owner\"}",
+              "expr": "aptos_state_sync_version{type=\"synced\", role=\"fullnode\", owner=~\"$owner\", chain_name=~\"$chain_name\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -1339,9 +1391,13 @@
           "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
+          "datasource": {
+            "uid": "${Datasource}",
+            "type": "prometheus"
+          },
           "targets": [
             {
-              "expr": "rate(aptos_consensus_error_count{owner=~\"$owner\"}[1m]) / on (owner) rate(consensus_duration_count{op='main_loop', owner=~\"$owner\"}[1m])",
+              "expr": "rate(aptos_consensus_error_count{owner=~\"$owner\", chain_name=~\"$chain_name\"}[1m]) / on (owner) rate(consensus_duration_count{op='main_loop', owner=~\"$owner\", chain_name=~\"$chain_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -1424,9 +1480,13 @@
           "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
+          "datasource": {
+            "uid": "${Datasource}",
+            "type": "prometheus"
+          },
           "targets": [
             {
-              "expr": "rate(aptos_consensus_timeout_rounds_count{owner=~\"$owner\"}[1m])",
+              "expr": "rate(aptos_consensus_timeout_rounds_count{owner=~\"$owner\", chain_name=~\"$chain_name\"}[1m])",
               "interval": "",
               "legendFormat": "{{owner}}",
               "refId": "A"
@@ -1509,9 +1569,13 @@
           "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
+          "datasource": {
+            "uid": "${Datasource}",
+            "type": "prometheus"
+          },
           "targets": [
             {
-              "expr": "aptos_consensus_current_round{owner=~\"$owner\"}",
+              "expr": "aptos_consensus_current_round{owner=~\"$owner\", chain_name=~\"$chain_name\"}",
               "instant": false,
               "interval": "",
               "legendFormat": "{{owner}}",
@@ -1608,9 +1672,13 @@
           "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
+          "datasource": {
+            "uid": "${Datasource}",
+            "type": "prometheus"
+          },
           "targets": [
             {
-              "expr": "core_mempool_index_size{index=\"system_ttl\", owner=~\"$owner\"}",
+              "expr": "core_mempool_index_size{index=\"system_ttl\", owner=~\"$owner\", chain_name=~\"$chain_name\"}",
               "format": "time_series",
               "hide": false,
               "instant": false,
@@ -1699,9 +1767,13 @@
           "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
+          "datasource": {
+            "uid": "${Datasource}",
+            "type": "prometheus"
+          },
           "targets": [
             {
-              "expr": "rate(core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted|commit_rejected\", owner=~\"$owner\"}[1m])/rate(core_mempool_txn_commit_latency_count{stage=~\"commit_accepted|commit_rejected\", owner=~\"$owner\"}[1m])",
+              "expr": "rate(core_mempool_txn_commit_latency_sum{stage=~\"commit_accepted|commit_rejected\", owner=~\"$owner\", chain_name=~\"$chain_name\"}[1m])/rate(core_mempool_txn_commit_latency_count{stage=~\"commit_accepted|commit_rejected\", owner=~\"$owner\", chain_name=~\"$chain_name\"}[1m])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -1787,9 +1859,13 @@
           "spaceLength": 10,
           "stack": false,
           "steppedLine": false,
+          "datasource": {
+            "uid": "${Datasource}",
+            "type": "prometheus"
+          },
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, sum(rate(aptos_executor_execute_block_seconds_bucket{role=\"validator\", owner=~\"$owner\"}[1m])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(aptos_executor_execute_block_seconds_bucket{role=\"validator\", owner=~\"$owner\", chain_name=~\"$chain_name\"}[1m])) by (le))",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -1798,7 +1874,7 @@
               "refId": "C"
             },
             {
-              "expr": "histogram_quantile(0.95, sum(rate(aptos_executor_execute_block_seconds_bucket{role=\"validator\", owner=~\"$owner\"}[1m])) by (le))",
+              "expr": "histogram_quantile(0.95, sum(rate(aptos_executor_execute_block_seconds_bucket{role=\"validator\", owner=~\"$owner\", chain_name=~\"$chain_name\"}[1m])) by (le))",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -1807,7 +1883,7 @@
               "refId": "B"
             },
             {
-              "expr": "histogram_quantile(0.50, sum(rate(aptos_executor_execute_block_seconds_bucket{role=\"validator\", owner=~\"$owner\"}[1m])) by (le))",
+              "expr": "histogram_quantile(0.50, sum(rate(aptos_executor_execute_block_seconds_bucket{role=\"validator\", owner=~\"$owner\", chain_name=~\"$chain_name\"}[1m])) by (le))",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -1858,6 +1934,19 @@
   "templating": {
     "list": [
       {
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "Datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
         "current": {
           "selected": true,
           "text": [
@@ -1869,7 +1958,41 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "PBFA97CFB590B2093"
+          "uid": "${Datasource}"
+        },
+        "definition": "label_values(chain_name)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "chain_name",
+        "options": [],
+        "query": {
+          "query": "label_values(chain_name)",
+          "refId": "Prometheus-chain-name-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Datasource}"
         },
         "definition": "label_values(owner)",
         "hide": 0,

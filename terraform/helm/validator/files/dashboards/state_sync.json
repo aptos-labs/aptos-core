@@ -3,20 +3,29 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": "-- Grafana --",
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
         "type": "dashboard"
       }
     ]
   },
   "editable": true,
-  "gnetId": null,
+  "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 40,
-  "iteration": 1604967180547,
+  "id": 9,
+  "iteration": 1650603989659,
   "links": [
     {
       "asDropdown": true,
@@ -28,10 +37,14 @@
       "type": "dashboards"
     }
   ],
+  "liveNow": false,
   "panels": [
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -48,11 +61,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Version of the latest ledger info committed. Any synced transactions beyond this version will not be considered committed",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -84,7 +99,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -94,7 +109,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_state_sync_version{type=\"committed\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", type=\"committed\", owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -103,9 +118,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Committed Version",
       "tooltip": {
         "shared": true,
@@ -114,9 +127,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -125,22 +136,16 @@
           "format": "short",
           "label": "version number",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -148,11 +153,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The version of the latest transaction synced",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -183,7 +190,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -193,16 +200,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_state_sync_version{type=\"synced\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", type=\"synced\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Synced Version",
       "tooltip": {
         "shared": true,
@@ -211,9 +216,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -222,22 +225,16 @@
           "format": "short",
           "label": "version number",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -245,11 +242,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Epoch of local state",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -280,7 +279,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -290,16 +289,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_state_sync_epoch{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_state_sync_epoch{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Epoch",
       "tooltip": {
         "shared": true,
@@ -308,46 +305,38 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "aliasColors": {},
       "bars": false,
-      "cacheTimeout": null,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Number of peers that are currently active and upstream. They are the set of nodes a node can make sync requests to",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -379,7 +368,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -389,7 +378,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, network) (aptos_state_sync_active_upstream_peers{owner=~\"$owner\", role=~\"$role\"})",
+          "expr": "sum by (owner, role, network) (aptos_state_sync_active_upstream_peers{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"})",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -400,9 +389,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Active Upstream Peers",
       "tooltip": {
         "shared": true,
@@ -411,9 +398,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -422,27 +407,25 @@
           "format": "short",
           "label": "Num upstream peers",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -459,11 +442,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of storage read failures ",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -494,7 +479,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -504,16 +489,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_storage_read_fail_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_storage_read_fail_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Failed Storage Read",
       "tooltip": {
         "shared": true,
@@ -522,33 +505,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -556,11 +530,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of number of times a aptosNet network send failed",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -591,7 +567,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -601,16 +577,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_requests_sent_total{result=\"fail\", owner=~\"$owner\", role=~\"$role\"}[$interval]) + rate(aptos_state_sync_responses_sent_total{result=\"fail\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_requests_sent_total{chain_name=~\"$chain_name\", result=\"fail\", owner=~\"$owner\", role=~\"$role\"}[$interval]) + rate(aptos_state_sync_responses_sent_total{chain_name=~\"$chain_name\", result=\"fail\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Failed Network Sends",
       "tooltip": {
         "shared": true,
@@ -619,33 +593,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -653,11 +618,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of number of times a channel send failed",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -688,7 +655,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -698,16 +665,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_failed_channel_sends_total{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_failed_channel_sends_total{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} - {{type}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Failed channel sends",
       "tooltip": {
         "shared": true,
@@ -716,33 +681,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -750,11 +706,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of failures encountered in the commit flow across consensus, state sync, and mempool",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -785,7 +743,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -795,16 +753,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_commit_flow_fail_total{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_commit_flow_fail_total{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} - {{component}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Commit Flow Failures",
       "tooltip": {
         "shared": true,
@@ -813,33 +769,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -847,11 +794,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of number of times a reconfig notification failed to happen",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -882,7 +831,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -892,16 +841,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_reconfig_count{result=\"fail\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_reconfig_count{chain_name=~\"$chain_name\", result=\"fail\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Reconfig Notification Failure",
       "tooltip": {
         "shared": true,
@@ -910,33 +857,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -944,11 +882,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of chunk responses received from a downstream peer ",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -979,7 +919,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -989,16 +929,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_responses_from_downstream_total{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_responses_from_downstream_total{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} <- ({{network}}:{{peer}})",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Chunk Responses Received from Downstream",
       "tooltip": {
         "shared": true,
@@ -1007,38 +945,32 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1055,11 +987,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of requests (e.g. commit, sync) received from consensus",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1090,7 +1024,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1100,16 +1034,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_state_sync_coordinator_msg_latency_count{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_state_sync_coordinator_msg_latency_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} - {{type}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Msgs Received",
       "tooltip": {
         "shared": true,
@@ -1118,9 +1050,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -1129,22 +1059,16 @@
           "format": "short",
           "label": "msgs",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -1152,11 +1076,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of sync requests from consensus completed",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1187,7 +1113,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1197,16 +1123,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_state_sync_sync_request_total{result=\"complete\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_state_sync_sync_request_total{chain_name=~\"$chain_name\", result=\"complete\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Sync Requests Completed",
       "tooltip": {
         "shared": true,
@@ -1215,33 +1139,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -1249,11 +1164,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of sync requests (from consensus) that did not succeed (e.g. failed, timed out)",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1284,7 +1201,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1294,16 +1211,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_sync_request_total{result!=\"complete\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_sync_request_total{chain_name=~\"$chain_name\", result!=\"complete\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} - {{result}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Failed Sync Requests",
       "tooltip": {
         "shared": true,
@@ -1312,33 +1227,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -1346,11 +1252,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of requests (e.g. commit, sync) received from consensus",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1381,7 +1289,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1391,16 +1299,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_coordinator_msg_latency_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_coordinator_msg_latency_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} - {{type}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Msgs Received",
       "tooltip": {
         "shared": true,
@@ -1409,9 +1315,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -1420,22 +1324,16 @@
           "format": "short",
           "label": "msg / s",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -1443,11 +1341,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of sync requests from consensus completed",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1478,7 +1378,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1488,16 +1388,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_sync_request_total{result=\"complete\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_sync_request_total{chain_name=~\"$chain_name\", result=\"complete\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Sync Requests Completed Rate",
       "tooltip": {
         "shared": true,
@@ -1506,9 +1404,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -1517,22 +1413,16 @@
           "format": "short",
           "label": "requests / s",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -1540,11 +1430,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "latency of processing sync msg from consensus",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1575,7 +1467,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1585,16 +1477,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_coordinator_msg_latency_sum{type=\"sync\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_state_sync_coordinator_msg_latency_count{type=\"sync\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_coordinator_msg_latency_sum{chain_name=~\"$chain_name\", type=\"sync\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_state_sync_coordinator_msg_latency_count{chain_name=~\"$chain_name\", type=\"sync\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Process Sync Msg Latency",
       "tooltip": {
         "shared": true,
@@ -1603,33 +1493,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "s",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -1637,11 +1518,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of number of times a commit msg from consensus failed to be processed",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1672,7 +1555,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1682,16 +1565,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_consensus_commit_fail{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_consensus_commit_fail{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Consensus Commit Fail",
       "tooltip": {
         "shared": true,
@@ -1700,33 +1581,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -1734,11 +1606,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Latency of processing commit msg from consensus",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1769,7 +1643,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1779,16 +1653,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_coordinator_msg_latency_sum{type=\"commit\", owner=~\"$owner\"}[$interval]) / rate(aptos_state_sync_coordinator_msg_latency_count{type=\"commit\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(aptos_state_sync_coordinator_msg_latency_sum{chain_name=~\"$chain_name\", type=\"commit\", owner=~\"$owner\"}[$interval]) / rate(aptos_state_sync_coordinator_msg_latency_count{chain_name=~\"$chain_name\", type=\"commit\", owner=~\"$owner\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Process Commit Msg Latency",
       "tooltip": {
         "shared": true,
@@ -1797,39 +1669,33 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
-          "decimals": null,
           "format": "s",
           "label": "",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1846,11 +1712,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of times a chunk was successfully applied to local state",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1882,7 +1750,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1892,7 +1760,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_state_sync_apply_chunk_total{result=\"success\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_state_sync_apply_chunk_total{chain_name=~\"$chain_name\", result=\"success\", owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1901,9 +1769,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Apply Chunk Success",
       "tooltip": {
         "shared": true,
@@ -1912,9 +1778,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -1923,22 +1787,17 @@
           "format": "short",
           "label": "",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -1946,11 +1805,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of times a received chunk failed to be applied to local state",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -1982,7 +1843,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1992,7 +1853,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_state_sync_apply_chunk_total{result=\"fail\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_state_sync_apply_chunk_total{chain_name=~\"$chain_name\", result=\"fail\", owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2001,9 +1862,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Apply Chunk Failure",
       "tooltip": {
         "shared": true,
@@ -2012,9 +1871,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -2023,22 +1880,17 @@
           "format": "short",
           "label": "",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -2046,11 +1898,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "A version a node is trying to sync up to",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2082,7 +1936,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2092,7 +1946,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_state_sync_version{type=\"target\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", type=\"target\", owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2101,9 +1955,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Target Version",
       "tooltip": {
         "shared": true,
@@ -2112,33 +1964,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "none",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -2146,11 +1989,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of times a chunk was successfully applied to local state",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2182,7 +2027,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2192,7 +2037,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_apply_chunk_total{result=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_apply_chunk_total{chain_name=~\"$chain_name\", result=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2201,9 +2046,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Apply Chunk Success Rate",
       "tooltip": {
         "shared": true,
@@ -2212,9 +2055,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -2223,22 +2064,17 @@
           "format": "short",
           "label": "success / s",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -2246,11 +2082,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of times a received chunk failed to be applied to local state",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2282,7 +2120,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2292,7 +2130,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_apply_chunk_total{result=\"fail\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_apply_chunk_total{chain_name=~\"$chain_name\", result=\"fail\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2301,9 +2139,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Apply Chunk Failure Rate",
       "tooltip": {
         "shared": true,
@@ -2312,9 +2148,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -2323,22 +2157,17 @@
           "format": "short",
           "label": "failures / s",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -2346,11 +2175,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of transactions state synchronizer has retrieved since last restart",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2382,7 +2213,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2392,7 +2223,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_state_sync_chunk_size_sum{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_state_sync_chunk_size_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2401,9 +2232,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Transaction Replayed",
       "tooltip": {
         "shared": true,
@@ -2412,9 +2241,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -2423,22 +2250,17 @@
           "format": "short",
           "label": "",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -2446,11 +2268,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "How long it took to sync a chunk, from requesting a chunk to fully processing and executing it",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2482,7 +2306,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2492,7 +2316,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_sync_progress_duration_s_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_state_sync_sync_progress_duration_s_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_sync_progress_duration_s_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_state_sync_sync_progress_duration_s_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2501,9 +2325,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Chunk E2E Latency",
       "tooltip": {
         "shared": true,
@@ -2512,33 +2334,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "s",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -2546,11 +2359,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of txns in a chunk",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2581,7 +2396,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2591,16 +2406,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_chunk_size_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_state_sync_chunk_size_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_chunk_size_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_state_sync_chunk_size_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} <- ({{network}}:{{sender}})",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Chunk Size",
       "tooltip": {
         "shared": true,
@@ -2609,9 +2422,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -2620,22 +2431,17 @@
           "format": "short",
           "label": "# of transactions",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
           "label": "",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -2643,11 +2449,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of transactions state synchronizer has retrieved since last restart",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2679,7 +2487,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2689,7 +2497,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_chunk_size_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_chunk_size_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2698,9 +2506,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Transaction Replayed Rate",
       "tooltip": {
         "shared": true,
@@ -2709,9 +2515,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -2720,22 +2524,17 @@
           "format": "short",
           "label": "replays / s",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -2743,11 +2542,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "time it takes to execute and commit a chunk (via executor proxy)",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2778,7 +2579,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2788,16 +2589,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_execute_chunk_duration_s_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_state_sync_execute_chunk_duration_s_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_execute_chunk_duration_s_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_state_sync_execute_chunk_duration_s_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Execute/Commit Chunk Latency",
       "tooltip": {
         "shared": true,
@@ -2806,39 +2605,33 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
-          "decimals": null,
           "format": "s",
           "label": "",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2855,11 +2648,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of number of chunk requests sent",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2891,7 +2686,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -2901,7 +2696,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_requests_sent_total{result=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_requests_sent_total{chain_name=~\"$chain_name\", result=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2910,9 +2705,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Requests Sent Rate",
       "tooltip": {
         "shared": true,
@@ -2921,9 +2714,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -2932,22 +2723,17 @@
           "format": "short",
           "label": "requests / s",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -2955,11 +2741,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of number of chunk responses received",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -2991,7 +2779,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3001,7 +2789,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_process_msg_latency_count{type=\"chunk_response\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_process_msg_latency_count{chain_name=~\"$chain_name\", type=\"chunk_response\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -3010,9 +2798,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Chunk Response Received Rate",
       "tooltip": {
         "shared": true,
@@ -3021,9 +2807,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -3032,22 +2816,17 @@
           "format": "short",
           "label": "responses / s",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -3055,11 +2834,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of networks the node is sending chunk requests to. =0 if the primary upstream network is healthy, else >0",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -3090,7 +2871,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3100,16 +2881,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_state_sync_multicast_level{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_state_sync_multicast_level{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Multicast Level",
       "tooltip": {
         "shared": true,
@@ -3118,9 +2897,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -3129,22 +2906,17 @@
           "format": "short",
           "label": "# of networks",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -3152,11 +2924,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of number of times a node successfully processed a chunk request",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -3187,7 +2961,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3197,16 +2971,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_process_chunk_request_total{result=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_process_chunk_request_total{chain_name=~\"$chain_name\", result=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} <- ({{network}}:{{sender}})",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Process Chunk Request Success Rate",
       "tooltip": {
         "shared": true,
@@ -3215,9 +2987,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -3226,22 +2996,16 @@
           "format": "short",
           "label": "requests / s",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -3249,11 +3013,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of number of times this node failed to process an incoming chunk request",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -3284,7 +3050,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3294,16 +3060,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_process_chunk_request_total{result=\"fail\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_process_chunk_request_total{chain_name=~\"$chain_name\", result=\"fail\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} <- ({{network}}:{{sender}})",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Process Chunk Request Failure Rate",
       "tooltip": {
         "shared": true,
@@ -3312,9 +3076,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -3323,22 +3085,16 @@
           "format": "short",
           "label": "failures / s",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -3346,11 +3102,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "time it takes to process a chunk response",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -3381,7 +3139,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3391,16 +3149,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_process_msg_latency_sum{type=\"chunk_response\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_state_sync_process_msg_latency_count{type=\"chunk_response\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_process_msg_latency_sum{chain_name=~\"$chain_name\", type=\"chunk_response\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_state_sync_process_msg_latency_count{chain_name=~\"$chain_name\", type=\"chunk_response\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} <- ({{network}}:{{sender}})",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Average Chunk Response Process Latency",
       "tooltip": {
         "shared": true,
@@ -3409,9 +3165,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -3420,22 +3174,16 @@
           "format": "s",
           "label": "",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -3443,11 +3191,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "time it takes to process a chunk request",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -3478,7 +3228,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3488,16 +3238,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_process_msg_latency_sum{type=\"chunk_request\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_state_sync_process_msg_latency_count{type=\"chunk_request\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_process_msg_latency_sum{chain_name=~\"$chain_name\", type=\"chunk_request\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_state_sync_process_msg_latency_count{chain_name=~\"$chain_name\", type=\"chunk_request\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} <- ({{network}}:{{sender}})",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Average Chunk Request Process Latency",
       "tooltip": {
         "shared": true,
@@ -3506,9 +3254,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -3517,22 +3263,16 @@
           "format": "s",
           "label": "",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -3540,11 +3280,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of number of times a FN long-poll subscription was delivered (does not include times where the initial FN chunk request was immediately responded to)",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -3575,7 +3317,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3585,16 +3327,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_subscription_delivery_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_subscription_delivery_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} -> {{network}}:{{recipient}} - {{result}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Subscription Delivery Rate",
       "tooltip": {
         "shared": true,
@@ -3603,9 +3343,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -3614,27 +3352,24 @@
           "format": "short",
           "label": "deliveries / s",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -3651,11 +3386,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of times a node's sent chunk request timed out",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -3687,7 +3424,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3697,7 +3434,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_state_sync_timeout_total{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_state_sync_timeout_total{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -3706,9 +3443,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Sent Chunk Request Timeout Rate",
       "tooltip": {
         "shared": true,
@@ -3717,45 +3452,49 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
-          "decimals": null,
           "format": "short",
           "label": "timeouts / s",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     }
   ],
   "refresh": false,
-  "schemaVersion": 26,
+  "schemaVersion": 36,
   "style": "dark",
   "tags": [],
   "templating": {
     "list": [
       {
-        "allValue": null,
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "Datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
         "current": {
           "selected": true,
           "text": [
@@ -3765,27 +3504,31 @@
             "$__all"
           ]
         },
-        "datasource": "Prometheus",
-        "definition": "label_values(owner)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Datasource}"
+        },
+        "definition": "label_values(chain_name)",
         "hide": 0,
-        "includeAll": true,
-        "label": null,
-        "multi": true,
-        "name": "owner",
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "chain_name",
         "options": [],
-        "query": "label_values(owner)",
+        "query": {
+          "query": "label_values(chain_name)",
+          "refId": "Prometheus-chain-name-Variable-Query"
+        },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
-        "sort": 0,
+        "sort": 1,
         "tagValuesQuery": "",
-        "tags": [],
         "tagsQuery": "",
         "type": "query",
         "useTags": false
       },
       {
-        "allValue": null,
         "current": {
           "selected": true,
           "text": [
@@ -3795,21 +3538,58 @@
             "$__all"
           ]
         },
-        "datasource": "Prometheus",
-        "definition": "label_values(role)",
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
+        "definition": "label_values(owner)",
         "hide": 0,
         "includeAll": true,
-        "label": null,
         "multi": true,
-        "name": "role",
+        "name": "owner",
         "options": [],
-        "query": "label_values(role)",
+        "query": {
+          "query": "label_values(owner)",
+          "refId": "Prometheus-owner-Variable-Query"
+        },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 0,
         "tagValuesQuery": "",
-        "tags": [],
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
+        "definition": "label_values(role)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "role",
+        "options": [],
+        "query": {
+          "query": "label_values(role)",
+          "refId": "Prometheus-role-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "tagValuesQuery": "",
         "tagsQuery": "",
         "type": "query",
         "useTags": false
@@ -3824,7 +3604,6 @@
           "value": "$__auto_interval_interval"
         },
         "hide": 0,
-        "label": null,
         "name": "interval",
         "options": [
           {
@@ -3927,5 +3706,6 @@
   "timezone": "",
   "title": "State Sync",
   "uid": "state-sync",
-  "version": 3
+  "version": 1,
+  "weekStart": ""
 }

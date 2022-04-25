@@ -3,20 +3,29 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": "-- Grafana --",
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
         "type": "dashboard"
       }
     ]
   },
   "editable": true,
-  "gnetId": null,
+  "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 37,
-  "iteration": 1604701798888,
+  "id": 17,
+  "iteration": 1650605409618,
   "links": [
     {
       "asDropdown": true,
@@ -28,10 +37,14 @@
       "type": "dashboards"
     }
   ],
+  "liveNow": false,
   "panels": [
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -48,10 +61,12 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -83,7 +98,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -93,7 +108,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_user_transactions_executed{status=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_user_transactions_executed{chain_name=~\"$chain_name\", status=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -102,9 +117,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "User Transactions (Successful)",
       "tooltip": {
         "shared": true,
@@ -113,9 +126,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -124,22 +135,17 @@
           "format": "none",
           "label": "transactions/s",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -147,10 +153,12 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -182,7 +190,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -192,7 +200,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_system_transactions_executed{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_system_transactions_executed{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -201,9 +209,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "System Transactions",
       "tooltip": {
         "shared": true,
@@ -212,9 +218,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -223,22 +227,17 @@
           "format": "none",
           "label": "transactions/s",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -246,10 +245,12 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -281,7 +282,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -291,7 +292,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_transactions_validated{status=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_transactions_validated{chain_name=~\"$chain_name\", status=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -300,9 +301,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Validated Transactions (Successful)",
       "tooltip": {
         "shared": true,
@@ -311,9 +310,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -322,22 +319,17 @@
           "format": "none",
           "label": "transactions/s",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -345,10 +337,12 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -380,7 +374,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -390,7 +384,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_num_txns_per_block_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_vm_num_txns_per_block_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_num_txns_per_block_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_vm_num_txns_per_block_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -399,9 +393,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Num Txns per Block",
       "tooltip": {
         "shared": true,
@@ -410,9 +402,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -421,27 +411,25 @@
           "format": "none",
           "label": "txns per block",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -458,10 +446,12 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -493,7 +483,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -503,7 +493,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_txn_gas_usage_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_vm_txn_gas_usage_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_txn_gas_usage_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_vm_txn_gas_usage_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -512,9 +502,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Avg Gas per User Txn",
       "tooltip": {
         "shared": true,
@@ -523,9 +511,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -534,27 +520,25 @@
           "format": "none",
           "label": "gas/txn",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -571,10 +555,12 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -606,7 +592,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -616,7 +602,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_txn_total_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_vm_txn_total_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_txn_total_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_vm_txn_total_seconds_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -625,9 +611,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Avg Txn Total Time",
       "tooltip": {
         "shared": true,
@@ -636,33 +620,25 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "s",
-          "label": null,
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -670,10 +646,12 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -705,7 +683,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -715,7 +693,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_txn_validation_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(aptos_vm_txn_validation_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_vm_txn_validation_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(aptos_vm_txn_validation_seconds_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -724,9 +702,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Avg Txn Validation Time",
       "tooltip": {
         "shared": true,
@@ -735,33 +711,25 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "s",
-          "label": null,
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -769,10 +737,12 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -783,7 +753,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 28
+        "y": 35
       },
       "hiddenSeries": false,
       "id": 64,
@@ -804,7 +774,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -814,7 +784,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_txn_total_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(aptos_vm_txn_total_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])/(rate(aptos_vm_txn_gas_usage_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(aptos_vm_txn_gas_usage_count{owner=~\"$owner\", role=~\"$role\"}[$interval]))",
+          "expr": "rate(aptos_vm_txn_total_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(aptos_vm_txn_total_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])/(rate(aptos_vm_txn_gas_usage_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(aptos_vm_txn_gas_usage_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -823,9 +793,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Avg Time per Gas Unit",
       "tooltip": {
         "shared": true,
@@ -834,9 +802,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -845,32 +811,39 @@
           "format": "s",
           "label": "seconds / unit gas",
           "logBase": 1,
-          "max": null,
           "min": "0",
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     }
   ],
-  "schemaVersion": 26,
+  "schemaVersion": 36,
   "style": "dark",
   "tags": [],
   "templating": {
     "list": [
       {
-        "allValue": null,
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "Datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
         "current": {
           "selected": true,
           "text": [
@@ -880,30 +853,66 @@
             "$__all"
           ]
         },
-        "datasource": "Prometheus",
-        "definition": "label_values(owner)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Datasource}"
+        },
+        "definition": "label_values(chain_name)",
         "hide": 0,
-        "includeAll": true,
-        "label": null,
-        "multi": true,
-        "name": "owner",
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "chain_name",
         "options": [],
-        "query": "label_values(owner)",
+        "query": {
+          "query": "label_values(chain_name)",
+          "refId": "Prometheus-chain-name-Variable-Query"
+        },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
-        "sort": 0,
+        "sort": 1,
         "tagValuesQuery": "",
-        "tags": [],
         "tagsQuery": "",
         "type": "query",
         "useTags": false
       },
       {
-        "allValue": null,
         "current": {
           "selected": true,
-          "tags": [],
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
+        "definition": "label_values(owner)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "owner",
+        "options": [],
+        "query": {
+          "query": "label_values(owner)",
+          "refId": "Prometheus-owner-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
+        "current": {
+          "selected": true,
           "text": [
             "validator"
           ],
@@ -911,21 +920,25 @@
             "validator"
           ]
         },
-        "datasource": "Prometheus",
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(role)",
         "hide": 0,
         "includeAll": true,
-        "label": null,
         "multi": true,
         "name": "role",
         "options": [],
-        "query": "label_values(role)",
+        "query": {
+          "query": "label_values(role)",
+          "refId": "Prometheus-role-Variable-Query"
+        },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 0,
         "tagValuesQuery": "",
-        "tags": [],
         "tagsQuery": "",
         "type": "query",
         "useTags": false
@@ -940,7 +953,6 @@
           "value": "$__auto_interval_interval"
         },
         "hide": 0,
-        "label": null,
         "name": "interval",
         "options": [
           {
@@ -1044,5 +1056,6 @@
   "timezone": "",
   "title": "VM",
   "uid": "VM",
-  "version": 2
+  "version": 1,
+  "weekStart": ""
 }

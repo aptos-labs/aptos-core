@@ -32,7 +32,10 @@
   ],
   "panels": [
     {
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -48,7 +51,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {},
@@ -102,7 +108,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, container) (rate(container_cpu_usage_seconds_total{container=~\"$container\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "sum by (owner, container) (rate(container_cpu_usage_seconds_total{chain_name=~\"$chain_name\", container=~\"$container\", owner=~\"$owner\"}[$AggInterval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -110,7 +116,7 @@
           "refId": "A"
         },
         {
-          "expr": "sum by (owner, container_name) (rate(container_cpu_usage_seconds_total{container_name=~\"$container\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "sum by (owner, container_name) (rate(container_cpu_usage_seconds_total{chain_name=~\"$chain_name\", container_name=~\"$container\", owner=~\"$owner\"}[$AggInterval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -164,7 +170,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {},
@@ -218,7 +227,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "container_memory_working_set_bytes{container=~\"$container\", owner=~\"$owner\"} / container_spec_memory_limit_bytes{container=~\"$container\", owner=~\"$owner\"}",
+          "expr": "container_memory_working_set_bytes{chain_name=~\"$chain_name\", container=~\"$container\", owner=~\"$owner\"} / container_spec_memory_limit_bytes{chain_name=~\"$chain_name\", container=~\"$container\", owner=~\"$owner\"}",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -227,7 +236,7 @@
           "refId": "C"
         },
         {
-          "expr": "container_memory_working_set_bytes{container_name=~\"$container\", owner=~\"$owner\"} / container_spec_memory_limit_bytes{container_name=~\"$container\", owner=~\"$owner\"}",
+          "expr": "container_memory_working_set_bytes{chain_name=~\"$chain_name\", container_name=~\"$container\", owner=~\"$owner\"} / container_spec_memory_limit_bytes{chain_name=~\"$chain_name\", container_name=~\"$container\", owner=~\"$owner\"}",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -282,7 +291,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {},
@@ -336,7 +348,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "container_fs_usage_bytes{owner=~\"$owner\", container=~\"$container\"} / container_fs_limit_bytes{owner=~\"$owner\", container=~\"$container\"}",
+          "expr": "container_fs_usage_bytes{chain_name=~\"$chain_name\", owner=~\"$owner\", container=~\"$container\"} / container_fs_limit_bytes{chain_name=~\"$chain_name\", owner=~\"$owner\", container=~\"$container\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -344,7 +356,7 @@
           "refId": "C"
         },
         {
-          "expr": "container_fs_usage_bytes{owner=~\"$owner\", container_name=~\"$container\"} / container_fs_limit_bytes{owner=~\"$owner\", container_name=~\"$container\"}",
+          "expr": "container_fs_usage_bytes{chain_name=~\"$chain_name\", owner=~\"$owner\", container_name=~\"$container\"} / container_fs_limit_bytes{chain_name=~\"$chain_name\", owner=~\"$owner\", container_name=~\"$container\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -395,7 +407,10 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -412,7 +427,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The rate of the committed round number.",
       "fieldConfig": {
         "defaults": {
@@ -458,7 +476,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_last_committed_round{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_consensus_last_committed_round{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -522,7 +540,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Duration between block generation time until the moment it's committed.",
       "fieldConfig": {
         "defaults": {
@@ -568,7 +589,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_block_tracing_sum{role=~\"$role\", owner=~\"$owner\", stage=\"committed\"}[$AggInterval])/rate(aptos_consensus_block_tracing_count{role=~\"$role\", owner=~\"$owner\", stage=\"committed\"}[$AggInterval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\", stage=\"committed\"}[$AggInterval])/rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\", stage=\"committed\"}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -622,7 +643,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The total number of rounds that have timeout certificate.",
       "fieldConfig": {
         "defaults": {
@@ -668,7 +692,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_timeout_rounds_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_consensus_timeout_rounds_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -722,7 +746,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The total number a single node has timeout locally. When 2f+1 nodes have local timeout for the same round, a timeout round is formed.",
       "fieldConfig": {
         "defaults": {
@@ -768,7 +795,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_timeout_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_consensus_timeout_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -822,7 +849,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The error rate of main loop (timeout is considered as error)",
       "fieldConfig": {
         "defaults": {
@@ -868,7 +898,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_error_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval]) / on (owner) rate(consensus_duration_count{role=~\"$role\", owner=~\"$owner\", op='main_loop'}[$AggInterval])",
+          "expr": "rate(aptos_consensus_error_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval]) / on (owner) rate(consensus_duration_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\", op='main_loop'}[$AggInterval])",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -918,7 +948,10 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -935,7 +968,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "time spent to execute a block",
       "fieldConfig": {
         "defaults": {
@@ -981,7 +1017,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (owner, role, le)(rate(aptos_executor_execute_block_seconds_bucket{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.50, sum by (owner, role, le)(rate(aptos_executor_execute_block_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1036,7 +1072,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": " time spent to execute a block",
       "fieldConfig": {
         "defaults": {
@@ -1082,7 +1121,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.90, sum by (owner, role, le)(rate(aptos_executor_execute_block_seconds_bucket{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.90, sum by (owner, role, le)(rate(aptos_executor_execute_block_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1137,7 +1176,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "time spent to execute a block",
       "fieldConfig": {
         "defaults": {
@@ -1183,7 +1225,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum by (owner, role, le) (rate(aptos_executor_execute_block_seconds_bucket{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.99, sum by (owner, role, le) (rate(aptos_executor_execute_block_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1238,7 +1280,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "the time spent to commit blocks",
       "fieldConfig": {
         "defaults": {
@@ -1284,7 +1329,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.5, sum by (owner, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.5, sum by (owner, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1338,7 +1383,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "the time spent to commit blocks",
       "fieldConfig": {
         "defaults": {
@@ -1384,7 +1432,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.9, sum by (owner, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.9, sum by (owner, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1438,7 +1486,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "the time spent to commit blocks",
       "fieldConfig": {
         "defaults": {
@@ -1484,7 +1535,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum by (owner, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.99, sum by (owner, role, le)(rate(aptos_executor_commit_blocks_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1535,7 +1586,10 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1552,7 +1606,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "This panel tracks the number of errors encountered by the key manager during execution in the last hour. More specifically, we track two error types: (i) liveness errors; and (ii) unexpected errors.",
       "fieldConfig": {
         "defaults": {
@@ -1597,13 +1654,13 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_key_manager_state{state=\"liveness_error_encountered\", owner=~\"$owner\"}[1h])",
+          "expr": "increase(aptos_key_manager_state{chain_name=~\"$chain_name\", state=\"liveness_error_encountered\", owner=~\"$owner\"}[1h])",
           "interval": "",
           "legendFormat": "{{owner}}_liveness_error",
           "refId": "A"
         },
         {
-          "expr": "increase(aptos_key_manager_state{state=\"unexpected_error_encountered\", owner=~\"$owner\"}[1h])",
+          "expr": "increase(aptos_key_manager_state{chain_name=~\"$chain_name\", state=\"unexpected_error_encountered\", owner=~\"$owner\"}[1h])",
           "interval": "",
           "legendFormat": "{{owner}}_unexpected_error",
           "refId": "B"
@@ -1655,7 +1712,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "This panel tracks the number of times the key manager decides to take no action after checking the keys because the keys are still fresh (in the last hour).",
       "fieldConfig": {
         "defaults": {
@@ -1700,7 +1760,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_key_manager_state{state=\"keys_still_fresh\", owner=~\"$owner\"}[1h])",
+          "expr": "increase(aptos_key_manager_state{chain_name=~\"$chain_name\", state=\"keys_still_fresh\", owner=~\"$owner\"}[1h])",
           "interval": "",
           "legendFormat": "{{owner}}_keys_still_fresh",
           "refId": "A"
@@ -1749,7 +1809,10 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1766,7 +1829,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Total Inbound connected peers.  There should be at most one peer with 0 inbound connections.",
       "fieldConfig": {
         "defaults": {
@@ -1811,7 +1877,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_connections{network_id=~\"$network_id\", role=~\"$role\", owner=~\"$owner\", direction=\"inbound\"}",
+          "expr": "aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role=~\"$role\", owner=~\"$owner\", direction=\"inbound\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -1863,7 +1929,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Total Outbound connected peers.  There should be at most one peer with 0 Outbound connections.",
       "fieldConfig": {
         "defaults": {
@@ -1908,7 +1977,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_connections{network_id=~\"$network_id\", role=~\"$role\", owner=~\"$owner\", direction=\"outbound\"}",
+          "expr": "aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role=~\"$role\", owner=~\"$owner\", direction=\"outbound\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -1957,7 +2026,10 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1975,7 +2047,10 @@
       "cacheTimeout": null,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "total number of transactions in mempool",
       "fieldConfig": {
         "defaults": {
@@ -2021,7 +2096,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "core_mempool_index_size{role=~\"$role\",owner=~\"$owner\",index=\"system_ttl\"}",
+          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", role=~\"$role\",owner=~\"$owner\",index=\"system_ttl\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -2077,7 +2152,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of transactions broadcasted to other peers",
       "fieldConfig": {
         "defaults": {
@@ -2123,7 +2201,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role) (rate(aptos_shared_mempool_transaction_broadcast_sum{role=~\"$role\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "sum by (owner, role) (rate(aptos_shared_mempool_transaction_broadcast_sum{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2174,7 +2252,10 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2192,7 +2273,10 @@
       "cacheTimeout": null,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "This panel displays the error counts encountered by safety rules queries within the last aggregation interval.",
       "fieldConfig": {
         "defaults": {
@@ -2238,7 +2322,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_safety_rules_queries{owner=~\"$owner\", result=\"error\"}[$AggInterval])",
+          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", owner=~\"$owner\", result=\"error\"}[$AggInterval])",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -2295,7 +2379,10 @@
       "cacheTimeout": null,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The most recent epoch processed by safety rules",
       "fieldConfig": {
         "defaults": {
@@ -2341,7 +2428,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_safety_rules_state{field=\"epoch\", owner=~\"$owner\"}",
+          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"epoch\", owner=~\"$owner\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -2398,7 +2485,10 @@
       "cacheTimeout": null,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The last round that the validator submitted a vote",
       "fieldConfig": {
         "defaults": {
@@ -2444,7 +2534,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_safety_rules_state{field=\"last_voted_round\", owner=~\"$owner\"}",
+          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"last_voted_round\", owner=~\"$owner\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -2501,7 +2591,10 @@
       "cacheTimeout": null,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The highest parent round from any incoming quorum certificate",
       "fieldConfig": {
         "defaults": {
@@ -2547,7 +2640,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_safety_rules_state{field=\"preferred_round\", owner=~\"$owner\"}",
+          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"preferred_round\", owner=~\"$owner\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -2600,7 +2693,10 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2617,7 +2713,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "",
       "fieldConfig": {
         "defaults": {
@@ -2665,7 +2764,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_schemadb_get_latency_seconds_sum{role=~\"$role\",owner=~\"$owner\"}[$AggInterval])/rate(aptos_schemadb_get_latency_seconds_count{role=~\"$role\",owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_schemadb_get_latency_seconds_sum{chain_name=~\"$chain_name\", role=~\"$role\",owner=~\"$owner\"}[$AggInterval])/rate(aptos_schemadb_get_latency_seconds_count{chain_name=~\"$chain_name\", role=~\"$role\",owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -2714,7 +2813,10 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2731,7 +2833,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {},
@@ -2776,7 +2881,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_user_transactions_executed{owner=~\"$owner\",role=~\"$role\",status=\"success\"}[1m])",
+          "expr": "rate(aptos_vm_user_transactions_executed{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role\",status=\"success\"}[1m])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2830,7 +2935,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {},
@@ -2875,7 +2983,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_system_transactions_executed{owner=~\"$owner\",role=~\"$role\"}[1m])",
+          "expr": "rate(aptos_vm_system_transactions_executed{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role\"}[1m])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2929,7 +3037,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {},
@@ -2974,7 +3085,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_vm_txn_total_seconds_sum{owner=~\"$owner\",role=~\"$role\"}[1m])/rate(aptos_vm_txn_total_seconds_count{owner=~\"$owner\",role=~\"$role\"}[1m])",
+          "expr": "rate(aptos_vm_txn_total_seconds_sum{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role\"}[1m])/rate(aptos_vm_txn_total_seconds_count{chain_name=~\"$chain_name\", owner=~\"$owner\",role=~\"$role\"}[1m])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -3025,7 +3136,10 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -3042,7 +3156,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "RPC endpoint level request count.",
       "fieldConfig": {
         "defaults": {
@@ -3087,7 +3204,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, type) (rate(aptos_client_service_rpc_requests_count{role=~\"$role\", type=~\"$requesttype\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "sum by (owner, role, type) (rate(aptos_client_service_rpc_requests_count{chain_name=~\"$chain_name\", role=~\"$role\", type=~\"$requesttype\", owner=~\"$owner\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}-{{type}}",
           "refId": "A"
@@ -3139,7 +3256,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Internal error rate, likely a bug if there is data show up.",
       "fieldConfig": {
         "defaults": {
@@ -3189,7 +3309,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, method, errorcode) (rate(aptos_client_service_internal_error_count{role=~\"$role\", type=~\"$requesttype\", method=~\"$method\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "sum by (owner, role, method, errorcode) (rate(aptos_client_service_internal_error_count{chain_name=~\"$chain_name\", role=~\"$role\", type=~\"$requesttype\", method=~\"$method\", owner=~\"$owner\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}-{{method}} {{errortype}}",
           "refId": "A"
@@ -3241,7 +3361,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The rate of invalid requests, all client side errors. ",
       "fieldConfig": {
         "defaults": {
@@ -3291,7 +3414,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, method, errortype) (rate(aptos_client_service_invalid_requests_count{role=~\"$role\", type=~\"$requesttype\", method=~\"$method\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "sum by (owner, role, method, errortype) (rate(aptos_client_service_invalid_requests_count{chain_name=~\"$chain_name\", role=~\"$role\", type=~\"$requesttype\", method=~\"$method\", owner=~\"$owner\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}-{{method}} {{errortype}}",
           "refId": "A"
@@ -3343,7 +3466,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "This latency is recorded at JSON-RPC handler level without knowing what method is called. There are 2 types, batch and single requests.  \nBatch request is total time for all methods call finished.",
       "fieldConfig": {
         "defaults": {
@@ -3404,7 +3530,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum  by (owner, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{role=~\"$role\", owner=~\"$owner\",type=~\"$requesttype\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.50, sum  by (owner, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\",type=~\"$requesttype\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -3457,7 +3583,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "This latency is recorded at JSON-RPC handler level without knowing what method is called. There are 2 types, batch and single requests.  \nBatch request is total time for all methods call finished.",
       "fieldConfig": {
         "defaults": {
@@ -3518,7 +3647,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.90, sum  by (owner, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{role=~\"$role\", owner=~\"$owner\",type=~\"$requesttype\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.90, sum  by (owner, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\",type=~\"$requesttype\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -3571,7 +3700,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "This latency is recorded at JSON-RPC handler level without knowing what method is called. There are 2 types, batch and single requests.  \nBatch request is total time for all methods call finished.",
       "fieldConfig": {
         "defaults": {
@@ -3632,7 +3764,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum  by (owner, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{role=~\"$role\", owner=~\"$owner\",type=~\"$requesttype\"}[$AggInterval])))",
+          "expr": "histogram_quantile(0.99, sum  by (owner, role, le)(rate(aptos_client_service_rpc_request_latency_seconds_bucket{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\",type=~\"$requesttype\"}[$AggInterval])))",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -3682,7 +3814,10 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -3699,7 +3834,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The rate of logs written via the code.  This is a superset of logs written through to the end log storage system.",
       "fieldConfig": {
         "defaults": {
@@ -3744,7 +3882,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_struct_log_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -3796,7 +3934,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The end to end rate of logs being submitted, to actually being sent to Logstash.  If this value rises above 0, see the corresponding error graphs to determine the issue.",
       "fieldConfig": {
         "defaults": {
@@ -3841,7 +3982,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "1-(rate(aptos_struct_log_tcp_submit_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])/rate(aptos_struct_log_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval]))",
+          "expr": "1-(rate(aptos_struct_log_tcp_submit_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])/rate(aptos_struct_log_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -3893,7 +4034,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Percentage of connections that fail to connect to the logging pod.  Extended or high percentage e.g. 100% connections points to a dead logging pod.",
       "fieldConfig": {
         "defaults": {
@@ -3938,7 +4082,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(rate(aptos_struct_log_connect_error_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval]) or 0 * rate(aptos_struct_log_tcp_connect_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])) / rate(aptos_struct_log_tcp_connect_count{role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "(rate(aptos_struct_log_connect_error_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval]) or 0 * rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])) / rate(aptos_struct_log_tcp_connect_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -3993,6 +4137,53 @@
   "templating": {
     "list": [
       {
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "Datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Datasource}"
+        },
+        "definition": "label_values(chain_name)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "chain_name",
+        "options": [],
+        "query": {
+          "query": "label_values(chain_name)",
+          "refId": "Prometheus-chain-name-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
         "allValue": null,
         "current": {
           "selected": true,
@@ -4003,7 +4194,10 @@
             "$__all"
           ]
         },
-        "datasource": "Prometheus",
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(owner)",
         "hide": 0,
         "includeAll": true,
@@ -4033,7 +4227,10 @@
             "validator"
           ]
         },
-        "datasource": "Prometheus",
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(role)",
         "hide": 0,
         "includeAll": true,
@@ -4063,7 +4260,10 @@
             "validator"
           ]
         },
-        "datasource": "Prometheus",
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(container)",
         "hide": 0,
         "includeAll": true,
@@ -4093,7 +4293,10 @@
             "Validator"
           ]
         },
-        "datasource": "Prometheus",
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(network_id)",
         "hide": 0,
         "includeAll": true,
@@ -4294,7 +4497,10 @@
         "type": "interval"
       },
       {
-        "datasource": "Prometheus",
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "filters": [],
         "hide": 0,
         "label": null,

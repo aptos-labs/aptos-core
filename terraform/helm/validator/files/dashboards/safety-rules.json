@@ -3,20 +3,29 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": "-- Grafana --",
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
         "type": "dashboard"
       }
     ]
   },
   "editable": true,
-  "gnetId": null,
+  "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 23,
-  "iteration": 1637617714865,
+  "id": 21,
+  "iteration": 1650603789932,
   "links": [
     {
       "asDropdown": true,
@@ -28,10 +37,14 @@
       "type": "dashboards"
     }
   ],
+  "liveNow": false,
   "panels": [
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -48,14 +61,11 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
-      "description": "This panel displays the error counts encountered by safety rules queries within the last aggregation interval.",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
       },
+      "description": "This panel displays the error counts encountered by safety rules queries within the last aggregation interval.",
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
@@ -82,7 +92,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -92,16 +102,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_safety_rules_queries{owner=~\"$owner\", result=\"error\"}[$interval])",
+          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", owner=~\"$owner\", result=\"error\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}_{{method}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Error Counts of Safety Rules Queries",
       "tooltip": {
         "shared": true,
@@ -110,9 +118,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -121,27 +127,24 @@
           "format": "short",
           "label": "Error Count (last aggregation interval)",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -158,14 +161,11 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
-      "description": "The most recent epoch processed by safety rules",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
       },
+      "description": "The most recent epoch processed by safety rules",
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
@@ -192,7 +192,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -202,7 +202,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_safety_rules_state{field=\"epoch\", owner=~\"$owner\"}",
+          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"epoch\", owner=~\"$owner\"}",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"
@@ -215,9 +215,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Current Epoch",
       "tooltip": {
         "shared": true,
@@ -226,9 +224,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -237,22 +233,16 @@
           "format": "short",
           "label": "Epoch Number",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -260,14 +250,11 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
-      "description": "The last round that the validator submitted a vote",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
       },
+      "description": "The last round that the validator submitted a vote",
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
@@ -294,7 +281,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -304,16 +291,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_safety_rules_state{field=\"last_voted_round\", owner=~\"$owner\"}",
+          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"last_voted_round\", owner=~\"$owner\"}",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Last Voted Round",
       "tooltip": {
         "shared": true,
@@ -322,9 +307,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -333,22 +316,16 @@
           "format": "short",
           "label": "Round Number",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -356,14 +333,11 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
-      "description": "The highest parent round from any incoming quorum certificate",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
       },
+      "description": "The highest parent round from any incoming quorum certificate",
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
@@ -390,7 +364,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -400,16 +374,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_safety_rules_state{field=\"preferred_round\", owner=~\"$owner\"}",
+          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"preferred_round\", owner=~\"$owner\"}",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Preferred Round",
       "tooltip": {
         "shared": true,
@@ -418,9 +390,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -429,22 +399,16 @@
           "format": "short",
           "label": "Round Number",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -452,14 +416,11 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
-      "description": "Current waypoint version of persistent safety storage",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
       },
+      "description": "Current waypoint version of persistent safety storage",
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
@@ -486,7 +447,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -496,16 +457,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_safety_rules_state{field=\"waypoint_version\", owner=~\"$owner\"}",
+          "expr": "aptos_safety_rules_state{chain_name=~\"$chain_name\", field=\"waypoint_version\", owner=~\"$owner\"}",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Waypoint Version",
       "tooltip": {
         "shared": true,
@@ -514,9 +473,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -525,27 +482,24 @@
           "format": "short",
           "label": "Waypoint Version",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -562,14 +516,11 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
-      "description": "This method initializes safety rules using an epoch ending ledger info.",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
       },
+      "description": "This method initializes safety rules using an epoch ending ledger info.",
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
@@ -596,7 +547,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -606,16 +557,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_safety_rules_queries{method=\"initialize\", owner=~\"$owner\"}[$interval])",
+          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", method=\"initialize\", owner=~\"$owner\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}_{{result}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Initialize",
       "tooltip": {
         "shared": true,
@@ -624,9 +573,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -635,22 +582,17 @@
           "format": "short",
           "label": "Result Count (last aggregation interval)",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
           "label": "",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -658,14 +600,11 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
-      "description": "This method provides the internal state of safety rules for monitoring and/or debugging purposes.",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
       },
+      "description": "This method provides the internal state of safety rules for monitoring and/or debugging purposes.",
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
@@ -692,7 +631,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -702,16 +641,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_safety_rules_queries{owner=~\"$owner\", method=\"consensus_state\"}[$interval])",
+          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", owner=~\"$owner\", method=\"consensus_state\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}_{{result}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Consensus State",
       "tooltip": {
         "shared": true,
@@ -720,9 +657,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -731,22 +666,16 @@
           "format": "short",
           "label": "Result Count (last aggregation interval)",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -754,14 +683,11 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
-      "description": "This method attempts to vote for a given proposal following the voting rules.",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
       },
+      "description": "This method attempts to vote for a given proposal following the voting rules.",
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
@@ -788,7 +714,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -798,16 +724,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_safety_rules_queries{owner=~\"$owner\", method=\"construct_and_sign_vote\"}[$interval])",
+          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", owner=~\"$owner\", method=\"construct_and_sign_vote\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}_{{result}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Construct and Sign Vote",
       "tooltip": {
         "shared": true,
@@ -816,9 +740,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -827,22 +749,16 @@
           "format": "short",
           "label": "Result Count (last aggregation interval)",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -850,14 +766,11 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
-      "description": "This method is called to sign a proposal or block.",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
       },
+      "description": "This method is called to sign a proposal or block.",
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
@@ -884,7 +797,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -894,16 +807,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_safety_rules_queries{owner=~\"$owner\", method=\"sign_proposal\"}[$interval])",
+          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", owner=~\"$owner\", method=\"sign_proposal\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}_{{result}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Sign Proposal",
       "tooltip": {
         "shared": true,
@@ -912,9 +823,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -923,22 +832,16 @@
           "format": "short",
           "label": "Result Count (last aggregation interval)",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -946,14 +849,11 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
-      "description": "This method is called to sign a timeout.",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": []
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
       },
+      "description": "This method is called to sign a timeout.",
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
@@ -980,7 +880,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -990,16 +890,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(aptos_safety_rules_queries{owner=~\"$owner\", method=\"sign_timeout\"}[$interval])",
+          "expr": "increase(aptos_safety_rules_queries{chain_name=~\"$chain_name\", owner=~\"$owner\", method=\"sign_timeout\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}_{{result}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Sign Timeout",
       "tooltip": {
         "shared": true,
@@ -1008,9 +906,7 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
@@ -1019,36 +915,41 @@
           "format": "short",
           "label": "Result Count (last aggregation interval)",
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     }
   ],
   "refresh": false,
-  "schemaVersion": 26,
+  "schemaVersion": 36,
   "style": "dark",
   "tags": [],
   "templating": {
     "list": [
       {
-        "allValue": null,
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "Datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
         "current": {
           "selected": true,
-          "tags": [],
           "text": [
             "All"
           ],
@@ -1056,21 +957,59 @@
             "$__all"
           ]
         },
-        "datasource": "Prometheus",
-        "definition": "label_values(owner)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Datasource}"
+        },
+        "definition": "label_values(chain_name)",
         "hide": 0,
-        "includeAll": true,
-        "label": null,
-        "multi": true,
-        "name": "owner",
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "chain_name",
         "options": [],
-        "query": "label_values(owner)",
+        "query": {
+          "query": "label_values(chain_name)",
+          "refId": "Prometheus-chain-name-Variable-Query"
+        },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
         "tagValuesQuery": "",
-        "tags": [],
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
+        "definition": "label_values(owner)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "owner",
+        "options": [],
+        "query": {
+          "query": "label_values(owner)",
+          "refId": "Prometheus-owner-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
         "tagsQuery": "",
         "type": "query",
         "useTags": false
@@ -1165,5 +1104,6 @@
   "timezone": "",
   "title": "Safety Rules",
   "uid": "safety-rules",
-  "version": 9
+  "version": 1,
+  "weekStart": ""
 }

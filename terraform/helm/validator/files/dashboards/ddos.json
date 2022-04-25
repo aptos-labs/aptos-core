@@ -31,7 +31,10 @@
   "panels": [
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -48,7 +51,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Total Inbound connected peers.  There should be at most one peer with 0 inbound connections.",
       "fieldConfig": {
         "defaults": {
@@ -93,7 +99,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id) (aptos_connections{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\"})",
+          "expr": "sum by (owner, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\"})",
           "interval": "",
           "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
           "refId": "A"
@@ -145,7 +151,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The rate of new inbound connections on the network interface",
       "fieldConfig": {
         "defaults": {
@@ -192,7 +201,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\" }[$AggInterval]))",
+          "expr": "sum by (owner, role_type, network_id) (rate(aptos_network_pending_connection_upgrades{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\" }[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
           "refId": "A"
@@ -244,7 +253,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Rate of connections being blocked by connection limits",
       "fieldConfig": {
         "defaults": {
@@ -289,7 +301,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_connections_rejected{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\"}[1m])",
+          "expr": "rate(aptos_connections_rejected{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", direction=\"inbound\"}[1m])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
           "refId": "A"
@@ -341,7 +353,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Total throughput of all Inbound RPC requests per peer",
       "fieldConfig": {
         "defaults": {
@@ -387,7 +402,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_rpc_bytes{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_rpc_bytes{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -441,7 +456,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Total number of all Inbound RPC requests per peer",
       "fieldConfig": {
         "defaults": {
@@ -487,7 +505,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_rpc_messages{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", type=\"request\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_rpc_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", type=\"request\", state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -541,7 +559,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Total throughput of all Inbound Direct Send requests per peer",
       "fieldConfig": {
         "defaults": {
@@ -587,7 +608,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_direct_send_bytes{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_direct_send_bytes{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -641,7 +662,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Total number of all Inbound Direct Send requests per peer",
       "fieldConfig": {
         "defaults": {
@@ -686,7 +710,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_direct_send_messages{network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
+          "expr": "sum by (owner, role_type, network_id)(rate(aptos_network_direct_send_messages{chain_name=~\"$chain_name\", network_id=~\"$network_id\", role_type=~\"$role_type\", owner=~\"$owner\", state=\"received\"}[$AggInterval]))",
           "interval": "",
           "legendFormat": "{{owner}}-{{role_type}}-{{network_id}}",
           "refId": "A"
@@ -738,7 +762,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of bytes allowed through the throttler inbound per second",
       "fieldConfig": {
         "defaults": {
@@ -784,7 +811,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_network_rate_limit_sum{metric=\"allowed\", direction=\"inbound\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", metric=\"allowed\", direction=\"inbound\", owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"
@@ -836,7 +863,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of bytes throttled inbound per second including partial messages",
       "fieldConfig": {
         "defaults": {
@@ -882,7 +912,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_network_rate_limit_sum{metric=\"throttled\", direction=\"inbound\", owner=~\"$owner\"}[$AggInterval])",
+          "expr": "rate(aptos_network_rate_limit_sum{chain_name=~\"$chain_name\", metric=\"throttled\", direction=\"inbound\", owner=~\"$owner\"}[$AggInterval])",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"
@@ -931,7 +961,10 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -948,7 +981,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {},
@@ -1064,7 +1100,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {},
@@ -1200,7 +1239,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {},
@@ -1318,7 +1360,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {},
@@ -1372,7 +1417,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "kubelet_volume_stats_used_bytes{persistentvolumeclaim=~\".*-($container)-e.*\", owner=~\"$owner\"} / kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~\".*-($container)-e.*\", owner=~\"$owner\"}",
+          "expr": "kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", persistentvolumeclaim=~\".*-($container)-e.*\", owner=~\"$owner\"} / kubelet_volume_stats_capacity_bytes{chain_name=~\"$chain_name\", persistentvolumeclaim=~\".*-($container)-e.*\", owner=~\"$owner\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1429,6 +1474,53 @@
   "templating": {
     "list": [
       {
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "Datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Datasource}"
+        },
+        "definition": "label_values(chain_name)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "chain_name",
+        "options": [],
+        "query": {
+          "query": "label_values(chain_name)",
+          "refId": "Prometheus-chain-name-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
         "allValue": "",
         "current": {
           "selected": false,
@@ -1439,7 +1531,10 @@
             "Public"
           ]
         },
-        "datasource": "Prometheus",
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(network_id)",
         "hide": 0,
         "includeAll": true,
@@ -1470,7 +1565,10 @@
             "full_node"
           ]
         },
-        "datasource": "Prometheus",
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(role_type)",
         "hide": 0,
         "includeAll": true,
@@ -1500,7 +1598,10 @@
             "$__all"
           ]
         },
-        "datasource": "Prometheus",
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(owner)",
         "hide": 0,
         "includeAll": true,
@@ -1530,7 +1631,10 @@
             "$__all"
           ]
         },
-        "datasource": "Prometheus",
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(protocol_id)",
         "hide": 0,
         "includeAll": true,
@@ -1625,7 +1729,10 @@
             "fullnode"
           ]
         },
-        "datasource": "Prometheus",
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(container)",
         "hide": 0,
         "includeAll": true,

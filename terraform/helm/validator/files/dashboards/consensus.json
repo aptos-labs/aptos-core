@@ -31,7 +31,10 @@
   "panels": [
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -48,7 +51,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The rate of the committed round number.",
       "fieldConfig": {
         "defaults": {
@@ -94,7 +100,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_last_committed_round{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_last_committed_round{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -158,7 +164,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The rate of the committed transaction version.",
       "fieldConfig": {
         "defaults": {
@@ -204,7 +213,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_last_committed_version{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_last_committed_version{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -256,7 +265,10 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -273,7 +285,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Duration between block generation time until the moment the leader signs it.",
       "fieldConfig": {
         "defaults": {
@@ -319,7 +334,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"signed\"}[$interval]) / rate(aptos_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"signed\"}[$interval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", stage=\"signed\"}[$interval]) / rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", stage=\"signed\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -373,7 +388,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Duration between block generation time until the moment the node receives it in consensus.",
       "fieldConfig": {
         "defaults": {
@@ -419,7 +437,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"received\"}[$interval]) / rate(aptos_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"received\"}[$interval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", stage=\"received\"}[$interval]) / rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", stage=\"received\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -473,7 +491,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Duration between block generation time until the moment the node is synced and ready to execute.",
       "fieldConfig": {
         "defaults": {
@@ -519,7 +540,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"synced\"}[$interval]) / rate(aptos_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"synced\"}[$interval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", stage=\"synced\"}[$interval]) / rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", stage=\"synced\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -573,7 +594,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Duration between block generation time until the moment the node executes the block.",
       "fieldConfig": {
         "defaults": {
@@ -619,7 +643,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"executed\"}[$interval]) / rate(aptos_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"executed\"}[$interval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", stage=\"executed\"}[$interval]) / rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", stage=\"executed\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -673,7 +697,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Duration between block generation time until the moment the node votes for it.",
       "fieldConfig": {
         "defaults": {
@@ -719,7 +746,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"voted\"}[$interval]) / rate(aptos_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"voted\"}[$interval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", stage=\"voted\"}[$interval]) / rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", stage=\"voted\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -773,7 +800,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Duration between block generation time until the moment the QC is aggregated by leader.",
       "fieldConfig": {
         "defaults": {
@@ -819,7 +849,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"qc_aggregated\"}[$interval]) / rate(aptos_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"qc_aggregated\"}[$interval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", stage=\"qc_aggregated\"}[$interval]) / rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", stage=\"qc_aggregated\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -873,7 +903,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Duration between block generation time until the moment the node adds the QC.",
       "fieldConfig": {
         "defaults": {
@@ -919,7 +952,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"qc_added\"}[$interval]) / rate(aptos_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"qc_added\"}[$interval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", stage=\"qc_added\"}[$interval]) / rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", stage=\"qc_added\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -973,7 +1006,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Duration between block generation time until the moment the node commits it.",
       "fieldConfig": {
         "defaults": {
@@ -1019,7 +1055,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_block_tracing_sum{owner=~\"$owner\", role=~\"$role\", stage=\"committed\"}[$interval]) / rate(aptos_consensus_block_tracing_count{owner=~\"$owner\", role=~\"$role\", stage=\"committed\"}[$interval])",
+          "expr": "rate(aptos_consensus_block_tracing_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", stage=\"committed\"}[$interval]) / rate(aptos_consensus_block_tracing_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", stage=\"committed\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "C"
@@ -1068,7 +1104,10 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1085,7 +1124,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Percent of time the main Event Loop spends idle",
       "fieldConfig": {
         "defaults": {
@@ -1131,7 +1173,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "1 - (rate(consensus_duration_sum{op='process_block_retrieval', owner=~\"$owner\", role=~\"$role\"}[$interval]) + on (owner, role) rate(consensus_duration_sum{op='process_message', owner=~\"$owner\", role=~\"$role\"}[$interval]) + on (owner, role) rate(consensus_duration_sum{op='process_local_timeout', owner=~\"$owner\", role=~\"$role\"}[$interval])) / on(owner, role) rate(consensus_duration_sum{op='main_loop', owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "1 - (rate(consensus_duration_sum{op='process_block_retrieval', owner=~\"$owner\", role=~\"$role\"}[$interval]) + on (owner, role) rate(consensus_duration_sum{op='process_message', owner=~\"$owner\", role=~\"$role\"}[$interval]) + on (owner, role) rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='process_local_timeout', owner=~\"$owner\", role=~\"$role\"}[$interval])) / on(owner, role) rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='main_loop', owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -1184,7 +1226,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Percent of time the main Event Loop spends for block retrieval",
       "fieldConfig": {
         "defaults": {
@@ -1230,7 +1275,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(consensus_duration_sum{op='process_message', owner=~\"$owner\", role=~\"$role\"}[$interval]) / on(owner, role) rate(consensus_duration_sum{op='main_loop', owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='process_message', owner=~\"$owner\", role=~\"$role\"}[$interval]) / on(owner, role) rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='main_loop', owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -1283,7 +1328,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Percent of time the main Event Loop spends for block retrieval",
       "fieldConfig": {
         "defaults": {
@@ -1329,7 +1377,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(consensus_duration_sum{op='process_block_retrieval', owner=~\"$owner\", role=~\"$role\"}[$interval]) / on(owner, role) rate(consensus_duration_sum{op='main_loop', owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='process_block_retrieval', owner=~\"$owner\", role=~\"$role\"}[$interval]) / on(owner, role) rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='main_loop', owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -1382,7 +1430,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Percent of time the main loop spends for processing local timeout.",
       "fieldConfig": {
         "defaults": {
@@ -1428,7 +1479,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(consensus_duration_sum{op='process_local_timeout', owner=~\"$owner\", role=~\"$role\"}[$interval]) / on(owner, role) rate(consensus_duration_sum{op='main_loop', owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='process_local_timeout', owner=~\"$owner\", role=~\"$role\"}[$interval]) / on(owner, role) rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='main_loop', owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -1481,7 +1532,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Percent time spent in process proposal compared to all consensus msg",
       "fieldConfig": {
         "defaults": {
@@ -1527,7 +1581,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(consensus_duration_sum{op='process_proposal', owner=~\"$owner\", role=~\"$role\"}[$interval]) / on(owner, role) rate(consensus_duration_sum{op='process_message',  owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='process_proposal', owner=~\"$owner\", role=~\"$role\"}[$interval]) / on(owner, role) rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='process_message',  owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -1580,7 +1634,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Percent time spent in process vote compared to all consensus msg",
       "fieldConfig": {
         "defaults": {
@@ -1626,7 +1683,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(consensus_duration_sum{op='process_vote', owner=~\"$owner\", role=~\"$role\"}[$interval]) / on(owner, role) rate(consensus_duration_sum{op='process_message', owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='process_vote', owner=~\"$owner\", role=~\"$role\"}[$interval]) / on(owner, role) rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='process_message', owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -1679,7 +1736,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Percent time spent in process sync info compared to all consensus msg",
       "fieldConfig": {
         "defaults": {
@@ -1725,7 +1785,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(consensus_duration_sum{op='process_sync_info', owner=~\"$owner\", role=~\"$role\"}[$interval]) / on(owner, role) rate(consensus_duration_sum{op='process_message', owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='process_sync_info', owner=~\"$owner\", role=~\"$role\"}[$interval]) / on(owner, role) rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='process_message', owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -1778,7 +1838,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The error rate of main loop (timeout is considered as error)",
       "fieldConfig": {
         "defaults": {
@@ -1824,7 +1887,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_error_count{owner=~\"$owner\", role=~\"$role\"}[$interval]) / on (owner, role) rate(consensus_duration_count{op='main_loop', owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_error_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / on (owner, role) rate(consensus_duration_count{chain_name=~\"$chain_name\", op='main_loop', owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -1877,7 +1940,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "A sampled binary number indicating whether the node is currently in a function. (Useful when the node is stuck somewhere)",
       "fieldConfig": {
         "defaults": {
@@ -1923,50 +1989,50 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "consensus_gauge{op='process_proposal_running', owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "consensus_gauge{chain_name=~\"$chain_name\", op='process_proposal_running', owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}: proposal",
           "refId": "A"
         },
         {
-          "expr": "consensus_gauge{op='process_vote_running', owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "consensus_gauge{chain_name=~\"$chain_name\", op='process_vote_running', owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}: vote",
           "refId": "B"
         },
         {
-          "expr": "consensus_gauge{op='process_local_timeout_running', owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "consensus_gauge{chain_name=~\"$chain_name\", op='process_local_timeout_running', owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}: timeout",
           "refId": "C"
         },
         {
-          "expr": "consensus_gauge{op='reconfig_running', owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "consensus_gauge{chain_name=~\"$chain_name\", op='reconfig_running', owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}: reconfig",
           "refId": "D"
         },
         {
-          "expr": "consensus_gauge{op='execute_block', owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "consensus_gauge{chain_name=~\"$chain_name\", op='execute_block', owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}: execute",
           "refId": "E"
         },
         {
-          "expr": "consensus_gauge{op='commit_block', owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "consensus_gauge{chain_name=~\"$chain_name\", op='commit_block', owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}: commit",
           "refId": "F"
         },
         {
-          "expr": "consensus_gauge{op='sync_to', owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "consensus_gauge{chain_name=~\"$chain_name\", op='sync_to', owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}: sync",
           "refId": "G"
         },
         {
-          "expr": "consensus_gauge{op='block_retrieval', owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "consensus_gauge{chain_name=~\"$chain_name\", op='block_retrieval', owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}: rpc",
           "refId": "H"
@@ -2015,7 +2081,10 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2032,7 +2101,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The current round consensus is at, the rate of this is roughly Committed blocks per sec.",
       "fieldConfig": {
         "defaults": {
@@ -2078,7 +2150,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_consensus_current_round{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_current_round{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -2131,7 +2203,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {},
@@ -2176,7 +2251,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_consensus_qc_rounds_count{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_qc_rounds_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2230,7 +2305,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The total number of rounds that have timeout certificate.",
       "fieldConfig": {
         "defaults": {
@@ -2276,7 +2354,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_consensus_timeout_rounds_count{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_timeout_rounds_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2330,7 +2408,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The total number a single node has timeout locally. When 2f+1 nodes have local timeout for the same round, a timeout round is formed.",
       "fieldConfig": {
         "defaults": {
@@ -2376,7 +2457,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_consensus_timeout_count{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_timeout_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2430,7 +2511,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The duration of a single round until it generates local timeout.",
       "fieldConfig": {
         "defaults": {
@@ -2476,7 +2560,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_consensus_round_timeout_s{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_round_timeout_s{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2527,7 +2611,10 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2544,7 +2631,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The current epoch number the node is in, the number is bumped with reconfiguration event like key rotation, validator set change etc.",
       "fieldConfig": {
         "defaults": {
@@ -2590,7 +2680,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_consensus_epoch{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_epoch{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -2643,7 +2733,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Number of validators for the current epoch.",
       "fieldConfig": {
         "defaults": {
@@ -2689,7 +2782,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_consensus_current_epoch_validators{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_current_epoch_validators{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -2739,7 +2832,10 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2756,7 +2852,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Pending blocks in the block tree, typically it should be less than 3.",
       "fieldConfig": {
         "defaults": {
@@ -2802,7 +2901,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_consensus_num_blocks_in_tree{owner=~\"$owner\", role=~\"$role\"} - 1",
+          "expr": "aptos_consensus_num_blocks_in_tree{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"} - 1",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2856,7 +2955,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The average number of transactions of a block, can impact the execution time and overall latency.",
       "fieldConfig": {
         "defaults": {
@@ -2902,7 +3004,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_num_txns_per_block_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_consensus_num_txns_per_block_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_num_txns_per_block_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_consensus_num_txns_per_block_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2956,7 +3058,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Total time the node has to wait before inserting the block",
       "fieldConfig": {
         "defaults": {
@@ -3002,7 +3107,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_consensus_wait_duration_s_sum{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_wait_duration_s_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -3053,7 +3158,10 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -3070,7 +3178,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The average time to execute a block.",
       "fieldConfig": {
         "defaults": {
@@ -3116,7 +3227,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(consensus_duration_sum{op='execute_block', owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{op='execute_block', owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='execute_block', owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", op='execute_block', owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -3169,7 +3280,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The average time to commit blocks (may commit more than 1 in a single call).",
       "fieldConfig": {
         "defaults": {
@@ -3215,7 +3329,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(consensus_duration_sum{op='commit_block', owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{op='commit_block',  owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='commit_block', owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", op='commit_block',  owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -3268,7 +3382,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The average latency of talking to safety rules (of all calls).",
       "fieldConfig": {
         "defaults": {
@@ -3314,7 +3431,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(consensus_duration_sum{op='safety_rules', owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{op='safety_rules', owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='safety_rules', owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", op='safety_rules', owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -3367,7 +3484,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The average latency of pulling the txn from mempool.",
       "fieldConfig": {
         "defaults": {
@@ -3413,7 +3533,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(consensus_duration_sum{op='pull_txn', owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{op='pull_txn', owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='pull_txn', owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", op='pull_txn', owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -3466,7 +3586,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The average latency of notifying mempool about failed transactions.",
       "fieldConfig": {
         "defaults": {
@@ -3512,7 +3635,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(consensus_duration_sum{op='notify_mempool', owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{op='notify_mempool', owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='notify_mempool', owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", op='notify_mempool', owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -3565,7 +3688,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The average latency of notifying state sync of committed txn.",
       "fieldConfig": {
         "defaults": {
@@ -3611,7 +3737,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(consensus_duration_sum{op='notify_state_sync', owner=~\"$owner\", role=~\"$role\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{op='notify_state_sync', owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(consensus_duration_sum{chain_name=~\"$chain_name\", op='notify_state_sync', owner=~\"$owner\", role=~\"$role\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(consensus_duration_count{chain_name=~\"$chain_name\", op='notify_state_sync', owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
@@ -3664,7 +3790,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The total count of call to sync to.",
       "fieldConfig": {
         "defaults": {
@@ -3710,7 +3839,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "consensus_duration_count{op='sync_to', owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "consensus_duration_count{chain_name=~\"$chain_name\", op='sync_to', owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -3764,7 +3893,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The total time spent in the external sync_to function.",
       "fieldConfig": {
         "defaults": {
@@ -3810,7 +3942,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "consensus_duration_sum{op='sync_to', owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "consensus_duration_sum{chain_name=~\"$chain_name\", op='sync_to', owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -3864,7 +3996,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The total number of sync info msg sent to help peers.",
       "fieldConfig": {
         "defaults": {
@@ -3910,7 +4045,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_consensus_sync_info_msg_sent_count{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_sync_info_msg_sent_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -3964,7 +4099,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The total number of block retrieval the node sends. It's required when the node is missing some ancestors of the block to be executed.",
       "fieldConfig": {
         "defaults": {
@@ -4010,7 +4148,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "consensus_duration_count{op='block_retrieval', owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "consensus_duration_count{chain_name=~\"$chain_name\", op='block_retrieval', owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -4064,7 +4202,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Total time spent in retrieval the blocks from peers. (This is blocking RPC call)",
       "fieldConfig": {
         "defaults": {
@@ -4110,7 +4251,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "consensus_duration_sum{op='block_retrieval', owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "consensus_duration_sum{chain_name=~\"$chain_name\", op='block_retrieval', owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -4161,7 +4302,10 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -4178,7 +4322,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The proposal rate of the node, indicating how many times it becomes leaders.",
       "fieldConfig": {
         "defaults": {
@@ -4224,7 +4371,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_proposals_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_proposals_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -4278,7 +4425,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The total number the node votes on a NIL block when the round timeout. (when the proposer doesn't send proposal in time).",
       "fieldConfig": {
         "defaults": {
@@ -4324,7 +4474,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_consensus_vote_nil_count{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_vote_nil_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -4375,7 +4525,10 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -4392,7 +4545,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The channel metrics related to network layer to consensus.",
       "fieldConfig": {
         "defaults": {
@@ -4437,7 +4593,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_consensus_pending_network_events{state=\"enqueued\", owner=~\"$owner\", role=~\"$role\"} - on (owner, role) aptos_consensus_pending_network_events{state=\"dequeued\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_pending_network_events{chain_name=~\"$chain_name\", state=\"enqueued\", owner=~\"$owner\", role=~\"$role\"} - on (owner, role) aptos_consensus_pending_network_events{chain_name=~\"$chain_name\", state=\"dequeued\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -4489,7 +4645,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The channel metrics related to network layer to consensus.",
       "fieldConfig": {
         "defaults": {
@@ -4534,7 +4693,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_pending_network_events{state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_pending_network_events{chain_name=~\"$chain_name\", state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "C"
@@ -4586,7 +4745,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The channel metrics related to consensus block retrieval (dedicated channel for the rpc).",
       "fieldConfig": {
         "defaults": {
@@ -4631,7 +4793,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_consensus_block_retrieval_channel_msgs_count{state=\"enqueued\", owner=~\"$owner\", role=~\"$role\"} - on (owner, role) aptos_consensus_block_retrieval_channel_msgs_count{state=\"dequeued\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_block_retrieval_channel_msgs_count{chain_name=~\"$chain_name\", state=\"enqueued\", owner=~\"$owner\", role=~\"$role\"} - on (owner, role) aptos_consensus_block_retrieval_channel_msgs_count{chain_name=~\"$chain_name\", state=\"dequeued\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -4683,7 +4845,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The channel metrics related to consensus block retrieval (dedicated channel for the rpc).",
       "fieldConfig": {
         "defaults": {
@@ -4728,7 +4893,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_block_retrieval_channel_msgs_count{state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_block_retrieval_channel_msgs_count{chain_name=~\"$chain_name\", state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "C"
@@ -4780,7 +4945,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The channel metrics related to consensus network -> main loop. (It only keeps one message per peer per type).",
       "fieldConfig": {
         "defaults": {
@@ -4825,7 +4993,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_consensus_channel_msgs_count{state=\"enqueued\", owner=~\"$owner\", role=~\"$role\"} - on (owner, role) aptos_consensus_channel_msgs_count{state=\"dequeued\", owner=~\"$owner\", role=~\"$role\"} - on (owner, role) aptos_consensus_channel_msgs_count{state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_channel_msgs_count{state=\"enqueued\", owner=~\"$owner\", role=~\"$role\"} - on (owner, role) aptos_consensus_channel_msgs_count{chain_name=~\"$chain_name\", state=\"dequeued\", owner=~\"$owner\", role=~\"$role\"} - on (owner, role) aptos_consensus_channel_msgs_count{chain_name=~\"$chain_name\", state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -4877,7 +5045,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The channel metrics related to consensus network -> main loop. (It only keeps one message per peer per type).",
       "fieldConfig": {
         "defaults": {
@@ -4922,7 +5093,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_consensus_channel_msgs_count{state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_consensus_channel_msgs_count{chain_name=~\"$chain_name\", state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "C"
@@ -4974,7 +5145,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The pending messages in the self message queue (for proposal and vote) and timeout queue (for local timeout).",
       "fieldConfig": {
         "defaults": {
@@ -5019,7 +5193,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_consensus_pending_self_messages{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_pending_self_messages{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -5071,7 +5245,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The pending messages in the self message queue (for proposal and vote) and timeout queue (for local timeout).",
       "fieldConfig": {
         "defaults": {
@@ -5116,7 +5293,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_consensus_pending_round_timeouts{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_consensus_pending_round_timeouts{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "C"
@@ -5171,6 +5348,53 @@
   "templating": {
     "list": [
       {
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "Datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Datasource}"
+        },
+        "definition": "label_values(chain_name)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "chain_name",
+        "options": [],
+        "query": {
+          "query": "label_values(chain_name)",
+          "refId": "Prometheus-chain-name-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
         "allValue": null,
         "current": {
           "selected": true,
@@ -5181,7 +5405,10 @@
             "$__all"
           ]
         },
-        "datasource": "Prometheus",
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(owner)",
         "hide": 0,
         "includeAll": true,
@@ -5211,7 +5438,10 @@
             "validator"
           ]
         },
-        "datasource": "Prometheus",
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(role)",
         "hide": 0,
         "includeAll": true,
