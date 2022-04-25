@@ -1,5 +1,11 @@
 # Developer Documentation
 
+   - [Installation](#installation)   
+      - [Requirements](#requirements)   
+   - [Fork and clone the Aptos repo](#fork-and-clone-the-aptos-repo)   
+   - [Build the docs locally](#build-the-docs-locally)   
+
+
 This Aptos Developer Documenatation is built using [Docusaurus 2](https://docusaurus.io/). Follow the below steps to build the docs locally and contribute.
 
 ## Installation
@@ -49,7 +55,7 @@ https://github.com/aptos-labs/aptos-core
 
 3. Start the Yarn server locally. This will also open the locally built docs in your default browser.
 
-  **NOTE**: This step will not generate static html files, but will only render the docs dynamically.
+> **NOTE**: This step will not generate static html files, but will only render the docs dynamically.
 
   ```
   yarn start
