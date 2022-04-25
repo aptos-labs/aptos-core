@@ -203,7 +203,7 @@ mod tests {
     };
 
     #[test]
-    fn test_safety_data_counters() {
+    fn test_counters() {
         let consensus_private_key = ValidatorSigner::from_int(0).private_key().clone();
         let storage = Storage::from(InMemoryStorage::new());
         let mut safety_storage = PersistentSafetyStorage::initialize(
@@ -214,7 +214,12 @@ mod tests {
             Waypoint::default(),
             true,
         );
+        // they both touch the global counters, running it serially to prevent race condition.
+        test_safety_data_counters(&mut safety_storage);
+        test_waypoint_counters(&mut safety_storage);
+    }
 
+    fn test_safety_data_counters(safety_storage: &mut PersistentSafetyStorage) {
         let safety_data = safety_storage.safety_data().unwrap();
         assert_eq!(safety_data.epoch, 1);
         assert_eq!(safety_data.last_voted_round, 0);
@@ -236,19 +241,7 @@ mod tests {
         assert_eq!(counters::get_state(counters::PREFERRED_ROUND), 1);
     }
 
-    #[test]
-    fn test_waypoint_counters() {
-        let consensus_private_key = ValidatorSigner::from_int(0).private_key().clone();
-        let storage = Storage::from(InMemoryStorage::new());
-        let mut safety_storage = PersistentSafetyStorage::initialize(
-            storage,
-            Author::random(),
-            consensus_private_key,
-            Ed25519PrivateKey::generate_for_testing(),
-            Waypoint::default(),
-            true,
-        );
-
+    fn test_waypoint_counters(safety_storage: &mut PersistentSafetyStorage) {
         let waypoint = safety_storage.waypoint().unwrap();
         assert_eq!(waypoint.version(), Version::default());
         assert_eq!(
