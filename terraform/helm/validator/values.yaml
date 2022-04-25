@@ -152,16 +152,6 @@ fullnode:
   affinity: {}
   config:
     max_inbound_connections: 1000
-    inbound_rate_limit:
-      enabled: true
-      ip_byte_bucket_rate: 1048576
-      ip_byte_bucket_size: 1048576
-      initial_bucket_fill_percentage: 25
-    outbound_rate_limit:
-      enabled: true
-      ip_byte_bucket_rate: 1048576
-      ip_byte_bucket_size: 1048576
-      initial_bucket_fill_percentage: 25
 
 keymanager:
   image:
