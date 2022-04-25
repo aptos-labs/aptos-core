@@ -49,7 +49,7 @@ export function OnboardingForm({onSubmit}: Props) {
               I accept the{" "}
               <a
                 className="text-indigo-500 hover:text-indigo-600 focus:outline-none rounded-md focus:underline"
-                href="#"
+                href={"#tos" /* TODO: Add real TOS link. */}
               >
                 Terms of Service
               </a>
