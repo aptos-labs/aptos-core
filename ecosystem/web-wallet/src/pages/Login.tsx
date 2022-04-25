@@ -1,8 +1,7 @@
 import React, { useState } from 'react'
-import { AptosAccount } from 'aptos'
-import { Buffer } from 'buffer'
 import { useNavigate } from 'react-router-dom'
 import { useGlobalState } from '../GlobalState'
+import { loginAccount } from '../utils/account'
 
 import './App.css'
 
@@ -13,10 +12,15 @@ export default function Login () {
 
   function handleSubmit (event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const encodedKey = Uint8Array.from(Buffer.from(key, 'hex'))
-    const account = new AptosAccount(encodedKey, undefined)
-    dispatch({ account })
-    navigate('/wallet')
+    const result = loginAccount(key)
+    if (result.isOk()) {
+      const account = result.value
+      dispatch({ account })
+      navigate('/wallet')
+    } else {
+      // todo: show error toast
+      throw result.error
+    }
   }
 
   return (
