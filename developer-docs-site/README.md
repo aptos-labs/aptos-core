@@ -1,41 +1,75 @@
-# Website
+# Developer Documentation
 
-This website is built using [Docusaurus 2](https://docusaurus.io/), a modern static website generator.
+This Aptos Developer Documenatation is built using [Docusaurus 2](https://docusaurus.io/). Follow the below steps to build the docs locally and contribute.
 
-### Installation
+## Installation
 
-```
-$ yarn
-```
+**IMPORTANT**: These installation steps apply to macOS environment.
 
-### Local Development
+### Requirements
 
-```
-$ yarn start
-```
+Before you proceed, make sure you install the following tools.
 
-This command starts a local development server and opens up a browser window. Most changes are reflected live without having to restart the server.
-
-### Build
+- Install [Node.js](https://nodejs.org/en/download/) by executing the below command on your Terminal:
 
 ```
-$ yarn build
+brew install node
 ```
 
-This command generates static content into the `build` directory and can be served using any static contents hosting service.
-
-### Deployment
-
-Using SSH:
+- Install the latest [Yarn](https://classic.yarnpkg.com/lang/en/docs/install/#mac-stable) by executing the below command on your Terminal:
 
 ```
-$ USE_SSH=true yarn deploy
+brew install yarn
 ```
 
-Not using SSH:
+## Fork and clone the Aptos repo
 
-```
-$ GIT_USER=<Your GitHub username> yarn deploy
-```
+1. Fork the Aptos Core repo by clicking on the **Fork** on the top right of this repo page:
+https://github.com/aptos-labs/aptos-core
 
-If you are using GitHub pages for hosting, this command is a convenient way to build the website and push to the `gh-pages` branch.
+2. Clone your fork.
+
+  ```
+  git clone https://github.com/<YOUR-GITHUB-USERID>/aptos-core
+
+  ```
+
+## Build the docs locally
+
+1. `cd` into the `developer-docs-site` directory in your clone.
+
+  ```
+  cd aptos-core/developer-docs-site
+  ```
+2. Run `yarn`.
+
+  ```
+  yarn
+  ```
+
+3. Start the Yarn server locally. This will also open the locally built docs in your default browser.
+
+  **NOTE**: This step will not generate static html files, but will only render the docs dynamically.
+
+  ```
+  yarn start
+  ```
+
+4. Install Yarn dependencies.
+
+  ```
+  yarn install
+  ```
+5. Finally, build with Yarn.
+
+  ```
+  $ yarn build
+  ```
+
+This command generates static html content and places it in the `build` directory.
+
+5. Finally, use the below command to start the documentation server on your localhost.
+
+  ```
+  npm run serve
+  ```
