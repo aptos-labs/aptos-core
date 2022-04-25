@@ -44,7 +44,7 @@ jobs:
     steps:
       - dev-setup
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: INDEXER_DATABASE_URL="postgresql://postgres@localhost/postgres" RUST_BACKTRACE=full cargo nextest --nextest-profile ci --partition hash:1/1 --test-threads 5 --package smoke-test
+      - run: INDEXER_DATABASE_URL="postgresql://postgres@localhost/postgres" RUST_BACKTRACE=full cargo nextest --nextest-profile ci --partition hash:1/1 --package smoke-test --retries 3
   unit-test:
     executor: ubuntu-2xl
     steps:
