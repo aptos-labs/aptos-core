@@ -7,6 +7,7 @@ import './App.css'
 
 export default function Login () {
   const [key, setKey] = useState('')
+  const [error, setError] = useState('')
   const [, dispatch] = useGlobalState()
   const navigate = useNavigate()
 
@@ -18,17 +19,22 @@ export default function Login () {
       dispatch({ account })
       navigate('/wallet')
     } else {
-      // todo: show error toast
-      throw result.error
+      setError(result.error.message)
     }
+  }
+
+  function onChange (event: React.ChangeEvent<HTMLInputElement>) {
+    setKey(event.target.value)
+    setError('')
   }
 
   return (
     <div className="App-header">
       <h2>Aptos Wallet</h2>
       <form onSubmit={handleSubmit}>
-        <input onChange={(e) => setKey(e.target.value)}/>
+        <input onChange={onChange}/>
       </form>
+      <text className="Error-message">{error}</text>
     </div>
   )
 }

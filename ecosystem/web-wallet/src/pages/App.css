@@ -8,3 +8,8 @@
   font-size: calc(10px + 2vmin);
   color: white;
 }
+
+.Error-message {
+  font-size: calc(8px + 1vmin);
+  color: rgb(255, 0, 0);
+}
