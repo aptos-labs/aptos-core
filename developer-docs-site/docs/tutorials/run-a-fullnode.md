@@ -327,7 +327,7 @@ yaml files are very sensitive to formatting errors. Use a dedicated yaml editor 
 ###  Question(s):
 I have no peers on the available node testers.  
 I have no output when curl'ing 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_state_sync_version{type="synced"}".  
-On to available node testers, it shows that i am not syncing. 
+On the available node testers, it shows that I am not syncing. 
 ###  Answer:
 Check your public_full_node.yaml if you have added some working seed peers. To check if seed peers are working, you can enter the peer-nodes IP address in any of the node testers and check their status.
 
