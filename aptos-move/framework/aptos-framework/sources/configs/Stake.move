@@ -1,6 +1,7 @@
 module AptosFramework::Stake {
-    use Std::Vector;
+    use Std::Errors;
     use Std::Signer;
+    use Std::Vector;
     use AptosFramework::SystemAddresses;
     use AptosFramework::Timestamp;
     use AptosFramework::TestCoin::{Self, Coin};
@@ -9,6 +10,26 @@ module AptosFramework::Stake {
     friend AptosFramework::Genesis;
 
     const MINIMUM_LOCK_PERIOD: u64 = 86400;
+
+    /// Delegation not found for the account.
+    const EDELEGATION_NOT_FOUND: u64 = 1;
+    /// Lock period is shorter than required.
+    const ELOCK_TIME_TOO_SHORT: u64 = 2;
+    /// Withdraw not allowed, the stake is still locked.
+    const EWITHDRAW_NOT_ALLOWED: u64 = 3;
+    /// Validator Config not published.
+    const EVALIDATOR_CONFIG: u64 = 4;
+    /// Not enough stake to join validator set.
+    const ESTAKE_TOO_LOW: u64 = 5;
+    /// Too much stake to join validator set.
+    const ESTAKE_TOO_HIGH: u64 = 6;
+    /// Account is already a validator or pending validator.
+    const EALREADY_VALIDATOR: u64 = 7;
+    /// Account is not a validator.
+    const ENOT_VALIDATOR: u64 = 8;
+    /// Can't remove last validator.
+    const ELAST_VALIDATOR: u64 = 9;
+
 
     /// Basic unit of stake delegation, it's stored in StakePool.
     struct Delegation has store {
@@ -52,6 +73,9 @@ module AptosFramework::Stake {
     }
 
     /// Full ValidatorSet, stored in @CoreResource.
+    /// 1. join_validator_set adds to pending_active queue.
+    /// 2. leave_valdiator_set moves from active to pending_inactive queue.
+    /// 3. on_new_epoch processes two pending queues and refresh ValidatorInfo from the owner's address.
     struct ValidatorSet has key {
         consensus_scheme: u8,
         // minimum stakes required to join validator set
@@ -70,7 +94,7 @@ module AptosFramework::Stake {
     public fun delegate_stake(account: &signer, to: address, amount: u64, locked_until_secs: u64) acquires StakePool, ValidatorSet {
         let coins = TestCoin::withdraw(account, amount);
         let current_time = Timestamp::now_seconds();
-        assert!(current_time + MINIMUM_LOCK_PERIOD < locked_until_secs, 0);
+        assert!(current_time + MINIMUM_LOCK_PERIOD < locked_until_secs, Errors::invalid_argument(ELOCK_TIME_TOO_SHORT));
         let stake_pool = borrow_global_mut<StakePool>(to);
         let delegation = Delegation {
             coins,
@@ -102,8 +126,7 @@ module AptosFramework::Stake {
             // move to pending_inactive if it can be unlocked
             Vector::push_back(&mut stake_pool.pending_inactive, d);
         } else {
-            // not allowed to withdraw
-            abort 0
+            abort Errors::invalid_argument(EWITHDRAW_NOT_ALLOWED)
         };
     }
 
@@ -140,6 +163,7 @@ module AptosFramework::Stake {
     /// Rotate the consensus key of the validator, it'll take effect in next epoch.
     public fun rotate_consensus_key(account: &signer, consensus_pubkey: vector<u8>) acquires ValidatorConfig {
         let addr = Signer::address_of(account);
+        assert!(exists<ValidatorConfig>(addr), Errors::not_published(EVALIDATOR_CONFIG));
         let validator_info = borrow_global_mut<ValidatorConfig>(addr);
         validator_info.consensus_pubkey = consensus_pubkey;
     }
@@ -162,14 +186,14 @@ module AptosFramework::Stake {
         let addr = Signer::address_of(account);
         let stake_pool = borrow_global<StakePool>(addr);
         let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
-        assert!(stake_pool.current_stake >= validator_set.minimum_stake, 0);
-        assert!(stake_pool.current_stake <= validator_set.maximum_stake, 0);
+        assert!(stake_pool.current_stake >= validator_set.minimum_stake, Errors::invalid_argument(ESTAKE_TOO_LOW));
+        assert!(stake_pool.current_stake <= validator_set.maximum_stake, Errors::invalid_argument(ESTAKE_TOO_HIGH));
         let (exist, _) = find_validator(&validator_set.active_validators, addr);
-        assert!(!exist, 0);
+        assert!(!exist, Errors::invalid_argument(EALREADY_VALIDATOR));
         let (exist, _) = find_validator(&validator_set.pending_inactive, addr);
-        assert!(!exist, 0);
+        assert!(!exist, Errors::invalid_argument(EALREADY_VALIDATOR));
         let (exist, _) = find_validator(&validator_set.pending_active, addr);
-        assert!(!exist, 0);
+        assert!(!exist, Errors::invalid_argument(EALREADY_VALIDATOR));
 
         Vector::push_back(&mut validator_set.pending_active, generate_validator_info(addr));
     }
@@ -180,10 +204,10 @@ module AptosFramework::Stake {
         let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
 
         let (exist, index) = find_validator(&validator_set.active_validators, addr);
-        assert!(exist, 0);
+        assert!(exist, Errors::invalid_argument(ENOT_VALIDATOR));
 
         let validator_info = Vector::swap_remove(&mut validator_set.active_validators, index);
-        assert!(Vector::length(&validator_set.active_validators) > 0, 0);
+        assert!(Vector::length(&validator_set.active_validators) > 0, Errors::invalid_argument(ELAST_VALIDATOR));
         Vector::push_back(&mut validator_set.pending_inactive, validator_info);
     }
 
@@ -191,6 +215,7 @@ module AptosFramework::Stake {
     /// 1. distribute rewards to stake pool of active and pending inactive validators
     /// 2. purge pending queues
     /// 3. update the validator info from owners' address
+    /// This function shouldn't abort.
     public(friend) fun on_new_epoch() acquires StakePool, ValidatorConfig, ValidatorSet {
         let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
         // distribute reward
@@ -225,6 +250,7 @@ module AptosFramework::Stake {
     /// 1. distribute rewards to active/pending_inactive delegations
     /// 2. process pending_active, pending_inactive correspondingly
     /// 3. update the current stake
+    /// This function shouldn't abort.
     fun update_stake_pool(addr: address) acquires StakePool {
         let stake_pool = borrow_global_mut<StakePool>(addr);
         distribute_reward( &mut stake_pool.active);
@@ -271,7 +297,7 @@ module AptosFramework::Stake {
             };
             i = i + 1;
         };
-        abort 0
+        abort Errors::invalid_argument(EDELEGATION_NOT_FOUND)
     }
 
     fun find_validator(v: &vector<ValidatorInfo>, addr: address): (bool, u64) {
