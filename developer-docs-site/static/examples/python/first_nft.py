@@ -3,6 +3,7 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
+import requests
 from typing import Any, Dict
 import sys
 
@@ -121,23 +122,33 @@ class TokenClient(RestClient):
         self.submit_transaction_helper(account, payload)
             
 #:!:>section_3
+    def table_item(self, handle: str, key_type: str, value_type: str, key: Any) -> Any:
+        response = requests.post(f"{self.url}/tables/{handle}/item", json={
+            "key_type": key_type,
+            "value_type": value_type,
+            "key": key,
+        })
+        assert response.status_code == 200, response.text
+        return response.json()
+
     def get_token_id(self, creator: str, collection_name: str, token_name: str) -> int:
         """ Retrieve the token's creation_num, which is useful for non-creator operations """
 
-        resources = self.account_resources(creator)
-        collections = []
-        tokens = []
-        for resource in resources:
-            if resource["type"] == f"0x1::Token::Collections":
-                collections = resource["data"]["collections"]["data"]
-        for collection in collections:
-            if collection["key"] == collection_name:
-                tokens = collection["value"]["tokens"]["data"]
-        for token in tokens:
-            if token["key"] == token_name:
-                return int(token["value"]["id"]["creation_num"])
-            
-        assert False
+        collections = self.account_resource(creator, "0x1::Token::Collections")
+        collection = self.table_item(
+            collections["data"]["collections"]["handle"],
+            "0x1::ASCII::String",
+            "0x1::Token::Collection",
+            collection_name,
+        )
+        token_data = self.table_item(
+            collection["tokens"]["handle"],
+            "0x1::ASCII::String",
+            "0x1::Token::TokenData",
+            token_name,
+        )
+        return token_data["id"]["creation_num"]
+
 #<:!:section_3
 
 
