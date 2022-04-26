@@ -5,6 +5,7 @@ use crate::{
     common::types::{CliError, CliTypedResult},
     CliResult,
 };
+use move_core_types::account_address::AccountAddress;
 use serde::Serialize;
 use std::{
     fs::File,
@@ -117,4 +118,16 @@ pub fn append_file_extension(
     } else {
         Ok(file.with_extension(appended_extension))
     }
+}
+
+pub async fn get_sequence_number(
+    client: &aptos_rest_client::Client,
+    address: AccountAddress,
+) -> CliTypedResult<u64> {
+    let account_response = client
+        .get_account(address)
+        .await
+        .map_err(|err| CliError::ApiError(err.to_string()))?;
+    let account = account_response.inner();
+    Ok(account.sequence_number)
 }

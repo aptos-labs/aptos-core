@@ -6,6 +6,7 @@ use clap::Subcommand;
 
 pub mod create;
 pub mod list;
+pub mod transfer;
 
 /// CLI tool for interacting with accounts
 ///
@@ -13,6 +14,7 @@ pub mod list;
 pub enum AccountTool {
     Create(create::CreateAccount),
     List(list::ListResources),
+    Transfer(transfer::TransferCoins),
 }
 
 impl AccountTool {
@@ -20,6 +22,7 @@ impl AccountTool {
         match self {
             AccountTool::Create(tool) => to_common_result(tool.execute().await),
             AccountTool::List(tool) => to_common_result(tool.execute().await),
+            AccountTool::Transfer(tool) => to_common_result(tool.execute().await),
         }
     }
 }
