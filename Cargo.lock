@@ -182,7 +182,6 @@ dependencies = [
  "serde 1.0.136",
  "serde_json",
  "serde_yaml",
- "short-hex-str",
  "tempfile",
  "thiserror",
  "tokio",
@@ -286,7 +285,6 @@ dependencies = [
  "rand 0.8.4",
  "serde 1.0.136",
  "serde_yaml",
- "short-hex-str",
  "thiserror",
 ]
 
@@ -670,7 +668,6 @@ dependencies = [
  "rayon",
  "serde 1.0.136",
  "serde_json",
- "short-hex-str",
  "storage-interface",
  "storage-service",
  "thiserror",
@@ -2113,7 +2110,6 @@ dependencies = [
  "schemadb",
  "serde 1.0.136",
  "serde_json",
- "short-hex-str",
  "storage-interface",
  "tempfile",
  "termion",
@@ -2155,7 +2151,6 @@ dependencies = [
  "proptest",
  "serde 1.0.136",
  "serde_json",
- "short-hex-str",
 ]
 
 [[package]]
@@ -2559,7 +2554,6 @@ dependencies = [
  "once_cell",
  "rand 0.8.4",
  "serde 1.0.136",
- "short-hex-str",
  "storage-service-types",
  "thiserror",
  "tokio",
@@ -5364,7 +5358,6 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serial_test",
- "short-hex-str",
  "thiserror",
  "tokio",
  "tokio-retry",
@@ -5421,7 +5414,6 @@ dependencies = [
  "once_cell",
  "rand 0.8.4",
  "serde_yaml",
- "short-hex-str",
  "tokio",
 ]
 
@@ -7306,19 +7298,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43b2853a4d09f215c24cc5489c992ce46052d359b5109343cbafbf26bc62f8a3"
 
 [[package]]
-name = "short-hex-str"
-version = "0.1.0"
-dependencies = [
- "aptos-workspace-hack",
- "hex",
- "mirai-annotations",
- "proptest",
- "serde 1.0.136",
- "static_assertions",
- "thiserror",
-]
-
-[[package]]
 name = "signal-hook"
 version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7601,7 +7580,6 @@ dependencies = [
  "proptest",
  "rand 0.8.4",
  "serde 1.0.136",
- "short-hex-str",
  "storage-interface",
  "storage-service",
  "thiserror",

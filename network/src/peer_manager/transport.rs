@@ -20,7 +20,6 @@ use futures::{
     stream::{Fuse, FuturesUnordered, StreamExt},
 };
 use netcore::transport::{ConnectionOrigin, Transport};
-use short_hex_str::AsShortHexStr;
 use std::time::Instant;
 
 #[derive(Debug)]
@@ -207,7 +206,7 @@ where
                                 NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
                                 "{} Failed to notify clients of TransportError for Peer {}: {:?}",
                                 self.network_context,
-                                peer_id.short_str(),
+                                peer_id,
                                 send_err
                             );
                         }
@@ -240,8 +239,8 @@ where
                 } else {
                     Err(PeerManagerError::from_transport_error(format_err!(
                         "Dialed PeerId '{}' differs from expected PeerId '{}'",
-                        dialed_peer_id.short_str(),
-                        peer_id.short_str()
+                        dialed_peer_id,
+                        peer_id
                     )))
                 }
             }
@@ -262,7 +261,7 @@ where
                     error = %err,
                     "{} Outbound connection failed for peer {} at {}: {}",
                     self.network_context,
-                    peer_id.short_str(),
+                    peer_id,
                     addr,
                     err
                 );
@@ -283,7 +282,7 @@ where
                 NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
                 "{} Failed to notify PeerManager of OutboundConnection upgrade result for Peer {}: {:?}",
                 self.network_context,
-                peer_id.short_str(),
+                peer_id,
                 send_err
             );
         }
@@ -342,7 +341,7 @@ where
             "{} {} connection from {} at {} successfully upgraded after {:.3} secs",
             self.network_context,
             metadata.origin,
-            metadata.remote_peer_id.short_str(),
+            metadata.remote_peer_id,
             metadata.addr,
             elapsed_time,
         );

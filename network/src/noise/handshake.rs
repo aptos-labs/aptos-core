@@ -21,7 +21,6 @@ use aptos_logger::trace;
 use aptos_types::PeerId;
 use futures::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use netcore::transport::ConnectionOrigin;
-use short_hex_str::{AsShortHexStr, ShortHexStr};
 use std::{collections::HashMap, convert::TryFrom as _, fmt::Debug, sync::Arc};
 
 /// In a mutually authenticated network, a client message is accompanied with a timestamp.
@@ -321,7 +320,6 @@ impl NoiseUpgrader {
         // We do this later in this function instead (to batch a number of checks) as there is no known attack here.
         let remote_peer_id = PeerId::try_from(remote_peer_id)
             .map_err(|_| NoiseHandshakeError::InvalidClientPeerId(hex::encode(remote_peer_id)))?;
-        let remote_peer_short = remote_peer_id.short_str();
 
         // reject accidental self-dials
         // this situation could occur either as a result of our own discovery
@@ -334,7 +332,7 @@ impl NoiseUpgrader {
         // verify that this is indeed our public key
         if self_expected_public_key != self.noise_config.public_key().as_slice() {
             return Err(NoiseHandshakeError::ClientExpectingDifferentPubkey(
-                remote_peer_short,
+                remote_peer_id,
                 hex::encode(self_expected_public_key),
             ));
         }
@@ -344,17 +342,17 @@ impl NoiseUpgrader {
         let (remote_public_key, handshake_state, payload) = self
             .noise_config
             .parse_client_init_message(prologue, client_init_message)
-            .map_err(|err| NoiseHandshakeError::ServerParseClient(remote_peer_short, err))?;
+            .map_err(|err| NoiseHandshakeError::ServerParseClient(remote_peer_id, err))?;
 
         // if mutual auth mode, verify the remote pubkey is in our set of trusted peers
         let peer_role = match &self.auth_mode {
             HandshakeAuthMode::Mutual { trusted_peers, .. } => {
                 match trusted_peers.read().get(&remote_peer_id) {
                     Some(peer) => {
-                        Self::authenticate_inbound(remote_peer_short, peer, &remote_public_key)
+                        Self::authenticate_inbound(remote_peer_id, peer, &remote_public_key)
                     }
                     None => Err(NoiseHandshakeError::UnauthenticatedClient(
-                        remote_peer_short,
+                        remote_peer_id,
                         remote_peer_id,
                     )),
                 }
@@ -362,7 +360,7 @@ impl NoiseUpgrader {
             HandshakeAuthMode::MaybeMutual(trusted_peers) => {
                 match trusted_peers.read().get(&remote_peer_id) {
                     Some(peer) => {
-                        Self::authenticate_inbound(remote_peer_short, peer, &remote_public_key)
+                        Self::authenticate_inbound(remote_peer_id, peer, &remote_public_key)
                     }
                     None => {
                         // if not, verify that their peerid is constructed correctly from their public key
@@ -372,7 +370,7 @@ impl NoiseUpgrader {
                             );
                         if derived_remote_peer_id != remote_peer_id {
                             Err(NoiseHandshakeError::ClientPeerIdMismatch(
-                                remote_peer_short,
+                                remote_peer_id,
                                 remote_peer_id,
                                 derived_remote_peer_id,
                             ))
@@ -390,7 +388,7 @@ impl NoiseUpgrader {
             // check that the payload received as the client timestamp (in seconds)
             if payload.len() != AntiReplayTimestamps::TIMESTAMP_SIZE {
                 return Err(NoiseHandshakeError::MissingAntiReplayTimestamp(
-                    remote_peer_short,
+                    remote_peer_id,
                 ));
             }
 
@@ -402,7 +400,7 @@ impl NoiseUpgrader {
             let mut anti_replay_timestamps = anti_replay_timestamps.write();
             if anti_replay_timestamps.is_replay(remote_public_key, client_timestamp) {
                 return Err(NoiseHandshakeError::ServerReplayDetected(
-                    remote_peer_short,
+                    remote_peer_id,
                     client_timestamp,
                 ));
             }
@@ -418,37 +416,37 @@ impl NoiseUpgrader {
             .noise_config
             .respond_to_client(&mut rng, handshake_state, None, &mut server_response)
             .map_err(|err| {
-                NoiseHandshakeError::BuildServerHandshakeMessageFailed(remote_peer_short, err)
+                NoiseHandshakeError::BuildServerHandshakeMessageFailed(remote_peer_id, err)
             })?;
 
         // send the response
         trace!(
             "{} noise server: handshake write: remote_peer_id: {}",
             self.network_context,
-            remote_peer_short,
+            remote_peer_id,
         );
         socket
             .write_all(&server_response)
             .await
-            .map_err(|err| NoiseHandshakeError::ServerWriteFailed(remote_peer_short, err))?;
+            .map_err(|err| NoiseHandshakeError::ServerWriteFailed(remote_peer_id, err))?;
 
         // finalize the connection
         trace!(
             "{} noise server: handshake finalize: remote_peer_id: {}",
             self.network_context,
-            remote_peer_short,
+            remote_peer_id,
         );
         Ok((NoiseStream::new(socket, session), remote_peer_id, peer_role))
     }
 
     fn authenticate_inbound(
-        remote_peer_short: ShortHexStr,
+        remote_peer_id: PeerId,
         peer: &Peer,
         remote_public_key: &x25519::PublicKey,
     ) -> Result<PeerRole, NoiseHandshakeError> {
         if !peer.keys.contains(remote_public_key) {
             return Err(NoiseHandshakeError::UnauthenticatedClientPubkey(
-                remote_peer_short,
+                remote_peer_id,
                 hex::encode(remote_public_key.as_slice()),
             ));
         }

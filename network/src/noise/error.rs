@@ -3,7 +3,6 @@
 
 use aptos_crypto::noise::NoiseError;
 use aptos_types::PeerId;
-use short_hex_str::ShortHexStr;
 use std::io;
 use thiserror::Error;
 
@@ -44,40 +43,40 @@ pub enum NoiseHandshakeError {
         "noise server: client {0}: client is expecting us to have a different \
          public key: {1}"
     )]
-    ClientExpectingDifferentPubkey(ShortHexStr, String),
+    ClientExpectingDifferentPubkey(PeerId, String),
 
     #[error("noise server: client {0}: error parsing handshake init message: {1}")]
-    ServerParseClient(ShortHexStr, NoiseError),
+    ServerParseClient(PeerId, NoiseError),
 
     #[error(
         "noise server: client {0}: known client peer id connecting to us with \
          unauthenticated public key: {1}"
     )]
-    UnauthenticatedClientPubkey(ShortHexStr, String),
+    UnauthenticatedClientPubkey(PeerId, String),
 
     #[error("noise server: client {0}: client connecting with unauthenticated peer id: {1}")]
-    UnauthenticatedClient(ShortHexStr, PeerId),
+    UnauthenticatedClient(PeerId, PeerId),
 
     #[error(
         "noise server: client {0}: client's self-reported peer id and pubkey-derived peer \
          id don't match: self-reported: {1}, derived: {2}"
     )]
-    ClientPeerIdMismatch(ShortHexStr, PeerId, PeerId),
+    ClientPeerIdMismatch(PeerId, PeerId, PeerId),
 
     #[error("noise server: client {0}: handshake message is missing the anti-replay timestamp")]
-    MissingAntiReplayTimestamp(ShortHexStr),
+    MissingAntiReplayTimestamp(PeerId),
 
     #[error(
         "noise server: client {0}: detected a replayed handshake message, we've \
          seen this timestamp before: {1}"
     )]
-    ServerReplayDetected(ShortHexStr, u64),
+    ServerReplayDetected(PeerId, u64),
 
     #[error("noise server: client {0}: error building handshake response message: {1}")]
-    BuildServerHandshakeMessageFailed(ShortHexStr, NoiseError),
+    BuildServerHandshakeMessageFailed(PeerId, NoiseError),
 
     #[error("noise server: client {0}: error sending server handshake response message: {1}")]
-    ServerWriteFailed(ShortHexStr, io::Error),
+    ServerWriteFailed(PeerId, io::Error),
 }
 
 impl NoiseHandshakeError {

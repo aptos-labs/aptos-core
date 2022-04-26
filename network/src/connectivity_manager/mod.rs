@@ -53,7 +53,6 @@ use rand::{
     seq::SliceRandom,
 };
 use serde::Serialize;
-use short_hex_str::AsShortHexStr;
 use std::{
     cmp::{min, Ordering},
     collections::{hash_map::Entry, HashMap, HashSet},
@@ -391,7 +390,7 @@ where
                             .remote_peer(&peer_id),
                         "{} Dial complete to {}",
                         self.network_context,
-                        peer_id.short_str(),
+                        peer_id,
                     );
                     self.dial_queue.remove(&peer_id);
                 },
@@ -431,9 +430,7 @@ where
         for p in stale_connections.into_iter() {
             info!(
                 NetworkSchema::new(&self.network_context).remote_peer(&p),
-                "{} Closing stale connection to peer {}",
-                self.network_context,
-                p.short_str()
+                "{} Closing stale connection to peer {}", self.network_context, p
             );
 
             // Close existing connection.
@@ -444,7 +441,7 @@ where
                     error = %e,
                     "{} Failed to close stale connection to peer {} : {}",
                     self.network_context,
-                    p.short_str(),
+                    p,
                     e
                 );
             }
@@ -468,9 +465,7 @@ where
         for p in stale_dials.into_iter() {
             debug!(
                 NetworkSchema::new(&self.network_context).remote_peer(&p),
-                "{} Cancelling stale dial {}",
-                self.network_context,
-                p.short_str()
+                "{} Cancelling stale dial {}", self.network_context, p
             );
             self.dial_queue.remove(&p);
         }
@@ -583,7 +578,7 @@ where
                             .network_address(&addr),
                         "{} Dialing peer {} at {}",
                         network_context,
-                        peer_id.short_str(),
+                        peer_id,
                         addr
                     );
                     match connection_reqs_tx.dial_peer(peer_id, addr.clone()).await {
@@ -728,7 +723,7 @@ where
                         .discovery_source(&src),
                     "{} pubkey sets updated for peer: {}, pubkeys: {}",
                     self.network_context,
-                    peer_id.short_str(),
+                    peer_id,
                     peer.keys
                 );
                 keys_updated = true;
@@ -742,7 +737,7 @@ where
                     network_addresses = &peer.addrs,
                     "{} addresses updated for peer: {}, update src: {:?}, addrs: {}",
                     self.network_context,
-                    peer_id.short_str(),
+                    peer_id,
                     src,
                     &peer.addrs,
                 );
@@ -804,7 +799,7 @@ where
                         stored_metadata = stored_metadata,
                         "{} Removing peer '{}' metadata: {}, vs event metadata: {}",
                         self.network_context,
-                        peer_id.short_str(),
+                        peer_id,
                         stored_metadata,
                         metadata
                     );
@@ -816,7 +811,7 @@ where
                             .connection_metadata(&metadata),
                         "{} Ignoring stale lost peer event for peer: {}, addr: {}",
                         self.network_context,
-                        peer_id.short_str(),
+                        peer_id,
                         metadata.addr
                     );
                 }
@@ -839,16 +834,14 @@ fn log_dial_result(
                     .network_address(&addr),
                 "{} Successfully connected to peer: {} at address: {}",
                 network_context,
-                peer_id.short_str(),
+                peer_id,
                 addr
             );
         }
         DialResult::Cancelled => {
             info!(
                 NetworkSchema::new(&network_context).remote_peer(&peer_id),
-                "{} Cancelled pending dial to peer: {}",
-                network_context,
-                peer_id.short_str()
+                "{} Cancelled pending dial to peer: {}", network_context, peer_id
             );
         }
         DialResult::Failed(err) => match err {
@@ -857,10 +850,7 @@ fn log_dial_result(
                     NetworkSchema::new(&network_context)
                         .remote_peer(&peer_id)
                         .network_address(&a),
-                    "{} Already connected to peer: {} at address: {}",
-                    network_context,
-                    peer_id.short_str(),
-                    a
+                    "{} Already connected to peer: {} at address: {}", network_context, peer_id, a
                 );
             }
             e => {
@@ -871,7 +861,7 @@ fn log_dial_result(
                     error = %e,
                     "{} Failed to connect to peer: {} at address: {}; error: {}",
                     network_context,
-                    peer_id.short_str(),
+                    peer_id,
                     addr,
                     e
                 );

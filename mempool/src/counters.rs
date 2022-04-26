@@ -8,7 +8,6 @@ use aptos_metrics::{
     IntCounterVec, IntGauge, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
-use short_hex_str::AsShortHexStr;
 use std::time::Duration;
 
 // Core mempool index labels
@@ -277,7 +276,7 @@ static SHARED_MEMPOOL_PENDING_BROADCASTS_COUNT: Lazy<IntGaugeVec> = Lazy::new(||
 pub fn shared_mempool_pending_broadcasts(peer: &PeerNetworkId) -> IntGauge {
     SHARED_MEMPOOL_PENDING_BROADCASTS_COUNT.with_label_values(&[
         peer.network_id().as_str(),
-        peer.peer_id().short_str().as_str(),
+        peer.peer_id().to_string().as_str(),
     ])
 }
 

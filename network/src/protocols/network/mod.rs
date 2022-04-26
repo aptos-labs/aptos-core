@@ -26,7 +26,6 @@ use futures::{
 };
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use short_hex_str::AsShortHexStr;
 use std::{cmp::min, iter::FromIterator, marker::PhantomData, pin::Pin, time::Duration};
 
 use super::wire::handshake::v1::ProtocolIdSet;
@@ -221,7 +220,7 @@ fn request_to_network_event<TMessage: Message, Request: SerializedRequest>(
             warn!(
                 SecurityEvent::InvalidNetworkEvent,
                 error = ?err,
-                remote_peer_id = peer_id.short_str(),
+                remote_peer_id = peer_id,
                 protocol_id = request.protocol_id(),
                 data_prefix = hex::encode(&data[..min(16, data.len())]),
             );

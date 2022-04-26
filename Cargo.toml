@@ -60,7 +60,6 @@ members = [
     "crates/fallible",
     "crates/num-variants",
     "crates/proxy",
-    "crates/short-hex-str",
     "crates/transaction-emitter",
     "devtools/x",
     "devtools/x-core",

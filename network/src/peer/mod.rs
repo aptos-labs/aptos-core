@@ -47,7 +47,6 @@ use futures::{
     FutureExt, SinkExt, TryFutureExt,
 };
 use serde::Serialize;
-use short_hex_str::AsShortHexStr;
 use std::{fmt, panic, time::Duration};
 use tokio::runtime::Handle;
 use tokio_util::compat::{
@@ -203,7 +202,7 @@ where
                 .connection_metadata(&self.connection_metadata),
             "{} Starting Peer actor for peer: {}",
             self.network_context,
-            remote_peer_id.short_str()
+            remote_peer_id
         );
 
         // Split the connection into a ReadHalf and a WriteHalf.
@@ -262,7 +261,7 @@ where
                                     error = %err,
                                     "{} Error in handling inbound message from peer: {}, error: {}",
                                     self.network_context,
-                                    remote_peer_id.short_str(),
+                                    remote_peer_id,
                                     err
                                 );
                             }
@@ -340,7 +339,7 @@ where
                                 error = %err,
                                 "{} Error in sending message to peer: {}, error: {}",
                                 network_context,
-                                remote_peer_id.short_str(),
+                                remote_peer_id,
                                 err
                             );
                             break;
@@ -353,9 +352,7 @@ where
             }
             info!(
                 NetworkSchema::new(&network_context).connection_metadata(&connection_metadata),
-                "{} Closing connection to peer: {}",
-                network_context,
-                remote_peer_id.short_str()
+                "{} Closing connection to peer: {}", network_context, remote_peer_id
             );
             let flush_and_close = async {
                 writer.flush().await?;
@@ -372,7 +369,7 @@ where
                             .connection_metadata(&connection_metadata),
                         "{} Timeout in flush/close of connection to peer: {}",
                         network_context,
-                        remote_peer_id.short_str()
+                        remote_peer_id
                     );
                 }
                 Ok(Err(err)) => {
@@ -382,7 +379,7 @@ where
                         error = %err,
                         "{} Failure in flush/close of connection to peer: {}, error: {}",
                         network_context,
-                        remote_peer_id.short_str(),
+                        remote_peer_id,
                         err
                     );
                 }
@@ -390,9 +387,7 @@ where
                     info!(
                         NetworkSchema::new(&network_context)
                             .connection_metadata(&connection_metadata),
-                        "{} Closed connection to peer: {}",
-                        network_context,
-                        remote_peer_id.short_str()
+                        "{} Closed connection to peer: {}", network_context, remote_peer_id
                     );
                 }
             }
@@ -414,7 +409,7 @@ where
                 .connection_metadata(&self.connection_metadata),
             "{} Received message from peer {}",
             self.network_context,
-            self.remote_peer_id().short_str()
+            self.remote_peer_id()
         );
 
         let message = match message {
@@ -450,7 +445,7 @@ where
                     error_msg = ?error_msg,
                     "{} Peer {} sent an error message: {:?}",
                     self.network_context,
-                    self.remote_peer_id().short_str(),
+                    self.remote_peer_id(),
                     error_msg,
                 );
             }
@@ -489,7 +484,7 @@ where
             protocol_id = protocol_id,
             "{} DirectSend: Received inbound message from peer {} for protocol {:?}",
             self.network_context,
-            peer_id.short_str(),
+            peer_id,
             protocol_id
         );
         let data_len = data.len() as u64;
@@ -521,11 +516,7 @@ where
             oneshot::Sender<Result<(), PeerManagerError>>,
         )>,
     ) {
-        trace!(
-            "Peer {} PeerRequest::{:?}",
-            self.remote_peer_id().short_str(),
-            request
-        );
+        trace!("Peer {} PeerRequest::{:?}", self.remote_peer_id(), request);
         match request {
             // To send an outbound DirectSendMsg, we just bump some counters and
             // push it onto our outbound writer queue.
@@ -557,7 +548,7 @@ where
                             error = ?e,
                             "Failed to send direct send message for protocol {} to peer: {}. Error: {:?}",
                             protocol_id,
-                            self.remote_peer_id().short_str(),
+                            self.remote_peer_id(),
                             e,
                         );
                     }
@@ -581,7 +572,7 @@ where
                         error = %e,
                         "Failed to send outbound rpc request for protocol {} to peer: {}. Error: {}",
                         protocol_id,
-                        self.remote_peer_id().short_str(),
+                        self.remote_peer_id(),
                         e,
                     );
                 }
@@ -613,7 +604,7 @@ where
                 error = ?e,
                 "{} Failed to notify upstream about disconnection of peer: {}; error: {:?}",
                 self.network_context,
-                remote_peer_id.short_str(),
+                remote_peer_id,
                 e
             );
         }
@@ -637,7 +628,7 @@ where
                 .connection_metadata(&self.connection_metadata),
             "{} Peer actor for '{}' terminated",
             self.network_context,
-            remote_peer_id.short_str()
+            remote_peer_id
         );
     }
 }

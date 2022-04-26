@@ -29,7 +29,6 @@ use futures::{
 };
 use netcore::transport::{proxy_protocol, tcp, ConnectionOrigin, Transport};
 use serde::Serialize;
-use short_hex_str::AsShortHexStr;
 use std::{collections::BTreeMap, convert::TryFrom, fmt, io, pin::Pin, sync::Arc, time::Duration};
 
 #[cfg(test)]
@@ -294,8 +293,7 @@ async fn upgrade_inbound<T: TSocket>(
         .map_err(|err| {
             let err = format!(
                 "handshake negotiation with peer {} failed: {}",
-                remote_peer_id.short_str(),
-                err
+                remote_peer_id, err
             );
             add_pp_addr(
                 proxy_protocol_enabled,

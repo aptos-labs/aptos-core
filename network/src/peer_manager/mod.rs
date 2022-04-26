@@ -34,7 +34,6 @@ use futures::{
     stream::StreamExt,
 };
 use netcore::transport::{ConnectionOrigin, Transport};
-use short_hex_str::AsShortHexStr;
 use std::{
     collections::{hash_map::Entry, HashMap},
     marker::PhantomData,
@@ -448,7 +447,7 @@ where
                             .connection_metadata_with_address(curr_connection),
                         "{} Already connected to Peer {} with connection {:?}. Not dialing address {}",
                         self.network_context,
-                        requested_peer_id.short_str(),
+                        requested_peer_id,
                         curr_connection,
                         addr
                     );
@@ -458,7 +457,7 @@ where
                                 .remote_peer(&requested_peer_id),
                             "{} Failed to notify that peer is already connected for Peer {}: {:?}",
                             self.network_context,
-                            requested_peer_id.short_str(),
+                            requested_peer_id,
                             send_err
                         );
                     }
@@ -485,7 +484,7 @@ where
                         NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
                         "{} Connection with peer: {} was already closed",
                         self.network_context,
-                        peer_id.short_str(),
+                        peer_id,
                     );
                     if let Err(err) = resp_tx.send(Err(PeerManagerError::NotConnected(peer_id))) {
                         info!(
@@ -537,7 +536,7 @@ where
                 protocol_id = %protocol_id,
                 "{} Can't send message to peer.  Peer {} is currently not connected",
                 self.network_context,
-                peer_id.short_str()
+                peer_id
             );
         }
     }
@@ -592,7 +591,7 @@ where
                     error = %e,
                     "{} Closing connection with Peer {} failed with error: {}",
                     network_context,
-                    peer_id.short_str(),
+                    peer_id,
                     e
                 );
             };
@@ -634,7 +633,7 @@ where
                     NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
                     "{} Closing existing connection with Peer {} to mitigate simultaneous dial",
                     self.network_context,
-                    peer_id.short_str()
+                    peer_id
                 );
                 send_new_peer_notification = false;
             } else {
@@ -642,7 +641,7 @@ where
                     NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
                     "{} Closing incoming connection with Peer {} to mitigate simultaneous dial",
                     self.network_context,
-                    peer_id.short_str()
+                    peer_id
                 );
                 // Drop the new connection and keep the one already stored in active_peers
                 self.disconnect(connection);
@@ -716,7 +715,7 @@ where
                     "{} Failed to send notification {} to handler for peer: {}. Error: {:?}",
                     self.network_context,
                     notification,
-                    peer_id.short_str(),
+                    peer_id,
                     e
                 );
             }

@@ -3,7 +3,6 @@
 use crate::config::{PeerRole, RoleType};
 use aptos_types::PeerId;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use short_hex_str::AsShortHexStr;
 use std::{fmt, str::FromStr};
 
 /// A grouping of common information between all networking code for logging.
@@ -31,7 +30,7 @@ impl fmt::Display for NetworkContext {
             "[{},{},{}]",
             self.role,
             self.network_id.as_str(),
-            self.peer_id.short_str(),
+            self.peer_id,
         )
     }
 }
@@ -267,7 +266,7 @@ impl fmt::Debug for PeerNetworkId {
 
 impl fmt::Display for PeerNetworkId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.network_id(), self.peer_id().short_str(),)
+        write!(f, "{}:{}", self.network_id(), self.peer_id(),)
     }
 }
 

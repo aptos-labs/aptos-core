@@ -74,7 +74,6 @@ use futures::{
     stream::{FuturesUnordered, StreamExt},
 };
 use serde::Serialize;
-use short_hex_str::AsShortHexStr;
 use std::{cmp::PartialEq, collections::HashMap, fmt::Debug, time::Duration};
 
 pub mod error;
@@ -227,7 +226,7 @@ impl InboundRpcs {
             NetworkSchema::new(network_context).remote_peer(&self.remote_peer_id),
             "{} Received inbound rpc request from peer {} with request_id {} and protocol_id {}",
             network_context,
-            self.remote_peer_id.short_str(),
+            self.remote_peer_id,
             request_id,
             protocol_id,
         );
@@ -318,7 +317,7 @@ impl InboundRpcs {
             NetworkSchema::new(network_context).remote_peer(&self.remote_peer_id),
             "{} Sending rpc response to peer {} for request_id {}",
             network_context,
-            self.remote_peer_id.short_str(),
+            self.remote_peer_id,
             response.request_id,
         );
         let message = NetworkMessage::RpcResponse(response);
@@ -424,7 +423,7 @@ impl OutboundRpcs {
             network_context,
             request_id,
             protocol_id,
-            peer_id.short_str(),
+            peer_id,
         );
 
         // Start timer to collect outbound RPC latency.
@@ -553,7 +552,7 @@ impl OutboundRpcs {
                      with {:.6} seconds of latency",
                     network_context,
                     request_id,
-                    peer_id.short_str(),
+                    peer_id,
                     latency,
                 );
             }
@@ -569,7 +568,7 @@ impl OutboundRpcs {
                     "{} Error making outbound rpc request with request_id {} to {}: {}",
                     network_context,
                     request_id,
-                    peer_id.short_str(),
+                    peer_id,
                     err
                 );
             }
@@ -605,7 +604,7 @@ impl OutboundRpcs {
                 "{} Received response for expired request_id {} from {}. Discarding.",
                 network_context,
                 request_id,
-                peer_id.short_str(),
+                peer_id,
             );
         } else {
             trace!(
@@ -614,7 +613,7 @@ impl OutboundRpcs {
                 "{} Notified pending outbound rpc task of inbound response for request_id {} from {}",
                 network_context,
                 request_id,
-                peer_id.short_str(),
+                peer_id,
             );
         }
     }

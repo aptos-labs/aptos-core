@@ -49,7 +49,6 @@ aptos-workspace-hack = { version = "0.1", path = "../crates/aptos-workspace-hack
 memsocket = { path = "./memsocket", optional = true }
 netcore = { path = "./netcore" }
 num-variants = { path = "../crates/num-variants" }
-short-hex-str = { path = "../crates/short-hex-str" }
 
 [dev-dependencies]
 aptos-config = { path = "../config", features = ["testing"] }

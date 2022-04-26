@@ -10,7 +10,6 @@ use aptos_metrics::{
 use aptos_types::PeerId;
 use netcore::transport::ConnectionOrigin;
 use once_cell::sync::Lazy;
-use short_hex_str::AsShortHexStr;
 
 // some type labels
 pub const REQUEST_LABEL: &str = "request";
@@ -37,7 +36,7 @@ pub fn connections(network_context: &NetworkContext, origin: ConnectionOrigin) -
     APTOS_CONNECTIONS.with_label_values(&[
         network_context.role().as_str(),
         network_context.network_id().as_str(),
-        network_context.peer_id().short_str().as_str(),
+        network_context.peer_id().to_string().as_str(),
         origin.as_str(),
     ])
 }
@@ -58,7 +57,7 @@ pub fn connections_rejected(
     APTOS_CONNECTIONS_REJECTED.with_label_values(&[
         network_context.role().as_str(),
         network_context.network_id().as_str(),
-        network_context.peer_id().short_str().as_str(),
+        network_context.peer_id().to_string().as_str(),
         origin.as_str(),
     ])
 }
@@ -78,8 +77,8 @@ pub fn peer_connected(network_context: &NetworkContext, remote_peer_id: &PeerId,
             .with_label_values(&[
                 network_context.role().as_str(),
                 network_context.network_id().as_str(),
-                network_context.peer_id().short_str().as_str(),
-                remote_peer_id.short_str().as_str(),
+                network_context.peer_id().to_string().as_str(),
+                remote_peer_id.to_string().as_str(),
             ])
             .set(v)
     }
@@ -96,7 +95,7 @@ pub fn inc_by_with_context(
         .with_label_values(&[
             network_context.role().as_str(),
             network_context.network_id().as_str(),
-            network_context.peer_id().short_str().as_str(),
+            network_context.peer_id().to_string().as_str(),
             label,
         ])
         .inc_by(val)
@@ -118,7 +117,7 @@ pub fn pending_connection_upgrades(
     APTOS_NETWORK_PENDING_CONNECTION_UPGRADES.with_label_values(&[
         network_context.role().as_str(),
         network_context.network_id().as_str(),
-        network_context.peer_id().short_str().as_str(),
+        network_context.peer_id().to_string().as_str(),
         direction.as_str(),
     ])
 }
@@ -140,7 +139,7 @@ pub fn connection_upgrade_time(
     APTOS_NETWORK_CONNECTION_UPGRADE_TIME.with_label_values(&[
         network_context.role().as_str(),
         network_context.network_id().as_str(),
-        network_context.peer_id().short_str().as_str(),
+        network_context.peer_id().to_string().as_str(),
         direction.as_str(),
         state,
     ])
@@ -172,7 +171,7 @@ pub fn rpc_messages(
     APTOS_NETWORK_RPC_MESSAGES.with_label_values(&[
         network_context.role().as_str(),
         network_context.network_id().as_str(),
-        network_context.peer_id().short_str().as_str(),
+        network_context.peer_id().to_string().as_str(),
         type_label,
         state_label,
     ])
@@ -195,7 +194,7 @@ pub fn rpc_bytes(
     APTOS_NETWORK_RPC_BYTES.with_label_values(&[
         network_context.role().as_str(),
         network_context.network_id().as_str(),
-        network_context.peer_id().short_str().as_str(),
+        network_context.peer_id().to_string().as_str(),
         type_label,
         state_label,
     ])
@@ -235,7 +234,7 @@ pub fn outbound_rpc_request_latency(
     APTOS_NETWORK_OUTBOUND_RPC_REQUEST_LATENCY.with_label_values(&[
         network_context.role().as_str(),
         network_context.network_id().as_str(),
-        network_context.peer_id().short_str().as_str(),
+        network_context.peer_id().to_string().as_str(),
         protocol_id.as_str(),
     ])
 }
@@ -256,7 +255,7 @@ pub fn inbound_rpc_handler_latency(
     APTOS_NETWORK_INBOUND_RPC_HANDLER_LATENCY.with_label_values(&[
         network_context.role().as_str(),
         network_context.network_id().as_str(),
-        network_context.peer_id().short_str().as_str(),
+        network_context.peer_id().to_string().as_str(),
         protocol_id.as_str(),
     ])
 }
@@ -276,8 +275,8 @@ pub fn direct_send_messages(
 ) -> IntCounter {
     APTOS_NETWORK_DIRECT_SEND_MESSAGES.with_label_values(&[
         network_context.role().as_str(),
-        network_context.network_id().as_str(),
-        network_context.peer_id().short_str().as_str(),
+        network_context.network_id().to_string().as_str(),
+        network_context.peer_id().to_string().as_str(),
         state_label,
     ])
 }
@@ -297,8 +296,8 @@ pub fn direct_send_bytes(
 ) -> IntCounter {
     APTOS_NETWORK_DIRECT_SEND_BYTES.with_label_values(&[
         network_context.role().as_str(),
-        network_context.network_id().as_str(),
-        network_context.peer_id().short_str().as_str(),
+        network_context.network_id().to_string().as_str(),
+        network_context.peer_id().to_string().as_str(),
         state_label,
     ])
 }
@@ -499,7 +498,7 @@ pub fn network_application_inbound_traffic(
         .with_label_values(&[
             network_context.role().as_str(),
             network_context.network_id().as_str(),
-            network_context.peer_id().short_str().as_str(),
+            network_context.peer_id().to_string().as_str(),
             protocol_id.as_str(),
             "size",
         ])
@@ -530,7 +529,7 @@ pub fn network_application_outbound_traffic(
         .with_label_values(&[
             network_context.role().as_str(),
             network_context.network_id().as_str(),
-            network_context.peer_id().short_str().as_str(),
+            network_context.peer_id().to_string().as_str(),
             protocol_id.as_str(),
             "size",
         ])

@@ -15,7 +15,6 @@ use aptos_types::on_chain_config::{OnChainConfigPayload, ValidatorSet};
 use event_notifications::ReconfigNotificationListener;
 use futures::Stream;
 use network::{counters::inc_by_with_context, logging::NetworkSchema};
-use short_hex_str::AsShortHexStr;
 use std::{
     collections::HashSet,
     pin::Pin,
@@ -60,7 +59,7 @@ impl ValidatorSetStream {
             .with_label_values(&[
                 self.network_context.role().as_str(),
                 self.network_context.network_id().as_str(),
-                self.network_context.peer_id().short_str().as_str(),
+                self.network_context.peer_id().to_string().as_str(),
             ])
             .set(mismatch);
     }
@@ -228,7 +227,7 @@ mod tests {
                 .get_metric_with_label_values(&[
                     network_context.role().as_str(),
                     network_context.network_id().as_str(),
-                    network_context.peer_id().short_str().as_str()
+                    network_context.peer_id().to_string().as_str()
                 ])
                 .unwrap()
                 .get()

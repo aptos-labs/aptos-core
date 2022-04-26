@@ -9,7 +9,6 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use serde::{Deserialize, Serialize};
-use short_hex_str::AsShortHexStr;
 use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Deserialize, Serialize, Clone, PartialEq, Eq)]
@@ -31,8 +30,7 @@ impl Display for CommitVote {
         write!(
             f,
             "CommitProposal: [author: {}, {}]",
-            self.author.short_str(),
-            self.ledger_info
+            self.author, self.ledger_info
         )
     }
 }

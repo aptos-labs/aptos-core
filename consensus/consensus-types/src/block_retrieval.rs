@@ -6,7 +6,6 @@ use anyhow::ensure;
 use aptos_crypto::hash::HashValue;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
-use short_hex_str::AsShortHexStr;
 use std::fmt;
 
 // this number is recommended to be greater than backpressure limit
@@ -147,7 +146,7 @@ impl fmt::Display for BlockRetrievalResponse {
                 )?;
 
                 f.debug_list()
-                    .entries(self.blocks.iter().map(|b| b.id().short_str()))
+                    .entries(self.blocks.iter().map(|b| b.id()))
                     .finish()?;
 
                 write!(f, "]")

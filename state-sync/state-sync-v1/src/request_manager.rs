@@ -20,7 +20,6 @@ use rand::{
     distributions::{Distribution, WeightedIndex},
     thread_rng,
 };
-use short_hex_str::AsShortHexStr;
 use std::{
     cmp::Ordering,
     collections::{
@@ -290,7 +289,7 @@ impl RequestManager {
             counters::REQUESTS_SENT
                 .with_label_values(&[
                     peer.network_id().as_str(),
-                    peer_id.short_str().as_str(),
+                    peer_id.to_string().as_str(),
                     result_label,
                 ])
                 .inc();

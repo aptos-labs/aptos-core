@@ -47,7 +47,6 @@ use futures::{
 };
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use short_hex_str::AsShortHexStr;
 use std::{collections::hash_map::Entry, time::Duration};
 
 pub mod builder;
@@ -259,7 +258,7 @@ impl HealthChecker {
                             round = self.round,
                             "{} Will ping: {} for round: {} nonce: {}",
                             self.network_context,
-                            peer_id.short_str(),
+                            peer_id,
                             self.round,
                             nonce
                         );
@@ -308,7 +307,7 @@ impl HealthChecker {
             NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
             "{} Sending Pong response to peer: {} with nonce: {}",
             self.network_context,
-            peer_id.short_str(),
+            peer_id,
             ping.0,
         );
         let _ = res_tx.send(Ok(message.into()));
@@ -329,7 +328,7 @@ impl HealthChecker {
                         rount = round,
                         "{} Ping successful for peer: {} round: {}",
                         self.network_context,
-                        peer_id.short_str(),
+                        peer_id,
                         round
                     );
                     // Update last successful ping to current round.
@@ -371,7 +370,7 @@ impl HealthChecker {
                     round = round,
                     "{} Ping failed for peer: {} round: {} with error: {:?}",
                     self.network_context,
-                    peer_id.short_str(),
+                    peer_id,
                     round,
                     err
                 );
@@ -406,9 +405,7 @@ impl HealthChecker {
                 if failures > self.ping_failures_tolerated {
                     info!(
                         NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
-                        "{} Disconnecting from peer: {}",
-                        self.network_context,
-                        peer_id.short_str()
+                        "{} Disconnecting from peer: {}", self.network_context, peer_id
                     );
                     let peer_network_id =
                         PeerNetworkId::new(self.network_context.network_id(), peer_id);
@@ -423,7 +420,7 @@ impl HealthChecker {
                             error = ?err,
                             "{} Failed to disconnect from peer: {} with error: {:?}",
                             self.network_context,
-                            peer_id.short_str(),
+                            peer_id,
                             err
                         );
                     }
@@ -445,7 +442,7 @@ impl HealthChecker {
             round = round,
             "{} Sending Ping request to peer: {} for round: {} nonce: {}",
             network_context,
-            peer_id.short_str(),
+            peer_id,
             round,
             nonce
         );

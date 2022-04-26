@@ -5,7 +5,6 @@ use crate::{block::Block, common::Author, sync_info::SyncInfo};
 use anyhow::{anyhow, ensure, format_err, Context, Result};
 use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
-use short_hex_str::AsShortHexStr;
 use std::fmt;
 
 /// ProposalMsg contains the required information for the proposer election protocol to make its
@@ -117,7 +116,7 @@ impl fmt::Display for ProposalMsg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "[proposal {} from ", self.proposal)?;
         match self.proposal.author() {
-            Some(author) => write!(f, "{}]", author.short_str()),
+            Some(author) => write!(f, "{}]", author),
             None => write!(f, "NIL]"),
         }
     }

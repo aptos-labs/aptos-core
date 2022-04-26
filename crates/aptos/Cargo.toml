@@ -38,7 +38,6 @@ aptos-rest-client = { path = "../../crates/aptos-rest-client"}
 aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 bcs = "0.1.2"
-short-hex-str = { path = "../short-hex-str" }
 cached-framework-packages =  { path = "../../aptos-move/framework/cached-packages" }
 move-binary-format = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
 move-cli = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }

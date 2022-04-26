@@ -26,7 +26,6 @@ aptos-secure-storage = { path = "../secure/storage" }
 aptos-temppath = { path = "../crates/aptos-temppath" }
 aptos-types = { path = "../types" }
 aptos-workspace-hack = { version = "0.1", path = "../crates/aptos-workspace-hack" }
-short-hex-str = { path = "../crates/short-hex-str" }
 
 [dev-dependencies]
 aptos-crypto = { path = "../crates/aptos-crypto", features = ["fuzzing"] }
