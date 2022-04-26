@@ -4,10 +4,7 @@
 use crate::{
     access_path::AccessPath,
     account_address::{self, AccountAddress},
-    account_config::{
-        AccountResource, AptosAccountResource, BalanceResource, KeyRotationCapabilityResource,
-        WithdrawCapabilityResource,
-    },
+    account_config::{AccountResource, BalanceResource},
     account_state_blob::AccountStateBlob,
     block_info::{BlockInfo, Round},
     block_metadata::BlockMetadata,
@@ -643,31 +640,6 @@ impl ContractEventGen {
 }
 
 #[derive(Arbitrary, Debug)]
-pub struct AptosAccountResourceGen {
-    withdrawal_capability: Option<WithdrawCapabilityResource>,
-    key_rotation_capability: Option<KeyRotationCapabilityResource>,
-}
-
-impl AptosAccountResourceGen {
-    pub fn materialize(
-        self,
-        account_index: Index,
-        universe: &AccountInfoUniverse,
-    ) -> AptosAccountResource {
-        let account_info = universe.get_account_info(account_index);
-
-        AptosAccountResource::new(
-            account_info.sequence_number,
-            account_info.public_key.to_bytes().to_vec(),
-            self.withdrawal_capability,
-            self.key_rotation_capability,
-            account_info.sent_event_handle.clone(),
-            account_info.received_event_handle.clone(),
-        )
-    }
-}
-
-#[derive(Arbitrary, Debug)]
 pub struct AccountResourceGen;
 
 impl AccountResourceGen {
@@ -698,7 +670,6 @@ impl BalanceResourceGen {
 
 #[derive(Arbitrary, Debug)]
 pub struct AccountStateBlobGen {
-    aptos_account_resource_gen: AptosAccountResourceGen,
     balance_resource_gen: BalanceResourceGen,
     account_resource_gen: AccountResourceGen,
 }
@@ -709,19 +680,11 @@ impl AccountStateBlobGen {
         account_index: Index,
         universe: &AccountInfoUniverse,
     ) -> AccountStateBlob {
-        let aptos_account_resource = self
-            .aptos_account_resource_gen
-            .materialize(account_index, universe);
         let account_resource = self
             .account_resource_gen
             .materialize(account_index, universe);
         let balance_resource = self.balance_resource_gen.materialize();
-        AccountStateBlob::try_from((
-            &account_resource,
-            &aptos_account_resource,
-            &balance_resource,
-        ))
-        .unwrap()
+        AccountStateBlob::try_from((&account_resource, &balance_resource)).unwrap()
     }
 }
 

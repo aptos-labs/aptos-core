@@ -4,9 +4,7 @@
 use crate::{
     access_path::Path,
     account_address::AccountAddress,
-    account_config::{
-        AccountResource, AptosAccountResource, BalanceResource, CRSNResource, ChainIdResource,
-    },
+    account_config::{AccountResource, BalanceResource, CRSNResource, ChainIdResource},
     account_state_blob::AccountStateBlob,
     block_metadata::BlockResource,
     on_chain_config::{
@@ -32,24 +30,13 @@ impl AccountState {
             .map(|opt_ar| opt_ar.map(|ar| ar.address()))
     }
 
-    pub fn get_diem_account_resource(&self) -> Result<Option<AptosAccountResource>> {
-        self.get_resource::<AptosAccountResource>()
-    }
-
     // Return the `AccountResource` for this blob. If the blob doesn't have an `AccountResource`
     // then it must have a `AptosAccountResource` in which case we convert that to an
     // `AccountResource`.
     pub fn get_account_resource(&self) -> Result<Option<AccountResource>> {
         match self.get_resource::<AccountResource>()? {
             x @ Some(_) => Ok(x),
-            None => match self.get_resource::<AptosAccountResource>()? {
-                Some(diem_ar) => Ok(Some(AccountResource::new(
-                    diem_ar.sequence_number(),
-                    diem_ar.authentication_key().to_vec(),
-                    diem_ar.address(),
-                ))),
-                None => Ok(None),
-            },
+            None => Ok(None),
         }
     }
 
@@ -259,24 +246,16 @@ impl TryFrom<&Vec<u8>> for AccountState {
     }
 }
 
-impl TryFrom<(&AccountResource, &AptosAccountResource, &BalanceResource)> for AccountState {
+impl TryFrom<(&AccountResource, &BalanceResource)> for AccountState {
     type Error = Error;
 
     fn try_from(
-        (account_resource, diem_account_resource, balance_resource): (
-            &AccountResource,
-            &AptosAccountResource,
-            &BalanceResource,
-        ),
+        (account_resource, balance_resource): (&AccountResource, &BalanceResource),
     ) -> Result<Self> {
         let mut btree_map: BTreeMap<Vec<u8>, Vec<u8>> = BTreeMap::new();
         btree_map.insert(
             AccountResource::resource_path(),
             bcs::to_bytes(account_resource)?,
-        );
-        btree_map.insert(
-            AptosAccountResource::resource_path(),
-            bcs::to_bytes(diem_account_resource)?,
         );
         btree_map.insert(
             BalanceResource::resource_path(),
