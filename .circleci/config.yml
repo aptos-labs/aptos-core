@@ -217,19 +217,13 @@ jobs:
           name: Check docker compose killswitch
           shell: /bin/bash
           command: |
-            if [ -n "$DOCKER_COMPOSE_ENABLED" ]; then
-              exit 0
-            fi
-            circleci-agent step halt
+            exit 0
       - docker-compose-setup
       - run:
           name: Check docker-compose status
           shell: /bin/bash
           command: |
-            if [ -n "$DOCKER_COMPOSE_BLOCKING" ]; then
-              exit $DOCKER_COMPOSE_EXIT_CODE
-            fi
-            circleci-agent step halt
+            exit $DOCKER_COMPOSE_EXIT_CODE
       - dev-setup
       - run:
           name: Install Node + Yarn
@@ -268,19 +262,19 @@ workflows:
         equal: [main, << pipeline.git.branch >>]
     jobs:
       #      - build-benchmarks
-      - e2e-test
-      - lint
-      - unit-test
-      - docker-build-push:
-          context: aws-dev
+      # - e2e-test
+      # - lint
+      # - unit-test
+      # - docker-build-push:
+      #     context: aws-dev
       - ecosystem-test:
           context: aws-dev
-          requires:
-            - docker-build-push
-      - forge-k8s-test:
-          context: aws-dev
-          requires:
-            - docker-build-push
+          # requires:
+          #   - docker-build-push
+      # - forge-k8s-test:
+      #     context: aws-dev
+      #     requires:
+      #       - docker-build-push
   ### on devnet branch update ###
   # Ensure the latest is built on the "devnet" branch, and mirror from ECR to Dockerhub
   devnet-branch-cut:
@@ -388,7 +382,7 @@ commands:
       - aws-setup
       - aws-ecr-setup
       - local-deploy-setup
-      - run: echo "export IMAGE_TAG=dev_$(git rev-parse --short=8 HEAD)" >> $BASH_ENV
+      - run: echo "export IMAGE_TAG=dev_circleci_cf818a3d" >> $BASH_ENV
       # since we're running with `--build-all`, assume that if it passes, we have all images required for Forge
       - run: aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG
       - run:
@@ -407,9 +401,10 @@ commands:
       - run:
           name: Verify testnet docker-compose up
           shell: /bin/bash
+          working_directory: docker/compose/validator-testnet
           command: |
             DOCKER_COMPOSE_EXIT_CODE=1
-            for i in $(seq 120); do
+            for i in $(seq 60); do
               curl -s -w "\n%{http_code}\n" localhost:8080 | tee >(tail -1 > validator_ret.txt)
               curl -s -w "\n%{http_code}\n" -X POST 'localhost:8000/mint?pub_key=459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d&amount=20000000' \
                 | tee >(tail -1 > faucet_ret.txt)
@@ -424,7 +419,8 @@ commands:
       - run:
           name: Check docker-compose resources
           shell: /bin/bash
+          working_directory: docker/compose/validator-testnet
           command: |
             set -x
-            docker container ls
+            docker container ls -a
             docker-compose logs
