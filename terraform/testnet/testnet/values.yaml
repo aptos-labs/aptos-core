@@ -1,6 +1,9 @@
 imageTag: latest
 validatorLite: false
 
+# name of the chain for prometheus label
+chain_name:
+
 genesis:
   numValidators: 1
   numPublicFullnodes: 1

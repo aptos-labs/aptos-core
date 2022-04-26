@@ -1,6 +1,8 @@
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+  external_labels:
+    chain_name: {{ .Values.chain_name }}
 
 # Alertmanager configuration
 alerting:
