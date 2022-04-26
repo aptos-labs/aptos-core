@@ -81,6 +81,7 @@ pub struct StateSyncDriverConfig {
     pub continuous_syncing_mode: ContinuousSyncingMode, // The mode by which to sync after bootstrapping
     pub progress_check_interval_ms: u64, // The interval (ms) at which to check state sync progress
     pub max_connection_deadline_secs: u64, // The max time (secs) to wait for connections from peers
+    pub max_consecutive_stream_notifications: u64, // The max number of notifications to process per driver loop
     pub max_pending_data_chunks: u64, // The max number of data chunks pending execution or commit
     pub max_stream_wait_time_ms: u64, // The max time (ms) to wait for a data stream notification
 }
@@ -95,6 +96,7 @@ impl Default for StateSyncDriverConfig {
             continuous_syncing_mode: ContinuousSyncingMode::ApplyTransactionOutputs,
             progress_check_interval_ms: 100,
             max_connection_deadline_secs: 10,
+            max_consecutive_stream_notifications: 10,
             max_pending_data_chunks: 100,
             max_stream_wait_time_ms: 10_000,
         }
