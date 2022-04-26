@@ -222,6 +222,14 @@ jobs:
             fi
             circleci-agent step halt
       - docker-compose-setup
+      - run:
+          name: Check docker-compose status
+          shell: /bin/bash
+          command: |
+            if [ -n "$DOCKER_COMPOSE_BLOCKING" ]; then
+              exit $DOCKER_COMPOSE_EXIT_CODE
+            fi
+            circleci-agent step halt
       - dev-setup
       - run:
           name: Install Node + Yarn
@@ -400,14 +408,23 @@ commands:
           name: Verify testnet docker-compose up
           shell: /bin/bash
           command: |
-            for i in $(seq 60); do
+            DOCKER_COMPOSE_EXIT_CODE=1
+            for i in $(seq 120); do
               curl -s -w "\n%{http_code}\n" localhost:8080 | tee >(tail -1 > validator_ret.txt)
               curl -s -w "\n%{http_code}\n" -X POST 'localhost:8000/mint?pub_key=459c77a38803bd53f3adee52703810e3a74fd7c46952c497e75afb0a7932586d&amount=20000000' \
                 | tee >(tail -1 > faucet_ret.txt)
               if [ "$(cat validator_ret.txt)" = "200" ] && [ "$(cat faucet_ret.txt)" = "200" ]; then
                 echo "Both validator and faucet healthy"
-                exit 0
+                DOCKER_COMPOSE_EXIT_CODE=0
+                break
               fi
               sleep 1
             done
-            exit 1
+            echo "export DOCKER_COMPOSE_EXIT_CODE=$DOCKER_COMPOSE_EXIT_CODE" >> $BASH_ENV
+      - run:
+          name: Check docker-compose resources
+          shell: /bin/bash
+          command: |
+            set -x
+            docker container ls
+            docker-compose logs
