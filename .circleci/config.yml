@@ -213,6 +213,14 @@ jobs:
   ecosystem-test:
     executor: ubuntu-xl
     steps:
+      - run:
+          name: Check docker compose killswitch
+          shell: /bin/bash
+          command: |
+            if [ -n "$DOCKER_COMPOSE_ENABLED" ]; then
+              exit 0
+            fi
+            circleci-agent step halt
       - docker-compose-setup
       - dev-setup
       - run:
