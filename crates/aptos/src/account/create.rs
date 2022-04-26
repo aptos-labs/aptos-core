@@ -19,7 +19,7 @@ use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
 use clap::Parser;
-use reqwest::{self, Url};
+use reqwest::Url;
 
 /// Command to create a new account on-chain
 ///
@@ -75,7 +75,7 @@ impl CreateAccount {
         sender_address: AccountAddress,
         sequence_number: u64,
     ) -> CliTypedResult<Response<Transaction>> {
-        let client = RestClient::new(reqwest::Url::clone(&self.write_options.rest_options.url()?));
+        let client = RestClient::new(Url::clone(&self.write_options.rest_options.url()?));
         let transaction_factory = TransactionFactory::new(self.write_options.chain_id().await?)
             .with_gas_unit_price(1)
             .with_max_gas_amount(self.write_options.max_gas);
@@ -91,7 +91,7 @@ impl CreateAccount {
     }
 
     pub async fn create_account_with_faucet(
-        faucet_url: reqwest::Url,
+        faucet_url: Url,
         initial_coins: u64,
         address: AccountAddress,
     ) -> CliTypedResult<()> {
@@ -116,7 +116,7 @@ impl CreateAccount {
     }
 
     async fn create_account_with_key(self, address: AccountAddress) -> CliTypedResult<()> {
-        let client = RestClient::new(reqwest::Url::clone(&self.write_options.rest_options.url()?));
+        let client = RestClient::new(Url::clone(&self.write_options.rest_options.url()?));
         let sender_private_key = self
             .write_options
             .private_key_options
