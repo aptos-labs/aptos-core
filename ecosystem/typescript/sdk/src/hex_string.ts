@@ -44,7 +44,7 @@ export class HexString {
   }
 
   toShortString(): string {
-    const trimmed = this.hexString.replace(/^0x0+/, "");
+    const trimmed = this.hexString.replace(/^0x0*/, "");
     return `0x${trimmed}`;
   }
 
