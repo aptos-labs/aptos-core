@@ -1,12 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::utils::{check_if_file_exists, write_to_file};
+use crate::common::{
+    init::DEFAULT_REST_URL,
+    utils::{check_if_file_exists, write_to_file},
+};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
 use aptos_logger::{debug, info};
+use aptos_rest_client::Client;
 use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
 use clap::{ArgEnum, Parser};
 use itertools::Itertools;
@@ -58,6 +62,10 @@ pub enum CliError {
 pub struct CliConfig {
     /// Private key for commands.  TODO: Add vault functionality
     pub private_key: Option<Ed25519PrivateKey>,
+    /// URL for the Aptos rest endpoint
+    pub rest_url: Option<String>,
+    /// URL for the Faucet endpoint (if applicable)
+    pub faucet_url: Option<String>,
 }
 
 impl CliConfig {
@@ -334,12 +342,23 @@ pub struct RestOptions {
     /// URL to a fullnode on the network
     ///
     /// Defaults to https://fullnode.devnet.aptoslabs.com
-    #[clap(
-        long,
-        parse(try_from_str),
-        default_value = "https://fullnode.devnet.aptoslabs.com"
-    )]
-    pub url: reqwest::Url,
+    #[clap(long, parse(try_from_str))]
+    pub url: Option<reqwest::Url>,
+}
+
+impl RestOptions {
+    pub fn url(&self) -> CliTypedResult<reqwest::Url> {
+        if let Some(ref url) = self.url {
+            Ok(url.clone())
+        } else if let Some(url) = CliConfig::load()?.rest_url {
+            reqwest::Url::parse(&url)
+                .map_err(|err| CliError::UnableToParse("Rest URL", err.to_string()))
+        } else {
+            reqwest::Url::parse(DEFAULT_REST_URL).map_err(|err| {
+                CliError::UnexpectedError(format!("Failed to parse default rest URL {}", err))
+            })
+        }
+    }
 }
 
 /// Options specific to submitting a private key to the Rest endpoint
@@ -349,14 +368,23 @@ pub struct WriteTransactionOptions {
     pub private_key_options: PrivateKeyInputOptions,
     #[clap(flatten)]
     pub rest_options: RestOptions,
-    /// ChainId for the network
-    #[clap(long)]
-    pub chain_id: ChainId,
     /// Maximum gas to be used to publish the package
     ///
     /// Defaults to 1000 gas units
     #[clap(long, default_value_t = 1000)]
     pub max_gas: u64,
+}
+
+impl WriteTransactionOptions {
+    pub async fn chain_id(&self) -> CliTypedResult<ChainId> {
+        let client = Client::new(self.rest_options.url()?);
+        let state = client
+            .get_ledger_information()
+            .await
+            .map_err(|err| CliError::ApiError(err.to_string()))?
+            .into_inner();
+        Ok(ChainId::new(state.chain_id))
+    }
 }
 
 /// Options for compiling a move package dir

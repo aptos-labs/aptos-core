@@ -151,8 +151,8 @@ impl PublishPackage {
             .extract_private_key(self.encoding_options.encoding)?;
 
         submit_transaction(
-            self.write_options.rest_options.url.clone(),
-            self.write_options.chain_id,
+            self.write_options.rest_options.url()?,
+            self.write_options.chain_id().await?,
             sender_key,
             compiled_payload,
             self.write_options.max_gas,
