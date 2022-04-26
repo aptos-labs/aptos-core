@@ -370,4 +370,10 @@ module AptosFramework::TestCoin {
         initialize(&account, 1000000);
         delegate_mint_capability(random, @0x1);
     }
+
+    #[test_only]
+    public fun mint_for_test(account: &signer, amount: u64) acquires Balance {
+        register(account);
+        deposit(Signer::address_of(account), Coin {value: amount});
+    }
 }

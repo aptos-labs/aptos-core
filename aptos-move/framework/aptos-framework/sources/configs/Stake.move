@@ -9,7 +9,6 @@ module AptosFramework::Stake {
     friend AptosFramework::Genesis;
 
     const MINIMUM_LOCK_PERIOD: u64 = 86400;
-    const MINIMUM_RECONFIG_PERIOD: u64 = 3600;
 
     /// Basic unit of stake delegation, it's stored in StakePool.
     struct Delegation has store {
@@ -55,7 +54,7 @@ module AptosFramework::Stake {
     /// Full ValidatorSet, stored in @CoreResource.
     struct ValidatorSet has key {
         consensus_scheme: u8,
-        // minimum stakes requires to join validator set
+        // minimum stakes required to join validator set
         minimum_stake: u64,
         // maximum stakes allowed to join validator set
         maximum_stake: u64,
@@ -93,7 +92,7 @@ module AptosFramework::Stake {
         let addr = Signer::address_of(account);
         let current_time = Timestamp::now_seconds();
         let stake_pool = borrow_global_mut<StakePool>(from);
-        let d = withdraw_internal(&mut stake_pool.inactive, addr);
+        let d = withdraw_internal(&mut stake_pool.active, addr);
         let is_current_validator = is_current_validator(from);
         if (!is_current_validator) {
             // directly deposit if it's not active validator
@@ -172,7 +171,7 @@ module AptosFramework::Stake {
         let (exist, _) = find_validator(&validator_set.pending_active, addr);
         assert!(!exist, 0);
 
-        Vector::push_back(&mut validator_set.pending_active, get_validator_info(addr));
+        Vector::push_back(&mut validator_set.pending_active, generate_validator_info(addr));
     }
 
     /// Initiate by the validator info owner.
@@ -217,7 +216,7 @@ module AptosFramework::Stake {
         let len = Vector::length(&validator_set.active_validators);
         while (i < len) {
             let old_validator_info = Vector::borrow_mut(&mut validator_set.active_validators, i);
-            *old_validator_info = get_validator_info(old_validator_info.addr);
+            *old_validator_info = generate_validator_info(old_validator_info.addr);
             i = i + 1;
         }
     }
@@ -290,8 +289,11 @@ module AptosFramework::Stake {
     public fun is_current_validator(addr: address): bool acquires ValidatorSet{
         let validator_set = borrow_global<ValidatorSet>(@CoreResources);
         let (exist_1, _) = find_validator(&validator_set.active_validators, addr);
+        if (exist_1) {
+            return true
+        };
         let (exist_2, _) = find_validator(&validator_set.pending_inactive, addr);
-        exist_1 || exist_2
+        exist_2
     }
 
     fun withdraw_internal(v: &mut vector<Delegation>, addr: address): Delegation {
@@ -299,7 +301,7 @@ module AptosFramework::Stake {
         Vector::swap_remove(v, index)
     }
 
-    fun get_validator_info(addr: address): ValidatorInfo acquires StakePool, ValidatorConfig {
+    fun generate_validator_info(addr: address): ValidatorInfo acquires StakePool, ValidatorConfig {
         let config = *borrow_global<ValidatorConfig>(addr);
         let voting_power = borrow_global<StakePool>(addr).current_stake;
         ValidatorInfo {
@@ -309,4 +311,91 @@ module AptosFramework::Stake {
         }
     }
 
+    #[test(core_resources = @CoreResources, account_1 = @0x123, account_2 = @0x234)]
+    fun test_basic_delegation(
+        core_resources: signer,
+        account_1: signer,
+        account_2: signer
+    ) acquires StakePool, ValidatorConfig, ValidatorSet {
+        initialize_validator_set(&core_resources, 100, 10000);
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        TestCoin::mint_for_test(&account_1, 10000);
+        TestCoin::mint_for_test(&account_2, 10000);
+        register_validator_candidate(&account_1, Vector::empty(), Vector::empty(), Vector::empty());
+        let addr1 = Signer::address_of(&account_1);
+        let addr2 = Signer::address_of(&account_2);
+        delegate_stake(&account_1, addr1, 100, 100000);
+        // delegation when the address is not a validator
+        assert!(TestCoin::value(&Vector::borrow(&borrow_global<StakePool>(addr1).active, 0).coins) == 100, 0);
+        assert!(Vector::borrow(&borrow_global<StakePool>(addr1).active, 0).from == addr1, 0);
+        delegate_stake(&account_2, addr1, 101, 100000);
+        assert!(TestCoin::value(&Vector::borrow(&borrow_global<StakePool>(addr1).active, 1).coins) == 101, 0);
+        assert!(Vector::borrow(&borrow_global<StakePool>(addr1).active, 1).from == addr2, 0);
+        // join the validator set with enough stake
+        join_validator_set(&account_1);
+        on_new_epoch();
+        // delegation when the address is active valdiator
+        assert!(is_current_validator(addr1), 0);
+        delegate_stake(&account_2, addr1, 102, 100000);
+        assert!(borrow_global<StakePool>(addr1).current_stake == 201, 0);
+        assert!(TestCoin::value(&Vector::borrow(&borrow_global<StakePool>(addr1).pending_active, 0).coins) == 102, 0);
+        // withdraw active stakes
+        Timestamp::update_global_time_for_test(100001000000);
+        withdraw_active(&account_1, addr1);
+        assert!(TestCoin::value(&Vector::borrow(&borrow_global<StakePool>(addr1).pending_inactive, 0).coins) == 100, 0);
+        // total stake doesn't change until next epoch
+        assert!(borrow_global<StakePool>(addr1).current_stake == 201, 0);
+        // pending delegations are processed on new epoch
+        on_new_epoch();
+        assert!(Vector::length(&borrow_global<StakePool>(addr1).pending_active) == 0, 0);
+        assert!(Vector::length(&borrow_global<StakePool>(addr1).pending_inactive) == 0, 0);
+        assert!(TestCoin::value(&Vector::borrow(&borrow_global<StakePool>(addr1).inactive, 0).coins) == 100, 0);
+        assert!(TestCoin::value(&Vector::borrow(&borrow_global<StakePool>(addr1).active, 1).coins) == 102, 0);
+        assert!(borrow_global<StakePool>(addr1).current_stake == 203, 0);
+        // withdraw inactive
+        withdraw_inactive(&account_1, addr1);
+        assert!(TestCoin::balance_of(addr1) == 10000, 0);
+    }
+
+    #[test(core_resources = @CoreResources, account_1 = @0x123, account_2 = @0x234, account_3 = @0x345)]
+    fun test_validator_join_leave(
+        core_resources: signer,
+        account_1: signer,
+        account_2: signer,
+        account_3: signer
+    ) acquires StakePool, ValidatorConfig, ValidatorSet {
+        initialize_validator_set(&core_resources, 100, 10000);
+        Timestamp::set_time_has_started_for_testing(&core_resources);
+        TestCoin::mint_for_test(&account_1, 10000);
+        let addr1 = Signer::address_of(&account_1);
+        let addr2 = Signer::address_of(&account_2);
+        let addr3 = Signer::address_of(&account_3);
+        register_validator_candidate(&account_1, Vector::empty(), Vector::empty(), Vector::empty());
+        register_validator_candidate(&account_2, Vector::empty(), Vector::empty(), Vector::empty());
+        register_validator_candidate(&account_3, Vector::empty(), Vector::empty(), Vector::empty());
+        delegate_stake(&account_1, addr1, 100, 100000);
+        delegate_stake(&account_1, addr2, 100, 100000);
+        delegate_stake(&account_1, addr3, 100, 100000);
+        join_validator_set(&account_1);
+        join_validator_set(&account_2);
+        assert!(Vector::borrow(&borrow_global<ValidatorSet>(@CoreResources).pending_active, 0).addr == addr1, 0);
+        assert!(Vector::borrow(&borrow_global<ValidatorSet>(@CoreResources).pending_active, 1).addr == addr2, 0);
+        on_new_epoch();
+        assert!(is_current_validator(addr1), 0);
+        assert!(is_current_validator(addr2), 0);
+        // changes don't take effect until next epoch
+        leave_validator_set(&account_2);
+        join_validator_set(&account_3);
+        rotate_consensus_key(&account_1, x"1234");
+        assert!(is_current_validator(addr2), 0);
+        assert!(Vector::borrow(&borrow_global<ValidatorSet>(@CoreResources).pending_inactive, 0).addr == addr2, 0);
+        assert!(!is_current_validator(addr3), 0);
+        assert!(Vector::borrow(&borrow_global<ValidatorSet>(@CoreResources).pending_active, 0).addr == addr3, 0);
+        assert!(Vector::borrow(&borrow_global<ValidatorSet>(@CoreResources).active_validators, 0).config.consensus_pubkey == Vector::empty(), 0);
+        // changes applied after new epoch
+        on_new_epoch();
+        assert!(!is_current_validator(addr2), 0);
+        assert!(is_current_validator(addr3), 0);
+        assert!(Vector::borrow(&borrow_global<ValidatorSet>(@CoreResources).active_validators, 0).config.consensus_pubkey == x"1234", 0);
+    }
 }
