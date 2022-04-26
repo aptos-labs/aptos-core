@@ -18,7 +18,7 @@ use aptos_types::{
 use data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, NotificationFeedback, StreamingServiceClient},
+    streaming_client::{DataStreamingClient, NotificationFeedback},
 };
 use event_notifications::EventSubscriptionService;
 use futures::StreamExt;
@@ -131,8 +131,8 @@ pub async fn get_data_notification(
 }
 
 /// Terminates the stream with the provided notification ID and feedback
-pub async fn terminate_stream_with_feedback(
-    streaming_service_client: &mut StreamingServiceClient,
+pub async fn terminate_stream_with_feedback<StreamingClient: DataStreamingClient + Clone>(
+    streaming_client: &mut StreamingClient,
     notification_id: NotificationId,
     notification_feedback: NotificationFeedback,
 ) -> Result<(), Error> {
@@ -141,7 +141,7 @@ pub async fn terminate_stream_with_feedback(
         notification_feedback, notification_id
     )));
 
-    streaming_service_client
+    streaming_client
         .terminate_stream_with_feedback(notification_id, notification_feedback)
         .await
         .map_err(|error| error.into())
@@ -149,8 +149,10 @@ pub async fn terminate_stream_with_feedback(
 
 /// Handles the end of stream notification or an invalid payload by terminating
 /// the stream appropriately.
-pub async fn handle_end_of_stream_or_invalid_payload(
-    streaming_service_client: &mut StreamingServiceClient,
+pub async fn handle_end_of_stream_or_invalid_payload<
+    StreamingClient: DataStreamingClient + Clone,
+>(
+    streaming_client: &mut StreamingClient,
     data_notification: DataNotification,
 ) -> Result<(), Error> {
     // Terminate the stream with the appropriate feedback
@@ -159,7 +161,7 @@ pub async fn handle_end_of_stream_or_invalid_payload(
         _ => NotificationFeedback::PayloadTypeIsIncorrect,
     };
     terminate_stream_with_feedback(
-        streaming_service_client,
+        streaming_client,
         data_notification.notification_id,
         notification_feedback,
     )
