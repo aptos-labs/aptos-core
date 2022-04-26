@@ -194,6 +194,7 @@ impl Transactions {
     }
 
     pub async fn create(self, txn: SignedTransaction) -> Result<impl Reply, Error> {
+        // 将交易发送到消息池
         let (mempool_status, vm_status_opt) = self.context.submit_transaction(txn.clone()).await?;
         match mempool_status.code {
             MempoolStatusCode::Accepted => {

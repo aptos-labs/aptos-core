@@ -36,13 +36,17 @@ pub struct TransactionStore {
     // indexes
     priority_index: PriorityIndex,
     // TTLIndex based on client-specified expiration time
+    // TTLIndex 基于客户端指定的过期时间
     expiration_time_index: TTLIndex,
     // TTLIndex based on system expiration time
     // we keep it separate from `expiration_time_index` so Mempool can't be clogged
     //  by old transactions even if it hasn't received commit callbacks for a while
+    // TTLIndex 基于系统过期时间，
+    // 我们将其与 `expiration_time_index` 分开，这样 Mempool 就不会被旧事务阻塞，即使它有一段时间没有收到提交回调
     system_ttl_index: TTLIndex,
     timeline_index: TimelineIndex,
     // keeps track of "non-ready" txns (transactions that can't be included in next block)
+    // 跟踪“未就绪”的 txns（不能包含在下一个块中的交易）
     parking_lot_index: ParkingLotIndex,
 
     // Index for looking up transaction by hash.
@@ -115,6 +119,7 @@ impl TransactionStore {
     }
 
     /// Insert transaction into TransactionStore. Performs validation checks and updates indexes.
+    /// 向TransactionStore插入交易。执行验证检查和更新索引。
     pub(crate) fn insert(&mut self, txn: MempoolTransaction) -> MempoolStatus {
         let address = txn.get_sender();
         let sequence_number = txn.sequence_info;
@@ -123,6 +128,9 @@ impl TransactionStore {
         // e.g. given request is update
         // we allow increase in gas price to speed up process.
         // ignores the case transaction hash is same for retrying submit transaction.
+        // 检查交易是否已经存在于Mempool中，
+        // 例如，给定的请求是更新，我们允许增加天然气价格以加快进程。
+        // 忽略交易哈希值相同的情况，以便重新提交交易。
         if let Some(txns) = self.transactions.get_mut(&address) {
             if let Some(current_version) =
                 txns.get_mut(&sequence_number.transaction_sequence_number)
@@ -130,6 +138,7 @@ impl TransactionStore {
                 if current_version.txn == txn.txn {
                     return MempoolStatus::new(MempoolStatusCode::Accepted);
                 }
+                // 更新gas
                 if current_version.txn.max_gas_amount() == txn.txn.max_gas_amount()
                     && current_version.txn.payload() == txn.txn.payload()
                     && current_version.txn.expiration_timestamp_secs()
@@ -145,7 +154,7 @@ impl TransactionStore {
                 }
             }
         }
-
+        // 消息池满了
         if self.check_is_full_after_eviction(
             &txn,
             sequence_number.account_sequence_number_type.min_seq(),
@@ -160,7 +169,7 @@ impl TransactionStore {
         self.transactions
             .entry(address)
             .or_insert_with(AccountTransactions::new);
-
+        // 清理已经被打包的交易
         self.clean_committed_transactions(
             &address,
             sequence_number.account_sequence_number_type.min_seq(),
@@ -225,6 +234,9 @@ impl TransactionStore {
     /// Checks if Mempool is full.
     /// If it's full, tries to free some space by evicting transactions from the ParkingLot.
     /// We only evict on attempt to insert a transaction that would be ready for broadcast upon insertion.
+    /// 检查Mempool是否已满。
+    /// 如果满了，就试图通过从ParkingLot驱逐事务来释放一些空间。
+    /// 我们只在试图插入一个交易时驱逐，该交易在插入时已准备好进行广播。
     fn check_is_full_after_eviction(
         &mut self,
         txn: &MempoolTransaction,
@@ -234,6 +246,7 @@ impl TransactionStore {
             && self.check_txn_ready(txn, curr_sequence_number)
         {
             // try to free some space in Mempool from ParkingLot by evicting a non-ready txn
+            // 试图通过驱逐一个未准备好的TXN来释放Mempool中的一些空间
             if let Some((address, sequence_number)) = self.parking_lot_index.get_poppable() {
                 if let Some(txn) = self
                     .transactions
@@ -259,6 +272,10 @@ impl TransactionStore {
     /// (this handles both cases where, (1) txn is first possible txn for an account and (2) the
     /// previous txn is committed).
     /// 2. The txn before this is ready for broadcast but not yet committed.
+    ///  检查一个事务在插入时是否会准备好在mempool中广播（不插入）。
+    /// 有两种情况会发生。
+    /// 1. txn序列号 == curr_sequence_number（这可以处理两种情况：（1）txn是一个账户的第一个可能的txn；（2）前一个txn已经提交）。
+    /// 2. 在这之前的txn已经准备好进行广播，但还没有提交
     fn check_txn_ready(&self, txn: &MempoolTransaction, curr_sequence_number: u64) -> bool {
         let tx_sequence_number = txn.sequence_info.transaction_sequence_number;
         if tx_sequence_number == curr_sequence_number {
@@ -286,6 +303,10 @@ impl TransactionStore {
     /// - All transactions of a given CRSN account that are greater than the account's min_nonce
     ///   should be included in both the PriorityIndex and TimelineIndex.
     /// - Other txns are considered to be "non-ready" and should be added to ParkingLotIndex.
+    /// 保持以下不变性。
+    /// - 一个给定的非CRSN账户的所有交易，如果与当前的序列号是连续的，应该包括在PriorityIndex（共识的排序）和TimelineIndex（共享内存的txns）。
+    /// - 一个给定的CRSN账户的所有交易，如果大于该账户的min_nonce，应该被包括在PriorityIndex和TimelineIndex中。
+    /// - 其他txns被认为是 "非就绪 "的，应该被添加到ParkingLotIndex中。
     fn process_ready_transactions(
         &mut self,
         address: &AccountAddress,
@@ -355,6 +376,7 @@ impl TransactionStore {
         if let Some(txns) = self.transactions.get_mut(address) {
             let mut active = txns.split_off(&sequence_number);
             let txns_for_removal = txns.clone();
+            // sequence_number 左边已经共识的交易
             txns.clear();
             txns.append(&mut active);
 

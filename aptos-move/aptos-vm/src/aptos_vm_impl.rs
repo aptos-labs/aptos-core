@@ -159,9 +159,11 @@ impl AptosVMImpl {
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
+        // 执行时会写入 log_context， 此时判断该交易是否写入了 log_context中，即判断交易是否开始执行
         let gas_constants = &self.get_gas_schedule(log_context)?.gas_constants;
         let raw_bytes_len = txn_data.transaction_size;
         // The transaction is too large.
+        // 判断交易是否过大
         if txn_data.transaction_size.get() > gas_constants.max_transaction_size_in_bytes {
             warn!(
                 *log_context,
@@ -179,6 +181,7 @@ impl AptosVMImpl {
         // The submitted max gas units that the transaction can consume is greater than the
         // maximum number of gas units bound that we have set for any
         // transaction.
+        // 判断消耗的gas 数量
         if txn_data.max_gas_amount().get() > gas_constants.maximum_number_of_gas_units.get() {
             warn!(
                 *log_context,
@@ -194,6 +197,7 @@ impl AptosVMImpl {
         // The submitted transactions max gas units needs to be at least enough to cover the
         // intrinsic cost of the transaction as calculated against the size of the
         // underlying `RawTransaction`
+        // 提交的交易最大气体单位需要至少足以支付交易的内在成本，根据相关 "RawTransaction "的规模计算。
         let min_txn_fee =
             gas_constants.to_external_units(calculate_intrinsic_gas(raw_bytes_len, gas_constants));
         if txn_data.max_gas_amount().get() < min_txn_fee.get() {
@@ -211,6 +215,8 @@ impl AptosVMImpl {
         // The submitted gas price is less than the minimum gas unit price set by the VM.
         // NB: MIN_PRICE_PER_GAS_UNIT may equal zero, but need not in the future. Hence why
         // we turn off the clippy warning.
+        //
+        // 提交的天然气价格低于VM设定的最低天然气单价。 注意：MIN_PRICE_PER_GAS_UNIT可能等于零，但将来不需要。因此，我们关闭了clippy警告的原因。
         #[allow(clippy::absurd_extreme_comparisons)]
         let below_min_bound =
             txn_data.gas_unit_price().get() < gas_constants.min_price_per_gas_unit.get();
@@ -257,19 +263,30 @@ impl AptosVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let chain_specific_info = self.chain_info();
+        /// 需要扣除gas的币种
         let gas_currency = self.get_gas_currency_args(account_currency_symbol);
+        // nonce 值
         let txn_sequence_number = txn_data.sequence_number();
+        // public key
         let txn_public_key = txn_data.authentication_key_preimage().to_vec();
+        // 交易gas
         let txn_gas_price = txn_data.gas_unit_price().get();
+        // 最大gas
         let txn_max_gas_units = txn_data.max_gas_amount().get();
+        // 交易过期时间
         let txn_expiration_timestamp_secs = txn_data.expiration_timestamp_secs();
+        // chain id
         let chain_id = txn_data.chain_id();
+        // 初始化gas（慢慢累加gas？）
         let mut gas_status = GasStatus::new_unmetered();
+        // secondary_authentication_key_preimages 二次认证？
+        /// 多签秘钥集？
         let secondary_public_key_hashes: Vec<MoveValue> = txn_data
             .secondary_authentication_key_preimages
             .iter()
             .map(|preimage| MoveValue::vector_u8(HashValue::sha3_256_of(preimage).to_vec()))
             .collect();
+        // 验证多签？
         let args = if self.get_version()? >= APTOS_VERSION_3 && txn_data.is_multi_agent() {
             vec![
                 MoveValue::Signer(txn_data.sender),
@@ -300,6 +317,7 @@ impl AptosVMImpl {
             } else {
                 &chain_specific_info.script_prologue_name
             };
+        /// ？验证合法性？
         session
             .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
@@ -331,6 +349,7 @@ impl AptosVMImpl {
         let txn_expiration_timestamp_secs = txn_data.expiration_timestamp_secs();
         let chain_id = txn_data.chain_id();
         let mut gas_status = GasStatus::new_unmetered();
+        // 执行module 方法？
         session
             .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
@@ -651,6 +670,7 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolver>(
 }
 
 pub(crate) fn get_gas_currency_code(txn: &SignedTransaction) -> Result<Identifier, VMStatus> {
+    /// 获取币种code
     let currency_code_string = txn.gas_currency_code();
     match account_config::from_currency_code_string(currency_code_string) {
         Ok(code) => Ok(code),

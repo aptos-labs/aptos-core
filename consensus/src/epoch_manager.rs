@@ -416,7 +416,7 @@ impl EpochManager {
         );
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
-
+        // decoupled_execution 执行与共识功能分开
         let state_computer = if onchain_config.decoupled_execution() {
             Arc::new(self.spawn_decoupled_execution(
                 safety_rules_container.clone(),
@@ -427,6 +427,7 @@ impl EpochManager {
         };
 
         info!(epoch = epoch, "Create BlockStore");
+        // 创建存储？？？？
         let block_store = Arc::new(BlockStore::new(
             Arc::clone(&self.storage),
             recovery_data,
@@ -439,6 +440,7 @@ impl EpochManager {
         info!(epoch = epoch, "Create ProposalGenerator");
         // txn manager is required both by proposal generator (to pull the proposers)
         // and by event processor (to update their status).
+        // 建议生成器（拉出建议者）和事件处理器（更新其状态）都需要txn管理器。
         let proposal_generator = ProposalGenerator::new(
             self.author,
             block_store.clone(),
@@ -471,6 +473,7 @@ impl EpochManager {
     }
 
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload) {
+        // 获取验证者集合
         let validator_set: ValidatorSet = payload
             .get()
             .expect("failed to get ValidatorSet from payload");
@@ -478,6 +481,7 @@ impl EpochManager {
             epoch: payload.epoch(),
             verifier: (&validator_set).into(),
         };
+        // 关闭当前的处理器？
         self.shutdown_current_processor().await;
 
         let onchain_config: OnChainConsensusConfig = payload.get().unwrap_or_default();
@@ -497,6 +501,7 @@ impl EpochManager {
         consensus_msg: ConsensusMsg,
     ) -> anyhow::Result<()> {
         // we can't verify signatures from a different epoch
+        // 我们无法验证来自不同年代的签名
         let maybe_unverified_event = self.check_epoch(peer_id, consensus_msg).await?;
 
         if let Some(unverified_event) = maybe_unverified_event {
@@ -638,6 +643,7 @@ impl EpochManager {
         mut network_receivers: NetworkReceivers,
     ) {
         // initial start of the processor
+        // 初始化
         self.await_reconfig_notification().await;
         loop {
             tokio::select! {

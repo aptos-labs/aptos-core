@@ -135,6 +135,10 @@ pub mod round_manager_fuzzing;
 /// etc.). It is exposing the async processing functions for each event type.
 /// The caller is responsible for running the event loops and driving the execution via some
 /// executors.
+/// 共识SMR是以事件为基础的工作方式。
+/// RoundManager负责处理单个事件（例如，process_new_round、process_proposal、process_vote等）。
+/// 它为每个事件类型提供了异步处理函数。
+/// 调用者负责运行事件循环，并通过一些执行器驱动执行。
 pub struct RoundManager {
     epoch_state: EpochState,
     block_store: Arc<BlockStore>,

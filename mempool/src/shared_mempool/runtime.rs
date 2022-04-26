@@ -102,6 +102,7 @@ pub fn bootstrap(
         .build()
         .expect("[shared mempool] failed to create runtime");
     let mempool = Arc::new(Mutex::new(CoreMempool::new(config)));
+    /// aptos move 中 aptos-vm 模块代码
     let vm_validator = Arc::new(RwLock::new(VMValidator::new(Arc::clone(&db))));
     start_shared_mempool(
         runtime.handle(),

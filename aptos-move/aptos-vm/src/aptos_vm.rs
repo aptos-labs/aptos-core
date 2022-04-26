@@ -857,6 +857,14 @@ impl VMValidator for AptosVM {
     /// TBD:
     /// 1. Transaction arguments matches the main function's type signature.
     ///    We don't check this item for now and would execute the check at execution time.
+    ///
+    /// 确定一个交易是否有效。
+    /// 如果交易被接受，将返回`None'，如果虚拟机拒绝交易，将返回`Some(Err)'，`Err'为错误代码。
+    /// 验证执行以下步骤。
+    /// 1. 签名交易（SignedTransaction）上的签名与交易中包含的公钥相符
+    /// 2. 要执行的脚本是在给定的特定配置下。
+    /// 3. 调用`Account.prologue'，它检查属性，如交易有正确的序列号，发送者有足够的余额来支付气体。
+    /// 待定：1.交易参数符合主函数的类型签名。 我们暂时不检查这一项，会在执行时执行检查。
     fn validate_transaction(
         &self,
         transaction: SignedTransaction,
@@ -880,6 +888,7 @@ impl VMAdapter for AptosVM {
     }
 
     fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus> {
+        // 重复插入？
         if txn.contains_duplicate_signers() {
             return Err(VMStatus::Error(StatusCode::SIGNERS_CONTAIN_DUPLICATES));
         }
@@ -915,12 +924,16 @@ impl VMAdapter for AptosVM {
         transaction: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
+        /// 判断 货币code 是否存在
         let currency_code = get_gas_currency_code(transaction)?;
+        // 交易元数据（未签名数据）
         let txn_data = TransactionMetadata::new(transaction);
         //let account_blob = session.data_cache.get_resource
         match transaction.payload() {
             TransactionPayload::Script(_) => {
+                // gas 判断
                 self.0.check_gas(&txn_data, log_context)?;
+                // 执行脚本内容？
                 self.0
                     .run_script_prologue(session, &txn_data, &currency_code, log_context)
             }

@@ -234,6 +234,7 @@ where
 
     let start_storage_read = Instant::now();
     // Track latency: fetching seq number
+    // 返回所有交易中发送交易的账号对应的nonce 值
     let seq_numbers = transactions
         .par_iter()
         .map(|t| {
@@ -245,19 +246,22 @@ where
         })
         .collect::<Vec<_>>();
     // Track latency for storage read fetching sequence number
+    // 跟踪读取数据库时间
     let storage_read_latency = start_storage_read.elapsed();
     counters::PROCESS_TXN_BREAKDOWN_LATENCY
         .with_label_values(&[counters::FETCH_SEQ_NUM_LABEL])
         .observe(storage_read_latency.as_secs_f64() / transactions.len() as f64);
-
+    /// 过滤异常交易
     let transactions: Vec<_> = transactions
         .into_iter()
         .enumerate()
         .filter_map(|(idx, t)| {
             if let Ok(crsn_or_seqno) = seq_numbers[idx] {
+                // nonce 比较
                 if t.sequence_number() >= crsn_or_seqno.min_seq() {
                     return Some((t, crsn_or_seqno));
                 } else {
+                    // 交易信息错误
                     statuses.push((
                         t,
                         (
@@ -281,9 +285,12 @@ where
         .collect();
 
     // Track latency: VM validation
+    // vm校验
     let vm_validation_timer = counters::PROCESS_TXN_BREAKDOWN_LATENCY
         .with_label_values(&[counters::VM_VALIDATION_LABEL])
         .start_timer();
+    // 消息vm校验结果集合
+    // 验证交易合法性
     let validation_results = transactions
         .iter()
         .map(|t| smp.validator.read().validate_transaction(t.0.clone()))
@@ -296,6 +303,7 @@ where
                 match validation_result.status() {
                     None => {
                         let gas_amount = transaction.max_gas_amount();
+                        // 交易优先级
                         let ranking_score = validation_result.score();
                         let mempool_status = mempool.add_txn(
                             transaction.clone(),

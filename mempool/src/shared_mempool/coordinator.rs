@@ -65,7 +65,7 @@ pub(crate) async fn coordinator<V>(
     // worker tasks that can process incoming transactions.
     let workers_available = smp.config.shared_mempool_max_concurrent_inbound_syncs;
     let bounded_executor = BoundedExecutor::new(workers_available, executor.clone());
-
+    /// 监听通道变化
     loop {
         let _timer = counters::MAIN_LOOP.start_timer();
         ::futures::select! {
@@ -108,6 +108,7 @@ async fn handle_client_request<V>(
         MempoolClientRequest::SubmitTransaction(txn, callback) => {
             // This timer measures how long it took for the bounded executor to *schedule* the
             // task.
+            // 记录时间？？
             let _timer = counters::task_spawn_latency_timer(
                 counters::CLIENT_EVENT_LABEL,
                 counters::SPAWN_LABEL,

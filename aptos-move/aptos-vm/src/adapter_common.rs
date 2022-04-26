@@ -35,6 +35,8 @@ pub trait VMAdapter {
     /// Creates a new Session backed by the given storage.
     /// TODO: this doesn't belong in this trait. We should be able to remove
     /// this after redesigning cache ownership model.
+    /// 创建一个由给定的存储空间支持的新Session。
+    /// TODO：这并不属于这个特性。在重新设计了缓存所有权模型后，我们应该可以删除这个。
     fn new_session<'r, R: MoveResolver>(
         &self,
         remote: &'r R,
@@ -91,6 +93,7 @@ pub fn validate_signed_transaction<A: VMAdapter>(
 ) -> VMValidatorResult {
     let _timer = TXN_VALIDATION_SECONDS.start_timer();
     let log_context = AdapterLogSchema::new(state_view.id(), 0);
+    // 验证签名合法性
     let txn = match A::check_signature(transaction) {
         Ok(t) => t,
         _ => {
@@ -100,13 +103,14 @@ pub fn validate_signed_transaction<A: VMAdapter>(
 
     let remote_cache = StateViewCache::new(state_view);
     let resolver = remote_cache.as_move_resolver();
+    /// 创建一个指定存储的新会话？ 会改变？
     let mut session = adapter.new_session(&resolver, SessionId::txn(&txn));
-
+    /// 获取gas 价格
     let (status, gas_price) = match adapter.get_gas_price(&*txn, &resolver) {
         Ok(price) => (None, price),
         Err(err) => (Some(err.status_code()), 0),
     };
-
+    // 验证交易
     let validation_result =
         validate_signature_checked_transaction(adapter, &mut session, &txn, true, &log_context);
 
@@ -135,8 +139,9 @@ pub(crate) fn validate_signature_checked_transaction<S: MoveResolver, A: VMAdapt
     allow_too_new: bool,
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
+    // 判断交易是否重复插入
     adapter.check_transaction_format(transaction)?;
-
+    // vm 执行交易？
     let prologue_status = adapter.run_prologue(session, transaction, log_context);
     match prologue_status {
         Err(err) if !allow_too_new || err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW => {

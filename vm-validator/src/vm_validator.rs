@@ -103,6 +103,7 @@ impl TransactionValidation for VMValidator {
 }
 
 /// returns account's sequence number from storage
+/// 从存储空间返回账户的序列号
 pub fn get_account_sequence_number(
     storage: &dyn DbReader,
     address: AccountAddress,

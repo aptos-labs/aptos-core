@@ -196,6 +196,9 @@ impl Ord for TTLOrderingKey {
 /// It's represented as Map <timeline_id, (Address, sequence_number)>, where timeline_id is auto
 /// increment unique id of "ready" transaction in local Mempool. (Address, sequence_number) is a
 /// logical reference to transaction content in main storage.
+///  TimelineIndex是所有 "准备好 "的交易的有序记录。
+/// 我们只在一个交易有机会被纳入下一个共识区块（这意味着它的状态是 != NotReady 或者它与另一个 "准备好 "的交易有顺序）时才将其添加到索引中。
+/// 它表示为Map <timeline_id, (Address, sequence_number)>，其中timeline_id是本地Mempool中 "就绪 "交易的自动增量唯一ID。(Address, sequence_number)是对主存储器中事务内容的逻辑引用
 pub struct TimelineIndex {
     timeline_id: u64,
     timeline: BTreeMap<u64, (AccountAddress, u64)>,
@@ -341,6 +344,7 @@ impl ParkingLotIndex {
     }
 
     /// Returns a random "non-ready" transaction (with highest sequence number for that account).
+    /// 返回一个随机的“未就绪”交易（该账户的最高序列号）。
     pub(crate) fn get_poppable(&self) -> Option<TxnPointer> {
         let mut rng = rand::thread_rng();
         self.data

@@ -125,6 +125,8 @@ impl Mempool {
 
     /// Used to add a transaction to the Mempool.
     /// Performs basic validation: checks account's sequence number.
+    /// 用于向Mempool添加一个交易。
+    /// 执行基本验证：检查账户的序列号。 ===> 验证交易时已经判断了
     pub(crate) fn add_txn(
         &mut self,
         txn: SignedTransaction,
@@ -133,6 +135,7 @@ impl Mempool {
         crsn_or_seqno: AccountSequenceInfo,
         timeline_state: TimelineState,
     ) -> MempoolStatus {
+        // 获取nonce 值
         let db_sequence_number = crsn_or_seqno.min_seq();
         trace!(
             LogSchema::new(LogEntry::AddTxn)
@@ -140,16 +143,21 @@ impl Mempool {
             committed_seq_number = db_sequence_number
         );
         let cached_value = self.sequence_number_cache.get(&txn.sender());
+        // 获取交易nonce
         let sequence_number = match crsn_or_seqno {
+            // CRSN ？？？ min nonce？
             AccountSequenceInfo::CRSN { .. } => crsn_or_seqno,
             AccountSequenceInfo::Sequential(_) => AccountSequenceInfo::Sequential(
                 cached_value.map_or(db_sequence_number, |value| max(*value, db_sequence_number)),
             ),
         };
+        /// 缓存交易nonce信息
+        /// 缓存有到期时间限制
         self.sequence_number_cache
             .insert(txn.sender(), sequence_number.min_seq());
 
         // don't accept old transactions (e.g. seq is less than account's current seq_number)
+        // 判断交易是否为最新交易
         if txn.sequence_number() < sequence_number.min_seq() {
             return MempoolStatus::new(MempoolStatusCode::InvalidSeqNumber).with_message(format!(
                 "transaction sequence number is {}, current sequence number is  {}",

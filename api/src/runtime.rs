@@ -17,6 +17,8 @@ use tokio::runtime::{Builder, Runtime};
 /// When api and json-rpc are configured with different port, both API will be served for
 /// both ports.
 /// Returns corresponding Tokio runtime
+/// 创建RESTFULL API
+/// Context::new 中关联了db 以及消息池
 pub fn bootstrap(
     config: &NodeConfig,
     chain_id: ChainId,

@@ -550,6 +550,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
         .unwrap();
 
     // Create a consensus subscription for reconfiguration events (if this node is a validator).
+    // 为重构事件创建一个共识订阅
     let consensus_reconfig_subscription = if node_config.base.role.is_validator() {
         Some(
             event_subscription_service
@@ -686,6 +687,7 @@ pub fn setup_environment(node_config: &NodeConfig, logger: Option<Arc<Logger>>) 
     let (consensus_to_mempool_sender, consensus_requests) = channel(INTRA_NODE_CHANNEL_BUFFER_SIZE);
 
     instant = Instant::now();
+    /// 消息池服务启动
     let mempool = aptos_mempool::bootstrap(
         node_config,
         Arc::clone(&db_rw.reader),

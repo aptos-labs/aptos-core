@@ -207,6 +207,7 @@ pub struct NetworkTask {
 
 impl NetworkTask {
     /// Establishes the initial connections with the peers and returns the receivers.
+    /// 建立与对等体的初始连接并返回接收者。
     pub fn new(
         network_events: ConsensusNetworkEvents,
         self_receiver: channel::Receiver<Event<ConsensusMsg>>,

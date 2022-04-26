@@ -303,9 +303,11 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     type_arguments,
                     arguments,
                 } = script_func_payload;
-
+                // move 模块
                 let module = function.module.clone();
+                // 获取模块code
                 let code = self.inner.get_module(&module.clone().into())? as Rc<dyn Bytecode>;
+                // 查找move 模块中的方法，并判断是否能找到
                 let func = code
                     .find_script_function(function.name.as_ident_str())
                     .ok_or_else(|| format_err!("could not find script function by {}", function))?;
@@ -316,6 +318,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     function,
                     type_arguments.len()
                 );
+                // 读取方法参数
                 let args = self
                     .try_into_move_values(func, arguments)?
                     .iter()
@@ -341,6 +344,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                         .collect(),
                 ))
             }
+            // 序列化？
             TransactionPayload::ScriptPayload(script) => {
                 let ScriptPayload {
                     code,

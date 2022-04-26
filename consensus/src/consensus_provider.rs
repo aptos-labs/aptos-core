@@ -60,7 +60,8 @@ pub fn start_consensus(
     let (timeout_sender, timeout_receiver) = channel::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
     let (self_sender, self_receiver) = channel::new(1_024, &counters::PENDING_SELF_MESSAGES);
     network_sender.initialize(peer_metadata_storage);
-
+    // epoch 管理工具
+    // reconfig_events 重新加载配置文件？
     let epoch_mgr = EpochManager::new(
         node_config,
         time_service,
@@ -74,7 +75,7 @@ pub fn start_consensus(
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);
-
+    // 监听其他节点以及自身的请求？
     runtime.spawn(network_task.start());
     runtime.spawn(epoch_mgr.start(timeout_receiver, network_receiver));
 

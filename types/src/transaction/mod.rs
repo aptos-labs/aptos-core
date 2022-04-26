@@ -444,6 +444,7 @@ pub enum TransactionPayload {
     /// A transaction that publishes multiple modules at the same time.
     ModuleBundle(ModuleBundle),
     /// A transaction that executes an existing script function published on-chain.
+    /// 一个执行链上发布的现有脚本功能的交易。
     ScriptFunction(ScriptFunction),
 }
 
