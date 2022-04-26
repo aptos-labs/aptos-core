@@ -51,6 +51,7 @@ use move_vm_types::{gas_schedule::GasStatus, loaded_data::runtime_types::Type};
 use num_cpus;
 use once_cell::sync::OnceCell;
 use std::{
+    cmp::min,
     collections::HashSet,
     convert::{AsMut, AsRef},
     sync::Arc,
@@ -88,12 +89,8 @@ impl AptosVM {
     }
 
     /// Sets execution concurrency level when invoked the first time.
-    pub fn set_concurrency_level_once(concurrency_level: usize) {
-        assert!(
-            concurrency_level > 0 && concurrency_level <= num_cpus::get(),
-            "Execution concurrency level {} should be between 1 and number of CPUs",
-            concurrency_level
-        );
+    pub fn set_concurrency_level_once(mut concurrency_level: usize) {
+        concurrency_level = min(concurrency_level, num_cpus::get());
         // Only the first call succeeds, due to OnceCell semantics.
         EXECUTION_CONCURRENCY_LEVEL.set(concurrency_level).ok();
     }
