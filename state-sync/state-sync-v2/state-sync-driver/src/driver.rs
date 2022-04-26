@@ -24,7 +24,7 @@ use aptos_types::waypoint::Waypoint;
 use consensus_notifications::{
     ConsensusCommitNotification, ConsensusNotification, ConsensusSyncNotification,
 };
-use data_streaming_service::streaming_client::{NotificationFeedback, StreamingServiceClient};
+use data_streaming_service::streaming_client::{DataStreamingClient, NotificationFeedback};
 use event_notifications::EventSubscriptionService;
 use futures::StreamExt;
 use mempool_notifications::MempoolNotificationSender;
@@ -60,9 +60,9 @@ impl DriverConfiguration {
 }
 
 /// The state sync driver that drives synchronization progress
-pub struct StateSyncDriver<DataClient, MempoolNotifier, StorageSyncer> {
+pub struct StateSyncDriver<DataClient, MempoolNotifier, StorageSyncer, StreamingClient> {
     // The component that manages the initial bootstrapping of the node
-    bootstrapper: Bootstrapper<StorageSyncer>,
+    bootstrapper: Bootstrapper<StorageSyncer, StreamingClient>,
 
     // The listener for client notifications
     client_notification_listener: ClientNotificationListener,
@@ -74,7 +74,7 @@ pub struct StateSyncDriver<DataClient, MempoolNotifier, StorageSyncer> {
     consensus_notification_handler: ConsensusNotificationHandler,
 
     // The component that manages the continuous syncing of the node
-    continuous_syncer: ContinuousSyncer<StorageSyncer>,
+    continuous_syncer: ContinuousSyncer<StorageSyncer, StreamingClient>,
 
     // The client for checking the global data summary of our peers
     aptos_data_client: DataClient,
@@ -102,7 +102,8 @@ impl<
         DataClient: AptosDataClient + Send + Clone + 'static,
         MempoolNotifier: MempoolNotificationSender,
         StorageSyncer: StorageSynchronizerInterface + Clone,
-    > StateSyncDriver<DataClient, MempoolNotifier, StorageSyncer>
+        StreamingClient: DataStreamingClient + Clone,
+    > StateSyncDriver<DataClient, MempoolNotifier, StorageSyncer, StreamingClient>
 {
     pub fn new(
         client_notification_listener: ClientNotificationListener,
@@ -114,18 +115,18 @@ impl<
         mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
         storage_synchronizer: StorageSyncer,
         aptos_data_client: DataClient,
-        streaming_service_client: StreamingServiceClient,
+        streaming_client: StreamingClient,
         storage: Arc<dyn DbReader>,
     ) -> Self {
         let bootstrapper = Bootstrapper::new(
             driver_configuration.clone(),
-            streaming_service_client.clone(),
+            streaming_client.clone(),
             storage.clone(),
             storage_synchronizer.clone(),
         );
         let continuous_syncer = ContinuousSyncer::new(
             driver_configuration.clone(),
-            streaming_service_client,
+            streaming_client,
             storage.clone(),
             storage_synchronizer,
         );
