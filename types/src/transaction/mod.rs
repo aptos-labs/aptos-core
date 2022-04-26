@@ -37,7 +37,6 @@ use std::{
 
 pub mod authenticator;
 mod change_set;
-pub mod helpers;
 mod module;
 mod script;
 mod transaction_argument;
