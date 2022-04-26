@@ -37,7 +37,7 @@ groups:
 
 {{ else }}
 # Pod status alerts using cAdvisor (by default)
-{{- range list "validator" "safety-rules" "haproxy" "logging" "monitoring"}}
+{{- range list "validator" "haproxy" "logging" "monitoring"}}
   - alert: Container metrics are missing
     expr: absent(container_start_time_seconds{container!="", container!="POD", pod=~".*{{ . }}.*"})
     for: 5m
