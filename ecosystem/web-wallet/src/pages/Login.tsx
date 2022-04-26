@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import React, { useState } from 'react'
 import { Buffer } from 'buffer'
 import { KEY_LENGTH } from '../constants'

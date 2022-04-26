@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { loginAccount } from '../utils/account'
 import { KEY_LENGTH } from '../constants'
 

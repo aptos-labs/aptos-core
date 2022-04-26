@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 export class Ok<T, E> {
   public constructor (public readonly value: T) {
     this.value = value
