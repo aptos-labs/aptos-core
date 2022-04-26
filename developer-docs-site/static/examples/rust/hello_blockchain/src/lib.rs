@@ -35,24 +35,10 @@ impl HelloBlockchainClient {
     pub fn get_message(&self, contract_address: &str, account_address: &str) -> Option<String> {
         let module_type = format!("0x{}::Message::MessageHolder", contract_address);
         self.rest_client
-            .account_resources(account_address)
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|x| {
-                x.get("type")
-                    .map(|v| v.as_str().unwrap() == module_type)
-                    .unwrap_or(false)
-            })
-            .and_then(|coin| {
-                coin.get("data")
-                    .unwrap()
-                    .get("message")
-                    .unwrap()
-                    .as_str()
-                    .and_then(|s| Some(s.to_string()))
-            })
+            .account_resource(account_address, &module_type)
+            .map(|value| value["data"]["message"].as_str().unwrap().to_string())
     }
+
     //<:!:section_2
     //:!:>section_3
     /// Potentially initialize and set the resource Message::MessageHolder::message
