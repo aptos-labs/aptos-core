@@ -157,7 +157,11 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
         &mut self,
         consensus_sync_request: Arc<Mutex<Option<ConsensusSyncRequest>>>,
     ) -> Result<(), Error> {
-        loop {
+        for _ in 0..self
+            .driver_configuration
+            .config
+            .max_consecutive_stream_notifications
+        {
             // Fetch and process any data notifications
             let data_notification = self.fetch_next_data_notification().await?;
             match data_notification.data_payload {
@@ -199,6 +203,8 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
                 }
             }
         }
+
+        Ok(())
     }
 
     /// Returns the highest synced version and epoch in storage

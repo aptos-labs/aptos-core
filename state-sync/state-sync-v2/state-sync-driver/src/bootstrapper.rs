@@ -469,7 +469,11 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
 
     /// Processes any notifications already pending on the active stream
     async fn process_active_stream_notifications(&mut self) -> Result<(), Error> {
-        loop {
+        for _ in 0..self
+            .driver_configuration
+            .config
+            .max_consecutive_stream_notifications
+        {
             // Fetch and process any data notifications
             let data_notification = self.fetch_next_data_notification().await?;
             match data_notification.data_payload {
@@ -515,6 +519,8 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
                 }
             }
         }
+
+        Ok(())
     }
 
     /// Fetches all account states (as required to bootstrap the node)
