@@ -293,8 +293,8 @@ fn publish_stdlib(session: &mut SessionExt<impl MoveResolver>, stdlib: Modules) 
               assert!(
                   a == addr,
                   "All genesis modules must be published under the same address, but found modules under both {} and {}",
-                  a.short_str_lossless(),
-                  addr.short_str_lossless()
+                  a,
+                  addr
               );
             } else {
                 addr_opt = Some(addr)

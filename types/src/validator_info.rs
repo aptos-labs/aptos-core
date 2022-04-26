@@ -30,11 +30,7 @@ pub struct ValidatorInfo {
 
 impl fmt::Display for ValidatorInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "account_address: {}",
-            self.account_address.short_str_lossless()
-        )
+        write!(f, "account_address: {}", self.account_address)
     }
 }
 

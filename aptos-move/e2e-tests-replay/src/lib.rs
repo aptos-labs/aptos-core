@@ -268,7 +268,7 @@ impl<'env> CrossRunner<'env> {
         if self.flags.verbose_trace_xrun {
             eprintln!(
                 "[-] xrun: 0x{}::{}::{}<{}>",
-                module_id.address().short_str_lossless(),
+                module_id.address(),
                 module_id.name(),
                 function_name,
                 ty_args
@@ -333,7 +333,7 @@ impl<'env> CrossRunner<'env> {
         if self.flags.verbose_trace_xrun {
             eprintln!(
                 "[-] xrun: 0x{}::{}::{}<{}>",
-                module_id.address().short_str_lossless(),
+                module_id.address(),
                 module_id.name(),
                 function_name,
                 ty_args
@@ -1047,7 +1047,7 @@ fn replay_trace<P: AsRef<Path>>(
                                 test_name,
                                 blk_seq,
                                 res_seq,
-                                script_fun.module().address().short_str_lossless(),
+                                script_fun.module().address(),
                                 script_fun.module().name(),
                                 script_fun.function(),
                             );
