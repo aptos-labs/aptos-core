@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::tests::utils::create_transaction_info;
+use crate::{
+    storage_synchronizer::StorageSynchronizerInterface, tests::utils::create_transaction_info,
+};
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_types::{
@@ -26,12 +28,19 @@ use aptos_types::{
         TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
     },
 };
+use async_trait::async_trait;
+use data_streaming_service::{
+    data_notification::NotificationId,
+    data_stream::DataStreamListener,
+    streaming_client::{DataStreamingClient, Epoch, NotificationFeedback},
+};
 use executor_types::ChunkExecutorTrait;
 use mockall::mock;
 use std::sync::Arc;
 use storage_interface::{
     DbReader, DbReaderWriter, DbWriter, Order, StartupInfo, StateSnapshotReceiver, TreeState,
 };
+use tokio::task::JoinHandle;
 
 // TODO(joshlind): if we see these as generally useful, we should
 // modify the definitions in the rest of the code.
@@ -44,6 +53,11 @@ pub fn create_mock_executor() -> MockChunkExecutor {
 /// Creates a mock database reader
 pub fn create_mock_db_reader() -> MockDatabaseReader {
     MockDatabaseReader::new()
+}
+
+/// Creates a mock database writer
+pub fn create_mock_db_writer() -> MockDatabaseWriter {
+    MockDatabaseWriter::new()
 }
 
 /// Creates a mock database reader writer
@@ -63,14 +77,19 @@ pub fn create_mock_reader_writer(
     }
 }
 
-/// Creates a mock database writer
-pub fn create_mock_db_writer() -> MockDatabaseWriter {
-    MockDatabaseWriter::new()
-}
-
 /// Creates a mock state snapshot receiver
 pub fn create_mock_receiver() -> MockSnapshotReceiver {
     MockSnapshotReceiver::new()
+}
+
+/// Creates a mock data streaming client
+pub fn create_mock_streaming_client() -> MockStreamingClient {
+    MockStreamingClient::new()
+}
+
+/// Creates a mock storage synchronizer
+pub fn create_mock_storage_synchronizer() -> MockStorageSynchronizer {
+    MockStorageSynchronizer::new()
 }
 
 // This automatically creates a MockChunkExecutor.
@@ -111,7 +130,7 @@ mock! {
     }
 }
 
-// This automatically creates a MockDataReader.
+// This automatically creates a MockDatabaseReader.
 mock! {
     pub DatabaseReader {}
     impl DbReader for DatabaseReader {
@@ -308,5 +327,102 @@ mock! {
         fn finish(self) -> Result<()>;
 
         fn finish_box(self: Box<Self>) -> Result<()>;
+    }
+}
+
+// This automatically creates a MockStreamingClient.
+mock! {
+    pub StreamingClient {}
+    #[async_trait]
+    impl DataStreamingClient for StreamingClient {
+        async fn get_all_accounts(
+            &self,
+            version: Version,
+            start_index: Option<u64>,
+        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+
+        async fn get_all_epoch_ending_ledger_infos(
+            &self,
+            start_epoch: Epoch,
+        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+
+        async fn get_all_transaction_outputs(
+            &self,
+            start_version: Version,
+            end_version: Version,
+            proof_version: Version,
+        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+
+        async fn get_all_transactions(
+            &self,
+            start_version: Version,
+            end_version: Version,
+            proof_version: Version,
+            include_events: bool,
+        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+
+        async fn continuously_stream_transaction_outputs(
+            &self,
+            start_version: Version,
+            start_epoch: Epoch,
+            target: Option<LedgerInfoWithSignatures>,
+        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+
+        async fn continuously_stream_transactions(
+            &self,
+            start_version: Version,
+            start_epoch: Epoch,
+            include_events: bool,
+            target: Option<LedgerInfoWithSignatures>,
+        ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
+
+        async fn terminate_stream_with_feedback(
+            &self,
+            notification_id: NotificationId,
+            notification_feedback: NotificationFeedback,
+        ) -> Result<(), data_streaming_service::error::Error>;
+    }
+    impl Clone for StreamingClient {
+        fn clone(&self) -> Self;
+    }
+}
+
+// This automatically creates a MockStorageSynchronizer.
+mock! {
+    pub StorageSynchronizer {}
+    impl StorageSynchronizerInterface for StorageSynchronizer {
+        fn apply_transaction_outputs(
+            &mut self,
+            notification_id: NotificationId,
+            output_list_with_proof: TransactionOutputListWithProof,
+            target_ledger_info: LedgerInfoWithSignatures,
+            end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
+        ) -> Result<(), crate::error::Error>;
+
+        fn execute_transactions(
+            &mut self,
+            notification_id: NotificationId,
+            transaction_list_with_proof: TransactionListWithProof,
+            target_ledger_info: LedgerInfoWithSignatures,
+            end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
+        ) -> Result<(), crate::error::Error>;
+
+        fn initialize_account_synchronizer(
+            &mut self,
+            epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
+            target_ledger_info: LedgerInfoWithSignatures,
+            target_output_with_proof: TransactionOutputListWithProof,
+        ) -> Result<JoinHandle<()>, crate::error::Error>;
+
+        fn pending_storage_data(&self) -> bool;
+
+        fn save_account_states(
+            &mut self,
+            notification_id: NotificationId,
+            account_states_with_proof: StateValueChunkWithProof,
+        ) -> Result<(), crate::error::Error>;
+    }
+    impl Clone for StorageSynchronizer {
+        fn clone(&self) -> Self;
     }
 }
