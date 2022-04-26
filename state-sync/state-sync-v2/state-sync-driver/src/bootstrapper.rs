@@ -35,7 +35,7 @@ use storage_interface::DbReader;
 
 /// A simple container for verified epoch states and epoch ending ledger infos
 /// that have been fetched from the network.
-struct VerifiedEpochStates {
+pub(crate) struct VerifiedEpochStates {
     // If new epoch ending ledger infos have been fetched from the network
     fetched_epoch_ending_ledger_infos: bool,
 
@@ -1289,5 +1289,11 @@ impl<
         self.account_state_syncer.reset_speculative_state();
         self.speculative_stream_state = None;
         self.active_data_stream = None;
+    }
+
+    /// Returns the verified epoch states struct for testing purposes.
+    #[cfg(test)]
+    pub(crate) fn get_verified_epoch_states(&mut self) -> &mut VerifiedEpochStates {
+        &mut self.verified_epoch_states
     }
 }
