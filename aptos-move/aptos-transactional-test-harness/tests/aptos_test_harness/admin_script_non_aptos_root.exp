@@ -1,4 +1,0 @@
-processed 2 tasks
-
-task 1 'run'. lines 3-6:
-Error: Transaction discarded. VMStatus: status REJECTED_WRITE_SET of type Validation

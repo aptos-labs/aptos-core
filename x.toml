@@ -170,7 +170,6 @@ members = [
     "aptos-keygen",
     "aptos-proptest-helpers",
     "aptos-retrier",
-    "aptos-transactional-test-harness",
     "aptos-transaction-benchmarks",
     "aptos-writeset-generator",
     "executor-benchmark",

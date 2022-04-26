@@ -8,7 +8,6 @@ members = [
     "aptos-move/aptos-keygen",
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-transaction-benchmarks",
-    "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
     "aptos-move/e2e-tests",

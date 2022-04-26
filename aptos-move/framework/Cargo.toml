@@ -47,14 +47,9 @@ datatest-stable = "0.1.1"
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 move-cli = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
 move-unit-test = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
-aptos-transactional-test-harness = { path = "../aptos-transactional-test-harness" }
 
 dir-diff = "0.3.2"
 
 [features]
 default = []
 fuzzing = ["aptos-types/fuzzing"]
-
-[[test]]
-name = "aptos_transactional_tests"
-harness = false

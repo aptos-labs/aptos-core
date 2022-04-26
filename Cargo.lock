@@ -1062,35 +1062,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-transactional-test-harness"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-keygen",
- "aptos-state-view",
- "aptos-transaction-builder",
- "aptos-types",
- "aptos-vm",
- "aptos-workspace-hack",
- "bcs",
- "cached-framework-packages",
- "clap 3.1.9",
- "datatest-stable",
- "framework",
- "hex",
- "language-e2e-tests",
- "move-binary-format",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-transactional-test-runner",
- "move-vm-runtime",
- "once_cell",
- "vm-genesis",
-]
-
-[[package]]
 name = "aptos-types"
 version = "0.0.3"
 dependencies = [
@@ -3233,7 +3204,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
- "aptos-transactional-test-harness",
  "aptos-types",
  "aptos-vm",
  "aptos-workspace-hack",
@@ -5130,37 +5100,6 @@ dependencies = [
  "once_cell",
  "sha3",
  "smallvec",
-]
-
-[[package]]
-name = "move-transactional-test-runner"
-version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=476305d239ce6afafce15a297c8c3839dd8465b6#476305d239ce6afafce15a297c8c3839dd8465b6"
-dependencies = [
- "anyhow",
- "clap 3.1.9",
- "colored",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-bytecode-utils",
- "move-cli",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-disassembler",
- "move-ir-compiler",
- "move-ir-types",
- "move-resource-viewer",
- "move-stackless-bytecode-interpreter",
- "move-stdlib",
- "move-symbol-pool",
- "move-vm-runtime",
- "move-vm-test-utils",
- "move-vm-types",
- "once_cell",
- "rayon",
- "regex",
- "tempfile",
 ]
 
 [[package]]
