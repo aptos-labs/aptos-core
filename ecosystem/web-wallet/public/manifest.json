@@ -1,9 +1,9 @@
 {
-  "short_name": "Aptos Wallet",
-  "name": "Aptos Developer Wallet",
-  "icons": [],
-  "start_url": ".",
-  "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "short_name": "Aptos",
+  "name": "Aptos Wallet",
+  "version": "0.0.1",
+  "manifest_version": 2,
+  "browser_action": {
+    "default_popup": "index.html"
+  }
 }
