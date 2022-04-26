@@ -460,6 +460,11 @@ pub enum WriteSetChange {
         state_key_hash: String,
         resource: MoveStructTag,
     },
+    DeleteTableItem {
+        state_key_hash: String,
+        handle: HexEncodedBytes,
+        key: HexEncodedBytes,
+    },
     WriteModule {
         address: Address,
         state_key_hash: String,
@@ -470,6 +475,12 @@ pub enum WriteSetChange {
         state_key_hash: String,
         data: MoveResource,
     },
+    WriteTableItem {
+        state_key_hash: String,
+        handle: HexEncodedBytes,
+        key: HexEncodedBytes,
+        value: HexEncodedBytes,
+    },
 }
 
 impl WriteSetChange {
@@ -477,8 +488,10 @@ impl WriteSetChange {
         match self {
             WriteSetChange::DeleteModule { .. } => "delete_module",
             WriteSetChange::DeleteResource { .. } => "delete_resource",
+            WriteSetChange::DeleteTableItem { .. } => "delete_table_item",
             WriteSetChange::WriteModule { .. } => "write_module",
             WriteSetChange::WriteResource { .. } => "write_resource",
+            WriteSetChange::WriteTableItem { .. } => "write_table_item",
         }
     }
 }

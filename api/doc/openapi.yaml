@@ -1374,8 +1374,10 @@ components:
       oneOf:
         - $ref: '#/components/schemas/DeleteModule'
         - $ref: '#/components/schemas/DeleteResource'
+        - $ref: '#/components/schemas/DeleteTableItem'
         - $ref: '#/components/schemas/WriteModule'
         - $ref: '#/components/schemas/WriteResource'
+        - $ref: '#/components/schemas/WriteTableItem'
       discriminator:
         propertyName: type
     DeleteModule:
@@ -1415,6 +1417,31 @@ components:
           $ref: '#/components/schemas/Address'
         resource:
           $ref: '#/components/schemas/MoveStructTagId'
+    DeleteTableItem:
+      title: Delete Table Item
+      type: object
+      description: Delete table item change.
+      required:
+        - type
+        - state_key_hash
+        - data
+      properties:
+        type:
+          type: string
+          example: "delete_table_item"
+        state_key_hash:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        data:
+          title: Table item deletion
+          type: object
+          required:
+            - handle
+            - key
+          properties:
+            handle:
+              $ref: '#/components/schemas/HexEncodedBytes'
+            key:
+              $ref: '#/components/schemas/HexEncodedBytes'
     WriteModule:
       title: Write Module
       type: object
@@ -1453,6 +1480,34 @@ components:
           $ref: '#/components/schemas/Address'
         data:
           $ref: '#/components/schemas/AccountResource'
+    WriteTableItem:
+      title: Write Table Item
+      type: object
+      description: Write table item
+      required:
+        - type
+        - state_key_hash
+        - data
+      properties:
+        type:
+          type: string
+          example: "write_table_item"
+        state_key_hash:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        data:
+          title: Table item write
+          type: object
+          required:
+            - handle
+            - key
+            - value
+          properties:
+            handle:
+              $ref: '#/components/schemas/HexEncodedBytes'
+            key:
+              $ref: '#/components/schemas/HexEncodedBytes'
+            value:
+              $ref: '#/components/schemas/HexEncodedBytes'
     Script:
       title: Script
       type: object

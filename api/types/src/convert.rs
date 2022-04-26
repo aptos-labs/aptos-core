@@ -204,24 +204,28 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         state_key: StateKey,
         op: WriteOp,
     ) -> Result<WriteSetChange> {
+        let hash = state_key.hash().to_hex_literal();
+
         match state_key {
             StateKey::AccessPath(access_path) => {
-                self.try_access_path_into_write_set_change(access_path, op)
+                self.try_access_path_into_write_set_change(hash, access_path, op)
             }
-            StateKey::AccountAddressKey(_) | StateKey::Raw(_) | StateKey::TableItem { .. } => Err(
-                format_err!("Can't convert state key {:?} to WriteSetChange", state_key),
-            ),
+            StateKey::TableItem { handle, key } => {
+                self.try_table_item_into_write_set_change(hash, handle, key, op)
+            }
+            StateKey::AccountAddressKey(_) | StateKey::Raw(_) => Err(format_err!(
+                "Can't convert state key {:?} to WriteSetChange",
+                state_key
+            )),
         }
     }
 
     pub fn try_access_path_into_write_set_change(
         &self,
+        state_key_hash: String,
         access_path: AccessPath,
         op: WriteOp,
     ) -> Result<WriteSetChange> {
-        let state_key_hash = StateKey::AccessPath(access_path.clone())
-            .hash()
-            .to_hex_literal();
         let ret = match op {
             WriteOp::Deletion => match access_path.get_path() {
                 Path::Code(module_id) => WriteSetChange::DeleteModule {
@@ -246,6 +250,31 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     state_key_hash,
                     data: self.try_into_resource(&typ, &val)?,
                 },
+            },
+        };
+        Ok(ret)
+    }
+
+    pub fn try_table_item_into_write_set_change(
+        &self,
+        state_key_hash: String,
+        handle: u128,
+        key: Vec<u8>,
+        op: WriteOp,
+    ) -> Result<WriteSetChange> {
+        let handle = handle.to_be_bytes().to_vec().into();
+        let key = key.into();
+        let ret = match op {
+            WriteOp::Deletion => WriteSetChange::DeleteTableItem {
+                state_key_hash,
+                handle,
+                key,
+            },
+            WriteOp::Value(value) => WriteSetChange::WriteTableItem {
+                state_key_hash,
+                handle,
+                key,
+                value: value.into(),
             },
         };
         Ok(ret)
