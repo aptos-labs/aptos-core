@@ -54,62 +54,6 @@ fn verify_signature() {
     }
 }
 
-#[ignore]
-#[test]
-fn verify_multi_agent() {
-    let mut executor = FakeExecutor::from_genesis_file();
-    executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_010, 10);
-    let secondary_signer = executor.create_raw_account_data(100_100, 100);
-
-    executor.add_account_data(&sender);
-    executor.add_account_data(&secondary_signer);
-
-    let signed_txn = transaction_test_helpers::get_test_unchecked_multi_agent_txn(
-        *sender.address(),
-        vec![*secondary_signer.address()],
-        10,
-        &sender.account().privkey,
-        sender.account().pubkey.clone(),
-        vec![&secondary_signer.account().privkey],
-        vec![secondary_signer.account().pubkey.clone()],
-        Some(multi_agent_swap_script(10, 10)),
-    );
-    assert_eq!(executor.verify_transaction(signed_txn).status(), None);
-}
-
-#[ignore]
-#[test]
-fn verify_multi_agent_multiple_secondary_signers() {
-    let mut executor = FakeExecutor::from_genesis_file();
-    executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_010, 10);
-    let secondary_signer = executor.create_raw_account_data(100_100, 100);
-    let third_signer = executor.create_raw_account_data(100_100, 100);
-
-    executor.add_account_data(&sender);
-    executor.add_account_data(&secondary_signer);
-    executor.add_account_data(&third_signer);
-
-    let signed_txn = transaction_test_helpers::get_test_unchecked_multi_agent_txn(
-        *sender.address(),
-        vec![*secondary_signer.address(), *third_signer.address()],
-        10,
-        &sender.account().privkey,
-        sender.account().pubkey.clone(),
-        vec![
-            &secondary_signer.account().privkey,
-            &third_signer.account().privkey,
-        ],
-        vec![
-            secondary_signer.account().pubkey.clone(),
-            third_signer.account().pubkey.clone(),
-        ],
-        Some(multi_agent_mint_script(100, 0)),
-    );
-    assert_eq!(executor.verify_transaction(signed_txn).status(), None);
-}
-
 #[test]
 fn verify_multi_agent_invalid_sender_signature() {
     let mut executor = FakeExecutor::from_genesis_file();
