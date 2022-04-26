@@ -3,12 +3,12 @@
     "type": "block_metadata_transaction",
     "version": "1",
     "hash": "0xa8fc186c28fc0f95b8233651438093e8e215a51dcd16475f5e68c0a421f6305c",
-    "state_root_hash": "0x164e0dd6c4865a34bf26ae9427a52285a07c564851ecb8711122d106ebcd42a9",
+    "state_root_hash": "0x9c89d31d92b19012cc8f74b695b4f4dd9137996c008a165154a17fa3f49ae9f4",
     "event_root_hash": "0xd62c85b93234824cf825e9c028c3bcc59b06926039721bd7edd76b56ae9fcecf",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x80badd4d29e8bdb11cca1e22811531cc562799a16a58706fdb4510fbc5029a0b",
+    "accumulator_root_hash": "0x8df7dd26d31b0def0cbcc733d7d0cb28004aeaa5fe756172fa35945562a12086",
     "changes": [
       {
         "type": "write_resource",
@@ -56,12 +56,12 @@
     "type": "user_transaction",
     "version": "2",
     "hash": "0x18073cb2536317833aa630d30062383a1f00221dd3604bbce19cd262813e6c36",
-    "state_root_hash": "0x3fb13a8a1fc4f0c284e4e7de179fb831aa63a25d7967c0ae32f2fdc50337b043",
+    "state_root_hash": "0xcf6ce5dc6f59e72c9afbcecbc388b0e97998de2b07d5f12f8f0ffdd05fc1a45c",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
     "gas_used": "92",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xf1a105da25d374b8f9204e8295276059b0aa0dc2c28b752908bbf06155d67d3d",
+    "accumulator_root_hash": "0x130ed5d43b3aadc635b65790f9b65030f0ec324809bbc2608f8e4823cdcc2583",
     "changes": [
       {
         "type": "write_resource",
@@ -86,18 +86,6 @@
             "coin": {
               "value": "18446744073709551614"
             }
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xa550c18",
-        "state_key_hash": "0x79a08e0b94ebb66c0dae37a07c182d46387c347aeb83c07de6109b0503c3a24e",
-        "data": {
-          "type": "0x1::TestCoin::CoinInfo",
-          "data": {
-            "scaling_factor": "1000000",
-            "total_value": "18446744073709551615"
           }
         }
       },

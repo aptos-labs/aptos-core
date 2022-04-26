@@ -90,8 +90,7 @@
   {
     "type": "0x1::TestCoin::CoinInfo",
     "data": {
-      "scaling_factor": "1000000",
-      "total_value": "18446744073709551615"
+      "scaling_factor": "1000000"
     }
   },
   {

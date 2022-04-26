@@ -2,12 +2,12 @@
   "type": "user_transaction",
   "version": "2",
   "hash": "0x8df66affad9c571750829820259721f96af4d7ae787bd7089bea259ff0f82cb1",
-  "state_root_hash": "0x57d403ee832dd459894ce406aa25e5e7b4872d7e72e5e59ce456def80051540d",
+  "state_root_hash": "0x4b11ccdf958617bbff0aaf8d16ebcfd4c09113c8c261557580e498e158d0ae0a",
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "1",
   "success": false,
   "vm_status": "Move bytecode deserialization / verification failed, including script function not found or invalid arguments",
-  "accumulator_root_hash": "0xc7046d7d9ff9b1bc66fa295ddfc707eacf2e6664f46f569afef8f32c1236879e",
+  "accumulator_root_hash": "0x82753b92ed78e200ed4baaecf2e0817af38387a52e48d248ea0e56383a6f88fa",
   "changes": [
     {
       "type": "write_resource",
@@ -32,18 +32,6 @@
           "coin": {
             "value": "18446744073709551614"
           }
-        }
-      }
-    },
-    {
-      "type": "write_resource",
-      "address": "0xa550c18",
-      "state_key_hash": "0x79a08e0b94ebb66c0dae37a07c182d46387c347aeb83c07de6109b0503c3a24e",
-      "data": {
-        "type": "0x1::TestCoin::CoinInfo",
-        "data": {
-          "scaling_factor": "1000000",
-          "total_value": "18446744073709551615"
         }
       }
     }
