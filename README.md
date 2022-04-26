@@ -2,6 +2,9 @@
 	<img width="100%" src="./.assets/aptos_banner.png" alt="Aptos Banner" />
 </a>
 
+
+foo
+
 ---
 
 [![Aptos Rust Crate Documentation (main)](https://img.shields.io/badge/docs-main-59f)](https://aptos-labs.github.io/aptos-core/)
