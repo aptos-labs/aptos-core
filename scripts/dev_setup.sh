@@ -375,8 +375,10 @@ function install_tidy {
 function install_gcc_powerpc_linux_gnu {
   PACKAGE_MANAGER=$1
   #Differently named packages for gcc-powerpc-linux-gnu
-  if [[ "$PACKAGE_MANAGER" == "apt-get" ]] || [[ "$PACKAGE_MANAGER" == "yum" ]]; then
+  if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
     install_pkg gcc-powerpc-linux-gnu "$PACKAGE_MANAGER"
+  elif [[ "$PACKAGE_MANAGER" == "yum" ]] || [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
+    install_pkg gcc-powerpc64-linux-gnu "$PACKAGE_MANAGER"
   fi
   #if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
   #  install_pkg powerpc-linux-gnu-gcc "$PACKAGE_MANAGER"
