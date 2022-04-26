@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
+import { Buffer } from 'buffer'
+import { KEY_LENGTH } from '../constants'
 import { useNavigate } from 'react-router-dom'
 import { useGlobalState } from '../GlobalState'
-import { loginAccount } from '../utils/account'
+import { createNewAccount, loginAccount } from '../utils/account'
 
 import './App.css'
 
@@ -28,13 +30,27 @@ export default function Login () {
     setError('')
   }
 
+  function onGenerateClick (event: React.MouseEvent<HTMLButtonElement>) {
+    const result = createNewAccount()
+    if (result.isOk()) {
+      const account = result.value
+      const accountKey = Buffer.from(account.signingKey.secretKey.buffer).toString('hex').slice(0, KEY_LENGTH)
+      setKey(accountKey)
+    } else {
+      setError(result.error.message)
+    }
+  }
+
   return (
     <div className="App-header">
       <h2>Aptos Wallet</h2>
       <form onSubmit={handleSubmit}>
-        <input onChange={onChange}/>
+        <input onChange={onChange} value={key}/>
       </form>
-      <text className="Error-message">{error}</text>
+      <small className="Error-message">{error}</small>
+      <button onClick={onGenerateClick}>
+          Generate Account
+      </button>
     </div>
   )
 }

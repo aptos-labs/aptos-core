@@ -1,2 +1,2 @@
 
-export const keyLength: number = 64
+export const KEY_LENGTH: number = 64
