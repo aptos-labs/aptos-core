@@ -213,6 +213,10 @@ jobs:
   ecosystem-test:
     executor: ubuntu-xl
     steps:
+      - checkout
+      - aws-setup
+      - aws-ecr-setup
+      - local-deploy-setup
       - run:
           name: Check docker compose killswitch
           shell: /bin/bash
@@ -221,6 +225,16 @@ jobs:
               exit 0
             fi
             circleci-agent step halt
+      # docker-compose up and down 10 times
+      - docker-compose-setup
+      - docker-compose-setup
+      - docker-compose-setup
+      - docker-compose-setup
+      - docker-compose-setup
+      - docker-compose-setup
+      - docker-compose-setup
+      - docker-compose-setup
+      - docker-compose-setup
       - docker-compose-setup
       - run:
           name: Check docker-compose status
@@ -267,20 +281,8 @@ workflows:
       not:
         equal: [main, << pipeline.git.branch >>]
     jobs:
-      #      - build-benchmarks
-      - e2e-test
-      - lint
-      - unit-test
-      - docker-build-push:
-          context: aws-dev
       - ecosystem-test:
           context: aws-dev
-          requires:
-            - docker-build-push
-      - forge-k8s-test:
-          context: aws-dev
-          requires:
-            - docker-build-push
   ### on devnet branch update ###
   # Ensure the latest is built on the "devnet" branch, and mirror from ECR to Dockerhub
   devnet-branch-cut:
@@ -384,11 +386,7 @@ commands:
             echo "export DOCKERHUB_IMAGES=( validator forge init validator_tcb tools faucet )" >> $BASH_ENV
   docker-compose-setup:
     steps:
-      - checkout
-      - aws-setup
-      - aws-ecr-setup
-      - local-deploy-setup
-      - run: echo "export IMAGE_TAG=dev_$(git rev-parse --short=8 HEAD)" >> $BASH_ENV
+      - run: echo "export IMAGE_TAG=main_0408d0a8" >> $BASH_ENV
       # since we're running with `--build-all`, assume that if it passes, we have all images required for Forge
       - run: aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG
       - run:
@@ -430,3 +428,11 @@ commands:
             set -x
             docker container ls -a
             docker-compose logs
+      - run:
+          name: Reset docker-compose
+          shell: /bin/bash
+          working_directory: docker/compose/validator-testnet
+          command: |
+            docker-compose down
+            docker volume rm aptos-shared
+            exit 0
