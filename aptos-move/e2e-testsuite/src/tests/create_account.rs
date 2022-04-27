@@ -34,8 +34,8 @@ fn create_account() {
         .expect("sender must exist");
 
     let updated_receiver_balance = executor
-        .read_balance_resource(&new_account)
+        .read_balance(&new_account)
         .expect("receiver balance must exist");
-    assert_eq!(initial_amount, updated_receiver_balance.coin());
+    assert_eq!(initial_amount, updated_receiver_balance);
     assert_eq!(1, updated_sender.sequence_number());
 }

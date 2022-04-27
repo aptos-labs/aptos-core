@@ -483,9 +483,9 @@ where
 {
     let balance = if let Some(blob) = &account_state_with_proof.value {
         AccountState::try_from(blob)?
-            .get_balance_resources()?
-            .map(|b| b.coin())
-            .unwrap_or(0)
+            .get_account_resource()?
+            .unwrap()
+            .balance()
     } else {
         0
     };

@@ -61,7 +61,7 @@ impl K8sSwarm {
             .await
             .map_err(|e| {
                 format_err!(
-                    "query_sequence_numbers on {:?} for dd account failed: {}",
+                    "query_sequence_numbers on {:?} for account failed: {}",
                     client,
                     e
                 )

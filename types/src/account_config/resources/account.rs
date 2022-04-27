@@ -4,7 +4,6 @@
 use crate::{account_config::constants::CORE_ACCOUNT_MODULE_IDENTIFIER, event::EventHandle};
 use move_core_types::{
     account_address::AccountAddress,
-    ident_str,
     identifier::IdentStr,
     move_resource::{MoveResource, MoveStructType},
 };
@@ -20,6 +19,8 @@ pub struct AccountResource {
     authentication_key: Vec<u8>,
     sequence_number: u64,
     self_address: AccountAddress,
+    balance: Coin,
+    transfer_events: TransferEvents,
 }
 
 impl AccountResource {
@@ -28,11 +29,16 @@ impl AccountResource {
         sequence_number: u64,
         authentication_key: Vec<u8>,
         self_address: AccountAddress,
+        balance: u64,
+        sent_events: EventHandle,
+        received_events: EventHandle,
     ) -> Self {
         AccountResource {
             authentication_key,
             sequence_number,
             self_address,
+            balance: Coin::new(balance),
+            transfer_events: TransferEvents::new(sent_events, received_events),
         }
     }
 
@@ -49,6 +55,19 @@ impl AccountResource {
     pub fn address(&self) -> AccountAddress {
         self.self_address
     }
+
+    pub fn balance(&self) -> u64 {
+        self.balance.value()
+    }
+
+    pub fn transfer_events(&self) -> &TransferEvents {
+        &self.transfer_events
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn set_balance(&mut self, amount: u64) {
+        self.balance.value = amount;
+    }
 }
 
 impl MoveStructType for AccountResource {
@@ -58,13 +77,14 @@ impl MoveStructType for AccountResource {
 
 impl MoveResource for AccountResource {}
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TransferEventsResource {
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct TransferEvents {
     sent_events: EventHandle,
     received_events: EventHandle,
 }
 
-impl TransferEventsResource {
+impl TransferEvents {
     pub fn new(sent_events: EventHandle, received_events: EventHandle) -> Self {
         Self {
             sent_events,
@@ -81,9 +101,18 @@ impl TransferEventsResource {
     }
 }
 
-impl MoveStructType for TransferEventsResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("TestCoin");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("TransferEvents");
+#[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct Coin {
+    value: u64,
 }
 
-impl MoveResource for TransferEventsResource {}
+impl Coin {
+    pub fn new(amount: u64) -> Self {
+        Coin { value: amount }
+    }
+
+    pub fn value(&self) -> u64 {
+        self.value
+    }
+}

@@ -30,6 +30,6 @@ impl SentEvent {
 }
 
 impl MoveStructType for SentEvent {
-    const MODULE_NAME: &'static IdentStr = ident_str!("TestCoin");
+    const MODULE_NAME: &'static IdentStr = ident_str!("Account");
     const STRUCT_NAME: &'static IdentStr = ident_str!("SentEvent");
 }

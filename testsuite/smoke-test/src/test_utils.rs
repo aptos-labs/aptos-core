@@ -86,7 +86,7 @@ pub async fn assert_balance(client: &RestClient, account: &LocalAccount, balance
         .unwrap()
         .into_inner();
 
-    assert_eq!(on_chain_balance.get(), balance);
+    assert_eq!(on_chain_balance, balance);
 }
 
 /// This module provides useful functions for operating, handling and managing

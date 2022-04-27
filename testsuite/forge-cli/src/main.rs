@@ -411,7 +411,7 @@ pub async fn check_account_balance(
         .get_account_balance(account_address)
         .await?
         .into_inner();
-    assert_eq!(balance.get(), expected);
+    assert_eq!(balance, expected);
 
     Ok(())
 }

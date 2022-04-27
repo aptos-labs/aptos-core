@@ -10,7 +10,7 @@ use aptos_keygen::KeyGen;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{self, AccountResource, BalanceResource, TransferEventsResource},
+    account_config::{self, AccountResource},
     chain_id::ChainId,
     event::EventHandle,
     state_store::state_key::StateKey,
@@ -126,17 +126,6 @@ impl Account {
     /// Use this to retrieve or publish the Account blob.
     pub fn make_account_access_path(&self) -> AccessPath {
         self.make_access_path(AccountResource::struct_tag())
-    }
-
-    /// Returns the AccessPath that describes the Account balance resource instance.
-    ///
-    /// Use this to retrieve or publish the Account balance blob.
-    pub fn make_balance_access_path(&self) -> AccessPath {
-        self.make_access_path(BalanceResource::struct_tag())
-    }
-
-    pub fn make_transfer_events_access_path(&self) -> AccessPath {
-        self.make_access_path(TransferEventsResource::struct_tag())
     }
 
     // TODO: plug in the account type
@@ -330,7 +319,7 @@ impl Balance {
 
     /// Returns the Move Value for the account balance
     pub fn to_value(&self) -> Value {
-        Value::struct_(Struct::pack(vec![Value::u64(self.coin)]))
+        Value::u64(self.coin)
     }
 
     /// Returns the value layout for the account balance
@@ -535,8 +524,16 @@ impl AccountData {
     pub fn layout() -> MoveStructLayout {
         use MoveStructLayout as S;
         use MoveTypeLayout as T;
+        let event_layout = T::Struct(S::new(vec![T::U64, T::Vector(Box::new(T::U8))]));
+        let transfer_events = S::new(vec![event_layout.clone(), event_layout]);
 
-        S::new(vec![T::Vector(Box::new(T::U8)), T::U64, T::Address])
+        S::new(vec![
+            T::Vector(Box::new(T::U8)),
+            T::U64,
+            T::Address,
+            T::U64,
+            T::Struct(transfer_events),
+        ])
     }
 
     /// Returns the account role specifier
@@ -545,14 +542,8 @@ impl AccountData {
     }
 
     /// Creates and returns the top-level resources to be published under the account
-    pub fn to_value(&self) -> (Value, Value, Value) {
+    pub fn to_value(&self) -> Value {
         // TODO: publish some concept of Account
-        let account = Value::struct_(Struct::pack(vec![
-            // TODO: this needs to compute the auth key instead
-            Value::vector_u8(AuthenticationKey::ed25519(&self.account.pubkey).to_vec()),
-            Value::u64(self.sequence_number),
-            Value::address(*self.address()),
-        ]));
         let sent_events = Value::struct_(Struct::pack(vec![
             Value::u64(self.sent_events_count()),
             Value::vector_u8(self.sent_events.key().to_vec()),
@@ -562,7 +553,15 @@ impl AccountData {
             Value::vector_u8(self.sent_events.key().to_vec()),
         ]));
         let transfer_events = Value::struct_(Struct::pack(vec![sent_events, received_events]));
-        (account, self.balance.to_value(), transfer_events)
+        let account = Value::struct_(Struct::pack(vec![
+            // TODO: this needs to compute the auth key instead
+            Value::vector_u8(AuthenticationKey::ed25519(&self.account.pubkey).to_vec()),
+            Value::u64(self.sequence_number),
+            Value::address(*self.address()),
+            self.balance.to_value(),
+            transfer_events,
+        ]));
+        account
     }
 
     /// Returns the AccessPath that describes the Account resource instance.
@@ -572,29 +571,10 @@ impl AccountData {
         self.account.make_account_access_path()
     }
 
-    /// Returns the AccessPath that describes the Account balance resource instance.
-    ///
-    /// Use this to retrieve or publish the Account blob.
-    pub fn make_balance_access_path(&self) -> AccessPath {
-        self.account.make_balance_access_path()
-    }
-
-    pub fn make_transfer_events_access_path(&self) -> AccessPath {
-        self.account.make_transfer_events_access_path()
-    }
-
-    pub fn transfer_event_layout() -> MoveStructLayout {
-        let event_layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-            MoveTypeLayout::U64,
-            MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
-        ]));
-        MoveStructLayout::new(vec![event_layout.clone(), event_layout])
-    }
-
     /// Creates a writeset that contains the account data and can be patched to the storage
     /// directly.
     pub fn to_writeset(&self) -> WriteSet {
-        let (account_blob, balance_blob, transfer_events) = self.to_value();
+        let account_blob = self.to_value();
         let mut write_set = Vec::new();
         let account = account_blob
             .value_as::<Struct>()
@@ -605,27 +585,6 @@ impl AccountData {
             StateKey::AccessPath(self.make_account_access_path()),
             WriteOp::Value(account),
         ));
-
-        let balance = balance_blob
-            .value_as::<Struct>()
-            .unwrap()
-            .simple_serialize(&Balance::layout())
-            .unwrap();
-        write_set.push((
-            StateKey::AccessPath(self.make_balance_access_path()),
-            WriteOp::Value(balance),
-        ));
-
-        let transfer = transfer_events
-            .value_as::<Struct>()
-            .unwrap()
-            .simple_serialize(&Self::transfer_event_layout())
-            .unwrap();
-        write_set.push((
-            StateKey::AccessPath(self.make_transfer_events_access_path()),
-            WriteOp::Value(transfer),
-        ));
-
         WriteSetMut::new(write_set).freeze().unwrap()
     }
 

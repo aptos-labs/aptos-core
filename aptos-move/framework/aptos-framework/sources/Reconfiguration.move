@@ -14,7 +14,6 @@ module AptosFramework::Reconfiguration {
     friend AptosFramework::ConsensusConfig;
     friend AptosFramework::Version;
     friend AptosFramework::VMConfig;
-    friend AptosFramework::TransactionPublishingOption;
 
     /// Event that signals consensus to start a new epoch,
     /// with new configuration information. This is also called a

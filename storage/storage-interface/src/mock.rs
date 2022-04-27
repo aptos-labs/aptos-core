@@ -10,6 +10,7 @@ use aptos_types::{
     account_config::AccountResource,
     account_state::AccountState,
     account_state_blob::AccountStateBlob,
+    event::{EventHandle, EventKey},
     state_store::{state_key::StateKey, state_value::StateValue},
 };
 use move_core_types::move_resource::MoveResource;
@@ -25,7 +26,17 @@ impl DbReader for MockDbReaderWriter {
 }
 
 fn get_mock_account_state_blob() -> StateValue {
-    let account_resource = AccountResource::new(0, vec![], AccountAddress::random());
+    let addr = AccountAddress::random();
+    let event_key_1 = EventKey::new_from_address(&addr, 0);
+    let event_key_2 = EventKey::new_from_address(&addr, 1);
+    let account_resource = AccountResource::new(
+        0,
+        vec![],
+        addr,
+        0,
+        EventHandle::new(event_key_1, 0),
+        EventHandle::new(event_key_2, 0),
+    );
 
     let mut account_state = AccountState::default();
     account_state.insert(

@@ -1,10 +1,45 @@
 [
   {
+    "type": "0x1::GUID::Generator",
+    "data": {
+      "counter": "2"
+    }
+  },
+  {
     "type": "0x1::Account::Account",
     "data": {
       "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
+      "balance": {
+        "value": "0"
+      },
       "self_address": "0x1",
-      "sequence_number": "0"
+      "sequence_number": "0",
+      "transfer_events": {
+        "received_events": {
+          "counter": "0",
+          "guid": {
+            "guid": {
+              "id": {
+                "addr": "0x1",
+                "creation_num": "1"
+              }
+            },
+            "len_bytes": 40
+          }
+        },
+        "sent_events": {
+          "counter": "0",
+          "guid": {
+            "guid": {
+              "id": {
+                "addr": "0x1",
+                "creation_num": "0"
+              }
+            },
+            "len_bytes": 40
+          }
+        }
+      }
     }
   }
 ]

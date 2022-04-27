@@ -13,7 +13,7 @@ use aptos_transaction_builder::aptos_stdlib::{
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{aptos_root_address, BalanceResource},
+    account_config::{aptos_root_address, AccountResource},
     account_state::AccountState,
     contract_event::ContractEvent,
     on_chain_config,
@@ -178,18 +178,18 @@ fn get_transfer_transaction(
     )
 }
 
-fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
+fn get_account_resource(account: &AccountAddress, db: &DbReaderWriter) -> AccountResource {
     let account_state_blob = db
         .reader
         .get_latest_state_value(StateKey::AccountAddressKey(*account))
         .unwrap()
         .unwrap();
     let account_state = AccountState::try_from(&account_state_blob).unwrap();
-    account_state
-        .get_balance_resources()
-        .unwrap()
-        .unwrap()
-        .coin()
+    account_state.get_account_resource().unwrap().unwrap()
+}
+
+fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
+    get_account_resource(account, db).balance()
 }
 
 fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
@@ -265,6 +265,8 @@ fn test_pre_genesis() {
     execute_and_commit(vec![txn1, txn2, txn3, txn4], &db_rw, &signer);
     assert_eq!(get_balance(&account1, &db_rw), 2000);
     assert_eq!(get_balance(&account2, &db_rw), 2000);
+    let mut new_account_resource = get_account_resource(&account1, &db_rw);
+    new_account_resource.set_balance(1000);
 
     // Get state tree backup.
     let (accounts_backup, proof, root_hash) = get_state_backup(&db);
@@ -286,8 +288,8 @@ fn test_pre_genesis() {
                 WriteOp::Value(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
             ),
             (
-                StateKey::AccessPath(AccessPath::new(account1, BalanceResource::resource_path())),
-                WriteOp::Value(bcs::to_bytes(&BalanceResource::new(1000)).unwrap()),
+                StateKey::AccessPath(AccessPath::new(account1, AccountResource::resource_path())),
+                WriteOp::Value(bcs::to_bytes(&new_account_resource).unwrap()),
             ),
         ])
         .freeze()
@@ -344,6 +346,8 @@ fn test_new_genesis() {
     execute_and_commit(vec![txn1, txn2, txn3, txn4], &db, &signer);
     assert_eq!(get_balance(&account1, &db), 2_000_000);
     assert_eq!(get_balance(&account2, &db), 2_000_000);
+    let mut new_account_resource = get_account_resource(&account1, &db);
+    new_account_resource.set_balance(1_000_000);
 
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
     let initial_accumulator = db
@@ -372,8 +376,8 @@ fn test_new_genesis() {
                 WriteOp::Value(bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap()),
             ),
             (
-                StateKey::AccessPath(AccessPath::new(account1, BalanceResource::resource_path())),
-                WriteOp::Value(bcs::to_bytes(&BalanceResource::new(1_000_000)).unwrap()),
+                StateKey::AccessPath(AccessPath::new(account1, AccountResource::resource_path())),
+                WriteOp::Value(bcs::to_bytes(&new_account_resource).unwrap()),
             ),
         ])
         .freeze()

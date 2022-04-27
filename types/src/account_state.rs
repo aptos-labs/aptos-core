@@ -4,7 +4,7 @@
 use crate::{
     access_path::Path,
     account_address::AccountAddress,
-    account_config::{AccountResource, BalanceResource, CRSNResource, ChainIdResource},
+    account_config::{AccountResource, CRSNResource, ChainIdResource},
     account_state_blob::AccountStateBlob,
     block_metadata::BlockResource,
     on_chain_config::{
@@ -42,10 +42,6 @@ impl AccountState {
 
     pub fn get_crsn_resource(&self) -> Result<Option<CRSNResource>> {
         self.get_resource::<CRSNResource>()
-    }
-
-    pub fn get_balance_resources(&self) -> Result<Option<BalanceResource>> {
-        self.get_resource::<BalanceResource>()
     }
 
     pub fn get_chain_id_resource(&self) -> Result<Option<ChainIdResource>> {
@@ -246,20 +242,14 @@ impl TryFrom<&Vec<u8>> for AccountState {
     }
 }
 
-impl TryFrom<(&AccountResource, &BalanceResource)> for AccountState {
+impl TryFrom<&AccountResource> for AccountState {
     type Error = Error;
 
-    fn try_from(
-        (account_resource, balance_resource): (&AccountResource, &BalanceResource),
-    ) -> Result<Self> {
+    fn try_from(account_resource: &AccountResource) -> Result<Self> {
         let mut btree_map: BTreeMap<Vec<u8>, Vec<u8>> = BTreeMap::new();
         btree_map.insert(
             AccountResource::resource_path(),
             bcs::to_bytes(account_resource)?,
-        );
-        btree_map.insert(
-            BalanceResource::resource_path(),
-            bcs::to_bytes(balance_resource)?,
         );
 
         Ok(Self(btree_map))

@@ -60,9 +60,9 @@ fn script_code_unverifiable() {
         .read_account_resource(sender.account())
         .expect("sender must exist");
     let updated_sender_balance = executor
-        .read_balance_resource(sender.account())
+        .read_balance(sender.account())
         .expect("sender balance must exist");
-    assert_eq!(balance, updated_sender_balance.coin());
+    assert_eq!(balance, updated_sender_balance);
     assert_eq!(11, updated_sender.sequence_number());
 }
 
@@ -136,9 +136,9 @@ fn script_none_existing_module_dep() {
         .read_account_resource(sender.account())
         .expect("sender must exist");
     let updated_sender_balance = executor
-        .read_balance_resource(sender.account())
+        .read_balance(sender.account())
         .expect("sender balance must exist");
-    assert_eq!(balance, updated_sender_balance.coin());
+    assert_eq!(balance, updated_sender_balance);
     assert_eq!(11, updated_sender.sequence_number());
 }
 
@@ -212,9 +212,9 @@ fn script_non_existing_function_dep() {
         .read_account_resource(sender.account())
         .expect("sender must exist");
     let updated_sender_balance = executor
-        .read_balance_resource(sender.account())
+        .read_balance(sender.account())
         .expect("sender balance must exist");
-    assert_eq!(balance, updated_sender_balance.coin());
+    assert_eq!(balance, updated_sender_balance);
     assert_eq!(11, updated_sender.sequence_number());
 }
 
@@ -289,9 +289,9 @@ fn script_bad_sig_function_dep() {
         .read_account_resource(sender.account())
         .expect("sender must exist");
     let updated_sender_balance = executor
-        .read_balance_resource(sender.account())
+        .read_balance(sender.account())
         .expect("sender balance must exist");
-    assert_eq!(balance, updated_sender_balance.coin());
+    assert_eq!(balance, updated_sender_balance);
     assert_eq!(11, updated_sender.sequence_number());
 }
 
@@ -354,9 +354,9 @@ fn script_type_argument_module_does_not_exist() {
         .read_account_resource(sender.account())
         .expect("sender must exist");
     let updated_sender_balance = executor
-        .read_balance_resource(sender.account())
+        .read_balance(sender.account())
         .expect("sender balance must exist");
-    assert_eq!(balance, updated_sender_balance.coin());
+    assert_eq!(balance, updated_sender_balance);
     assert_eq!(11, updated_sender.sequence_number());
 }
 
@@ -419,8 +419,8 @@ fn script_nested_type_argument_module_does_not_exist() {
         .read_account_resource(sender.account())
         .expect("sender must exist");
     let updated_sender_balance = executor
-        .read_balance_resource(sender.account())
+        .read_balance(sender.account())
         .expect("sender balance must exist");
-    assert_eq!(balance, updated_sender_balance.coin());
+    assert_eq!(balance, updated_sender_balance);
     assert_eq!(11, updated_sender.sequence_number());
 }

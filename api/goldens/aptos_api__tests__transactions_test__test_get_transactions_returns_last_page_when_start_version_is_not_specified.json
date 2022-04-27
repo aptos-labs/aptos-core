@@ -3,12 +3,12 @@
     "type": "block_metadata_transaction",
     "version": "15",
     "hash": "0xab4b8030c0f02abde2a88a278e7e8306c96e2d63bdb9bdb397127c2d6ff124a3",
-    "state_root_hash": "0x1a26aa0e5177a9c578686eb1d76d15b61f371475449b3a12d3ca5af0d135c4b7",
+    "state_root_hash": "0x3bcc7c297272ef346320a141d589400e48c99998bca34b8ed3bf9b67b326902c",
     "event_root_hash": "0xfc0f9408425e820476668a895d8f224289bdb47f9ae81ea453cbf73d9d38d9dc",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x4f779145f3b2ee9c1a9cf030ab70af18cd40596a91c37613ebaee6829dabb1f9",
+    "accumulator_root_hash": "0x3c08b04c3000a53ac3f4b7716efb873677732f5467d0cbcef26a7112e30edfb3",
     "changes": [
       {
         "type": "write_resource",
@@ -56,12 +56,12 @@
     "type": "user_transaction",
     "version": "16",
     "hash": "0x7bc390a5d4f5b88560b0494e0baac9ca723fcbac4e5265a2420dd1114c6dd64e",
-    "state_root_hash": "0x3745e459cfbf30c78e473f6c02c79d766dd3922344c12c93ae5c80dd6ee0f949",
+    "state_root_hash": "0xc58d77e794f9e3f5db916cadf8dce9cdeb89266e76a6bdef702abeacc0da7685",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
-    "gas_used": "92",
+    "gas_used": "83",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xfd5145bf48bde63c0e7d8bf02d2e91a1c6d0cfcbe5512ec5d724db05d77e2a6f",
+    "accumulator_root_hash": "0xaeda7e259b782a199c748b774fa0e91ac868b6e96c420713df91859e9b63e65a",
     "changes": [
       {
         "type": "write_resource",
@@ -71,20 +71,36 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
-            "self_address": "0xa550c18",
-            "sequence_number": "8"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xa550c18",
-        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
+            "balance": {
               "value": "18446744073709551614"
+            },
+            "self_address": "0xa550c18",
+            "sequence_number": "8",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
             }
           }
         }
@@ -97,8 +113,37 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
+            "balance": {
+              "value": "0"
+            },
             "self_address": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
-            "sequence_number": "0"
+            "sequence_number": "0",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
+            }
           }
         }
       },
@@ -110,53 +155,6 @@
           "type": "0x1::GUID::Generator",
           "data": {
             "counter": "2"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
-        "state_key_hash": "0xd4aef363298742ed031fd1d9eac686dc9dd61519ad7381f9cedbc574f5939a61",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
-              "value": "0"
-            }
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
-        "state_key_hash": "0x147a9d87dc6f57acbb88460c29468fc6b49705f500cdda5e826adfbef50eaf2b",
-        "data": {
-          "type": "0x1::TestCoin::TransferEvents",
-          "data": {
-            "received_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
-              }
-            },
-            "sent_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
-              }
-            }
           }
         }
       }
@@ -186,12 +184,12 @@
     "type": "block_metadata_transaction",
     "version": "17",
     "hash": "0xff76c3e356955265af1d3ba30315df5a21b41ae06dc08012062e12f96b259b2c",
-    "state_root_hash": "0xa21fb87f130f969eba52e7e6c48e956ec33379208806237499506a7ca9282aa6",
+    "state_root_hash": "0xc2977f2780328ea548e151fb77da82bb8902d533a619efe5205073f6e29ea911",
     "event_root_hash": "0xa6a9b44eb5c9a225afd2d745cccbcf07c5acb9e9bfa7b4c9d88ffa39a4c3f117",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xc111490abbacf2a59f1fe2f4f867aaa39f2481113d57aa58d0c30bf0152b031c",
+    "accumulator_root_hash": "0x86118dcb4968d47e2db7f6c8449fd48718430f0338a0b6176ca9a969e220aa83",
     "changes": [
       {
         "type": "write_resource",
@@ -239,12 +237,12 @@
     "type": "user_transaction",
     "version": "18",
     "hash": "0x28fb2e2dda957e42fd64e36b6df5282764ad4cf04f5b4e82e6d60706a31eef35",
-    "state_root_hash": "0xa68f4142c2c825d6d096d6cb94001441c95cd0da15079032146df1b7acd574f5",
+    "state_root_hash": "0x7fcb1201ad9b156826de210c383c3816fbb26b64aadc56d4640dc545cfcc5277",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
-    "gas_used": "92",
+    "gas_used": "83",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xc0f25eb6c038749e704c0f8f0980e6c348b8c03c43bed14e32a99125dd74f40a",
+    "accumulator_root_hash": "0xd2f4678b4a8a768fa325bc12e870d6a20641552df3874f87aa55f69f8484fd45",
     "changes": [
       {
         "type": "write_resource",
@@ -254,20 +252,36 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
-            "self_address": "0xa550c18",
-            "sequence_number": "9"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xa550c18",
-        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
+            "balance": {
               "value": "18446744073709551614"
+            },
+            "self_address": "0xa550c18",
+            "sequence_number": "9",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
             }
           }
         }
@@ -280,8 +294,37 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x059c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
+            "balance": {
+              "value": "0"
+            },
             "self_address": "0x59c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
-            "sequence_number": "0"
+            "sequence_number": "0",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0x59c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0x59c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
+            }
           }
         }
       },
@@ -293,53 +336,6 @@
           "type": "0x1::GUID::Generator",
           "data": {
             "counter": "2"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x59c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
-        "state_key_hash": "0xac1ca2bce83e8a5be3af45e0eb22a75bcaf79c272778910f9241bcf778415ff3",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
-              "value": "0"
-            }
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x59c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
-        "state_key_hash": "0xb8ea4877d3a15d539974d5473078f32eaa65f9eddff84f526585070fdf22361f",
-        "data": {
-          "type": "0x1::TestCoin::TransferEvents",
-          "data": {
-            "received_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x59c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
-              }
-            },
-            "sent_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x59c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
-              }
-            }
           }
         }
       }
@@ -369,12 +365,12 @@
     "type": "block_metadata_transaction",
     "version": "19",
     "hash": "0xc7f0b608aeabd6d96828cb0ef04a2b598ca2bc3ac8e644cf6ef799021494c9b0",
-    "state_root_hash": "0x0c7602652fdd165028cdaeefd356e3f83f098b0b1bf9b2b89856abf592878369",
+    "state_root_hash": "0x555ca4a74cf48595cec46c1c5d281f37362f0deba51adf897da8c8d27863acd1",
     "event_root_hash": "0x496e79b2a294b6c0eb9a2b0e4827a2f0c0c559074ce5dfbf4e4462f08d12dfc8",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x332aa05d864a6f466a5c037606a62a481b0149c4c6fcd2b85be1cc8f3abc0307",
+    "accumulator_root_hash": "0x9189024cadb351a5653b299b42eff051ca691f9a16a5f5d37aa05b06e1186bb1",
     "changes": [
       {
         "type": "write_resource",
@@ -422,12 +418,12 @@
     "type": "user_transaction",
     "version": "20",
     "hash": "0x652f97186eb303dc48af00318aec7c9b6efbad3f8538a541d1cab6afe593d0b2",
-    "state_root_hash": "0xfda2b59cfe4cf5ca40716ff027c9fed48068a0fa9c66aba3aadf982f2aa452ff",
+    "state_root_hash": "0x80ea3a7e87a343f2545b4a33fa03a4757c939b7be7cda4ea5880e1e750586032",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
-    "gas_used": "92",
+    "gas_used": "83",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xdf8bea190b394cc06dd804c8d52f77cfe1b934c4fb4cb6098694528ab8524e66",
+    "accumulator_root_hash": "0x77057642f741d90bc7c9428f2d59f4779ddaa71f7abe3543c50f1850b39a9237",
     "changes": [
       {
         "type": "write_resource",
@@ -437,20 +433,36 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
-            "self_address": "0xa550c18",
-            "sequence_number": "10"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xa550c18",
-        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
+            "balance": {
               "value": "18446744073709551614"
+            },
+            "self_address": "0xa550c18",
+            "sequence_number": "10",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
             }
           }
         }
@@ -463,8 +475,37 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
+            "balance": {
+              "value": "0"
+            },
             "self_address": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
-            "sequence_number": "0"
+            "sequence_number": "0",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
+            }
           }
         }
       },
@@ -476,53 +517,6 @@
           "type": "0x1::GUID::Generator",
           "data": {
             "counter": "2"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
-        "state_key_hash": "0x2131acd287391c8b5b57eba83c3c22d9539623fd33835cbc439dc6daa6c349ec",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
-              "value": "0"
-            }
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
-        "state_key_hash": "0x316023da5e04ebecd7ec034437eac83eb78be7b499303274f582548c928d69ea",
-        "data": {
-          "type": "0x1::TestCoin::TransferEvents",
-          "data": {
-            "received_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
-              }
-            },
-            "sent_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
-              }
-            }
           }
         }
       }
@@ -552,12 +546,12 @@
     "type": "block_metadata_transaction",
     "version": "21",
     "hash": "0x87595e096f8f40bcc5b304449d1a746fe849a097b2894dcf08da17fbe2add83c",
-    "state_root_hash": "0x0393ea21da6e497b919cdf0df6f716ba04e7ebfeacc014d29462707ac6b6dbab",
+    "state_root_hash": "0x3919429d9b7dd2cbb5db80cdbf077bc127a9166390284a3fbee72b63f85c8a3c",
     "event_root_hash": "0x32505461d562923642b8f4144f32e3e73955e76f0f2a969e1c4749246664ee81",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x2e0e571ebad143f0d80b03f877badea7544d8b46d61823f390146a89f77cba9f",
+    "accumulator_root_hash": "0xcf2f57b75ea78013090228901d75c85ca12d168fb4c081bd4b8b97479cc1c9a5",
     "changes": [
       {
         "type": "write_resource",
@@ -605,12 +599,12 @@
     "type": "user_transaction",
     "version": "22",
     "hash": "0xda850e6cde9e2a036603b21f27d1aaaaabed970130deb84f624b844c422b0d86",
-    "state_root_hash": "0xc83c0449c170f3464ec5fccc80db19a1e35ccdbe92324ab6c7570a0aa44c35b4",
+    "state_root_hash": "0xa9cc0fb3d420834c1edd8ce28d0269b1ec73cf6bd64b93be5ee5bb0631c5fa67",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
-    "gas_used": "92",
+    "gas_used": "83",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x1bdda3ed646cbd2bf95e5350acf4ecc8dc62f0491f65ad44407e45616fb5ab71",
+    "accumulator_root_hash": "0xec6f1192015e9b53214e819e3d469a470b35e57dacbcc6e9229a5261de3bb065",
     "changes": [
       {
         "type": "write_resource",
@@ -620,20 +614,36 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
-            "self_address": "0xa550c18",
-            "sequence_number": "11"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xa550c18",
-        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
+            "balance": {
               "value": "18446744073709551614"
+            },
+            "self_address": "0xa550c18",
+            "sequence_number": "11",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
             }
           }
         }
@@ -646,8 +656,37 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
+            "balance": {
+              "value": "0"
+            },
             "self_address": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
-            "sequence_number": "0"
+            "sequence_number": "0",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
+            }
           }
         }
       },
@@ -659,53 +698,6 @@
           "type": "0x1::GUID::Generator",
           "data": {
             "counter": "2"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
-        "state_key_hash": "0x2e288c3d05b00045585128368b18d7619a65b275312aee7e4ad767f26bb6a6f1",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
-              "value": "0"
-            }
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
-        "state_key_hash": "0x2a5e591719799823be3bb152f3033dd6c38a1a044641b24b569623c98bafabb6",
-        "data": {
-          "type": "0x1::TestCoin::TransferEvents",
-          "data": {
-            "received_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
-              }
-            },
-            "sent_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
-              }
-            }
           }
         }
       }
@@ -735,12 +727,12 @@
     "type": "block_metadata_transaction",
     "version": "23",
     "hash": "0x9bed1b067e0c22ac849b46bbf5c73cbd59ecd769cf8d9c10632f4226b9b5cc23",
-    "state_root_hash": "0x5f8761c781f697cfd04146782db9c52499fc6405a0b5ff2fbd54d2e8fbb7743f",
+    "state_root_hash": "0x790acb27cdc42bd25568de49422c509794a46aa3c0f93f1cc39bb1cc1d086683",
     "event_root_hash": "0xb473990da4cec260bef238d5fa0ae94273985146231517965ee00a0d8e543489",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x1ba8f63cf396930e771d96ad2d07ca7eee10e4fa1243ca754c00f98e46234cdd",
+    "accumulator_root_hash": "0x7a17d5c853307d0cf9ba7cf2f80a300774f15dfc32fb4b1265a8fb9792683f47",
     "changes": [
       {
         "type": "write_resource",
@@ -788,12 +780,12 @@
     "type": "user_transaction",
     "version": "24",
     "hash": "0x68cdfdeabb160917d852e8960a2588a3a8a1905707561a2a5e4b3922f2c20109",
-    "state_root_hash": "0xf40cef73be854609cf3326d611f11a16f792ada30f317a5d9ebdfd4731120cc8",
+    "state_root_hash": "0x88be911077d9986f837a4e723f756993356ee0f41f32ab268c61b45c23748d1c",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
-    "gas_used": "92",
+    "gas_used": "83",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xa7cec8e24dc44be8387471864a1643cd32f6d2dfae940b0b10c7034a8e1e6451",
+    "accumulator_root_hash": "0x338dc16763c4157de6ca2bf24159d9fed6abed0d31f92877a0404bd1de545269",
     "changes": [
       {
         "type": "write_resource",
@@ -803,20 +795,36 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
-            "self_address": "0xa550c18",
-            "sequence_number": "12"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xa550c18",
-        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
+            "balance": {
               "value": "18446744073709551614"
+            },
+            "self_address": "0xa550c18",
+            "sequence_number": "12",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
             }
           }
         }
@@ -829,8 +837,37 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
+            "balance": {
+              "value": "0"
+            },
             "self_address": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
-            "sequence_number": "0"
+            "sequence_number": "0",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
+            }
           }
         }
       },
@@ -842,53 +879,6 @@
           "type": "0x1::GUID::Generator",
           "data": {
             "counter": "2"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
-        "state_key_hash": "0x61edbd7b8d9472fba6aca1bbe56a8596b46f5424d3228573ab952a7e40b477dc",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
-              "value": "0"
-            }
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
-        "state_key_hash": "0xaf80147f6422bad3603f1d4a77e37db1740bef9215166da55e2ef208495b5ad0",
-        "data": {
-          "type": "0x1::TestCoin::TransferEvents",
-          "data": {
-            "received_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
-              }
-            },
-            "sent_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
-              }
-            }
           }
         }
       }
@@ -918,12 +908,12 @@
     "type": "block_metadata_transaction",
     "version": "25",
     "hash": "0x0b7764d54ad6dd6490a482a7997a598a5257024017993eafcd936a95c0efdb80",
-    "state_root_hash": "0x1b6844e821135fbf54f8b94cfe716dbc345ef013033c89d75304bc2d0d31a133",
+    "state_root_hash": "0xf89dbbf550a842005d888af88948fda49645f94a18f558285abb7bc519bd6a21",
     "event_root_hash": "0x8e252e4998b08918e04f49d8c009144fc995a000a923667efc111157916c565c",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x37b04f020cf81c4d03fe8c8e172b031192f7b15c27df7678a969ea2858e39131",
+    "accumulator_root_hash": "0x9c61d9541c3e7f70694d6a7af46365d1b74a5e6876dfdef9f059fb960f691e0f",
     "changes": [
       {
         "type": "write_resource",
@@ -971,12 +961,12 @@
     "type": "user_transaction",
     "version": "26",
     "hash": "0x673d5dca47ffde8b99952fec38ee130fd2aa735c084402b3a8850165d467a917",
-    "state_root_hash": "0x12fdf43973176eb23580707ba8475c7f8bc8fb0a85cbed93462a75e385d41627",
+    "state_root_hash": "0xe87f15d6bb3aa571fa2655bed0f2a6ff2b5914716e0d1c2171d8f7ef519392b0",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
-    "gas_used": "92",
+    "gas_used": "83",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xd1f4f52c5963d042aeec4b2cbf2be0c1886d9591dd256ad9f0e23438a86f2120",
+    "accumulator_root_hash": "0x38aee37fd864a564059709a37677c2d7dc6a9cb981e390e28bf01a46df9520ac",
     "changes": [
       {
         "type": "write_resource",
@@ -986,20 +976,36 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
-            "self_address": "0xa550c18",
-            "sequence_number": "13"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xa550c18",
-        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
+            "balance": {
               "value": "18446744073709551614"
+            },
+            "self_address": "0xa550c18",
+            "sequence_number": "13",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
             }
           }
         }
@@ -1012,8 +1018,37 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x0811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
+            "balance": {
+              "value": "0"
+            },
             "self_address": "0x811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
-            "sequence_number": "0"
+            "sequence_number": "0",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0x811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0x811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
+            }
           }
         }
       },
@@ -1025,53 +1060,6 @@
           "type": "0x1::GUID::Generator",
           "data": {
             "counter": "2"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
-        "state_key_hash": "0x5d623fecd4de200f72972d59f569cdd18016978934984af1929243431d926922",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
-              "value": "0"
-            }
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
-        "state_key_hash": "0x70aad05c2708467f63fb8be86d74bdc0541e234ae14dc47752fac7aaab09765f",
-        "data": {
-          "type": "0x1::TestCoin::TransferEvents",
-          "data": {
-            "received_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
-              }
-            },
-            "sent_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
-              }
-            }
           }
         }
       }
@@ -1101,12 +1089,12 @@
     "type": "block_metadata_transaction",
     "version": "27",
     "hash": "0xacb5e69631257947d0bdb5453e02de7f760e27c7432f53e41950a959f73f3cc1",
-    "state_root_hash": "0xfe63ea37dacaa40859693c37cd736a51f7f6990e62ece3e5dd3e277d6358de2c",
+    "state_root_hash": "0xdc345e98ac8df57b238431d13df2e4eecba9e77aa2aa17fbfa945906fbf074e4",
     "event_root_hash": "0x0705a795230d060400e635f254aea3c6325d1abebc2f9a5e4554356ccf67ecee",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xc4d7f8af7168289b0537bdd34e6ca30bbbe532147938efdabf411caf2025f03a",
+    "accumulator_root_hash": "0xeeaf18142bf5cbec1379997c4e61f089354fdb72da7aa50f727c76a10240c616",
     "changes": [
       {
         "type": "write_resource",
@@ -1154,12 +1142,12 @@
     "type": "user_transaction",
     "version": "28",
     "hash": "0x50b56bc5a09a095afcf38451aef0ffeeca9e8c17f538d082ccf33b4ead3d9de9",
-    "state_root_hash": "0xb15cc2c335397637f76819543c82786399ce3cbfc1c676a0eee4c50bb71eca13",
+    "state_root_hash": "0x105effe12a356d9f921a469650639a3f6d08f8532a3edd0a9962942b4fbf99f7",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
-    "gas_used": "92",
+    "gas_used": "83",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xdb5dd721c398dfdc98151c0896323f322965e13ab36a48d9de04135d4a41ef60",
+    "accumulator_root_hash": "0x5e85e1c854fa1c3533875a7c382d7effa49b364ef1e86579954c203601714d1b",
     "changes": [
       {
         "type": "write_resource",
@@ -1169,20 +1157,36 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
-            "self_address": "0xa550c18",
-            "sequence_number": "14"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xa550c18",
-        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
+            "balance": {
               "value": "18446744073709551614"
+            },
+            "self_address": "0xa550c18",
+            "sequence_number": "14",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
             }
           }
         }
@@ -1195,8 +1199,37 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
+            "balance": {
+              "value": "0"
+            },
             "self_address": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
-            "sequence_number": "0"
+            "sequence_number": "0",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
+            }
           }
         }
       },
@@ -1208,53 +1241,6 @@
           "type": "0x1::GUID::Generator",
           "data": {
             "counter": "2"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
-        "state_key_hash": "0xa7fe3341cb8ca11f4c583022ac3a42f59194744b922c3323fead4f80cb70c2ba",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
-              "value": "0"
-            }
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
-        "state_key_hash": "0x9be88cb4b760d26470fc19921ad50711193f57a11cb04285dfea183d27652e83",
-        "data": {
-          "type": "0x1::TestCoin::TransferEvents",
-          "data": {
-            "received_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
-              }
-            },
-            "sent_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
-              }
-            }
           }
         }
       }
@@ -1284,12 +1270,12 @@
     "type": "block_metadata_transaction",
     "version": "29",
     "hash": "0xcd0ef18ec2388d7e92564fb7d68b5c3c1bb21cf5c52ea27b19b40ee78c561c94",
-    "state_root_hash": "0xaa23effbf007f863dfe88a0a365ff7dc6ec108dcc099b4ee597e164cfc8fdfc3",
+    "state_root_hash": "0xe172c853424c4dae664d21c4644ba236c2dbda71d212a70ae7382e7e73292cac",
     "event_root_hash": "0xe983a92b7c4b5440b045e59d64cff9044536782ab5b6c6089e1cfe05ffb50218",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x83e31fe86127fdd89403bc8ecfa4ab7dc47e19f5120a6524eba23783b2d9579d",
+    "accumulator_root_hash": "0xd1297f8fd64cc98ce0264da6945067008edb395b4b0a1714238c1ba201c2b7fe",
     "changes": [
       {
         "type": "write_resource",
@@ -1337,12 +1323,12 @@
     "type": "user_transaction",
     "version": "30",
     "hash": "0x8c9e6c04384957bd474d64147adad5e3405733aab3319e715ef116e7e60c6be4",
-    "state_root_hash": "0x117466216694ed9b7bbcc02c8f782077e7a6d6a88932ffc3e843c758468f2ec0",
+    "state_root_hash": "0x2720c66f34ae85247bd3d6c645165bfc8f7536ea928c1fa48f0a0035dc52a4db",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
-    "gas_used": "92",
+    "gas_used": "83",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x9a07ab6d933779d0cbc108f409cec31ad54643770201d42e735e0d92918abaf4",
+    "accumulator_root_hash": "0xd7da3ef81dbd514081c5fd448d512e45dd6a81d7e45c7559b85d6729d61ef057",
     "changes": [
       {
         "type": "write_resource",
@@ -1352,20 +1338,36 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
-            "self_address": "0xa550c18",
-            "sequence_number": "15"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xa550c18",
-        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
+            "balance": {
               "value": "18446744073709551614"
+            },
+            "self_address": "0xa550c18",
+            "sequence_number": "15",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
             }
           }
         }
@@ -1378,8 +1380,37 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
+            "balance": {
+              "value": "0"
+            },
             "self_address": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
-            "sequence_number": "0"
+            "sequence_number": "0",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
+            }
           }
         }
       },
@@ -1391,53 +1422,6 @@
           "type": "0x1::GUID::Generator",
           "data": {
             "counter": "2"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
-        "state_key_hash": "0x32423c797d019e8ace8c33d9dcf7f3e83c77692d756f7dba454d14a74dec91b8",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
-              "value": "0"
-            }
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
-        "state_key_hash": "0xb2ae44fa9e703fb9dab2e8bddcb2d90bf9d7fdc4217ce02221c3d0632936b9c0",
-        "data": {
-          "type": "0x1::TestCoin::TransferEvents",
-          "data": {
-            "received_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
-              }
-            },
-            "sent_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
-              }
-            }
           }
         }
       }
@@ -1467,12 +1451,12 @@
     "type": "block_metadata_transaction",
     "version": "31",
     "hash": "0xe7c21dbd27d48c1c39e2b0e232e7ae5c92dbed02adc5dd45f8f4afa3759198d4",
-    "state_root_hash": "0xc3bddf6acf43e28f41803336a914043bf2fa37494b3aaabdca3e7e5043604ca3",
+    "state_root_hash": "0x85b39b2e2ad452ebef84117aec31a006b2bc9e011d12666f29f726320a760bd3",
     "event_root_hash": "0x65d9c64fc0037bcbc4d77763204f191e92635cc864e3da1ab60b9665368c9371",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xd20a0043caf8e4279ab4d833338e427fd7ba6975e4bb985840b769d23dce1ba6",
+    "accumulator_root_hash": "0x002d6249120e2db6f79b01118f9afbae1da91f545bd51a87e52372982dfa51f1",
     "changes": [
       {
         "type": "write_resource",
@@ -1520,12 +1504,12 @@
     "type": "user_transaction",
     "version": "32",
     "hash": "0x0c26a52a417e88ba6bcb3c0b892ca231d8b71aed396c9d0e6ede20877c198682",
-    "state_root_hash": "0x66a1aae44ad652b2e2d062193a1c96d774e205ae76a157e64cbf86dcd74650b4",
+    "state_root_hash": "0xf80990f25f395243742dc570621d71357fbe511df97b11702c0398511202be6f",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
-    "gas_used": "92",
+    "gas_used": "83",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x226e00c580e4633d1dee3f021d1b6bc8a5ffa5cea2b0a58e28b6fc47fd4b3888",
+    "accumulator_root_hash": "0x17fa03c42dcf8ec899c644f4feb218e06c64101558c2b4c0fe94d485535fb178",
     "changes": [
       {
         "type": "write_resource",
@@ -1535,20 +1519,36 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
-            "self_address": "0xa550c18",
-            "sequence_number": "16"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xa550c18",
-        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
+            "balance": {
               "value": "18446744073709551614"
+            },
+            "self_address": "0xa550c18",
+            "sequence_number": "16",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
             }
           }
         }
@@ -1561,8 +1561,37 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
+            "balance": {
+              "value": "0"
+            },
             "self_address": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
-            "sequence_number": "0"
+            "sequence_number": "0",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
+            }
           }
         }
       },
@@ -1574,53 +1603,6 @@
           "type": "0x1::GUID::Generator",
           "data": {
             "counter": "2"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
-        "state_key_hash": "0x23bd1e4e6ba3f68605ca6eb959cb560f6ea2736a771d92e522e4bb2af639651c",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
-              "value": "0"
-            }
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
-        "state_key_hash": "0xa990e18349ef4a927f462c4777c3eefb44911116b81e4c0b9e2d5139e05a824c",
-        "data": {
-          "type": "0x1::TestCoin::TransferEvents",
-          "data": {
-            "received_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
-              }
-            },
-            "sent_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
-              }
-            }
           }
         }
       }
@@ -1650,12 +1632,12 @@
     "type": "block_metadata_transaction",
     "version": "33",
     "hash": "0x024ded6930a59f0bab79f57ad6b7d21ca11b47ffbf85736ff221c255669202d4",
-    "state_root_hash": "0x7af346a36dee19fea995aa0a627b70b7b5b7b3b42f70365ef7b29cdd4d32df7f",
+    "state_root_hash": "0x1f3c977bf41748601f5d55a4bf5ecd82246aa8bfafd333823bf738f4d3a18c65",
     "event_root_hash": "0x20747e0a553e9e055902d419f76f38004ba4d751fbe959c32c1ff6c4a982d578",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x51c8cd1a8648422c2c528cdc8eb0cac17f29c8c1e98ea57f13037c2bfeafbca3",
+    "accumulator_root_hash": "0xd8059b6858b0915e26176f63b8af321f1f8c365a022c5f15d154e67b10cefd8c",
     "changes": [
       {
         "type": "write_resource",
@@ -1703,12 +1685,12 @@
     "type": "user_transaction",
     "version": "34",
     "hash": "0xf91aed259eb4db845dc1b611e2ed67ddbf5fed8966ec76dd184659493b0677fb",
-    "state_root_hash": "0x28b9ed4cab4296f49cc8fbc4505928f2e8d06fed27366c8240faf92a5be47d3c",
+    "state_root_hash": "0x017f8b8f867881b17e3a466ebf756bca8c980a8adcb2233657caf70119b01998",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
-    "gas_used": "92",
+    "gas_used": "83",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xd035b8b6f98000b0b7e27fd43ae929b1e29f582cf55b3414077c3c845b12af5d",
+    "accumulator_root_hash": "0x59eb159fb93758c2861c23fb0be5a7a7723651d87729c13e86b296e3d43ff239",
     "changes": [
       {
         "type": "write_resource",
@@ -1718,20 +1700,36 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
-            "self_address": "0xa550c18",
-            "sequence_number": "17"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xa550c18",
-        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
+            "balance": {
               "value": "18446744073709551614"
+            },
+            "self_address": "0xa550c18",
+            "sequence_number": "17",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
             }
           }
         }
@@ -1744,8 +1742,37 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
+            "balance": {
+              "value": "0"
+            },
             "self_address": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
-            "sequence_number": "0"
+            "sequence_number": "0",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
+            }
           }
         }
       },
@@ -1757,53 +1784,6 @@
           "type": "0x1::GUID::Generator",
           "data": {
             "counter": "2"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
-        "state_key_hash": "0x1c36af51ff2cdeb39f0e7c7bc745c7cf2ac09bbb37d928be4c656643a5ad0df9",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
-              "value": "0"
-            }
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
-        "state_key_hash": "0x9aa92243c259ba084b042d14fb25f4125da7a080ed1e157d4c0714815923c1e3",
-        "data": {
-          "type": "0x1::TestCoin::TransferEvents",
-          "data": {
-            "received_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
-              }
-            },
-            "sent_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
-              }
-            }
           }
         }
       }
@@ -1833,12 +1813,12 @@
     "type": "block_metadata_transaction",
     "version": "35",
     "hash": "0xa7507dd24e0c31f630087d85c5ffdb72e4352ab70020ae31044d6be77ea72a13",
-    "state_root_hash": "0x5ebc01a21403b3e34a60cbe903ef525290781c64434601202a3ee3cc0f06e14b",
+    "state_root_hash": "0x53a4d673becb4f36f39ea019985d4325efacdabd8a11340ba2cf0f2b221b1280",
     "event_root_hash": "0x239c9fd4aed1dc852e6bd817282c845600d5f578ab140a267d50ffb5d365bf7a",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x514c7dead6252dee27b05d23c4cd9ed9493a75421e467e3c396528b3606d2b49",
+    "accumulator_root_hash": "0x0273156e597716a035e37566b927452f3715909fdff39a47cea5522e2be6c0ef",
     "changes": [
       {
         "type": "write_resource",
@@ -1886,12 +1866,12 @@
     "type": "user_transaction",
     "version": "36",
     "hash": "0xf102d60f1e2350c3491f00d87fd646d9441bc6341672c2d81c7541627958f181",
-    "state_root_hash": "0xa821097c45062ec8d49b2da2bc55118a5a43ac63f47a52c3f300656e656cdbda",
+    "state_root_hash": "0x3b42c38782c7448de5994da8e73e36114418f2cdf63f8109b4a7025e7522571e",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
-    "gas_used": "92",
+    "gas_used": "83",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x2f8195184c0b8e4d1e9f40413515b7a0266c329d822ad2960d5790502c28fe27",
+    "accumulator_root_hash": "0x877144df16dcd2639dc33ecb11834fe78500557f8489faf50204a494e3773bd2",
     "changes": [
       {
         "type": "write_resource",
@@ -1901,20 +1881,36 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
-            "self_address": "0xa550c18",
-            "sequence_number": "18"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xa550c18",
-        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
+            "balance": {
               "value": "18446744073709551614"
+            },
+            "self_address": "0xa550c18",
+            "sequence_number": "18",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
             }
           }
         }
@@ -1927,8 +1923,37 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
+            "balance": {
+              "value": "0"
+            },
             "self_address": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
-            "sequence_number": "0"
+            "sequence_number": "0",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
+            }
           }
         }
       },
@@ -1940,53 +1965,6 @@
           "type": "0x1::GUID::Generator",
           "data": {
             "counter": "2"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
-        "state_key_hash": "0x5b9cc988bf95904ebec9e4a6fdde8c970d13d7d81256359c3a9a8611c14d353f",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
-              "value": "0"
-            }
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
-        "state_key_hash": "0x594be380e6b9da07e429d9a2e988cedc52bbcf9610456ff113d84f1f8e249142",
-        "data": {
-          "type": "0x1::TestCoin::TransferEvents",
-          "data": {
-            "received_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
-              }
-            },
-            "sent_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
-              }
-            }
           }
         }
       }
@@ -2016,12 +1994,12 @@
     "type": "block_metadata_transaction",
     "version": "37",
     "hash": "0x12a953e6b6bcd5bac5cf670f018ec1a1f4b918a3e8a6c7398fdf3f935dae6b48",
-    "state_root_hash": "0x524d85ddd3c43e3c4ac3831bfb10b3682011249f02dd6c4ad01e348cfa64397a",
+    "state_root_hash": "0xcea6b3c82df5e6ce078f45210ee6d79c66356b43f960c73938d842a52e9ef23f",
     "event_root_hash": "0x0fb2cd74861c38ca95112f194e496f084333fb444284b1005e7eb9ed061c0ecb",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x9bec74eba8f66d30c29564aa5b0523bece99d4114d47f8bbf7676616063abc75",
+    "accumulator_root_hash": "0xda7ebe56876bfdd1adb66de5c0445214d7410de454a83f20a8a163dd61867415",
     "changes": [
       {
         "type": "write_resource",
@@ -2069,12 +2047,12 @@
     "type": "user_transaction",
     "version": "38",
     "hash": "0xd8a0e4a0854841f0a2d0ccba40b0bd4e033781b6458580e521a50286835bfcf6",
-    "state_root_hash": "0x7d2fc083201d0d47797ef5a86da474de69f00617a0643e982eec8be12ddaf49b",
+    "state_root_hash": "0x9264b64641372a45ceb9ed7f14e25e466df2dadbbfe2108ccad50d8beebd2436",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
-    "gas_used": "92",
+    "gas_used": "83",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x3a5af838b69ace4c3567a6a886e5338fb98622ff3555d1777ab13e3bd4b69bcf",
+    "accumulator_root_hash": "0x7ca6a1d51fc5f19ebc5fa750d091c7d289ef7933f6c160ebeab7dea01239dac2",
     "changes": [
       {
         "type": "write_resource",
@@ -2084,20 +2062,36 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
-            "self_address": "0xa550c18",
-            "sequence_number": "19"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xa550c18",
-        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
+            "balance": {
               "value": "18446744073709551614"
+            },
+            "self_address": "0xa550c18",
+            "sequence_number": "19",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
             }
           }
         }
@@ -2110,8 +2104,37 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
+            "balance": {
+              "value": "0"
+            },
             "self_address": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
-            "sequence_number": "0"
+            "sequence_number": "0",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
+            }
           }
         }
       },
@@ -2123,53 +2146,6 @@
           "type": "0x1::GUID::Generator",
           "data": {
             "counter": "2"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
-        "state_key_hash": "0x0dd97334721ea9f3cc79c1cf2af38ce3caab0eb99867b585c1dcded1ee481404",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
-              "value": "0"
-            }
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
-        "state_key_hash": "0x2b0c63c7fdbed0267adc655340afe638b98c06ae9e0c4696eb0d81435851a22d",
-        "data": {
-          "type": "0x1::TestCoin::TransferEvents",
-          "data": {
-            "received_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
-              }
-            },
-            "sent_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
-              }
-            }
           }
         }
       }
@@ -2199,12 +2175,12 @@
     "type": "block_metadata_transaction",
     "version": "39",
     "hash": "0x2b9f44dbdcf4cb278e5e49d6981385801f6cbcfd0e5b6854537094b04f4f95f5",
-    "state_root_hash": "0x2ed136aa2b76d4b169f985670d2ea7086a2313e974ee0cb4c96274b37ba2ccde",
+    "state_root_hash": "0xebe9207724ab008af253fc87da2df06744b2cdf55d3d9076895ed4b3a58c212b",
     "event_root_hash": "0xa478d3f1b71522bd300aeff7b6d0838796c8b5d21226303ae99d4ada6981e19e",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x6468f9b6b3dffec2c7cdee95d0fb696fe9f442ad88eefd6053896bcd526fae25",
+    "accumulator_root_hash": "0x6bc0adc9f8d0a8389232e3d90e9b1fd9a7b0985c0720e4dff65f7612739e9a06",
     "changes": [
       {
         "type": "write_resource",

@@ -15,7 +15,7 @@ mod response;
 mod table;
 mod transaction;
 
-pub use account::AccountData;
+pub use account::*;
 pub use address::Address;
 pub use bytecode::Bytecode;
 pub use convert::{new_vm_ascii_string, AsConverter, MoveConverter};

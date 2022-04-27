@@ -31,8 +31,7 @@ impl AptosTest for MintTransfer {
             ctx.client()
                 .get_account_balance(account2.address())
                 .await?
-                .into_inner()
-                .get(),
+                .into_inner(),
             400
         );
 

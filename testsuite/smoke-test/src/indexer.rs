@@ -129,11 +129,8 @@ impl AptosTest for Indexer {
             assert!(bmt2.is_none());
             assert!(wsc2.len() > 1);
             assert_eq!(events2.len(), 2);
-            assert_eq!(events2.get(0).unwrap().type_, "0x1::TestCoin::SentEvent");
-            assert_eq!(
-                events2.get(1).unwrap().type_,
-                "0x1::TestCoin::ReceivedEvent"
-            );
+            assert_eq!(events2.get(0).unwrap().type_, "0x1::Account::SentEvent");
+            assert_eq!(events2.get(1).unwrap().type_, "0x1::Account::ReceivedEvent");
         }
 
         let latest_version = tailer.set_fetcher_to_lowest_processor_version().await;

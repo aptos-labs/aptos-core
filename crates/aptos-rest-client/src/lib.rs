@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::types::Version;
 use anyhow::{anyhow, Result};
 pub use aptos_api_types::{self, MoveModuleBytecode, PendingTransaction, Transaction};
 use aptos_crypto::HashValue;
@@ -14,6 +15,7 @@ use serde_json::{json, Value};
 use state::State;
 use std::time::Duration;
 use url::Url;
+
 pub mod error;
 pub mod faucet;
 pub use faucet::FaucetClient;
@@ -21,9 +23,7 @@ pub mod response;
 pub use response::Response;
 mod state;
 pub mod types;
-use crate::aptos::{AptosVersion, Balance};
 pub use types::{Account, Resource, RestError};
-pub mod aptos;
 
 const BCS_CONTENT_TYPE: &str = "application/x.diem.signed_transaction+bcs";
 const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
@@ -46,18 +46,21 @@ impl Client {
         Self { inner, base_url }
     }
 
-    pub async fn get_aptos_version(&self) -> Result<Response<AptosVersion>> {
-        self.get_resource::<AptosVersion>(aptos_root_address(), "0x1::Version::Version")
+    pub async fn get_aptos_version(&self) -> Result<Response<Version>> {
+        self.get_resource::<Version>(aptos_root_address(), "0x1::Version::Version")
             .await
     }
 
-    pub async fn get_account_balance(&self, address: AccountAddress) -> Result<Response<Balance>> {
+    pub async fn get_account_balance(&self, address: AccountAddress) -> Result<Response<u64>> {
         let resp = self
-            .get_account_resource(address, "0x1::TestCoin::Balance")
+            .get_account_resource(address, "0x1::Account::Account")
             .await?;
         resp.and_then(|resource| {
             if let Some(res) = resource {
-                Ok(serde_json::from_value::<Balance>(res.data)?)
+                Ok(*serde_json::from_value::<Account>(res.data)?
+                    .balance
+                    .value
+                    .inner())
             } else {
                 Err(anyhow!("No data returned"))
             }

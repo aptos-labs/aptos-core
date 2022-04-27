@@ -2,6 +2,7 @@ module AptosFramework::Stake {
     use Std::Errors;
     use Std::Signer;
     use Std::Vector;
+    use AptosFramework::Account;
     use AptosFramework::SystemAddresses;
     use AptosFramework::Timestamp;
     use AptosFramework::TestCoin::{Self, Coin};
@@ -92,7 +93,7 @@ module AptosFramework::Stake {
 
     /// Any user can delegate a stake.
     public fun delegate_stake(account: &signer, to: address, amount: u64, locked_until_secs: u64) acquires StakePool, ValidatorSet {
-        let coins = TestCoin::withdraw(account, amount);
+        let coins = Account::withdraw_from(account, amount);
         let current_time = Timestamp::now_seconds();
         assert!(current_time + MINIMUM_LOCK_PERIOD < locked_until_secs, Errors::invalid_argument(ELOCK_TIME_TOO_SHORT));
         let stake_pool = borrow_global_mut<StakePool>(to);
@@ -121,7 +122,7 @@ module AptosFramework::Stake {
         if (!is_current_validator) {
             // directly deposit if it's not active validator
             let Delegation {coins, from: _, locked_until_secs: _} = d;
-            TestCoin::deposit(addr, coins);
+            Account::deposit_to(addr, coins);
         } else if (d.locked_until_secs < current_time) {
             // move to pending_inactive if it can be unlocked
             Vector::push_back(&mut stake_pool.pending_inactive, d);
@@ -136,7 +137,7 @@ module AptosFramework::Stake {
         let stake_pool = borrow_global_mut<StakePool>(from);
         let d = withdraw_internal(&mut stake_pool.inactive, addr);
         let Delegation {coins, from: _, locked_until_secs: _} = d;
-        TestCoin::deposit(addr, coins);
+        Account::deposit_to(addr, coins);
     }
 
     /// Initialize the ValidatorInfo for account.
@@ -345,8 +346,8 @@ module AptosFramework::Stake {
     ) acquires StakePool, ValidatorConfig, ValidatorSet {
         initialize_validator_set(&core_resources, 100, 10000);
         Timestamp::set_time_has_started_for_testing(&core_resources);
-        TestCoin::mint_for_test(&account_1, 10000);
-        TestCoin::mint_for_test(&account_2, 10000);
+        Account::create_and_mint_for_test(&account_1, 10000);
+        Account::create_and_mint_for_test(&account_2, 10000);
         register_validator_candidate(&account_1, Vector::empty(), Vector::empty(), Vector::empty());
         let addr1 = Signer::address_of(&account_1);
         let addr2 = Signer::address_of(&account_2);
@@ -380,7 +381,7 @@ module AptosFramework::Stake {
         assert!(borrow_global<StakePool>(addr1).current_stake == 203, 0);
         // withdraw inactive
         withdraw_inactive(&account_1, addr1);
-        assert!(TestCoin::balance_of(addr1) == 10000, 0);
+        assert!(Account::get_balance(addr1) == 10000, 0);
     }
 
     #[test(core_resources = @CoreResources, account_1 = @0x123, account_2 = @0x234, account_3 = @0x345)]
@@ -392,7 +393,7 @@ module AptosFramework::Stake {
     ) acquires StakePool, ValidatorConfig, ValidatorSet {
         initialize_validator_set(&core_resources, 100, 10000);
         Timestamp::set_time_has_started_for_testing(&core_resources);
-        TestCoin::mint_for_test(&account_1, 10000);
+        Account::create_and_mint_for_test(&account_1, 10000);
         let addr1 = Signer::address_of(&account_1);
         let addr2 = Signer::address_of(&account_2);
         let addr3 = Signer::address_of(&account_3);

@@ -21,7 +21,7 @@ use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
-    account_config::{AccountResource, BalanceResource, TransferEventsResource, CORE_CODE_ADDRESS},
+    account_config::{AccountResource, TransferEvents, CORE_CODE_ADDRESS},
     block_metadata::{new_block_event_key, BlockMetadata, NewBlockEvent},
     on_chain_config::{OnChainConfig, VMPublishingOption, ValidatorSet, Version},
     state_store::state_key::StateKey,
@@ -268,8 +268,9 @@ impl FakeExecutor {
         bcs::from_bytes(data_blob.as_slice()).ok()
     }
 
-    pub fn read_transfer_event(&self, account: &Account) -> Option<TransferEventsResource> {
-        self.read_resource(account.address())
+    pub fn read_transfer_event(&self, account: &Account) -> Option<TransferEvents> {
+        self.read_account_resource_at_address(account.address())
+            .map(|account| account.transfer_events().clone())
     }
 
     /// Reads the resource [`Value`] for an account under the given address from
@@ -283,17 +284,15 @@ impl FakeExecutor {
 
     /// Reads the balance resource value for an account from this executor's data store with the
     /// given balance currency_code.
-    pub fn read_balance_resource(&self, account: &Account) -> Option<BalanceResource> {
-        self.read_balance_resource_at_address(account.address())
+    pub fn read_balance(&self, account: &Account) -> Option<u64> {
+        self.read_balance_at_address(account.address())
     }
 
-    /// Reads the balance resource value for an account under the given address from this executor's
-    /// data store with the given balance currency_code.
-    pub fn read_balance_resource_at_address(
-        &self,
-        addr: &AccountAddress,
-    ) -> Option<BalanceResource> {
-        self.read_resource(addr)
+    /// Reads the balance value for an account under the given address from this executor's
+    /// data store.
+    pub fn read_balance_at_address(&self, addr: &AccountAddress) -> Option<u64> {
+        self.read_account_resource_at_address(addr)
+            .map(|account| account.balance())
     }
 
     /// Executes the given block of transactions.

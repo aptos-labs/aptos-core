@@ -1,6 +1,7 @@
 module AptosFramework::Account {
     use Std::BCS;
     use Std::Errors;
+    use Std::Event::{Self, EventHandle};
     use Std::Hash;
     use Std::Signer;
     use Std::Vector;
@@ -13,11 +14,30 @@ module AptosFramework::Account {
     friend AptosFramework::Genesis;
 
     /// Resource representing an account.
-    struct Account has key, store {
+    struct Account has key {
         authentication_key: vector<u8>,
         sequence_number: u64,
         self_address: address,
+        balance: TestCoin::Coin,
+        transfer_events: TransferEvents,
     }
+
+    /// Events handles.
+    struct TransferEvents has store {
+        sent_events: EventHandle<SentEvent>,
+        received_events: EventHandle<ReceivedEvent>,
+    }
+
+    struct SentEvent has drop, store {
+        amount: u64,
+        to: address,
+    }
+
+    struct ReceivedEvent has drop, store {
+        amount: u64,
+        from: address,
+    }
+
 
     /// This holds information that will be picked up by the VM to call the
     /// correct chain-specific prologue and epilogue functions
@@ -95,6 +115,13 @@ module AptosFramework::Account {
         });
     }
 
+    /// Create the account for @AptosFramework to help module upgrades on testnet.
+    public(friend) fun create_core_framework_account(): signer {
+        Timestamp::assert_genesis();
+        let (signer, _) = create_account_unchecked(@AptosFramework);
+        signer
+    }
+
     /// Construct an authentication key, aborting if the prefix is not valid.
     fun create_authentication_key(account: &signer, auth_key_prefix: vector<u8>): vector<u8> {
         let authentication_key = auth_key_prefix;
@@ -143,6 +170,11 @@ module AptosFramework::Account {
                 authentication_key: copy authentication_key,
                 sequence_number: 0,
                 self_address: new_address,
+                balance: TestCoin::zero(),
+                transfer_events: TransferEvents {
+                    sent_events: Event::new_event_handle<SentEvent>(&new_account),
+                    received_events: Event::new_event_handle<ReceivedEvent>(&new_account),
+                }
             }
         );
 
@@ -161,8 +193,8 @@ module AptosFramework::Account {
         *&borrow_global<Account>(addr).authentication_key
     }
 
-    public(script) fun rotate_authentication_key(account: signer, new_auth_key: vector<u8>) acquires Account {
-        rotate_authentication_key_internal(&account, new_auth_key);
+    public fun get_balance(addr: address): u64 acquires Account {
+        TestCoin::value(&borrow_global<Account>(addr).balance)
     }
 
     public fun rotate_authentication_key_internal(
@@ -217,8 +249,7 @@ module AptosFramework::Account {
             Errors::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
         );
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
-        assert!(TestCoin::exists_at(transaction_sender), Errors::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
-        let balance = TestCoin::balance_of(transaction_sender);
+        let balance = get_balance(transaction_sender);
         assert!(balance >= max_transaction_fee, Errors::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
     }
 
@@ -301,7 +332,7 @@ module AptosFramework::Account {
             Errors::limit_exceeded(EGAS)
         );
         let transaction_fee_amount = txn_gas_price * gas_used;
-        let coin = TestCoin::withdraw(&account, transaction_fee_amount);
+        let coin = withdraw_from(&account, transaction_fee_amount);
         TransactionFee::burn_fee(coin);
 
         let addr = Signer::address_of(&account);
@@ -318,18 +349,103 @@ module AptosFramework::Account {
     }
 
     ///////////////////////////////////////////////////////////////////////////
-    /// Basic account creation method.
+    /// Coin related functions.
+    ///////////////////////////////////////////////////////////////////////////
+
+    public fun withdraw_from(from: &signer, amount: u64): TestCoin::Coin acquires Account {
+        let account = borrow_global_mut<Account>(Signer::address_of(from));
+        TestCoin::split(&mut account.balance, amount)
+    }
+
+    public fun deposit_to(to: address, coins: TestCoin::Coin) acquires Account {
+        let account = borrow_global_mut<Account>(to);
+        TestCoin::merge(&mut account.balance, coins);
+    }
+
+    /// Mint coins if the account has MintCapability.
+    public fun mint_internal(account: &signer, mint_addr: address, amount: u64) acquires Account {
+        let coins = TestCoin::mint(account, amount);
+        deposit_to(mint_addr, coins);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    /// Script functions.
     ///////////////////////////////////////////////////////////////////////////
 
     public(script) fun create_account(auth_key: address) {
-        let (signer, _) = create_account_internal(auth_key);
-        TestCoin::register(&signer);
+        create_account_internal(auth_key);
     }
 
-    /// Create the account for @AptosFramework to help module upgrades on testnet.
-    public(friend) fun create_core_framework_account(): signer {
-        Timestamp::assert_genesis();
-        let (signer, _) = create_account_unchecked(@AptosFramework);
-        signer
+    public(script) fun rotate_authentication_key(account: signer, new_auth_key: vector<u8>) acquires Account {
+        rotate_authentication_key_internal(&account, new_auth_key);
+    }
+
+    /// Transfers `amount` of coins from `from` to `to`.
+    public(script) fun transfer(from: &signer, to: address, amount: u64) acquires Account {
+        let check = withdraw_from(from, amount);
+        deposit_to(to, check);
+        // emit events
+        let sender_handle = &mut borrow_global_mut<Account>(Signer::address_of(from)).transfer_events;
+        Event::emit_event<SentEvent>(
+            &mut sender_handle.sent_events,
+            SentEvent { amount, to },
+        );
+        let receiver_handle = &mut borrow_global_mut<Account>(to).transfer_events;
+        Event::emit_event<ReceivedEvent>(
+            &mut receiver_handle.received_events,
+            ReceivedEvent { amount, from: Signer::address_of(from) },
+        );
+    }
+
+    /// Mint coins if the account has MintCapability.
+    public(script) fun mint(account: signer, mint_addr: address, amount: u64) acquires Account {
+        mint_internal(&account, mint_addr, amount);
+    }
+
+    #[test(account = @0x123)]
+    fun zero_balance(account: signer) acquires Account {
+        let addr = Signer::address_of(&account);
+        create_account_internal(addr);
+        assert!(get_balance(addr) == 0, 0);
+    }
+
+    #[test(account = @0x123)]
+    #[expected_failure(abort_code = 6)] // Can specify an abort code
+    fun double_creation(account: signer) {
+        let addr = Signer::address_of(&account);
+        create_account_internal(addr);
+        create_account_internal(addr);
+    }
+
+    #[test]
+    #[expected_failure]
+    fun balance_of_dne() acquires Account {
+        get_balance(@0x1);
+    }
+
+    #[test(account = @CoreResources, receiver = @0x123)]
+    public(script) fun test_transfer(
+        account: signer,
+        receiver: signer,
+    ) acquires Account {
+        TestCoin::initialize(&account, 1000000);
+        let amount = 1000;
+        let addr = Signer::address_of(&account);
+        let addr1 = Signer::address_of(&receiver);
+        create_account_internal(addr);
+        create_account_internal(addr1);
+        mint_internal(&account, addr, amount);
+
+        transfer(&account, addr1, 400);
+        assert!(get_balance(addr) == 600, 0);
+        assert!(get_balance(addr1) == 400, 0);
+    }
+
+    #[test_only]
+    public fun create_and_mint_for_test(account: &signer, amount: u64) acquires Account {
+        let addr = Signer::address_of(account);
+        create_account_internal(addr);
+
+        deposit_to(addr, TestCoin::mint_for_test(amount));
     }
 }

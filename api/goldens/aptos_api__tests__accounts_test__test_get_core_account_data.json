@@ -1,4 +1,34 @@
 {
   "sequence_number": "0",
-  "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6"
+  "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
+  "self_address": "0xa550c18",
+  "balance": {
+    "value": "18446744073709551614"
+  },
+  "transfer_events": {
+    "sent_events": {
+      "counter": "0",
+      "guid": {
+        "len_bytes": 40,
+        "guid": {
+          "id": {
+            "creation_num": "0",
+            "addr": "0xa550c18"
+          }
+        }
+      }
+    },
+    "received_events": {
+      "counter": "0",
+      "guid": {
+        "len_bytes": 40,
+        "guid": {
+          "id": {
+            "creation_num": "1",
+            "addr": "0xa550c18"
+          }
+        }
+      }
+    }
+  }
 }

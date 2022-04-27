@@ -2,12 +2,12 @@
   "type": "user_transaction",
   "version": "2",
   "hash": "0xf1d9819d9c3890f1d3e515be30cf920bd5bba8a7616dc02f21438c3ce08e27fa",
-  "state_root_hash": "0x590f869a35bfa866f85baca8bd5fbab5c53f7911bc70c10d8bb29b0187d89b1d",
+  "state_root_hash": "0x8c9477979fbb94b849d0f35cac7c8ef96ff8a332ae08f7f8fbfd9563df44ff0a",
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "1",
   "success": false,
   "vm_status": "Move bytecode deserialization / verification failed, including script function not found or invalid arguments",
-  "accumulator_root_hash": "0x57fe684da8f5e4f43abff4fa0c92bee0bec2def71f630f73f21aec8fe7054132",
+  "accumulator_root_hash": "0xac125c6b87bd86b346634a8f7a90d9952359230565d1396468595f40454a2217",
   "changes": [
     {
       "type": "write_resource",
@@ -17,20 +17,36 @@
         "type": "0x1::Account::Account",
         "data": {
           "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
-          "self_address": "0xa550c18",
-          "sequence_number": "1"
-        }
-      }
-    },
-    {
-      "type": "write_resource",
-      "address": "0xa550c18",
-      "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
-      "data": {
-        "type": "0x1::TestCoin::Balance",
-        "data": {
-          "coin": {
+          "balance": {
             "value": "18446744073709551614"
+          },
+          "self_address": "0xa550c18",
+          "sequence_number": "1",
+          "transfer_events": {
+            "received_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xa550c18",
+                    "creation_num": "1"
+                  }
+                },
+                "len_bytes": 40
+              }
+            },
+            "sent_events": {
+              "counter": "0",
+              "guid": {
+                "guid": {
+                  "id": {
+                    "addr": "0xa550c18",
+                    "creation_num": "0"
+                  }
+                },
+                "len_bytes": 40
+              }
+            }
           }
         }
       }

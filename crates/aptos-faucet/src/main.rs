@@ -120,8 +120,9 @@ mod tests {
     use aptos_infallible::RwLock;
     use aptos_rest_client::{
         aptos_api_types::{
-            AccountData, DirectWriteSet, LedgerInfo, PendingTransaction, Response,
-            TransactionPayload as TransactionPayloadData, WriteSet, WriteSetPayload,
+            convert_event_key, AccountData, DirectWriteSet, EventHandle, LedgerInfo,
+            PendingTransaction, Response, TestCoin, TransactionPayload as TransactionPayloadData,
+            TransferEvents, WriteSet, WriteSetPayload,
         },
         FaucetClient,
     };
@@ -130,6 +131,7 @@ mod tests {
         types::{
             account_address::AccountAddress,
             chain_id::ChainId,
+            event::EventKey,
             transaction::{
                 authenticator::AuthenticationKey, SignedTransaction, Transaction,
                 TransactionPayload::Script,
@@ -219,9 +221,25 @@ mod tests {
         };
         if let Some(account) = account {
             let auth_vec: Vec<u8> = account.authentication_key.as_ref().into();
+            let event_key =
+                EventKey::new_from_address(&account.authentication_key.derived_address(), 0);
             let account_data = AccountData {
                 authentication_key: auth_vec.into(),
                 sequence_number: account.sequence_number.into(),
+                self_address: account.authentication_key.derived_address().into(),
+                balance: TestCoin {
+                    value: account.balance.into(),
+                },
+                transfer_events: TransferEvents {
+                    sent_events: EventHandle {
+                        counter: 0.into(),
+                        guid: convert_event_key(&event_key),
+                    },
+                    received_events: EventHandle {
+                        counter: 0.into(),
+                        guid: convert_event_key(&event_key),
+                    },
+                },
             };
             Ok(response(&account_data))
         } else {

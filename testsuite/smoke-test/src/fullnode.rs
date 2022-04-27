@@ -67,7 +67,7 @@ impl LaunchFullnode {
             .await?
             .into_inner();
 
-        assert_eq!(balance.get(), 10);
+        assert_eq!(balance, 10);
 
         Ok(())
     }

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_api_types::{Address, U64};
+use aptos_api_types::{Address, TestCoin, TransferEvents, U64};
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use move_core_types::{language_storage::StructTag, parser::parse_struct_tag};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -63,27 +63,12 @@ pub struct Account {
     pub authentication_key: AuthenticationKey,
     #[serde(deserialize_with = "deserialize_from_string")]
     pub sequence_number: u64,
+    pub self_address: Address,
+    pub balance: TestCoin,
+    pub transfer_events: TransferEvents,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct EventHandle {
-    counter: U64,
-    guid: EventHandleGUID,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct EventHandleGUID {
-    len_bytes: u8,
-    guid: GUID,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct GUID {
-    id: ID,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ID {
-    creation_num: U64,
-    addr: Address,
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Version {
+    pub major: U64,
 }

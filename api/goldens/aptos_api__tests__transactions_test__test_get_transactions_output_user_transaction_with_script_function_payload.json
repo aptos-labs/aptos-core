@@ -3,12 +3,12 @@
     "type": "block_metadata_transaction",
     "version": "1",
     "hash": "0xa8fc186c28fc0f95b8233651438093e8e215a51dcd16475f5e68c0a421f6305c",
-    "state_root_hash": "0x8e8d033419b5d2c32c863069a7745dfa57ac8f5c420ea43b0e92621ae7b855c7",
+    "state_root_hash": "0xe6d9617ab5c772b6aae53cf4c7e3b5592fc044aa4546f0dd3e7b077023780693",
     "event_root_hash": "0xd62c85b93234824cf825e9c028c3bcc59b06926039721bd7edd76b56ae9fcecf",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xdcf615b5978b3273ec5e81298eab09fefb28542f26fb5d8791814d53f1f31095",
+    "accumulator_root_hash": "0x59c256ee5990a736a5e2aac98658f6e1baa708b643d2b48e618e68b68ea54ef0",
     "changes": [
       {
         "type": "write_resource",
@@ -56,12 +56,12 @@
     "type": "user_transaction",
     "version": "2",
     "hash": "0x18073cb2536317833aa630d30062383a1f00221dd3604bbce19cd262813e6c36",
-    "state_root_hash": "0xbaf51db8bf5a5ee511928b03da8195306b126fbd66c1688ff7178ad28bab86d0",
+    "state_root_hash": "0x559f2943202c2a2016f5524c4e9a6ddc71c6cc036cebb1c139ac74de36387450",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
-    "gas_used": "92",
+    "gas_used": "83",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xeee833776348d0fa4e93ee9d2faa6a4f59e16bcbb12d1477a68dc0d1b66f47c1",
+    "accumulator_root_hash": "0x2829c0cf9836e8a4e3bef0e941f11c6c49bcc56f8480521ba9e22fefcbb1cea2",
     "changes": [
       {
         "type": "write_resource",
@@ -71,20 +71,36 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
-            "self_address": "0xa550c18",
-            "sequence_number": "1"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xa550c18",
-        "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
+            "balance": {
               "value": "18446744073709551614"
+            },
+            "self_address": "0xa550c18",
+            "sequence_number": "1",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xa550c18",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
             }
           }
         }
@@ -97,8 +113,37 @@
           "type": "0x1::Account::Account",
           "data": {
             "authentication_key": "0x0e60912ecb0a8c365d163d258f3b9f1b62f8f9148c207643864d7ed4a2b23159",
+            "balance": {
+              "value": "0"
+            },
             "self_address": "0xe60912ecb0a8c365d163d258f3b9f1b62f8f9148c207643864d7ed4a2b23159",
-            "sequence_number": "0"
+            "sequence_number": "0",
+            "transfer_events": {
+              "received_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xe60912ecb0a8c365d163d258f3b9f1b62f8f9148c207643864d7ed4a2b23159",
+                      "creation_num": "1"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              },
+              "sent_events": {
+                "counter": "0",
+                "guid": {
+                  "guid": {
+                    "id": {
+                      "addr": "0xe60912ecb0a8c365d163d258f3b9f1b62f8f9148c207643864d7ed4a2b23159",
+                      "creation_num": "0"
+                    }
+                  },
+                  "len_bytes": 40
+                }
+              }
+            }
           }
         }
       },
@@ -110,53 +155,6 @@
           "type": "0x1::GUID::Generator",
           "data": {
             "counter": "2"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xe60912ecb0a8c365d163d258f3b9f1b62f8f9148c207643864d7ed4a2b23159",
-        "state_key_hash": "0xdfe49d4e38fbd3f272555234ca2bfff43df59d18ed84d8d91e2abc56c0512ffa",
-        "data": {
-          "type": "0x1::TestCoin::Balance",
-          "data": {
-            "coin": {
-              "value": "0"
-            }
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xe60912ecb0a8c365d163d258f3b9f1b62f8f9148c207643864d7ed4a2b23159",
-        "state_key_hash": "0x3eb9bd9e5d57ea570fc4dcfc82d8a20873cc45976b3d65dc8ad23daa46b482fe",
-        "data": {
-          "type": "0x1::TestCoin::TransferEvents",
-          "data": {
-            "received_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xe60912ecb0a8c365d163d258f3b9f1b62f8f9148c207643864d7ed4a2b23159",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
-              }
-            },
-            "sent_events": {
-              "counter": "0",
-              "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xe60912ecb0a8c365d163d258f3b9f1b62f8f9148c207643864d7ed4a2b23159",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
-              }
-            }
           }
         }
       }

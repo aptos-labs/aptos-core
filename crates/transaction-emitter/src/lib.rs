@@ -366,8 +366,7 @@ impl<'t> TxnEmitter<'t> {
             .into_inner();
         println!(
             "Root account current balances are {}, requested {} coins",
-            balance.get(),
-            coins_total
+            balance, coins_total
         );
         Ok(faucet_account)
     }
@@ -387,7 +386,7 @@ impl<'t> TxnEmitter<'t> {
             .await
             .map_err(|e| {
                 format_err!(
-                    "query_sequence_numbers on {:?} for dd account failed: {}",
+                    "query_sequence_numbers on {:?} for account failed: {}",
                     client,
                     e
                 )
@@ -755,8 +754,7 @@ pub async fn query_sequence_numbers(
 ) -> Result<Vec<u64>> {
     Ok(
         try_join_all(addresses.iter().map(|address| client.get_account(*address)))
-            .await
-            .context("get accounts failed")?
+            .await?
             .into_iter()
             .map(|resp| resp.into_inner().sequence_number)
             .collect(),

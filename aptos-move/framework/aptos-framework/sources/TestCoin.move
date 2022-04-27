@@ -4,7 +4,6 @@ module AptosFramework::TestCoin {
     use Std::Errors;
     use Std::Signer;
     use Std::Vector;
-    use Std::Event::{Self, EventHandle};
     use Std::Option::{Self, Option};
 
     use AptosFramework::SystemAddresses;
@@ -20,11 +19,6 @@ module AptosFramework::TestCoin {
 
     struct Coin has store {
         value: u64
-    }
-
-    /// Struct representing the balance of each address.
-    struct Balance has key {
-        coin: Coin
     }
 
     /// Represnets the metadata of the coin, store @CoreResources.
@@ -47,44 +41,12 @@ module AptosFramework::TestCoin {
         inner: vector<DelegatedMintCapability>,
     }
 
-    /// Events handles.
-    struct TransferEvents has key {
-        sent_events: EventHandle<SentEvent>,
-        received_events: EventHandle<ReceivedEvent>,
-    }
-
-    struct SentEvent has drop, store {
-        amount: u64,
-        to: address,
-    }
-
-    struct ReceivedEvent has drop, store {
-        amount: u64,
-        from: address,
-    }
-
     public fun initialize(core_resource: &signer, scaling_factor: u64) {
         SystemAddresses::assert_core_resource(core_resource);
         move_to(core_resource, MintCapability {});
         move_to(core_resource, BurnCapability {});
         move_to(core_resource, CoinInfo { scaling_factor });
         move_to(core_resource, Delegations { inner: Vector::empty() });
-        register(core_resource);
-    }
-
-    /// Publish an empty balance resource under `account`'s address. This function must be called before
-    /// minting or transferring to the account.
-    public fun register(account: &signer) {
-        let empty_coin = Coin { value: 0 };
-        assert!(!exists<Balance>(Signer::address_of(account)), Errors::already_published(EALREADY_HAS_BALANCE));
-        move_to(account, Balance { coin:  empty_coin });
-        move_to(
-            account,
-            TransferEvents {
-                sent_events: Event::new_event_handle<SentEvent>(account),
-                received_events: Event::new_event_handle<ReceivedEvent>(account),
-            }
-        );
     }
 
     /// Create delegated token for the address so the account could claim MintCapability later.
@@ -127,67 +89,25 @@ module AptosFramework::TestCoin {
         index
     }
 
-    /// Mint coins with capability.
-    public(script) fun mint(
-        account: &signer,
-        mint_addr: address,
-        amount: u64
-    ) acquires Balance, MintCapability
-    {
-        mint_internal(account, mint_addr, amount);
-    }
-
-    public fun mint_internal(account: &signer, mint_addr: address, amount: u64) acquires Balance, MintCapability {
+    /// Mint with Capability.
+    public fun mint(account: &signer, amount: u64): Coin acquires  MintCapability {
         let sender_addr = Signer::address_of(account);
         let _cap = borrow_global<MintCapability>(sender_addr);
-        // Deposit `amount` of tokens to `mint_addr`'s balance
-        deposit(mint_addr, Coin { value: amount });
-    }
-
-    public fun exists_at(addr: address): bool{
-        exists<Balance>(addr)
-    }
-
-    /// Returns the balance of `owner`.
-    public fun balance_of(owner: address): u64 acquires Balance {
-        assert!(exists<Balance>(owner), Errors::not_published(EBALANCE_NOT_PUBLISHED));
-        borrow_global<Balance>(owner).coin.value
-    }
-
-    /// Transfers `amount` of tokens from `from` to `to`.
-    public(script) fun transfer(from: &signer, to: address, amount: u64) acquires Balance, TransferEvents {
-        let check = withdraw(from, amount);
-        deposit(to, check);
-        // emit events
-        let sender_handle = borrow_global_mut<TransferEvents>(Signer::address_of(from));
-        Event::emit_event<SentEvent>(
-            &mut sender_handle.sent_events,
-            SentEvent { amount, to },
-        );
-        let receiver_handle = borrow_global_mut<TransferEvents>(to);
-        Event::emit_event<ReceivedEvent>(
-            &mut receiver_handle.received_events,
-            ReceivedEvent { amount, from: Signer::address_of(from) },
-        );
-    }
-
-    /// Withdraw `amount` number of tokens from the balance under `addr`.
-    public fun withdraw(signer: &signer, amount: u64) : Coin acquires Balance {
-        let addr = Signer::address_of(signer);
-        let balance = balance_of(addr);
-        // balance must be greater than the withdraw amount
-        assert!(balance >= amount, Errors::limit_exceeded(EINSUFFICIENT_BALANCE));
-        let balance_ref = &mut borrow_global_mut<Balance>(addr).coin.value;
-        *balance_ref = balance - amount;
         Coin { value: amount }
     }
 
-    /// Deposit `amount` number of tokens to the balance under `addr`.
-    public fun deposit(addr: address, check: Coin) acquires Balance {
-        let balance = balance_of(addr);
-        let balance_ref = &mut borrow_global_mut<Balance>(addr).coin.value;
+    /// Split `amount` number of coins.
+    public fun split(coin: &mut Coin, amount: u64): Coin {
+        // balance must be greater than the withdraw amount
+        assert!(coin.value >= amount, Errors::limit_exceeded(EINSUFFICIENT_BALANCE));
+        coin.value = coin.value - amount;
+        Coin { value: amount }
+    }
+
+    /// Merge coins.
+    public fun merge(coin: &mut Coin, check: Coin){
         let Coin { value } = check;
-        *balance_ref = balance + value;
+        coin.value = coin.value + value
     }
 
     /// Burn coins with capability.
@@ -214,120 +134,59 @@ module AptosFramework::TestCoin {
         Coin {value: 0}
     }
 
-    public fun merge(lhs: &mut Coin, rhs: Coin) {
-        let Coin { value } = rhs;
-        lhs.value = lhs.value + value;
-    }
-
     public fun value(coin: &Coin): u64 {
         coin.value
     }
 
     #[test(account = @0x1)]
     #[expected_failure] // This test should abort
-    fun mint_non_owner(account: signer) acquires Balance, MintCapability {
+    fun mint_non_owner(account: signer) acquires MintCapability {
         // Make sure the address we've chosen doesn't match the module
         // owner address
-        register(&account);
         assert!(Signer::address_of(&account) != @CoreResources, 0);
-        mint_internal(&account, @0x1, 10);
+        let Coin { value: _ } = mint(&account, 10);
     }
 
     #[test(account = @CoreResources)]
     public(script) fun mint_check_balance_and_supply(
         account: signer,
-    ) acquires Balance, MintCapability {
+    ) acquires MintCapability {
         initialize(&account, 1000000);
-        let addr = Signer::address_of(&account);
-        mint(&account, @CoreResources, 42);
-        assert!(balance_of(addr) == 42, 0);
-    }
-
-    #[test(account = @0x1)]
-    fun register_has_zero(account: signer) acquires Balance {
-        let addr = Signer::address_of(&account);
-        register(&account);
-        assert!(balance_of(addr) == 0, 0);
-    }
-
-    #[test(account = @0x1)]
-    #[expected_failure(abort_code = 262)] // Can specify an abort code
-    fun register_already_exists(account: signer) {
-        register(&account);
-        register(&account);
-    }
-
-    #[test]
-    #[expected_failure]
-    fun balance_of_dne() acquires Balance {
-        balance_of(@0x1);
-    }
-
-    #[test(account = @0x1)]
-    #[expected_failure]
-    fun withdraw_dne(account: signer) acquires Balance {
-        // Need to unpack the coin since `Coin` is a resource
-        Coin { value: _ } = withdraw(&account, 0);
-    }
-
-    #[test(account = @0x1)]
-    #[expected_failure]
-    fun withdraw_too_much(account: signer) acquires Balance {
-        register(&account);
-        Coin { value: _ } = withdraw(&account, 1);
+        let Coin{ value } = mint(&account, 42);
+        assert!(value == 42, 0);
     }
 
     #[test(account = @CoreResources)]
-    fun can_withdraw_amount(account: signer) acquires Balance, MintCapability {
+    fun can_split_amount(account: signer) acquires MintCapability {
         initialize(&account, 1000000);
         let amount = 1000;
-        let addr = Signer::address_of(&account);
-        mint_internal(&account, addr, amount);
-        let Coin { value } = withdraw(&account, amount);
-        assert!(value == amount, 0);
+        let coins = mint(&account, amount);
+        let Coin { value } = split(&mut coins, 100);
+        assert!(value == 100, 0);
+        let Coin { value } = coins;
+        assert!(value == 900, 0);
     }
 
     #[test(account = @CoreResources)]
-    fun successful_burn(account: signer) acquires Balance, MintCapability, BurnCapability {
+    fun successful_burn(account: signer) acquires MintCapability, BurnCapability {
         initialize(&account, 1000000);
         let amount = 1000;
-        let addr = Signer::address_of(&account);
-        mint_internal(&account, addr, amount);
-        burn(&account, withdraw(&account, 100));
-        assert!(balance_of(addr) == 900, 0);
+        let coins = mint(&account, amount);
+        burn(&account, coins);
     }
 
     #[test(account = @CoreResources, another = @0x1)]
     #[expected_failure]
-    fun failed_burn(account: signer, another: signer) acquires Balance, MintCapability, BurnCapability {
+    fun failed_burn(account: signer, another: signer) acquires MintCapability, BurnCapability {
         initialize(&account, 1000000);
         let amount = 1000;
-        let addr = Signer::address_of(&another);
-        mint_internal(&account, addr, amount);
-        burn(&another, withdraw(&another, 100));
-    }
-
-    #[test(account = @CoreResources, receiver = @0x1)]
-    public(script) fun transfer_test(
-        account: signer,
-        receiver: signer,
-    ) acquires Balance, MintCapability, TransferEvents {
-        initialize(&account, 1000000);
-        register(&receiver);
-        let amount = 1000;
-        let addr = Signer::address_of(&account);
-        let addr1 = Signer::address_of(&receiver);
-        mint_internal(&account, addr, amount);
-
-        transfer(&account, addr1, 400);
-        assert!(balance_of(addr) == 600, 0);
-        assert!(balance_of(addr1) == 400, 0);
+        let coins = mint(&account, amount);
+        burn(&another, coins);
     }
 
     #[test(account = @CoreResources, account_clone = @CoreResources, delegatee = @0x1)]
-    public(script) fun mint_delegation_success(account: signer, account_clone: signer, delegatee: signer) acquires Balance, Delegations, MintCapability  {
+    public(script) fun mint_delegation_success(account: signer, account_clone: signer, delegatee: signer) acquires Delegations, MintCapability  {
         initialize(&account, 1000000);
-        register(&delegatee);
         let addr = Signer::address_of(&delegatee);
         let addr1 = @0x2;
         // make sure can delegate more than one
@@ -335,8 +194,8 @@ module AptosFramework::TestCoin {
         delegate_mint_capability(account, addr);
         claim_mint_capability(&delegatee);
 
-        mint(&delegatee, addr, 1000);
-        assert!(balance_of(addr) == 1000, 0);
+        let Coin { value } = mint(&delegatee, 1000);
+        assert!(value == 1000, 0);
     }
 
     #[test(account = @CoreResources, random = @0x1)]
@@ -356,8 +215,7 @@ module AptosFramework::TestCoin {
     }
 
     #[test_only]
-    public fun mint_for_test(account: &signer, amount: u64) acquires Balance {
-        register(account);
-        deposit(Signer::address_of(account), Coin {value: amount});
+    public fun mint_for_test(amount: u64): Coin {
+        Coin {value: amount}
     }
 }

@@ -49,8 +49,37 @@
     "type": "0x1::Account::Account",
     "data": {
       "authentication_key": "0x7deeccb1080854f499ec8b4c1b213b82c5e34b925cf6875fec02d4b77adbd2d6",
+      "balance": {
+        "value": "18446744073709551614"
+      },
       "self_address": "0xa550c18",
-      "sequence_number": "0"
+      "sequence_number": "0",
+      "transfer_events": {
+        "received_events": {
+          "counter": "0",
+          "guid": {
+            "guid": {
+              "id": {
+                "addr": "0xa550c18",
+                "creation_num": "1"
+              }
+            },
+            "len_bytes": 40
+          }
+        },
+        "sent_events": {
+          "counter": "0",
+          "guid": {
+            "guid": {
+              "id": {
+                "addr": "0xa550c18",
+                "creation_num": "0"
+              }
+            },
+            "len_bytes": 40
+          }
+        }
+      }
     }
   },
   {
@@ -80,14 +109,6 @@
     }
   },
   {
-    "type": "0x1::TestCoin::Balance",
-    "data": {
-      "coin": {
-        "value": "18446744073709551614"
-      }
-    }
-  },
-  {
     "type": "0x1::TestCoin::CoinInfo",
     "data": {
       "scaling_factor": "1000000"
@@ -109,35 +130,6 @@
     "type": "0x1::TestCoin::MintCapability",
     "data": {
       "dummy_field": false
-    }
-  },
-  {
-    "type": "0x1::TestCoin::TransferEvents",
-    "data": {
-      "received_events": {
-        "counter": "0",
-        "guid": {
-          "guid": {
-            "id": {
-              "addr": "0xa550c18",
-              "creation_num": "1"
-            }
-          },
-          "len_bytes": 40
-        }
-      },
-      "sent_events": {
-        "counter": "0",
-        "guid": {
-          "guid": {
-            "id": {
-              "addr": "0xa550c18",
-              "creation_num": "0"
-            }
-          },
-          "len_bytes": 40
-        }
-      }
     }
   },
   {

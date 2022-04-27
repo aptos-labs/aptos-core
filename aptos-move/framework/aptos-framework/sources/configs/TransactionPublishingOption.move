@@ -4,7 +4,6 @@ module AptosFramework::TransactionPublishingOption {
     use Std::Vector;
     use AptosFramework::Timestamp;
     use AptosFramework::SystemAddresses;
-    use AptosFramework::Reconfiguration;
 
     /// Defines and holds the publishing policies for the VM. There are three possible configurations:
     /// 1. No module publishing, only allow-listed scripts are allowed.
@@ -51,13 +50,5 @@ module AptosFramework::TransactionPublishingOption {
         let publish_option = borrow_global<TransactionPublishingOption>(@CoreResources);
 
         publish_option.module_publishing_allowed
-    }
-
-    public(script) fun set_module_publishing_allowed(account:signer, is_allowed: bool) acquires TransactionPublishingOption {
-        SystemAddresses::assert_core_resource(&account);
-        let publish_option = borrow_global_mut<TransactionPublishingOption>(@CoreResources);
-        publish_option.module_publishing_allowed = is_allowed;
-
-        Reconfiguration::reconfigure();
     }
 }
