@@ -32,6 +32,12 @@ pub type CliTypedResult<T> = Result<T, CliError>;
 
 #[derive(Debug, Error)]
 pub enum CliError {
+    #[error("Aborted command")]
+    AbortedError,
+    #[error("API error: {0}")]
+    ApiError(String),
+    #[error("Error (de)serializing '{0}': {1}")]
+    BCS(&'static str, #[source] bcs::Error),
     #[error("Invalid arguments: {0}")]
     CommandArgumentError(String),
     #[error("Unable to load config: {0} {1}")]
@@ -40,39 +46,33 @@ pub enum CliError {
     ConfigNotFoundError(String),
     #[error("Error accessing '{0}': {1}")]
     IO(String, #[source] std::io::Error),
-    #[error("Error (de)serializing '{0}': {1}")]
-    BCS(&'static str, #[source] bcs::Error),
-    #[error("Unable to parse '{0}': error: {1}")]
-    UnableToParse(&'static str, String),
-    #[error("Unable to read file '{0}', error: {1}")]
-    UnableToReadFile(String, String),
-    #[error("API error: {0}")]
-    ApiError(String),
-    #[error("Unexpected error: {0}")]
-    UnexpectedError(String),
-    #[error("Aborted command")]
-    AbortedError,
     #[error("Move compilation failed: {0}")]
     MoveCompilationError(String),
     #[error("Move unit tests failed: {0}")]
     MoveTestError(String),
+    #[error("Unable to parse '{0}': error: {1}")]
+    UnableToParse(&'static str, String),
+    #[error("Unable to read file '{0}', error: {1}")]
+    UnableToReadFile(String, String),
+    #[error("Unexpected error: {0}")]
+    UnexpectedError(String),
 }
 
 impl CliError {
     pub fn to_str(&self) -> &'static str {
         match self {
+            CliError::AbortedError => "AbortedError",
+            CliError::ApiError(_) => "ApiError",
+            CliError::BCS(_, _) => "BCS",
             CliError::CommandArgumentError(_) => "CommandArgumentError",
             CliError::ConfigLoadError(_, _) => "ConfigLoadError",
             CliError::ConfigNotFoundError(_) => "ConfigNotFoundError",
             CliError::IO(_, _) => "IO",
-            CliError::BCS(_, _) => "BCS",
-            CliError::UnableToParse(_, _) => "UnableToParse",
-            CliError::UnableToReadFile(_, _) => "UnableToReadFile",
-            CliError::ApiError(_) => "ApiError",
-            CliError::UnexpectedError(_) => "UnexpectedError",
-            CliError::AbortedError => "AbortedError",
             CliError::MoveCompilationError(_) => "MoveCompilationError",
             CliError::MoveTestError(_) => "MoveTestError",
+            CliError::UnableToParse(_, _) => "UnableToParse",
+            CliError::UnableToReadFile(_, _) => "UnableToReadFile",
+            CliError::UnexpectedError(_) => "UnexpectedError",
         }
     }
 }
