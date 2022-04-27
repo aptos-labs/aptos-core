@@ -1,16 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React from "react";
-import ReactDOM from "react-dom/client";
-import {BrowserRouter as Router} from "react-router-dom";
 import "./index.css";
-import App from "./App";
-import {AuthProvider} from "auth";
+
 import * as Sentry from "@sentry/react";
 import {BrowserTracing} from "@sentry/tracing";
-
+import {App} from "App";
+import {AuthProvider} from "auth";
+import * as React from "react";
+import ReactDOM from "react-dom/client";
 import ReactGA from "react-ga4";
+import {BrowserRouter as Router} from "react-router-dom";
 
 ReactGA.initialize(process.env.REACT_APP_GA_MEASUREMENT_ID!, {
   testMode: process.env.NODE_ENV !== "production",

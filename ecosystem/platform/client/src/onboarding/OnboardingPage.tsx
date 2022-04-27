@@ -1,12 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+import {useAuth} from "auth";
 import * as React from "react";
+
 import {GitHubSignIn} from "./GitHubSignIn";
 import {OnboardingForm} from "./OnboardingForm";
 import {OnboardingSuccess} from "./OnboardingSuccess";
 import {Identity} from "./types";
-import {useAuth} from "auth";
 
 export function OnboardingPage() {
   const {isSignedIn} = useAuth();

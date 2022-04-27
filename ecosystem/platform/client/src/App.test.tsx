@@ -1,10 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
 import {render, screen} from "@testing-library/react";
+import * as React from "react";
 import {MemoryRouter} from "react-router";
-import App from "./App";
+
+import {App} from "./App";
 
 jest.mock("onboarding", () => {
   return {

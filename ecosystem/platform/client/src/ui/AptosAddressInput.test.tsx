@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import * as React from "react";
 import {render, screen} from "@testing-library/react";
+import * as React from "react";
+
 import {AptosAddressInput} from "./AptosAddressInput";
 
 it("accepts valid addresses", () => {

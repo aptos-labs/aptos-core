@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+import {act, fireEvent, render, screen} from "@testing-library/react";
 import * as React from "react";
-import {act, render, screen, fireEvent} from "@testing-library/react";
+
 import {SocialLoginButton} from "./SocialLoginButton";
 
 const TEST_UUID = "11c16097-505b-4622-8b8d-9480bb52a024";

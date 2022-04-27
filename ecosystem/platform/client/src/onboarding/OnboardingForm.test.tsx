@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+import {fireEvent, render, screen} from "@testing-library/react";
 import * as React from "react";
-import {render, screen, fireEvent} from "@testing-library/react";
+
 import {OnboardingForm} from "./OnboardingForm";
 
 it("calls onSubmit if the form is filled out and the submit button is clicked", () => {
