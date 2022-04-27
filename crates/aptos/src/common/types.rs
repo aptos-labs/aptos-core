@@ -69,6 +69,10 @@ pub struct CliConfig {
 pub struct ProfileConfig {
     /// Private key for commands.  TODO: Add vault functionality
     pub private_key: Option<Ed25519PrivateKey>,
+    /// Public key for commands
+    pub public_key: Option<Ed25519PublicKey>,
+    /// Account for commands
+    pub account: Option<AccountAddress>,
     /// URL for the Aptos rest endpoint
     pub rest_url: Option<String>,
     /// URL for the Faucet endpoint (if applicable)

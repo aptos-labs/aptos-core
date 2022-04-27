@@ -29,8 +29,8 @@ pub struct TransferCoins {
     profile: ProfileOptions,
 
     /// Address of account you want to send coins to
-    #[clap(long)]
-    receiving_account: AccountAddress,
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    account: AccountAddress,
 
     /// Amount of coins to transfer
     #[clap(long)]
@@ -58,7 +58,7 @@ impl TransferCoins {
         let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
         let transaction =
             sender_account.sign_with_transaction_builder(transaction_factory.payload(
-                aptos_stdlib::encode_transfer_script_function(self.receiving_account, self.amount),
+                aptos_stdlib::encode_transfer_script_function(self.account, self.amount),
             ));
         client
             .submit_and_wait(&transaction)

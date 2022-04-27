@@ -31,8 +31,9 @@ pub struct CreateAccount {
     write_options: WriteTransactionOptions,
     #[clap(flatten)]
     profile: ProfileOptions,
+    /// Address to create account for
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
-    address: AccountAddress,
+    account: AccountAddress,
     /// Flag for using faucet to create the account
     #[clap(long)]
     use_faucet: bool,
@@ -46,7 +47,7 @@ pub struct CreateAccount {
 
 impl CreateAccount {
     pub async fn execute(self) -> CliTypedResult<String> {
-        let address = self.address;
+        let address = self.account;
         if self.use_faucet {
             let faucet_url = if let Some(faucet_url) = self.faucet_url {
                 faucet_url
