@@ -54,7 +54,7 @@ impl InitTool {
 
         // Rest Endpoint
         eprintln!(
-            "Enter your rest endpoint [Current: {} No input: {}]",
+            "Enter your rest endpoint [Current: {} | No input: {}]",
             profile_config
                 .rest_url
                 .unwrap_or_else(|| "None".to_string()),
@@ -75,7 +75,7 @@ impl InitTool {
 
         // Faucet Endpoint
         eprintln!(
-            "Enter your faucet endpoint [Current: {} No input: {}]",
+            "Enter your faucet endpoint [Current: {} | No input: {}]",
             profile_config
                 .faucet_url
                 .unwrap_or_else(|| "None".to_string()),
@@ -95,7 +95,7 @@ impl InitTool {
         profile_config.faucet_url = Some(faucet_url.to_string());
 
         // Private key
-        eprintln!("Enter your private key as a hex literal (0x...) [Current: {} No input: Generate new key (or keep one if present)]", profile_config.private_key.as_ref().map(|_| "Redacted").unwrap_or("None"));
+        eprintln!("Enter your private key as a hex literal (0x...) [Current: {} | No input: Generate new key (or keep one if present)]", profile_config.private_key.as_ref().map(|_| "Redacted").unwrap_or("None"));
         let input = read_line("Private key")?;
         let input = input.trim();
         let private_key = if input.is_empty() {
