@@ -29,6 +29,7 @@ services:
     image: "${VALIDATOR_IMAGE_REPO:-aptoslab/validator}:${IMAGE_TAG:-devnet}"
     networks:
       shared:
+        ipv4_address:  172.16.1.10
     volumes:
       - type: volume
         source: aptos-shared
@@ -48,6 +49,7 @@ services:
       - validator
     networks:
       shared:
+        ipv4_address:  172.16.1.11
     volumes:
       - type: volume
         source: aptos-shared
@@ -65,7 +67,7 @@ services:
               --port 8000 \\
               --chain-id TESTING \\
               --mint-key-file-path /opt/aptos/var/mint.key \\
-              --server-url http://validator:8080
+              --server-url http://172.16.1.10:8080
             echo 'Faucet failed to run likely due to the Validator still starting. Will try again.'
           fi
         done
