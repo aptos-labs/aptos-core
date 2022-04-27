@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import * as React from "react";
 import {Route, Routes} from "react-router";
 import {OnboardingPage} from "onboarding";
