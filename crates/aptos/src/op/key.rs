@@ -5,7 +5,7 @@ use crate::{
     common::{
         types::{
             CliError, CliTypedResult, EncodingOptions, EncodingType, ExtractPublicKey, KeyType,
-            PrivateKeyInputOptions, SaveFile,
+            PrivateKeyInputOptions, ProfileOptions, SaveFile,
         },
         utils::{append_file_extension, check_if_file_exists, to_common_result, write_to_file},
     },
@@ -52,6 +52,8 @@ pub struct ExtractPeer {
     output_file_options: SaveFile,
     #[clap(flatten)]
     encoding_options: EncodingOptions,
+    #[clap(flatten)]
+    profile: ProfileOptions,
 }
 
 impl ExtractPeer {
@@ -62,7 +64,7 @@ impl ExtractPeer {
         // Load key based on public or private
         let public_key = self
             .private_key_input_options
-            .extract_x25519_public_key(self.encoding_options.encoding)?;
+            .extract_x25519_public_key(self.encoding_options.encoding, &self.profile.profile)?;
 
         // Build peer info
         // TODO: Take in an address?

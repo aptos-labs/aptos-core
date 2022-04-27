@@ -7,7 +7,8 @@
 //!
 
 use crate::common::types::{
-    account_address_from_public_key, CliConfig, CliError, CliTypedResult, RestOptions,
+    account_address_from_public_key, CliConfig, CliError, CliTypedResult, ProfileOptions,
+    RestOptions,
 };
 use aptos_crypto::PrivateKey;
 use aptos_rest_client::{types::Resource, Client};
@@ -21,8 +22,11 @@ pub struct ListResources {
     #[clap(flatten)]
     rest_options: RestOptions,
 
+    #[clap(flatten)]
+    profile: ProfileOptions,
+
     /// Address of account you want to list resources for
-    #[clap(long)]
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     account: Option<AccountAddress>,
 }
 
@@ -32,7 +36,9 @@ impl ListResources {
     pub(crate) async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
         let account = if let Some(account) = self.account {
             account
-        } else if let Some(private_key) = CliConfig::load()?.private_key {
+        } else if let Some(Some(private_key)) =
+            CliConfig::load_profile(&self.profile.profile)?.map(|p| p.private_key)
+        {
             let public_key = private_key.public_key();
             account_address_from_public_key(&public_key)
         } else {
@@ -41,7 +47,7 @@ impl ListResources {
             ));
         };
 
-        let client = Client::new(self.rest_options.url()?);
+        let client = Client::new(self.rest_options.url(&self.profile.profile)?);
         let response: Vec<Resource> = client
             .get_account_resources(account)
             .await

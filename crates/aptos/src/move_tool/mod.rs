@@ -9,7 +9,8 @@
 use crate::{
     common::{
         types::{
-            CliError, CliTypedResult, EncodingOptions, MovePackageDir, WriteTransactionOptions,
+            CliError, CliTypedResult, EncodingOptions, MovePackageDir, ProfileOptions,
+            WriteTransactionOptions,
         },
         utils::to_common_result,
     },
@@ -133,6 +134,8 @@ pub struct PublishPackage {
     move_options: MovePackageDir,
     #[clap(flatten)]
     write_options: WriteTransactionOptions,
+    #[clap(flatten)]
+    profile: ProfileOptions,
 }
 
 impl PublishPackage {
@@ -156,11 +159,11 @@ impl PublishPackage {
         let sender_key = self
             .write_options
             .private_key_options
-            .extract_private_key(self.encoding_options.encoding)?;
+            .extract_private_key(self.encoding_options.encoding, &self.profile.profile)?;
 
         submit_transaction(
-            self.write_options.rest_options.url()?,
-            self.write_options.chain_id().await?,
+            self.write_options.rest_options.url(&self.profile.profile)?,
+            self.write_options.chain_id(&self.profile.profile).await?,
             sender_key,
             compiled_payload,
             self.write_options.max_gas,
@@ -212,6 +215,8 @@ pub struct RunFunction {
     encoding_options: EncodingOptions,
     #[clap(flatten)]
     write_options: WriteTransactionOptions,
+    #[clap(flatten)]
+    profile: ProfileOptions,
     /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
     ///
     /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::Message::set_message`
@@ -253,11 +258,11 @@ impl RunFunction {
         );
 
         submit_transaction(
-            self.write_options.rest_options.url()?,
-            self.write_options.chain_id().await?,
+            self.write_options.rest_options.url(&self.profile.profile)?,
+            self.write_options.chain_id(&self.profile.profile).await?,
             self.write_options
                 .private_key_options
-                .extract_private_key(self.encoding_options.encoding)?,
+                .extract_private_key(self.encoding_options.encoding, &self.profile.profile)?,
             TransactionPayload::ScriptFunction(script_function),
             self.write_options.max_gas,
         )
