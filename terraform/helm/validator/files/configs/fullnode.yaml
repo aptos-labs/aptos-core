@@ -24,7 +24,7 @@ storage:
   storage_pruner_config:
     ledger_prune_window: {{ int .Values.validator.config.ledger_prune_window }}
     state_store_prune_window: {{ int .Values.validator.config.state_store_prune_window }}
-    max_version_to_prune_per_batch: {{ int .Values.validator.config.max_version_to_prune_per_batch }}
+    pruning_batch_size: {{ int .Values.validator.config.pruning_batch_size }}
 
 full_node_networks:
 - network_id:

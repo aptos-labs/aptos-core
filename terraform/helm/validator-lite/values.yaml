@@ -35,7 +35,7 @@ validator:
     round_initial_timeout_ms:
     ledger_prune_window: 10000000
     state_store_prune_window: 1000000
-    max_version_to_prune_per_batch: 100
+    pruning_batch_size: 10000
 
 vault:
   image:
