@@ -9,8 +9,8 @@
 use crate::{
     common::{
         types::{
-            CliError, CliTypedResult, EncodingOptions, MovePackageDir, ProfileOptions,
-            WriteTransactionOptions,
+            load_account_arg, CliError, CliTypedResult, EncodingOptions, MovePackageDir,
+            ProfileOptions, WriteTransactionOptions,
         },
         utils::to_common_result,
     },
@@ -366,10 +366,11 @@ fn parse_function_name(function_id: &str) -> CliTypedResult<FunctionId> {
                 .to_string(),
         ));
     }
-
-    let address = AccountAddress::from_hex_literal(ids.get(0).unwrap()).unwrap();
-    let module = Identifier::from_str(ids.get(1).unwrap()).unwrap();
-    let function_id = Identifier::from_str(ids.get(2).unwrap()).unwrap();
+    let address = load_account_arg(ids.get(0).unwrap())?;
+    let module = Identifier::from_str(ids.get(1).unwrap())
+        .map_err(|err| CliError::UnableToParse("Module Name", err.to_string()))?;
+    let function_id = Identifier::from_str(ids.get(2).unwrap())
+        .map_err(|err| CliError::UnableToParse("Function Name", err.to_string()))?;
     let module_id = ModuleId::new(address, module);
     Ok(FunctionId {
         module_id,
