@@ -29,7 +29,7 @@ impl Tool {
     pub async fn execute(self) -> CliResult {
         match self {
             Tool::Account(tool) => tool.execute().await,
-            Tool::Init(tool) => to_common_success_result(tool.execute().await),
+            Tool::Init(tool) => to_common_success_result("AptosInit", tool.execute().await).await,
             Tool::Move(tool) => tool.execute().await,
             Tool::Key(tool) => tool.execute().await,
         }

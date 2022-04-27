@@ -51,10 +51,14 @@ pub enum MoveTool {
 impl MoveTool {
     pub async fn execute(self) -> CliResult {
         match self {
-            MoveTool::Compile(tool) => to_common_result(tool.execute().await),
-            MoveTool::Publish(tool) => to_common_result(tool.execute().await),
-            MoveTool::Run(tool) => to_common_result(tool.execute().await),
-            MoveTool::Test(tool) => to_common_result(tool.execute().await),
+            MoveTool::Compile(tool) => {
+                to_common_result("CompilePackage", tool.execute().await).await
+            }
+            MoveTool::Publish(tool) => {
+                to_common_result("PublishPackage", tool.execute().await).await
+            }
+            MoveTool::Run(tool) => to_common_result("RunFunction", tool.execute().await).await,
+            MoveTool::Test(tool) => to_common_result("TestPackage", tool.execute().await).await,
         }
     }
 }

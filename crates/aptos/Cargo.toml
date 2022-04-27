@@ -8,6 +8,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 edition = "2018"
+build = "build.rs"
 
 [dependencies]
 anyhow = "1.0.52"
@@ -20,10 +21,12 @@ reqwest = { version = "0.11.2", features = ["blocking", "json"] }
 serde = "1.0.124"
 serde_json = "1.0.64"
 serde_yaml = "0.8.17"
+shadow-rs = "0.11.0"
 thiserror = "1.0.24"
 tempfile = "3.2.0"
 tokio = { version = "1.8.1", features = ["full"] }
 tokio-util = { version = "0.6.4", features = ["compat"] }
+uuid = { version = "0.8.2", features = ["v4", "serde"] }
 
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto" }
@@ -46,3 +49,6 @@ move-core-types = { git = "https://github.com/move-language/move", rev = "1b6b75
 move-package = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
 move-unit-test = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
 move-vm-types = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
+
+[build-dependencies]
+shadow-rs = "0.11.0"

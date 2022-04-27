@@ -20,9 +20,15 @@ pub enum AccountTool {
 impl AccountTool {
     pub async fn execute(self) -> CliResult {
         match self {
-            AccountTool::Create(tool) => to_common_result(tool.execute().await),
-            AccountTool::List(tool) => to_common_result(tool.execute().await),
-            AccountTool::Transfer(tool) => to_common_result(tool.execute().await),
+            AccountTool::Create(tool) => {
+                to_common_result("CreateAccount", tool.execute().await).await
+            }
+            AccountTool::List(tool) => {
+                to_common_result("ListResources", tool.execute().await).await
+            }
+            AccountTool::Transfer(tool) => {
+                to_common_result("TransferCoins", tool.execute().await).await
+            }
         }
     }
 }
