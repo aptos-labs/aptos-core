@@ -212,7 +212,13 @@ jobs:
             exit 0
   ecosystem-test:
     executor: ubuntu-xl
+    parameters:
+      run_num:
+        description: test run num
+        type: string
+        default: main
     steps:
+      - run: echo "TEST <<parameters.run_num>>"
       - checkout
       - aws-setup
       - aws-ecr-setup
@@ -283,6 +289,34 @@ workflows:
     jobs:
       - ecosystem-test:
           context: aws-dev
+          run_num: "1"
+      - ecosystem-test:
+          context: aws-dev
+          run_num: "2"
+      - ecosystem-test:
+          context: aws-dev
+          run_num: "3"
+      - ecosystem-test:
+          context: aws-dev
+          run_num: "4"
+      - ecosystem-test:
+          context: aws-dev
+          run_num: "5"
+      - ecosystem-test:
+          context: aws-dev
+          run_num: "6"
+      - ecosystem-test:
+          context: aws-dev
+          run_num: "7"
+      - ecosystem-test:
+          context: aws-dev
+          run_num: "8"
+      - ecosystem-test:
+          context: aws-dev
+          run_num: "9"
+      - ecosystem-test:
+          context: aws-dev
+          run_num: "10"
   ### on devnet branch update ###
   # Ensure the latest is built on the "devnet" branch, and mirror from ECR to Dockerhub
   devnet-branch-cut:
