@@ -32,6 +32,13 @@ pub struct CreateAccount {
     #[clap(long)]
     use_faucet: bool,
 
+    #[clap(
+        long,
+        parse(try_from_str),
+        default_value = "https://faucet.devnet.aptoslabs.com"
+    )]
+    faucet_url: reqwest::Url,
+
     /// Initial coins to fund when using the faucet
     #[clap(long, default_value = "10000")]
     initial_coins: u64,
@@ -104,8 +111,8 @@ impl CreateAccount {
             // TODO: Currently, we are just using mint 0 to create an account using the faucet
             // We should make a faucet endpoint for creating an account
             .post(format!(
-                "{}/mint?amount={}&auth_key={}",
-                "https://faucet.devnet.aptoslabs.com", self.initial_coins, address
+                "{}mint?amount={}&auth_key={}",
+                self.faucet_url, self.initial_coins, address
             ))
             .send()
             .await
