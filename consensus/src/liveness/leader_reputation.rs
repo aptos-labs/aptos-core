@@ -97,7 +97,8 @@ impl MetadataBackend for AptosDBBackend {
 /// Interface to calculate weights for proposers based on history.
 pub trait ReputationHeuristic: Send + Sync {
     /// Return the weights of all candidates based on the history.
-    fn get_weights(&self, candidates: &[Author], history: &[NewBlockEvent]) -> Vec<u64>;
+    fn get_weights(&self, epoch: u64, candidates: &[Author], history: &[NewBlockEvent])
+        -> Vec<u64>;
 }
 
 /// If candidate appear in the history, it's assigned active_weight otherwise inactive weight.
@@ -115,30 +116,103 @@ impl ActiveInactiveHeuristic {
             inactive_weight,
         }
     }
+
+    fn bitmap_to_voters<'a>(
+        validators: &'a [Author],
+        bitmap: &[bool],
+    ) -> Result<Vec<&'a Author>, String> {
+        if validators.len() != bitmap.len() {
+            return Err(format!(
+                "bitmap {} does not match validators {}",
+                bitmap.len(),
+                validators.len()
+            ));
+        }
+
+        Ok(validators
+            .iter()
+            .zip(bitmap.iter())
+            .filter_map(|(validator, &voted)| if voted { Some(validator) } else { None })
+            .collect())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::liveness::leader_reputation::ActiveInactiveHeuristic;
+    use aptos_types::account_address::AccountAddress;
+
+    #[test]
+    fn test_bitmap_to_voters() {
+        let validators: Vec<_> = (0..4)
+            .into_iter()
+            .map(|_| AccountAddress::random())
+            .collect();
+        let bitmap = vec![true, true, false, true];
+
+        if let Ok(voters) = ActiveInactiveHeuristic::bitmap_to_voters(&validators, &bitmap) {
+            assert_eq!(&validators[0], voters[0]);
+            assert_eq!(&validators[1], voters[1]);
+            assert_eq!(&validators[3], voters[2]);
+        }
+    }
+
+    #[test]
+    fn test_bitmap_to_voters_mismatched_lengths() {
+        let validators: Vec<_> = (0..4) // size of 4
+            .into_iter()
+            .map(|_| AccountAddress::random())
+            .collect();
+        let bitmap_too_long = vec![true, true, false, true, true]; // size of 5
+        assert!(ActiveInactiveHeuristic::bitmap_to_voters(&validators, &bitmap_too_long).is_err());
+        let bitmap_too_short = vec![true, true, false];
+        assert!(ActiveInactiveHeuristic::bitmap_to_voters(&validators, &bitmap_too_short).is_err());
+    }
 }
 
 impl ReputationHeuristic for ActiveInactiveHeuristic {
-    fn get_weights(&self, candidates: &[Author], history: &[NewBlockEvent]) -> Vec<u64> {
+    fn get_weights(
+        &self,
+        epoch: u64,
+        candidates: &[Author],
+        history: &[NewBlockEvent],
+    ) -> Vec<u64> {
         let mut committed_proposals: usize = 0;
         let mut committed_votes: usize = 0;
 
-        let set = history.iter().fold(HashSet::new(), |mut set, meta| {
-            set.insert(meta.proposer());
-            for vote in meta.votes() {
-                set.insert(vote);
-                if vote == self.author {
-                    committed_votes = committed_votes
-                        .checked_add(1)
-                        .expect("Should not overflow the number of committed votes in a window");
+        let set = history.iter().filter(|&meta| meta.epoch() == epoch).fold(
+            HashSet::new(),
+            |mut set, meta| {
+                set.insert(meta.proposer());
+                if meta.proposer() == self.author {
+                    committed_proposals = committed_proposals.checked_add(1).expect(
+                        "Should not overflow the number of committed proposals in a window",
+                    );
                 }
-            }
-            if meta.proposer() == self.author {
-                committed_proposals = committed_proposals
-                    .checked_add(1)
-                    .expect("Should not overflow the number of committed proposals in a window");
-            }
-            set
-        });
+
+                match Self::bitmap_to_voters(candidates, meta.previous_block_votes()) {
+                    Ok(voters) => {
+                        for &voter in voters {
+                            set.insert(voter);
+                            if voter == self.author {
+                                committed_votes = committed_votes.checked_add(1).expect(
+                                    "Should not overflow the number of committed votes in a window",
+                                );
+                            }
+                        }
+                    }
+                    Err(msg) => {
+                        warn!(
+                            "Voter conversion from bitmap failed at epoch {}, round {}: {}",
+                            meta.epoch(),
+                            meta.round(),
+                            msg
+                        )
+                    }
+                }
+                set
+            },
+        );
 
         COMMITTED_PROPOSALS_IN_WINDOW.set(committed_proposals as i64);
         COMMITTED_VOTES_IN_WINDOW.set(committed_votes as i64);
@@ -160,6 +234,7 @@ impl ReputationHeuristic for ActiveInactiveHeuristic {
 /// Committed history based proposer election implementation that could help bias towards
 /// successful leaders to help improve performance.
 pub struct LeaderReputation {
+    epoch: u64,
     proposers: Vec<Author>,
     backend: Box<dyn MetadataBackend>,
     heuristic: Box<dyn ReputationHeuristic>,
@@ -169,12 +244,21 @@ pub struct LeaderReputation {
 
 impl LeaderReputation {
     pub fn new(
+        epoch: u64,
         proposers: Vec<Author>,
         backend: Box<dyn MetadataBackend>,
         heuristic: Box<dyn ReputationHeuristic>,
         exclude_round: u64,
     ) -> Self {
+        // assert!(proposers.is_sorted()) implementation from new api
+        assert!(proposers.windows(2).all(|w| {
+            PartialOrd::partial_cmp(&&w[0], &&w[1])
+                .map(|o| o != Ordering::Greater)
+                .unwrap_or(false)
+        }));
+
         Self {
+            epoch,
             proposers,
             backend,
             heuristic,
@@ -188,7 +272,9 @@ impl ProposerElection for LeaderReputation {
     fn get_valid_proposer(&self, round: Round) -> Author {
         let target_round = round.saturating_sub(self.exclude_round);
         let sliding_window = self.backend.get_block_metadata(target_round);
-        let mut weights = self.heuristic.get_weights(&self.proposers, &sliding_window);
+        let mut weights = self
+            .heuristic
+            .get_weights(self.epoch, &self.proposers, &sliding_window);
         assert_eq!(weights.len(), self.proposers.len());
         let mut total_weight = 0;
         for w in &mut weights {

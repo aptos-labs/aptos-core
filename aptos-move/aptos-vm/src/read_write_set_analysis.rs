@@ -177,14 +177,15 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
                 self.get_keys_user_transaction_impl(tx, concretize)
             }
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
-                let (round, timestamp, previous_vote, proposer) =
+                let (epoch, round, timestamp, previous_vote, proposer) =
                     block_metadata.clone().into_inner();
                 let args = serialize_values(&vec![
                     MoveValue::Signer(account_config::reserved_vm_address()),
+                    MoveValue::U64(epoch),
                     MoveValue::U64(round),
-                    MoveValue::U64(timestamp),
-                    MoveValue::Vector(previous_vote.into_iter().map(MoveValue::Address).collect()),
+                    MoveValue::Vector(previous_vote.into_iter().map(MoveValue::Bool).collect()),
                     MoveValue::Address(proposer),
+                    MoveValue::U64(timestamp),
                 ]);
                 let metadata_access = self.get_partially_concretized_summary(
                     &BLOCK_MODULE,

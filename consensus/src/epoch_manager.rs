@@ -195,6 +195,7 @@ impl EpochManager {
                     heuristic_config.inactive_weights,
                 ));
                 Box::new(LeaderReputation::new(
+                    epoch_state.epoch,
                     proposers,
                     backend,
                     heuristic,
@@ -418,6 +419,7 @@ impl EpochManager {
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
+        self.commit_state_computer.new_epoch(&epoch_state);
         let state_computer = if onchain_config.decoupled_execution() {
             Arc::new(self.spawn_decoupled_execution(
                 safety_rules_container.clone(),

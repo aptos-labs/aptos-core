@@ -548,8 +548,9 @@ fn test_transaction_list_with_proof() {
         HashValue::random(),
         0,
         0,
-        vec![],
+        vec![false],
         AccountAddress::random(),
+        0,
     ))];
 
     // Create transaction list with proof
@@ -618,8 +619,9 @@ fn test_transaction_and_output_list_with_proof() {
         HashValue::random(),
         0,
         0,
-        vec![],
+        vec![false],
         AccountAddress::random(),
+        0,
     ));
     let event = create_event();
     let transaction_output = TransactionOutput::new(

@@ -47,8 +47,11 @@
       }
     ],
     "id": "0xf44b581f23222c10916b17a369b4da039d075952b58036f2a7b561446592403c",
+    "epoch": "0",
     "round": "1",
-    "previous_block_votes": [],
+    "previous_block_votes": [
+      false
+    ],
     "proposer": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
     "timestamp": "1"
   },

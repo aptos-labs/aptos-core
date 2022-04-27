@@ -113,10 +113,11 @@ fn test_reconfiguration() {
     // txn2 = a dummy block prologue to bump the timer.
     let txn2 = Transaction::BlockMetadata(BlockMetadata::new(
         gen_block_id(1),
+        0,
         1,
-        300000001,
-        vec![],
+        vec![false],
         validator_account,
+        300000001,
     ));
 
     // txn3 = set the aptos version

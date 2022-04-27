@@ -47,8 +47,11 @@
       }
     ],
     "id": "0x4a876b463d1297603568c40e814d9d5396d23087a0fd641e91e0e00df6c012cd",
+    "epoch": "0",
     "round": "1",
-    "previous_block_votes": [],
+    "previous_block_votes": [
+      false
+    ],
     "proposer": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
     "timestamp": "8"
   },
@@ -230,8 +233,11 @@
       }
     ],
     "id": "0x464b5ca6488b897c005b2e17f00fc0bc8e7ed3f2ab59d607b0e3586bda1cda4e",
+    "epoch": "0",
     "round": "1",
-    "previous_block_votes": [],
+    "previous_block_votes": [
+      false
+    ],
     "proposer": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
     "timestamp": "9"
   },
@@ -413,8 +419,11 @@
       }
     ],
     "id": "0x19d258b113d8e3e12bca2aa612b304ece5b25988818dd7234e049913233eb918",
+    "epoch": "0",
     "round": "1",
-    "previous_block_votes": [],
+    "previous_block_votes": [
+      false
+    ],
     "proposer": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
     "timestamp": "10"
   },
@@ -596,8 +605,11 @@
       }
     ],
     "id": "0xb99003d30a245ac74a02e26e45cb80ee1b9c00a93345ce5f12bea9ffe04748d6",
+    "epoch": "0",
     "round": "1",
-    "previous_block_votes": [],
+    "previous_block_votes": [
+      false
+    ],
     "proposer": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
     "timestamp": "11"
   },
@@ -779,8 +791,11 @@
       }
     ],
     "id": "0xea95b8f9082c10620c0d6e3fc9596b4538d0dc24bec371bb3e4634561f8892e6",
+    "epoch": "0",
     "round": "1",
-    "previous_block_votes": [],
+    "previous_block_votes": [
+      false
+    ],
     "proposer": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
     "timestamp": "12"
   },
@@ -962,8 +977,11 @@
       }
     ],
     "id": "0xa229ec3dd885442b44972526c4e8ce25a0416c3955d818bb1ab0e832877d6282",
+    "epoch": "0",
     "round": "1",
-    "previous_block_votes": [],
+    "previous_block_votes": [
+      false
+    ],
     "proposer": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
     "timestamp": "13"
   },
@@ -1145,8 +1163,11 @@
       }
     ],
     "id": "0x80ec4f332f4d1a6742c537f2bb32473b01b1dcb1caac942722a4787bb185e479",
+    "epoch": "0",
     "round": "1",
-    "previous_block_votes": [],
+    "previous_block_votes": [
+      false
+    ],
     "proposer": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
     "timestamp": "14"
   },
@@ -1328,8 +1349,11 @@
       }
     ],
     "id": "0x842f736ab973e87f53b4857842789a1dd59167629b3c5cabe47dbf48827ec081",
+    "epoch": "0",
     "round": "1",
-    "previous_block_votes": [],
+    "previous_block_votes": [
+      false
+    ],
     "proposer": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
     "timestamp": "15"
   },
@@ -1511,8 +1535,11 @@
       }
     ],
     "id": "0x3beda43d6e9f9b1b1bc44cdfce3574e7f7f0b2de2323a06ebc356bad614726b3",
+    "epoch": "0",
     "round": "1",
-    "previous_block_votes": [],
+    "previous_block_votes": [
+      false
+    ],
     "proposer": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
     "timestamp": "16"
   },
@@ -1694,8 +1721,11 @@
       }
     ],
     "id": "0x755687120a7c6df2389c373c8fbe06bda7a61120652668dd5687fee73fac7a2c",
+    "epoch": "0",
     "round": "1",
-    "previous_block_votes": [],
+    "previous_block_votes": [
+      false
+    ],
     "proposer": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
     "timestamp": "17"
   },
@@ -1877,8 +1907,11 @@
       }
     ],
     "id": "0x430d191fbc937d42f74104aa291871f4b9d120f76583a1da5d1123f2b8a0ac60",
+    "epoch": "0",
     "round": "1",
-    "previous_block_votes": [],
+    "previous_block_votes": [
+      false
+    ],
     "proposer": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
     "timestamp": "18"
   },
@@ -2060,8 +2093,11 @@
       }
     ],
     "id": "0x2af5203112331adc2ed6f402dca396bfe6dfa3ac8a57ea08860870fd515cf7ca",
+    "epoch": "0",
     "round": "1",
-    "previous_block_votes": [],
+    "previous_block_votes": [
+      false
+    ],
     "proposer": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
     "timestamp": "19"
   },
@@ -2243,8 +2279,11 @@
       }
     ],
     "id": "0xe451cd3c364076623c0231898be0722c08e4eb229c44cb957d29cf7370af8a1b",
+    "epoch": "0",
     "round": "1",
-    "previous_block_votes": [],
+    "previous_block_votes": [
+      false
+    ],
     "proposer": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
     "timestamp": "20"
   }

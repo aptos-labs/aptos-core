@@ -21,7 +21,10 @@ use aptos_types::{
 };
 use mirai_annotations::debug_checked_verify_eq;
 use serde::{Deserialize, Deserializer, Serialize};
-use std::fmt::{self, Display, Formatter};
+use std::{
+    collections::BTreeMap,
+    fmt::{self, Display, Formatter},
+};
 
 #[path = "block_test_utils.rs"]
 #[cfg(any(test, feature = "fuzzing"))]
@@ -289,16 +292,68 @@ impl Block {
         Ok(())
     }
 
-    pub fn transactions_to_execute(&self) -> Vec<Transaction> {
-        std::iter::once(Transaction::BlockMetadata(self.into()))
-            .chain(
-                self.payload()
-                    .unwrap_or(&Vec::new())
-                    .iter()
-                    .cloned()
-                    .map(Transaction::UserTransaction),
-            )
+    pub fn transactions_to_execute(&self, validators: &[AccountAddress]) -> Vec<Transaction> {
+        std::iter::once(Transaction::BlockMetadata(
+            self.new_block_metadata(validators),
+        ))
+        .chain(
+            self.payload()
+                .unwrap_or(&Vec::new())
+                .iter()
+                .cloned()
+                .map(Transaction::UserTransaction),
+        )
+        .collect()
+    }
+
+    fn new_block_metadata(&self, validators: &[AccountAddress]) -> BlockMetadata {
+        BlockMetadata::new(
+            self.id(),
+            self.epoch(),
+            self.round(),
+            // A bitmap of voters
+            Self::voters_to_bitmap(validators, self.quorum_cert().ledger_info().signatures()),
+            // For nil block, we use 0x0 which is convention for nil address in move.
+            self.author().unwrap_or(AccountAddress::ZERO),
+            self.timestamp_usecs(),
+        )
+    }
+
+    fn voters_to_bitmap<T>(
+        validators: &[AccountAddress],
+        voters: &BTreeMap<AccountAddress, T>,
+    ) -> Vec<bool> {
+        validators
+            .iter()
+            .map(|address| voters.contains_key(address))
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::block::Block;
+    use aptos_types::account_address::AccountAddress;
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn test_voters_to_bitmap() {
+        let validators: Vec<_> = (0..4)
+            .into_iter()
+            .map(|_| AccountAddress::random())
+            .collect();
+        let expected_voter_bitmap = vec![true, true, false, true];
+
+        let voters: BTreeMap<_, _> = validators
+            .iter()
+            .zip(expected_voter_bitmap.iter())
+            .filter_map(|(&validator, &voted)| if voted { Some((validator, 0)) } else { None })
+            .collect();
+
+        assert_eq!(
+            expected_voter_bitmap,
+            Block::voters_to_bitmap(&validators, &voters)
+        );
     }
 }
 
@@ -324,25 +379,5 @@ impl<'de> Deserialize<'de> for Block {
             block_data,
             signature,
         })
-    }
-}
-
-impl From<&Block> for BlockMetadata {
-    fn from(block: &Block) -> Self {
-        Self::new(
-            block.id(),
-            block.round(),
-            block.timestamp_usecs(),
-            // an ordered vector of voters' account address
-            block
-                .quorum_cert()
-                .ledger_info()
-                .signatures()
-                .keys()
-                .cloned()
-                .collect(),
-            // For nil block, we use 0x0 which is convention for nil address in move.
-            block.author().unwrap_or(AccountAddress::ZERO),
-        )
     }
 }

@@ -216,7 +216,7 @@ impl TestContext {
 
     pub async fn commit_block(&mut self, signed_txns: &[SignedTransaction]) {
         let metadata = self.new_block_metadata();
-        let timestamp = metadata.timestamp_usec();
+        let timestamp = metadata.timestamp_usecs();
         let txns: Vec<Transaction> = std::iter::once(Transaction::BlockMetadata(metadata.clone()))
             .chain(
                 signed_txns
@@ -394,7 +394,7 @@ impl TestContext {
         let id = HashValue::random_with_rng(&mut self.rng);
         self.fake_time += 1;
         let timestamp = self.fake_time;
-        BlockMetadata::new(id, round, timestamp, vec![], self.validator_owner)
+        BlockMetadata::new(id, 0, round, vec![false], self.validator_owner, timestamp)
     }
 
     fn new_ledger_info(
@@ -416,7 +416,7 @@ impl TestContext {
                 metadata.id(),
                 root_hash,
                 version,
-                metadata.timestamp_usec(),
+                metadata.timestamp_usecs(),
                 None,
             ),
             HashValue::zero(),

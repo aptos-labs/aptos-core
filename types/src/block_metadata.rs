@@ -29,27 +29,29 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockMetadata {
     id: HashValue,
+    epoch: u64,
     round: u64,
-    timestamp_usecs: u64,
-    // The vector has to be sorted to ensure consistent result among all nodes
-    previous_block_votes: Vec<AccountAddress>,
+    previous_block_votes: Vec<bool>,
     proposer: AccountAddress,
+    timestamp_usecs: u64,
 }
 
 impl BlockMetadata {
     pub fn new(
         id: HashValue,
+        epoch: u64,
         round: u64,
-        timestamp_usecs: u64,
-        previous_block_votes: Vec<AccountAddress>,
+        previous_block_votes: Vec<bool>,
         proposer: AccountAddress,
+        timestamp_usecs: u64,
     ) -> Self {
         Self {
             id,
+            epoch,
             round,
-            timestamp_usecs,
             previous_block_votes,
             proposer,
+            timestamp_usecs,
         }
     }
 
@@ -57,8 +59,9 @@ impl BlockMetadata {
         self.id
     }
 
-    pub fn into_inner(self) -> (u64, u64, Vec<AccountAddress>, AccountAddress) {
+    pub fn into_inner(self) -> (u64, u64, u64, Vec<bool>, AccountAddress) {
         (
+            self.epoch,
             self.round,
             self.timestamp_usecs,
             self.previous_block_votes.clone(),
@@ -66,7 +69,7 @@ impl BlockMetadata {
         )
     }
 
-    pub fn timestamp_usec(&self) -> u64 {
+    pub fn timestamp_usecs(&self) -> u64 {
         self.timestamp_usecs
     }
 
@@ -74,8 +77,12 @@ impl BlockMetadata {
         self.proposer
     }
 
-    pub fn previous_block_votes(&self) -> &Vec<AccountAddress> {
+    pub fn previous_block_votes(&self) -> &Vec<bool> {
         &self.previous_block_votes
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
     }
 
     pub fn round(&self) -> u64 {
@@ -120,35 +127,43 @@ impl MoveResource for BlockResource {}
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct NewBlockEvent {
+    epoch: u64,
     round: u64,
+    previous_block_votes: Vec<bool>,
     proposer: AccountAddress,
-    votes: Vec<AccountAddress>,
     timestamp: u64,
 }
 
 impl NewBlockEvent {
     pub fn new(
+        epoch: u64,
         round: u64,
+        previous_block_votes: Vec<bool>,
         proposer: AccountAddress,
-        votes: Vec<AccountAddress>,
         timestamp: u64,
     ) -> Self {
         Self {
+            epoch,
             round,
+            previous_block_votes,
             proposer,
-            votes,
             timestamp,
         }
     }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
     pub fn round(&self) -> u64 {
         self.round
     }
 
-    pub fn proposer(&self) -> AccountAddress {
-        self.proposer
+    pub fn previous_block_votes(&self) -> &Vec<bool> {
+        &self.previous_block_votes
     }
 
-    pub fn votes(&self) -> Vec<AccountAddress> {
-        self.votes.clone()
+    pub fn proposer(&self) -> AccountAddress {
+        self.proposer
     }
 }

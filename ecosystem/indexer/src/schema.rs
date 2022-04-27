@@ -10,6 +10,8 @@ table! {
         proposer -> Varchar,
         timestamp -> Timestamp,
         inserted_at -> Timestamp,
+        epoch -> Int8,
+        previous_block_votes_bitmap -> Jsonb,
     }
 }
 
@@ -67,7 +69,7 @@ table! {
 }
 
 table! {
-    write_set_changes (hash) {
+    write_set_changes (transaction_hash, hash) {
         transaction_hash -> Varchar,
         hash -> Varchar,
         #[sql_name = "type"]

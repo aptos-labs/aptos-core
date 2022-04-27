@@ -619,13 +619,14 @@ impl AptosVM {
             .0
             .new_session(storage, SessionId::block_meta(&block_metadata));
 
-        let (round, timestamp, previous_vote, proposer) = block_metadata.into_inner();
+        let (epoch, round, timestamp, previous_vote, proposer) = block_metadata.into_inner();
         let args = serialize_values(&vec![
             MoveValue::Signer(txn_data.sender),
+            MoveValue::U64(epoch),
             MoveValue::U64(round),
-            MoveValue::U64(timestamp),
-            MoveValue::Vector(previous_vote.into_iter().map(MoveValue::Address).collect()),
+            MoveValue::Vector(previous_vote.into_iter().map(MoveValue::Bool).collect()),
             MoveValue::Address(proposer),
+            MoveValue::U64(timestamp),
         ]);
         session
             .execute_function_bypass_visibility(

@@ -11,7 +11,6 @@ use aptos_crypto::{
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
-    block_metadata::BlockMetadata,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     test_helpers::transaction_test_helpers::get_test_signed_txn,
     transaction::{Transaction, TransactionPayload},
@@ -83,16 +82,6 @@ pub fn extract_signer(config: &mut NodeConfig) -> ValidatorSigner {
     ValidatorSigner::new(
         sr_test.author,
         sr_test.consensus_key.as_ref().unwrap().private_key(),
-    )
-}
-
-pub fn gen_block_metadata(index: u8, proposer: AccountAddress) -> BlockMetadata {
-    BlockMetadata::new(
-        gen_block_id(index),
-        index as u64,
-        index as u64,
-        vec![],
-        proposer,
     )
 }
 
