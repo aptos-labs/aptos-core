@@ -33,8 +33,8 @@ pub enum KeyTool {
 impl KeyTool {
     pub async fn execute(self) -> CliResult {
         match self {
-            KeyTool::Generate(tool) => to_common_result(tool.execute()),
-            KeyTool::ExtractPeer(tool) => to_common_result(tool.execute()),
+            KeyTool::Generate(tool) => to_common_result("GenerateKey", tool.execute()).await,
+            KeyTool::ExtractPeer(tool) => to_common_result("ExtracatPeer", tool.execute()).await,
         }
     }
 }

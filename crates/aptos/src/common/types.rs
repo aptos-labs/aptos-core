@@ -58,6 +58,25 @@ pub enum CliError {
     MoveTestError(String),
 }
 
+impl CliError {
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            CliError::CommandArgumentError(_) => "CommandArgumentError",
+            CliError::ConfigLoadError(_, _) => "ConfigLoadError",
+            CliError::ConfigNotFoundError(_) => "ConfigNotFoundError",
+            CliError::IO(_, _) => "IO",
+            CliError::BCS(_, _) => "BCS",
+            CliError::UnableToParse(_, _) => "UnableToParse",
+            CliError::UnableToReadFile(_, _) => "UnableToReadFile",
+            CliError::ApiError(_) => "ApiError",
+            CliError::UnexpectedError(_) => "UnexpectedError",
+            CliError::AbortedError => "AbortedError",
+            CliError::MoveCompilationError(_) => "MoveCompilationError",
+            CliError::MoveTestError(_) => "MoveTestError",
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CliConfig {
     /// Map of profile configs

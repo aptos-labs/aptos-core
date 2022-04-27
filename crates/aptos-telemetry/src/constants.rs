@@ -14,6 +14,7 @@ pub const GA4_URL: &str = "https://www.google-analytics.com/mp/collect";
 
 // Metrics events
 pub const APTOS_NODE_PUSH_METRICS: &str = "APTOS_NODE_PUSH_METRICS";
+pub const APTOS_CLI_PUSH_METRICS: &str = "APTOS_CLI_PUSH_METRICS";
 
 // Metrics names
 pub const IP_ADDR_METRIC: &str = "IP_ADDRESS";
