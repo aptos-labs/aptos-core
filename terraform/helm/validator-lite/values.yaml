@@ -33,7 +33,7 @@ validator:
     concurrency_level: 4
     mempool_poll_count:
     round_initial_timeout_ms:
-    default_prune_window: 10000000
+    ledger_prune_window: 10000000
     state_store_prune_window: 1000000
     max_version_to_prune_per_batch: 100
 
