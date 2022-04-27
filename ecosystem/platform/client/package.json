@@ -24,13 +24,21 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "test:debug": "react-scripts --inspect-brk test --runInBand --no-cache",
+    "lint": "eslint src",
+    "lint:fix": "eslint --fix src",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
     "extends": [
       "react-app",
       "react-app/jest"
-    ]
+    ],
+    "plugins": [
+      "header"
+    ],
+    "rules": {
+      "header/header": [2, "line", " Copyright (c) Aptos\n SPDX-License-Identifier: Apache-2.0", 2]
+    }
   },
   "browserslist": {
     "production": [
@@ -48,6 +56,7 @@
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.0",
     "autoprefixer": "^10.4.4",
+    "eslint-plugin-header": "^3.1.1",
     "postcss": "^8.4.12",
     "prettier": "^2.6.2",
     "tailwindcss": "^3.0.24"
