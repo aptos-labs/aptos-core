@@ -9,7 +9,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
-use aptos_logger::{debug, info};
+use aptos_logger::debug;
 use aptos_rest_client::Client;
 use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
 use clap::{ArgEnum, Parser};
@@ -132,7 +132,7 @@ impl CliConfig {
                     aptos_folder, err
                 ))
             })?;
-            info!("Created .aptos/ folder");
+            debug!("Created .aptos/ folder");
         } else {
             debug!(".aptos/ folder already initialized");
         }
