@@ -92,6 +92,17 @@ pub fn create_mock_storage_synchronizer() -> MockStorageSynchronizer {
     MockStorageSynchronizer::new()
 }
 
+/// Creates a mock storage synchronizer that is not currently handling
+/// any pending storage data.
+pub fn create_ready_storage_synchronizer() -> MockStorageSynchronizer {
+    let mut mock_storage_synchronizer = create_mock_storage_synchronizer();
+    mock_storage_synchronizer
+        .expect_pending_storage_data()
+        .return_const(false);
+
+    mock_storage_synchronizer
+}
+
 // This automatically creates a MockChunkExecutor.
 mock! {
     pub ChunkExecutor {}
