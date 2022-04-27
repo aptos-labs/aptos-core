@@ -7,6 +7,14 @@ import BlockQuote from "@site/src/components/BlockQuote";
 
 # Run a Local Testnet
 
+   - [Using the Aptos-core source code](#using-the-aptos-core-source-code)   
+      - [Attaching a Faucet to your testnet](#attaching-a-faucet-to-your-testnet)   
+   - [Using Docker](#using-docker)   
+      - [Example](#example)   
+      - [Troubleshooting](#troubleshooting)   
+   - [Interacting with the local test validator network](#interacting-with-the-local-test-validator-network)   
+   - [Next Steps](#next-steps)   
+
 You can run a local testnet of the Aptos Blockchain. This local testnet will not be connected to the Aptos devnet. It will run on your local machine, independently of the Aptos ecosystem. You can use this local testnet for testing and development purposes.
 
 You can run a local testnet in two ways:
