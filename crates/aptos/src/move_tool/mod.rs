@@ -69,7 +69,7 @@ pub struct CompilePackage {
 impl CompilePackage {
     pub async fn execute(self) -> CliTypedResult<Vec<String>> {
         let build_config = BuildConfig {
-            additional_named_addresses: self.move_options.named_addresses.clone(),
+            additional_named_addresses: self.move_options.named_addresses(),
             generate_docs: true,
             install_dir: self.move_options.output_dir.clone(),
             ..Default::default()
@@ -95,7 +95,7 @@ pub struct TestPackage {
 impl TestPackage {
     pub async fn execute(self) -> CliTypedResult<&'static str> {
         let config = BuildConfig {
-            additional_named_addresses: self.move_options.named_addresses.clone(),
+            additional_named_addresses: self.move_options.named_addresses(),
             test_mode: true,
             install_dir: self.move_options.output_dir.clone(),
             ..Default::default()
@@ -141,7 +141,7 @@ pub struct PublishPackage {
 impl PublishPackage {
     pub async fn execute(self) -> CliTypedResult<aptos_rest_client::Transaction> {
         let build_config = BuildConfig {
-            additional_named_addresses: self.move_options.named_addresses.clone(),
+            additional_named_addresses: self.move_options.named_addresses(),
             generate_abis: false,
             generate_docs: true,
             install_dir: self.move_options.output_dir.clone(),

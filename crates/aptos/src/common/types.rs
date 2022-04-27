@@ -458,7 +458,17 @@ pub struct MovePackageDir {
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
     #[clap(long, parse(try_from_str = parse_map), default_value = "")]
-    pub named_addresses: BTreeMap<String, AccountAddress>,
+    named_addresses: BTreeMap<String, AccountAddressWrapper>,
+}
+
+impl MovePackageDir {
+    pub fn named_addresses(&self) -> BTreeMap<String, AccountAddress> {
+        self.named_addresses
+            .clone()
+            .into_iter()
+            .map(|(key, value)| (key, value.account_address))
+            .collect()
+    }
 }
 
 const PARSE_MAP_SYNTAX_MSG: &str = "Invalid syntax for map.  Example: Name=Value,Name2=Value";
@@ -492,6 +502,21 @@ where
         map.insert(key, value);
     }
     Ok(map)
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct AccountAddressWrapper {
+    pub account_address: AccountAddress,
+}
+
+impl FromStr for AccountAddressWrapper {
+    type Err = CliError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(AccountAddressWrapper {
+            account_address: load_account_arg(s)?,
+        })
+    }
 }
 
 /// Loads an account arg and allows for naming based on profiles
