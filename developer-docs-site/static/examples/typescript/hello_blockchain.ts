@@ -30,12 +30,11 @@ class HelloBlockchainClient extends RestClient {
   //:!:>section_2
   /** Retrieve the resource Message::MessageHolder::message */
   async getMessage(contractAddress: string, accountAddress: string): Promise<string> {
-    const resources = await this.accountResources(accountAddress);
-    for (const key in resources) {
-      const resource = resources[key];
-      if (resource["type"] == `0x${contractAddress}::Message::MessageHolder`) {
-        return resource["data"]["message"];
-      }
+    const resource = await this.accountResource(accountAddress, `0x${contractAddress}::Message::MessageHolder`);
+    if (resource == null) {
+      return null;
+    } else {
+      return resource["data"]["message"]
     }
   }
   //<:!:section_2
