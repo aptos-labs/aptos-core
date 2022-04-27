@@ -138,6 +138,8 @@ async fn test_connection_limiting() {
     );
 }
 
+// Currently this test seems flaky: https://github.com/aptos-labs/aptos-core/issues/670
+#[ignore]
 #[tokio::test]
 async fn test_file_discovery() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
