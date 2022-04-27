@@ -36,19 +36,19 @@ impl InitTool {
         };
 
         // Select profile we're using
-        let mut profile_config =
-            if let Some(profile_config) = config.remove_profile(&self.profile.profile) {
-                profile_config
-            } else {
-                ProfileConfig::default()
-            };
-
-        if !prompt_yes(
-            &format!("Aptos already initialized for profile {}, do you want to overwrite the existing config?", self.profile.profile),
-        ) {
-            eprintln!("Exiting...");
-            return Ok(());
-        }
+        let mut profile_config = if let Some(profile_config) =
+            config.remove_profile(&self.profile.profile)
+        {
+            if !prompt_yes(
+                    &format!("Aptos already initialized for profile {}, do you want to overwrite the existing config?", self.profile.profile),
+                ) {
+                    eprintln!("Exiting...");
+                    return Ok(());
+                }
+            profile_config
+        } else {
+            ProfileConfig::default()
+        };
 
         eprintln!("Configuring for profile {}", self.profile.profile);
 
