@@ -113,6 +113,8 @@ impl InitTool {
         let public_key = private_key.public_key();
         let address = account_address_from_public_key(&public_key);
         profile_config.private_key = Some(private_key);
+        profile_config.public_key = Some(public_key);
+        profile_config.account = Some(address);
 
         // Create account if it doesn't exist
         let client = aptos_rest_client::Client::new(rest_url);

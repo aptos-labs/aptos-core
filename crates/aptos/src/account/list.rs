@@ -6,11 +6,7 @@
 //! TODO: Examples
 //!
 
-use crate::common::types::{
-    account_address_from_public_key, CliConfig, CliError, CliTypedResult, ProfileOptions,
-    RestOptions,
-};
-use aptos_crypto::PrivateKey;
+use crate::common::types::{CliConfig, CliError, CliTypedResult, ProfileOptions, RestOptions};
 use aptos_rest_client::{types::Resource, Client};
 use aptos_types::account_address::AccountAddress;
 use clap::Parser;
@@ -36,11 +32,10 @@ impl ListResources {
     pub(crate) async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
         let account = if let Some(account) = self.account {
             account
-        } else if let Some(Some(private_key)) =
-            CliConfig::load_profile(&self.profile.profile)?.map(|p| p.private_key)
+        } else if let Some(Some(account)) =
+            CliConfig::load_profile(&self.profile.profile)?.map(|p| p.account)
         {
-            let public_key = private_key.public_key();
-            account_address_from_public_key(&public_key)
+            account
         } else {
             return Err(CliError::CommandArgumentError(
                 "Please provide an account using --account or run aptos init".to_string(),
