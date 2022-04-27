@@ -29,6 +29,7 @@ validator:
   config:
     provide_genesis: true
     sync_only: false
+    concurrency_level: 4
     mempool_poll_count:
     round_initial_timeout_ms:
     default_prune_window: 10000000
