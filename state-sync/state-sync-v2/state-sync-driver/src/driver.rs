@@ -290,7 +290,7 @@ impl<
 
         let operations = [
             metrics::StorageSynchronizerOperations::ExecutedTransactions,
-            metrics::StorageSynchronizerOperations::SyncedTransactions,
+            metrics::StorageSynchronizerOperations::Synced,
         ];
         for operation in operations {
             metrics::increment_gauge(

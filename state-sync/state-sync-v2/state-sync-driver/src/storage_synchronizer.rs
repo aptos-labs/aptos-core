@@ -443,7 +443,7 @@ fn spawn_committer<
                             );
                             metrics::increment_gauge(
                                 &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                                metrics::StorageSynchronizerOperations::SyncedTransactions
+                                metrics::StorageSynchronizerOperations::Synced
                                     .get_label(),
                                 transactions.len() as u64,
                             );

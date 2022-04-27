@@ -14,8 +14,8 @@ pub const STORAGE_SYNCHRONIZER_PENDING_DATA: &str = "storage_synchronizer_pendin
 pub enum StorageSynchronizerOperations {
     AppliedTransactionOutputs, // Applied a chunk of transactions outputs.
     ExecutedTransactions,      // Executed a chunk of transactions.
+    Synced,                    // Wrote a chunk of transactions and outputs to storage.
     SyncedAccounts,            // Wrote a chunk of accounts to storage.
-    SyncedTransactions,        // Wrote a chunk of transactions and outputs to storage.
 }
 
 impl StorageSynchronizerOperations {
@@ -25,8 +25,8 @@ impl StorageSynchronizerOperations {
                 "applied_transaction_outputs"
             }
             StorageSynchronizerOperations::ExecutedTransactions => "executed_transactions",
+            StorageSynchronizerOperations::Synced => "synced",
             StorageSynchronizerOperations::SyncedAccounts => "synced_accounts",
-            StorageSynchronizerOperations::SyncedTransactions => "synced_transactions",
         }
     }
 }

@@ -32,13 +32,6 @@ groups:
       severity: error
       summary: "State sync is not making progress (i.e., it is not keeping up with the head of the blockchain)"
     annotations:
-  - alert: State sync has no active upstream peers
-    expr: (sum by (owner, kubernetes_pod_name) (aptos_state_sync_active_upstream_peers)) == 0
-    for: 3m
-    labels:
-      severity: error
-      summary: "State sync has no active upstream peers (i.e., it has no peers to synchronize from!)"
-    annotations:
 
     # Mempool alerts
   - alert: Mempool has no active upstream peers
