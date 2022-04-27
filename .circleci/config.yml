@@ -262,7 +262,7 @@ workflows:
   ### on bors action ###
   # Build the PR binaries and run various tests
   # Build the Docker images and run Forge tests
-  build-and-test:
+  build-test-deploy:
     when:
       not:
         equal: [main, << pipeline.git.branch >>]
