@@ -51,13 +51,13 @@ The rest of this document describes:
   - When you run the below command to start the local validator network, your terminal will enter into an interactive mode, with an option to terminate the testnet. Hence, you will need to open another shell terminal for the subsequent steps described in this section.
   - After the below command runs, you will need to copy the `Config path` information from the terminal output for the next step.
 
-  To start your validator network locally, run the following command:
+    To start your validator network locally, run the following command:
 
     ```
     CARGO_NET_GIT_FETCH_WITH_CLI=true cargo run -p aptos-node -- --test
     ```
 
-  See below for an example of the partial output. Make a note of the `Config path` from the output.
+    See below for an example of the partial output. Make a note of the `Config path` from the output.
 
     ```
     ...
@@ -123,9 +123,9 @@ For example, the command sequence for the above steps 2 through 4 is shown below
 
   **NOTE**: If you do not have `wget` installed on your macOS, then run the below command to install the `wget` before you follow the below example.
 
-      ```
-      brew install wget
-      ```
+  ```
+  brew install wget
+  ```
 
   After you installed `wget` proceed as below.
 
