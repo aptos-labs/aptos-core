@@ -3,10 +3,10 @@
    - [Installation](#installation)   
       - [Requirements](#requirements)   
    - [Fork and clone the Aptos repo](#fork-and-clone-the-aptos-repo)   
-   - [Build the docs locally](#build-the-docs-locally)   
+   - [Build and serve the docs locally](#build-and-serve-the-docs-locally)   
+   - [Build static html files](#build-static-html-files)   
 
-
-This Aptos Developer Documenatation is built using [Docusaurus 2](https://docusaurus.io/). Follow the below steps to build the docs locally and contribute.
+This Aptos Developer Documenatation is built using [Docusaurus 2](https://docusaurus.io/). Follow the below steps to build the docs locally to test your contribution.
 
 ## Installation
 
@@ -30,6 +30,8 @@ brew install yarn
 
 ## Fork and clone the Aptos repo
 
+>**NOTE**: See this [GitHub documentation for how to configure for a fork](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/syncing-a-fork).
+
 1. Fork the Aptos Core repo by clicking on the **Fork** on the top right of this repo page:
 https://github.com/aptos-labs/aptos-core
 
@@ -40,7 +42,7 @@ https://github.com/aptos-labs/aptos-core
 
   ```
 
-## Build the docs locally
+## Build and serve the docs locally
 
 1. `cd` into the `developer-docs-site` directory in your clone.
 
@@ -52,21 +54,26 @@ https://github.com/aptos-labs/aptos-core
   ```
   yarn
   ```
+This step will configure the Docusaurus static site generator.
 
 3. Start the Yarn server locally. This will also open the locally built docs in your default browser.
 
-> **NOTE**: This step will not generate static html files, but will only render the docs dynamically.
+> **NOTE**: This step will not generate static html files, but will render the docs dynamically.
 
   ```
   yarn start
   ```
 
-4. Install Yarn dependencies.
+## Build static html files
+
+Execute the below steps if you want to generate static html documentation files. A `build` directory will be created with the static html files and assets contained in it.
+
+1. Make sure you install Yarn dependencies.
 
   ```
   yarn install
   ```
-5. Finally, build with Yarn.
+2. Build static html files with Yarn.
 
   ```
   $ yarn build
@@ -74,7 +81,7 @@ https://github.com/aptos-labs/aptos-core
 
 This command generates static html content and places it in the `build` directory.
 
-5. Finally, use the below command to start the documentation server on your localhost.
+3. Finally, use the below command to start the documentation server on your localhost.
 
   ```
   npm run serve
