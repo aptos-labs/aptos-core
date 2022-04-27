@@ -17,7 +17,7 @@ use itertools::Itertools;
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     fmt::Debug,
     path::{Path, PathBuf},
     str::FromStr,
@@ -58,14 +58,29 @@ pub enum CliError {
     MoveTestError(String),
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CliConfig {
+    /// Map of profile configs
+    pub profiles: Option<HashMap<String, ProfileConfig>>,
+}
+
+/// An individual profile
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct ProfileConfig {
     /// Private key for commands.  TODO: Add vault functionality
     pub private_key: Option<Ed25519PrivateKey>,
     /// URL for the Aptos rest endpoint
     pub rest_url: Option<String>,
     /// URL for the Faucet endpoint (if applicable)
     pub faucet_url: Option<String>,
+}
+
+impl Default for CliConfig {
+    fn default() -> Self {
+        CliConfig {
+            profiles: Some(HashMap::new()),
+        }
+    }
 }
 
 impl CliConfig {
@@ -86,6 +101,19 @@ impl CliConfig {
         })?;
         serde_yaml::from_slice(&bytes)
             .map_err(|err| CliError::ConfigLoadError(format!("{:?}", config_file), err.to_string()))
+    }
+
+    pub fn load_profile(profile: &str) -> CliTypedResult<Option<ProfileConfig>> {
+        let mut config = Self::load()?;
+        Ok(config.remove_profile(profile))
+    }
+
+    pub fn remove_profile(&mut self, profile: &str) -> Option<ProfileConfig> {
+        if let Some(ref mut profiles) = self.profiles {
+            profiles.remove(&profile.to_string())
+        } else {
+            None
+        }
     }
 
     /// Saves the config to ./.aptos/config.yml
@@ -142,6 +170,13 @@ impl FromStr for KeyType {
             _ => Err("Invalid key type"),
         }
     }
+}
+
+#[derive(Debug, Parser)]
+pub struct ProfileOptions {
+    /// Profile to use from config
+    #[clap(long, default_value = "default")]
+    pub profile: String,
 }
 
 /// Types of encodings used by the blockchain
@@ -247,7 +282,11 @@ pub struct PublicKeyInputOptions {
 }
 
 impl ExtractPublicKey for PublicKeyInputOptions {
-    fn extract_public_key(&self, encoding: EncodingType) -> CliTypedResult<Ed25519PublicKey> {
+    fn extract_public_key(
+        &self,
+        encoding: EncodingType,
+        _profile: &str,
+    ) -> CliTypedResult<Ed25519PublicKey> {
         if let Some(ref file) = self.public_key_file {
             encoding.load_key("--public-key-file", file.as_path())
         } else if let Some(ref key) = self.public_key {
@@ -272,13 +311,19 @@ pub struct PrivateKeyInputOptions {
 }
 
 impl PrivateKeyInputOptions {
-    pub fn extract_private_key(&self, encoding: EncodingType) -> CliTypedResult<Ed25519PrivateKey> {
+    pub fn extract_private_key(
+        &self,
+        encoding: EncodingType,
+        profile: &str,
+    ) -> CliTypedResult<Ed25519PrivateKey> {
         if let Some(ref file) = self.private_key_file {
             encoding.load_key("--private-key-file", file.as_path())
         } else if let Some(ref key) = self.private_key {
             let key = key.as_bytes().to_vec();
             encoding.decode_key("--private-key", key)
-        } else if let Some(private_key) = CliConfig::load()?.private_key {
+        } else if let Some(Some(private_key)) =
+            CliConfig::load_profile(profile)?.map(|p| p.private_key)
+        {
             Ok(private_key)
         } else {
             Err(CliError::CommandArgumentError(
@@ -289,20 +334,29 @@ impl PrivateKeyInputOptions {
 }
 
 impl ExtractPublicKey for PrivateKeyInputOptions {
-    fn extract_public_key(&self, encoding: EncodingType) -> CliTypedResult<Ed25519PublicKey> {
-        self.extract_private_key(encoding)
+    fn extract_public_key(
+        &self,
+        encoding: EncodingType,
+        profile: &str,
+    ) -> CliTypedResult<Ed25519PublicKey> {
+        self.extract_private_key(encoding, profile)
             .map(|private_key| private_key.public_key())
     }
 }
 
 pub trait ExtractPublicKey {
-    fn extract_public_key(&self, encoding: EncodingType) -> CliTypedResult<Ed25519PublicKey>;
+    fn extract_public_key(
+        &self,
+        encoding: EncodingType,
+        profile: &str,
+    ) -> CliTypedResult<Ed25519PublicKey>;
 
     fn extract_x25519_public_key(
         &self,
         encoding: EncodingType,
+        profile: &str,
     ) -> CliTypedResult<x25519::PublicKey> {
-        let key = self.extract_public_key(encoding)?;
+        let key = self.extract_public_key(encoding, profile)?;
         x25519::PublicKey::from_ed25519_public_bytes(&key.to_bytes()).map_err(|err| {
             CliError::UnexpectedError(format!("Failed to convert ed25519 to x25519 {:?}", err))
         })
@@ -347,10 +401,10 @@ pub struct RestOptions {
 }
 
 impl RestOptions {
-    pub fn url(&self) -> CliTypedResult<reqwest::Url> {
+    pub fn url(&self, profile: &str) -> CliTypedResult<reqwest::Url> {
         if let Some(ref url) = self.url {
             Ok(url.clone())
-        } else if let Some(url) = CliConfig::load()?.rest_url {
+        } else if let Some(Some(url)) = CliConfig::load_profile(profile)?.map(|p| p.rest_url) {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("Rest URL", err.to_string()))
         } else {
@@ -376,8 +430,8 @@ pub struct WriteTransactionOptions {
 }
 
 impl WriteTransactionOptions {
-    pub async fn chain_id(&self) -> CliTypedResult<ChainId> {
-        let client = Client::new(self.rest_options.url()?);
+    pub async fn chain_id(&self, profile: &str) -> CliTypedResult<ChainId> {
+        let client = Client::new(self.rest_options.url(profile)?);
         let state = client
             .get_ledger_information()
             .await
@@ -438,4 +492,23 @@ where
         map.insert(key, value);
     }
     Ok(map)
+}
+
+/// Loads an account arg and allows for naming based on profiles
+pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
+    if str.starts_with("0x") {
+        AccountAddress::from_hex_literal(str).map_err(|err| {
+            CliError::CommandArgumentError(format!("Failed to parse AccountAddress {}", err))
+        })
+    } else if let Ok(account_address) = AccountAddress::from_str(str) {
+        Ok(account_address)
+    } else if let Some(Some(private_key)) = CliConfig::load_profile(str)?.map(|p| p.private_key) {
+        let public_key = private_key.public_key();
+        Ok(account_address_from_public_key(&public_key))
+    } else {
+        Err(CliError::CommandArgumentError(
+            "'--account-address' or '--profile' after using aptos init must be provided"
+                .to_string(),
+        ))
+    }
 }

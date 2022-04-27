@@ -4,13 +4,17 @@
 use crate::{
     account::create::CreateAccount,
     common::{
-        types::{account_address_from_public_key, CliConfig, CliError, CliTypedResult},
+        types::{
+            account_address_from_public_key, CliConfig, CliError, CliTypedResult, ProfileConfig,
+            ProfileOptions,
+        },
         utils::prompt_yes,
     },
     op::key::GenerateKey,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
 use clap::Parser;
+use std::collections::HashMap;
 
 pub const DEFAULT_REST_URL: &str = "https://fullnode.devnet.aptoslabs.com";
 pub const DEFAULT_FAUCET_URL: &str = "https://faucet.devnet.aptoslabs.com";
@@ -18,26 +22,42 @@ const NUM_DEFAULT_COINS: u64 = 10000;
 
 /// Tool to initialize current directory for the aptos tool
 #[derive(Debug, Parser)]
-pub struct InitTool {}
+pub struct InitTool {
+    #[clap(flatten)]
+    profile: ProfileOptions,
+}
 
 impl InitTool {
     pub async fn execute(self) -> CliTypedResult<()> {
         let mut config = if CliConfig::config_exists()? {
-            if !prompt_yes(
-                "Aptos already initialized, do you want to overwrite the existing config?",
-            ) {
-                eprintln!("Exiting...");
-                return Ok(());
-            }
             CliConfig::load()?
         } else {
             CliConfig::default()
         };
 
+        // Select profile we're using
+        let mut profile_config =
+            if let Some(profile_config) = config.remove_profile(&self.profile.profile) {
+                profile_config
+            } else {
+                ProfileConfig::default()
+            };
+
+        if !prompt_yes(
+            &format!("Aptos already initialized for profile {}, do you want to overwrite the existing config?", self.profile.profile),
+        ) {
+            eprintln!("Exiting...");
+            return Ok(());
+        }
+
+        eprintln!("Configuring for profile {}", self.profile.profile);
+
         // Rest Endpoint
         eprintln!(
             "Enter your rest endpoint [Current: {} No input: {}]",
-            config.rest_url.unwrap_or_else(|| "None".to_string()),
+            profile_config
+                .rest_url
+                .unwrap_or_else(|| "None".to_string()),
             DEFAULT_REST_URL
         );
         let input = read_line("Rest endpoint")?;
@@ -51,12 +71,14 @@ impl InitTool {
             reqwest::Url::parse(input)
                 .map_err(|err| CliError::UnableToParse("Rest Endpoint", err.to_string()))?
         };
-        config.rest_url = Some(rest_url.to_string());
+        profile_config.rest_url = Some(rest_url.to_string());
 
         // Faucet Endpoint
         eprintln!(
             "Enter your faucet endpoint [Current: {} No input: {}]",
-            config.faucet_url.unwrap_or_else(|| "None".to_string()),
+            profile_config
+                .faucet_url
+                .unwrap_or_else(|| "None".to_string()),
             DEFAULT_FAUCET_URL
         );
         let input = read_line("Faucet endpoint")?;
@@ -70,14 +92,14 @@ impl InitTool {
             reqwest::Url::parse(input)
                 .map_err(|err| CliError::UnableToParse("Faucet Endpoint", err.to_string()))?
         };
-        config.faucet_url = Some(faucet_url.to_string());
+        profile_config.faucet_url = Some(faucet_url.to_string());
 
         // Private key
-        eprintln!("Enter your private key as a hex literal (0x...) [Current: {} No input: Generate new key (or keep one if present)]", config.private_key.as_ref().map(|_| "Redacted").unwrap_or("None"));
+        eprintln!("Enter your private key as a hex literal (0x...) [Current: {} No input: Generate new key (or keep one if present)]", profile_config.private_key.as_ref().map(|_| "Redacted").unwrap_or("None"));
         let input = read_line("Private key")?;
         let input = input.trim();
         let private_key = if input.is_empty() {
-            if let Some(private_key) = config.private_key {
+            if let Some(private_key) = profile_config.private_key {
                 eprintln!("No key given, keeping existing key...");
                 private_key
             } else {
@@ -90,7 +112,7 @@ impl InitTool {
         };
         let public_key = private_key.public_key();
         let address = account_address_from_public_key(&public_key);
-        config.private_key = Some(private_key);
+        profile_config.private_key = Some(private_key);
 
         // Create account if it doesn't exist
         let client = aptos_rest_client::Client::new(rest_url);
@@ -102,6 +124,16 @@ impl InitTool {
             CreateAccount::create_account_with_faucet(faucet_url, NUM_DEFAULT_COINS, address)
                 .await?;
         }
+
+        // Ensure the loaded config has profiles setup for a possible empty file
+        if config.profiles.is_none() {
+            config.profiles = Some(HashMap::new());
+        }
+        config
+            .profiles
+            .as_mut()
+            .unwrap()
+            .insert(self.profile.profile, profile_config);
         config.save()?;
         eprintln!("Aptos is now set up for account {}!  Run `aptos help` for more information about commands", address);
         Ok(())

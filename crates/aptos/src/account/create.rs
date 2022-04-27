@@ -10,7 +10,7 @@ use crate::common::{
     init::DEFAULT_FAUCET_URL,
     types::{
         account_address_from_public_key, CliConfig, CliError, CliTypedResult, EncodingOptions,
-        ExtractPublicKey, PublicKeyInputOptions, WriteTransactionOptions,
+        ProfileOptions, WriteTransactionOptions,
     },
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
@@ -30,7 +30,9 @@ pub struct CreateAccount {
     #[clap(flatten)]
     write_options: WriteTransactionOptions,
     #[clap(flatten)]
-    public_key_options: PublicKeyInputOptions,
+    profile: ProfileOptions,
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    address: AccountAddress,
     /// Flag for using faucet to create the account
     #[clap(long)]
     use_faucet: bool,
@@ -44,15 +46,13 @@ pub struct CreateAccount {
 
 impl CreateAccount {
     pub async fn execute(self) -> CliTypedResult<String> {
-        let public_key_to_create = self
-            .public_key_options
-            .extract_public_key(self.encoding_options.encoding)?;
-        let address = account_address_from_public_key(&public_key_to_create);
-
+        let address = self.address;
         if self.use_faucet {
             let faucet_url = if let Some(faucet_url) = self.faucet_url {
                 faucet_url
-            } else if let Some(url) = CliConfig::load()?.faucet_url {
+            } else if let Some(Some(url)) =
+                CliConfig::load_profile(&self.profile.profile)?.map(|profile| profile.faucet_url)
+            {
                 Url::parse(&url)
                     .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string()))?
             } else {
@@ -75,10 +75,13 @@ impl CreateAccount {
         sender_address: AccountAddress,
         sequence_number: u64,
     ) -> CliTypedResult<Response<Transaction>> {
-        let client = RestClient::new(Url::clone(&self.write_options.rest_options.url()?));
-        let transaction_factory = TransactionFactory::new(self.write_options.chain_id().await?)
-            .with_gas_unit_price(1)
-            .with_max_gas_amount(self.write_options.max_gas);
+        let client = RestClient::new(Url::clone(
+            &self.write_options.rest_options.url(&self.profile.profile)?,
+        ));
+        let transaction_factory =
+            TransactionFactory::new(self.write_options.chain_id(&self.profile.profile).await?)
+                .with_gas_unit_price(1)
+                .with_max_gas_amount(self.write_options.max_gas);
         let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
         let transaction = sender_account.sign_with_transaction_builder(
             transaction_factory
@@ -116,11 +119,13 @@ impl CreateAccount {
     }
 
     async fn create_account_with_key(self, address: AccountAddress) -> CliTypedResult<()> {
-        let client = RestClient::new(Url::clone(&self.write_options.rest_options.url()?));
+        let client = RestClient::new(Url::clone(
+            &self.write_options.rest_options.url(&self.profile.profile)?,
+        ));
         let sender_private_key = self
             .write_options
             .private_key_options
-            .extract_private_key(self.encoding_options.encoding)?;
+            .extract_private_key(self.encoding_options.encoding, &self.profile.profile)?;
         let sender_public_key = sender_private_key.public_key();
         let sender_address = account_address_from_public_key(&sender_public_key);
         let sequence_number = client
