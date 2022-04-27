@@ -10,7 +10,7 @@ use crate::common::{
     init::DEFAULT_FAUCET_URL,
     types::{
         account_address_from_public_key, CliConfig, CliError, CliTypedResult, EncodingOptions,
-        ExtractPublicKey, PublicKeyInputOptions, WriteTransactionOptions,
+        ExtractPublicKey, PublicKeyInputOptions,
     },
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
@@ -27,8 +27,6 @@ use reqwest::Url;
 pub struct CreateAccount {
     #[clap(flatten)]
     encoding_options: EncodingOptions,
-    #[clap(flatten)]
-    write_options: WriteTransactionOptions,
     #[clap(flatten)]
     public_key_options: PublicKeyInputOptions,
     /// Flag for using faucet to create the account

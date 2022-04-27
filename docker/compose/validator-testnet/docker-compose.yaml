@@ -63,7 +63,6 @@ services:
             /opt/aptos/bin/aptos-faucet \\
               --address 0.0.0.0 \\
               --port 8000 \\
-              --chain-id TESTING \\
               --mint-key-file-path /opt/aptos/var/mint.key \\
               --server-url http://validator:8080
             echo 'Faucet failed to run likely due to the Validator still starting. Will try again.'

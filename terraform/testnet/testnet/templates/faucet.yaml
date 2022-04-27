@@ -48,7 +48,6 @@ spec:
         - "--address=0.0.0.0"
         - "--port=8080"
         - "--server-url=http://{{ include "testnet.fullname" . }}-jsonrpc"
-        - "--chain-id={{ .Values.genesis.chain_id | default .Values.genesis.era }}"
         - "--mint-key-file-path=/opt/aptos/etc/mint.key"
         ports:
         - name: http
