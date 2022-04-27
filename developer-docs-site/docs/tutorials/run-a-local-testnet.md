@@ -24,15 +24,15 @@ The rest of this document describes:
 
 1. Clone the Aptos-core repository from GitHub.
 
-  ```
-  git clone https://github.com/aptos-labs/aptos-core.git
-  ```
+    ```
+    git clone https://github.com/aptos-labs/aptos-core.git
+    ```
 
 2. `cd` into `aptos-core` directory.
 
-  ```
-  cd aptos-core
-  ```
+    ```
+    cd aptos-core
+    ```
 
 3. Run the `scripts/dev_setup.sh` Bash script as shown below. This will prepare your developer environment.
 
@@ -42,9 +42,9 @@ The rest of this document describes:
 
 4. Update your current shell environment.
 
-  ```
-  source ~/.cargo/env
-  ```
+    ```
+    source ~/.cargo/env
+    ```
 
 5. With your development environment ready, now you can start your testnet network. Before you proceed, make a note of the following:
 
@@ -52,11 +52,13 @@ The rest of this document describes:
   - After the below command runs, you will need to copy the `Config path` information from the terminal output for the next step.
 
   To start your validator network locally, run the following command:
+
     ```
     CARGO_NET_GIT_FETCH_WITH_CLI=true cargo run -p aptos-node -- --test
     ```
 
-    See below for an example of the partial output. Make a note of the `Config path` from the output.
+  See below for an example of the partial output. Make a note of the `Config path` from the output.
+
     ```
     ...
     ...
@@ -73,11 +75,11 @@ The rest of this document describes:
     Aptos is running, press ctrl-c to exit
     ```
 
-    **NOTE**: This command runs `aptos-node` from a genesis-only ledger state. If you want to reuse the ledger state produced by a previous run of `aptos-node`, then use:
+**NOTE**: The above command runs `aptos-node` from a genesis-only ledger state. If you want to reuse the ledger state produced by a previous run of `aptos-node`, then use:
 
-    ```
-    cargo run -p aptos-node -- --test --config <config-path>
-    ```
+```
+cargo run -p aptos-node -- --test --config <config-path>
+```
 
 ### Attaching a Faucet to your testnet
 
@@ -111,19 +113,21 @@ This section describes how to start your local testing using Docker.
 
 4. Start Docker Compose by running the command:
 
-  ```
-  docker-compose up
-  ```
+    ```
+    docker-compose up
+    ```
 
 ### Example
 
 For example, the command sequence for the above steps 2 through 4 is shown below:
 
-**NOTE**: If you do not have `wget` installed on your macOS, then run the below command to install the `wget` before you follow the below example.
+  **NOTE**: If you do not have `wget` installed on your macOS, then run the below command to install the `wget` before you follow the below example.
 
-  ```
-  brew install wget
-  ```
+      ```
+      brew install wget
+      ```
+
+  After you installed `wget` proceed as below.
 
 ```bash
 mkdir aptos_local_validator && cd aptos_local_validator
