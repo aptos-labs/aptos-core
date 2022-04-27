@@ -222,7 +222,7 @@ pub fn initialize_sync_version_gauges(storage: Arc<dyn DbReader>) -> Result<(), 
     let metrics = [
         metrics::StorageSynchronizerOperations::AppliedTransactionOutputs,
         metrics::StorageSynchronizerOperations::ExecutedTransactions,
-        metrics::StorageSynchronizerOperations::SyncedTransactions,
+        metrics::StorageSynchronizerOperations::Synced,
     ];
 
     for metric in metrics {
