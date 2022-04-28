@@ -1,11 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! A tool for interacting with Move
-//!
-//! TODO: Examples
-//!
-
 use crate::{
     common::{
         types::{

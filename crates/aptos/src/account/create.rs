@@ -1,11 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! A command to create a new account on-chain
-//!
-//! TODO: Examples
-//!
-
 use crate::common::{
     init::DEFAULT_FAUCET_URL,
     types::{
@@ -106,8 +101,6 @@ impl CreateAccount {
         address: AccountAddress,
     ) -> CliTypedResult<()> {
         let response = reqwest::Client::new()
-            // TODO: Currently, we are just using mint 0 to create an account using the faucet
-            // We should make a faucet endpoint for creating an account
             .post(format!(
                 "{}mint?amount={}&auth_key={}",
                 faucet_url, initial_coins, address

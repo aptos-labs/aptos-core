@@ -87,7 +87,7 @@ pub struct CliConfig {
 /// An individual profile
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ProfileConfig {
-    /// Private key for commands.  TODO: Add vault functionality
+    /// Private key for commands.
     pub private_key: Option<Ed25519PrivateKey>,
     /// Public key for commands
     pub public_key: Option<Ed25519PublicKey>,
@@ -158,7 +158,6 @@ impl CliConfig {
         }
 
         // Save over previous config file
-        // TODO: Ask for saving over?
         let config_file = aptos_folder.join("config.yml");
         let config_bytes = serde_yaml::to_string(&self).map_err(|err| {
             CliError::UnexpectedError(format!("Failed to serialize config {}", err))

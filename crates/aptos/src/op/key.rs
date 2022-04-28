@@ -68,7 +68,6 @@ impl ExtractPeer {
         )?;
 
         // Build peer info
-        // TODO: Take in an address?
         let peer_id = from_identity_public_key(public_key);
         let mut public_keys = HashSet::new();
         public_keys.insert(public_key);

@@ -1,11 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! A command to list resources owned by an address
-//!
-//! TODO: Examples
-//!
-
 use crate::common::types::{CliConfig, CliError, CliTypedResult, ProfileOptions, RestOptions};
 use aptos_rest_client::{types::Resource, Client};
 use aptos_types::account_address::AccountAddress;

@@ -21,7 +21,6 @@ use std::{
 shadow!(build);
 
 /// Prompts for confirmation until a yes or no is given explicitly
-/// TODO: Capture interrupts
 pub fn prompt_yes(prompt: &str) -> bool {
     let mut result: Result<bool, ()> = Err(());
 
