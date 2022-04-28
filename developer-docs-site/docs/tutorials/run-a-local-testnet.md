@@ -7,7 +7,7 @@ import BlockQuote from "@site/src/components/BlockQuote";
 
 # Run a Local Testnet
 
-You can run a local testnet of the Aptos Blockchain. This local testnet will not be connected to the Aptos devnet. It will run on your local machine, independently of the Aptos ecosystem. You can use this local testnet for testing and development purposes.
+You can run a local testnet of the Aptos Blockchain. This local testnet will not be connected to the Aptos devnet. It will run on your local machine, independent of other Aptos networks. You can use this local testnet for testing and development purposes.
 
 You can run a local testnet in two ways:
 
