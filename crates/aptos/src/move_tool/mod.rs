@@ -2,21 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::types::{
-        load_account_arg, CliError, CliTypedResult, EncodingOptions, MovePackageDir,
-        ProfileOptions, TransactionSummary, WriteTransactionOptions,
+    common::{
+        types::{
+            load_account_arg, CliError, CliTypedResult, EncodingOptions, MovePackageDir,
+            ProfileOptions, TransactionSummary, WriteTransactionOptions,
+        },
+        utils::submit_transaction,
     },
     CliCommand, CliResult,
 };
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
-use aptos_rest_client::{aptos_api_types::MoveType, Client};
-use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
-use aptos_types::{
-    chain_id::ChainId,
-    transaction::{
-        authenticator::AuthenticationKey, ModuleBundle, ScriptFunction, TransactionPayload,
-    },
-};
+use aptos_rest_client::aptos_api_types::MoveType;
+use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
 use aptos_vm::natives::aptos_natives;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
@@ -28,7 +24,6 @@ use move_core_types::{
 };
 use move_package::{compilation::compiled_package::CompiledPackage, BuildConfig};
 use move_unit_test::UnitTestingConfig;
-use reqwest::Url;
 use std::{convert::TryFrom, path::Path, str::FromStr};
 
 /// CLI tool for performing Move tasks
@@ -181,43 +176,8 @@ impl CliCommand<TransactionSummary> for PublishPackage {
             self.write_options.max_gas,
         )
         .await
+        .map(TransactionSummary::from)
     }
-}
-
-/// Submits a [`TransactionPayload`] as signed by the `sender_key`
-async fn submit_transaction(
-    url: Url,
-    chain_id: ChainId,
-    sender_key: Ed25519PrivateKey,
-    payload: TransactionPayload,
-    max_gas: u64,
-) -> CliTypedResult<TransactionSummary> {
-    let client = Client::new(url);
-
-    // Get sender address
-    let sender_address = AuthenticationKey::ed25519(&sender_key.public_key()).derived_address();
-    let sender_address = AccountAddress::new(*sender_address);
-
-    // Get account to get the sequence number
-    let account_response = client
-        .get_account(sender_address)
-        .await
-        .map_err(|err| CliError::ApiError(err.to_string()))?;
-    let account = account_response.inner();
-    let sequence_number = account.sequence_number;
-
-    let transaction_factory = TransactionFactory::new(chain_id)
-        .with_gas_unit_price(1)
-        .with_max_gas_amount(max_gas);
-    let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
-    let transaction =
-        sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
-    let response = client
-        .submit_and_wait(&transaction)
-        .await
-        .map_err(|err| CliError::ApiError(err.to_string()))?;
-
-    Ok(response.into_inner().into())
 }
 
 /// Run a Move function
@@ -289,6 +249,7 @@ impl CliCommand<TransactionSummary> for RunFunction {
             self.write_options.max_gas,
         )
         .await
+        .map(TransactionSummary::from)
     }
 }
 

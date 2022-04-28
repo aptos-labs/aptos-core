@@ -5,9 +5,17 @@ use crate::{
     common::types::{CliError, CliTypedResult},
     CliResult,
 };
+use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
+use aptos_rest_client::{Client, Transaction};
+use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_telemetry::constants::APTOS_CLI_PUSH_METRICS;
+use aptos_types::{
+    chain_id::ChainId,
+    transaction::{authenticator::AuthenticationKey, TransactionPayload},
+};
 use itertools::Itertools;
 use move_core_types::account_address::AccountAddress;
+use reqwest::Url;
 use serde::Serialize;
 use shadow_rs::shadow;
 use std::{
@@ -225,4 +233,36 @@ where
         map.insert(key, value);
     }
     Ok(map)
+}
+
+/// Submits a [`TransactionPayload`] as signed by the `sender_key`
+pub async fn submit_transaction(
+    url: Url,
+    chain_id: ChainId,
+    sender_key: Ed25519PrivateKey,
+    payload: TransactionPayload,
+    max_gas: u64,
+) -> CliTypedResult<Transaction> {
+    let client = Client::new(url);
+
+    // Get sender address
+    let sender_address = AuthenticationKey::ed25519(&sender_key.public_key()).derived_address();
+    let sender_address = AccountAddress::new(*sender_address);
+
+    // Get sequence number for account
+    let sequence_number = get_sequence_number(&client, sender_address).await?;
+
+    // Sign and submit transaction
+    let transaction_factory = TransactionFactory::new(chain_id)
+        .with_gas_unit_price(1)
+        .with_max_gas_amount(max_gas);
+    let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
+    let transaction =
+        sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
+    let response = client
+        .submit_and_wait(&transaction)
+        .await
+        .map_err(|err| CliError::ApiError(err.to_string()))?;
+
+    Ok(response.into_inner())
 }

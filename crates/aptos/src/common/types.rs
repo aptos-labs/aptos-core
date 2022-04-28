@@ -560,7 +560,7 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
 /// A shortened transaction output
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct TransactionSummary {
-    changes: BTreeMap<String, serde_json::Value>,
+    changes: Vec<ChangeSummary>,
     gas_used: Option<u64>,
     success: bool,
     version: Option<u64>,
@@ -582,33 +582,70 @@ impl From<Transaction> for TransactionSummary {
                 .changes
                 .iter()
                 .map(|change| match change {
-                    WriteSetChange::DeleteModule { module, .. } => {
-                        (module.to_string(), "Deleted".into())
-                    }
+                    WriteSetChange::DeleteModule { module, .. } => ChangeSummary {
+                        event: change.type_str(),
+                        module: Some(module.to_string()),
+                        ..Default::default()
+                    },
                     WriteSetChange::DeleteResource {
                         address, resource, ..
-                    } => (format!("{}::{}", address, resource), "Deleted".into()),
-
-                    WriteSetChange::DeleteTableItem { handle, key, .. } => {
-                        (format!("{}:{}", handle, key), "Deleted".into())
-                    }
-                    WriteSetChange::WriteModule { address, .. } => {
-                        (address.to_string(), "Module written".into())
-                    }
-                    WriteSetChange::WriteResource { address, data, .. } => (
-                        format!("{}::{}", address, data.typ),
-                        serde_json::to_value(&data.data).unwrap_or_default(),
-                    ),
+                    } => ChangeSummary {
+                        event: change.type_str(),
+                        address: Some(*address.inner()),
+                        resource: Some(resource.to_string()),
+                        ..Default::default()
+                    },
+                    WriteSetChange::DeleteTableItem { handle, key, .. } => ChangeSummary {
+                        event: change.type_str(),
+                        handle: Some(handle.to_string()),
+                        key: Some(key.to_string()),
+                        ..Default::default()
+                    },
+                    WriteSetChange::WriteModule { address, .. } => ChangeSummary {
+                        event: change.type_str(),
+                        address: Some(*address.inner()),
+                        ..Default::default()
+                    },
+                    WriteSetChange::WriteResource { address, data, .. } => ChangeSummary {
+                        event: change.type_str(),
+                        address: Some(*address.inner()),
+                        resource: Some(data.typ.to_string()),
+                        data: Some(serde_json::to_value(&data.data).unwrap_or_default()),
+                        ..Default::default()
+                    },
                     WriteSetChange::WriteTableItem {
                         handle, key, value, ..
-                    } => (
-                        format!("{}::{}", handle, key),
-                        format!("Written as {}", value).into(),
-                    ),
+                    } => ChangeSummary {
+                        event: change.type_str(),
+                        handle: Some(handle.to_string()),
+                        key: Some(key.to_string()),
+                        value: Some(value.to_string()),
+                        ..Default::default()
+                    },
                 })
                 .collect();
         }
 
         summary
     }
+}
+
+/// A summary of a [`WriteSetChange`] for easy printing
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct ChangeSummary {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    address: Option<AccountAddress>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data: Option<serde_json::Value>,
+    event: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    handle: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    module: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    resource: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    value: Option<String>,
 }

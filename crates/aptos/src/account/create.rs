@@ -4,13 +4,11 @@
 use crate::common::{
     init::DEFAULT_FAUCET_URL,
     types::{
-        account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
-        EncodingOptions, ProfileOptions, TransactionSummary, WriteTransactionOptions,
+        CliCommand, CliConfig, CliError, CliTypedResult, EncodingOptions, ProfileOptions,
+        WriteTransactionOptions,
     },
+    utils::submit_transaction,
 };
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
-use aptos_rest_client::Client as RestClient;
-use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
@@ -72,38 +70,6 @@ impl CliCommand<String> for CreateAccount {
 }
 
 impl CreateAccount {
-    async fn post_account(
-        &self,
-        address: AccountAddress,
-        sender_key: Ed25519PrivateKey,
-        sender_address: AccountAddress,
-        sequence_number: u64,
-    ) -> CliTypedResult<TransactionSummary> {
-        let client = RestClient::new(Url::clone(
-            &self
-                .write_options
-                .rest_options
-                .url(&self.profile_options.profile)?,
-        ));
-        let transaction_factory = TransactionFactory::new(
-            self.write_options
-                .chain_id(&self.profile_options.profile)
-                .await?,
-        )
-        .with_gas_unit_price(1)
-        .with_max_gas_amount(self.write_options.max_gas);
-        let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
-        let transaction = sender_account.sign_with_transaction_builder(
-            transaction_factory
-                .payload(aptos_stdlib::encode_create_account_script_function(address)),
-        );
-        client
-            .submit_and_wait(&transaction)
-            .await
-            .map(|txn| txn.into_inner().into())
-            .map_err(|err| CliError::ApiError(err.to_string()))
-    }
-
     pub async fn create_account_with_faucet(
         faucet_url: Url,
         initial_coins: u64,
@@ -128,26 +94,23 @@ impl CreateAccount {
     }
 
     async fn create_account_with_key(self, address: AccountAddress) -> CliTypedResult<()> {
-        let client = RestClient::new(Url::clone(
-            &self
-                .write_options
-                .rest_options
-                .url(&self.profile_options.profile)?,
-        ));
-        let sender_private_key = self.write_options.private_key_options.extract_private_key(
+        let sender_key = self.write_options.private_key_options.extract_private_key(
             self.encoding_options.encoding,
             &self.profile_options.profile,
         )?;
-        let sender_public_key = sender_private_key.public_key();
-        let sender_address = account_address_from_public_key(&sender_public_key);
-        let sequence_number = client
-            .get_account(sender_address)
-            .await
-            .map_err(|err| CliError::ApiError(err.to_string()))?
-            .into_inner()
-            .sequence_number;
-        self.post_account(address, sender_private_key, sender_address, sequence_number)
-            .await?;
+
+        submit_transaction(
+            self.write_options
+                .rest_options
+                .url(&self.profile_options.profile)?,
+            self.write_options
+                .chain_id(&self.profile_options.profile)
+                .await?,
+            sender_key,
+            aptos_stdlib::encode_create_account_script_function(address),
+            self.write_options.max_gas,
+        )
+        .await?;
         Ok(())
     }
 }
