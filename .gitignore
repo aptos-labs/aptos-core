@@ -75,5 +75,9 @@ target-out-docker
 *.swp
 *.swo
 
+# Emacs backup files
+*~
+\#*\#
+
 # Aptos CLI files
 .aptos/
