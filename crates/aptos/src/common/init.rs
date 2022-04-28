@@ -5,14 +5,15 @@ use crate::{
     account::create::CreateAccount,
     common::{
         types::{
-            account_address_from_public_key, CliConfig, CliError, CliTypedResult, ProfileConfig,
-            ProfileOptions,
+            account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
+            ProfileConfig, ProfileOptions,
         },
         utils::prompt_yes,
     },
     op::key::GenerateKey,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
+use async_trait::async_trait;
 use clap::Parser;
 use std::collections::HashMap;
 
@@ -27,8 +28,13 @@ pub struct InitTool {
     profile_options: ProfileOptions,
 }
 
-impl InitTool {
-    pub async fn execute(self) -> CliTypedResult<()> {
+#[async_trait]
+impl CliCommand<()> for InitTool {
+    fn command_name(&self) -> &'static str {
+        "AptosInit"
+    }
+
+    async fn execute(self) -> CliTypedResult<()> {
         let mut config = if CliConfig::config_exists()? {
             CliConfig::load()?
         } else {

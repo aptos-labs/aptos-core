@@ -1,9 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{CliConfig, CliError, CliTypedResult, ProfileOptions, RestOptions};
+use crate::common::types::{
+    CliCommand, CliConfig, CliError, CliTypedResult, ProfileOptions, RestOptions,
+};
 use aptos_rest_client::{types::Resource, Client};
 use aptos_types::account_address::AccountAddress;
+use async_trait::async_trait;
 use clap::Parser;
 
 /// Command to list resources owned by an address
@@ -21,10 +24,15 @@ pub struct ListResources {
     account: Option<AccountAddress>,
 }
 
-impl ListResources {
+#[async_trait]
+impl CliCommand<Vec<serde_json::Value>> for ListResources {
+    fn command_name(&self) -> &'static str {
+        "ListResources"
+    }
+
     // TODO: Format this in a reasonable way while providing all information
     // add options like --tokens --nfts etc
-    pub(crate) async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
+    async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
         let account = if let Some(account) = self.account {
             account
         } else if let Some(Some(account)) =

@@ -3,7 +3,7 @@
 
 use crate::common::{
     init::DEFAULT_REST_URL,
-    utils::{check_if_file_exists, write_to_file},
+    utils::{check_if_file_exists, to_common_result, write_to_file},
 };
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -12,6 +12,7 @@ use aptos_crypto::{
 use aptos_logger::debug;
 use aptos_rest_client::Client;
 use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
+use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
@@ -22,6 +23,7 @@ use std::{
     str::FromStr,
 };
 use thiserror::Error;
+use crate::common::utils::to_common_success_result;
 
 /// A common result to be returned to users
 pub type CliResult = Result<String, String>;
@@ -531,5 +533,27 @@ pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
             "'--account-address' or '--profile' after using aptos init must be provided"
                 .to_string(),
         ))
+    }
+}
+
+/// A common trait for all CLI commands to have consistent outputs
+#[async_trait]
+pub trait CliCommand<T: Serialize + Send>: Sized + Send {
+    /// Returns a name for logging purposes
+    fn command_name(&self) -> &'static str;
+
+    /// Executes the command, returning a command specific type
+    async fn execute(self) -> CliTypedResult<T>;
+
+    /// Executes the command, and serializes it to the common JSON output type
+    async fn execute_serialized(self) -> CliResult {
+        let command_name = self.command_name();
+        to_common_result(command_name, self.execute().await).await
+    }
+
+    /// Executes the command, and throws away Ok(result) for the string Success
+    async fn execute_serialized_success(self) -> CliResult {
+        let command_name = self.command_name();
+        to_common_success_result(command_name, self.execute().await).await
     }
 }

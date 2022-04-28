@@ -40,9 +40,9 @@ pub fn prompt_yes(prompt: &str) -> bool {
     result.unwrap()
 }
 
-/// Convert an empty response to Success
-pub async fn to_common_success_result(command: &str, result: CliTypedResult<()>) -> CliResult {
-    to_common_result(command, result.map(|()| "Success")).await
+/// Convert any successful response to Success
+pub async fn to_common_success_result<T>(command: &str, result: CliTypedResult<T>) -> CliResult {
+    to_common_result(command, result.map(|_| "Success")).await
 }
 
 /// For pretty printing outputs in JSON

@@ -165,6 +165,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-workspace-hack",
+ "async-trait",
  "base64",
  "bcs",
  "cached-framework-packages",

@@ -4,8 +4,8 @@
 use crate::common::{
     init::DEFAULT_FAUCET_URL,
     types::{
-        account_address_from_public_key, CliConfig, CliError, CliTypedResult, EncodingOptions,
-        ProfileOptions, WriteTransactionOptions,
+        account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
+        EncodingOptions, ProfileOptions, WriteTransactionOptions,
     },
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
@@ -13,6 +13,7 @@ use aptos_rest_client::{Client as RestClient, Response, Transaction};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
+use async_trait::async_trait;
 use clap::Parser;
 use reqwest::Url;
 
@@ -40,8 +41,13 @@ pub struct CreateAccount {
     initial_coins: u64,
 }
 
-impl CreateAccount {
-    pub async fn execute(self) -> CliTypedResult<String> {
+#[async_trait]
+impl CliCommand<String> for CreateAccount {
+    fn command_name(&self) -> &'static str {
+        "CreateAccount"
+    }
+
+    async fn execute(self) -> CliTypedResult<String> {
         let address = self.account;
         if self.use_faucet {
             let faucet_url = if let Some(faucet_url) = self.faucet_url {
@@ -63,7 +69,9 @@ impl CreateAccount {
         }
         .map(|_| format!("Account Created at {}", address))
     }
+}
 
+impl CreateAccount {
     async fn post_account(
         &self,
         address: AccountAddress,

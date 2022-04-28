@@ -1,15 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use async_trait::async_trait;
 use crate::{
     common::{
         types::{
             load_account_arg, CliError, CliTypedResult, EncodingOptions, MovePackageDir,
             ProfileOptions, WriteTransactionOptions,
         },
-        utils::to_common_result,
     },
-    CliResult,
+    CliCommand, CliResult,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
 use aptos_rest_client::{aptos_api_types::MoveType, Client, Transaction};
@@ -46,14 +46,10 @@ pub enum MoveTool {
 impl MoveTool {
     pub async fn execute(self) -> CliResult {
         match self {
-            MoveTool::Compile(tool) => {
-                to_common_result("CompilePackage", tool.execute().await).await
-            }
-            MoveTool::Publish(tool) => {
-                to_common_result("PublishPackage", tool.execute().await).await
-            }
-            MoveTool::Run(tool) => to_common_result("RunFunction", tool.execute().await).await,
-            MoveTool::Test(tool) => to_common_result("TestPackage", tool.execute().await).await,
+            MoveTool::Compile(tool) => tool.execute_serialized().await,
+            MoveTool::Publish(tool) => tool.execute_serialized().await,
+            MoveTool::Run(tool) => tool.execute_serialized().await,
+            MoveTool::Test(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -65,8 +61,13 @@ pub struct CompilePackage {
     move_options: MovePackageDir,
 }
 
-impl CompilePackage {
-    pub async fn execute(self) -> CliTypedResult<Vec<String>> {
+#[async_trait]
+impl CliCommand<Vec<String>> for CompilePackage {
+    fn command_name(&self) -> &'static str {
+        "CompilePackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<Vec<String>> {
         let build_config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses(),
             generate_docs: true,
@@ -91,8 +92,13 @@ pub struct TestPackage {
     move_options: MovePackageDir,
 }
 
-impl TestPackage {
-    pub async fn execute(self) -> CliTypedResult<&'static str> {
+#[async_trait]
+impl CliCommand<&'static str> for TestPackage {
+    fn command_name(&self) -> &'static str {
+        "TestPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
         let config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses(),
             test_mode: true,
@@ -137,8 +143,13 @@ pub struct PublishPackage {
     profile_options: ProfileOptions,
 }
 
-impl PublishPackage {
-    pub async fn execute(self) -> CliTypedResult<aptos_rest_client::Transaction> {
+#[async_trait]
+impl CliCommand<aptos_rest_client::Transaction> for PublishPackage {
+    fn command_name(&self) -> &'static str {
+        "PublishPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<aptos_rest_client::Transaction> {
         let build_config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses(),
             generate_abis: false,
@@ -237,8 +248,13 @@ pub struct RunFunction {
     type_args: Vec<MoveType>,
 }
 
-impl RunFunction {
-    pub async fn execute(self) -> Result<Transaction, CliError> {
+#[async_trait]
+impl CliCommand<Transaction> for RunFunction {
+    fn command_name(&self) -> &'static str {
+        "RunFunction"
+    }
+
+    async fn execute(self) -> CliTypedResult<Transaction> {
         let args: Vec<Vec<u8>> = self
             .args
             .iter()

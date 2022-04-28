@@ -3,8 +3,8 @@
 
 use crate::common::{
     types::{
-        account_address_from_public_key, CliError, CliTypedResult, EncodingOptions, ProfileOptions,
-        WriteTransactionOptions,
+        account_address_from_public_key, CliCommand, CliError, CliTypedResult, EncodingOptions,
+        ProfileOptions, WriteTransactionOptions,
     },
     utils::get_sequence_number,
 };
@@ -12,6 +12,7 @@ use aptos_crypto::PrivateKey;
 use aptos_rest_client::Transaction;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::account_address::AccountAddress;
+use async_trait::async_trait;
 use cached_framework_packages::aptos_stdlib;
 use clap::Parser;
 
@@ -37,8 +38,13 @@ pub struct TransferCoins {
     amount: u64,
 }
 
-impl TransferCoins {
-    pub(crate) async fn execute(self) -> CliTypedResult<Transaction> {
+#[async_trait]
+impl CliCommand<Transaction> for TransferCoins {
+    fn command_name(&self) -> &'static str {
+        "TransferCoins"
+    }
+
+    async fn execute(self) -> CliTypedResult<Transaction> {
         let client = aptos_rest_client::Client::new(reqwest::Url::clone(
             &self
                 .write_options
