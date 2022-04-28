@@ -5,11 +5,11 @@ use crate::common::{
     init::DEFAULT_FAUCET_URL,
     types::{
         account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
-        EncodingOptions, ProfileOptions, WriteTransactionOptions,
+        EncodingOptions, ProfileOptions, TransactionSummary, WriteTransactionOptions,
     },
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
-use aptos_rest_client::{Client as RestClient, Response, Transaction};
+use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
@@ -78,7 +78,7 @@ impl CreateAccount {
         sender_key: Ed25519PrivateKey,
         sender_address: AccountAddress,
         sequence_number: u64,
-    ) -> CliTypedResult<Response<Transaction>> {
+    ) -> CliTypedResult<TransactionSummary> {
         let client = RestClient::new(Url::clone(
             &self
                 .write_options
@@ -100,6 +100,7 @@ impl CreateAccount {
         client
             .submit_and_wait(&transaction)
             .await
+            .map(|txn| txn.into_inner().into())
             .map_err(|err| CliError::ApiError(err.to_string()))
     }
 

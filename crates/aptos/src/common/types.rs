@@ -3,14 +3,14 @@
 
 use crate::common::{
     init::DEFAULT_REST_URL,
-    utils::{check_if_file_exists, to_common_result, write_to_file},
+    utils::{check_if_file_exists, to_common_result, to_common_success_result, write_to_file},
 };
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
 use aptos_logger::debug;
-use aptos_rest_client::Client;
+use aptos_rest_client::{aptos_api_types::WriteSetChange, Client, Transaction};
 use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
@@ -23,7 +23,6 @@ use std::{
     str::FromStr,
 };
 use thiserror::Error;
-use crate::common::utils::to_common_success_result;
 
 /// A common result to be returned to users
 pub type CliResult = Result<String, String>;
@@ -555,5 +554,61 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
     async fn execute_serialized_success(self) -> CliResult {
         let command_name = self.command_name();
         to_common_success_result(command_name, self.execute().await).await
+    }
+}
+
+/// A shortened transaction output
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct TransactionSummary {
+    changes: BTreeMap<String, serde_json::Value>,
+    gas_used: Option<u64>,
+    success: bool,
+    version: Option<u64>,
+    vm_status: String,
+}
+
+impl From<Transaction> for TransactionSummary {
+    fn from(transaction: Transaction) -> Self {
+        let mut summary = TransactionSummary {
+            success: transaction.success(),
+            version: transaction.version(),
+            vm_status: transaction.vm_status(),
+            ..Default::default()
+        };
+
+        if let Ok(info) = transaction.transaction_info() {
+            summary.gas_used = Some(info.gas_used.0);
+            summary.changes = info
+                .changes
+                .iter()
+                .map(|change| match change {
+                    WriteSetChange::DeleteModule { module, .. } => {
+                        (module.to_string(), "Deleted".into())
+                    }
+                    WriteSetChange::DeleteResource {
+                        address, resource, ..
+                    } => (format!("{}::{}", address, resource), "Deleted".into()),
+
+                    WriteSetChange::DeleteTableItem { handle, key, .. } => {
+                        (format!("{}:{}", handle, key), "Deleted".into())
+                    }
+                    WriteSetChange::WriteModule { address, .. } => {
+                        (address.to_string(), "Module written".into())
+                    }
+                    WriteSetChange::WriteResource { address, data, .. } => (
+                        format!("{}::{}", address, data.typ),
+                        serde_json::to_value(&data.data).unwrap_or_default(),
+                    ),
+                    WriteSetChange::WriteTableItem {
+                        handle, key, value, ..
+                    } => (
+                        format!("{}::{}", handle, key),
+                        format!("Written as {}", value).into(),
+                    ),
+                })
+                .collect();
+        }
+
+        summary
     }
 }

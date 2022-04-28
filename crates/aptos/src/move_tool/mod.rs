@@ -1,18 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use async_trait::async_trait;
 use crate::{
-    common::{
-        types::{
-            load_account_arg, CliError, CliTypedResult, EncodingOptions, MovePackageDir,
-            ProfileOptions, WriteTransactionOptions,
-        },
+    common::types::{
+        load_account_arg, CliError, CliTypedResult, EncodingOptions, MovePackageDir,
+        ProfileOptions, TransactionSummary, WriteTransactionOptions,
     },
     CliCommand, CliResult,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
-use aptos_rest_client::{aptos_api_types::MoveType, Client, Transaction};
+use aptos_rest_client::{aptos_api_types::MoveType, Client};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
     chain_id::ChainId,
@@ -21,6 +18,7 @@ use aptos_types::{
     },
 };
 use aptos_vm::natives::aptos_natives;
+use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use move_cli::package::cli::{run_move_unit_tests, UnitTestResult};
 use move_core_types::{
@@ -144,12 +142,12 @@ pub struct PublishPackage {
 }
 
 #[async_trait]
-impl CliCommand<aptos_rest_client::Transaction> for PublishPackage {
+impl CliCommand<TransactionSummary> for PublishPackage {
     fn command_name(&self) -> &'static str {
         "PublishPackage"
     }
 
-    async fn execute(self) -> CliTypedResult<aptos_rest_client::Transaction> {
+    async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let build_config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses(),
             generate_abis: false,
@@ -193,7 +191,7 @@ async fn submit_transaction(
     sender_key: Ed25519PrivateKey,
     payload: TransactionPayload,
     max_gas: u64,
-) -> CliTypedResult<Transaction> {
+) -> CliTypedResult<TransactionSummary> {
     let client = Client::new(url);
 
     // Get sender address
@@ -219,7 +217,7 @@ async fn submit_transaction(
         .await
         .map_err(|err| CliError::ApiError(err.to_string()))?;
 
-    Ok(response.inner().clone())
+    Ok(response.into_inner().into())
 }
 
 /// Run a Move function
@@ -249,12 +247,12 @@ pub struct RunFunction {
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for RunFunction {
+impl CliCommand<TransactionSummary> for RunFunction {
     fn command_name(&self) -> &'static str {
         "RunFunction"
     }
 
-    async fn execute(self) -> CliTypedResult<Transaction> {
+    async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let args: Vec<Vec<u8>> = self
             .args
             .iter()
