@@ -98,7 +98,7 @@ Faucets are stateless services that can be run in parallel with the testnet. A F
       --server-url http://127.0.0.1:8080
 ```
 
-This will start a Faucet running locally without any restrictions to tokens that can be claimed and minted. This Faucet service will be as accessible as the testnet youy started above.
+This will start a Faucet running locally without any restrictions to tokens that can be claimed and minted. This Faucet service will be as accessible as the testnet you started above.
 
 ## Using Docker
 
