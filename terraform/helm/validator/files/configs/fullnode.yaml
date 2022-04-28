@@ -18,6 +18,15 @@ execution:
   genesis_file_location: ""
   {{- end}}
 
+state_sync:
+  # state_sync_driver:
+  #   enable_state_sync_v2: false
+  storage_service:
+    storage_summary_refresh_interval_ms: 100
+  data_streaming_service:
+    global_summary_refresh_interval_ms: 100
+  aptos_data_client:
+    summary_poll_interval_ms: 100
 
 storage:
   backup_service_address: "0.0.0.0:6186"
