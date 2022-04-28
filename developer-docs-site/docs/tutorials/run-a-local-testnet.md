@@ -106,7 +106,7 @@ This section describes how to start your local testing using Docker.
 
 1. Install [Docker](https://docs.docker.com/get-docker/) including [Docker-Compose](https://docs.docker.com/compose/install/).
 2. Create a directory for your local test validator network, and `cd` into it.
-3. Download the YAML files for:
+3. Download the YAML configuration files for:
 
   - [Validator testnet docker compose](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/validator-testnet/docker-compose.yaml) and
   - [Validator configuration](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/validator-testnet/validator_node_template.yaml).
