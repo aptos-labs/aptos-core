@@ -55,7 +55,7 @@ export class AptosClient {
 
     // `withCredentials` ensures cookie handling
     this.client = new HttpClient<unknown>({
-      withCredentials: true,
+      withCredentials: false,
       baseURL: nodeUrl,
       validateStatus: () => true, // Don't explode here on error responses; let our code handle it
       ...(config || {}),
