@@ -33,8 +33,10 @@ pub fn load_abis(path: &str) -> Vec<ScriptABI> {
         .find("**/*abis/*.abi")
         .unwrap()
         .filter_map(|file_module| match file_module {
-            DirEntry::Dir(_) => None,
-            DirEntry::File(file) => Some(bcs::from_bytes::<ScriptABI>(file.contents()).unwrap()),
+            DirEntry::File(file) if !file.path().to_str().unwrap().contains("Genesis") => {
+                Some(bcs::from_bytes::<ScriptABI>(file.contents()).unwrap())
+            }
+            _ => None,
         })
         .collect::<Vec<_>>()
 }

@@ -3,7 +3,7 @@
 
 use forge::{forge_main, ForgeConfig, LocalFactory, Options, Result};
 use smoke_test::{
-    aptos::{AccountCreation, ErrorReport, GasCheck, MintTransfer, ModulePublish},
+    aptos::{AccountCreation, ErrorReport, GasCheck, MintTransfer, ModulePublish, Staking},
     transaction::ExternalTransactionSigner,
 };
 
@@ -17,6 +17,7 @@ fn main() -> Result<()> {
             &MintTransfer,
             &ModulePublish,
             &smoke_test::nft_transaction::NFTTransaction,
+            &Staking,
         ])
         .with_genesis_modules_bytes(cached_framework_packages::module_blobs().to_vec());
 

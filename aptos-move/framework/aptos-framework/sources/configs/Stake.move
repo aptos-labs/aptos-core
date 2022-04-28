@@ -1,5 +1,6 @@
 module AptosFramework::Stake {
     use Std::Errors;
+    use Std::Option::{Self, Option};
     use Std::Signer;
     use Std::Vector;
     use AptosFramework::SystemAddresses;
@@ -191,11 +192,9 @@ module AptosFramework::Stake {
         let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
         assert!(stake_pool.current_stake >= validator_set.minimum_stake, Errors::invalid_argument(ESTAKE_TOO_LOW));
         assert!(stake_pool.current_stake <= validator_set.maximum_stake, Errors::invalid_argument(ESTAKE_TOO_HIGH));
-        let (exist, _) = find_validator(&validator_set.active_validators, addr);
-        assert!(!exist, Errors::invalid_argument(EALREADY_VALIDATOR));
-        let (exist, _) = find_validator(&validator_set.pending_inactive, addr);
-        assert!(!exist, Errors::invalid_argument(EALREADY_VALIDATOR));
-        let (exist, _) = find_validator(&validator_set.pending_active, addr);
+        let exist =  Option::is_some(&find_validator(&validator_set.active_validators, addr)) ||
+                     Option::is_some(&find_validator(&validator_set.pending_inactive, addr)) ||
+                     Option::is_some(&find_validator(&validator_set.pending_active, addr));
         assert!(!exist, Errors::invalid_argument(EALREADY_VALIDATOR));
 
         Vector::push_back(&mut validator_set.pending_active, generate_validator_info(addr));
@@ -206,8 +205,9 @@ module AptosFramework::Stake {
         let addr = Signer::address_of(account);
         let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
 
-        let (exist, index) = find_validator(&validator_set.active_validators, addr);
-        assert!(exist, Errors::invalid_argument(ENOT_VALIDATOR));
+        let maybe_index = find_validator(&validator_set.active_validators, addr);
+        assert!(Option::is_some(&maybe_index), Errors::invalid_argument(ENOT_VALIDATOR));
+        let index = Option::extract(&mut maybe_index);
 
         let validator_info = Vector::swap_remove(&mut validator_set.active_validators, index);
         assert!(Vector::length(&validator_set.active_validators) > 0, Errors::invalid_argument(ELAST_VALIDATOR));
@@ -216,12 +216,8 @@ module AptosFramework::Stake {
 
     public fun is_current_validator(addr: address): bool acquires ValidatorSet{
         let validator_set = borrow_global<ValidatorSet>(@CoreResources);
-        let (exist_1, _) = find_validator(&validator_set.active_validators, addr);
-        if (exist_1) {
-            return true
-        };
-        let (exist_2, _) = find_validator(&validator_set.pending_inactive, addr);
-        exist_2
+        Option::is_some(&find_validator(&validator_set.active_validators, addr)) ||
+        Option::is_some(&find_validator(&validator_set.pending_inactive, addr))
     }
 
     /// Triggers at epoch boundary.
@@ -301,52 +297,43 @@ module AptosFramework::Stake {
     }
 
     fun find_delegation_from_pool(pool: &StakePool, addr: address): bool {
-        let (exist, _) = find_delegation(&pool.active, addr);
-        if (exist) {
-            return true
-        };
-        let (exist, _) = find_delegation(&pool.pending_active, addr);
-        if (exist) {
-            return true
-        };
-        let (exist, _) = find_delegation(&pool.pending_inactive, addr);
-        if (exist) {
-            return true
-        };
-        let (exist, _) = find_delegation(&pool.inactive, addr);
-        exist
+        Option::is_some(&find_delegation(&pool.active, addr)) ||
+        Option::is_some(&find_delegation(&pool.pending_active, addr)) ||
+        Option::is_some(&find_delegation(&pool.pending_inactive, addr)) ||
+        Option::is_some(&find_delegation(&pool.inactive, addr))
     }
 
-    fun find_delegation(v: &vector<Delegation>, addr: address): (bool, u64) {
+    fun find_delegation(v: &vector<Delegation>, addr: address): Option<u64> {
         let i = 0;
         let len =  Vector::length(v);
         while (i < len) {
             let d = Vector::borrow(v, i);
             if (d.from == addr) {
-                return (true, i)
+                return Option::some(i)
             };
             i = i + 1;
         };
-        (false, 0)
+        Option::none()
     }
 
-    fun find_validator(v: &vector<ValidatorInfo>, addr: address): (bool, u64) {
+    fun find_validator(v: &vector<ValidatorInfo>, addr: address): Option<u64> {
         let i = 0;
         let len = Vector::length(v);
         while (i < len) {
             if (Vector::borrow(v, i).addr == addr) {
-                return (true, i)
+                return Option::some(i)
             };
             i = i + 1;
         };
-        (false, 0)
+        Option::none()
     }
 
     fun withdraw_internal(v: &mut vector<Delegation>, addr: address): Delegation {
-        let (exist, index) = find_delegation(v, addr);
-        if (!exist) {
+        let maybe_index = find_delegation(v, addr);
+        if (Option::is_none(&maybe_index)) {
             abort Errors::invalid_argument(EDELEGATION_NOT_FOUND)
         };
+        let index = Option::extract(&mut maybe_index);
         Vector::swap_remove(v, index)
     }
 
