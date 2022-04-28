@@ -1,0 +1,6 @@
+- change cluster name in cluster.tf 
+- terraform init
+- terraform apply
+- export KUBECONFIG=<path>/vultr_kube_config.yaml
+- kubectl get pods --all-namespaces
+- kubectl describe pod --namespace aptos default0-aptos-fullnode-0
