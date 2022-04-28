@@ -88,7 +88,7 @@ pub static STORAGE_SYNCHRONIZER_OPERATIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "aptos_state_sync_version",
         "The versions processed by the storage synchronizer operations",
-        &["storage_synchronizer_operation"]
+        &["type"]
     )
     .unwrap()
 });
