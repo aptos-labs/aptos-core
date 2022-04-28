@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::{
-    on_chain_config::VMPublishingOption, transaction::TransactionStatus, vm_status::KeptVMStatus,
+    on_chain_config::VMPublishingOption,
+    transaction::{ExecutionStatus, TransactionStatus},
 };
 use language_e2e_tests::{
     account::Account, compile::compile_module, current_function_name, executor::FakeExecutor,
     transaction_status_eq,
 };
+use move_core_types::vm_status::StatusCode;
 
 // A module with an address different from the sender's address should be rejected
 #[test]
@@ -51,7 +53,12 @@ fn bad_module_address() {
     let output = executor.execute_transaction(txn);
     match output.status() {
         TransactionStatus::Keep(status) => {
-            assert!(status == &KeptVMStatus::MiscellaneousError);
+            assert!(
+                status
+                    == &ExecutionStatus::MiscellaneousError(Some(
+                        StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER
+                    ))
+            );
             // assert!(status.status_code() == StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER);
         }
         vm_status => panic!("Unexpected verification status: {:?}", vm_status),
@@ -59,7 +66,7 @@ fn bad_module_address() {
 }
 
 macro_rules! module_republish_test {
-    ($name:ident, $prog1:literal, $prog2:literal, $result:ident) => {
+    ($name:ident, $prog1:literal, $prog2:literal, $result:expr) => {
         #[test]
         fn $name() {
             let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
@@ -94,14 +101,14 @@ macro_rules! module_republish_test {
             // first tx should allways succeed
             assert!(transaction_status_eq(
                 &output1.status(),
-                &TransactionStatus::Keep(KeptVMStatus::Executed),
+                &TransactionStatus::Keep(ExecutionStatus::Success),
             ));
 
             let output2 = executor.execute_transaction(txn2);
             // second tx should yield the expected result
             assert!(transaction_status_eq(
                 &output2.status(),
-                &TransactionStatus::Keep(KeptVMStatus::$result),
+                &TransactionStatus::Keep($result),
             ));
         }
     };
@@ -122,7 +129,7 @@ module_republish_test!(
         public f() { label b0: return; }
     }
     ",
-    Executed
+    ExecutionStatus::Success
 );
 
 // Republishing a module named M under the same address with a superset of the structs is OK
@@ -137,7 +144,7 @@ module_republish_test!(
         struct T { f: u64 }
     }
     ",
-    Executed
+    ExecutionStatus::Success
 );
 
 // Republishing a module named M under the same address with a superset of public functions is OK
@@ -152,7 +159,7 @@ module_republish_test!(
         public f() { label b0: return; }
     }
     ",
-    Executed
+    ExecutionStatus::Success
 );
 
 // Republishing a module named M under the same address that breaks data layout should be rejected
@@ -168,7 +175,7 @@ module_republish_test!(
         struct T { f: u64, g: bool }
     }
     ",
-    MiscellaneousError
+    ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
 );
 
 module_republish_test!(
@@ -183,7 +190,7 @@ module_republish_test!(
         struct T { f: bool }
     }
     ",
-    MiscellaneousError
+    ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
 );
 
 module_republish_test!(
@@ -198,7 +205,7 @@ module_republish_test!(
         struct T {}
     }
     ",
-    MiscellaneousError
+    ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
 );
 
 module_republish_test!(
@@ -212,7 +219,7 @@ module_republish_test!(
     module 0x##ADDRESS##.M {
     }
     ",
-    MiscellaneousError
+    ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
 );
 
 // Republishing a module named M under the same address that breaks linking should be rejected
@@ -228,7 +235,7 @@ module_republish_test!(
         public f(_a: u64) { label b0: return; }
     }
     ",
-    MiscellaneousError
+    ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
 );
 
 module_republish_test!(
@@ -243,7 +250,7 @@ module_republish_test!(
         public f(_a: bool) { label b0: return; }
     }
     ",
-    MiscellaneousError
+    ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
 );
 
 module_republish_test!(
@@ -257,7 +264,7 @@ module_republish_test!(
     module 0x##ADDRESS##.M {
     }
     ",
-    MiscellaneousError
+    ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
 );
 
 #[test]
@@ -286,7 +293,7 @@ pub fn test_publishing_modules_proper_sender() {
     assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
     assert_eq!(
         executor.execute_transaction(txn).status(),
-        &TransactionStatus::Keep(KeptVMStatus::Executed)
+        &TransactionStatus::Keep(ExecutionStatus::Success)
     );
 }
 
@@ -317,7 +324,9 @@ pub fn test_publishing_modules_invalid_sender() {
     assert_eq!(
         executor.execute_transaction(txn).status(),
         // this should be MODULE_ADDRESS_DOES_NOT_MATCH_SENDER but we don't do this check in prologue now
-        &TransactionStatus::Keep(KeptVMStatus::MiscellaneousError),
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER
+        ))),
     );
 }
 
@@ -349,6 +358,6 @@ pub fn test_publishing_allow_modules() {
     assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
     assert_eq!(
         executor.execute_transaction(txn).status(),
-        &TransactionStatus::Keep(KeptVMStatus::Executed)
+        &TransactionStatus::Keep(ExecutionStatus::Success)
     );
 }

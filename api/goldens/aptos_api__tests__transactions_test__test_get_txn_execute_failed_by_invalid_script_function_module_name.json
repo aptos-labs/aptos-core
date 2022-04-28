@@ -6,8 +6,8 @@
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "1",
   "success": false,
-  "vm_status": "Move bytecode deserialization / verification failed, including script function not found or invalid arguments",
-  "accumulator_root_hash": "0x28ca1287846826cd276063d674b7f9ac7ca9257a753ae8d2b0e53ea738ef7c09",
+  "vm_status": "Transaction Executed and Committed with Error LINKER_ERROR",
+  "accumulator_root_hash": "0xd3e3f6fc14545d96c82e250bf96a0ee769cbb0b4f477dc294c920784921e9d45",
   "changes": [
     {
       "type": "write_resource",

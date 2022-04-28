@@ -22,8 +22,8 @@ use aptos_types::{
         ConfigStorage, OnChainConfig, VMConfig, VMPublishingOption, Version, APTOS_VERSION_3,
     },
     state_store::state_key::StateKey,
-    transaction::{TransactionOutput, TransactionStatus},
-    vm_status::{KeptVMStatus, StatusCode, VMStatus},
+    transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
+    vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use fail::fail_point;
@@ -647,7 +647,7 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
     session: SessionExt<S>,
     gas_left: GasUnits<GasCarrier>,
     txn_data: &TransactionMetadata,
-    status: KeptVMStatus,
+    status: ExecutionStatus,
 ) -> Result<TransactionOutput, VMStatus> {
     let gas_used: u64 = txn_data.max_gas_amount().sub(gas_left).get();
 

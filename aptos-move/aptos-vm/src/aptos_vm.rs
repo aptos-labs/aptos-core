@@ -29,11 +29,11 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     on_chain_config::{VMConfig, VMPublishingOption, Version},
     transaction::{
-        ChangeSet, ModuleBundle, SignatureCheckedTransaction, SignedTransaction, Transaction,
-        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
+        ChangeSet, ExecutionStatus, ModuleBundle, SignatureCheckedTransaction, SignedTransaction,
+        Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         WriteSetPayload,
     },
-    vm_status::{KeptVMStatus, StatusCode, VMStatus},
+    vm_status::{StatusCode, VMStatus},
     write_set::{WriteSet, WriteSetMut},
 };
 use fail::fail_point;
@@ -269,7 +269,7 @@ impl AptosVM {
                 session,
                 gas_status.remaining_gas(),
                 txn_data,
-                KeptVMStatus::Executed,
+                ExecutionStatus::Success,
             )?,
         ))
     }
@@ -612,7 +612,7 @@ impl AptosVM {
             session,
             gas_status.remaining_gas(),
             &txn_data,
-            KeptVMStatus::Executed,
+            ExecutionStatus::Success,
         )?;
         Ok((VMStatus::Executed, output))
     }
@@ -749,7 +749,7 @@ impl AptosVM {
                 write_set,
                 events,
                 0,
-                TransactionStatus::Keep(KeptVMStatus::Executed),
+                TransactionStatus::Keep(ExecutionStatus::Success),
             ),
         ))
     }
@@ -934,7 +934,7 @@ impl VMAdapter for AptosVM {
                     WriteSet::default(),
                     Vec::new(),
                     0,
-                    TransactionStatus::Keep(KeptVMStatus::Executed),
+                    TransactionStatus::Keep(ExecutionStatus::Success),
                 );
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
             }

@@ -5,8 +5,8 @@ use crate::{error::MempoolError, state_replication::TxnManager, txn_manager::Mem
 use anyhow::Result;
 use aptos_mempool::ConsensusRequest;
 use aptos_types::{
-    transaction::TransactionStatus,
-    vm_status::{KeptVMStatus, StatusCode},
+    transaction::{ExecutionStatus, TransactionStatus},
+    vm_status::StatusCode,
 };
 use consensus_types::{
     block::{block_test_utils::random_payload, Block},
@@ -35,7 +35,7 @@ fn mock_transaction_status(count: usize) -> Vec<TransactionStatus> {
     for _ in 0..=count {
         let random_status = match rand::thread_rng().gen_range(0..1000) {
             0 => TransactionStatus::Discard(StatusCode::UNKNOWN_VALIDATION_STATUS),
-            _ => TransactionStatus::Keep(KeptVMStatus::Executed),
+            _ => TransactionStatus::Keep(ExecutionStatus::Success),
         };
         statuses.push(random_status);
     }

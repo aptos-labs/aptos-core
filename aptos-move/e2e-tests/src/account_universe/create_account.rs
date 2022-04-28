@@ -11,8 +11,8 @@ use crate::{
 };
 use aptos_proptest_helpers::Index;
 use aptos_types::{
-    transaction::{SignedTransaction, TransactionStatus},
-    vm_status::{AbortLocation, KeptVMStatus, StatusCode},
+    transaction::{ExecutionStatus, SignedTransaction, TransactionStatus},
+    vm_status::{AbortLocation, StatusCode},
 };
 use proptest::prelude::*;
 use proptest_derive::Arbitrary;
@@ -99,7 +99,10 @@ impl AUTransactionGen for CreateExistingAccountGen {
             gas_used = sender.create_existing_account_gas_cost();
             sender.balance -= gas_used * gas_price;
             // TODO(tmn) provide a real abort location
-            TransactionStatus::Keep(KeptVMStatus::MoveAbort(AbortLocation::Script, 777_777))
+            TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                location: AbortLocation::Script,
+                code: 777_777,
+            })
         } else {
             // Not enough gas to get past the prologue.
             TransactionStatus::Discard(StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE)

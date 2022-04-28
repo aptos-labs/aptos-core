@@ -17,8 +17,8 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     on_chain_config::Version,
     transaction::{
-        Script, ScriptFunction, Transaction, TransactionArgument, TransactionOutput,
-        TransactionPayload, TransactionStatus, WriteSetPayload,
+        ExecutionStatus, Script, ScriptFunction, Transaction, TransactionArgument,
+        TransactionOutput, TransactionPayload, TransactionStatus, WriteSetPayload,
     },
 };
 use aptos_vm::{
@@ -46,7 +46,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     resolver::MoveResolver,
     value::MoveValue,
-    vm_status::{KeptVMStatus, VMStatus},
+    vm_status::VMStatus,
 };
 use move_stackless_bytecode_interpreter::{
     concrete::{
@@ -156,14 +156,17 @@ fn compare_output(expect_output: &TransactionOutput, actual_output: VMResult<Ses
             let actual_status = &err.into_vm_status();
             match (expect_status, actual_status) {
                 (
-                    TransactionStatus::Keep(KeptVMStatus::MoveAbort(expect_loc, expect_code)),
+                    TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                        location: expect_loc,
+                        code: expect_code,
+                    }),
                     VMStatus::MoveAbort(actual_loc, actual_code),
                 ) => {
                     assert_eq!(expect_loc, actual_loc);
                     assert_eq!(expect_code, actual_code);
                 }
                 (
-                    TransactionStatus::Keep(KeptVMStatus::ExecutionFailure {
+                    TransactionStatus::Keep(ExecutionStatus::ExecutionFailure {
                         location: expect_loc,
                         function: expect_func,
                         code_offset: expect_offset,
@@ -696,7 +699,7 @@ impl<'env> TraceReplayer<'env> {
         // ignore out-of-gas cases
         if matches!(
             expect_output.status(),
-            TransactionStatus::Keep(KeptVMStatus::OutOfGas)
+            TransactionStatus::Keep(ExecutionStatus::OutOfGas)
         ) {
             return;
         }
@@ -944,7 +947,7 @@ fn replay_trace<P: AsRef<Path>>(
                 Transaction::GenesisTransaction(_) => {
                     if !matches!(
                         res.status(),
-                        TransactionStatus::Keep(KeptVMStatus::Executed)
+                        TransactionStatus::Keep(ExecutionStatus::Success)
                     ) {
                         if flags.warning {
                             eprintln!(
@@ -958,7 +961,7 @@ fn replay_trace<P: AsRef<Path>>(
                 Transaction::BlockMetadata(block_metadata) => {
                     if !matches!(
                         res.status(),
-                        TransactionStatus::Keep(KeptVMStatus::Executed)
+                        TransactionStatus::Keep(ExecutionStatus::Success)
                     ) {
                         if flags.warning {
                             eprintln!(

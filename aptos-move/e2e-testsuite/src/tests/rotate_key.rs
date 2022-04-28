@@ -8,8 +8,10 @@ use aptos_crypto::{
 };
 use aptos_keygen::KeyGen;
 use aptos_types::{
-    transaction::{authenticator::AuthenticationKey, SignedTransaction, TransactionStatus},
-    vm_status::{KeptVMStatus, StatusCode},
+    transaction::{
+        authenticator::AuthenticationKey, ExecutionStatus, SignedTransaction, TransactionStatus,
+    },
+    vm_status::StatusCode,
 };
 use language_e2e_tests::{
     common_transactions::{raw_rotate_key_txn, rotate_key_txn},
@@ -36,7 +38,7 @@ fn rotate_ed25519_key() {
         let output = &executor.execute_transaction(txn);
         assert_eq!(
             output.status(),
-            &TransactionStatus::Keep(KeptVMStatus::Executed),
+            &TransactionStatus::Keep(ExecutionStatus::Success),
         );
         executor.apply_write_set(output.write_set());
 
@@ -65,7 +67,7 @@ fn rotate_ed25519_key() {
         let new_key_output = &executor.execute_transaction(new_key_txn);
         assert_eq!(
             new_key_output.status(),
-            &TransactionStatus::Keep(KeptVMStatus::Executed),
+            &TransactionStatus::Keep(ExecutionStatus::Success),
         );
     }
     }
@@ -100,7 +102,7 @@ fn rotate_ed25519_multisig_key() {
         ));
         assert_eq!(
             output.status(),
-            &TransactionStatus::Keep(KeptVMStatus::Executed),
+            &TransactionStatus::Keep(ExecutionStatus::Success),
         );
         executor.apply_write_set(output.write_set());
         seq_number += 1;
@@ -113,7 +115,7 @@ fn rotate_ed25519_multisig_key() {
         let output = &executor.execute_transaction(signed_txn1);
         assert_eq!(
             output.status(),
-            &TransactionStatus::Keep(KeptVMStatus::Executed),
+            &TransactionStatus::Keep(ExecutionStatus::Success),
         );
         executor.apply_write_set(output.write_set());
         seq_number += 1;
@@ -128,7 +130,7 @@ fn rotate_ed25519_multisig_key() {
         let output = &executor.execute_transaction(signed_txn2);
         assert_eq!(
             output.status(),
-            &TransactionStatus::Keep(KeptVMStatus::Executed),
+            &TransactionStatus::Keep(ExecutionStatus::Success),
         );
     }
     }

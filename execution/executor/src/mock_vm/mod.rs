@@ -19,10 +19,10 @@ use aptos_types::{
     },
     state_store::state_key::StateKey,
     transaction::{
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionArgument,
-        TransactionOutput, TransactionPayload, TransactionStatus,
+        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
+        TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
     },
-    vm_status::{KeptVMStatus, StatusCode, VMStatus},
+    vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptos_vm::VMExecutor;
@@ -45,7 +45,7 @@ enum MockVMTransaction {
 }
 
 pub static KEEP_STATUS: Lazy<TransactionStatus> =
-    Lazy::new(|| TransactionStatus::Keep(KeptVMStatus::Executed));
+    Lazy::new(|| TransactionStatus::Keep(ExecutionStatus::Success));
 
 // We use 10 as the assertion error code for insufficient balance within the Aptos coin contract.
 pub static DISCARD_STATUS: Lazy<TransactionStatus> =
@@ -142,7 +142,7 @@ impl VMExecutor for MockVM {
                         write_set,
                         events,
                         0,
-                        TransactionStatus::Keep(KeptVMStatus::Executed),
+                        TransactionStatus::Keep(ExecutionStatus::Success),
                     ));
                 }
                 MockVMTransaction::Reconfiguration => {

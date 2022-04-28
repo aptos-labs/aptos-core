@@ -12,8 +12,10 @@ use aptos_crypto::{
 };
 use aptos_proptest_helpers::Index;
 use aptos_types::{
-    transaction::{authenticator::AuthenticationKey, SignedTransaction, TransactionStatus},
-    vm_status::{KeptVMStatus, StatusCode},
+    transaction::{
+        authenticator::AuthenticationKey, ExecutionStatus, SignedTransaction, TransactionStatus,
+    },
+    vm_status::StatusCode,
 };
 use proptest::prelude::*;
 use proptest_derive::Arbitrary;
@@ -51,7 +53,7 @@ impl AUTransactionGen for RotateKeyGen {
                 self.new_keypair.public_key.clone(),
             );
 
-            TransactionStatus::Keep(KeptVMStatus::Executed)
+            TransactionStatus::Keep(ExecutionStatus::Success)
         } else {
             TransactionStatus::Discard(StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE)
         };

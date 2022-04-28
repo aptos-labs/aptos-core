@@ -5,8 +5,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config,
     on_chain_config::VMPublishingOption,
-    transaction::{Script, TransactionStatus},
-    vm_status::KeptVMStatus,
+    transaction::{ExecutionStatus, Script, TransactionStatus},
 };
 use language_e2e_tests::{current_function_name, executor::FakeExecutor};
 use move_binary_format::file_format::{
@@ -16,6 +15,7 @@ use move_binary_format::file_format::{
 use move_core_types::{
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
+    vm_status::{StatusCode, StatusCode::LINKER_ERROR},
 };
 
 #[test]
@@ -49,7 +49,9 @@ fn script_code_unverifiable() {
     assert_eq!(
         status.status(),
         // StatusCode::NEGATIVE_STACK_SIZE_WITHIN_BLOCK
-        Ok(KeptVMStatus::MiscellaneousError)
+        Ok(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::NEGATIVE_STACK_SIZE_WITHIN_BLOCK
+        )))
     );
     executor.apply_write_set(output.write_set());
 
@@ -125,7 +127,9 @@ fn script_none_existing_module_dep() {
     assert_eq!(
         status.status(),
         //StatusCode::LINKER_ERROR
-        Ok(KeptVMStatus::MiscellaneousError)
+        Ok(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::LINKER_ERROR
+        )))
     );
     executor.apply_write_set(output.write_set());
 
@@ -201,7 +205,9 @@ fn script_non_existing_function_dep() {
     assert_eq!(
         status.status(),
         // StatusCode::LOOKUP_FAILED
-        Ok(KeptVMStatus::MiscellaneousError)
+        Ok(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::LOOKUP_FAILED
+        )))
     );
     executor.apply_write_set(output.write_set());
 
@@ -278,7 +284,9 @@ fn script_bad_sig_function_dep() {
     assert_eq!(
         status.status(),
         // StatusCode::TYPE_MISMATCH
-        Ok(KeptVMStatus::MiscellaneousError)
+        Ok(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::TYPE_MISMATCH
+        )))
     );
     executor.apply_write_set(output.write_set());
 
@@ -343,7 +351,7 @@ fn script_type_argument_module_does_not_exist() {
     let status = output.status();
     assert_eq!(
         status,
-        &TransactionStatus::Keep(KeptVMStatus::MiscellaneousError)
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(LINKER_ERROR)))
     );
     executor.apply_write_set(output.write_set());
 
@@ -408,7 +416,7 @@ fn script_nested_type_argument_module_does_not_exist() {
     let status = output.status();
     assert_eq!(
         status,
-        &TransactionStatus::Keep(KeptVMStatus::MiscellaneousError)
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(LINKER_ERROR)))
     );
     executor.apply_write_set(output.write_set());
 

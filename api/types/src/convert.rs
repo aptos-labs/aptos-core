@@ -16,8 +16,10 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
-    transaction::{ModuleBundle, RawTransaction, Script, ScriptFunction, SignedTransaction},
-    vm_status::{AbortLocation, KeptVMStatus},
+    transaction::{
+        ExecutionStatus, ModuleBundle, RawTransaction, Script, ScriptFunction, SignedTransaction,
+    },
+    vm_status::AbortLocation,
     write_set::WriteOp,
 };
 use aptos_vm::move_vm_ext::MoveResolverExt;
@@ -558,11 +560,11 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         ))
     }
 
-    fn explain_vm_status(&self, status: &KeptVMStatus) -> String {
+    fn explain_vm_status(&self, status: &ExecutionStatus) -> String {
         match status {
-            KeptVMStatus::MoveAbort(location, abort_code) => match &location {
+            ExecutionStatus::MoveAbort { location, code} => match &location {
                 AbortLocation::Module(module_id) => {
-                    let explanation = error_explain::get_explanation(module_id, *abort_code);
+                    let explanation = error_explain::get_explanation(module_id, *code);
                     explanation
                         .map(|ec| {
                             format!(
@@ -574,14 +576,14 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                             )
                         })
                         .unwrap_or_else(|| {
-                            format!("Move abort: code {} at {}", abort_code, location)
+                            format!("Move abort: code {} at {}", code, location)
                         })
                 }
-                AbortLocation::Script => format!("Move abort: code {}", abort_code),
+                AbortLocation::Script => format!("Move abort: code {}", code),
             },
-            KeptVMStatus::Executed => "Executed successfully".to_owned(),
-            KeptVMStatus::OutOfGas => "Out of gas".to_owned(),
-            KeptVMStatus::ExecutionFailure {
+            ExecutionStatus::Success => "Executed successfully".to_owned(),
+            ExecutionStatus::OutOfGas => "Out of gas".to_owned(),
+            ExecutionStatus::ExecutionFailure {
                 location,
                 function,
                 code_offset,
@@ -598,9 +600,13 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     func_name, code_offset
                 )
             }
-            KeptVMStatus::MiscellaneousError => {
-                "Move bytecode deserialization / verification failed, including script function not found or invalid arguments"
-                    .to_owned()
+            ExecutionStatus::MiscellaneousError( code ) => {
+                code.map_or(
+                    "Move bytecode deserialization / verification failed, including script function not found or invalid arguments".to_owned(),
+                    |e| format!(
+                        "Transaction Executed and Committed with Error {:#?}", e
+                    )
+                )
             }
         }
     }

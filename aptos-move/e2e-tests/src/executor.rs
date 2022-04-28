@@ -26,10 +26,10 @@ use aptos_types::{
     on_chain_config::{OnChainConfig, VMPublishingOption, ValidatorSet, Version},
     state_store::state_key::StateKey,
     transaction::{
-        ChangeSet, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
-        VMValidatorResult,
+        ChangeSet, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
+        TransactionStatus, VMValidatorResult,
     },
-    vm_status::{KeptVMStatus, VMStatus},
+    vm_status::VMStatus,
     write_set::WriteSet,
 };
 use aptos_vm::{
@@ -337,7 +337,7 @@ impl FakeExecutor {
             TransactionStatus::Keep(status) => {
                 self.apply_write_set(output.write_set());
                 assert!(
-                    status == &KeptVMStatus::Executed,
+                    status == &ExecutionStatus::Success,
                     "transaction failed with {:?}",
                     status
                 );

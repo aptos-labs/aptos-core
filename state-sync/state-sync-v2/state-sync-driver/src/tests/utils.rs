@@ -20,11 +20,10 @@ use aptos_types::{
     },
     state_store::state_value::StateValueChunkWithProof,
     transaction::{
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionInfo,
+        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction, TransactionInfo,
         TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
         TransactionPayload, TransactionStatus, Version,
     },
-    vm_status::KeptVMStatus,
     waypoint::Waypoint,
     write_set::WriteSet,
 };
@@ -157,7 +156,7 @@ pub fn create_transaction_info() -> TransactionInfo {
         HashValue::random(),
         HashValue::random(),
         0,
-        KeptVMStatus::Executed,
+        ExecutionStatus::Success,
     )
 }
 
@@ -186,6 +185,6 @@ pub fn create_transaction_output() -> TransactionOutput {
         WriteSet::default(),
         vec![create_event()],
         0,
-        TransactionStatus::Keep(KeptVMStatus::Executed),
+        TransactionStatus::Keep(ExecutionStatus::Success),
     )
 }

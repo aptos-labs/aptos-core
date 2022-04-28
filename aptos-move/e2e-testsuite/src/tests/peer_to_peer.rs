@@ -3,8 +3,7 @@
 
 use aptos_types::{
     account_config::{ReceivedEvent, SentEvent},
-    transaction::{SignedTransaction, TransactionOutput, TransactionStatus},
-    vm_status::KeptVMStatus,
+    transaction::{ExecutionStatus, SignedTransaction, TransactionOutput, TransactionStatus},
 };
 use language_e2e_tests::{
     account::Account, common_transactions::peer_to_peer_txn, executor::FakeExecutor,
@@ -30,7 +29,7 @@ fn single_peer_to_peer_with_event() {
         let output = executor.execute_transaction(txn);
         assert_eq!(
             output.status(),
-            &TransactionStatus::Keep(KeptVMStatus::Executed)
+            &TransactionStatus::Keep(ExecutionStatus::Success)
         );
 
         executor.apply_write_set(output.write_set());
@@ -175,7 +174,7 @@ fn few_peer_to_peer_with_event() {
         for (idx, txn_output) in output.iter().enumerate() {
             assert_eq!(
                 txn_output.status(),
-                &TransactionStatus::Keep(KeptVMStatus::Executed)
+                &TransactionStatus::Keep(ExecutionStatus::Success)
             );
 
             // check events
@@ -405,7 +404,7 @@ fn cycle_peer_to_peer() {
         for txn_output in &output {
             assert_eq!(
                 txn_output.status(),
-                &TransactionStatus::Keep(KeptVMStatus::Executed)
+                &TransactionStatus::Keep(ExecutionStatus::Success)
             );
         }
         assert_eq!(accounts.len(), output.len());
@@ -450,7 +449,7 @@ fn cycle_peer_to_peer_multi_block() {
             for txn_output in &output {
                 assert_eq!(
                     txn_output.status(),
-                    &TransactionStatus::Keep(KeptVMStatus::Executed)
+                    &TransactionStatus::Keep(ExecutionStatus::Success)
                 );
             }
             assert_eq!(cycle, output.len());
@@ -497,7 +496,7 @@ fn one_to_many_peer_to_peer() {
             for txn_output in &output {
                 assert_eq!(
                     txn_output.status(),
-                    &TransactionStatus::Keep(KeptVMStatus::Executed)
+                    &TransactionStatus::Keep(ExecutionStatus::Success)
                 );
             }
             assert_eq!(cycle - 1, output.len());
@@ -544,7 +543,7 @@ fn many_to_one_peer_to_peer() {
             for txn_output in &output {
                 assert_eq!(
                     txn_output.status(),
-                    &TransactionStatus::Keep(KeptVMStatus::Executed)
+                    &TransactionStatus::Keep(ExecutionStatus::Success)
                 );
             }
             assert_eq!(cycle - 1, output.len());

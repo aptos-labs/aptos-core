@@ -6,8 +6,8 @@ use crate::{
     common_transactions::peer_to_peer_txn,
 };
 use aptos_types::{
-    transaction::{SignedTransaction, TransactionStatus},
-    vm_status::{KeptVMStatus, StatusCode},
+    transaction::{ExecutionStatus, SignedTransaction, TransactionStatus},
+    vm_status::StatusCode,
 };
 use move_core_types::{
     ident_str,
@@ -71,7 +71,7 @@ impl AUTransactionGen for P2PTransferGen {
                 receiver.balance += self.amount;
                 receiver.received_events_count += 1;
 
-                status = TransactionStatus::Keep(KeptVMStatus::Executed);
+                status = TransactionStatus::Keep(ExecutionStatus::Success);
                 gas_used = sender.peer_to_peer_gas_cost();
             }
             (true, true, false) => {
@@ -84,13 +84,13 @@ impl AUTransactionGen for P2PTransferGen {
                 // the balance was insufficient while trying to deduct gas costs in the
                 // epilogue.
                 // TODO: define these values in a central location
-                status = TransactionStatus::Keep(KeptVMStatus::MoveAbort(
-                    AbortLocation::Module(ModuleId::new(
+                status = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                    location: AbortLocation::Module(ModuleId::new(
                         CORE_CODE_ADDRESS,
                         ident_str!("TestCoin").to_owned(),
                     )),
-                    8,
-                ));
+                    code: 8,
+                });
             }
             (true, false, _) => {
                 // Enough to pass validation but not to do the transfer. The transaction will be run
@@ -99,13 +99,13 @@ impl AUTransactionGen for P2PTransferGen {
                 gas_used = sender.peer_to_peer_too_low_gas_cost();
                 sender.balance -= gas_used * txn.gas_unit_price();
                 // the balance was insufficient while trying to transfer.
-                status = TransactionStatus::Keep(KeptVMStatus::MoveAbort(
-                    AbortLocation::Module(ModuleId::new(
+                status = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                    location: AbortLocation::Module(ModuleId::new(
                         CORE_CODE_ADDRESS,
                         ident_str!("TestCoin").to_owned(),
                     )),
-                    8,
-                ));
+                    code: 8,
+                });
             }
             (false, _, _) => {
                 // Not enough gas to pass validation. Nothing will happen.

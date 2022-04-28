@@ -6,8 +6,8 @@
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "1",
   "success": false,
-  "vm_status": "Move bytecode deserialization / verification failed, including script function not found or invalid arguments",
-  "accumulator_root_hash": "0x11a3cea077b7b0c5f7cd0eb3a8a69d8dd6b1610333a0fb0187a6d4d83d3bf8f1",
+  "vm_status": "Transaction Executed and Committed with Error FAILED_TO_DESERIALIZE_ARGUMENT",
+  "accumulator_root_hash": "0xcc86fac7123f562fa1be03253303b1e29c1431c1c1bcd7d61d1bf630201581fe",
   "changes": [
     {
       "type": "write_resource",
