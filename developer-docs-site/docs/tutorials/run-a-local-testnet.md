@@ -17,16 +17,21 @@ You can run a local testnet in two ways:
 
 The rest of this document describes:
 
-- How to start your local testnet using both the methods, and
+- How to start your local testnet with a single Validator FullNode, using both the methods, and
 - How to start a Faucet service and attach it to your testnet.
 
 ## Using the Aptos-core source code
 
-1. Clone the Aptos-core repository from GitHub.
+1. Fork and clone the Aptos repo.
+
+  - Fork the Aptos Core repo by clicking on the **Fork** on the top right of this repo page: https://github.com/aptos-labs/aptos-core.
+  - Clone your fork.
 
     ```
-    git clone https://github.com/aptos-labs/aptos-core.git
+    git clone https://github.com/<YOUR-GITHUB-USERID>/aptos-core
+
     ```
+
 
 2. `cd` into `aptos-core` directory.
 
@@ -48,10 +53,10 @@ The rest of this document describes:
 
 5. With your development environment ready, now you can start your testnet network. Before you proceed, make a note of the following:
 
-  - When you run the below command to start the local validator network, your terminal will enter into an interactive mode, with an option to terminate the testnet. Hence, you will need to open another shell terminal for the subsequent steps described in this section.
+  - When you run the below command to start the local testnet, your terminal will enter into an interactive mode, with an option to terminate the testnet. Hence, you will need to open another shell terminal for the subsequent steps described in this section.
   - After the below command runs, you will need to copy the `Config path` information from the terminal output for the next step.
 
-    To start your validator network locally, run the following command:
+    To start your testnet locally, run the following command:
 
     ```
     CARGO_NET_GIT_FETCH_WITH_CLI=true cargo run -p aptos-node -- --test
@@ -75,7 +80,7 @@ The rest of this document describes:
     Aptos is running, press ctrl-c to exit
     ```
 
-**NOTE**: The above command runs `aptos-node` from a genesis-only ledger state. If you want to reuse the ledger state produced by a previous run of `aptos-node`, then use:
+**NOTE**: The above command starts a local testnet with a single validator FullNode. The command runs `aptos-node` from a genesis-only ledger state. If you want to reuse the ledger state produced by a previous run of `aptos-node`, then use:
 
 ```
 cargo run -p aptos-node -- --test --config <config-path>
@@ -85,7 +90,7 @@ cargo run -p aptos-node -- --test --config <config-path>
 
 Faucets are stateless services that can be run in parallel with the testnet. A Faucet is a way to create Aptos coin with no real-world value. You can use the Faucet by sending a request to create coins and transfer them into a given account on your behalf.
 
-1. Make sure that you started your local validator network as described in Step 5 above.
+1. Make sure that you started your local testnet as described in Step 5 above.
 2. Open a new shell terminal.
 3. Copy the _Aptos root key path_ from your terminal where you started the testnet, and use it to replace the `mint-key-file-path` in the below command.
 4. Run the following command to start a Faucet:
@@ -119,15 +124,7 @@ This section describes how to start your local testing using Docker.
 
 ### Example
 
-For example, the command sequence for the above steps 2 through 4 is shown below:
-
-  **NOTE**: If you do not have `wget` installed on your macOS, then run the below command to install the `wget` before you follow the below example.
-
-  ```
-  brew install wget
-  ```
-
-  After you installed `wget` proceed as below.
+An example command sequence for the above steps 2 through 4 is shown below:
 
 ```bash
 mkdir aptos_local_validator && cd aptos_local_validator
@@ -154,12 +151,13 @@ docker stop $(docker ps -a -q) && docker rm $(docker ps -a -q) && docker rmi $(d
 ```
 :::note
 
-If you intend to use your Testnet over an extended period of time, you should pin the images to a specific ID. Image IDs can be obtained via `docker container ls` and added to the docker compose file.
+If you intend to use your testnet over an extended period of time, you should pin the images to a specific ID. Image IDs can be obtained via `docker container ls` and added to the docker compose file.
 
 :::
 
-## Interacting with the local test validator network
-After starting your local test validator network, you should see the following:
+## Interacting with the local test testnet
+
+After starting your local testnet, you should see the following:
 
 ```
 Entering test mode, this should never be used in production!
@@ -175,13 +173,14 @@ Completed generating configuration:
 Aptos is running, press ctrl-c to exit
 ```
 
-This output contains information required for starting the Aptos CLI tool:
+Use the [Aptos CLI tool](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md) to interact with your local testnet. The above output contains information you will use for starting the [Aptos CLI tool](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md):
+
 * `Aptos root key path`: The root key (also known as the mint or faucet key) controls the account that can mint tokens. Available in the docker compose folder under `aptos_root_key`.
 * `Waypoint`: A verifiable checkpoint of the blockchain (available in the docker compose folder under waypoint.txt)
 * `REST endpoint`: The endpoint for the REST service, e.g., `http://127.0.0.1:8080`.
-* `ChainId`: The chain id uniquely distinguishes this network from other blockchain networks.
+* `ChainId`: The chain ID uniquely distinguishes this network from other blockchain networks.
 
-## Next Steps
+## Next steps
 
 At this point, you will have a special root account at `0x1` that can perform the mint operation. Follow up with:
 
@@ -189,6 +188,8 @@ At this point, you will have a special root account at `0x1` that can perform th
 * [Your first Move module](/tutorials/your-first-move-module) to learn how to create Move modules.
 * [Interacting with the Aptos Blockchain](/transactions/interacting-with-the-aptos-blockchain) to learn how to mint coins.
 
-It is important to note that this guide does not include creating a faucet. That is left as an exercise for the reader.
+:::info
 
-[docker](https://docs.docker.com/get-docker/)
+This guide does not describe how to create a faucet.
+
+:::
