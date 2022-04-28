@@ -1,6 +1,19 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+import { AptosAccount, AptosAccountObject } from 'aptos'
+
+export type AptosAccountState = AptosAccount | undefined;
+
+export interface LocalStorageState {
+  aptosAccountObject?: AptosAccountObject,
+}
+
+export const MessageMethod = Object.freeze({
+  GET_ACCOUNT_ADDRESS: 'getAccountAddress',
+  SIGN_TRANSACTION: 'signTransaction'
+} as const)
+
 export class Ok<T, E> {
   public constructor (public readonly value: T) {
     this.value = value
