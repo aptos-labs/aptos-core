@@ -80,7 +80,7 @@ impl MockNetwork {
             )
         });
 
-        let peer_infos = PeerMetadataStorage::new(&[NetworkId::Validator]);
+        let peer_infos = PeerMetadataStorage::new(&[NetworkId::Validator, NetworkId::Vfn]);
         let network_client = StorageServiceClient::new(network_sender, peer_infos.clone());
 
         let mock_time = TimeService::mock();
@@ -98,9 +98,19 @@ impl MockNetwork {
         (mock_network, mock_time.into_mock(), client, poller)
     }
 
-    /// Add a new random connected peer to the network peer DB
-    fn add_connected_peer(&mut self) -> PeerNetworkId {
+    /// Add a new priority peer to the network peer DB
+    fn add_priority_peer(&mut self) -> PeerNetworkId {
         let network_id = NetworkId::Validator;
+        self.add_peer(network_id)
+    }
+
+    /// Add a new regular peer to the network peer DB
+    fn add_regular_peer(&mut self) -> PeerNetworkId {
+        let network_id = NetworkId::Vfn;
+        self.add_peer(network_id)
+    }
+
+    fn add_peer(&mut self, network_id: NetworkId) -> PeerNetworkId {
         let peer_id = PeerId::random();
         let mut connection_metadata = ConnectionMetadata::mock(peer_id);
         connection_metadata
@@ -150,7 +160,7 @@ async fn request_works_only_when_data_available() {
     assert_matches!(error, Error::DataIsUnavailable(_));
 
     // Add a connected peer
-    let expected_peer = mock_network.add_connected_peer();
+    let expected_peer = mock_network.add_priority_peer();
 
     // Requesting some txns now will still fail since no peers are advertising
     // availability for the desired range.
@@ -207,7 +217,7 @@ async fn request_works_only_when_data_available() {
 }
 
 #[tokio::test]
-async fn fetch_peers_to_poll() {
+async fn fetch_priority_peers_to_poll() {
     ::aptos_logger::Logger::init_for_testing();
     let (mut mock_network, _, client, _) = MockNetwork::new();
 
@@ -217,61 +227,126 @@ async fn fetch_peers_to_poll() {
         Err(Error::DataIsUnavailable(_))
     );
 
-    // Add connected peer 1
-    let connected_peer_1 = mock_network.add_connected_peer();
+    // Add priority peer 1
+    let priority_peer_1 = mock_network.add_priority_peer();
 
-    // Request the next set of peers to poll and verify the set contains peer 1
-    let peers_to_poll = client.fetch_peers_to_poll().unwrap();
-    assert_eq!(peers_to_poll, vec![connected_peer_1]);
+    // Request the next set of peers and verify the set contains priority peer 1
+    for _ in 0..2 {
+        let peers_to_poll = client.fetch_peers_to_poll().unwrap();
+        assert_eq!(peers_to_poll, vec![priority_peer_1]);
+    }
 
-    // Request the next set of peers to poll and verify the set is the same
-    let peers_to_poll = client.fetch_peers_to_poll().unwrap();
-    assert_eq!(peers_to_poll, vec![connected_peer_1]);
+    // Add priority peer 2
+    let priority_peer_2 = mock_network.add_priority_peer();
 
-    // Add connected peer 2
-    let connected_peer_2 = mock_network.add_connected_peer();
-
-    // Request the next set of peers to poll and verify the set contains both peers
+    // Request the next set of peers and verify the set contains both peers
     let peers_to_poll = client.fetch_peers_to_poll().unwrap();
     assert_eq!(2, peers_to_poll.len());
-    assert!(peers_to_poll.contains(&connected_peer_1));
-    assert!(peers_to_poll.contains(&connected_peer_2));
+    assert!(peers_to_poll.contains(&priority_peer_1));
+    assert!(peers_to_poll.contains(&priority_peer_2));
 
-    // Request the next set of peers to poll and verify the set returns only one
+    // Request the next set of peers and verify the set returns only one
     let peers_to_poll = client.fetch_peers_to_poll().unwrap();
     assert_eq!(1, peers_to_poll.len());
 
-    // Request the next set of peers to poll and verify the set returns the oldest
+    // Request the next set of peers and verify the set returns the oldest
     let peers_to_poll = client.fetch_peers_to_poll().unwrap();
     assert_eq!(1, peers_to_poll.len());
     let polled_peer = peers_to_poll.first().unwrap();
 
-    // Add connected peer 3
-    let connected_peer_3 = mock_network.add_connected_peer();
+    // Add priority peer 3
+    let priority_peer_3 = mock_network.add_priority_peer();
 
-    // Request the next set of peers to poll and verify the set
+    // Request the next set of peers and verify the set contains two priority peers
     let peers_to_poll = client.fetch_peers_to_poll().unwrap();
     assert_eq!(2, peers_to_poll.len());
-    assert!(peers_to_poll.contains(&connected_peer_3));
+    assert!(peers_to_poll.contains(&priority_peer_3));
     assert!(!peers_to_poll.contains(polled_peer));
 
-    // Add connected peer 4 and 5
-    let connected_peer_4 = mock_network.add_connected_peer();
-    let connected_peer_5 = mock_network.add_connected_peer();
+    // Add priority peer 4 and 5
+    let priority_peer_4 = mock_network.add_priority_peer();
+    let priority_peer_5 = mock_network.add_priority_peer();
 
-    // Request the next set of peers to poll and verify the set
+    // Request the next set of peers and verify the set contains three priority peers
     let peers_to_poll = client.fetch_peers_to_poll().unwrap();
     assert_eq!(3, peers_to_poll.len());
-    assert!(peers_to_poll.contains(&connected_peer_4));
-    assert!(peers_to_poll.contains(&connected_peer_5));
+    assert!(peers_to_poll.contains(&priority_peer_4));
+    assert!(peers_to_poll.contains(&priority_peer_5));
     assert!(peers_to_poll.contains(polled_peer));
 
-    // Request the next set of peers to poll and verify the set
+    // Request the next set of peers and verify the oldest peer is chosen
     let peers_to_poll = client.fetch_peers_to_poll().unwrap();
     assert_eq!(1, peers_to_poll.len());
-    assert!(!peers_to_poll.contains(&connected_peer_4));
-    assert!(!peers_to_poll.contains(&connected_peer_5));
+    assert!(!peers_to_poll.contains(&priority_peer_4));
+    assert!(!peers_to_poll.contains(&priority_peer_5));
     assert!(!peers_to_poll.contains(polled_peer));
+}
+
+#[tokio::test]
+async fn fetch_regular_peers_to_poll() {
+    ::aptos_logger::Logger::init_for_testing();
+    let (mut mock_network, _, client, _) = MockNetwork::new();
+
+    // Request the next set of peers and verify we have no peers
+    assert_matches!(
+        client.fetch_peers_to_poll(),
+        Err(Error::DataIsUnavailable(_))
+    );
+
+    // Add regular peer 1
+    let regular_peer_1 = mock_network.add_regular_peer();
+
+    // Request the next set of peers and verify the set contains regular peer 1
+    for _ in 0..3 {
+        let peers_to_poll = client.fetch_peers_to_poll().unwrap();
+        assert_eq!(peers_to_poll, vec![regular_peer_1]);
+    }
+
+    // Add priority peer 1
+    let priority_peer_1 = mock_network.add_priority_peer();
+
+    // Request the next set of peers and verify the regular peer is polled only a few times
+    let num_fetch_polls = 20;
+    let mut regular_poll_count = 0;
+    for _ in 0..10 {
+        let peers_to_poll = client.fetch_peers_to_poll().unwrap();
+        let num_peers_to_poll = peers_to_poll.len();
+        assert!(num_peers_to_poll == 1 || num_peers_to_poll == 2);
+        assert!(peers_to_poll.contains(&priority_peer_1));
+        if peers_to_poll.len() == 2 {
+            regular_poll_count += 1;
+        }
+    }
+    assert!(regular_poll_count > 0 && regular_poll_count < num_fetch_polls);
+
+    // Add regular peer 2
+    let regular_peer_2 = mock_network.add_regular_peer();
+
+    // Request the next set of peers and verify the set returns the priority and new peer
+    let peers_to_poll = client.fetch_peers_to_poll().unwrap();
+    assert!(peers_to_poll.contains(&regular_peer_2));
+    assert!(peers_to_poll.contains(&priority_peer_1));
+
+    // Add priority peer 2
+    let priority_peer_2 = mock_network.add_priority_peer();
+
+    // Request the next set of peers to poll and verify the set contains both priority peers
+    let peers_to_poll = client.fetch_peers_to_poll().unwrap();
+    assert!(peers_to_poll.contains(&priority_peer_1));
+    assert!(peers_to_poll.contains(&priority_peer_2));
+
+    // Request the next set of peers to poll and verify the set contains only one priority peer
+    // and potentially a regular peer (depending on the sampling).
+    let peers_to_poll = client.fetch_peers_to_poll().unwrap();
+    let num_peers_to_poll = peers_to_poll.len();
+    assert!(num_peers_to_poll == 1 || num_peers_to_poll == 2);
+    if num_peers_to_poll == 1 {
+        assert!(
+            peers_to_poll.contains(&priority_peer_1) || peers_to_poll.contains(&priority_peer_2)
+        );
+    } else {
+        assert!(peers_to_poll.contains(&regular_peer_1) || peers_to_poll.contains(&regular_peer_2));
+    }
 }
 
 // 1. 2 peers
@@ -284,8 +359,8 @@ async fn bad_peer_is_eventually_banned_internal() {
     ::aptos_logger::Logger::init_for_testing();
     let (mut mock_network, _, client, _) = MockNetwork::new();
 
-    let good_peer = mock_network.add_connected_peer();
-    let bad_peer = mock_network.add_connected_peer();
+    let good_peer = mock_network.add_priority_peer();
+    let bad_peer = mock_network.add_priority_peer();
 
     // Bypass poller and just add the storage summaries directly.
 
@@ -363,7 +438,7 @@ async fn bad_peer_is_eventually_banned_callback() {
     ::aptos_logger::Logger::init_for_testing();
     let (mut mock_network, _, client, _) = MockNetwork::new();
 
-    let bad_peer = mock_network.add_connected_peer();
+    let bad_peer = mock_network.add_priority_peer();
 
     // Bypass poller and just add the storage summaries directly.
     // Bad peer advertises txns 0 -> 200 (but can't actually service).
@@ -427,7 +502,7 @@ async fn bad_peer_is_eventually_added_back() {
     let (mut mock_network, mock_time, client, poller) = MockNetwork::new();
 
     // Add a connected peer.
-    mock_network.add_connected_peer();
+    mock_network.add_priority_peer();
 
     tokio::spawn(poller.start_poller());
     tokio::spawn(async move {
