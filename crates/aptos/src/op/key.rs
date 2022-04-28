@@ -53,7 +53,7 @@ pub struct ExtractPeer {
     #[clap(flatten)]
     encoding_options: EncodingOptions,
     #[clap(flatten)]
-    profile: ProfileOptions,
+    profile_options: ProfileOptions,
 }
 
 impl ExtractPeer {
@@ -62,9 +62,10 @@ impl ExtractPeer {
         self.output_file_options.check_file()?;
 
         // Load key based on public or private
-        let public_key = self
-            .private_key_input_options
-            .extract_x25519_public_key(self.encoding_options.encoding, &self.profile.profile)?;
+        let public_key = self.private_key_input_options.extract_x25519_public_key(
+            self.encoding_options.encoding,
+            &self.profile_options.profile,
+        )?;
 
         // Build peer info
         // TODO: Take in an address?

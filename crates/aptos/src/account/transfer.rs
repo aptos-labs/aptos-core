@@ -23,10 +23,10 @@ pub struct TransferCoins {
     write_options: WriteTransactionOptions,
 
     #[clap(flatten)]
-    encoding: EncodingOptions,
+    encoding_options: EncodingOptions,
 
     #[clap(flatten)]
-    profile: ProfileOptions,
+    profile_options: ProfileOptions,
 
     /// Address of account you want to send coins to
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
@@ -40,17 +40,23 @@ pub struct TransferCoins {
 impl TransferCoins {
     pub(crate) async fn execute(self) -> CliTypedResult<Transaction> {
         let client = aptos_rest_client::Client::new(reqwest::Url::clone(
-            &self.write_options.rest_options.url(&self.profile.profile)?,
+            &self
+                .write_options
+                .rest_options
+                .url(&self.profile_options.profile)?,
         ));
-        let transaction_factory =
-            TransactionFactory::new(self.write_options.chain_id(&self.profile.profile).await?)
-                .with_gas_unit_price(1)
-                .with_max_gas_amount(self.write_options.max_gas);
+        let transaction_factory = TransactionFactory::new(
+            self.write_options
+                .chain_id(&self.profile_options.profile)
+                .await?,
+        )
+        .with_gas_unit_price(1)
+        .with_max_gas_amount(self.write_options.max_gas);
 
-        let sender_key = self
-            .write_options
-            .private_key_options
-            .extract_private_key(self.encoding.encoding, &self.profile.profile)?;
+        let sender_key = self.write_options.private_key_options.extract_private_key(
+            self.encoding_options.encoding,
+            &self.profile_options.profile,
+        )?;
         let sender_public_key = sender_key.public_key();
         let sender_address = account_address_from_public_key(&sender_public_key);
         let sequence_number = get_sequence_number(&client, sender_address).await?;

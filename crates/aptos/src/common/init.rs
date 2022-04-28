@@ -24,7 +24,7 @@ const NUM_DEFAULT_COINS: u64 = 10000;
 #[derive(Debug, Parser)]
 pub struct InitTool {
     #[clap(flatten)]
-    profile: ProfileOptions,
+    profile_options: ProfileOptions,
 }
 
 impl InitTool {
@@ -37,10 +37,10 @@ impl InitTool {
 
         // Select profile we're using
         let mut profile_config = if let Some(profile_config) =
-            config.remove_profile(&self.profile.profile)
+            config.remove_profile(&self.profile_options.profile)
         {
             if !prompt_yes(
-                    &format!("Aptos already initialized for profile {}, do you want to overwrite the existing config?", self.profile.profile),
+                    &format!("Aptos already initialized for profile {}, do you want to overwrite the existing config?", self.profile_options.profile),
                 ) {
                     eprintln!("Exiting...");
                     return Ok(());
@@ -50,7 +50,7 @@ impl InitTool {
             ProfileConfig::default()
         };
 
-        eprintln!("Configuring for profile {}", self.profile.profile);
+        eprintln!("Configuring for profile {}", self.profile_options.profile);
 
         // Rest Endpoint
         eprintln!(
@@ -135,7 +135,7 @@ impl InitTool {
             .profiles
             .as_mut()
             .unwrap()
-            .insert(self.profile.profile, profile_config);
+            .insert(self.profile_options.profile, profile_config);
         config.save()?;
         eprintln!("Aptos is now set up for account {}!  Run `aptos help` for more information about commands", address);
         Ok(())

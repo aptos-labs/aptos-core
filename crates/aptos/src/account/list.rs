@@ -19,7 +19,7 @@ pub struct ListResources {
     rest_options: RestOptions,
 
     #[clap(flatten)]
-    profile: ProfileOptions,
+    profile_options: ProfileOptions,
 
     /// Address of account you want to list resources for
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
@@ -33,7 +33,7 @@ impl ListResources {
         let account = if let Some(account) = self.account {
             account
         } else if let Some(Some(account)) =
-            CliConfig::load_profile(&self.profile.profile)?.map(|p| p.account)
+            CliConfig::load_profile(&self.profile_options.profile)?.map(|p| p.account)
         {
             account
         } else {
@@ -42,7 +42,7 @@ impl ListResources {
             ));
         };
 
-        let client = Client::new(self.rest_options.url(&self.profile.profile)?);
+        let client = Client::new(self.rest_options.url(&self.profile_options.profile)?);
         let response: Vec<Resource> = client
             .get_account_resources(account)
             .await
