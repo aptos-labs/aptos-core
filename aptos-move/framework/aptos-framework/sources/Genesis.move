@@ -69,7 +69,7 @@ module AptosFramework::Genesis {
             b"script_prologue",
             b"module_prologue",
             b"writeset_prologue",
-            b"script_prologue",
+            b"multi_agent_script_prologue",
             b"epilogue",
             b"writeset_epilogue",
             false,

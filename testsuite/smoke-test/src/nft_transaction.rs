@@ -100,6 +100,13 @@ impl AptosTest for NFTTransaction {
         let claim_txn = owner.sign_with_transaction_builder(claim_builder);
         client.submit_and_wait(&claim_txn).await?;
 
+        let transfer_builder = ctx.transaction_factory().payload(
+            aptos_stdlib::encode_direct_transfer_script_function(creator.address(), token_num, 1),
+        );
+        let transfer_txn =
+            owner.sign_multi_agent_with_transaction_builder(vec![&creator], transfer_builder);
+        client.submit_and_wait(&transfer_txn).await?;
+
         Ok(())
     }
 }

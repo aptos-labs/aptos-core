@@ -60,7 +60,7 @@
       "module_addr": "0x1",
       "module_name": "0x4163636f756e74",
       "module_prologue_name": "0x6d6f64756c655f70726f6c6f677565",
-      "multi_agent_prologue_name": "0x7363726970745f70726f6c6f677565",
+      "multi_agent_prologue_name": "0x6d756c74695f6167656e745f7363726970745f70726f6c6f677565",
       "script_prologue_name": "0x7363726970745f70726f6c6f677565",
       "user_epilogue_name": "0x6570696c6f677565",
       "writeset_epilogue_name": "0x77726974657365745f6570696c6f677565",
