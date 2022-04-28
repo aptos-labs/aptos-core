@@ -356,6 +356,18 @@ module AptosFramework::Token {
         *&mut token_data.supply = token_data.supply - balance;
     }
 
+    public(script) fun direct_transfer(
+        sender: &signer,
+        receiver: &signer,
+        creator: address,
+        creation_num: u64,
+        amount: u64,
+    ) acquires Collections, Gallery {
+        let token_id = GUID::create_id(creator, creation_num);
+        let token = withdraw_token(sender, &token_id, amount);
+        deposit_token(receiver, token)
+    }
+
     #[test(creator = @0x1, owner = @0x2)]
     public fun create_withdraw_deposit_nft(
         creator: signer,
@@ -409,6 +421,16 @@ module AptosFramework::Token {
             1,
             ASCII::string(b"https://aptos.dev"),
         );
+    }
+
+    #[test(creator = @0x1, owner = @0x2)]
+    public(script) fun direct_transfer_test(creator: signer, owner: signer) acquires Collections, Gallery {
+        let (_collection_name, token_id) = create_collection_and_token(&creator, 2);
+        let creator_addr = GUID::id_creator_address(&token_id);
+        let creation_num = GUID::id_creation_num(&token_id);
+        direct_transfer(&creator, &owner, creator_addr, creation_num, 1);
+        let token = withdraw_token(&owner, &token_id, 1);
+        deposit_token(&creator, token);
     }
 
     fun create_collection_and_token(
