@@ -93,7 +93,7 @@ module AptosFramework::Stake {
     }
 
     /// Any user can delegate a stake.
-    public fun delegate_stake(account: &signer, to: address, amount: u64, locked_until_secs: u64) acquires StakePool, ValidatorSet {
+    public(script) fun delegate_stake(account: &signer, to: address, amount: u64, locked_until_secs: u64) acquires StakePool, ValidatorSet {
         let coins = TestCoin::withdraw(account, amount);
         let current_time = Timestamp::now_seconds();
         assert!(current_time + MINIMUM_LOCK_PERIOD < locked_until_secs, Errors::invalid_argument(ELOCK_TIME_TOO_SHORT));
@@ -116,7 +116,7 @@ module AptosFramework::Stake {
 
     /// Unlock from active delegation, it's moved to pending_inactive if locked_until_secs < current_time or
     /// directly inactive if it's not from an active validator.
-    public fun unlock(account: &signer, from: address) acquires StakePool, ValidatorSet {
+    public(script) fun unlock(account: &signer, from: address) acquires StakePool, ValidatorSet {
         let addr = Signer::address_of(account);
         let current_time = Timestamp::now_seconds();
         let stake_pool = borrow_global_mut<StakePool>(from);
@@ -134,7 +134,7 @@ module AptosFramework::Stake {
     }
 
     /// Withdraw from inactive delegation.
-    public fun withdraw(account: &signer, from: address): Coin acquires StakePool {
+    public(script) fun withdraw(account: &signer, from: address): Coin acquires StakePool {
         let addr = Signer::address_of(account);
         let stake_pool = borrow_global_mut<StakePool>(from);
         let d = withdraw_internal(&mut stake_pool.inactive, addr);
@@ -143,7 +143,7 @@ module AptosFramework::Stake {
     }
 
     /// Initialize the ValidatorInfo for account.
-    public fun register_validator_candidate(
+    public(script) fun register_validator_candidate(
         account: &signer,
         consensus_pubkey: vector<u8>,
         network_address: vector<u8>,
@@ -164,7 +164,7 @@ module AptosFramework::Stake {
     }
 
     /// Rotate the consensus key of the validator, it'll take effect in next epoch.
-    public fun rotate_consensus_key(account: &signer, consensus_pubkey: vector<u8>) acquires ValidatorConfig {
+    public(script) fun rotate_consensus_key(account: &signer, consensus_pubkey: vector<u8>) acquires ValidatorConfig {
         let addr = Signer::address_of(account);
         assert!(exists<ValidatorConfig>(addr), Errors::not_published(EVALIDATOR_CONFIG));
         let validator_info = borrow_global_mut<ValidatorConfig>(addr);
@@ -185,7 +185,7 @@ module AptosFramework::Stake {
     }
 
     /// Initiate by the validator info owner
-    public fun join_validator_set(account: &signer) acquires StakePool, ValidatorConfig, ValidatorSet {
+    public(script) fun join_validator_set(account: &signer) acquires StakePool, ValidatorConfig, ValidatorSet {
         let addr = Signer::address_of(account);
         let stake_pool = borrow_global<StakePool>(addr);
         let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
@@ -202,7 +202,7 @@ module AptosFramework::Stake {
     }
 
     /// Initiate by the validator info owner.
-    public fun leave_validator_set(account: &signer) acquires ValidatorSet {
+    public(script) fun leave_validator_set(account: &signer) acquires ValidatorSet {
         let addr = Signer::address_of(account);
         let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
 
@@ -361,7 +361,7 @@ module AptosFramework::Stake {
     }
 
     #[test(core_resources = @CoreResources, account_1 = @0x123, account_2 = @0x234, account_3 = @0x345)]
-    fun test_basic_delegation(
+    public(script) fun test_basic_delegation(
         core_resources: signer,
         account_1: signer,
         account_2: signer,
@@ -412,7 +412,7 @@ module AptosFramework::Stake {
     }
 
     #[test(core_resources = @CoreResources, account_1 = @0x123, account_2 = @0x234, account_3 = @0x345)]
-    fun test_validator_join_leave(
+    public(script) fun test_validator_join_leave(
         core_resources: signer,
         account_1: signer,
         account_2: signer,

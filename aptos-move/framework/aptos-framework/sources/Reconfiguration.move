@@ -89,6 +89,12 @@ module AptosFramework::Reconfiguration {
         !exists<DisableReconfiguration>(@CoreResources)
     }
 
+    /// Force an epoch change.
+    public(script) fun force_reconfigure(account: &signer) acquires Configuration {
+        SystemAddresses::assert_core_resource(account);
+        reconfigure();
+    }
+
     /// Signal validators to start using new configuration. Must be called from friend config modules.
     public(friend) fun reconfigure() acquires Configuration {
         Stake::on_new_epoch();
