@@ -13,7 +13,6 @@ use aptos_logger::debug;
 use aptos_rest_client::Client;
 use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
 use clap::{ArgEnum, Parser};
-use itertools::Itertools;
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -30,6 +29,7 @@ pub type CliResult = Result<String, String>;
 /// A common result to remove need for typing `Result<T, CliError>`
 pub type CliTypedResult<T> = Result<T, CliError>;
 
+/// CLI Errors for reporting through telemetry and outputs
 #[derive(Debug, Error)]
 pub enum CliError {
     #[error("Aborted command")]
@@ -77,6 +77,7 @@ impl CliError {
     }
 }
 
+/// Config saved to `.aptos/config.yaml`
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CliConfig {
     /// Map of profile configs
@@ -179,7 +180,9 @@ impl CliConfig {
 /// Types of Keys used by the blockchain
 #[derive(ArgEnum, Clone, Copy, Debug)]
 pub enum KeyType {
+    /// Ed25519 key used for signing
     Ed25519,
+    /// X25519 key used for network handshakes and identity
     X25519,
 }
 
@@ -424,6 +427,7 @@ pub struct RestOptions {
 }
 
 impl RestOptions {
+    /// Retrieve the URL from the profile or the command line
     pub fn url(&self, profile: &str) -> CliTypedResult<reqwest::Url> {
         if let Some(ref url) = self.url {
             Ok(url.clone())
@@ -453,6 +457,7 @@ pub struct WriteTransactionOptions {
 }
 
 impl WriteTransactionOptions {
+    /// Retrieve the chain id from onchain via the Rest API
     pub async fn chain_id(&self, profile: &str) -> CliTypedResult<ChainId> {
         let client = Client::new(self.rest_options.url(profile)?);
         let state = client
@@ -480,11 +485,12 @@ pub struct MovePackageDir {
     /// Example: alice=0x1234, bob=0x5678
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
-    #[clap(long, parse(try_from_str = parse_map), default_value = "")]
+    #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
     named_addresses: BTreeMap<String, AccountAddressWrapper>,
 }
 
 impl MovePackageDir {
+    /// Retrieve the NamedAddresses, resolving all the account addresses accordingly
     pub fn named_addresses(&self) -> BTreeMap<String, AccountAddress> {
         self.named_addresses
             .clone()
@@ -494,39 +500,7 @@ impl MovePackageDir {
     }
 }
 
-const PARSE_MAP_SYNTAX_MSG: &str = "Invalid syntax for map.  Example: Name=Value,Name2=Value";
-
-/// Parses an inline map of values
-///
-/// Example: Name=Value,Name2=Value
-pub fn parse_map<K: FromStr + Ord, V: FromStr>(str: &str) -> anyhow::Result<BTreeMap<K, V>>
-where
-    K::Err: 'static + std::error::Error + Send + Sync,
-    V::Err: 'static + std::error::Error + Send + Sync,
-{
-    let mut map = BTreeMap::new();
-
-    // Split pairs by commas
-    for pair in str.split_terminator(',') {
-        // Split pairs by = then trim off any spacing
-        let (first, second): (&str, &str) = pair
-            .split_terminator('=')
-            .collect_tuple()
-            .ok_or_else(|| anyhow::Error::msg(PARSE_MAP_SYNTAX_MSG))?;
-        let first = first.trim();
-        let second = second.trim();
-        if first.is_empty() || second.is_empty() {
-            return Err(anyhow::Error::msg(PARSE_MAP_SYNTAX_MSG));
-        }
-
-        // At this point, we just give error messages appropriate to parsing
-        let key: K = K::from_str(first)?;
-        let value: V = V::from_str(second)?;
-        map.insert(key, value);
-    }
-    Ok(map)
-}
-
+/// A wrapper around `AccountAddress` to be more flexible from strings than AccountAddress
 #[derive(Clone, Copy, Debug)]
 pub struct AccountAddressWrapper {
     pub account_address: AccountAddress,

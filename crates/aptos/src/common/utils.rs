@@ -6,14 +6,16 @@ use crate::{
     CliResult,
 };
 use aptos_telemetry::constants::APTOS_CLI_PUSH_METRICS;
+use itertools::Itertools;
 use move_core_types::account_address::AccountAddress;
 use serde::Serialize;
 use shadow_rs::shadow;
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     fs::File,
     io::Write,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 shadow!(build);
@@ -179,6 +181,7 @@ pub fn append_file_extension(
     }
 }
 
+/// Retrieves sequence number from the rest client
 pub async fn get_sequence_number(
     client: &aptos_rest_client::Client,
     address: AccountAddress,
@@ -189,4 +192,38 @@ pub async fn get_sequence_number(
         .map_err(|err| CliError::ApiError(err.to_string()))?;
     let account = account_response.inner();
     Ok(account.sequence_number)
+}
+
+/// Error message for parsing a map
+const PARSE_MAP_SYNTAX_MSG: &str = "Invalid syntax for map. Example: Name=Value,Name2=Value";
+
+/// Parses an inline map of values
+///
+/// Example: Name=Value,Name2=Value
+pub fn parse_map<K: FromStr + Ord, V: FromStr>(str: &str) -> anyhow::Result<BTreeMap<K, V>>
+where
+    K::Err: 'static + std::error::Error + Send + Sync,
+    V::Err: 'static + std::error::Error + Send + Sync,
+{
+    let mut map = BTreeMap::new();
+
+    // Split pairs by commas
+    for pair in str.split_terminator(',') {
+        // Split pairs by = then trim off any spacing
+        let (first, second): (&str, &str) = pair
+            .split_terminator('=')
+            .collect_tuple()
+            .ok_or_else(|| anyhow::Error::msg(PARSE_MAP_SYNTAX_MSG))?;
+        let first = first.trim();
+        let second = second.trim();
+        if first.is_empty() || second.is_empty() {
+            return Err(anyhow::Error::msg(PARSE_MAP_SYNTAX_MSG));
+        }
+
+        // At this point, we just give error messages appropriate to parsing
+        let key: K = K::from_str(first)?;
+        let value: V = V::from_str(second)?;
+        map.insert(key, value);
+    }
+    Ok(map)
 }
