@@ -454,6 +454,7 @@ impl StorageReader {
         let pruning_window = self
             .storage
             .get_state_prune_window()
+            .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?
             .map(|window| window as u64);
         if let Some(pruning_window) = pruning_window {
             if latest_version > pruning_window {

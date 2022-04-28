@@ -766,8 +766,8 @@ impl DbReader for MockDbReader {
         Ok(account_states_chunk_with_proof)
     }
 
-    fn get_state_prune_window(&self) -> Option<usize> {
-        Some(STATE_PRUNE_WINDOW as usize)
+    fn get_state_prune_window(&self) -> Result<Option<usize>> {
+        Ok(Some(STATE_PRUNE_WINDOW as usize))
     }
 }
 
