@@ -13,12 +13,15 @@ use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
+use clap_verbosity_flag::{Verbosity, WarnLevel};
 use reqwest::Url;
 
 /// Command to create a new account on-chain
 ///
 #[derive(Debug, Parser)]
 pub struct CreateAccount {
+    #[clap(flatten)]
+    verbosity: Verbosity<WarnLevel>,
     #[clap(flatten)]
     encoding_options: EncodingOptions,
     #[clap(flatten)]
@@ -43,6 +46,10 @@ pub struct CreateAccount {
 impl CliCommand<String> for CreateAccount {
     fn command_name(&self) -> &'static str {
         "CreateAccount"
+    }
+
+    fn verbosity(&self) -> &Verbosity<WarnLevel> {
+        &self.verbosity
     }
 
     async fn execute(self) -> CliTypedResult<String> {

@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::LevelFilter;
 use serde::{Deserialize, Serialize};
-use std::{fmt, str::FromStr};
+use std::{convert::TryFrom, fmt, str::FromStr};
 
 /// Associated metadata with every log to identify what kind of log and where it came from
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -130,6 +131,21 @@ impl FromStr for Level {
             .position(|name| name.eq_ignore_ascii_case(level))
             .map(|idx| Level::from_usize(idx).unwrap())
             .ok_or(LevelParseError)
+    }
+}
+
+impl TryFrom<LevelFilter> for Level {
+    type Error = LevelParseError;
+
+    fn try_from(level: LevelFilter) -> Result<Self, LevelParseError> {
+        match level {
+            LevelFilter::Error => Ok(Level::Error),
+            LevelFilter::Warn => Ok(Level::Warn),
+            LevelFilter::Info => Ok(Level::Info),
+            LevelFilter::Debug => Ok(Level::Debug),
+            LevelFilter::Trace => Ok(Level::Trace),
+            _ => Err(LevelParseError),
+        }
     }
 }
 

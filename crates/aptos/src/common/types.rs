@@ -9,15 +9,17 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
-use aptos_logger::debug;
+use aptos_logger::{debug, LevelFilter};
 use aptos_rest_client::{aptos_api_types::WriteSetChange, Client, Transaction};
 use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
+use clap_verbosity_flag::{Verbosity, WarnLevel};
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
+    convert::TryInto,
     fmt::Debug,
     path::{Path, PathBuf},
     str::FromStr,
@@ -541,20 +543,52 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
     /// Returns a name for logging purposes
     fn command_name(&self) -> &'static str;
 
+    /// Verbosity level for logging
+    fn verbosity(&self) -> &Verbosity<WarnLevel>;
+
     /// Executes the command, returning a command specific type
     async fn execute(self) -> CliTypedResult<T>;
+
+    async fn run_command(self) -> CliTypedResult<T> {
+        setup_logger(self.verbosity())?;
+        self.execute().await
+    }
 
     /// Executes the command, and serializes it to the common JSON output type
     async fn execute_serialized(self) -> CliResult {
         let command_name = self.command_name();
-        to_common_result(command_name, self.execute().await).await
+        to_common_result(command_name, self.run_command().await).await
     }
 
     /// Executes the command, and throws away Ok(result) for the string Success
     async fn execute_serialized_success(self) -> CliResult {
         let command_name = self.command_name();
-        to_common_success_result(command_name, self.execute().await).await
+        to_common_success_result(command_name, self.run_command().await).await
     }
+}
+
+/// Setup things that need to be prepped for a command
+fn setup_logger(verbosity: &Verbosity<WarnLevel>) -> CliTypedResult<()> {
+    let filter = match verbosity.log_level() {
+        None => LevelFilter::Info, // Default
+        Some(level) => LevelFilter::from_str(level.as_str()).map_err(|_| {
+            CliError::UnexpectedError("Failed to get log verbosity level".to_string())
+        })?,
+    };
+
+    match filter {
+        LevelFilter::Off => {}
+        _ => {
+            let mut logger = aptos_logger::Logger::new();
+            logger
+                .channel_size(1000)
+                .is_async(false)
+                .level(filter.try_into().unwrap())
+                .read_env();
+            logger.build();
+        }
+    };
+    Ok(())
 }
 
 /// A shortened transaction output

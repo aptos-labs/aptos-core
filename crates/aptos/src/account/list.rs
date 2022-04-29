@@ -8,11 +8,14 @@ use aptos_rest_client::{types::Resource, Client};
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
+use clap_verbosity_flag::{Verbosity, WarnLevel};
 
 /// Command to list resources owned by an address
 ///
 #[derive(Debug, Parser)]
 pub struct ListResources {
+    #[clap(flatten)]
+    verbosity: Verbosity<WarnLevel>,
     #[clap(flatten)]
     rest_options: RestOptions,
 
@@ -28,6 +31,10 @@ pub struct ListResources {
 impl CliCommand<Vec<serde_json::Value>> for ListResources {
     fn command_name(&self) -> &'static str {
         "ListResources"
+    }
+
+    fn verbosity(&self) -> &Verbosity<WarnLevel> {
+        &self.verbosity
     }
 
     // TODO: Format this in a reasonable way while providing all information

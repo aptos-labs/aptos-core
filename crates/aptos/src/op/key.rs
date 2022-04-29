@@ -16,6 +16,7 @@ use aptos_crypto::{ed25519, x25519, PrivateKey, Uniform, ValidCryptoMaterial};
 use aptos_types::account_address::{from_identity_public_key, AccountAddress};
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
+use clap_verbosity_flag::{Verbosity, WarnLevel};
 use rand::SeedableRng;
 use std::{
     collections::{HashMap, HashSet},
@@ -48,6 +49,8 @@ impl KeyTool {
 #[derive(Debug, Parser)]
 pub struct ExtractPeer {
     #[clap(flatten)]
+    verbosity: Verbosity<WarnLevel>,
+    #[clap(flatten)]
     private_key_input_options: PrivateKeyInputOptions,
     #[clap(flatten)]
     output_file_options: SaveFile,
@@ -61,6 +64,10 @@ pub struct ExtractPeer {
 impl CliCommand<HashMap<AccountAddress, Peer>> for ExtractPeer {
     fn command_name(&self) -> &'static str {
         "ExtractPeer"
+    }
+
+    fn verbosity(&self) -> &Verbosity<WarnLevel> {
+        &self.verbosity
     }
 
     async fn execute(self) -> CliTypedResult<HashMap<AccountAddress, Peer>> {
@@ -100,6 +107,8 @@ impl CliCommand<HashMap<AccountAddress, Peer>> for ExtractPeer {
 /// key encoded with the `encoding`.
 #[derive(Debug, Parser)]
 pub struct GenerateKey {
+    #[clap(flatten)]
+    verbosity: Verbosity<WarnLevel>,
     /// Key type: `x25519` or `ed25519`
     #[clap(long, default_value = "ed25519")]
     key_type: KeyType,
@@ -111,6 +120,10 @@ pub struct GenerateKey {
 impl CliCommand<HashMap<&'static str, PathBuf>> for GenerateKey {
     fn command_name(&self) -> &'static str {
         "GenerateKey"
+    }
+
+    fn verbosity(&self) -> &Verbosity<WarnLevel> {
+        &self.verbosity
     }
 
     async fn execute(self) -> CliTypedResult<HashMap<&'static str, PathBuf>> {

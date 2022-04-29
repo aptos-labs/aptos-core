@@ -15,6 +15,7 @@ use crate::{
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
 use async_trait::async_trait;
 use clap::Parser;
+use clap_verbosity_flag::{Verbosity, WarnLevel};
 use std::collections::HashMap;
 
 pub const DEFAULT_REST_URL: &str = "https://fullnode.devnet.aptoslabs.com";
@@ -25,6 +26,8 @@ const NUM_DEFAULT_COINS: u64 = 10000;
 #[derive(Debug, Parser)]
 pub struct InitTool {
     #[clap(flatten)]
+    verbosity: Verbosity<WarnLevel>,
+    #[clap(flatten)]
     profile_options: ProfileOptions,
 }
 
@@ -32,6 +35,10 @@ pub struct InitTool {
 impl CliCommand<()> for InitTool {
     fn command_name(&self) -> &'static str {
         "AptosInit"
+    }
+
+    fn verbosity(&self) -> &Verbosity<WarnLevel> {
+        &self.verbosity
     }
 
     async fn execute(self) -> CliTypedResult<()> {

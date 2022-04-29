@@ -10,6 +10,7 @@ use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use cached_framework_packages::aptos_stdlib;
 use clap::Parser;
+use clap_verbosity_flag::{Verbosity, WarnLevel};
 use serde::Serialize;
 use std::collections::BTreeMap;
 
@@ -17,6 +18,8 @@ use std::collections::BTreeMap;
 ///
 #[derive(Debug, Parser)]
 pub struct TransferCoins {
+    #[clap(flatten)]
+    verbosity: Verbosity<WarnLevel>,
     #[clap(flatten)]
     write_options: WriteTransactionOptions,
 
@@ -39,6 +42,10 @@ pub struct TransferCoins {
 impl CliCommand<TransferSummary> for TransferCoins {
     fn command_name(&self) -> &'static str {
         "TransferCoins"
+    }
+
+    fn verbosity(&self) -> &Verbosity<WarnLevel> {
+        &self.verbosity
     }
 
     async fn execute(self) -> CliTypedResult<TransferSummary> {

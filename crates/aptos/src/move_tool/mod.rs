@@ -16,6 +16,7 @@ use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload}
 use aptos_vm::natives::aptos_natives;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
+use clap_verbosity_flag::{Verbosity, WarnLevel};
 use move_cli::package::cli::{run_move_unit_tests, UnitTestResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -51,6 +52,8 @@ impl MoveTool {
 #[derive(Parser)]
 pub struct CompilePackage {
     #[clap(flatten)]
+    verbosity: Verbosity<WarnLevel>,
+    #[clap(flatten)]
     move_options: MovePackageDir,
 }
 
@@ -58,6 +61,10 @@ pub struct CompilePackage {
 impl CliCommand<Vec<String>> for CompilePackage {
     fn command_name(&self) -> &'static str {
         "CompilePackage"
+    }
+
+    fn verbosity(&self) -> &Verbosity<WarnLevel> {
+        &self.verbosity
     }
 
     async fn execute(self) -> CliTypedResult<Vec<String>> {
@@ -82,6 +89,8 @@ impl CliCommand<Vec<String>> for CompilePackage {
 #[derive(Parser)]
 pub struct TestPackage {
     #[clap(flatten)]
+    verbosity: Verbosity<WarnLevel>,
+    #[clap(flatten)]
     move_options: MovePackageDir,
 }
 
@@ -89,6 +98,10 @@ pub struct TestPackage {
 impl CliCommand<&'static str> for TestPackage {
     fn command_name(&self) -> &'static str {
         "TestPackage"
+    }
+
+    fn verbosity(&self) -> &Verbosity<WarnLevel> {
+        &self.verbosity
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
@@ -127,6 +140,8 @@ fn compile_move(build_config: BuildConfig, package_dir: &Path) -> CliTypedResult
 #[derive(Parser)]
 pub struct PublishPackage {
     #[clap(flatten)]
+    verbosity: Verbosity<WarnLevel>,
+    #[clap(flatten)]
     encoding_options: EncodingOptions,
     #[clap(flatten)]
     move_options: MovePackageDir,
@@ -140,6 +155,10 @@ pub struct PublishPackage {
 impl CliCommand<TransactionSummary> for PublishPackage {
     fn command_name(&self) -> &'static str {
         "PublishPackage"
+    }
+
+    fn verbosity(&self) -> &Verbosity<WarnLevel> {
+        &self.verbosity
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
@@ -184,6 +203,8 @@ impl CliCommand<TransactionSummary> for PublishPackage {
 #[derive(Parser)]
 pub struct RunFunction {
     #[clap(flatten)]
+    verbosity: Verbosity<WarnLevel>,
+    #[clap(flatten)]
     encoding_options: EncodingOptions,
     #[clap(flatten)]
     write_options: WriteTransactionOptions,
@@ -210,6 +231,10 @@ pub struct RunFunction {
 impl CliCommand<TransactionSummary> for RunFunction {
     fn command_name(&self) -> &'static str {
         "RunFunction"
+    }
+
+    fn verbosity(&self) -> &Verbosity<WarnLevel> {
+        &self.verbosity
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
