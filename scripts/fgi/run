@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 from kube import (
     kube_init_context,
@@ -28,8 +28,10 @@ WORKSPACE = ""
 REPORT = ""
 DEFL_TIMEOUT_SECS = 1800  # Default timeout is 30 mins
 USER = getpass.getuser()  # Use the current user for naming
-OUTPUT_TEE = os.getenv("FGI_OUTPUT_LOG", tempfile.mkstemp()[1])
-TIME_FMT = '%Y-%m-%dT%H:%M:%S.000Z'
+FORGE_OUTPUT_TEE = os.getenv("FGI_OUTPUT_LOG", tempfile.mkstemp()[1])
+
+OPENSEARCH_TIME_FMT = '%Y-%m-%dT%H:%M:%S.000Z'
+DEFL_FORGE_REPORT = "forge_report.json"
 
 HEADER = "\033[95m"
 OKBLUE = "\033[94m"
@@ -38,8 +40,9 @@ WARNING = "\033[93m"
 FAIL = "\033[91m"
 RESTORE = "\033[0m"
 
-# build the arg parser and return a tuple of (fgi args, forge args)
+
 def build_argparser():
+    """Build the arg parser and return a tuple of (fgi args, forge args)"""
     parser = argparse.ArgumentParser(
         description="Entrypoint for the Forge unified testing framework"
     )
@@ -61,8 +64,10 @@ def build_argparser():
         help="Extra environment variables to pass to Forge",
     )
     build_group = parser.add_mutually_exclusive_group(required=True)
-    build_group.add_argument("--tag", "-T", help="Image tag to use in kubernetes Forge tests")
-    build_group.add_argument("--pr", "-p", help="PR to build images from for kubernetes Forge tests")
+    build_group.add_argument(
+        "--tag", "-T", help="Image tag to use in kubernetes Forge tests")
+    build_group.add_argument(
+        "--pr", "-p", help="PR to build images from for kubernetes Forge tests")
     build_group.add_argument(
         "--local-swarm",
         "-L",
@@ -77,14 +82,14 @@ def build_argparser():
     parser.add_argument(
         "--report",
         "-R",
+        default=DEFL_FORGE_REPORT,
         help="Dump report to file"
     )
     return parser.parse_known_args()
 
 
 def get_grafana_url(cluster_name):
-    grafana_url_pattern = "http://mon.CLUSTERNAME.aptosdev.com"
-    return grafana_url_pattern.replace("CLUSTERNAME", cluster_name)
+    return f"http://o11y.aptosdev.com/grafana/d/overview/overview?orgId=1&var-Datasource=Remote%20Prometheus%20Devinfra&var-chain_name=aptos-{cluster_name}&var-owner=All"
 
 
 def cli_tool_installed(tool_name):
@@ -95,7 +100,32 @@ def cli_tool_installed(tool_name):
 
 
 def get_opensearch_time(timestamp_ms):
-    return datetime.fromtimestamp(timestamp_ms/1000).strftime(TIME_FMT)
+    return datetime.fromtimestamp(timestamp_ms/1000, timezone.utc).strftime(OPENSEARCH_TIME_FMT)
+
+
+def print_streaming_o11y_resources(grafana_url, start_ts_ms):
+    print("\n**********")
+    print(
+        f"{OKBLUE}Auto refresh Dashboard:{RESTORE} {grafana_url}&from={start_ts_ms}&to=now&refresh=10s")
+    print("**********")
+
+
+def get_final_o11y_resources(grafana_url, workspace, start_ts_ms, end_ts_ms):
+    DASHBOARD_LINK = f"{grafana_url}&from={start_ts_ms}&to={end_ts_ms}"
+    LOGGING_LINK = (
+        f"https://es.devinfra.aptosdev.com/_dashboards/app/discover#/?"
+        f"_g=(filters:!(),refreshInterval:(pause:!t,value:0),time:(from:'{get_opensearch_time(start_ts_ms)}',to:'{get_opensearch_time(end_ts_ms)}'))"
+        f"&_a=(columns:!(_source),filters:!(('$state':(store:appState),"
+        f"meta:(alias:!n,disabled:!f,index:d0bc5e20-badc-11ec-9a50-89b84ac337af,key:chain_name,negate:!f,params:(query:aptos-{workspace}),type:phrase),"
+        f"query:(match_phrase:(chain_name:aptos-{workspace})))),"
+        f"index:d0bc5e20-badc-11ec-9a50-89b84ac337af,interval:auto,query:(language:kuery,query:''),sort:!())"
+    )
+
+    print("\n**********")
+    print(f"{OKBLUE}Dashboard snapshot:{RESTORE} {DASHBOARD_LINK}")
+    print(f"{OKBLUE}Logs snapshot:{RESTORE} {LOGGING_LINK}")
+    print("**********\n")
+    return DASHBOARD_LINK, LOGGING_LINK
 
 
 # ================ Parse the args ================
@@ -115,7 +145,8 @@ if not args.tag:
             print(f"{FAIL}Failed to access codebuild. Try aws-mfa?{RESTORE}")
             sys.exit(1)
         ret = subprocess.call(
-            ["./docker/build-aws.sh", "--build-forge", "--version", f"pull/{args.pr}"]
+            ["./docker/build-aws.sh", "--build-forge",
+                "--version", f"pull/{args.pr}"]
         )
         if ret != 0:
             print(f"{FAIL}Failed to build forge.")
@@ -138,7 +169,8 @@ print(f"""
 
 if args.local_swarm:
     print("Running Forge on backend: local swarm")
-    ret = subprocess.call(["cargo", "run", "-p", "forge-cli", "--", "test", "local-swarm"])
+    ret = subprocess.call(
+        ["cargo", "run", "-p", "forge-cli", "--", "test", "local-swarm"])
     sys.exit(ret)
 
 print("Running Forge on backend: kubernetes testnet")
@@ -164,11 +196,11 @@ if not args.workspace:
 else:
     ret = kube_ensure_cluster([workspace])
     if not ret:
-        print(f"{FAIL}Failed to acquire specified forge testnet cluster {workspace}{RESTORE}")
+        print(
+            f"{FAIL}Failed to acquire specified forge testnet cluster {workspace}{RESTORE}")
         sys.exit(1)
 context = get_cluster_context(workspace)
 print(f"Running experiments on cluster: {workspace}")
-grafana_url = get_grafana_url(workspace)
 push_helm_charts(workspace)
 print()
 
@@ -186,7 +218,8 @@ print(f"Specfile: {specfile}")
 
 # ================ Create and run the job ================
 print(f"Creating job: {job_name}")
-ret = subprocess.call(["kubectl", f"--context={context}", "apply", "-f", specfile])
+ret = subprocess.call(
+    ["kubectl", f"--context={context}", "apply", "-f", specfile])
 if ret != 0:
     print(f"{FAIL}Failed to create forge job{RESTORE}")
     sys.exit(1)
@@ -199,20 +232,18 @@ if ret != 0:
 # account for the time delta between querying pod status and finishing waiting
 delta_ms = 1000
 start_ts_ms = int(time.time() * 1000) - delta_ms
-print("\n**********")
-print(
-    f"{OKBLUE}Auto refresh Dashboard:{RESTORE} {grafana_url}/d/overview/overview?from={start_ts_ms}&to=now&refresh"
-    f"=10s&orgId=1 "
-)
-print("**********")
+grafana_url = get_grafana_url(workspace)
 
-print("==========begin-pod-logs==========")
+print_streaming_o11y_resources(grafana_url, start_ts_ms)
+
+print("==========begin-forge-pod-logs==========")
+# TODO(rustielin): might have to retry this if kube reschedules it
 subprocess.call(
-    f"kubectl --context={context} logs -f -l job-name={job_name} | tee -a {OUTPUT_TEE}",
+    f"kubectl --context={context} logs -f -l job-name={job_name} | tee -a {FORGE_OUTPUT_TEE}",
     shell=True,
 )
-print("==========end-pod-logs==========")
-print(f"\nLog output: {OUTPUT_TEE}")
+print("==========end-forge-pod-logs==========")
+print(f"\nForge log output: {FORGE_OUTPUT_TEE}")
 
 try:
     job_status = json.loads(
@@ -234,25 +265,15 @@ except Exception as e:
     job_status = {"failed": 1}
 
 end_ts_ms = int(time.time() * 1000)
-DASHBOARD_LINK = f"{grafana_url}/d/overview/overview?from={start_ts_ms}&to={end_ts_ms}&orgId=1"
-LOGGING_LINK = (
-    "https://es.devinfra.aptosdev.com/_dashboards/app/discover#/?_g=(filters:!(),"
-    f"refreshInterval:(pause:!t,value:0),time:(from:'{get_opensearch_time(start_ts_ms)}',to:'{get_opensearch_time(end_ts_ms)}'))&_a=(columns:!(_source),filters:!,"
-    "(('$state':(store:appState),meta:(alias:!n,disabled:!f,index:ac3499a0-abc8-11ec-9a50-89b84ac337af,"
-    f"key:chain_name,negate:!f,params:(query:aptos-{workspace}),type:phrase),query:(match_phrase:(chain_name:aptos-{workspace})))),"
-    "index:ac3499a0-abc8-11ec-9a50-89b84ac337af,interval:auto,query:(language:kuery,query:''),sort:!())"
-)
 
-print("\n**********")
-print(f"{OKBLUE}Dashboard snapshot:{RESTORE} {DASHBOARD_LINK}")
-print(f"{OKBLUE}Logs snapshot:{RESTORE} {LOGGING_LINK}")
-print("**********\n")
+DASHBOARD_LINK, LOGGING_LINK = get_final_o11y_resources(
+    grafana_url, workspace, start_ts_ms, end_ts_ms)
 
 test_res = 'failed'
 # perf report
 test_report = []
 read_lines = False
-with open(f"{OUTPUT_TEE}", 'r') as file:
+with open(f"{FORGE_OUTPUT_TEE}", 'r') as file:
     for line in file.readlines():
         if 'json-report-end' in line:
             read_lines = False
@@ -263,13 +284,14 @@ with open(f"{OUTPUT_TEE}", 'r') as file:
         if 'test result: ok' in line:
             test_res = 'passed'
 if len(test_report) == 0:
+    # If Forge emits no report, return a generic error
     test_report.append("{\"text\": \"Forge test runner is terminated\"}")
-temp = json.loads(''.join(test_report))
-temp["logs"] = "Logs: " + LOGGING_LINK
-temp["dashboard"] = "Dashboard: " + DASHBOARD_LINK
+temp_forge_report = json.loads(''.join(test_report))
+temp_forge_report["logs"] = LOGGING_LINK
+temp_forge_report["dashboard"] = DASHBOARD_LINK
 if args.report:
     with open(f"{REPORT}", 'w') as file_object:
-        file_object.write(json.dumps(temp))
+        file_object.write(json.dumps(temp_forge_report))
 
 
 if "failed" in job_status and job_status["failed"] == 1:
