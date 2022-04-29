@@ -37,6 +37,7 @@ thiserror = "1.0.24"
 criterion = "0.3.4"
 tempfile = "3.2.0"
 proptest = "1.0.0"
+rusty-fork = "0.3.0"
 
 consensus-types = { path = "../consensus-types", features = ["fuzzing"] }
 aptos-config = { path = "../../config", features = ["fuzzing"] }

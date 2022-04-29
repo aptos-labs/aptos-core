@@ -6835,6 +6835,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "rand 0.8.4",
+ "rusty-fork",
  "serde 1.0.136",
  "serde_json",
  "tempfile",
