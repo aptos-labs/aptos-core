@@ -133,7 +133,7 @@
             "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", storage_synchronizer_operation=\"synced\"}",
+          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", type=\"synced\"}",
           "legendFormat": "{{owner}}-{{role}}",
           "range": true,
           "refId": "A"
@@ -199,7 +199,7 @@
             "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", storage_synchronizer_operation=\"synced\"}",
+          "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", type=\"synced\"}",
           "legendFormat": "{{owner}}-{{role}}",
           "range": true,
           "refId": "A"
@@ -265,7 +265,7 @@
             "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "clamp_min(aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", data_type=\"transactions\"} - on(owner,role) aptos_state_sync_version{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", storage_synchronizer_operation=\"synced\"}, 0)",
+          "expr": "clamp_min(aptos_data_client_highest_advertised_data{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", data_type=\"transactions\"} - on(owner,role) aptos_state_sync_version{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\", type=\"synced\"}, 0)",
           "hide": false,
           "legendFormat": "{{owner}}-{{role}}",
           "range": true,
@@ -356,8 +356,8 @@
             "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "rate(aptos_state_sync_version{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\",storage_synchronizer_operation=\"synced\"}[$interval])",
-          "legendFormat": "{{owner}}-{{role}}-{{storage_synchronizer_operation}}",
+          "expr": "rate(aptos_state_sync_version{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\",type=\"synced\"}[$interval])",
+          "legendFormat": "{{owner}}-{{role}}-{{type}}",
           "range": true,
           "refId": "A"
         }
@@ -537,7 +537,7 @@
           },
           "editorMode": "code",
           "expr": "aptos_state_sync_version{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
-          "legendFormat": "{{owner}}-{{role}}-{{storage_synchronizer_operation}}",
+          "legendFormat": "{{owner}}-{{role}}-{{type}}",
           "range": true,
           "refId": "A"
         }
