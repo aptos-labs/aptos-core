@@ -9,8 +9,8 @@ use aptos_types::{
     chain_id::ChainId,
     on_chain_config::VMPublishingOption,
     test_helpers::transaction_test_helpers,
-    transaction::{Script, TransactionArgument, TransactionStatus},
-    vm_status::{KeptVMStatus, StatusCode},
+    transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
+    vm_status::StatusCode,
 };
 use language_e2e_tests::{
     assert_prologue_disparity, assert_prologue_parity, common_transactions::EMPTY_SCRIPT,
@@ -22,6 +22,7 @@ use move_core_types::{
     gas_schedule::{GasAlgebra, GasConstants, MAX_TRANSACTION_SIZE_IN_BYTES},
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
+    vm_status::StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER,
 };
 use move_ir_compiler::Compiler;
 
@@ -420,8 +421,8 @@ fn verify_simple_payment() {
         let output = executor.execute_transaction(txn);
         assert_eq!(
             output.status(),
-            // StatusCode::TYPE_MISMATCH
-            &TransactionStatus::Keep(KeptVMStatus::MiscellaneousError)
+            &TransactionStatus::Keep(
+                ExecutionStatus::MiscellaneousError(Some(StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH)))
         );
     }
     }
@@ -455,7 +456,9 @@ pub fn test_arbitrary_script_execution() {
     assert_eq!(
         status.status(),
         // StatusCode::CODE_DESERIALIZATION_ERROR
-        Ok(KeptVMStatus::MiscellaneousError)
+        Ok(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::CODE_DESERIALIZATION_ERROR
+        )))
     );
 }
 
@@ -659,7 +662,10 @@ pub fn test_open_publishing_invalid_address() {
     let output = executor.execute_transaction(txn);
     if let TransactionStatus::Keep(status) = output.status() {
         // assert!(status.status_code() == StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER)
-        assert!(status == &KeptVMStatus::MiscellaneousError);
+        assert!(
+            status
+                == &ExecutionStatus::MiscellaneousError(Some(MODULE_ADDRESS_DOES_NOT_MATCH_SENDER))
+        );
     } else {
         panic!("Unexpected execution status: {:?}", output)
     };
@@ -710,7 +716,7 @@ pub fn test_open_publishing() {
     assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
     assert_eq!(
         executor.execute_transaction(txn).status(),
-        &TransactionStatus::Keep(KeptVMStatus::Executed)
+        &TransactionStatus::Keep(ExecutionStatus::Success)
     );
 }
 

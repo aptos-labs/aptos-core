@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_state_view::StateView;
-use aptos_types::vm_status::{KeptVMStatus, StatusCode, VMStatus};
+use aptos_types::{
+    transaction::ExecutionStatus,
+    vm_status::{StatusCode, VMStatus},
+};
 use aptos_vm::{
     data_cache::{IntoMoveResolver, StateViewCache},
     logging::AdapterLogSchema,
@@ -14,7 +17,10 @@ use language_e2e_tests::{
     versioning::CURRENT_RELEASE_VERSIONS,
 };
 use move_binary_format::file_format::NUMBER_OF_NATIVE_FUNCTIONS;
-use move_core_types::gas_schedule::{GasAlgebra, GasPrice, GasUnits};
+use move_core_types::{
+    gas_schedule::{GasAlgebra, GasPrice, GasUnits},
+    vm_status::StatusCode::TYPE_MISMATCH,
+};
 use move_vm_types::gas_schedule::{zero_cost_schedule, GasStatus};
 
 #[test]
@@ -53,7 +59,7 @@ fn failed_transaction_cleanup_test() {
         assert_eq!(
             out1.status().status(),
             // StatusCode::TYPE_MISMATCH
-            Ok(KeptVMStatus::MiscellaneousError)
+            Ok(ExecutionStatus::MiscellaneousError(Some(TYPE_MISMATCH)))
         );
 
         // Invariant violations should be discarded and not charged.

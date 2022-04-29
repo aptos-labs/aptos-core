@@ -4,8 +4,7 @@ use aptos_types::{
     access_path::AccessPath,
     on_chain_config::Version,
     state_store::state_key::StateKey,
-    transaction::{ChangeSet, Script, TransactionStatus, WriteSetPayload},
-    vm_status::KeptVMStatus,
+    transaction::{ChangeSet, ExecutionStatus, Script, TransactionStatus, WriteSetPayload},
     write_set::WriteOp,
 };
 use aptos_vm::AptosVM;
@@ -60,7 +59,7 @@ fn build_upgrade_writeset() {
     let output = executor.execute_transaction(writeset_txn.clone());
     assert_eq!(
         output.status(),
-        &TransactionStatus::Keep(KeptVMStatus::Executed)
+        &TransactionStatus::Keep(ExecutionStatus::Success)
     );
     assert!(executor.verify_transaction(writeset_txn).status().is_none());
 
@@ -95,6 +94,6 @@ label b0:
     let output = executor.execute_transaction(txn);
     assert_eq!(
         output.status(),
-        &TransactionStatus::Keep(KeptVMStatus::Executed)
+        &TransactionStatus::Keep(ExecutionStatus::Success)
     );
 }

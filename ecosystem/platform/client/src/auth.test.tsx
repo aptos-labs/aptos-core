@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {render} from "@testing-library/react";
-import {useAuth, AuthContext} from "auth";
+import {AuthContext, useAuth} from "auth";
 
 describe("useAuth", () => {
   it("when userId is undefined", () => {

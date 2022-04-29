@@ -210,6 +210,7 @@ async fn generate_private_key_and_peer(op_tool: &OperationalTool) -> (PrivateKey
     key_file.create_as_file().unwrap();
     let (private_key, _) =
         GenerateKey::generate_x25519(aptos::common::types::EncodingType::BCS, key_file.as_ref())
+            .await
             .unwrap();
     let peer_set = op_tool
         .extract_peer_from_file(key_file.as_ref(), EncodingType::BCS)

@@ -1,14 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! A command to list resources owned by an address
-//!
-//! TODO: Examples
-//!
-
-use crate::common::types::{CliConfig, CliError, CliTypedResult, ProfileOptions, RestOptions};
+use crate::common::types::{
+    CliCommand, CliConfig, CliError, CliTypedResult, ProfileOptions, RestOptions,
+};
 use aptos_rest_client::{types::Resource, Client};
 use aptos_types::account_address::AccountAddress;
+use async_trait::async_trait;
 use clap::Parser;
 
 /// Command to list resources owned by an address
@@ -19,21 +17,26 @@ pub struct ListResources {
     rest_options: RestOptions,
 
     #[clap(flatten)]
-    profile: ProfileOptions,
+    profile_options: ProfileOptions,
 
     /// Address of account you want to list resources for
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     account: Option<AccountAddress>,
 }
 
-impl ListResources {
+#[async_trait]
+impl CliCommand<Vec<serde_json::Value>> for ListResources {
+    fn command_name(&self) -> &'static str {
+        "ListResources"
+    }
+
     // TODO: Format this in a reasonable way while providing all information
     // add options like --tokens --nfts etc
-    pub(crate) async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
+    async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
         let account = if let Some(account) = self.account {
             account
         } else if let Some(Some(account)) =
-            CliConfig::load_profile(&self.profile.profile)?.map(|p| p.account)
+            CliConfig::load_profile(&self.profile_options.profile)?.map(|p| p.account)
         {
             account
         } else {
@@ -42,7 +45,7 @@ impl ListResources {
             ));
         };
 
-        let client = Client::new(self.rest_options.url(&self.profile.profile)?);
+        let client = Client::new(self.rest_options.url(&self.profile_options.profile)?);
         let response: Vec<Resource> = client
             .get_account_resources(account)
             .await

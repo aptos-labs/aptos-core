@@ -56,5 +56,4 @@ scratchpad = { path = "../scratchpad", features = ["fuzzing"] }
 
 [features]
 default = []
-aptossum = []
 fuzzing = ["proptest", "proptest-derive", "aptos-proptest-helpers", "aptos-temppath", "aptos-crypto/fuzzing", "aptos-jellyfish-merkle/fuzzing", "aptos-types/fuzzing", "executor-types/fuzzing", "schemadb/fuzzing", "scratchpad/fuzzing"]

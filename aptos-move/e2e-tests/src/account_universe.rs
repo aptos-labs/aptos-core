@@ -29,8 +29,8 @@ use crate::{
 };
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_types::{
-    transaction::{SignedTransaction, TransactionStatus},
-    vm_status::{known_locations, KeptVMStatus, StatusCode},
+    transaction::{ExecutionStatus, SignedTransaction, TransactionStatus},
+    vm_status::{known_locations, StatusCode},
 };
 use once_cell::sync::Lazy;
 use proptest::{prelude::*, strategy::Union};
@@ -265,7 +265,7 @@ pub fn txn_one_account_result(
             sender.sequence_number += 1;
             sender.sent_events_count += 1;
             sender.balance -= to_deduct;
-            (TransactionStatus::Keep(KeptVMStatus::Executed), true)
+            (TransactionStatus::Keep(ExecutionStatus::Success), true)
         }
         (true, true, false) => {
             // Enough gas to pass validation and to do the transfer, but not enough to succeed
@@ -274,10 +274,10 @@ pub fn txn_one_account_result(
             sender.sequence_number += 1;
             sender.balance -= gas_used * gas_price;
             (
-                TransactionStatus::Keep(KeptVMStatus::MoveAbort(
-                    known_locations::core_account_module_abort(),
-                    6,
-                )),
+                TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                    location: known_locations::core_account_module_abort(),
+                    code: 6,
+                }),
                 false,
             )
         }
@@ -288,10 +288,10 @@ pub fn txn_one_account_result(
             sender.sequence_number += 1;
             sender.balance -= low_gas_used * gas_price;
             (
-                TransactionStatus::Keep(KeptVMStatus::MoveAbort(
-                    known_locations::core_account_module_abort(),
-                    10,
-                )),
+                TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                    location: known_locations::core_account_module_abort(),
+                    code: 10,
+                }),
                 false,
             )
         }

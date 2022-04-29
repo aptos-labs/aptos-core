@@ -12,6 +12,7 @@ build = "build.rs"
 
 [dependencies]
 anyhow = "1.0.52"
+async-trait = "0.1.42"
 base64 = "0.13.0"
 clap = "3.1.8"
 hex = "0.4.3"

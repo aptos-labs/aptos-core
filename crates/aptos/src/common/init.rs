@@ -5,14 +5,15 @@ use crate::{
     account::create::CreateAccount,
     common::{
         types::{
-            account_address_from_public_key, CliConfig, CliError, CliTypedResult, ProfileConfig,
-            ProfileOptions,
+            account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
+            ProfileConfig, ProfileOptions,
         },
         utils::prompt_yes,
     },
     op::key::GenerateKey,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
+use async_trait::async_trait;
 use clap::Parser;
 use std::collections::HashMap;
 
@@ -24,11 +25,16 @@ const NUM_DEFAULT_COINS: u64 = 10000;
 #[derive(Debug, Parser)]
 pub struct InitTool {
     #[clap(flatten)]
-    profile: ProfileOptions,
+    profile_options: ProfileOptions,
 }
 
-impl InitTool {
-    pub async fn execute(self) -> CliTypedResult<()> {
+#[async_trait]
+impl CliCommand<()> for InitTool {
+    fn command_name(&self) -> &'static str {
+        "AptosInit"
+    }
+
+    async fn execute(self) -> CliTypedResult<()> {
         let mut config = if CliConfig::config_exists()? {
             CliConfig::load()?
         } else {
@@ -37,10 +43,10 @@ impl InitTool {
 
         // Select profile we're using
         let mut profile_config = if let Some(profile_config) =
-            config.remove_profile(&self.profile.profile)
+            config.remove_profile(&self.profile_options.profile)
         {
             if !prompt_yes(
-                    &format!("Aptos already initialized for profile {}, do you want to overwrite the existing config?", self.profile.profile),
+                    &format!("Aptos already initialized for profile {}, do you want to overwrite the existing config?", self.profile_options.profile),
                 ) {
                     eprintln!("Exiting...");
                     return Ok(());
@@ -50,7 +56,7 @@ impl InitTool {
             ProfileConfig::default()
         };
 
-        eprintln!("Configuring for profile {}", self.profile.profile);
+        eprintln!("Configuring for profile {}", self.profile_options.profile);
 
         // Rest Endpoint
         eprintln!(
@@ -135,7 +141,7 @@ impl InitTool {
             .profiles
             .as_mut()
             .unwrap()
-            .insert(self.profile.profile, profile_config);
+            .insert(self.profile_options.profile, profile_config);
         config.save()?;
         eprintln!("Aptos is now set up for account {}!  Run `aptos help` for more information about commands", address);
         Ok(())

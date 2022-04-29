@@ -96,10 +96,8 @@ members = [
     "state-sync/storage-service/types",
     "storage/accumulator",
     "storage/aptosdb",
-    "storage/aptossum",
     "storage/backup/backup-cli",
     "storage/backup/backup-service",
-    "storage/inspector",
     "storage/jellyfish-merkle",
     "storage/schemadb",
     "storage/scratchpad",
@@ -139,8 +137,6 @@ default-members = [
     "aptos-move/transaction-builder-generator",
     "execution/db-bootstrapper",
     "storage/backup/backup-cli",
-    "storage/aptossum",
-    "storage/inspector",
     "ecosystem/indexer",
 ]
 

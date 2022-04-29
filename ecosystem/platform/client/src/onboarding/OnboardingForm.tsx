@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as React from "react";
-import {Identity} from "./types";
 import {AptosAddressInput, Button, Checkbox} from "ui";
+
+import {Identity} from "./types";
 
 type Props = {
   onSubmit: (identity: Identity) => void;

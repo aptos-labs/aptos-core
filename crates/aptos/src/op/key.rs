@@ -7,13 +7,14 @@ use crate::{
             CliError, CliTypedResult, EncodingOptions, EncodingType, ExtractPublicKey, KeyType,
             PrivateKeyInputOptions, ProfileOptions, SaveFile,
         },
-        utils::{append_file_extension, check_if_file_exists, to_common_result, write_to_file},
+        utils::{append_file_extension, check_if_file_exists, write_to_file},
     },
-    CliResult,
+    CliCommand, CliResult,
 };
 use aptos_config::config::{Peer, PeerRole};
 use aptos_crypto::{ed25519, x25519, PrivateKey, Uniform, ValidCryptoMaterial};
 use aptos_types::account_address::{from_identity_public_key, AccountAddress};
+use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use rand::SeedableRng;
 use std::{
@@ -33,8 +34,8 @@ pub enum KeyTool {
 impl KeyTool {
     pub async fn execute(self) -> CliResult {
         match self {
-            KeyTool::Generate(tool) => to_common_result("GenerateKey", tool.execute()).await,
-            KeyTool::ExtractPeer(tool) => to_common_result("ExtracatPeer", tool.execute()).await,
+            KeyTool::Generate(tool) => tool.execute_serialized().await,
+            KeyTool::ExtractPeer(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -53,21 +54,26 @@ pub struct ExtractPeer {
     #[clap(flatten)]
     encoding_options: EncodingOptions,
     #[clap(flatten)]
-    profile: ProfileOptions,
+    profile_options: ProfileOptions,
 }
 
-impl ExtractPeer {
-    pub fn execute(self) -> CliTypedResult<HashMap<AccountAddress, Peer>> {
+#[async_trait]
+impl CliCommand<HashMap<AccountAddress, Peer>> for ExtractPeer {
+    fn command_name(&self) -> &'static str {
+        "ExtractPeer"
+    }
+
+    async fn execute(self) -> CliTypedResult<HashMap<AccountAddress, Peer>> {
         // Check output file exists
         self.output_file_options.check_file()?;
 
         // Load key based on public or private
-        let public_key = self
-            .private_key_input_options
-            .extract_x25519_public_key(self.encoding_options.encoding, &self.profile.profile)?;
+        let public_key = self.private_key_input_options.extract_x25519_public_key(
+            self.encoding_options.encoding,
+            &self.profile_options.profile,
+        )?;
 
         // Build peer info
-        // TODO: Take in an address?
         let peer_id = from_identity_public_key(public_key);
         let mut public_keys = HashSet::new();
         public_keys.insert(public_key);
@@ -101,8 +107,13 @@ pub struct GenerateKey {
     save_params: SaveKey,
 }
 
-impl GenerateKey {
-    pub fn execute(self) -> CliTypedResult<HashMap<&'static str, PathBuf>> {
+#[async_trait]
+impl CliCommand<HashMap<&'static str, PathBuf>> for GenerateKey {
+    fn command_name(&self) -> &'static str {
+        "GenerateKey"
+    }
+
+    async fn execute(self) -> CliTypedResult<HashMap<&'static str, PathBuf>> {
         self.save_params.check_key_file()?;
 
         // Generate a ed25519 key
@@ -119,9 +130,11 @@ impl GenerateKey {
             KeyType::Ed25519 => self.save_params.save_key(&ed25519_key, "ed22519"),
         }
     }
+}
 
+impl GenerateKey {
     /// A test friendly typed key generation for x25519 keys.
-    pub fn generate_x25519(
+    pub async fn generate_x25519(
         encoding: EncodingType,
         key_file: &Path,
     ) -> CliTypedResult<(x25519::PrivateKey, x25519::PublicKey)> {
@@ -132,7 +145,7 @@ impl GenerateKey {
             encoding = encoding,
         );
         let command = GenerateKey::parse_from(args.split_whitespace());
-        command.execute()?;
+        command.execute().await?;
         Ok((
             encoding.load_key("private_key", key_file)?,
             encoding.load_key(
@@ -143,7 +156,7 @@ impl GenerateKey {
     }
 
     /// A test friendly typed key generation for e25519 keys.
-    pub fn generate_ed25519(
+    pub async fn generate_ed25519(
         encoding: EncodingType,
         key_file: &Path,
     ) -> CliTypedResult<(ed25519::Ed25519PrivateKey, ed25519::Ed25519PublicKey)> {
@@ -154,7 +167,7 @@ impl GenerateKey {
             encoding = encoding,
         );
         let command = GenerateKey::parse_from(args.split_whitespace());
-        command.execute()?;
+        command.execute().await?;
         Ok((
             encoding.load_key("private_key", key_file)?,
             encoding.load_key(

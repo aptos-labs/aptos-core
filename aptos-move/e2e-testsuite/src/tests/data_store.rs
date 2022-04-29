@@ -1,9 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::{
-    transaction::{Module, SignedTransaction, Transaction, TransactionStatus},
-    vm_status::KeptVMStatus,
+use aptos_types::transaction::{
+    ExecutionStatus, Module, SignedTransaction, Transaction, TransactionStatus,
 };
 use language_e2e_tests::{
     account::AccountData, compile::compile_script, current_function_name, executor::FakeExecutor,
@@ -29,7 +28,7 @@ fn move_from_across_blocks() {
     assert!(matches!(
         output.status().status(),
         // StatusCode::MISSING_DATA
-        Ok(KeptVMStatus::ExecutionFailure { .. })
+        Ok(ExecutionStatus::ExecutionFailure { .. })
     ));
     executor.apply_write_set(output.write_set());
 
@@ -51,7 +50,7 @@ fn move_from_across_blocks() {
     assert!(matches!(
         output.status().status(),
         // StatusCode::MISSING_DATA
-        Ok(KeptVMStatus::ExecutionFailure { .. })
+        Ok(ExecutionStatus::ExecutionFailure { .. })
     ));
     executor.apply_write_set(output.write_set());
 
@@ -61,7 +60,7 @@ fn move_from_across_blocks() {
     assert!(matches!(
         output.status().status(),
         // StatusCode::MISSING_DATA
-        Ok(KeptVMStatus::ExecutionFailure { .. })
+        Ok(ExecutionStatus::ExecutionFailure { .. })
     ));
     executor.apply_write_set(output.write_set());
 
@@ -79,12 +78,12 @@ fn move_from_across_blocks() {
         .expect("Must execute transactions");
     assert_eq!(
         output[0].status(),
-        &TransactionStatus::Keep(KeptVMStatus::Executed)
+        &TransactionStatus::Keep(ExecutionStatus::Success)
     );
     assert!(matches!(
         output[1].status().status(),
         // StatusCode::MISSING_DATA
-        Ok(KeptVMStatus::ExecutionFailure { .. })
+        Ok(ExecutionStatus::ExecutionFailure { .. })
     ));
     for out in output {
         executor.apply_write_set(out.write_set());
@@ -108,7 +107,7 @@ fn borrow_after_move() {
     assert!(matches!(
         output.status().status(),
         // StatusCode::MISSING_DATA
-        Ok(KeptVMStatus::ExecutionFailure { .. })
+        Ok(ExecutionStatus::ExecutionFailure { .. })
     ));
     executor.apply_write_set(output.write_set());
 
@@ -130,12 +129,12 @@ fn borrow_after_move() {
         .expect("Must execute transactions");
     assert_eq!(
         output[0].status(),
-        &TransactionStatus::Keep(KeptVMStatus::Executed)
+        &TransactionStatus::Keep(ExecutionStatus::Success)
     );
     assert!(matches!(
         output[1].status().status(),
         // StatusCode::MISSING_DATA
-        Ok(KeptVMStatus::ExecutionFailure { .. })
+        Ok(ExecutionStatus::ExecutionFailure { .. })
     ));
     for out in output {
         executor.apply_write_set(out.write_set());
@@ -159,7 +158,7 @@ fn change_after_move() {
     assert!(matches!(
         output.status().status(),
         // StatusCode::MISSING_DATA
-        Ok(KeptVMStatus::ExecutionFailure { .. })
+        Ok(ExecutionStatus::ExecutionFailure { .. })
     ));
     executor.apply_write_set(output.write_set());
 
@@ -181,12 +180,12 @@ fn change_after_move() {
         .expect("Must execute transactions");
     assert_eq!(
         output[0].status(),
-        &TransactionStatus::Keep(KeptVMStatus::Executed)
+        &TransactionStatus::Keep(ExecutionStatus::Success)
     );
     assert!(matches!(
         output[1].status().status(),
         // StatusCode::MISSING_DATA
-        Ok(KeptVMStatus::ExecutionFailure { .. })
+        Ok(ExecutionStatus::ExecutionFailure { .. })
     ));
     for out in output {
         executor.apply_write_set(out.write_set());
@@ -198,7 +197,7 @@ fn change_after_move() {
     assert!(matches!(
         output.status().status(),
         // StatusCode::MISSING_DATA
-        Ok(KeptVMStatus::ExecutionFailure { .. })
+        Ok(ExecutionStatus::ExecutionFailure { .. })
     ));
     executor.apply_write_set(output.write_set());
 }

@@ -258,7 +258,7 @@ Verification
 
 ### SyncInfo
 
-This structure provides verifiable certificates that can allow a validator to catch up to another validator. The max round _r_ of the `highest_quorum_cert` and `highest_timeout_cert` have already completed according to > 2f validators and convince any validator join round _r+1_ immediately if they are currently on a round < _r+1_. A correct implementation ensures that `highest_commit_cert` and `highest_quorum_cert` are on the same chain id. If a validator learns about more recent state upon receiving `SyncInfo`, then it should catch up through [BlockRetrievalRequest](#BlockRetrievalRequest), [EpochRetrievalRequest](#EpochRetrievalRequest) or [state synchronization](../state_synchronizer/state_sync_specification.md).
+This structure provides verifiable certificates that can allow a validator to catch up to another validator. The max round _r_ of the `highest_quorum_cert` and `highest_timeout_cert` have already completed according to > 2f validators and convince any validator join round _r+1_ immediately if they are currently on a round < _r+1_. A correct implementation ensures that `highest_commit_cert` and `highest_quorum_cert` are on the same chain id. If a validator learns about more recent state upon receiving `SyncInfo`, then it should catch up through [BlockRetrievalRequest](#BlockRetrievalRequest), [EpochRetrievalRequest](#EpochRetrievalRequest) or [state synchronization](../state_sync/README.md).
 
 ```rust
 pub struct SyncInfo {
@@ -326,7 +326,7 @@ Verification
 
 * verify all fields independently
 * ensure `proposal.block_data.quorum_cert == sync_info.highest_quorum_cert`
-* ensure `proposal.block_data.round == sync_info.`[highest_round()](#highest_round)`+ 1`
+* ensure `proposal.block_data.round == sync_info.highest_round()+ 1`
 * ensure `proposal.block_data.block_type == BlockType::Proposal`
 
 ### VoteMsg
@@ -394,7 +394,7 @@ Verification
 
 * ensure `status` == Succeeded
 
-  * TODO: Consider whether `status` == NotEnoughBlocks is also correct behavior. If the number of blocks to catch up exceeds a limit, a validator should rely on [state synchronization](../state_synchronizer/state_sync_specification.md) to catch up.
+  * TODO: Consider whether `status` == NotEnoughBlocks is also correct behavior. If the number of blocks to catch up exceeds a limit, a validator should rely on [state synchronization](../state_sync/README.md) to catch up.
 
 * verify each blocks independently
 * verify the blocks form a chain where the first one's id == the `block_id` in BlockRetrievalRequest. `[blocks[i].block_data.quorum_cert.certified_block.id == blocks[i+1].id for i in 0..blocks.len()-1]`
@@ -765,7 +765,7 @@ let commit_info = if commit_rule() {
 }
 ```
 
-Generate a LedgerInfo with bcs seiralize hash of vote_data and sign the bcs seriealize hash to generate a vote signature which captures both vote and commit.
+Generate a LedgerInfo with bcs serialize hash of vote_data and sign the bcs serialize hash to generate a vote signature which captures both vote and commit.
 
 ```rust
 let ledger_info = LedgerInfo {
@@ -960,7 +960,7 @@ In this section we specify how the state transitions with events. There are 3 ty
 
 #### Reconfiguration
 
-Upon receiving a reconfiguration notification (end-epoch `LedgerInfo`) from `StateComputer`, a validator transitions to a new `´epoch` with a generated genesis block at round 0 and round state at round 1\. This is the only way to enter a new epoch.
+Upon receiving a reconfiguration notification (end-epoch `LedgerInfo`) from `StateComputer`, a validator transitions to a new `epoch` with a generated genesis block at round 0 and round state at round 1\. This is the only way to enter a new epoch.
 
 ```rust
 fn reconfig(ledger_info: LedgerInfoWithSignatures, config: OnChainConfig) -> EpochState {
@@ -1152,7 +1152,7 @@ This section documents the steps to follow after receiving a [VoteMsg](#votemsg)
   + ensure that the votes are equivalent (both `vote.ledger_info.hash()` are equal)
   + only process the new vote if it is a new timeout vote (if it contains a timeout signature and the previously seen one doesn't)
 - store the vote under `pending_votes[sender]`
-- if there's enough votes (_2f+1_) for the same `VoteData` and `LedgerInfo`, store the following [quorum certificate](#quorumcert) in the [block store](block_store.md) via `block_store.insert_quorum_cert()`:
+- if there's enough votes (_2f+1_) for the same `VoteData` and `LedgerInfo`, store the following [quorum certificate](#quorumcert) in the [block store](#blockstore) via `block_store.insert_quorum_cert()`:
 
   ```rust
   QuorumCert {
@@ -1165,7 +1165,7 @@ This section documents the steps to follow after receiving a [VoteMsg](#votemsg)
   ```
 
   where `vote_data` and `ledger_info` are the common values that the votes signed, and where `signatures` is a map of validator account addresses to their vote signatures.
-- if there was no QC created and the new vote is a timeout vote (contains a timeout signature), check if there are now enough (_2f+1_) timeout signatures and store the following [timeout certificate](#timeoutcertificate) in the [block store](block_store.md) via `block_store.insert_timeout_certificate()`:
+- if there was no QC created and the new vote is a timeout vote (contains a timeout signature), check if there are now enough (_2f+1_) timeout signatures and store the following [timeout certificate](#timeoutcertificate) in the todofix[block store](#blockstore) via `block_store.insert_timeout_certificate()`:
 
   ```rust
   TimeoutCertificate {

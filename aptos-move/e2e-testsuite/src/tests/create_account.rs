@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::{transaction::TransactionStatus, vm_status::KeptVMStatus};
+use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 use language_e2e_tests::{
     account::Account, common_transactions::create_account_txn, current_function_name,
     executor::FakeExecutor,
@@ -24,7 +24,7 @@ fn create_account() {
     let output = executor.execute_transaction(txn);
     assert_eq!(
         output.status(),
-        &TransactionStatus::Keep(KeptVMStatus::Executed)
+        &TransactionStatus::Keep(ExecutionStatus::Success)
     );
     executor.apply_write_set(output.write_set());
 

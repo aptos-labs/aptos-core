@@ -9,8 +9,6 @@
 //! It relays read/write operations on the physical storage via [`schemadb`] to the underlying
 //! Key-Value storage system, and implements aptos data structures on top of it.
 
-#[cfg(any(feature = "aptossum"))]
-pub mod aptossum;
 // Used in this and other crates for testing.
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test_helper;

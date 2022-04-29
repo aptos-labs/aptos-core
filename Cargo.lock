@@ -165,6 +165,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-workspace-hack",
+ "async-trait",
  "base64",
  "bcs",
  "cached-framework-packages",
@@ -955,22 +956,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-storage-inspector"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-config",
- "aptos-crypto",
- "aptos-logger",
- "aptos-types",
- "aptos-workspace-hack",
- "aptosdb",
- "storage-interface",
- "structopt",
- "tempfile",
-]
-
-[[package]]
 name = "aptos-telemetry"
 version = "0.1.0"
 dependencies = [
@@ -1288,21 +1273,6 @@ dependencies = [
  "serde 1.0.136",
  "storage-interface",
  "thiserror",
-]
-
-[[package]]
-name = "aptossum"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-types",
- "aptos-workspace-hack",
- "aptosdb",
- "serde 1.0.136",
- "serde_json",
- "storage-interface",
- "structopt",
 ]
 
 [[package]]
@@ -3065,6 +3035,7 @@ dependencies = [
  "aptos-types",
  "aptos-workspace-hack",
  "bcs",
+ "itertools",
  "scratchpad",
  "serde 1.0.136",
  "storage-interface",

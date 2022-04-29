@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Aptos is a one stop tool for operations, debugging, and other operations with the blockchain
-//!
-//! TODO: Examples
-//!
+
 #![forbid(unsafe_code)]
 
 use aptos::Tool;

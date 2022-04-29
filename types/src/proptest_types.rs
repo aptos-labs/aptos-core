@@ -17,14 +17,14 @@ use crate::{
     proof::TransactionInfoListWithProof,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        ChangeSet, Module, ModuleBundle, RawTransaction, Script, SignatureCheckedTransaction,
-        SignedTransaction, Transaction, TransactionArgument, TransactionInfo,
-        TransactionListWithProof, TransactionPayload, TransactionStatus, TransactionToCommit,
-        Version, WriteSetPayload,
+        ChangeSet, ExecutionStatus, Module, ModuleBundle, RawTransaction, Script,
+        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
+        TransactionInfo, TransactionListWithProof, TransactionPayload, TransactionStatus,
+        TransactionToCommit, Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
-    vm_status::{KeptVMStatus, VMStatus},
+    vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptos_crypto::{
@@ -767,7 +767,7 @@ pub struct TransactionToCommitGen {
     /// Gas used.
     gas_used: u64,
     /// Transaction status
-    status: KeptVMStatus,
+    status: ExecutionStatus,
 }
 
 impl TransactionToCommitGen {
@@ -826,7 +826,7 @@ impl Arbitrary for TransactionToCommitGen {
             vec((any::<Index>(), any::<AccountStateBlobGen>()), 0..=1),
             any::<WriteSet>(),
             any::<u64>(),
-            any::<KeptVMStatus>(),
+            any::<ExecutionStatus>(),
         )
             .prop_map(
                 |(sender, event_emitters, mut touched_accounts, write_set, gas_used, status)| {

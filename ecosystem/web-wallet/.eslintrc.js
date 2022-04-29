@@ -8,7 +8,7 @@ module.exports = {
     'standard'
   ],
   ignorePatterns: [
-    '*.css',
+    '*.css'
   ],
   parser: '@typescript-eslint/parser',
   parserOptions: {

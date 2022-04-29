@@ -1,31 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! A tool for interacting with Move
-//!
-//! TODO: Examples
-//!
-
 use crate::{
     common::{
         types::{
             load_account_arg, CliError, CliTypedResult, EncodingOptions, MovePackageDir,
-            ProfileOptions, WriteTransactionOptions,
+            ProfileOptions, TransactionSummary, WriteTransactionOptions,
         },
-        utils::to_common_result,
+        utils::submit_transaction,
     },
-    CliResult,
+    CliCommand, CliResult,
 };
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
-use aptos_rest_client::{aptos_api_types::MoveType, Client, Transaction};
-use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
-use aptos_types::{
-    chain_id::ChainId,
-    transaction::{
-        authenticator::AuthenticationKey, ModuleBundle, ScriptFunction, TransactionPayload,
-    },
-};
+use aptos_rest_client::aptos_api_types::MoveType;
+use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
 use aptos_vm::natives::aptos_natives;
+use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use move_cli::package::cli::{run_move_unit_tests, UnitTestResult};
 use move_core_types::{
@@ -35,7 +24,6 @@ use move_core_types::{
 };
 use move_package::{compilation::compiled_package::CompiledPackage, BuildConfig};
 use move_unit_test::UnitTestingConfig;
-use reqwest::Url;
 use std::{convert::TryFrom, path::Path, str::FromStr};
 
 /// CLI tool for performing Move tasks
@@ -51,14 +39,10 @@ pub enum MoveTool {
 impl MoveTool {
     pub async fn execute(self) -> CliResult {
         match self {
-            MoveTool::Compile(tool) => {
-                to_common_result("CompilePackage", tool.execute().await).await
-            }
-            MoveTool::Publish(tool) => {
-                to_common_result("PublishPackage", tool.execute().await).await
-            }
-            MoveTool::Run(tool) => to_common_result("RunFunction", tool.execute().await).await,
-            MoveTool::Test(tool) => to_common_result("TestPackage", tool.execute().await).await,
+            MoveTool::Compile(tool) => tool.execute_serialized().await,
+            MoveTool::Publish(tool) => tool.execute_serialized().await,
+            MoveTool::Run(tool) => tool.execute_serialized().await,
+            MoveTool::Test(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -70,8 +54,13 @@ pub struct CompilePackage {
     move_options: MovePackageDir,
 }
 
-impl CompilePackage {
-    pub async fn execute(self) -> CliTypedResult<Vec<String>> {
+#[async_trait]
+impl CliCommand<Vec<String>> for CompilePackage {
+    fn command_name(&self) -> &'static str {
+        "CompilePackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<Vec<String>> {
         let build_config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses(),
             generate_docs: true,
@@ -96,8 +85,13 @@ pub struct TestPackage {
     move_options: MovePackageDir,
 }
 
-impl TestPackage {
-    pub async fn execute(self) -> CliTypedResult<&'static str> {
+#[async_trait]
+impl CliCommand<&'static str> for TestPackage {
+    fn command_name(&self) -> &'static str {
+        "TestPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
         let config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses(),
             test_mode: true,
@@ -139,11 +133,16 @@ pub struct PublishPackage {
     #[clap(flatten)]
     write_options: WriteTransactionOptions,
     #[clap(flatten)]
-    profile: ProfileOptions,
+    profile_options: ProfileOptions,
 }
 
-impl PublishPackage {
-    pub async fn execute(self) -> CliTypedResult<aptos_rest_client::Transaction> {
+#[async_trait]
+impl CliCommand<TransactionSummary> for PublishPackage {
+    fn command_name(&self) -> &'static str {
+        "PublishPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let build_config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses(),
             generate_abis: false,
@@ -160,56 +159,25 @@ impl PublishPackage {
         let compiled_payload = TransactionPayload::ModuleBundle(ModuleBundle::new(compiled_units));
 
         // Now that it's compiled, lets send it
-        let sender_key = self
-            .write_options
-            .private_key_options
-            .extract_private_key(self.encoding_options.encoding, &self.profile.profile)?;
+        let sender_key = self.write_options.private_key_options.extract_private_key(
+            self.encoding_options.encoding,
+            &self.profile_options.profile,
+        )?;
 
         submit_transaction(
-            self.write_options.rest_options.url(&self.profile.profile)?,
-            self.write_options.chain_id(&self.profile.profile).await?,
+            self.write_options
+                .rest_options
+                .url(&self.profile_options.profile)?,
+            self.write_options
+                .chain_id(&self.profile_options.profile)
+                .await?,
             sender_key,
             compiled_payload,
             self.write_options.max_gas,
         )
         .await
+        .map(TransactionSummary::from)
     }
-}
-
-/// Submits a [`TransactionPayload`] as signed by the `sender_key`
-async fn submit_transaction(
-    url: Url,
-    chain_id: ChainId,
-    sender_key: Ed25519PrivateKey,
-    payload: TransactionPayload,
-    max_gas: u64,
-) -> CliTypedResult<Transaction> {
-    let client = Client::new(url);
-
-    // Get sender address
-    let sender_address = AuthenticationKey::ed25519(&sender_key.public_key()).derived_address();
-    let sender_address = AccountAddress::new(*sender_address);
-
-    // Get account to get the sequence number
-    let account_response = client
-        .get_account(sender_address)
-        .await
-        .map_err(|err| CliError::ApiError(err.to_string()))?;
-    let account = account_response.inner();
-    let sequence_number = account.sequence_number;
-
-    let transaction_factory = TransactionFactory::new(chain_id)
-        .with_gas_unit_price(1)
-        .with_max_gas_amount(max_gas);
-    let sender_account = &mut LocalAccount::new(sender_address, sender_key, sequence_number);
-    let transaction =
-        sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
-    let response = client
-        .submit_and_wait(&transaction)
-        .await
-        .map_err(|err| CliError::ApiError(err.to_string()))?;
-
-    Ok(response.inner().clone())
 }
 
 /// Run a Move function
@@ -220,7 +188,7 @@ pub struct RunFunction {
     #[clap(flatten)]
     write_options: WriteTransactionOptions,
     #[clap(flatten)]
-    profile: ProfileOptions,
+    profile_options: ProfileOptions,
     /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
     ///
     /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::Message::set_message`
@@ -238,8 +206,13 @@ pub struct RunFunction {
     type_args: Vec<MoveType>,
 }
 
-impl RunFunction {
-    pub async fn execute(self) -> Result<Transaction, CliError> {
+#[async_trait]
+impl CliCommand<TransactionSummary> for RunFunction {
+    fn command_name(&self) -> &'static str {
+        "RunFunction"
+    }
+
+    async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let args: Vec<Vec<u8>> = self
             .args
             .iter()
@@ -262,15 +235,21 @@ impl RunFunction {
         );
 
         submit_transaction(
-            self.write_options.rest_options.url(&self.profile.profile)?,
-            self.write_options.chain_id(&self.profile.profile).await?,
             self.write_options
-                .private_key_options
-                .extract_private_key(self.encoding_options.encoding, &self.profile.profile)?,
+                .rest_options
+                .url(&self.profile_options.profile)?,
+            self.write_options
+                .chain_id(&self.profile_options.profile)
+                .await?,
+            self.write_options.private_key_options.extract_private_key(
+                self.encoding_options.encoding,
+                &self.profile_options.profile,
+            )?,
             TransactionPayload::ScriptFunction(script_function),
             self.write_options.max_gas,
         )
         .await
+        .map(TransactionSummary::from)
     }
 }
 

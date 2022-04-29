@@ -1,12 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+import {OnboardingPage} from "onboarding";
 import * as React from "react";
 import {Route, Routes} from "react-router";
-import {OnboardingPage} from "onboarding";
 import {SocialLoginButtonCallbackPage} from "ui";
 
-function App() {
+export function App() {
   return (
     <Routes>
       <Route path="/onboarding" element={<OnboardingPage />} />
@@ -14,5 +14,3 @@ function App() {
     </Routes>
   );
 }
-
-export default App;
