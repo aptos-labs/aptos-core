@@ -172,6 +172,12 @@ impl CliCommand<Vec<String>> for CompilePackage {
     }
 }
 
+impl From<MovePackageDir> for CompilePackage {
+    fn from(move_options: MovePackageDir) -> Self {
+        CompilePackage { move_options }
+    }
+}
+
 /// Run Move unit tests against a package path
 #[derive(Parser)]
 pub struct TestPackage {
@@ -186,6 +192,12 @@ impl CliCommand<&'static str> for TestPackage {
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {
+        // Compile the package before running the test
+        // This is added to fix the error with test re-run
+        CompilePackage::from(self.move_options.clone())
+            .execute()
+            .await?;
+
         let config = BuildConfig {
             additional_named_addresses: self.move_options.named_addresses(),
             test_mode: true,
