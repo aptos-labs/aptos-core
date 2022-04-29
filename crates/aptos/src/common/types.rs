@@ -468,7 +468,7 @@ impl WriteTransactionOptions {
 #[derive(Debug, Parser)]
 pub struct MovePackageDir {
     /// Path to a move package (the folder with a Move.toml file)
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, parse(from_os_str), default_value = ".")]
     pub package_dir: PathBuf,
     /// Path to save the compiled move package
     ///
