@@ -11,10 +11,11 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.52"
+bcs = "0.1.2"
+itertools = "0.10.0"
 serde = { version = "1.0.124", default-features = false }
 thiserror = "1.0.24"
 
-bcs = "0.1.2"
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-secure-net = { path = "../../secure/net" }
 aptos-state-view = { path = "../../storage/state-view" }

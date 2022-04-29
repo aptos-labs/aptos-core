@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{ExecutedTrees, StateComputeResult, TransactionData};
-use anyhow::{ensure, Result};
+use anyhow::{bail, ensure, Result};
 use aptos_crypto::hash::{CryptoHash, TransactionAccumulatorHasher};
 use aptos_types::{
     contract_event::ContractEvent,
@@ -93,11 +93,25 @@ impl ExecutedChunk {
             .iter()
             .map(CryptoHash::hash)
             .collect::<Vec<_>>();
-        ensure!(
-            txn_info_hashes == expected_txn_info_hashes,
-            "Transaction infos don't match",
-        );
-        Ok(())
+
+        if txn_info_hashes != expected_txn_info_hashes {
+            for (idx, ((_, txn_data), expected_txn_info)) in
+                itertools::zip_eq(self.to_commit.iter(), transaction_infos.iter()).enumerate()
+            {
+                if &txn_data.txn_info != expected_txn_info {
+                    bail!(
+                        "Transaction infos don't match. version: {}, txn_info:{}, expected_txn_info:{}",
+                        self.result_view.transaction_accumulator.version() + 1 + idx as u64
+                            - self.to_commit.len() as u64,
+                        &txn_data.txn_info,
+                        expected_txn_info,
+                    )
+                }
+            }
+            unreachable!()
+        } else {
+            Ok(())
+        }
     }
 
     pub fn maybe_select_chunk_ending_ledger_info(
