@@ -29,10 +29,14 @@
 !/tmp/storage/
 !/tmp/storage/.keep
 
+# Ignore asset builds.
+/app/assets/builds
+
 /public/assets
 
 # Ignore master key for decrypting credentials and more.
 /config/master.key
+/config/credentials.yml.enc
 
 # Never commit this dangerous file :-)
 .env

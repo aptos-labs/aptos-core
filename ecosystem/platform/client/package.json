@@ -63,7 +63,7 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://localhost:8000",
+  "proxy": "http://localhost:3001",
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.0",
     "autoprefixer": "^10.4.4",

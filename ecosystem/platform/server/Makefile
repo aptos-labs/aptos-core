@@ -111,7 +111,7 @@ run-generate:
 	bundle exec rails generate $(RUN_ARGS)
 
 run-rails:
-	bundle exec puma -t 1:1 -b tcp://0.0.0.0:3000
+	bundle exec puma -t 1:1 -b tcp://0.0.0.0:3001
 
 run-server:
 	bundle exec rails s

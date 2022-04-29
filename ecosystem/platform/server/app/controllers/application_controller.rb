@@ -17,12 +17,13 @@ class ApplicationController < ActionController::Base
     }
   end
 
-  def after_sign_in_path_for(resource)
-    if resource.is_root?
-      admin_dashboard_path
-    else
-      '/'
-    end
+  def after_sign_in_path_for(user)
+    stored_location_for(user) ||
+      if user.email.nil?
+        onboarding_email_path
+      else
+        overview_index_path
+      end
   end
 
   def admin_access_denied(_exception)

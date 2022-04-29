@@ -1,0 +1,56 @@
+<%= form_with(model: it1_profile, class: "contents") do |form| %>
+  <% if it1_profile.errors.any? %>
+    <div id="error_explanation" class="bg-red-50 text-red-500 px-3 py-2 font-medium rounded-lg mt-3">
+      <h2><%= pluralize(it1_profile.errors.count, "error") %> prohibited this it1_profile from being saved:</h2>
+
+      <ul>
+        <% it1_profile.errors.each do |error| %>
+          <li><%= error.full_message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div>
+    <p>
+    <%= form.label :consensus_key %>
+    <%= form.text_field :consensus_key, required: true, format: '0x[a-f0-9]{64}' %>
+    </p>
+    <p>
+    <%= form.label :account_key %>
+    <%= form.text_field :account_key, required: true, format: '0x[a-f0-9]{64}' %>
+    </p>
+    <p>
+    <%= form.label :network_key %>
+    <%= form.text_field :network_key, required: true, format: '0x[a-f0-9]{64}' %>
+    </p>
+    <p>
+    <%= form.label :validator_address %>
+    <%= form.text_field :validator_address, required: true %>
+    </p>
+    <p>
+    <%= form.label :validator_port %>
+    <%= form.number_field :validator_port, required: true %>
+    </p>
+    <p>
+    <%= form.label :metrics_port %>
+    <%= form.number_field :metrics_port, required: true %>
+    </p>
+    <p>
+    <%= form.label :fullnode_address %>
+    <%= form.text_field :fullnode_address %>
+    </p>
+    <p>
+    <%= form.label :fullnode_port %>
+    <%= form.number_field :fullnode_port %>
+    </p>
+    <p>
+    <%= form.label :terms %>
+    <%= form.check_box :terms, required: true %>
+    </p>
+  </div>
+
+  <div class="inline">
+    <%= form.submit class: "rounded-lg py-3 px-5 bg-blue-600 text-white inline-block font-medium cursor-pointer" %>
+  </div>
+<% end %>

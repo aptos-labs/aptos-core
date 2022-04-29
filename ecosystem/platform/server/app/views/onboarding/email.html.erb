@@ -1,0 +1,13 @@
+<h2>Welcome, <%= @oauth_username %></h2>
+<p>Please verify your email to continue the signup process</p>
+
+<%= form_with(model: current_user, url: onboarding_email_path, method: :post) do |f| %>
+  <div class="field">
+    <%= f.label :email %><br />
+    <%= f.email_field :email, autofocus: true, autocomplete: "email", value: @oauth_email %>
+  </div>
+
+  <div class="actions">
+    <%= f.submit "Send email" %>
+  </div>
+<% end %>

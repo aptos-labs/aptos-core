@@ -5,39 +5,25 @@
 
 module Users
   class OmniauthCallbacksController < Devise::OmniauthCallbacksController
-    def github
-      @user = User.from_omniauth(auth_data, current_user)
-      if @user.persisted?
-        @message = I18n.t 'devise.omniauth_callbacks.success', kind: 'Github'
-        sign_in(@user)
-      else
-        # TODO: make this bulletproof
-        @message = I18n.t 'devise.omniauth_callbacks.failure', kind: :github,
-                                                               reason: @user.errors.full_messages.join("\n")
+    User.omniauth_providers.each do |provider|
+      define_method provider do
+        oauth_callback(provider)
       end
-
-      # TODO: RENDER SOME RESPONSE!
-      # render json: { message: }
-      render 'api/users/show', formats: [:json]
-    end
-
-    def discord
-      @user = User.from_omniauth(auth_data, current_user)
-
-      if @user.persisted?
-        message = I18n.t 'devise.omniauth_callbacks.success', kind: 'Discord'
-        sign_in(@user)
-      else
-        # TODO: make this bulletproof
-        message = I18n.t 'devise.omniauth_callbacks.failure', kind: :discord,
-                                                              reason: @user.errors.full_messages.join("\n")
-      end
-
-      # TODO: RENDER SOME RESPONSE!
-      render json: { message: }
     end
 
     private
+
+    def oauth_callback(provider)
+      @user = User.from_omniauth(auth_data, current_user)
+
+      if @user.persisted?
+        sign_in_and_redirect @user, event: :authentication # this will throw if @user is not activated
+        set_flash_message(:notice, :success, kind: provider.to_s.titleize) if is_navigational_format?
+      else
+        # TODO: make this bulletproof
+        raise 'Unable to persist user'
+      end
+    end
 
     def auth_data
       request.env['omniauth.auth']

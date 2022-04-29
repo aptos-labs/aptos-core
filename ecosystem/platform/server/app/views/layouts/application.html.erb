@@ -6,22 +6,20 @@
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
+    <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
   </head>
 
-  <body>
-  <% if notice %>
-    <p class="alert alert-success"><%= notice %></p>
-  <% end %>
-  <% if alert %>
-    <p class="alert alert-danger"><%= alert %></p>
-  <% end %>
+  <body class="flex flex-col h-screen justify-between">
+    <div class="flex flex-col flex-1">
+      <%= render "layouts/header" %>
 
-    <div class="yield-wrapper-outer">
-      <div class="yield-wrapper-inner">
+      <main class="flex-1">
         <%= yield %>
       </div>
-    </div>
+    </main>
+
+    <%= render "layouts/footer" %>
   </body>
 </html>

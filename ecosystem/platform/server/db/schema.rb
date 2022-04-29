@@ -1,8 +1,5 @@
 # frozen_string_literal: true
 
-# Copyright (c) Aptos
-# SPDX-License-Identifier: Apache-2.0
-
 # This file is auto-generated from the current state of the database. Instead
 # of editing this file, please use the migrations feature of Active Record to
 # incrementally modify your database, and then regenerate this schema definition.
@@ -15,7 +12,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 20_220_429_012_658) do
+ActiveRecord::Schema[7.0].define(version: 20_220_506_185_917) do
   # These are extensions that must be enabled in order to support this database
   enable_extension 'plpgsql'
 
@@ -54,6 +51,21 @@ ActiveRecord::Schema[7.0].define(version: 20_220_429_012_658) do
     t.index ['user_id'], name: 'index_authorizations_on_user_id'
   end
 
+  create_table 'it1_profiles', force: :cascade do |t|
+    t.bigint 'user_id', null: false
+    t.string 'consensus_key'
+    t.string 'account_key'
+    t.string 'network_key'
+    t.string 'validator_address'
+    t.integer 'validator_port'
+    t.integer 'metrics_port'
+    t.string 'fullnode_address'
+    t.integer 'fullnode_port'
+    t.datetime 'created_at', null: false
+    t.datetime 'updated_at', null: false
+    t.index ['user_id'], name: 'index_it1_profiles_on_user_id'
+  end
+
   create_table 'users', force: :cascade do |t|
     t.string 'username'
     t.string 'email'
@@ -82,4 +94,6 @@ ActiveRecord::Schema[7.0].define(version: 20_220_429_012_658) do
     t.index ['reset_password_token'], name: 'index_users_on_reset_password_token', unique: true
     t.index ['username'], name: 'index_users_on_username', unique: true
   end
+
+  add_foreign_key 'it1_profiles', 'users'
 end
