@@ -83,6 +83,10 @@ impl CliCommand<Vec<String>> for CompilePackage {
 pub struct TestPackage {
     #[clap(flatten)]
     move_options: MovePackageDir,
+
+    /// A filter string to determine which unit tests to run
+    #[clap(name = "filter", short = 'f', long = "filter")]
+    pub filter: Option<String>,
 }
 
 #[async_trait]
@@ -101,7 +105,10 @@ impl CliCommand<&'static str> for TestPackage {
         let result = run_move_unit_tests(
             self.move_options.package_dir.as_path(),
             config,
-            UnitTestingConfig::default_with_bound(Some(100_000)),
+            UnitTestingConfig {
+                filter: self.filter,
+                ..UnitTestingConfig::default_with_bound(Some(100_000))
+            },
             aptos_natives(),
             false,
         )
