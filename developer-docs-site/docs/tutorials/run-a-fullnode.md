@@ -76,19 +76,17 @@ You can also use Docker to configure and run your FullNode.
 
 ### Verify initial synchronization
 During the initial synchronization of your FullNode, there may be a lot of data to transfer. Progress can be monitored
-by querying the metrics port to see what version your node is currently synced to. Run the following command:
+by querying the metrics port to see what version your node is currently synced to. Run the following command to output the current synced version of your node:
+```
+curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_state_sync_version{.*\"synced\"}" | awk '{print $2}'
+```
 
+Example output:
 ```
-curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_state_sync_version{type=\"synced\"}"
-```
-
-The command will output the current synced version of your node. For example:
-```
-$ curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_state_sync_version{type=\"synced\"}"
-aptos_state_sync_version{type="synced"} 71000
+71000
 ```
   
-Compare the synced version returned by this command (e.g., `71000`) with the `Current Version` (latest) shown on the
+Compare the synced version returned by this command (e.g. `71000`) with the `Current Version` (latest) shown on the
 [Aptos status page](https://status.devnet.aptos.dev/). If your node is catching up to the current version, it is
 synchronizing correctly. Note: a few versions difference between the node and the status page is fine, as the status
 page does not automatically refresh.
