@@ -35,7 +35,7 @@ affinity: {}
 
 storage:
   # Set this to a StorageClass available on your Kubernetes cluster
-  class: local-storage
+  class: 
   size: 350Gi
 
 service:
