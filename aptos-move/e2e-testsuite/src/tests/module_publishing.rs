@@ -66,7 +66,7 @@ fn bad_module_address() {
 }
 
 macro_rules! module_republish_test {
-    ($name:ident, $prog1:literal, $prog2:literal, $result:expr) => {
+    ($name:ident, $prog1:literal, $prog2:literal) => {
         #[test]
         fn $name() {
             let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
@@ -105,10 +105,13 @@ macro_rules! module_republish_test {
             ));
 
             let output2 = executor.execute_transaction(txn2);
-            // second tx should yield the expected result
+            println!("{:?}", output2.status());
+            // second tx should always fail, module republish is not allowed
             assert!(transaction_status_eq(
                 &output2.status(),
-                &TransactionStatus::Keep($result),
+                &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+                    StatusCode::DUPLICATE_MODULE_NAME
+                ))),
             ));
         }
     };
@@ -128,8 +131,7 @@ module_republish_test!(
         struct T { f: u64 }
         public f() { label b0: return; }
     }
-    ",
-    ExecutionStatus::Success
+    " // ExecutionStatus::Success
 );
 
 // Republishing a module named M under the same address with a superset of the structs is OK
@@ -143,8 +145,7 @@ module_republish_test!(
     module 0x##ADDRESS##.M {
         struct T { f: u64 }
     }
-    ",
-    ExecutionStatus::Success
+    " // ExecutionStatus::Success
 );
 
 // Republishing a module named M under the same address with a superset of public functions is OK
@@ -158,8 +159,7 @@ module_republish_test!(
     module 0x##ADDRESS##.M {
         public f() { label b0: return; }
     }
-    ",
-    ExecutionStatus::Success
+    " // ExecutionStatus::Success
 );
 
 // Republishing a module named M under the same address that breaks data layout should be rejected
@@ -174,8 +174,7 @@ module_republish_test!(
     module 0x##ADDRESS##.M {
         struct T { f: u64, g: bool }
     }
-    ",
-    ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
+    " // ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
 );
 
 module_republish_test!(
@@ -189,8 +188,7 @@ module_republish_test!(
     module 0x##ADDRESS##.M {
         struct T { f: bool }
     }
-    ",
-    ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
+    " // ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
 );
 
 module_republish_test!(
@@ -204,8 +202,7 @@ module_republish_test!(
     module 0x##ADDRESS##.M {
         struct T {}
     }
-    ",
-    ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
+    " // ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
 );
 
 module_republish_test!(
@@ -218,8 +215,7 @@ module_republish_test!(
     "
     module 0x##ADDRESS##.M {
     }
-    ",
-    ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
+    " // ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
 );
 
 // Republishing a module named M under the same address that breaks linking should be rejected
@@ -234,8 +230,7 @@ module_republish_test!(
     module 0x##ADDRESS##.M {
         public f(_a: u64) { label b0: return; }
     }
-    ",
-    ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
+    " // ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
 );
 
 module_republish_test!(
@@ -249,8 +244,7 @@ module_republish_test!(
     module 0x##ADDRESS##.M {
         public f(_a: bool) { label b0: return; }
     }
-    ",
-    ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
+    " // ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
 );
 
 module_republish_test!(
@@ -263,8 +257,7 @@ module_republish_test!(
     "
     module 0x##ADDRESS##.M {
     }
-    ",
-    ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
+    " // ExecutionStatus::MiscellaneousError(Some(StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE))
 );
 
 #[test]
