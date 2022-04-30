@@ -2,7 +2,8 @@
 
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
-
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 from nacl.signing import SigningKey
 import hashlib
 import requests
@@ -38,6 +39,22 @@ class Account:
         """Returns the public key for the associated account"""
 
         return self.signing_key.verify_key.encode().hex()
+
+    def seed(self) -> str:
+        """Returns the private key for the associated account"""
+
+        return self.signing_key.__bytes__().hex()
+
+    def peer_id(self) -> str:
+        """
+        Returns the node peer id for the associated account
+        https://cryptography.io/en/latest/hazmat/primitives/asymmetric/x25519/
+        """
+
+        return X25519PrivateKey.from_private_bytes(self.signing_key.__bytes__()).public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw
+        ).hex()
 #<:!:section_1
 
 #:!:>section_2
@@ -176,6 +193,11 @@ if __name__ == "__main__":
     print("\n=== Addresses ===")
     print(f"Alice: {alice.address()}")
     print(f"Bob: {bob.address()}")
+
+    carol = Account(seed=bytes.fromhex('5888B160347472CD5D642DB37A0C3448340A9C54F84D9A5E3DD10BB5A5124654'))
+    print("\n=== Carol Account Seed and Node Peer Id ===")
+    print(f"Carol Account Seed: {carol.seed()}")
+    print(f"Carol Node Peer Id: {carol.peer_id()}")
 
     faucet_client.fund_account(alice.address(), 1_000_000)
     faucet_client.fund_account(bob.address(), 0)
