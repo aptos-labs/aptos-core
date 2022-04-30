@@ -20,33 +20,25 @@ test(
     await faucetClient.fundAccount(alice.address(), 10000);
     await faucetClient.fundAccount(bob.address(), 5000);
 
-    // Create collection and token on Alice's account
-    await tokenClient.createCollection(alice, "Alice's simple collection", "AliceCollection", "https://aptos.dev");
-    let resources = await client.getAccountResources(alice.address());
-    let accountResource: { type: string; data: any } = resources.find((r) => r.type === "0x1::Token::Collections");
+    const collection_name = "AliceCollection";
+    const token_name = "Alice Token";
 
-    expect(accountResource.data.collections.data[0]["key"]).toBe("AliceCollection");
+    // Create collection and token on Alice's account
+    await tokenClient.createCollection(alice, collection_name, "Alice's simple collection", "https://aptos.dev");
 
     await tokenClient.createToken(
       alice,
       "AliceCollection",
-      "Alice's simple token",
       "AliceToken",
+      "Alice's simple token",
       1,
       "https://aptos.dev/img/nyan.jpeg",
     );
-    resources = await client.getAccountResources(alice.address());
-    accountResource = resources.find((r) => r.type === "0x1::Token::Gallery");
-
-    expect(accountResource.data.gallery.data[0]["value"]["name"]).toBe("AliceToken");
 
     // Transfer Token from Alice's Account to Bob's Account
-    const token_id = await tokenClient.getTokenId(alice.address().hex(), "AliceCollection", "AliceToken");
-    await tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), token_id, 1);
-    await tokenClient.claimToken(bob, alice.address().hex(), alice.address().hex(), token_id);
-    resources = await client.getAccountResources(bob.address());
-    accountResource = resources.find((r) => r.type === "0x1::Token::Gallery");
-    expect(accountResource.data.gallery.data[0]["value"]["name"]).toBe("AliceToken");
+    const token_id = await tokenClient.getTokenId(alice.address().hex(), collection_name, token_name);
+    await tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), collection_name, token_name, 1);
+    await tokenClient.claimToken(bob, alice.address().hex(), alice.address().hex(), collection_name, token_name);
   },
   30 * 1000,
 );

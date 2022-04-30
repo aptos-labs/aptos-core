@@ -120,6 +120,8 @@ class RestClient:
             assert count < 10, f"transaction {txn_hash} timed out"
             time.sleep(1)
             count += 1
+        response = requests.get(f"{self.url}/transactions/{txn_hash}")
+        assert response.json()["success"], f"{response.text} - {txn_hash}"
 #<:!:section_4
 
 #:!:>section_5

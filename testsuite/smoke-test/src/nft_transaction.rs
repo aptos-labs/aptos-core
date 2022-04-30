@@ -3,7 +3,6 @@
 
 use aptos_transaction_builder::aptos_stdlib;
 use forge::{AptosContext, AptosTest, Result, Test};
-use serde_json::Value;
 
 pub struct NFTTransaction;
 
@@ -26,10 +25,13 @@ impl AptosTest for NFTTransaction {
         ctx.create_user_account(owner.public_key()).await?;
         ctx.mint(owner.address(), 10_000_000).await?;
 
+        let collection_name = "collection name".to_owned().into_bytes();
+        let token_name = "token name".to_owned().into_bytes();
+
         let collection_builder = ctx.transaction_factory().payload(
             aptos_stdlib::encode_create_unlimited_collection_script_script_function(
+                collection_name.clone(),
                 "description".to_owned().into_bytes(),
-                "collection name".to_owned().into_bytes(),
                 "uri".to_owned().into_bytes(),
             ),
         );
@@ -40,10 +42,11 @@ impl AptosTest for NFTTransaction {
         println!("collection created.");
 
         let token_builder = ctx.transaction_factory().payload(
-            aptos_stdlib::encode_create_token_script_script_function(
-                "collection name".to_owned().into_bytes(),
+            aptos_stdlib::encode_create_unlimited_token_script_script_function(
+                collection_name.clone(),
+                token_name.clone(),
                 "collection description".to_owned().into_bytes(),
-                "token name".to_owned().into_bytes(),
+                true,
                 1,
                 "uri".to_owned().into_bytes(),
             ),
@@ -52,38 +55,13 @@ impl AptosTest for NFTTransaction {
         let token_txn = creator.sign_with_transaction_builder(token_builder);
         client.submit_and_wait(&token_txn).await?;
 
-        let resource = client
-            .get_account_resource(creator.address(), "0x1::Token::Collections")
-            .await?
-            .into_inner()
-            .unwrap();
-        let collections = &resource.data["collections"];
-        let collection = client
-            .get_table_item(
-                table_handle(collections),
-                "0x1::ASCII::String",
-                "0x1::Token::Collection",
-                "collection name",
-            )
-            .await?
-            .into_inner();
-        let token_data = client
-            .get_table_item(
-                table_handle(&collection["tokens"]),
-                "0x1::ASCII::String",
-                "0x1::Token::TokenData",
-                "token name",
-            )
-            .await?
-            .into_inner();
-        let token_num = token_data["id"]["creation_num"].as_str().unwrap().parse()?;
-
         let offer_builder =
             ctx.transaction_factory()
                 .payload(aptos_stdlib::encode_offer_script_script_function(
                     owner.address(),
                     creator.address(),
-                    token_num,
+                    collection_name.clone(),
+                    token_name.clone(),
                     1,
                 ));
         let offer_txn = creator.sign_with_transaction_builder(offer_builder);
@@ -94,14 +72,20 @@ impl AptosTest for NFTTransaction {
                 .payload(aptos_stdlib::encode_claim_script_script_function(
                     creator.address(),
                     creator.address(),
-                    token_num,
+                    collection_name.clone(),
+                    token_name.clone(),
                 ));
 
         let claim_txn = owner.sign_with_transaction_builder(claim_builder);
         client.submit_and_wait(&claim_txn).await?;
 
         let transfer_builder = ctx.transaction_factory().payload(
-            aptos_stdlib::encode_direct_transfer_script_function(creator.address(), token_num, 1),
+            aptos_stdlib::encode_direct_transfer_script_script_function(
+                creator.address(),
+                collection_name.clone(),
+                token_name.clone(),
+                1,
+            ),
         );
         let transfer_txn =
             owner.sign_multi_agent_with_transaction_builder(vec![&creator], transfer_builder);
@@ -109,8 +93,4 @@ impl AptosTest for NFTTransaction {
 
         Ok(())
     }
-}
-
-fn table_handle(table: &Value) -> u128 {
-    table["handle"].as_str().unwrap().parse().unwrap()
 }

@@ -23,8 +23,8 @@ export class TokenClient {
   // Creates a new collection within the specified account
   async createCollection(
     account: AptosAccount,
-    description: string,
     name: string,
+    description: string,
     uri: string,
   ): Promise<Types.HexEncodedBytes> {
     const payload: Types.TransactionPayload = {
@@ -32,8 +32,8 @@ export class TokenClient {
       function: "0x1::Token::create_unlimited_collection_script",
       type_arguments: [],
       arguments: [
-        Buffer.from(description).toString("hex"),
         Buffer.from(name).toString("hex"),
+        Buffer.from(description).toString("hex"),
         Buffer.from(uri).toString("hex"),
       ],
     };
@@ -45,19 +45,21 @@ export class TokenClient {
   async createToken(
     account: AptosAccount,
     collectionName: string,
-    description: string,
     name: string,
+    description: string,
     supply: number,
     uri: string,
   ): Promise<Types.HexEncodedBytes> {
     const payload: Types.TransactionPayload = {
       type: "script_function_payload",
-      function: "0x1::Token::create_token_script",
+      function: "0x1::Token::create_limited_token_script",
       type_arguments: [],
       arguments: [
         Buffer.from(collectionName).toString("hex"),
-        Buffer.from(description).toString("hex"),
         Buffer.from(name).toString("hex"),
+        Buffer.from(description).toString("hex"),
+        true,
+        supply.toString(),
         supply.toString(),
         Buffer.from(uri).toString("hex"),
       ],
@@ -71,14 +73,21 @@ export class TokenClient {
     account: AptosAccount,
     receiver: MaybeHexString,
     creator: MaybeHexString,
-    tokenCreationNum: number,
+    collectionName: string,
+    name: string,
     amount: number,
   ): Promise<Types.HexEncodedBytes> {
     const payload: Types.TransactionPayload = {
       type: "script_function_payload",
       function: "0x1::TokenTransfers::offer_script",
       type_arguments: [],
-      arguments: [receiver, creator, tokenCreationNum.toString(), amount.toString()],
+      arguments: [
+        receiver,
+        creator,
+        Buffer.from(collectionName).toString("hex"),
+        Buffer.from(name).toString("hex"),
+        amount.toString(),
+      ],
     };
     const transactionHash = await this.submitTransactionHelper(account, payload);
     return transactionHash;
@@ -89,13 +98,19 @@ export class TokenClient {
     account: AptosAccount,
     sender: MaybeHexString,
     creator: MaybeHexString,
-    tokenCreationNum: number,
+    collectionName: string,
+    name: string,
   ): Promise<Types.HexEncodedBytes> {
     const payload: Types.TransactionPayload = {
       type: "script_function_payload",
       function: "0x1::TokenTransfers::claim_script",
       type_arguments: [],
-      arguments: [sender, creator, tokenCreationNum.toString()],
+      arguments: [
+        sender,
+        creator,
+        Buffer.from(collectionName).toString("hex"),
+        Buffer.from(name).toString("hex"),
+      ],
     };
     const transactionHash = await this.submitTransactionHelper(account, payload);
     return transactionHash;
@@ -106,13 +121,19 @@ export class TokenClient {
     account: AptosAccount,
     receiver: MaybeHexString,
     creator: MaybeHexString,
-    tokenCreationNum: number,
+    collectionName: string,
+    name: string,
   ): Promise<Types.HexEncodedBytes> {
     const payload: Types.TransactionPayload = {
       type: "script_function_payload",
       function: "0x1::TokenTransfers::cancel_offer_script",
       type_arguments: [],
-      arguments: [receiver, creator, tokenCreationNum.toString()],
+      arguments: [
+        sender,
+        creator,
+        Buffer.from(collectionName).toString("hex"),
+        Buffer.from(name).toString("hex"),
+      ],
     };
     const transactionHash = await this.submitTransactionHelper(account, payload);
     return transactionHash;
