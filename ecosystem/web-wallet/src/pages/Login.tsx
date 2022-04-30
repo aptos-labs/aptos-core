@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React from 'react'
+import React, { useEffect } from 'react'
 import { AptosAccount } from 'aptos'
 import { Buffer } from 'buffer'
 import {
@@ -24,20 +24,11 @@ import {
 import { SubmitHandler, useForm } from 'react-hook-form'
 import { AptosBlackLogo, AptosWhiteLogo } from '../components/AptosLogo'
 import withSimulatedExtensionContainer from '../components/WithSimulatedExtensionContainer'
-import { QuestionIcon } from '@chakra-ui/icons'
 import { getAccountResources } from './Wallet'
+import ChakraLink from '../components/ChakraLink'
+import { secondaryBgColor, secondaryErrorMessageColor } from '../constants'
 
 type Inputs = Record<string, any>
-
-export const secondaryBgColor = {
-  dark: 'gray.900',
-  light: 'white'
-}
-
-const secondaryErrorMessageColor = {
-  dark: 'red.200',
-  light: 'red.500'
-}
 
 export const secondaryTextColor = {
   dark: 'gray.400',
@@ -46,7 +37,7 @@ export const secondaryTextColor = {
 
 function Login () {
   const { colorMode } = useColorMode()
-  const { updateWalletState } = useWalletState()
+  const { aptosAccount, updateWalletState } = useWalletState()
   const { register, watch, handleSubmit, setError, formState: { errors } } = useForm()
   const key: string = watch('privateKey')
   const navigate = useNavigate()
@@ -67,6 +58,12 @@ function Login () {
       setError('privateKey', { type: 'custom', message: 'Invalid private key' })
     }
   }
+
+  useEffect(() => {
+    if (aptosAccount) {
+      navigate('/wallet')
+    }
+  }, [])
 
   return (
     <VStack
@@ -113,15 +110,21 @@ function Login () {
                 </Center>
               </Box>
             </Center>
-            <Button colorScheme="teal" variant="ghost" isDisabled>
-              Create a new wallet
-            </Button>
+            <ChakraLink to="/create-wallet">
+              <Button colorScheme="teal" variant="ghost">
+                Create a new wallet
+              </Button>
+            </ChakraLink>
           </VStack>
         </form>
       </Flex>
-      <Button size="xs" as="a" href='/help' leftIcon={<QuestionIcon />} variant="link">
-        Help
-      </Button>
+      {/* TODO: Fill this in later */}
+      {/* <HStack spacing={2} color={secondaryTextColor[colorMode]}>
+        <QuestionIcon />
+        <ChakraLink to="/help" fontSize="xs">
+          Help
+        </ChakraLink>
+      </HStack> */}
     </VStack>
   )
 }
