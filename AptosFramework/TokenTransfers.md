@@ -73,7 +73,7 @@ This module provides the foundation for transferring of Tokens
     <b>move_to</b>(
         account,
         <a href="TokenTransfers.md#0x1_TokenTransfers">TokenTransfers</a> {
-            pending_claims: <a href="Table.md#0x1_Table_create">Table::create</a>&lt;<b>address</b>, <a href="Table.md#0x1_Table">Table</a>&lt;ID, <a href="Token.md#0x1_Token">Token</a>&gt;&gt;(),
+            pending_claims: <a href="Table.md#0x1_Table_new">Table::new</a>&lt;<b>address</b>, <a href="Table.md#0x1_Table">Table</a>&lt;ID, <a href="Token.md#0x1_Token">Token</a>&gt;&gt;(),
         }
     )
 }
@@ -142,18 +142,18 @@ This module provides the foundation for transferring of Tokens
 
     <b>let</b> pending_claims =
         &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="TokenTransfers.md#0x1_TokenTransfers">TokenTransfers</a>&gt;(sender_addr).pending_claims;
-    <b>if</b> (!<a href="Table.md#0x1_Table_contains_key">Table::contains_key</a>(pending_claims, &receiver)) {
-        <a href="Table.md#0x1_Table_insert">Table::insert</a>(pending_claims, receiver, <a href="Table.md#0x1_Table_create">Table::create</a>())
+    <b>if</b> (!<a href="Table.md#0x1_Table_contains">Table::contains</a>(pending_claims, &receiver)) {
+        <a href="Table.md#0x1_Table_add">Table::add</a>(pending_claims, &receiver, <a href="Table.md#0x1_Table_new">Table::new</a>())
     };
     <b>let</b> addr_pending_claims = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(pending_claims, &receiver);
 
     <b>let</b> token = <a href="Token.md#0x1_Token_withdraw_token">Token::withdraw_token</a>(sender, token_id, amount);
-    <b>let</b> token_id = <a href="Token.md#0x1_Token_token_id">Token::token_id</a>(&token);
-    <b>if</b> (<a href="Table.md#0x1_Table_contains_key">Table::contains_key</a>(addr_pending_claims, token_id)) {
-        <b>let</b> dst_token = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(addr_pending_claims, token_id);
+    <b>let</b> token_id = *<a href="Token.md#0x1_Token_token_id">Token::token_id</a>(&token);
+    <b>if</b> (<a href="Table.md#0x1_Table_contains">Table::contains</a>(addr_pending_claims, &token_id)) {
+        <b>let</b> dst_token = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(addr_pending_claims, &token_id);
         <a href="Token.md#0x1_Token_merge_token">Token::merge_token</a>(token, dst_token)
     } <b>else</b> {
-        <a href="Table.md#0x1_Table_insert">Table::insert</a>(addr_pending_claims, *token_id, token)
+        <a href="Table.md#0x1_Table_add">Table::add</a>(addr_pending_claims, &token_id, token)
     }
 }
 </code></pre>
@@ -216,10 +216,10 @@ This module provides the foundation for transferring of Tokens
     <b>let</b> pending_claims =
         &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="TokenTransfers.md#0x1_TokenTransfers">TokenTransfers</a>&gt;(sender).pending_claims;
     <b>let</b> pending_tokens = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(pending_claims, &receiver_addr);
-    <b>let</b> (_id, token) = <a href="Table.md#0x1_Table_remove">Table::remove</a>(pending_tokens, token_id);
+    <b>let</b> token = <a href="Table.md#0x1_Table_remove">Table::remove</a>(pending_tokens, token_id);
 
-    <b>if</b> (<a href="Table.md#0x1_Table_count">Table::count</a>(pending_tokens) == 0) {
-        <b>let</b> (_id, real_pending_claims) = <a href="Table.md#0x1_Table_remove">Table::remove</a>(pending_claims, &receiver_addr);
+    <b>if</b> (<a href="Table.md#0x1_Table_length">Table::length</a>(pending_tokens) == 0) {
+        <b>let</b> real_pending_claims = <a href="Table.md#0x1_Table_remove">Table::remove</a>(pending_claims, &receiver_addr);
         <a href="Table.md#0x1_Table_destroy_empty">Table::destroy_empty</a>(real_pending_claims)
     };
 
@@ -285,10 +285,10 @@ This module provides the foundation for transferring of Tokens
     <b>let</b> pending_claims =
         &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="TokenTransfers.md#0x1_TokenTransfers">TokenTransfers</a>&gt;(sender_addr).pending_claims;
     <b>let</b> pending_tokens = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(pending_claims, &receiver);
-    <b>let</b> (_id, token) = <a href="Table.md#0x1_Table_remove">Table::remove</a>(pending_tokens, token_id);
+    <b>let</b> token = <a href="Table.md#0x1_Table_remove">Table::remove</a>(pending_tokens, token_id);
 
-    <b>if</b> (<a href="Table.md#0x1_Table_count">Table::count</a>(pending_tokens) == 0) {
-        <b>let</b> (_id, real_pending_claims) = <a href="Table.md#0x1_Table_remove">Table::remove</a>(pending_claims, &receiver);
+    <b>if</b> (<a href="Table.md#0x1_Table_length">Table::length</a>(pending_tokens) == 0) {
+        <b>let</b> real_pending_claims = <a href="Table.md#0x1_Table_remove">Table::remove</a>(pending_claims, &receiver);
         <a href="Table.md#0x1_Table_destroy_empty">Table::destroy_empty</a>(real_pending_claims)
     };
 

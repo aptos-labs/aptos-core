@@ -4,7 +4,7 @@
 # Module `0x1::TestCoin`
 
 This module defines a minimal and generic Coin and Balance.
-modified from https://github.com/diem/move/tree/main/language/documentation/tutorial
+modified from https://github.com/move-language/move/tree/main/language/documentation/tutorial
 
 
 -  [Struct `Coin`](#0x1_TestCoin_Coin)
@@ -22,28 +22,28 @@ modified from https://github.com/diem/move/tree/main/language/documentation/tuto
 -  [Function `register`](#0x1_TestCoin_register)
 -  [Function `delegate_mint_capability`](#0x1_TestCoin_delegate_mint_capability)
 -  [Function `claim_mint_capability`](#0x1_TestCoin_claim_mint_capability)
--  [Function `claim_mint_capability_internal`](#0x1_TestCoin_claim_mint_capability_internal)
 -  [Function `find_delegation`](#0x1_TestCoin_find_delegation)
 -  [Function `mint`](#0x1_TestCoin_mint)
 -  [Function `mint_internal`](#0x1_TestCoin_mint_internal)
 -  [Function `exists_at`](#0x1_TestCoin_exists_at)
 -  [Function `balance_of`](#0x1_TestCoin_balance_of)
 -  [Function `transfer`](#0x1_TestCoin_transfer)
--  [Function `transfer_internal`](#0x1_TestCoin_transfer_internal)
 -  [Function `withdraw`](#0x1_TestCoin_withdraw)
 -  [Function `deposit`](#0x1_TestCoin_deposit)
 -  [Function `burn`](#0x1_TestCoin_burn)
 -  [Function `burn_with_capability`](#0x1_TestCoin_burn_with_capability)
 -  [Function `burn_gas`](#0x1_TestCoin_burn_gas)
--  [Function `total_supply`](#0x1_TestCoin_total_supply)
 -  [Function `scaling_factor`](#0x1_TestCoin_scaling_factor)
+-  [Function `zero`](#0x1_TestCoin_zero)
+-  [Function `merge`](#0x1_TestCoin_merge)
+-  [Function `value`](#0x1_TestCoin_value)
 
 
 <pre><code><b>use</b> <a href="../MoveStdlib/Errors.md#0x1_Errors">0x1::Errors</a>;
 <b>use</b> <a href="../MoveStdlib/Event.md#0x1_Event">0x1::Event</a>;
 <b>use</b> <a href="../MoveStdlib/Option.md#0x1_Option">0x1::Option</a>;
 <b>use</b> <a href="../MoveStdlib/Signer.md#0x1_Signer">0x1::Signer</a>;
-<b>use</b> <a href="../CoreFramework/SystemAddresses.md#0x1_SystemAddresses">0x1::SystemAddresses</a>;
+<b>use</b> <a href="SystemAddresses.md#0x1_SystemAddresses">0x1::SystemAddresses</a>;
 <b>use</b> <a href="../MoveStdlib/Vector.md#0x1_Vector">0x1::Vector</a>;
 </code></pre>
 
@@ -121,12 +121,6 @@ Represnets the metadata of the coin, store @CoreResources.
 
 
 <dl>
-<dt>
-<code>total_value: u128</code>
-</dt>
-<dd>
-
-</dd>
 <dt>
 <code>scaling_factor: u64</code>
 </dt>
@@ -417,10 +411,10 @@ Error codes
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_initialize">initialize</a>(core_resource: &signer, scaling_factor: u64) {
-    <a href="../CoreFramework/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(core_resource);
+    <a href="SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(core_resource);
     <b>move_to</b>(core_resource, <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a> {});
     <b>move_to</b>(core_resource, <a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a> {});
-    <b>move_to</b>(core_resource, <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> { total_value: 0, scaling_factor });
+    <b>move_to</b>(core_resource, <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> { scaling_factor });
     <b>move_to</b>(core_resource, <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> { inner: <a href="../MoveStdlib/Vector.md#0x1_Vector_empty">Vector::empty</a>() });
     <a href="TestCoin.md#0x1_TestCoin_register">register</a>(core_resource);
 }
@@ -482,7 +476,7 @@ Create delegated token for the address so the account could claim MintCapability
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_delegate_mint_capability">delegate_mint_capability</a>(account: signer, <b>to</b>: <b>address</b>) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> {
-    <a href="../CoreFramework/SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(&account);
+    <a href="SystemAddresses.md#0x1_SystemAddresses_assert_core_resource">SystemAddresses::assert_core_resource</a>(&account);
     <b>let</b> delegations = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a>&gt;(@CoreResources).inner;
     <b>let</b> i = 0;
     <b>while</b> (i &lt; <a href="../MoveStdlib/Vector.md#0x1_Vector_length">Vector::length</a>(delegations)) {
@@ -505,7 +499,7 @@ Create delegated token for the address so the account could claim MintCapability
 Claim the delegated mint capability and destroy the delegated token.
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_claim_mint_capability">claim_mint_capability</a>(account: signer)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_claim_mint_capability">claim_mint_capability</a>(account: &signer)
 </code></pre>
 
 
@@ -514,31 +508,7 @@ Claim the delegated mint capability and destroy the delegated token.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_claim_mint_capability">claim_mint_capability</a>(account: signer) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> {
-    <a href="TestCoin.md#0x1_TestCoin_claim_mint_capability_internal">claim_mint_capability_internal</a>(&account);
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_TestCoin_claim_mint_capability_internal"></a>
-
-## Function `claim_mint_capability_internal`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_claim_mint_capability_internal">claim_mint_capability_internal</a>(account: &signer)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_claim_mint_capability_internal">claim_mint_capability_internal</a>(account: &signer) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> {
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_claim_mint_capability">claim_mint_capability</a>(account: &signer) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Delegations">Delegations</a> {
     <b>let</b> maybe_index = <a href="TestCoin.md#0x1_TestCoin_find_delegation">find_delegation</a>(<a href="../MoveStdlib/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account));
     <b>assert</b>!(<a href="../MoveStdlib/Option.md#0x1_Option_is_some">Option::is_some</a>(&maybe_index), <a href="TestCoin.md#0x1_TestCoin_EDELEGATION_NOT_FOUND">EDELEGATION_NOT_FOUND</a>);
     <b>let</b> idx = *<a href="../MoveStdlib/Option.md#0x1_Option_borrow">Option::borrow</a>(&maybe_index);
@@ -596,7 +566,7 @@ Claim the delegated mint capability and destroy the delegated token.
 Mint coins with capability.
 
 
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_mint">mint</a>(account: signer, mint_addr: <b>address</b>, amount: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_mint">mint</a>(account: &signer, mint_addr: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -606,12 +576,12 @@ Mint coins with capability.
 
 
 <pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_mint">mint</a>(
-    account: signer,
+    account: &signer,
     mint_addr: <b>address</b>,
     amount: u64
-) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>, <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a>, <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a>
+) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>, <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a>
 {
-    <a href="TestCoin.md#0x1_TestCoin_mint_internal">mint_internal</a>(&account, mint_addr, amount);
+    <a href="TestCoin.md#0x1_TestCoin_mint_internal">mint_internal</a>(account, mint_addr, amount);
 }
 </code></pre>
 
@@ -634,14 +604,11 @@ Mint coins with capability.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_mint_internal">mint_internal</a>(account: &signer, mint_addr: <b>address</b>, amount: u64) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>, <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a>, <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_mint_internal">mint_internal</a>(account: &signer, mint_addr: <b>address</b>, amount: u64) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>, <a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a> {
     <b>let</b> sender_addr = <a href="../MoveStdlib/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account);
     <b>let</b> _cap = <b>borrow_global</b>&lt;<a href="TestCoin.md#0x1_TestCoin_MintCapability">MintCapability</a>&gt;(sender_addr);
     // Deposit `amount` of tokens <b>to</b> `mint_addr`'s balance
     <a href="TestCoin.md#0x1_TestCoin_deposit">deposit</a>(mint_addr, <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a> { value: amount });
-    // Update the total supply
-    <b>let</b> coin_info = <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a>&gt;(@CoreResources);
-    coin_info.total_value = coin_info.total_value + (amount <b>as</b> u128);
 }
 </code></pre>
 
@@ -703,34 +670,10 @@ Returns the balance of <code>owner</code>.
 
 ## Function `transfer`
 
-
-
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_transfer">transfer</a>(from: signer, <b>to</b>: <b>address</b>, amount: u64)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_transfer">transfer</a>(from: signer, <b>to</b>: <b>address</b>, amount: u64) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>, <a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a> {
-    <a href="TestCoin.md#0x1_TestCoin_transfer_internal">transfer_internal</a>(&from, <b>to</b>, amount);
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_TestCoin_transfer_internal"></a>
-
-## Function `transfer_internal`
-
 Transfers <code>amount</code> of tokens from <code>from</code> to <code><b>to</b></code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_transfer_internal">transfer_internal</a>(from: &signer, <b>to</b>: <b>address</b>, amount: u64)
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_transfer">transfer</a>(from: &signer, <b>to</b>: <b>address</b>, amount: u64)
 </code></pre>
 
 
@@ -739,7 +682,7 @@ Transfers <code>amount</code> of tokens from <code>from</code> to <code><b>to</b
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_transfer_internal">transfer_internal</a>(from: &signer, <b>to</b>: <b>address</b>, amount: u64) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>, <a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a> {
+<pre><code><b>public</b>(<b>script</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_transfer">transfer</a>(from: &signer, <b>to</b>: <b>address</b>, amount: u64) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_Balance">Balance</a>, <a href="TestCoin.md#0x1_TestCoin_TransferEvents">TransferEvents</a> {
     <b>let</b> check = <a href="TestCoin.md#0x1_TestCoin_withdraw">withdraw</a>(from, amount);
     <a href="TestCoin.md#0x1_TestCoin_deposit">deposit</a>(<b>to</b>, check);
     // emit events
@@ -835,7 +778,7 @@ Burn coins with capability.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_burn">burn</a>(account: &signer, coins: <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a>) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a>, <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_burn">burn</a>(account: &signer, coins: <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a>) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a> {
     <b>let</b> cap = <b>borrow_global</b>&lt;<a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a>&gt;(<a href="../MoveStdlib/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account));
     <a href="TestCoin.md#0x1_TestCoin_burn_with_capability">burn_with_capability</a>(coins, cap);
 }
@@ -860,11 +803,8 @@ Burn coins with capability.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="TestCoin.md#0x1_TestCoin_burn_with_capability">burn_with_capability</a>(coins: <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a>, _cap: &<a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a>) <b>acquires</b>  <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> {
-    <b>let</b> <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a> { value } = coins;
-    // Update the total supply
-    <b>let</b> coin_info = <b>borrow_global_mut</b>&lt;<a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a>&gt;(@CoreResources);
-    coin_info.total_value = coin_info.total_value - (value <b>as</b> u128);
+<pre><code><b>fun</b> <a href="TestCoin.md#0x1_TestCoin_burn_with_capability">burn_with_capability</a>(coins: <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a>, _cap: &<a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a>) {
+    <b>let</b> <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a> { value: _ } = coins;
 }
 </code></pre>
 
@@ -888,34 +828,9 @@ Burn transaction gas.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_burn_gas">burn_gas</a>(fee: <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a>) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a>, <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_burn_gas">burn_gas</a>(fee: <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a>) <b>acquires</b> <a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a> {
     <b>let</b> cap = <b>borrow_global</b>&lt;<a href="TestCoin.md#0x1_TestCoin_BurnCapability">BurnCapability</a>&gt;(@CoreResources);
     <a href="TestCoin.md#0x1_TestCoin_burn_with_capability">burn_with_capability</a>(fee, cap);
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_TestCoin_total_supply"></a>
-
-## Function `total_supply`
-
-Get the current total supply of the coin.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_total_supply">total_supply</a>(): u128
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_total_supply">total_supply</a>(): u128 <b>acquires</b>  <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> {
-    <b>borrow_global</b>&lt;<a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a>&gt;(@CoreResources).total_value
 }
 </code></pre>
 
@@ -940,6 +855,79 @@ Get the current total supply of the coin.
 
 <pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_scaling_factor">scaling_factor</a>(): u64 <b>acquires</b>  <a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a> {
     <b>borrow_global</b>&lt;<a href="TestCoin.md#0x1_TestCoin_CoinInfo">CoinInfo</a>&gt;(@CoreResources).scaling_factor
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_TestCoin_zero"></a>
+
+## Function `zero`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_zero">zero</a>(): <a href="TestCoin.md#0x1_TestCoin_Coin">TestCoin::Coin</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_zero">zero</a>(): <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a> {
+    <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a> {value: 0}
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_TestCoin_merge"></a>
+
+## Function `merge`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_merge">merge</a>(lhs: &<b>mut</b> <a href="TestCoin.md#0x1_TestCoin_Coin">TestCoin::Coin</a>, rhs: <a href="TestCoin.md#0x1_TestCoin_Coin">TestCoin::Coin</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_merge">merge</a>(lhs: &<b>mut</b> <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a>, rhs: <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a>) {
+    <b>let</b> <a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a> { value } = rhs;
+    lhs.value = lhs.value + value;
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_TestCoin_value"></a>
+
+## Function `value`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_value">value</a>(coin: &<a href="TestCoin.md#0x1_TestCoin_Coin">TestCoin::Coin</a>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="TestCoin.md#0x1_TestCoin_value">value</a>(coin: &<a href="TestCoin.md#0x1_TestCoin_Coin">Coin</a>): u64 {
+    coin.value
 }
 </code></pre>
 

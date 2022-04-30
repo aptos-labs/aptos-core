@@ -341,7 +341,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
     <b>move_to</b>(
         account,
         <a href="Token.md#0x1_Token_Collections">Collections</a> {
-            collections: <a href="Table.md#0x1_Table_create">Table::create</a>&lt;<a href="../MoveStdlib/ASCII.md#0x1_ASCII_String">ASCII::String</a>, <a href="Token.md#0x1_Token_Collection">Collection</a>&gt;(),
+            collections: <a href="Table.md#0x1_Table_new">Table::new</a>&lt;<a href="../MoveStdlib/ASCII.md#0x1_ASCII_String">ASCII::String</a>, <a href="Token.md#0x1_Token_Collection">Collection</a>&gt;(),
         },
     )
 }
@@ -454,8 +454,8 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
     <b>let</b> collections = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="Token.md#0x1_Token_Collections">Collections</a>&gt;(account_addr).collections;
     <b>let</b> collection = <a href="Token.md#0x1_Token_Collection">Collection</a> {
-        tokens: <a href="Table.md#0x1_Table_create">Table::create</a>(),
-        claimed_tokens: <a href="Table.md#0x1_Table_create">Table::create</a>(),
+        tokens: <a href="Table.md#0x1_Table_new">Table::new</a>(),
+        claimed_tokens: <a href="Table.md#0x1_Table_new">Table::new</a>(),
         description,
         name,
         uri,
@@ -463,7 +463,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
         maximum,
     };
 
-    <a href="Table.md#0x1_Table_insert">Table::insert</a>(collections, *&name, collection);
+    <a href="Table.md#0x1_Table_add">Table::add</a>(collections, &name, collection);
 }
 </code></pre>
 
@@ -495,7 +495,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
     <b>let</b> collection = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(collections, &token.collection);
     <b>if</b> (<a href="Table.md#0x1_Table_borrow">Table::borrow</a>(&collection.tokens, &token.name).supply == 1) {
       <a href="Table.md#0x1_Table_remove">Table::remove</a>(&<b>mut</b> collection.claimed_tokens, &token.name);
-      <a href="Table.md#0x1_Table_insert">Table::insert</a>(&<b>mut</b> collection.claimed_tokens, *&token.name, <a href="../MoveStdlib/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account))
+      <a href="Table.md#0x1_Table_add">Table::add</a>(&<b>mut</b> collection.claimed_tokens, &token.name, <a href="../MoveStdlib/Signer.md#0x1_Signer_address_of">Signer::address_of</a>(account))
     };
     token
 }
@@ -524,7 +524,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
     <b>move_to</b>(
         signer,
         <a href="Token.md#0x1_Token_Gallery">Gallery</a> {
-            gallery: <a href="Table.md#0x1_Table_create">Table::create</a>&lt;ID, <a href="Token.md#0x1_Token">Token</a>&gt;(),
+            gallery: <a href="Table.md#0x1_Table_new">Table::new</a>&lt;ID, <a href="Token.md#0x1_Token">Token</a>&gt;(),
         },
     )
 }
@@ -553,7 +553,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
     <b>move_to</b>(
         account,
         <a href="Token.md#0x1_Token_TokenMetadata">TokenMetadata</a> {
-            metadata: <a href="Table.md#0x1_Table_create">Table::create</a>&lt;ID, TokenType&gt;(),
+            metadata: <a href="Table.md#0x1_Table_new">Table::new</a>&lt;ID, TokenType&gt;(),
         },
     )
 }
@@ -669,7 +669,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
     <b>let</b> collection = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(collections, &collection_name);
 
     <b>if</b> (<a href="../MoveStdlib/Option.md#0x1_Option_is_some">Option::is_some</a>(&collection.maximum)) {
-        <b>let</b> current = <a href="Table.md#0x1_Table_count">Table::count</a>(&collection.tokens);
+        <b>let</b> current = <a href="Table.md#0x1_Table_length">Table::length</a>(&collection.tokens);
         <b>let</b> maximum = <a href="../MoveStdlib/Option.md#0x1_Option_borrow">Option::borrow</a>(&collection.maximum);
         <b>assert</b>!(current != *maximum, <a href="Token.md#0x1_Token_EMAXIMUM_NUMBER_OF_TOKENS_FOR_COLLECTION">EMAXIMUM_NUMBER_OF_TOKENS_FOR_COLLECTION</a>)
     };
@@ -693,12 +693,12 @@ This module provides the foundation for (collectible) Tokens often called NFTs
     };
 
     <b>if</b> (supply == 1) {
-        <a href="Table.md#0x1_Table_insert">Table::insert</a>(&<b>mut</b> collection.claimed_tokens, *&name, account_addr)
+        <a href="Table.md#0x1_Table_add">Table::add</a>(&<b>mut</b> collection.claimed_tokens, &name, account_addr)
     };
-    <a href="Table.md#0x1_Table_insert">Table::insert</a>(&<b>mut</b> collection.tokens, name, token_data);
+    <a href="Table.md#0x1_Table_add">Table::add</a>(&<b>mut</b> collection.tokens, &name, token_data);
 
     <b>let</b> token = <a href="Token.md#0x1_Token_claim_token_ownership">claim_token_ownership</a>(account, token);
-    <a href="Table.md#0x1_Table_insert">Table::insert</a>(gallery, *&token_id, token);
+    <a href="Table.md#0x1_Table_add">Table::add</a>(gallery, &token_id, token);
     token_id
 }
 </code></pre>
@@ -738,7 +738,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
 
     <b>let</b> id = <a href="Token.md#0x1_Token_create_token">create_token</a>(account, collection_name, description, name, supply, uri);
     <b>let</b> metadata_table = <b>borrow_global_mut</b>&lt;<a href="Token.md#0x1_Token_TokenMetadata">TokenMetadata</a>&lt;TokenType&gt;&gt;(account_addr);
-    <a href="Table.md#0x1_Table_insert">Table::insert</a>(&<b>mut</b> metadata_table.metadata, *&id, metadata);
+    <a href="Table.md#0x1_Table_add">Table::add</a>(&<b>mut</b> metadata_table.metadata, &id, metadata);
     id
 }
 </code></pre>
@@ -798,8 +798,7 @@ This module provides the foundation for (collectible) Tokens often called NFTs
     <b>assert</b>!(balance &gt;= amount, <a href="Token.md#0x1_Token_EINSUFFICIENT_BALANCE">EINSUFFICIENT_BALANCE</a>);
 
     <b>if</b> (balance == amount) {
-        <b>let</b> (_key, value) = <a href="Table.md#0x1_Table_remove">Table::remove</a>(gallery, token_id);
-        value
+        <a href="Table.md#0x1_Table_remove">Table::remove</a>(gallery, token_id)
     } <b>else</b> {
         <b>let</b> token = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(gallery, token_id);
         token.balance = balance - amount;
@@ -844,11 +843,12 @@ This module provides the foundation for (collectible) Tokens often called NFTs
     <b>let</b> token = <a href="Token.md#0x1_Token_claim_token_ownership">claim_token_ownership</a>(account, token);
 
     <b>let</b> gallery = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="Token.md#0x1_Token_Gallery">Gallery</a>&gt;(account_addr).gallery;
-    <b>if</b> (<a href="Table.md#0x1_Table_contains_key">Table::contains_key</a>(gallery, &token.id)) {
+    <b>if</b> (<a href="Table.md#0x1_Table_contains">Table::contains</a>(gallery, &token.id)) {
         <b>let</b> current_token = <a href="Table.md#0x1_Table_borrow_mut">Table::borrow_mut</a>(gallery, &token.id);
         <a href="Token.md#0x1_Token_merge_token">merge_token</a>(token, current_token);
     } <b>else</b> {
-        <a href="Table.md#0x1_Table_insert">Table::insert</a>(gallery, *&token.id, token)
+        <b>let</b> token_id = token.id;
+        <a href="Table.md#0x1_Table_add">Table::add</a>(gallery, &token_id, token)
     }
 }
 </code></pre>
