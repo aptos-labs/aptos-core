@@ -1,4 +1,4 @@
-module Marketplace::Marketplace {
+module AptosFramework::Marketplace {
     use Std::GUID::{Self, ID};
     use Std::Signer;
     use AptosFramework::Table::{Self, Table};
