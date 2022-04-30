@@ -3,6 +3,9 @@ import { AptosClient } from "./aptos_client";
 import { Types } from "./types";
 import { MaybeHexString } from "./hex_string";
 
+import assert from "assert";
+import fetch from "cross-fetch";
+
 export class TokenClient {
   aptosClient: AptosClient;
 
@@ -118,27 +121,42 @@ export class TokenClient {
     return transactionHash;
   }
 
-  // Retrieve the token's creation_num, which is useful for non-creator operations
-  async getTokenId(creator: MaybeHexString, collectionName: string, tokenName: string): Promise<number> {
-    const resources: Types.AccountResource[] = await this.aptosClient.getAccountResources(creator);
-    let collections: any[] = [];
-    let tokens = [];
-    const accountResource: { type: string; data: any } = resources.find((r) => r.type === "0x1::Token::Collections");
-    collections = accountResource.data.collections.data;
+  async tableItem(handle: string, keyType: string, valueType: string, key: any): Promise<any> {
+    const response = await fetch(`${this.aptosClient.nodeUrl}/tables/${handle}/item`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            "key_type": keyType,
+            "value_type": valueType,
+            "key": key
+        })
+    });
 
-    for (let index = 0; index < collections.length; index += 1) {
-      if (collections[index].key === collectionName) {
-        tokens = collections[index].value.tokens.data;
-        break;
-      }
+    if (response.status == 404) {
+        return null
+    } else if (response.status != 200) {
+        assert(response.status == 200, await response.text());
+    } else {
+        return await response.json();
     }
+}
 
-    for (let index = 0; index < tokens.length; index += 1) {
-      if (tokens[index].key === tokenName) {
-        return parseInt(tokens[index].value.id.creation_num, 10);
-      }
-    }
-
-    return null;
-  }
+/** Retrieve the token's creation_num, which is useful for non-creator operations */
+async getTokenId(creator: string, collection_name: string, token_name: string): Promise<number> {
+  const resources: Types.AccountResource[] = await this.aptosClient.getAccountResources(creator);
+  const accountResource: { type: string; data: any } = resources.find((r) => r.type === "0x1::Token::Collections");
+  let collection = await this.tableItem(
+        accountResource.data.collections.handle,
+        "0x1::ASCII::String",
+        "0x1::Token::Collection",
+        collection_name,
+    );
+    let tokenData = await this.tableItem(
+        collection["tokens"]["handle"],
+        "0x1::ASCII::String",
+        "0x1::Token::TokenData",
+        token_name,
+    );
+    return tokenData["id"]["creation_num"]
+}
 }
