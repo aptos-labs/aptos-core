@@ -1,6 +1,10 @@
 #!/bin/sh
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
+
+# This script is a utility script used by some rust tests such as aptos-core/secure/storage/src/tests/vault.rs .
+# If this is not directly referenced anywhere in the codebase anymore you can delete it.
+
 set -ex
 
 IP="172.18.0.3"

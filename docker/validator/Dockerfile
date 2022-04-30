@@ -29,7 +29,8 @@ RUN apt-get update && apt-get install -y libssl1.1 && apt-get clean && rm -r /va
 RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-create-home --uid 6180 aptos
 
 RUN mkdir -p /opt/aptos/bin /opt/aptos/etc
-COPY docker/install-tools.sh /root
+# TODO(geekflyer): Probable dead code - consider removing the 2 lines as install-tools.sh is not executed and therefore probably obsolete.
+COPY docker/validator/install-tools.sh /root
 COPY --from=builder /aptos/target/release/aptos-node /opt/aptos/bin
 COPY --from=builder /aptos/target/release/db-backup /opt/aptos/bin
 COPY --from=builder /aptos/target/release/db-bootstrapper /opt/aptos/bin

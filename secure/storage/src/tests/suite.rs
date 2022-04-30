@@ -15,7 +15,7 @@ use aptos_crypto::{
 /// This holds the canonical list of secure storage tests. It allows different callers
 /// of the test suite to ensure they're executing all tests.
 /// Note: this is required because: (i) vault tests cannot be run in the usual fashion (i.e., vault
-/// tests rely on first running the vault docker script in `docker/vault/run.sh`); and (ii) vault
+/// tests rely on first running the vault docker script in `docker/testutils/start_vault_container.sh`); and (ii) vault
 /// tests cannot currently be run in parallel, as each test uses the same vault instance.
 const STORAGE_TESTS: &[fn(&mut Storage)] = &[
     test_set_reset_get,

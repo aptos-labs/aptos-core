@@ -1,5 +1,0 @@
-# use default value for everything
-# pipeline:
-#  batch:
-#    size: 125
-#    delay: 50

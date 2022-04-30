@@ -50,7 +50,7 @@ const VAULT_TESTS: &[fn()] = &[
 
 /// A test for verifying VaultStorage properly implements the SecureStorage API and enforces
 /// strict separation between unique namespaces. This test depends on running Vault, which can be
-/// done by using the provided docker run script in `docker/vault/run.sh`
+/// done by using the provided docker run script in `docker/testutils/start_vault_container.sh`
 #[test]
 fn execute_storage_tests_vault() {
     if dev::test_host_safe().is_none() {
