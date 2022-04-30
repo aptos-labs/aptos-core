@@ -53,10 +53,10 @@ test(
     const token_id = await tokenClient.getTokenId(alice.address().hex(), "AliceCollection", "AliceToken");
     await tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), token_id, 1);
     await tokenClient.claimToken(bob, alice.address().hex(), alice.address().hex(), token_id);
-    
+
     resources = await client.getAccountResources(bob.address().toString());
     accountResource = resources.find((r) => r.type === "0x1::Token::Gallery");
-  
+
     let token = await tokenClient.tableItem(
       accountResource.data.gallery.handle,
       "0x1::GUID::ID",
