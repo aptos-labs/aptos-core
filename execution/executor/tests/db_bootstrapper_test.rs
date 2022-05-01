@@ -7,10 +7,7 @@ use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_temppath::TempPath;
-use aptos_transaction_builder::aptos_stdlib::{
-    encode_create_account_script_function, encode_mint_script_function,
-    encode_transfer_script_function,
-};
+use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -134,7 +131,7 @@ fn get_demo_accounts() -> (
     (account1, privkey1, account2, privkey2)
 }
 
-fn get_mint_transaction(
+fn get_test_coin_mint_transaction(
     aptos_root_key: &Ed25519PrivateKey,
     aptos_root_seq_num: u64,
     account: &AccountAddress,
@@ -145,7 +142,7 @@ fn get_mint_transaction(
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
-        Some(encode_mint_script_function(*account, amount)),
+        Some(aptos_stdlib::encode_test_coin_mint(*account, amount)),
     )
 }
 
@@ -160,11 +157,11 @@ fn get_account_transaction(
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
-        Some(encode_create_account_script_function(*account)),
+        Some(aptos_stdlib::encode_account_create_account(*account)),
     )
 }
 
-fn get_transfer_transaction(
+fn get_test_coin_transfer_transaction(
     sender: AccountAddress,
     sender_seq_number: u64,
     sender_key: &Ed25519PrivateKey,
@@ -176,7 +173,7 @@ fn get_transfer_transaction(
         sender_seq_number,
         sender_key.clone(),
         sender_key.public_key(),
-        Some(encode_transfer_script_function(recipient, amount)),
+        Some(aptos_stdlib::encode_test_coin_transfer(recipient, amount)),
     )
 }
 
@@ -259,8 +256,8 @@ fn test_pre_genesis() {
     let (account1, account1_key, account2, account2_key) = get_demo_accounts();
     let txn1 = get_account_transaction(genesis_key, 0, &account1, &account1_key);
     let txn2 = get_account_transaction(genesis_key, 1, &account2, &account2_key);
-    let txn3 = get_mint_transaction(genesis_key, 2, &account1, 2000);
-    let txn4 = get_mint_transaction(genesis_key, 3, &account2, 2000);
+    let txn3 = get_test_coin_mint_transaction(genesis_key, 2, &account1, 2000);
+    let txn4 = get_test_coin_mint_transaction(genesis_key, 3, &account2, 2000);
     execute_and_commit(vec![txn1, txn2, txn3, txn4], &db_rw, &signer);
     assert_eq!(get_balance(&account1, &db_rw), 2000);
     assert_eq!(get_balance(&account2, &db_rw), 2000);
@@ -346,8 +343,8 @@ fn test_new_genesis() {
     let (account1, account1_key, account2, account2_key) = get_demo_accounts();
     let txn1 = get_account_transaction(genesis_key, 0, &account1, &account1_key);
     let txn2 = get_account_transaction(genesis_key, 1, &account2, &account2_key);
-    let txn3 = get_mint_transaction(genesis_key, 2, &account1, 2_000_000);
-    let txn4 = get_mint_transaction(genesis_key, 3, &account2, 2_000_000);
+    let txn3 = get_test_coin_mint_transaction(genesis_key, 2, &account1, 2_000_000);
+    let txn4 = get_test_coin_mint_transaction(genesis_key, 3, &account2, 2_000_000);
     execute_and_commit(vec![txn1, txn2, txn3, txn4], &db, &signer);
     assert_eq!(get_balance(&account1, &db), 2_000_000);
     assert_eq!(get_balance(&account2, &db), 2_000_000);
@@ -419,7 +416,7 @@ fn test_new_genesis() {
     assert_eq!(get_balance(&account2, &db), 2_000_000);
 
     // Transfer some money.
-    let txn = get_transfer_transaction(account1, 0, &account1_key, account2, 500_000);
+    let txn = get_test_coin_transfer_transaction(account1, 0, &account1_key, account2, 500_000);
     execute_and_commit(vec![txn], &db, &signer);
 
     // And verify.

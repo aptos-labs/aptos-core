@@ -8,8 +8,9 @@
 use crate::account_with_state_view::{AccountWithStateView, AsAccountWithStateView};
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_types::{state_store::state_key::StateKey, transaction::Version};
-use move_core_types::account_address::AccountAddress;
+use aptos_types::{
+    account_address::AccountAddress, state_store::state_key::StateKey, transaction::Version,
+};
 use std::ops::Deref;
 
 pub mod account_with_state_cache;

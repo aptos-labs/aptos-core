@@ -273,14 +273,14 @@ mod tests {
         }
         if let Some(script_function) = ScriptFunctionCall::decode(txn.payload()) {
             match script_function {
-                ScriptFunctionCall::CreateAccount {
+                ScriptFunctionCall::AccountCreateAccount {
                     auth_key: address, ..
                 } => {
                     let mut writer = accounts.write();
                     let previous = writer.insert(address, AccountState::new(0));
                     assert!(previous.is_none(), "should not create account twice");
                 }
-                ScriptFunctionCall::Mint {
+                ScriptFunctionCall::TestCoinMint {
                     mint_addr, amount, ..
                 } => {
                     // Sometimes we call CreateAccount and Mint at the same time (from our tests: this is a test method)

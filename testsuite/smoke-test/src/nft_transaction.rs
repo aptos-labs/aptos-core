@@ -29,7 +29,7 @@ impl AptosTest for NFTTransaction {
         let token_name = "token name".to_owned().into_bytes();
 
         let collection_builder = ctx.transaction_factory().payload(
-            aptos_stdlib::encode_create_unlimited_collection_script_script_function(
+            aptos_stdlib::encode_token_create_unlimited_collection_script(
                 collection_name.clone(),
                 "description".to_owned().into_bytes(),
                 "uri".to_owned().into_bytes(),
@@ -42,7 +42,7 @@ impl AptosTest for NFTTransaction {
         println!("collection created.");
 
         let token_builder = ctx.transaction_factory().payload(
-            aptos_stdlib::encode_create_unlimited_token_script_script_function(
+            aptos_stdlib::encode_token_create_unlimited_token_script(
                 collection_name.clone(),
                 token_name.clone(),
                 "collection description".to_owned().into_bytes(),
@@ -57,7 +57,7 @@ impl AptosTest for NFTTransaction {
 
         let offer_builder =
             ctx.transaction_factory()
-                .payload(aptos_stdlib::encode_offer_script_script_function(
+                .payload(aptos_stdlib::encode_token_transfers_offer_script(
                     owner.address(),
                     creator.address(),
                     collection_name.clone(),
@@ -69,7 +69,7 @@ impl AptosTest for NFTTransaction {
 
         let claim_builder =
             ctx.transaction_factory()
-                .payload(aptos_stdlib::encode_claim_script_script_function(
+                .payload(aptos_stdlib::encode_token_transfers_claim_script(
                     creator.address(),
                     creator.address(),
                     collection_name.clone(),
@@ -79,14 +79,14 @@ impl AptosTest for NFTTransaction {
         let claim_txn = owner.sign_with_transaction_builder(claim_builder);
         client.submit_and_wait(&claim_txn).await?;
 
-        let transfer_builder = ctx.transaction_factory().payload(
-            aptos_stdlib::encode_direct_transfer_script_script_function(
-                creator.address(),
-                collection_name.clone(),
-                token_name.clone(),
-                1,
-            ),
-        );
+        let transfer_builder =
+            ctx.transaction_factory()
+                .payload(aptos_stdlib::encode_token_direct_transfer_script(
+                    creator.address(),
+                    collection_name.clone(),
+                    token_name.clone(),
+                    1,
+                ));
         let transfer_txn =
             owner.sign_multi_agent_with_transaction_builder(vec![&creator], transfer_builder);
         client.submit_and_wait(&transfer_txn).await?;

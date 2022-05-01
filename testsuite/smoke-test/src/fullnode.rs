@@ -58,7 +58,7 @@ impl LaunchFullnode {
         wait_for_account(&client, account1.address()).await?;
 
         let txn = account1.sign_with_transaction_builder(factory.payload(
-            aptos_stdlib::encode_transfer_script_function(account2.address(), 10),
+            aptos_stdlib::encode_test_coin_transfer(account2.address(), 10),
         ));
 
         client.submit_and_wait(&txn).await?;

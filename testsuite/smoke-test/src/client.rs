@@ -98,7 +98,7 @@ async fn test_concurrent_transfers_single_node() {
 
     for _ in 0..20 {
         let txn = account_0.sign_with_transaction_builder(transaction_factory.payload(
-            aptos_stdlib::encode_transfer_script_function(account_1.address(), 1),
+            aptos_stdlib::encode_test_coin_transfer(account_1.address(), 1),
         ));
         client.submit_and_wait(&txn).await.unwrap();
     }

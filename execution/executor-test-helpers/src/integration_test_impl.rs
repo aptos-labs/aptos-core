@@ -7,10 +7,7 @@ use crate::{
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_state_view::account_with_state_view::{AccountWithStateView, AsAccountWithStateView};
-use aptos_transaction_builder::aptos_stdlib::{
-    encode_create_account_script_function, encode_mint_script_function,
-    encode_transfer_script_function,
-};
+use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     account_config::aptos_root_address,
     account_view::AccountView,
@@ -70,7 +67,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 0,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(encode_create_account_script_function(account1)),
+        Some(aptos_stdlib::encode_account_create_account(account1)),
     );
 
     let tx2 = get_test_signed_transaction(
@@ -78,7 +75,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 1,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(encode_create_account_script_function(account2)),
+        Some(aptos_stdlib::encode_account_create_account(account2)),
     );
 
     let tx3 = get_test_signed_transaction(
@@ -86,7 +83,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 2,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(encode_create_account_script_function(account3)),
+        Some(aptos_stdlib::encode_account_create_account(account3)),
     );
 
     // Create account1 with 2M coins.
@@ -95,7 +92,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 3,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(encode_mint_script_function(account1, 2_000_000)),
+        Some(aptos_stdlib::encode_test_coin_mint(account1, 2_000_000)),
     );
 
     // Create account2 with 1.2M coins.
@@ -104,7 +101,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 4,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(encode_mint_script_function(account2, 1_200_000)),
+        Some(aptos_stdlib::encode_test_coin_mint(account2, 1_200_000)),
     );
 
     // Create account3 with 1M coins.
@@ -113,7 +110,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 5,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(encode_mint_script_function(account3, 1_000_000)),
+        Some(aptos_stdlib::encode_test_coin_mint(account3, 1_000_000)),
     );
 
     // Transfer 20k coins from account1 to account2.
@@ -123,7 +120,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 0,
         privkey1.clone(),
         pubkey1.clone(),
-        Some(encode_transfer_script_function(account2, 20_000)),
+        Some(aptos_stdlib::encode_test_coin_transfer(account2, 20_000)),
     );
 
     // Transfer 10k coins from account2 to account3.
@@ -133,7 +130,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 0,
         privkey2,
         pubkey2,
-        Some(encode_transfer_script_function(account3, 10_000)),
+        Some(aptos_stdlib::encode_test_coin_transfer(account3, 10_000)),
     );
 
     // Transfer 70k coins from account1 to account3.
@@ -143,7 +140,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         /* sequence_number = */ 1,
         privkey1.clone(),
         pubkey1.clone(),
-        Some(encode_transfer_script_function(account3, 70_000)),
+        Some(aptos_stdlib::encode_test_coin_transfer(account3, 70_000)),
     );
 
     let block1 = vec![tx1, tx2, tx3, txn1, txn2, txn3, txn4, txn5, txn6];
@@ -159,7 +156,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             /* sequence_number = */ i,
             privkey1.clone(),
             pubkey1.clone(),
-            Some(encode_transfer_script_function(account3, 10_000)),
+            Some(aptos_stdlib::encode_test_coin_transfer(account3, 10_000)),
         ));
     }
 

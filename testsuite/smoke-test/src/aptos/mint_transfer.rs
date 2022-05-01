@@ -24,7 +24,7 @@ impl AptosTest for MintTransfer {
 
         let transfer_txn =
             account1.sign_with_transaction_builder(ctx.aptos_transaction_factory().payload(
-                aptos_stdlib::encode_transfer_script_function(account2.address(), 400),
+                aptos_stdlib::encode_test_coin_transfer(account2.address(), 400),
             ));
         ctx.client().submit_and_wait(&transfer_txn).await?;
         assert_eq!(
@@ -41,7 +41,7 @@ impl AptosTest for MintTransfer {
         let delegate_txn1 = ctx
             .root_account()
             .sign_with_transaction_builder(txn_factory.payload(
-                aptos_stdlib::encode_delegate_mint_capability_script_function(account1.address()),
+                aptos_stdlib::encode_test_coin_delegate_mint_capability(account1.address()),
             ));
         ctx.client().submit_and_wait(&delegate_txn1).await?;
 
@@ -49,17 +49,17 @@ impl AptosTest for MintTransfer {
         let delegate_txn2 = ctx
             .root_account()
             .sign_with_transaction_builder(txn_factory.payload(
-                aptos_stdlib::encode_delegate_mint_capability_script_function(account2.address()),
+                aptos_stdlib::encode_test_coin_delegate_mint_capability(account2.address()),
             ));
         ctx.client().submit_and_wait(&delegate_txn2).await?;
 
         let claim_txn = account1.sign_with_transaction_builder(
-            txn_factory.payload(aptos_stdlib::encode_claim_mint_capability_script_function()),
+            txn_factory.payload(aptos_stdlib::encode_test_coin_claim_mint_capability()),
         );
         ctx.client().submit_and_wait(&claim_txn).await?;
-        let mint_txn = account1.sign_with_transaction_builder(txn_factory.payload(
-            aptos_stdlib::encode_mint_script_function(account1.address(), 100),
-        ));
+        let mint_txn = account1.sign_with_transaction_builder(
+            txn_factory.payload(aptos_stdlib::encode_test_coin_mint(account1.address(), 100)),
+        );
         ctx.client().submit_and_wait(&mint_txn).await?;
 
         Ok(())

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_transaction_builder::aptos_stdlib::encode_mint_script_function;
+use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 use language_e2e_tests::{
     gas_costs::TXN_RESERVED, test_with_different_versions, versioning::CURRENT_RELEASE_VERSIONS,
@@ -21,7 +21,7 @@ fn mint_to_new_account() {
         let mint_amount = TXN_RESERVED;
         let output = executor.execute_transaction(
             root.transaction()
-                .payload(encode_mint_script_function(
+                .payload(aptos_stdlib::encode_test_coin_mint(
                     *new_account.address(),
                     mint_amount,
                 ))

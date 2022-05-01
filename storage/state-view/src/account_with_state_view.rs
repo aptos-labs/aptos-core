@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use crate::StateView;
-use aptos_types::{account_view::AccountView, state_store::state_key::StateKey};
-use move_core_types::account_address::AccountAddress;
+use aptos_types::{
+    account_address::AccountAddress, account_view::AccountView, state_store::state_key::StateKey,
+};
 
 pub struct AccountWithStateView<'a> {
     account_address: &'a AccountAddress,

@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 use crate::{account::Account, compile, executor::FakeExecutor};
-use aptos_transaction_builder::aptos_stdlib::encode_set_version_script_function;
+use aptos_transaction_builder::aptos_stdlib;
 use move_binary_format::file_format::CompiledModule;
 
 pub fn close_module_publishing(
@@ -61,7 +61,7 @@ pub fn upgrade_df(
         executor.execute_and_apply(
             dr_account
                 .transaction()
-                .payload(encode_set_version_script_function(version_number))
+                .payload(aptos_stdlib::encode_version_set_version(version_number))
                 .sequence_number(*dr_seqno)
                 .sign(),
         );
