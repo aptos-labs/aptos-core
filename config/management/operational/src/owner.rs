@@ -44,7 +44,7 @@ impl SetValidatorOperator {
             config.chain_id,
             owner_address,
             client.sequence_number(owner_address).await?,
-            transaction_builder::encode_set_validator_operator_script_function(
+            transaction_builder::encode_validator_set_script_set_validator_operator(
                 self.name.as_bytes().to_vec(),
                 self.account_address,
             )

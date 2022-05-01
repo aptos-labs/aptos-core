@@ -4,10 +4,7 @@
 //! Support for encoding transactions for common situations.
 
 use crate::account::Account;
-use aptos_transaction_builder::aptos_stdlib::{
-    encode_create_account_script_function, encode_rotate_authentication_key_script_function,
-    encode_transfer_script_function,
-};
+use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::transaction::{RawTransaction, Script, SignedTransaction};
 use move_ir_compiler::Compiler;
 use once_cell::sync::Lazy;
@@ -49,7 +46,7 @@ pub fn create_account_txn(
 ) -> SignedTransaction {
     sender
         .transaction()
-        .payload(encode_create_account_script_function(
+        .payload(aptos_stdlib::encode_account_create_account(
             *new_account.address(),
         ))
         .sequence_number(seq_num)
@@ -67,7 +64,7 @@ pub fn peer_to_peer_txn(
     // get a SignedTransaction
     sender
         .transaction()
-        .payload(encode_transfer_script_function(
+        .payload(aptos_stdlib::encode_test_coin_transfer(
             *receiver.address(),
             transfer_amount,
         ))
@@ -79,7 +76,7 @@ pub fn peer_to_peer_txn(
 pub fn rotate_key_txn(sender: &Account, new_key_hash: Vec<u8>, seq_num: u64) -> SignedTransaction {
     sender
         .transaction()
-        .payload(encode_rotate_authentication_key_script_function(
+        .payload(aptos_stdlib::encode_account_rotate_authentication_key(
             new_key_hash,
         ))
         .sequence_number(seq_num)
@@ -90,7 +87,7 @@ pub fn rotate_key_txn(sender: &Account, new_key_hash: Vec<u8>, seq_num: u64) -> 
 pub fn raw_rotate_key_txn(sender: &Account, new_key_hash: Vec<u8>, seq_num: u64) -> RawTransaction {
     sender
         .transaction()
-        .payload(encode_rotate_authentication_key_script_function(
+        .payload(aptos_stdlib::encode_account_rotate_authentication_key(
             new_key_hash,
         ))
         .sequence_number(seq_num)

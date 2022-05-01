@@ -1,10 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use aptos_types::{
+    account_address::AccountAddress,
     account_view::AccountView,
     state_store::{state_key::StateKey, state_value::StateValue},
 };
-use move_core_types::account_address::AccountAddress;
 use std::collections::HashMap;
 
 pub struct AccountWithStateCache<'a> {

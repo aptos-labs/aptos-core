@@ -107,7 +107,7 @@ impl CreateAccount {
                 .chain_id(&self.profile_options.profile)
                 .await?,
             sender_key,
-            aptos_stdlib::encode_create_account_script_function(address),
+            aptos_stdlib::encode_account_create_account(address),
             self.write_options.max_gas,
         )
         .await?;

@@ -80,6 +80,35 @@ pub(crate) fn make_abi_enum_container(abis: &[ScriptABI]) -> ContainerFormat {
     ContainerFormat::Enum(variants)
 }
 
+pub(crate) fn make_namespaced_abi_enum_container(abis: &[ScriptABI]) -> ContainerFormat {
+    let mut variants = BTreeMap::new();
+    for (index, abi) in abis.iter().enumerate() {
+        let mut fields = Vec::new();
+        for ty_arg in abi.ty_args() {
+            fields.push(quote_type_parameter_as_field(ty_arg));
+        }
+        for arg in abi.args() {
+            fields.push(quote_parameter_as_field(arg));
+        }
+
+        let name = match abi {
+            ScriptABI::ScriptFunction(sf) => {
+                format!("{}{}", sf.module_name().name(), abi.name().to_camel_case())
+            }
+            _ => abi.name().to_camel_case(),
+        };
+
+        variants.insert(
+            index as u32,
+            Named {
+                name,
+                value: VariantFormat::Struct(fields),
+            },
+        );
+    }
+    ContainerFormat::Enum(variants)
+}
+
 pub(crate) fn mangle_type(type_tag: &TypeTag) -> String {
     use TypeTag::*;
     match type_tag {

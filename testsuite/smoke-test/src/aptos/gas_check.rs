@@ -24,7 +24,7 @@ impl AptosTest for GasCheck {
 
         let transfer_txn =
             account1.sign_with_transaction_builder(ctx.aptos_transaction_factory().payload(
-                aptos_stdlib::encode_transfer_script_function(account2.address(), 100),
+                aptos_stdlib::encode_test_coin_transfer(account2.address(), 100),
             ));
         // fail due to not enough gas
         let err = ctx
@@ -46,7 +46,7 @@ impl AptosTest for GasCheck {
         let update_txn = ctx
             .root_account()
             .sign_with_transaction_builder(txn_factory.payload(
-                aptos_stdlib::encode_set_gas_constants_script_function(
+                aptos_stdlib::encode_vm_config_set_gas_constants(
                     gas_constant.global_memory_per_byte_cost.get(),
                     gas_constant.global_memory_per_byte_write_cost.get(),
                     gas_constant.min_transaction_gas_units.get(),
@@ -64,7 +64,7 @@ impl AptosTest for GasCheck {
 
         let zero_gas_txn = account1.sign_with_transaction_builder(
             ctx.aptos_transaction_factory()
-                .payload(aptos_stdlib::encode_transfer_script_function(
+                .payload(aptos_stdlib::encode_test_coin_transfer(
                     account2.address(),
                     100,
                 ))
