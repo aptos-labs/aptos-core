@@ -1,0 +1,17 @@
+{
+  "name": "messageboard",
+  "version": "0.0.1",
+  "description": "This is a demo for Messageboard on Aptos",
+  "main": "index.js",
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "demo": "tsc index.ts && node index.js"
+  },
+  "dependencies": {
+    "@types/node": "^17.0.23",
+    "aptos": "0.0.17",
+    "ts-node": "^10.7.0",
+    "typescript": "^4.6.3"
+  }
+}

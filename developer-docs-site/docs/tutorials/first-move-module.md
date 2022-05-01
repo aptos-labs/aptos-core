@@ -57,9 +57,14 @@ source ~/.cargo/env
 git checkout origin/devnet
 ```
 
+Install Aptos Commandline tool. Learn more about the [Aptos command line tool](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos)
+```bash
+cargo install --git https://github.com/aptos-labs/aptos-core.git aptos
+```
+
 ### Step 1.2) Review the Module
 
-In this terminal, change directories to `aptos-move/move-examples`. Keep this terminal window for the rest of this tutorial- we will refer to it later as the "Move Window". The rest of this section will review the file `sources/HelloBlockchain.move`.
+In this terminal, change directories to `aptos-move/move-examples/hello_blockchain`. Keep this terminal window for the rest of this tutorial- we will refer to it later as the "Move Window". The rest of this section will review the file `sources/HelloBlockchain.move`.
 
 This module enables users to create a `String` resource under their account and set it. Users are only able to set their resource and cannot set other's resources.
 
@@ -95,7 +100,7 @@ In the code above, the two important sections are the struct `MessageHolder` and
 
 Move allows for inline tests, so we add `get_message` to make retrieving the `message` convenient and a test function `sender_can_set_message` to validate an end-to-end flow. This can be validated by running `cargo test`. There is another test under `sources/HelloBlockchainTest.move` that demonstrates another method for writing tests.
 
-This can be tested by entering `cargo test --package move-examples` at the terminal.
+This can be tested by entering `cargo test test_hello_blockchain -p move-examples -- --exact` at the terminal.
 
 Note: `sender_can_set_message` is a `script` function in order to call the `script` function `set_message`.
 
@@ -242,8 +247,8 @@ For Typescript:
 * After a few moments it will mention that "Update the module with Alice's address, build, copy to the provided path,
   and press enter."
 * In the "Move Window" terminal, and for the Move file we had previously looked at:
-  * Edit `Move.toml` and under `[addresses]` replace the `0xe110` address with Alice's address, output above the prompt.
-  * Build `cargo run -- sources`
+  * Copy Alice's address
+  * Compile the modules with Alice's address by `aptos move compile --package-dir . --named-addresses HelloBlockchain=0x{alice_address_here}`. Here, we replace the generic named address `HelloBlockChain='_'` in `hello_blockchain/move.toml` with Alice's Address
   * Copy `build/Examples/bytecode_modules/Message.mv` to the same folder as this tutorial project code
 * Return to your other terminal window, and press "enter" at the prompt to continue executing the rest of the code
 
@@ -252,8 +257,8 @@ The output should look like the following:
 
 ```
 === Addresses ===
-Alice: a52671f10dc3479b09d0a11ce47694c0
-Bob: ec6ec14e4abe10aaa6ad53b0b63a1806
+Alice: 11c32982d04fbcc79b694647edff88c5b5d5b1a99c9d2854039175facbeefb40
+Bob: 7ec8f962139943bc41c17a72e782b7729b1625cf65ed7812152a5677364a4f88
 
 === Initial Balances ===
 Alice: 10000000

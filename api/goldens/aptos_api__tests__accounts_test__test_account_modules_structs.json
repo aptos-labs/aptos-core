@@ -1,5 +1,84 @@
 [
   {
+    "bytecode": "0xa11ceb0b050000000b010006020604030a3c04460a0550410791016508f60120069602140aaa02060cb0028a010dba030200000001000200000700000300010000040201000005020300000601040000070001000205070301000109080800020a090101000206010a0100020b070c010002070d0e010005060706080609060a060207080005000206080005010101080002070a050605010502060a0900060900010302070a09000900010a090004070a050605010302010302070a0900030109000341434c064572726f727306566563746f72036164640f6173736572745f636f6e7461696e7308636f6e7461696e7305656d7074790672656d6f7665046c69737410696e76616c69645f617267756d656e7409707573685f6261636b08696e6465785f6f6600000000000000000000000000000000000000000000000000000000000000010308000000000000000003080100000000000000000201080a050001000005150a000f000e010c030c020b022e0b0338002003100b000107001106270b000f000b013801020101000001080b000b01110203070701110627020201000001050b0010000e013800020301000001033802120002040100000b180a000f000e010c030c020b022e0b0338030c050c040b0403120b000107011106270b000f000b0538040102000000",
+    "abi": {
+      "address": "0x1",
+      "name": "ACL",
+      "friends": [],
+      "exposed_functions": [
+        {
+          "name": "add",
+          "visibility": "public",
+          "generic_type_params": [],
+          "params": [
+            "&mut 0x1::ACL::ACL",
+            "address"
+          ],
+          "return": []
+        },
+        {
+          "name": "assert_contains",
+          "visibility": "public",
+          "generic_type_params": [],
+          "params": [
+            "&0x1::ACL::ACL",
+            "address"
+          ],
+          "return": []
+        },
+        {
+          "name": "contains",
+          "visibility": "public",
+          "generic_type_params": [],
+          "params": [
+            "&0x1::ACL::ACL",
+            "address"
+          ],
+          "return": [
+            "bool"
+          ]
+        },
+        {
+          "name": "empty",
+          "visibility": "public",
+          "generic_type_params": [],
+          "params": [],
+          "return": [
+            "0x1::ACL::ACL"
+          ]
+        },
+        {
+          "name": "remove",
+          "visibility": "public",
+          "generic_type_params": [],
+          "params": [
+            "&mut 0x1::ACL::ACL",
+            "address"
+          ],
+          "return": []
+        }
+      ],
+      "structs": [
+        {
+          "name": "ACL",
+          "is_native": false,
+          "abilities": [
+            "copy",
+            "drop",
+            "store"
+          ],
+          "generic_type_params": [],
+          "fields": [
+            {
+              "name": "list",
+              "type": "vector<address>"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
     "bytecode": "0xa11ceb0b0500000006010002030206050807070f0d081c200c3c04000000010001010001060900010a020342435308746f5f627974657300000000000000000000000000000000000000000000000000000000000000010001020000",
     "abi": {
       "address": "0x1",
@@ -661,6 +740,110 @@
             {
               "name": "guid",
               "type": "0x1::GUID::GUID"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "bytecode": "0xa11ceb0b050000000c010006020606030c2c05381d07557408c9012006e9011e0a8702080b8f02020c91028d010d9e03020ea0030200000001000200000801000000030000010400040102010400050003010400060405010401090606000203070000010a060600010b060600010503060c09000500010102060c05010900010301060c040105090005054f66666572064572726f7273065369676e65720a616464726573735f6f6606637265617465096578697374735f61740672656465656d076f66666572656403666f720d6e6f745f7075626c697368656411616c72656164795f7075626c697368656410696e76616c69645f617267756d656e740000000000000000000000000000000000000000000000000000000000000001030801000000000000000308000000000000000003080200000000000000000202070900080500050001000100020b0a003b00030607021104270b003d00370014020101000002100a0011053b0020030a0b000107001106270b000b010b0239003f00020201000002030b003b0002030100010008230a013b0003080b000107021104270a013e003a000c030c040b0011050c050a050b032103150518080c02051c0b050b01210c020b02032107011107270b04020001000500",
+    "abi": {
+      "address": "0x1",
+      "name": "Offer",
+      "friends": [],
+      "exposed_functions": [
+        {
+          "name": "address_of",
+          "visibility": "public",
+          "generic_type_params": [
+            {
+              "constraints": [
+                "store"
+              ]
+            }
+          ],
+          "params": [
+            "address"
+          ],
+          "return": [
+            "address"
+          ]
+        },
+        {
+          "name": "create",
+          "visibility": "public",
+          "generic_type_params": [
+            {
+              "constraints": [
+                "store"
+              ]
+            }
+          ],
+          "params": [
+            "&signer",
+            "T0",
+            "address"
+          ],
+          "return": []
+        },
+        {
+          "name": "exists_at",
+          "visibility": "public",
+          "generic_type_params": [
+            {
+              "constraints": [
+                "store"
+              ]
+            }
+          ],
+          "params": [
+            "address"
+          ],
+          "return": [
+            "bool"
+          ]
+        },
+        {
+          "name": "redeem",
+          "visibility": "public",
+          "generic_type_params": [
+            {
+              "constraints": [
+                "store"
+              ]
+            }
+          ],
+          "params": [
+            "&signer",
+            "address"
+          ],
+          "return": [
+            "T0"
+          ]
+        }
+      ],
+      "structs": [
+        {
+          "name": "Offer",
+          "is_native": false,
+          "abilities": [
+            "key"
+          ],
+          "generic_type_params": [
+            {
+              "constraints": [],
+              "is_phantom": false
+            }
+          ],
+          "fields": [
+            {
+              "name": "offered",
+              "type": "T0"
+            },
+            {
+              "name": "for",
+              "type": "address"
             }
           ]
         }

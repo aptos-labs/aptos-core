@@ -1,28 +1,38 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use structopt::StructOpt;
+use aptos_types::account_address::AccountAddress;
+use clap::Parser;
+use std::collections::BTreeMap;
 
-#[derive(Debug, StructOpt)]
-#[structopt(about = "Lightweight Move package builder")]
+#[derive(Parser)]
+#[clap(author, version, about = "Lightweight Move package builder", long_about = None)]
 struct Args {
     input_path: std::path::PathBuf,
-    #[structopt(
-        long,
-        short = "o",
-        about = "Optional output path, defaults to input_path/out"
-    )]
     output_path: Option<std::path::PathBuf>,
+    #[clap(short, long, value_name = "ADDRESS_NAME")]
+    address_name: Option<String>,
+    #[clap(short, long, value_name = "ADDRESS_HEX_STR")]
+    hex_address: Option<String>,
 }
 
 fn main() {
-    let args = Args::from_args();
+    let args = Args::parse();
+    let named_address = if let Some(value) = args.address_name {
+        BTreeMap::from([(
+            value,
+            AccountAddress::from_hex_literal(args.hex_address.unwrap().as_str()).unwrap(),
+        )])
+    } else {
+        BTreeMap::new()
+    };
 
     let build_config = move_package::BuildConfig {
         dev_mode: false,
         generate_abis: false,
         generate_docs: true,
         install_dir: args.output_path,
+        additional_named_addresses: named_address,
         ..Default::default()
     };
 
