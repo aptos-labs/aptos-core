@@ -105,6 +105,346 @@
     }
   },
   {
+    "bytecode": "0xa11ceb0b050000000d01000e020e3e034c900104dc011805f401cd0107c103ca03088b072006ab07500afb07400bbb080a0cc508d7040d9c0d0e0eaa0d0e000000010002000300040005000600070d010001000004010001000808010001000908010001000a0600000b0000000c0d010001000d060001140700040407010000031f0401060106060300000e00010100000f020301000010040301000011050301000012060301000013070301000015030801000016090301000017030101000018030a0100001907030100001a0b0c0100022201010005230900000624030f010006251000000426111201000427131401000328170301060229010100022a010100012b190800042c0d1a0100042d031a0100032e091e01060e0d100111011216040d16011701020d1816181f0b0d121f0105010302060c0b010109000002050b0101090004060c0a02030102070b010109000b0101090003060c050301080801060c010b09010302060c03010b0101090001090007080b060b00010900050305070b090103070301080b0106080b01060b09010900010101070b090109000107090001070b0301090001080402070b0a0109000900060b090103030808050b02010900080b010a02010b0901090006080b060b060109000505070b09010307030205080b010b03010900010b0a01090001080703050703070b0301090004436f696e054153434949064572726f7273054576656e74064f7074696f6e065369676e65720854797065496e666f0e4275726e4361706162696c69747908436f696e496e666f09436f696e53746f72650c4465706f7369744576656e740946616b654d6f6e65790e4d696e744361706162696c6974790d57697468647261774576656e740762616c616e6365046275726e076465706f7369740a696e697469616c697a65056d65726765046d696e7406537472696e67046e616d650872656769737465720e7363616c696e675f666163746f7206737570706c79087472616e736665720877697468647261770b64756d6d795f6669656c640576616c756504636f696e0e6465706f7369745f6576656e74730b4576656e7448616e646c650f77697468647261775f6576656e747306616d6f756e740d6e6f745f7075626c69736865640a616464726573735f6f6607747970655f6f660f6163636f756e745f616464726573730769735f736f6d650a626f72726f775f6d75740a656d69745f6576656e7410696e76616c69645f617267756d656e7411616c72656164795f7075626c697368656406737472696e6704736f6d65046e6f6e65106e65775f6576656e745f68616e646c65000000000000000000000000000000000000000000000000000000000000000103080000000000000000030801000000000000000308020000000000000003080300000000000000030804000000000000000308050000000000000003080600000000000000030807000000000000000002011b010102011c030202031508081703180b0901030302031d0b010109001e0b0a010804200b0a01080704020121030502011b010602011b010702012103030d000d010d020d060d0001000103030c0a003b0003060704110c270b003d003700370114020101000200020e2a0b00110d0c040a043b0103090706110c270b043d01010b013a020c0538000c020e02110f0c060b063c0336020c070a072e3801031d05270b0738020c080a08140b05170b081505290b070102020100010315150a003b0003060704110c270b003c000c020a0236030e01370114120438030b0236000b013804020302000018370a00110d0c0738000c090e09110f0a0721030f0b000107001113270b073b032003180b000107011114270b0111150c060b020c050b030320052406000000000000000038050c04052638060c040b060b050b0439030c080a000b083f030a000939013f010b000939043f040204010000030e0a003701140e01370114160b003601150b013a020102050200030203061b2b0b00110d0c050a053b0403090707110c270b053d04010b010a023902380738000c030e03110f0c060b063c0336020c070a072e3801031e05280b0738020c080a08140b02160b0815052a0b07010206010001021c0a38000c010e01110f0c000b003d0337041402070200001d160a00110d3b0020030a0b0001070311142706000000000000000039020a0038080a00380939000c010b000b013f000208010001021c0a38000c010e01110f0c000b003d033705140209010001021c0a38000c010e01110f0c000b003d03370214020a020001030c080b000b02380a0c030b010b033807020b01000103201e0b00110d0c020a023b0003090704110c270b023c000c040a0436060a011207380b0b04360036010c030a03140a01170b03150b013902020300010002020301020002010302000d010d020d030d040d050d060d00",
+    "abi": {
+      "address": "0x1",
+      "name": "Coin",
+      "friends": [],
+      "exposed_functions": [
+        {
+          "name": "balance",
+          "visibility": "public",
+          "generic_type_params": [
+            {
+              "constraints": []
+            }
+          ],
+          "params": [
+            "address"
+          ],
+          "return": [
+            "u64"
+          ]
+        },
+        {
+          "name": "burn",
+          "visibility": "public",
+          "generic_type_params": [
+            {
+              "constraints": []
+            }
+          ],
+          "params": [
+            "&signer",
+            "0x1::Coin::Coin<T0>"
+          ],
+          "return": []
+        },
+        {
+          "name": "deposit",
+          "visibility": "public",
+          "generic_type_params": [
+            {
+              "constraints": []
+            }
+          ],
+          "params": [
+            "address",
+            "0x1::Coin::Coin<T0>"
+          ],
+          "return": []
+        },
+        {
+          "name": "initialize",
+          "visibility": "script",
+          "generic_type_params": [
+            {
+              "constraints": []
+            }
+          ],
+          "params": [
+            "&signer",
+            "vector<u8>",
+            "u64",
+            "bool"
+          ],
+          "return": []
+        },
+        {
+          "name": "merge",
+          "visibility": "public",
+          "generic_type_params": [
+            {
+              "constraints": []
+            }
+          ],
+          "params": [
+            "&mut 0x1::Coin::Coin<T0>",
+            "0x1::Coin::Coin<T0>"
+          ],
+          "return": []
+        },
+        {
+          "name": "mint",
+          "visibility": "script",
+          "generic_type_params": [
+            {
+              "constraints": []
+            }
+          ],
+          "params": [
+            "&signer",
+            "address",
+            "u64"
+          ],
+          "return": []
+        },
+        {
+          "name": "name",
+          "visibility": "public",
+          "generic_type_params": [
+            {
+              "constraints": []
+            }
+          ],
+          "params": [],
+          "return": [
+            "0x1::ASCII::String"
+          ]
+        },
+        {
+          "name": "register",
+          "visibility": "script",
+          "generic_type_params": [
+            {
+              "constraints": []
+            }
+          ],
+          "params": [
+            "&signer"
+          ],
+          "return": []
+        },
+        {
+          "name": "scaling_factor",
+          "visibility": "public",
+          "generic_type_params": [
+            {
+              "constraints": []
+            }
+          ],
+          "params": [],
+          "return": [
+            "u64"
+          ]
+        },
+        {
+          "name": "supply",
+          "visibility": "public",
+          "generic_type_params": [
+            {
+              "constraints": []
+            }
+          ],
+          "params": [],
+          "return": [
+            "0x1::Option::Option<u64>"
+          ]
+        },
+        {
+          "name": "transfer",
+          "visibility": "script",
+          "generic_type_params": [
+            {
+              "constraints": []
+            }
+          ],
+          "params": [
+            "&signer",
+            "address",
+            "u64"
+          ],
+          "return": []
+        },
+        {
+          "name": "withdraw",
+          "visibility": "public",
+          "generic_type_params": [
+            {
+              "constraints": []
+            }
+          ],
+          "params": [
+            "&signer",
+            "u64"
+          ],
+          "return": [
+            "0x1::Coin::Coin<T0>"
+          ]
+        }
+      ],
+      "structs": [
+        {
+          "name": "BurnCapability",
+          "is_native": false,
+          "abilities": [
+            "copy",
+            "store",
+            "key"
+          ],
+          "generic_type_params": [
+            {
+              "constraints": [],
+              "is_phantom": true
+            }
+          ],
+          "fields": [
+            {
+              "name": "dummy_field",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "name": "Coin",
+          "is_native": false,
+          "abilities": [
+            "store"
+          ],
+          "generic_type_params": [
+            {
+              "constraints": [],
+              "is_phantom": true
+            }
+          ],
+          "fields": [
+            {
+              "name": "value",
+              "type": "u64"
+            }
+          ]
+        },
+        {
+          "name": "CoinInfo",
+          "is_native": false,
+          "abilities": [
+            "key"
+          ],
+          "generic_type_params": [
+            {
+              "constraints": [],
+              "is_phantom": true
+            }
+          ],
+          "fields": [
+            {
+              "name": "name",
+              "type": "0x1::ASCII::String"
+            },
+            {
+              "name": "scaling_factor",
+              "type": "u64"
+            },
+            {
+              "name": "supply",
+              "type": "0x1::Option::Option<u64>"
+            }
+          ]
+        },
+        {
+          "name": "CoinStore",
+          "is_native": false,
+          "abilities": [
+            "key"
+          ],
+          "generic_type_params": [
+            {
+              "constraints": [],
+              "is_phantom": true
+            }
+          ],
+          "fields": [
+            {
+              "name": "coin",
+              "type": "0x1::Coin::Coin<T0>"
+            },
+            {
+              "name": "deposit_events",
+              "type": "0x1::Event::EventHandle<0x1::Coin::DepositEvent>"
+            },
+            {
+              "name": "withdraw_events",
+              "type": "0x1::Event::EventHandle<0x1::Coin::WithdrawEvent>"
+            }
+          ]
+        },
+        {
+          "name": "DepositEvent",
+          "is_native": false,
+          "abilities": [
+            "drop",
+            "store"
+          ],
+          "generic_type_params": [],
+          "fields": [
+            {
+              "name": "amount",
+              "type": "u64"
+            }
+          ]
+        },
+        {
+          "name": "FakeMoney",
+          "is_native": false,
+          "abilities": [],
+          "generic_type_params": [],
+          "fields": [
+            {
+              "name": "dummy_field",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "name": "MintCapability",
+          "is_native": false,
+          "abilities": [
+            "copy",
+            "store",
+            "key"
+          ],
+          "generic_type_params": [
+            {
+              "constraints": [],
+              "is_phantom": true
+            }
+          ],
+          "fields": [
+            {
+              "name": "dummy_field",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "name": "WithdrawEvent",
+          "is_native": false,
+          "abilities": [
+            "drop",
+            "store"
+          ],
+          "generic_type_params": [],
+          "fields": [
+            {
+              "name": "amount",
+              "type": "u64"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
     "bytecode": "0xa11ceb0b050000000a010004020410031446055a2f078901fd010886032006a6030a0ab003170cc703ba020d8106080000000100020e0000000600000308000004070000050001000006020300000704010000080501000009060700000a060400000b080900000c000a00000d040700000e060300000f0b070000100b04000011000c00011400040001060c01080102050301080301050205060800010608010103020608010608030101010800010608030002030708020447554944065369676e6572104372656174654361706162696c6974790947656e657261746f7202494406637265617465096372656174655f69640b6372656174655f696d706c166372656174655f776974685f6361706162696c6974790c6372656174696f6e5f6e756d0f63726561746f725f616464726573730565715f69641567656e5f6372656174655f6361706162696c697479156765745f6e6578745f6372656174696f6e5f6e756d0269640f69645f6372656174696f6e5f6e756d1269645f63726561746f725f61646472657373117075626c6973685f67656e657261746f72046164647207636f756e7465720a616464726573735f6f6600000000000000000000000000000000000000000000000000000000000000010308000000000000000000020112050102010e0803020201130303020209031205000100010204120a00110d0c010a012902200308050d0b0006000000000000000012022d02050f0b00010b01110202010100000c040b010b0012030202000001020d120a002a020c020a021000140c010a01060100000000000000160b020f00150b010b00120312010203010001020c080a00290203050700270b00110202040100000c050b00100110021402050100000c050b00100110031402060100000c050b0010010b0121020701000004120a00110d0c010a012902200308050d0b0006000000000000000012022d02050f0b00010b011200020801000102070f0a00290220030505080600000000000000000c01050d0b002b021000140c010b0102090100000c040b00100114020a0100000c040b00100214020b0100000c040b00100314020c0100000c050b0006000000000000000012022d0202020001000300030100",
     "abi": {
       "address": "0x1",
@@ -3198,6 +3538,87 @@
             {
               "name": "received_events",
               "type": "0x1::Event::EventHandle<0x1::TestCoin::ReceivedEvent>"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "bytecode": "0xa11ceb0b0500000009010002020204030615051b0d0728390861200a81010b0c8c01280db40106000000000300000100010000020002000003000200000403040100010608000105010a02000108000854797065496e666f0f6163636f756e745f616464726573730b6d6f64756c655f6e616d650b7374727563745f6e616d6507747970655f6f6600000000000000000000000000000000000000000000000000000000000000010002030105020a02030a020001000003040b00100014020101000003040b00100114020201000003040b00100214020301020000000001000200",
+    "abi": {
+      "address": "0x1",
+      "name": "TypeInfo",
+      "friends": [],
+      "exposed_functions": [
+        {
+          "name": "account_address",
+          "visibility": "public",
+          "generic_type_params": [],
+          "params": [
+            "&0x1::TypeInfo::TypeInfo"
+          ],
+          "return": [
+            "address"
+          ]
+        },
+        {
+          "name": "module_name",
+          "visibility": "public",
+          "generic_type_params": [],
+          "params": [
+            "&0x1::TypeInfo::TypeInfo"
+          ],
+          "return": [
+            "vector<u8>"
+          ]
+        },
+        {
+          "name": "struct_name",
+          "visibility": "public",
+          "generic_type_params": [],
+          "params": [
+            "&0x1::TypeInfo::TypeInfo"
+          ],
+          "return": [
+            "vector<u8>"
+          ]
+        },
+        {
+          "name": "type_of",
+          "visibility": "public",
+          "generic_type_params": [
+            {
+              "constraints": []
+            }
+          ],
+          "params": [],
+          "return": [
+            "0x1::TypeInfo::TypeInfo"
+          ]
+        }
+      ],
+      "structs": [
+        {
+          "name": "TypeInfo",
+          "is_native": false,
+          "abilities": [
+            "copy",
+            "drop"
+          ],
+          "generic_type_params": [],
+          "fields": [
+            {
+              "name": "account_address",
+              "type": "address"
+            },
+            {
+              "name": "module_name",
+              "type": "vector<u8>"
+            },
+            {
+              "name": "struct_name",
+              "type": "vector<u8>"
             }
           ]
         }
