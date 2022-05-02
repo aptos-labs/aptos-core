@@ -6,9 +6,9 @@ use crate::{
     common::{
         types::{
             account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
-            ProfileConfig, ProfileOptions,
+            ProfileConfig, ProfileOptions, PromptOptions,
         },
-        utils::prompt_yes,
+        utils::prompt_yes_with_override,
     },
     op::key::GenerateKey,
 };
@@ -28,6 +28,8 @@ const NUM_DEFAULT_COINS: u64 = 10000;
 pub struct InitTool {
     #[clap(flatten)]
     profile_options: ProfileOptions,
+    #[clap(flatten)]
+    prompt_options: PromptOptions,
 }
 
 #[async_trait]
@@ -47,12 +49,7 @@ impl CliCommand<()> for InitTool {
         let mut profile_config = if let Some(profile_config) =
             config.remove_profile(&self.profile_options.profile)
         {
-            if !prompt_yes(
-                    &format!("Aptos already initialized for profile {}, do you want to overwrite the existing config?", self.profile_options.profile),
-                ) {
-                    eprintln!("Exiting...");
-                    return Ok(());
-                }
+            prompt_yes_with_override(&format!("Aptos already initialized for profile {}, do you want to overwrite the existing config?", self.profile_options.profile), self.prompt_options)?;
             profile_config
         } else {
             ProfileConfig::default()

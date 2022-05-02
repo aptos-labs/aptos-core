@@ -151,18 +151,21 @@ impl<T> From<CliTypedResult<T>> for ResultWrapper<T> {
 
 /// Checks if a file exists, being overridden by `PromptOptions`
 pub fn check_if_file_exists(file: &Path, prompt_options: PromptOptions) -> CliTypedResult<()> {
-    let exists = file.exists();
-    if (exists && prompt_options.assume_no)
-        || (exists
-            && !prompt_options.assume_yes
-            && !prompt_yes(
-                format!(
-                    "{:?} already exists, are you sure you want to overwrite it?",
-                    file.as_os_str()
-                )
-                .as_str(),
-            ))
-    {
+    if file.exists() {
+        prompt_yes_with_override(
+            &format!(
+                "{:?} already exists, are you sure you want to overwrite it?",
+                file.as_os_str(),
+            ),
+            prompt_options,
+        )?
+    }
+
+    Ok(())
+}
+
+pub fn prompt_yes_with_override(prompt: &str, prompt_options: PromptOptions) -> CliTypedResult<()> {
+    if prompt_options.assume_no || (!prompt_options.assume_yes && !prompt_yes(prompt)) {
         Err(CliError::AbortedError)
     } else {
         Ok(())
