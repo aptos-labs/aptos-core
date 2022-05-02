@@ -3,7 +3,6 @@
 
 import {
   Button,
-  Grid,
   Heading,
   HStack,
   Input,
@@ -21,7 +20,7 @@ import {
 } from '@chakra-ui/react'
 import { SubmitHandler, useForm } from 'react-hook-form'
 import React, { useEffect, useState } from 'react'
-import WalletHeader, { seconaryAddressFontColor } from '../components/WalletHeader'
+import { seconaryAddressFontColor } from '../components/WalletHeader'
 import withSimulatedExtensionContainer from '../components/WithSimulatedExtensionContainer'
 import useWalletState from '../hooks/useWalletState'
 import { AptosAccount, AptosClient, FaucetClient, Types } from 'aptos'
@@ -29,8 +28,8 @@ import { AccountResource } from 'aptos/dist/api/data-contracts'
 import { FaFaucet } from 'react-icons/fa'
 import { IoIosSend } from 'react-icons/io'
 import numeral from 'numeral'
-import { DEVNET_NODE_URL, FAUCET_URL, secondaryBgColor, secondaryErrorMessageColor } from '../constants'
-import WalletFooter from '../components/WalletFooter'
+import { DEVNET_NODE_URL, FAUCET_URL, secondaryErrorMessageColor } from '../constants'
+import WalletLayout from '../Layouts/WalletLayout'
 
 /**
  * TODO: Will be fixed in upcoming Chakra-UI 2.0.0
@@ -174,14 +173,7 @@ const Wallet = () => {
   }, [refreshState])
 
   return (
-    <Grid
-      height="100%"
-      width="100%"
-      maxW="100%"
-      templateRows="30px 1fr 50px"
-      bgColor={secondaryBgColor[colorMode]}
-    >
-      <WalletHeader />
+    <WalletLayout>
       <VStack width="100%" paddingTop={8}>
         <Text fontSize="sm" color={seconaryAddressFontColor[colorMode]}>Account balance</Text>
         <Heading>{tokenBalanceString}</Heading>
@@ -249,8 +241,7 @@ const Wallet = () => {
           </Popover>
         </HStack>
       </VStack>
-      <WalletFooter />
-    </Grid>
+    </WalletLayout>
   )
 }
 

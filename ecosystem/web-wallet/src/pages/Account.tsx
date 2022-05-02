@@ -3,7 +3,6 @@
 
 import {
   Box,
-  Grid,
   Heading,
   useColorMode,
   VStack,
@@ -23,15 +22,13 @@ import {
   ModalBody
 } from '@chakra-ui/react'
 import React from 'react'
-import WalletFooter from '../components/WalletFooter'
-import WalletHeader from '../components/WalletHeader'
 import withSimulatedExtensionContainer from '../components/WithSimulatedExtensionContainer'
-import { secondaryBgColor } from '../constants'
 import { CredentialHeaderAndBody, CredentialHeaderAndBodyProps } from './CreateWallet'
 import useWalletState from '../hooks/useWalletState'
 import { useNavigate } from 'react-router-dom'
 import { secondaryTextColor } from './Login'
 import { ExternalLinkIcon } from '@chakra-ui/icons'
+import WalletLayout from '../Layouts/WalletLayout'
 
 export const CredentialRow = ({
   header,
@@ -60,7 +57,6 @@ export const CredentialRow = ({
 }
 
 const Account = () => {
-  const { colorMode } = useColorMode()
   const { isOpen, onOpen, onClose } = useDisclosure()
   const { signOut, aptosAccount } = useWalletState()
   const navigate = useNavigate()
@@ -77,14 +73,7 @@ const Account = () => {
   }
 
   return (
-    <Grid
-      height="100%"
-      width="100%"
-      maxW="100%"
-      templateRows="30px 1fr 50px"
-      bgColor={secondaryBgColor[colorMode]}
-    >
-      <WalletHeader />
+    <WalletLayout>
       <VStack width="100%" paddingTop={8}>
         <Box px={4} pb={4}>
           <Heading fontSize="xl" >Account</Heading>
@@ -158,8 +147,7 @@ const Account = () => {
           </Box>
         </Box>
       </VStack>
-      <WalletFooter />
-    </Grid>
+    </WalletLayout>
   )
 }
 

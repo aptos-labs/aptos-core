@@ -11,6 +11,7 @@ import { WalletStateProvider } from './hooks/useWalletState'
 import Help from './pages/Help'
 import CreateWallet from './pages/CreateWallet'
 import Account from './pages/Account'
+import Gallery from './pages/Gallery'
 
 const theme: ThemeConfig = extendTheme({
   initialColorMode: 'dark',
@@ -35,6 +36,7 @@ root.render(
           <Routes>
             <Route path='/' element={<Login/>} />
             <Route path='/wallet' element={<Wallet/>} />
+            <Route path='/gallery' element={<Gallery/>} />
             <Route path="/help" element={<Help />} />
             <Route path="/create-wallet" element={<CreateWallet />} />
             <Route path="/account" element={<Account />} />
