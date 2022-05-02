@@ -38,6 +38,7 @@ module AptosFramework::Stake {
     /// Basic unit of stake delegation, it's stored in StakePool.
     struct Delegation has store {
         coins: Coin,
+        rewards: Coin,
         from: address,
         locked_until_secs: u64,
     }
@@ -106,6 +107,7 @@ module AptosFramework::Stake {
         assert!(!find_delegation_from_pool(stake_pool, addr), Errors::invalid_argument(EDELEGATION_ALREADY_EXIST));
         let delegation = Delegation {
             coins,
+            rewards: TestCoin::zero(),
             locked_until_secs,
             from: addr,
         };
@@ -145,7 +147,8 @@ module AptosFramework::Stake {
         let addr = Signer::address_of(account);
         let stake_pool = borrow_global_mut<StakePool>(from);
         let d = withdraw_internal(&mut stake_pool.inactive, addr);
-        let Delegation {coins, from: _, locked_until_secs: _} = d;
+        let Delegation {coins, rewards, from: _, locked_until_secs: _} = d;
+        TestCoin::merge(&mut coins, rewards);
         coins
     }
 
@@ -293,7 +296,7 @@ module AptosFramework::Stake {
         while (i < len) {
             let d = Vector::borrow_mut(v, i);
             let reward = TestCoin::zero(); // mint some coins based on delegation, timestamp, maybe also total stakes
-            TestCoin::merge(&mut d.coins, reward);
+            TestCoin::merge(&mut d.rewards, reward);
             i = i + 1;
         };
     }
