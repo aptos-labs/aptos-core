@@ -48,7 +48,11 @@ metadata:
 spec:
   selector:
     app.kubernetes.io/part-of: aptos-validator
+{{- if .Values.validatorLite }}
+    app.kubernetes.io/name: validator
+{{- else }}
     app.kubernetes.io/name: haproxy
+{{- end }}
   ports:
   - port: 80
     targetPort: 8080
