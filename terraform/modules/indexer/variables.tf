@@ -76,3 +76,8 @@ variable "db_parameter_group_family" {
   description = "Parameter group family name for the RDS DB. Must be compatible with the db_engine and db_engine_version. https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_WorkingWithDBInstanceParamGroups.html"
   default     = "postgres14"
 }
+
+variable "db_publicly_accessible" {
+  default     = false
+  description = "Determines if RDS instance is publicly accessible"
+}

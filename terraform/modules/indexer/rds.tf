@@ -18,6 +18,18 @@ resource "aws_security_group" "indexer" {
   }
 }
 
+resource "aws_db_parameter_group" "indexer" {
+  name = "indexer-${local.workspace_name}"
+  # family parameter must correspond with the engine version of aws_db_instance.indexer
+  # aws rds describe-db-engine-versions --query "DBEngineVersions[].DBParameterGroupFamily"
+  family = var.db_parameter_group_family
+
+  parameter {
+    name  = "log_connections"
+    value = "1"
+  }
+}
+
 
 resource "aws_db_instance" "indexer" {
   identifier = "indexer-${local.workspace_name}"
@@ -33,20 +45,8 @@ resource "aws_db_instance" "indexer" {
   db_subnet_group_name   = aws_db_subnet_group.indexer.name
   vpc_security_group_ids = [aws_security_group.indexer.id]
   parameter_group_name   = aws_db_parameter_group.indexer.name
-  publicly_accessible    = false
+  publicly_accessible    = var.db_publicly_accessible
   skip_final_snapshot    = true
-}
-
-resource "aws_db_parameter_group" "indexer" {
-  name = "indexer-${local.workspace_name}"
-  # family parameter must correspond with the engine version of aws_db_instance.indexer
-  # aws rds describe-db-engine-versions --query "DBEngineVersions[].DBParameterGroupFamily"
-  family = var.db_parameter_group_family
-
-  parameter {
-    name  = "log_connections"
-    value = "1"
-  }
 }
 
 resource "kubernetes_secret" "indexer_credentials" {

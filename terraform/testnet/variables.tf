@@ -56,7 +56,7 @@ variable "ssh_pub_key" {
 
 variable "validator_lite_mode" {
   description = "Run validator lite deployment"
-  default = false
+  default     = false
 }
 
 variable "num_validators" {
@@ -176,6 +176,11 @@ variable "enable_indexer" {
 variable "indexer_db_password" {
   description = "password for indexer RDS instance"
   default     = ""
+}
+
+variable "indexer_db_publicly_accessible" {
+  default     = false
+  description = "Determines if indexer RDS instance is publicly accessible"
 }
 
 variable "enable_k8s_metrics_server" {
