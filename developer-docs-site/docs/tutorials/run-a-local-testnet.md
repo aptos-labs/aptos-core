@@ -17,7 +17,7 @@ You can run a local testnet in two ways:
 
 The rest of this document describes:
 
-- How to start your local testnet with a single Validator FullNode, using both the methods, and
+- How to start your local testnet with a single Validator node, using both the methods, and
 - How to start a Faucet service and attach it to your testnet.
 
 ## Using the Aptos-core source code
@@ -80,7 +80,7 @@ The rest of this document describes:
     Aptos is running, press ctrl-c to exit
     ```
 
-**NOTE**: The above command starts a local testnet with a single validator FullNode. The command runs `aptos-node` from a genesis-only ledger state. If you want to reuse the ledger state produced by a previous run of `aptos-node`, then use:
+**NOTE**: The above command starts a local testnet with a single validator node. The command runs `aptos-node` from a genesis-only ledger state. If you want to reuse the ledger state produced by a previous run of `aptos-node`, then use:
 
 ```
 cargo run -p aptos-node -- --test --config <config-path>
@@ -88,7 +88,7 @@ cargo run -p aptos-node -- --test --config <config-path>
 
 ### Attaching a Faucet to your testnet
 
-Faucets are stateless services that can be run in parallel with the testnet. A Faucet is a way to create Aptos coin with no real-world value. You can use the Faucet by sending a request to create coins and transfer them into a given account on your behalf.
+Faucets are stateless services that can be run in parallel with the testnet. A Faucet is a way to create Aptos test coins with no real-world value. You can use the Faucet by sending a request to create coins and transfer them into a given account on your behalf.
 
 1. Make sure that you started your local testnet as described in Step 5 above.
 2. Open a new shell terminal.
@@ -133,7 +133,7 @@ wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose
 docker-compose up
 ```
 
-This will start both a Validator and a Faucet.
+This will start both a Validator node and Faucet service.
 
 - The Validator's REST endpoint will be available at `http://127.0.0.1:8080`, and
 - The Faucet is available at `http://127.0.0.1:8000`.
@@ -187,9 +187,3 @@ At this point, you will have a special root account at `0x1` that can perform th
 * [Your first transaction](/tutorials/your-first-transaction) to learn how to submit transactions.
 * [Your first Move module](/tutorials/your-first-move-module) to learn how to create Move modules.
 * [Interacting with the Aptos Blockchain](/transactions/interacting-with-the-aptos-blockchain) to learn how to mint coins.
-
-:::info
-
-This guide does not describe how to create a faucet.
-
-:::
