@@ -413,7 +413,7 @@ async fn periodic_telemetry_dump(node_config: NodeConfig, db: DbReaderWriter) {
                 // Measurement Protocol params must be underscore or alphanumeric
                 // Prometheus metrics use {} to represent dimensions, so rename it
                 let met = get_public_metrics();
-                let re = Regex::new(r"[\{\}]").unwrap();
+                let re = Regex::new(r"[\{\}=]").unwrap();
                 for (k, v) in &met {
                     metrics_params.insert(re.replace_all(k, "_").to_string(), v.to_string());
                 }
