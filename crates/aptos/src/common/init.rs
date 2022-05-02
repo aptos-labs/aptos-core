@@ -6,7 +6,7 @@ use crate::{
     common::{
         types::{
             account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
-            ProfileConfig, ProfileOptions, PromptOptions,
+            EncodingOptions, PrivateKeyInputOptions, ProfileConfig, ProfileOptions, PromptOptions,
         },
         utils::prompt_yes_with_override,
     },
@@ -15,6 +15,7 @@ use crate::{
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
 use async_trait::async_trait;
 use clap::Parser;
+use reqwest::Url;
 use std::collections::HashMap;
 
 pub const DEFAULT_REST_URL: &str = "https://fullnode.devnet.aptoslabs.com";
@@ -26,10 +27,20 @@ const NUM_DEFAULT_COINS: u64 = 10000;
 /// Configuration will be pushed into .aptos/config.yaml
 #[derive(Debug, Parser)]
 pub struct InitTool {
+    /// URL to a fullnode on the network
+    #[clap(long)]
+    pub rest_url: Option<Url>,
+    /// URL for the Faucet endpoint
+    #[clap(long)]
+    pub faucet_url: Option<Url>,
+    #[clap(flatten)]
+    private_key_options: PrivateKeyInputOptions,
     #[clap(flatten)]
     profile_options: ProfileOptions,
     #[clap(flatten)]
     prompt_options: PromptOptions,
+    #[clap(flatten)]
+    encoding_options: EncodingOptions,
 }
 
 #[async_trait]
@@ -58,62 +69,80 @@ impl CliCommand<()> for InitTool {
         eprintln!("Configuring for profile {}", self.profile_options.profile);
 
         // Rest Endpoint
-        eprintln!(
-            "Enter your rest endpoint [Current: {} | No input: {}]",
-            profile_config
-                .rest_url
-                .unwrap_or_else(|| "None".to_string()),
-            DEFAULT_REST_URL
-        );
-        let input = read_line("Rest endpoint")?;
-        let input = input.trim();
-        let rest_url = if input.is_empty() {
-            eprintln!("No rest url given, using {}...", DEFAULT_REST_URL);
-            reqwest::Url::parse(DEFAULT_REST_URL).map_err(|err| {
-                CliError::UnexpectedError(format!("Failed to parse default rest URL {}", err))
-            })?
+        let rest_url = if let Some(rest_url) = self.rest_url {
+            eprintln!("Using command line argument for rest URL {}", rest_url);
+            rest_url
         } else {
-            reqwest::Url::parse(input)
-                .map_err(|err| CliError::UnableToParse("Rest Endpoint", err.to_string()))?
+            eprintln!(
+                "Enter your rest endpoint [Current: {} | No input: {}]",
+                profile_config
+                    .rest_url
+                    .unwrap_or_else(|| "None".to_string()),
+                DEFAULT_REST_URL
+            );
+            let input = read_line("Rest endpoint")?;
+            let input = input.trim();
+            if input.is_empty() {
+                eprintln!("No rest url given, using {}...", DEFAULT_REST_URL);
+                reqwest::Url::parse(DEFAULT_REST_URL).map_err(|err| {
+                    CliError::UnexpectedError(format!("Failed to parse default rest URL {}", err))
+                })?
+            } else {
+                reqwest::Url::parse(input)
+                    .map_err(|err| CliError::UnableToParse("Rest Endpoint", err.to_string()))?
+            }
         };
         profile_config.rest_url = Some(rest_url.to_string());
 
         // Faucet Endpoint
-        eprintln!(
-            "Enter your faucet endpoint [Current: {} | No input: {}]",
-            profile_config
-                .faucet_url
-                .unwrap_or_else(|| "None".to_string()),
-            DEFAULT_FAUCET_URL
-        );
-        let input = read_line("Faucet endpoint")?;
-        let input = input.trim();
-        let faucet_url = if input.is_empty() {
-            eprintln!("No faucet url given, using {}...", DEFAULT_FAUCET_URL);
-            reqwest::Url::parse(DEFAULT_FAUCET_URL).map_err(|err| {
-                CliError::UnexpectedError(format!("Failed to parse default faucet URL {}", err))
-            })?
+        let faucet_url = if let Some(faucet_url) = self.faucet_url {
+            eprintln!("Using command line argument for faucet URL {}", faucet_url);
+            faucet_url
         } else {
-            reqwest::Url::parse(input)
-                .map_err(|err| CliError::UnableToParse("Faucet Endpoint", err.to_string()))?
+            eprintln!(
+                "Enter your faucet endpoint [Current: {} | No input: {}]",
+                profile_config
+                    .faucet_url
+                    .unwrap_or_else(|| "None".to_string()),
+                DEFAULT_FAUCET_URL
+            );
+            let input = read_line("Faucet endpoint")?;
+            let input = input.trim();
+            if input.is_empty() {
+                eprintln!("No faucet url given, using {}...", DEFAULT_FAUCET_URL);
+                reqwest::Url::parse(DEFAULT_FAUCET_URL).map_err(|err| {
+                    CliError::UnexpectedError(format!("Failed to parse default faucet URL {}", err))
+                })?
+            } else {
+                reqwest::Url::parse(input)
+                    .map_err(|err| CliError::UnableToParse("Faucet Endpoint", err.to_string()))?
+            }
         };
         profile_config.faucet_url = Some(faucet_url.to_string());
 
         // Private key
-        eprintln!("Enter your private key as a hex literal (0x...) [Current: {} | No input: Generate new key (or keep one if present)]", profile_config.private_key.as_ref().map(|_| "Redacted").unwrap_or("None"));
-        let input = read_line("Private key")?;
-        let input = input.trim();
-        let private_key = if input.is_empty() {
-            if let Some(private_key) = profile_config.private_key {
-                eprintln!("No key given, keeping existing key...");
-                private_key
-            } else {
-                eprintln!("No key given, generating key...");
-                GenerateKey::generate_ed25519_in_memory()
-            }
+        let private_key = if let Some(private_key) = self
+            .private_key_options
+            .extract_private_key_cli(self.encoding_options.encoding)?
+        {
+            eprintln!("Using command line argument for private key");
+            private_key
         } else {
-            Ed25519PrivateKey::from_encoded_string(input)
-                .map_err(|err| CliError::UnableToParse("Ed25519PrivateKey", err.to_string()))?
+            eprintln!("Enter your private key as a hex literal (0x...) [Current: {} | No input: Generate new key (or keep one if present)]", profile_config.private_key.as_ref().map(|_| "Redacted").unwrap_or("None"));
+            let input = read_line("Private key")?;
+            let input = input.trim();
+            if input.is_empty() {
+                if let Some(private_key) = profile_config.private_key {
+                    eprintln!("No key given, keeping existing key...");
+                    private_key
+                } else {
+                    eprintln!("No key given, generating key...");
+                    GenerateKey::generate_ed25519_in_memory()
+                }
+            } else {
+                Ed25519PrivateKey::from_encoded_string(input)
+                    .map_err(|err| CliError::UnableToParse("Ed25519PrivateKey", err.to_string()))?
+            }
         };
         let public_key = private_key.public_key();
         let address = account_address_from_public_key(&public_key);
