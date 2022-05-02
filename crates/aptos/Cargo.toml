@@ -27,6 +27,7 @@ thiserror = "1.0.24"
 tempfile = "3.2.0"
 tokio = { version = "1.8.1", features = ["full"] }
 tokio-util = { version = "0.6.4", features = ["compat"] }
+toml = "0.5.9"
 uuid = { version = "0.8.2", features = ["v4", "serde"] }
 
 aptos-config = { path = "../../config" }
