@@ -12,7 +12,7 @@ edition = "2018"
 ### BEGIN HAKARI SECTION
 [dependencies]
 Inflector = { version = "0.11.4", features = ["heavyweight", "lazy_static", "regex"] }
-anyhow = { version = "1.0.56", features = ["backtrace", "std"] }
+anyhow = { version = "1.0.57", features = ["backtrace", "std"] }
 arrayvec = { version = "0.5.2", features = ["array-sizes-33-128", "std"] }
 backtrace = { version = "0.3.58", features = ["addr2line", "gimli-symbolize", "miniz_oxide", "object", "serde", "std"] }
 block-buffer = { version = "0.9.0", default-features = false, features = ["block-padding"] }
@@ -38,7 +38,7 @@ hyper = { version = "0.14.18", features = ["client", "full", "h2", "http1", "htt
 include_dir = { version = "0.7.2", features = ["glob"] }
 indexmap = { version = "1.8.1", default-features = false, features = ["std"] }
 itertools = { version = "0.10.3", features = ["use_alloc", "use_std"] }
-libc = { version = "0.2.123", features = ["std"] }
+libc = { version = "0.2.124", features = ["std"] }
 log = { version = "0.4.16", default-features = false, features = ["serde", "std"] }
 memchr = { version = "2.4.1", features = ["std", "use_std"] }
 move-unit-test = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e", default-features = false, features = ["table-extension"] }
@@ -66,7 +66,7 @@ zeroize = { version = "1.5.4", features = ["alloc", "zeroize_derive"] }
 
 [build-dependencies]
 Inflector = { version = "0.11.4", features = ["heavyweight", "lazy_static", "regex"] }
-anyhow = { version = "1.0.56", features = ["backtrace", "std"] }
+anyhow = { version = "1.0.57", features = ["backtrace", "std"] }
 arrayvec = { version = "0.5.2", features = ["array-sizes-33-128", "std"] }
 backtrace = { version = "0.3.58", features = ["addr2line", "gimli-symbolize", "miniz_oxide", "object", "serde", "std"] }
 block-buffer = { version = "0.9.0", default-features = false, features = ["block-padding"] }
@@ -93,7 +93,7 @@ hyper = { version = "0.14.18", features = ["client", "full", "h2", "http1", "htt
 include_dir = { version = "0.7.2", features = ["glob"] }
 indexmap = { version = "1.8.1", default-features = false, features = ["std"] }
 itertools = { version = "0.10.3", features = ["use_alloc", "use_std"] }
-libc = { version = "0.2.123", features = ["std"] }
+libc = { version = "0.2.124", features = ["std"] }
 log = { version = "0.4.16", default-features = false, features = ["serde", "std"] }
 memchr = { version = "2.4.1", features = ["std", "use_std"] }
 move-unit-test = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e", default-features = false, features = ["table-extension"] }

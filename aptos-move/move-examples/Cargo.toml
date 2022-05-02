@@ -10,12 +10,14 @@ edition = "2018"
 
 [dependencies]
 aptos-vm = { path = "../aptos-vm" }
+aptos-types = {path = "../../types"}
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
-structopt = "0.3.21"
+
 move-compiler = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
 move-package = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
 move-stdlib = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
-move-unit-test = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e", features=["table-extension"] }
+move-unit-test = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
+clap = "3.1.8"
 
 [dev-dependencies]
 move-cli = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }

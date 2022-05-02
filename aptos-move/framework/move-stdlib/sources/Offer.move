@@ -132,7 +132,4 @@ module Std::Offer {
       recipient == global<Offer<Offered>>(offer_addr).for || recipient == offer_addr
     }
   }
-
-
-
 }

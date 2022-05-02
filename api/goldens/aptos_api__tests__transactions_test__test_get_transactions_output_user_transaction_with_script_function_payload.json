@@ -3,12 +3,12 @@
     "type": "block_metadata_transaction",
     "version": "1",
     "hash": "0xa8fc186c28fc0f95b8233651438093e8e215a51dcd16475f5e68c0a421f6305c",
-    "state_root_hash": "0x36266c9178229c20082c86058a0ff15d7e8281d564c0396199c40b9837c094e5",
+    "state_root_hash": "0xd9e5574895eb9c509bfaece5d792d95b4c28508512e0430f894254c51fe1ce16",
     "event_root_hash": "0xd62c85b93234824cf825e9c028c3bcc59b06926039721bd7edd76b56ae9fcecf",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x5c3815107d2d38bf0918f1f0102c7eadaff311e727d720f99beb049386365806",
+    "accumulator_root_hash": "0x8e99bc6db50ff6792fd076da5a9f0ac3ea3f72f522a97ba6caaca62a9476ee98",
     "changes": [
       {
         "type": "write_resource",
@@ -56,12 +56,12 @@
     "type": "user_transaction",
     "version": "2",
     "hash": "0x18073cb2536317833aa630d30062383a1f00221dd3604bbce19cd262813e6c36",
-    "state_root_hash": "0xfd956cd03081bd9e5a82e6ae4c20b5d0bf44669368ab1002d1d3393b80e85d87",
+    "state_root_hash": "0x25af3deecfaca1bc963e775cd0c73c75a306c92fa5456e080aa4bb75ed15a648",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
     "gas_used": "92",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x2617051da37d49dfd32aa91dd94bd1286feed4f72a653cb954a587eb6e1c0c85",
+    "accumulator_root_hash": "0x3445e79d8be413432882aa0f045632462556456f3de287b02de551ebd85af5fc",
     "changes": [
       {
         "type": "write_resource",

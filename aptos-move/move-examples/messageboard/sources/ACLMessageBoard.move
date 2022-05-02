@@ -34,8 +34,8 @@ module MessageBoard::ACLBasedMB{
         participant: address
     }
 
-    /// create the message board and move the resource to signer
-    public fun message_board_init_internal(account: &signer) {
+    /// init message board
+    public(script) fun message_board_init(account: &signer) {
         let board = ACLBasedMB{
             participants: ACL::empty(),
             pinned_post: Vector::empty<u8>()
@@ -47,24 +47,15 @@ module MessageBoard::ACLBasedMB{
         })
     }
 
-    /// init message board
-    public(script) fun message_board_init(account: signer) {
-        message_board_init_internal(&account);
-    }
-
     public fun view_message(board_addr: address): vector<u8> acquires ACLBasedMB {
         let post = borrow_global<ACLBasedMB>(board_addr).pinned_post;
         copy post
     }
 
     /// board owner control adding new participants
-    public fun add_participant_internal(account: &signer, participant: address) acquires ACLBasedMB {
+    public(script) fun add_participant(account: &signer, participant: address) acquires ACLBasedMB {
         let board = borrow_global_mut<ACLBasedMB>(Signer::address_of(account));
         ACL::add(&mut board.participants, participant);
-    }
-
-    public(script) fun add_participant(account: signer, participant: address) acquires ACLBasedMB {
-        add_participant_internal(&account, participant);
     }
 
     /// remove a participant from the ACL
@@ -75,7 +66,7 @@ module MessageBoard::ACLBasedMB{
     }
 
     /// an account publish the message to update the notice
-    public fun send_pinned_message_internal(
+    public(script) fun send_pinned_message(
         account: &signer, board_addr: address, message: vector<u8>
     ) acquires ACLBasedMB, MessageChangeEventHandle {
         let board = borrow_global<ACLBasedMB>(board_addr);
@@ -95,22 +86,16 @@ module MessageBoard::ACLBasedMB{
         );
     }
 
-    public(script) fun send_pinned_message(
-        account: signer, board_addr: address, message: vector<u8>
-    ) acquires ACLBasedMB, MessageChangeEventHandle {
-        send_pinned_message_internal(&account, board_addr, message);
-    }
-
     /// an account can send events containing message
     public(script) fun send_message_to(
-        board_addr: address, message: vector<u8>
+        account: signer, board_addr: address, message: vector<u8>
     ) acquires MessageChangeEventHandle {
         let event_handle = borrow_global_mut<MessageChangeEventHandle>(board_addr);
         Event::emit_event<MessageChangeEvent>(
             &mut event_handle.change_events,
             MessageChangeEvent{
                 message,
-                participant: board_addr
+                participant: Signer::address_of(&account)
             }
         );
     }
@@ -128,18 +113,18 @@ module MessageBoard::MessageBoardTests {
     const  BOB_IS_HERE: vector<u8> = vector<u8>[142, 157, 142, 040, 151, 163, 040, 150, 145, 162, 145];
 
     #[test]
-    fun test_init_messageboard() {
+    public(script) fun test_init_messageboard() {
         let (alice, _) = create_two_signers();
-        ACLBasedMB::message_board_init_internal(&alice);
-        ACLBasedMB::send_pinned_message_internal(&alice, Signer::address_of(&alice), HELLO_WORLD);
+        ACLBasedMB::message_board_init(&alice);
+        ACLBasedMB::send_pinned_message(&alice, Signer::address_of(&alice), HELLO_WORLD);
     }
 
     #[test]
-    fun test_send_pinned_message() {
+    public(script) fun test_send_pinned_message() {
         let (alice, bob) = create_two_signers();
-        ACLBasedMB::message_board_init_internal(&alice);
-        ACLBasedMB::add_participant_internal(&alice, Signer::address_of(&bob));
-        ACLBasedMB::send_pinned_message_internal(&bob, Signer::address_of(&alice), BOB_IS_HERE);
+        ACLBasedMB::message_board_init(&alice);
+        ACLBasedMB::add_participant(&alice, Signer::address_of(&bob));
+        ACLBasedMB::send_pinned_message(&bob, Signer::address_of(&alice), BOB_IS_HERE);
         let message = ACLBasedMB::view_message(Signer::address_of(&alice));
         assert!( message == BOB_IS_HERE, 1);
         let message = ACLBasedMB::view_message(Signer::address_of(&alice));
@@ -148,17 +133,17 @@ module MessageBoard::MessageBoardTests {
 
     #[test]
     public(script) fun test_send_message_v_cap() {
-        let (alice, _) = create_two_signers();
-        ACLBasedMB::message_board_init_internal(&alice);
-        ACLBasedMB::send_message_to(Signer::address_of(&alice), BOB_IS_HERE);
+        let (alice, bob) = create_two_signers();
+        ACLBasedMB::message_board_init(&alice);
+        ACLBasedMB::send_message_to(bob, Signer::address_of(&alice), BOB_IS_HERE);
     }
 
     #[test]
-    fun read_message_multiple_times() {
+    public(script) fun read_message_multiple_times() {
         let (alice, bob) = create_two_signers();
-        ACLBasedMB::message_board_init_internal(&alice);
-        ACLBasedMB::add_participant_internal(&alice, Signer::address_of(&bob));
-        ACLBasedMB::send_pinned_message_internal(&bob, Signer::address_of(&alice), BOB_IS_HERE);
+        ACLBasedMB::message_board_init(&alice);
+        ACLBasedMB::add_participant(&alice, Signer::address_of(&bob));
+        ACLBasedMB::send_pinned_message(&bob, Signer::address_of(&alice), BOB_IS_HERE);
         let message = ACLBasedMB::view_message(Signer::address_of(&alice));
         assert!( message == BOB_IS_HERE, 1);
         let message = ACLBasedMB::view_message(Signer::address_of(&alice));
@@ -167,10 +152,10 @@ module MessageBoard::MessageBoardTests {
 
     #[test]
     #[expected_failure(abort_code = 1)]
-    fun test_add_new_participant() {
+    public(script) fun test_add_new_participant() {
         let (alice, bob) = create_two_signers();
-        ACLBasedMB::message_board_init_internal(&alice);
-        ACLBasedMB::send_pinned_message_internal(&bob, Signer::address_of(&alice), BOB_IS_HERE);
+        ACLBasedMB::message_board_init(&alice);
+        ACLBasedMB::send_pinned_message(&bob, Signer::address_of(&alice), BOB_IS_HERE);
     }
 
     #[test_only]

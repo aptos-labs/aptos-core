@@ -43,9 +43,19 @@ impl AptosTest for ModulePublish {
         let publish_txn = ctx
             .root_account()
             .sign_with_transaction_builder(txn_factory.payload(TransactionPayload::ModuleBundle(
-                ModuleBundle::singleton(blobs),
+                ModuleBundle::singleton(blobs.clone()),
             )));
         ctx.client().submit_and_wait(&publish_txn).await?;
+        let publish_txn = ctx
+            .root_account()
+            .sign_with_transaction_builder(txn_factory.payload(TransactionPayload::ModuleBundle(
+                ModuleBundle::singleton(blobs),
+            )));
+        // republish should fail
+        ctx.client()
+            .submit_and_wait(&publish_txn)
+            .await
+            .unwrap_err();
         Ok(())
     }
 }

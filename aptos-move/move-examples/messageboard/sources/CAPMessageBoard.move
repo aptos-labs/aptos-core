@@ -49,8 +49,8 @@ module MessageBoard::CapBasedMB {
         participant: address
     }
 
-    /// init the message board and move the resource to signer
-    public fun message_board_init_internal(account: &signer) {
+    /// create the message board and move the resource to signer
+    public(script) fun message_board_init(account: &signer) {
         let board = CapBasedMB{
             pinned_post: Vector::empty<u8>()
         };
@@ -66,11 +66,6 @@ module MessageBoard::CapBasedMB {
         })
     }
 
-    /// create the message board and move the resource to signer
-    public(script) fun message_board_init(account: signer) {
-        message_board_init_internal(&account);
-    }
-
     /// directly view message
     public fun view_message(board_addr: address): vector<u8> acquires CapBasedMB {
         let post = borrow_global<CapBasedMB>(board_addr).pinned_post;
@@ -78,11 +73,7 @@ module MessageBoard::CapBasedMB {
     }
 
     /// board owner controls adding new participants
-    public(script) fun add_participant(account: signer, participant: address) acquires MessageCapEventHandle {
-        add_participant_internal(&account, participant);
-    }
-
-    public fun add_participant_internal(account: &signer, participant: address) acquires MessageCapEventHandle {
+    public(script) fun add_participant(account: &signer, participant: address) acquires MessageCapEventHandle {
         let board_addr = Signer::address_of(account);
         Offer::create(account, MessageChangeCapability{ board: board_addr }, participant);
 
@@ -96,12 +87,8 @@ module MessageBoard::CapBasedMB {
         );
     }
 
-    public(script) fun claim_notice_cap(account: signer, board: address) {
-        claim_notice_cap_internal(&account, board);
-    }
-
     /// claim offered capability
-    public fun claim_notice_cap_internal(account: &signer, board: address) {
+    public(script) fun claim_notice_cap(account: &signer, board: address) {
         let notice_cap = Offer::redeem<MessageChangeCapability>(
             account, board);
         move_to(account, notice_cap);
@@ -116,9 +103,10 @@ module MessageBoard::CapBasedMB {
     }
 
     /// only the participant with right capability can publish the message
-    public fun send_pinned_message_internal(
-        cap: &MessageChangeCapability, sender: address, board_addr: address, message: vector<u8>
-    ) acquires MessageChangeEventHandle, CapBasedMB {
+    public(script) fun send_pinned_message(
+        account: &signer, board_addr: address, message: vector<u8>
+    ) acquires MessageChangeCapability, MessageChangeEventHandle, CapBasedMB {
+        let cap = borrow_global<MessageChangeCapability>(Signer::address_of(account));
         assert!(cap.board == board_addr, EACCOUNT_NO_NOTICE_CAP);
         let board = borrow_global_mut<CapBasedMB>(board_addr);
         board.pinned_post = message;
@@ -127,28 +115,21 @@ module MessageBoard::CapBasedMB {
             &mut event_handle.change_events,
             MessageChangeEvent{
                 message,
-                participant: sender
+                participant: Signer::address_of(account)
             }
         );
     }
 
-    public(script) fun send_pinned_message(
-        account: signer, board_addr: address, message: vector<u8>
-    ) acquires MessageChangeCapability, MessageChangeEventHandle, CapBasedMB {
-        let cap = borrow_global<MessageChangeCapability>(Signer::address_of(&account));
-        send_pinned_message_internal(cap, Signer::address_of(&account), board_addr, message);
-    }
-
     /// an account can send events containing message
     public(script) fun send_message_to(
-        board_addr: address, message: vector<u8>
+        account: signer, board_addr: address, message: vector<u8>
     ) acquires MessageChangeEventHandle {
         let event_handle = borrow_global_mut<MessageChangeEventHandle>(board_addr);
         Event::emit_event<MessageChangeEvent>(
             &mut event_handle.change_events,
             MessageChangeEvent{
                 message,
-                participant: board_addr
+                participant: Signer::address_of(&account)
             }
         );
     }
@@ -168,36 +149,36 @@ module MessageBoard::MessageBoardCapTests {
     #[test]
     public(script) fun test_init_messageboard_v_cap() {
         let (alice, _) = create_two_signers();
-        CapBasedMB::message_board_init_internal(&alice);
+        CapBasedMB::message_board_init(&alice);
         let board_addr = Signer::address_of(&alice);
-        CapBasedMB::send_pinned_message(alice, board_addr, HELLO_WORLD);
+        CapBasedMB::send_pinned_message(&alice, board_addr, HELLO_WORLD);
     }
 
     #[test]
     public(script) fun test_send_pinned_message_v_cap() {
         let (alice, bob) = create_two_signers();
-        CapBasedMB::message_board_init_internal(&alice);
-        CapBasedMB::add_participant_internal(&alice, Signer::address_of(&bob));
-        CapBasedMB::claim_notice_cap_internal(&bob, Signer::address_of(&alice));
-        CapBasedMB::send_pinned_message(bob, Signer::address_of(&alice), BOB_IS_HERE);
+        CapBasedMB::message_board_init(&alice);
+        CapBasedMB::add_participant(&alice, Signer::address_of(&bob));
+        CapBasedMB::claim_notice_cap(&bob, Signer::address_of(&alice));
+        CapBasedMB::send_pinned_message(&bob, Signer::address_of(&alice), BOB_IS_HERE);
         let message = CapBasedMB::view_message(Signer::address_of(&alice));
         assert!(message == BOB_IS_HERE, 1)
     }
 
     #[test]
     public(script) fun test_send_message_v_cap() {
-        let (alice, _) = create_two_signers();
-        CapBasedMB::message_board_init_internal(&alice);
-        CapBasedMB::send_message_to(Signer::address_of(&alice), BOB_IS_HERE);
+        let (alice, bob) = create_two_signers();
+        CapBasedMB::message_board_init(&alice);
+        CapBasedMB::send_message_to(bob, Signer::address_of(&alice), BOB_IS_HERE);
     }
 
     #[test]
     #[expected_failure]
     public(script) fun test_add_new_participant_v_cap() {
         let (alice, bob) = create_two_signers();
-        CapBasedMB::message_board_init_internal(&alice);
-        CapBasedMB::add_participant_internal(&alice, Signer::address_of(&bob));
-        CapBasedMB::send_pinned_message(bob, Signer::address_of(&alice), BOB_IS_HERE);
+        CapBasedMB::message_board_init(&alice);
+        CapBasedMB::add_participant(&alice, Signer::address_of(&bob));
+        CapBasedMB::send_pinned_message(&bob, Signer::address_of(&alice), BOB_IS_HERE);
     }
 
     #[test_only]
@@ -206,4 +187,3 @@ module MessageBoard::MessageBoardCapTests {
         (Vector::pop_back(signers), Vector::pop_back(signers))
     }
 }
-

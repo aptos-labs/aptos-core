@@ -1,5 +1,6 @@
 module AptosFramework::Stake {
     use Std::Errors;
+    use Std::Option::{Self, Option};
     use Std::Signer;
     use Std::Vector;
     use AptosFramework::SystemAddresses;
@@ -29,6 +30,8 @@ module AptosFramework::Stake {
     const ENOT_VALIDATOR: u64 = 8;
     /// Can't remove last validator.
     const ELAST_VALIDATOR: u64 = 9;
+    /// Delegation from the address already exists in this pool
+    const EDELEGATION_ALREADY_EXIST: u64 = 10;
 
 
     /// Basic unit of stake delegation, it's stored in StakePool.
@@ -91,15 +94,17 @@ module AptosFramework::Stake {
     }
 
     /// Any user can delegate a stake.
-    public fun delegate_stake(account: &signer, to: address, amount: u64, locked_until_secs: u64) acquires StakePool, ValidatorSet {
+    public(script) fun delegate_stake(account: &signer, to: address, amount: u64, locked_until_secs: u64) acquires StakePool, ValidatorSet {
         let coins = TestCoin::withdraw(account, amount);
         let current_time = Timestamp::now_seconds();
         assert!(current_time + MINIMUM_LOCK_PERIOD < locked_until_secs, Errors::invalid_argument(ELOCK_TIME_TOO_SHORT));
+        let addr = Signer::address_of(account);
         let stake_pool = borrow_global_mut<StakePool>(to);
+        assert!(!find_delegation_from_pool(stake_pool, addr), Errors::invalid_argument(EDELEGATION_ALREADY_EXIST));
         let delegation = Delegation {
             coins,
             locked_until_secs,
-            from: Signer::address_of(account),
+            from: addr,
         };
         // add to pending_active if it's a current validator otherwise add to active directly
         if (is_current_validator(to)) {
@@ -110,18 +115,17 @@ module AptosFramework::Stake {
         }
     }
 
-    /// Withdraw from active delegation, it's moved to pending_inactive if locked_until_secs < current_time or
-    /// directly deposit if it's not from an active validator.
-    public fun withdraw_active(account: &signer, from: address) acquires StakePool, ValidatorSet {
+    /// Unlock from active delegation, it's moved to pending_inactive if locked_until_secs < current_time or
+    /// directly inactive if it's not from an active validator.
+    public(script) fun unlock(account: &signer, from: address) acquires StakePool, ValidatorSet {
         let addr = Signer::address_of(account);
         let current_time = Timestamp::now_seconds();
         let stake_pool = borrow_global_mut<StakePool>(from);
         let d = withdraw_internal(&mut stake_pool.active, addr);
         let is_current_validator = is_current_validator(from);
         if (!is_current_validator) {
-            // directly deposit if it's not active validator
-            let Delegation {coins, from: _, locked_until_secs: _} = d;
-            TestCoin::deposit(addr, coins);
+            // move to inactive directly if it's not from an active validator
+            Vector::push_back(&mut stake_pool.inactive, d);
         } else if (d.locked_until_secs < current_time) {
             // move to pending_inactive if it can be unlocked
             Vector::push_back(&mut stake_pool.pending_inactive, d);
@@ -130,17 +134,17 @@ module AptosFramework::Stake {
         };
     }
 
-    /// Withdraw from inactive delegation, directly deposited to the account's balance.
-    public fun withdraw_inactive(account: &signer, from: address) acquires StakePool {
+    /// Withdraw from inactive delegation.
+    public(script) fun withdraw(account: &signer, from: address): Coin acquires StakePool {
         let addr = Signer::address_of(account);
         let stake_pool = borrow_global_mut<StakePool>(from);
         let d = withdraw_internal(&mut stake_pool.inactive, addr);
         let Delegation {coins, from: _, locked_until_secs: _} = d;
-        TestCoin::deposit(addr, coins);
+        coins
     }
 
     /// Initialize the ValidatorInfo for account.
-    public fun register_validator_candidate(
+    public(script) fun register_validator_candidate(
         account: &signer,
         consensus_pubkey: vector<u8>,
         network_address: vector<u8>,
@@ -161,7 +165,7 @@ module AptosFramework::Stake {
     }
 
     /// Rotate the consensus key of the validator, it'll take effect in next epoch.
-    public fun rotate_consensus_key(account: &signer, consensus_pubkey: vector<u8>) acquires ValidatorConfig {
+    public(script) fun rotate_consensus_key(account: &signer, consensus_pubkey: vector<u8>) acquires ValidatorConfig {
         let addr = Signer::address_of(account);
         assert!(exists<ValidatorConfig>(addr), Errors::not_published(EVALIDATOR_CONFIG));
         let validator_info = borrow_global_mut<ValidatorConfig>(addr);
@@ -182,33 +186,38 @@ module AptosFramework::Stake {
     }
 
     /// Initiate by the validator info owner
-    public fun join_validator_set(account: &signer) acquires StakePool, ValidatorConfig, ValidatorSet {
+    public(script) fun join_validator_set(account: &signer) acquires StakePool, ValidatorConfig, ValidatorSet {
         let addr = Signer::address_of(account);
         let stake_pool = borrow_global<StakePool>(addr);
         let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
         assert!(stake_pool.current_stake >= validator_set.minimum_stake, Errors::invalid_argument(ESTAKE_TOO_LOW));
         assert!(stake_pool.current_stake <= validator_set.maximum_stake, Errors::invalid_argument(ESTAKE_TOO_HIGH));
-        let (exist, _) = find_validator(&validator_set.active_validators, addr);
-        assert!(!exist, Errors::invalid_argument(EALREADY_VALIDATOR));
-        let (exist, _) = find_validator(&validator_set.pending_inactive, addr);
-        assert!(!exist, Errors::invalid_argument(EALREADY_VALIDATOR));
-        let (exist, _) = find_validator(&validator_set.pending_active, addr);
+        let exist =  Option::is_some(&find_validator(&validator_set.active_validators, addr)) ||
+                     Option::is_some(&find_validator(&validator_set.pending_inactive, addr)) ||
+                     Option::is_some(&find_validator(&validator_set.pending_active, addr));
         assert!(!exist, Errors::invalid_argument(EALREADY_VALIDATOR));
 
         Vector::push_back(&mut validator_set.pending_active, generate_validator_info(addr));
     }
 
     /// Initiate by the validator info owner.
-    public fun leave_validator_set(account: &signer) acquires ValidatorSet {
+    public(script) fun leave_validator_set(account: &signer) acquires ValidatorSet {
         let addr = Signer::address_of(account);
         let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
 
-        let (exist, index) = find_validator(&validator_set.active_validators, addr);
-        assert!(exist, Errors::invalid_argument(ENOT_VALIDATOR));
+        let maybe_index = find_validator(&validator_set.active_validators, addr);
+        assert!(Option::is_some(&maybe_index), Errors::invalid_argument(ENOT_VALIDATOR));
+        let index = Option::extract(&mut maybe_index);
 
         let validator_info = Vector::swap_remove(&mut validator_set.active_validators, index);
         assert!(Vector::length(&validator_set.active_validators) > 0, Errors::invalid_argument(ELAST_VALIDATOR));
         Vector::push_back(&mut validator_set.pending_inactive, validator_info);
+    }
+
+    public fun is_current_validator(addr: address): bool acquires ValidatorSet{
+        let validator_set = borrow_global<ValidatorSet>(@CoreResources);
+        Option::is_some(&find_validator(&validator_set.active_validators, addr)) ||
+        Option::is_some(&find_validator(&validator_set.pending_inactive, addr))
     }
 
     /// Triggers at epoch boundary.
@@ -287,43 +296,44 @@ module AptosFramework::Stake {
         }
     }
 
-    fun find_delegation(v: &vector<Delegation>, addr: address): u64 {
+    fun find_delegation_from_pool(pool: &StakePool, addr: address): bool {
+        Option::is_some(&find_delegation(&pool.active, addr)) ||
+        Option::is_some(&find_delegation(&pool.pending_active, addr)) ||
+        Option::is_some(&find_delegation(&pool.pending_inactive, addr)) ||
+        Option::is_some(&find_delegation(&pool.inactive, addr))
+    }
+
+    fun find_delegation(v: &vector<Delegation>, addr: address): Option<u64> {
         let i = 0;
         let len =  Vector::length(v);
         while (i < len) {
             let d = Vector::borrow(v, i);
             if (d.from == addr) {
-                return i
+                return Option::some(i)
             };
             i = i + 1;
         };
-        abort Errors::invalid_argument(EDELEGATION_NOT_FOUND)
+        Option::none()
     }
 
-    fun find_validator(v: &vector<ValidatorInfo>, addr: address): (bool, u64) {
+    fun find_validator(v: &vector<ValidatorInfo>, addr: address): Option<u64> {
         let i = 0;
         let len = Vector::length(v);
         while (i < len) {
             if (Vector::borrow(v, i).addr == addr) {
-                return (true, i)
+                return Option::some(i)
             };
             i = i + 1;
         };
-        (false, 0)
-    }
-
-    public fun is_current_validator(addr: address): bool acquires ValidatorSet{
-        let validator_set = borrow_global<ValidatorSet>(@CoreResources);
-        let (exist_1, _) = find_validator(&validator_set.active_validators, addr);
-        if (exist_1) {
-            return true
-        };
-        let (exist_2, _) = find_validator(&validator_set.pending_inactive, addr);
-        exist_2
+        Option::none()
     }
 
     fun withdraw_internal(v: &mut vector<Delegation>, addr: address): Delegation {
-        let index = find_delegation(v, addr);
+        let maybe_index = find_delegation(v, addr);
+        if (Option::is_none(&maybe_index)) {
+            abort Errors::invalid_argument(EDELEGATION_NOT_FOUND)
+        };
+        let index = Option::extract(&mut maybe_index);
         Vector::swap_remove(v, index)
     }
 
@@ -337,19 +347,22 @@ module AptosFramework::Stake {
         }
     }
 
-    #[test(core_resources = @CoreResources, account_1 = @0x123, account_2 = @0x234)]
-    fun test_basic_delegation(
+    #[test(core_resources = @CoreResources, account_1 = @0x123, account_2 = @0x234, account_3 = @0x345)]
+    public(script) fun test_basic_delegation(
         core_resources: signer,
         account_1: signer,
-        account_2: signer
+        account_2: signer,
+        account_3: signer,
     ) acquires StakePool, ValidatorConfig, ValidatorSet {
         initialize_validator_set(&core_resources, 100, 10000);
         Timestamp::set_time_has_started_for_testing(&core_resources);
         TestCoin::mint_for_test(&account_1, 10000);
         TestCoin::mint_for_test(&account_2, 10000);
+        TestCoin::mint_for_test(&account_3, 10000);
         register_validator_candidate(&account_1, Vector::empty(), Vector::empty(), Vector::empty());
         let addr1 = Signer::address_of(&account_1);
         let addr2 = Signer::address_of(&account_2);
+        let addr3 = Signer::address_of(&account_3);
         delegate_stake(&account_1, addr1, 100, 100000);
         // delegation when the address is not a validator
         assert!(TestCoin::value(&Vector::borrow(&borrow_global<StakePool>(addr1).active, 0).coins) == 100, 0);
@@ -362,12 +375,13 @@ module AptosFramework::Stake {
         on_new_epoch();
         // delegation when the address is active valdiator
         assert!(is_current_validator(addr1), 0);
-        delegate_stake(&account_2, addr1, 102, 100000);
+        delegate_stake(&account_3, addr1, 102, 100000);
         assert!(borrow_global<StakePool>(addr1).current_stake == 201, 0);
         assert!(TestCoin::value(&Vector::borrow(&borrow_global<StakePool>(addr1).pending_active, 0).coins) == 102, 0);
-        // withdraw active stakes
+        assert!(Vector::borrow(&borrow_global<StakePool>(addr1).pending_active, 0).from == addr3, 0);
+        // unlock active stakes
         Timestamp::update_global_time_for_test(100001000000);
-        withdraw_active(&account_1, addr1);
+        unlock(&account_1, addr1);
         assert!(TestCoin::value(&Vector::borrow(&borrow_global<StakePool>(addr1).pending_inactive, 0).coins) == 100, 0);
         // total stake doesn't change until next epoch
         assert!(borrow_global<StakePool>(addr1).current_stake == 201, 0);
@@ -378,13 +392,14 @@ module AptosFramework::Stake {
         assert!(TestCoin::value(&Vector::borrow(&borrow_global<StakePool>(addr1).inactive, 0).coins) == 100, 0);
         assert!(TestCoin::value(&Vector::borrow(&borrow_global<StakePool>(addr1).active, 1).coins) == 102, 0);
         assert!(borrow_global<StakePool>(addr1).current_stake == 203, 0);
-        // withdraw inactive
-        withdraw_inactive(&account_1, addr1);
-        assert!(TestCoin::balance_of(addr1) == 10000, 0);
+        // withdraw
+        let coins = withdraw(&account_1, addr1);
+        assert!(TestCoin::value(&coins) == 100, 0);
+        TestCoin::deposit(addr1, coins);
     }
 
     #[test(core_resources = @CoreResources, account_1 = @0x123, account_2 = @0x234, account_3 = @0x345)]
-    fun test_validator_join_leave(
+    public(script) fun test_validator_join_leave(
         core_resources: signer,
         account_1: signer,
         account_2: signer,
