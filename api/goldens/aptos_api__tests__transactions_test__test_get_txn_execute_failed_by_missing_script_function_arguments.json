@@ -2,12 +2,12 @@
   "type": "user_transaction",
   "version": "2",
   "hash": "0x8df66affad9c571750829820259721f96af4d7ae787bd7089bea259ff0f82cb1",
-  "state_root_hash": "0xb2e7e297073058181f47bcd0843bf61ccf2c77e0d176b69ca5de823a71c2e49b",
+  "state_root_hash": "0x27bc09f7632975d6db2d873c8f3ebbf8953de74d970de72a1001795fe241dd09",
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "1",
   "success": false,
   "vm_status": "Transaction Executed and Committed with Error NUMBER_OF_ARGUMENTS_MISMATCH",
-  "accumulator_root_hash": "0x4ab41f99c44ee5b0a5b30a277aefa24beb529e9db1ac0773327d45ca125a7cb0",
+  "accumulator_root_hash": "0xd72365c552c932280a86805d32fb3f4fa250803bd48ccf8f66afcb97dd499eb4",
   "changes": [
     {
       "type": "write_resource",
