@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+mod aptos_debug_natives;
+
 use crate::{
     common::{
         types::{
@@ -14,7 +16,6 @@ use crate::{
 };
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
-use aptos_vm::natives::aptos_natives;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use move_cli::package::cli::UnitTestResult;
@@ -203,7 +204,7 @@ impl CliCommand<&'static str> for TestPackage {
                 filter: self.filter,
                 ..UnitTestingConfig::default_with_bound(Some(100_000))
             },
-            aptos_natives(),
+            aptos_debug_natives::aptos_debug_natives(),
             false,
         )
         .map_err(|err| CliError::MoveTestError(err.to_string()))?;
