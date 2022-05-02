@@ -248,11 +248,18 @@ module AptosFramework::Stake {
         // update validator info (so network address/public key change takes effect)
         let i = 0;
         let len = Vector::length(&validator_set.active_validators);
+        let active_validators = Vector::empty();
         while (i < len) {
             let old_validator_info = Vector::borrow_mut(&mut validator_set.active_validators, i);
-            *old_validator_info = generate_validator_info(old_validator_info.addr);
+            let new_validator_info = generate_validator_info(old_validator_info.addr);
+            if (new_validator_info.voting_power >= validator_set.minimum_stake &&
+                new_validator_info.voting_power <= validator_set.maximum_stake
+            ) {
+                Vector::push_back(&mut active_validators, new_validator_info);
+            };
             i = i + 1;
-        }
+        };
+        validator_set.active_validators = active_validators;
     }
 
     /// Update individual validator's stake pool
@@ -438,5 +445,10 @@ module AptosFramework::Stake {
         assert!(!is_current_validator(addr2), 0);
         assert!(is_current_validator(addr3), 0);
         assert!(Vector::borrow(&borrow_global<ValidatorSet>(@CoreResources).active_validators, 0).config.consensus_pubkey == x"1234", 0);
+        // validators without enough stake will be removed
+        Timestamp::update_global_time_for_test(100001000000);
+        unlock(&account_1, addr1);
+        on_new_epoch();
+        assert!(!is_current_validator(addr1), 0);
     }
 }
