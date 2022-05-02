@@ -276,6 +276,42 @@ Test result: OK. Total tests: 2; passed: 2; failed: 0
 }
 ```
 
+### Debug and Print Stacktrace
+
+In this example, we will use `DebugDemo` in [debug-move](./debug-move-example)
+
+First, you need to include Move nursery in your Move.toml file [toml file](debug-move-example/Move.toml)
+
+Now, you can use `Debug::print` and `Debug::print_stack_trace` in your [move file](debug-move-example/sources/DebugDemo.move)
+
+You can run the following command:
+```bash
+aptos move test --package-dir crates/aptos/debug-move-example
+```
+
+The command will generate the following output:
+```bash
+Running Move unit tests
+[debug] 0000000000000000000000000000000000000000000000000000000000000001
+Call Stack:
+    [0] 0000000000000000000000000000000000000000000000000000000000000001::Message::sender_can_set_message
+
+        Code:
+            [4] CallGeneric(0)
+            [5] MoveLoc(0)
+            [6] LdConst(0)
+          > [7] Call(1)
+            [8] Ret
+
+        Locals:
+            [0] -
+            [1] 0000000000000000000000000000000000000000000000000000000000000001
+
+
+Operand Stack:
+```
+
+
 ### Publishing a Move Package
 
 In this example, we'll use the `HelloBlockchain` in [move-examples](../../aptos-move/move-examples/).
