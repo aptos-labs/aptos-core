@@ -340,16 +340,14 @@ pub struct PrivateKeyInputOptions {
 }
 
 impl PrivateKeyInputOptions {
+    /// Extract private key from CLI args with fallback to config
     pub fn extract_private_key(
         &self,
         encoding: EncodingType,
         profile: &str,
     ) -> CliTypedResult<Ed25519PrivateKey> {
-        if let Some(ref file) = self.private_key_file {
-            encoding.load_key("--private-key-file", file.as_path())
-        } else if let Some(ref key) = self.private_key {
-            let key = key.as_bytes().to_vec();
-            encoding.decode_key("--private-key", key)
+        if let Some(key) = self.extract_private_key_cli(encoding)? {
+            Ok(key)
         } else if let Some(Some(private_key)) =
             CliConfig::load_profile(profile)?.map(|p| p.private_key)
         {
@@ -358,6 +356,23 @@ impl PrivateKeyInputOptions {
             Err(CliError::CommandArgumentError(
                 "One of ['--private-key', '--private-key-file'] must be used".to_string(),
             ))
+        }
+    }
+
+    /// Extract private key from CLI args
+    pub fn extract_private_key_cli(
+        &self,
+        encoding: EncodingType,
+    ) -> CliTypedResult<Option<Ed25519PrivateKey>> {
+        if let Some(ref file) = self.private_key_file {
+            Ok(Some(
+                encoding.load_key("--private-key-file", file.as_path())?,
+            ))
+        } else if let Some(ref key) = self.private_key {
+            let key = key.as_bytes().to_vec();
+            Ok(Some(encoding.decode_key("--private-key", key)?))
+        } else {
+            Ok(None)
         }
     }
 }
