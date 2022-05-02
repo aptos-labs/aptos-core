@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! Support for mocking the Diem data store.
+//! Support for mocking the Aptos data store.
 
 use crate::account::AccountData;
 use anyhow::Result;

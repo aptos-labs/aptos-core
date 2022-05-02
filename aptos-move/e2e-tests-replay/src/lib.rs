@@ -68,7 +68,7 @@ const MOVE_VM_TRACING_LOG_FILENAME: &str = "move_vm_trace.log";
 //**************************************************************************************************
 
 pub struct ReplayFlags {
-    /// Filter based on which diem version the trace was executed under
+    /// Filter based on which aptos version the trace was executed under
     pub aptos_version: Version,
     /// Filters on which trace (and steps) to run
     pub filters: BTreeMap<String, BTreeSet<usize>>,
@@ -990,7 +990,7 @@ fn replay_trace<P: AsRef<Path>>(
                         TransactionPayload::ScriptFunction(script_fun) => {
                             // NOTE: if module transaction are not allowed and direct write-sets do
                             // not contain code, then we know that a script function executed should
-                            // be in the diem framework.
+                            // be in the aptos framework.
                             (vec![signed_txn.sender()], script_fun.clone(), false)
                         }
                         TransactionPayload::ModuleBundle(_) => {
@@ -998,7 +998,7 @@ fn replay_trace<P: AsRef<Path>>(
                             // hence, exit the test and call it successful
                             if flags.warning {
                                 eprintln!(
-                                    "[!] Replay stopped due to non-Diem module compilation: {}",
+                                    "[!] Replay stopped due to non-Aptos module compilation: {}",
                                     test_name
                                 );
                             }

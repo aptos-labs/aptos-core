@@ -2,7 +2,7 @@
 /// It interacts with the other modules in the following ways:
 ///
 /// * Genesis: to initialize the timestamp
-/// * ValidatorSystem, DiemAccount, Reconfiguration: to check if the current state is in the genesis state
+/// * ValidatorSystem, AptosAccount, Reconfiguration: to check if the current state is in the genesis state
 /// * Block: to reach consensus on the global wall clock time
 ///
 /// This module moreover enables code to assert that it is running in genesis (`Self::assert_genesis`) or after
@@ -65,7 +65,7 @@ module AptosFramework::Timestamp {
         timestamp: u64
     ) acquires CurrentTimeMicroseconds {
         assert_operating();
-        // Can only be invoked by DiemVM signer.
+        // Can only be invoked by AptosVM signer.
         SystemAddresses::assert_vm(account);
 
         let global_timer = borrow_global_mut<CurrentTimeMicroseconds>(@CoreResources);
@@ -129,7 +129,7 @@ module AptosFramework::Timestamp {
         spec_now_microseconds() / MICRO_CONVERSION_FACTOR
     }
 
-    /// Helper function to determine if Diem is in genesis state.
+    /// Helper function to determine if Aptos is in genesis state.
     public fun is_genesis(): bool {
         !exists<CurrentTimeMicroseconds>(@CoreResources)
     }
@@ -143,7 +143,7 @@ module AptosFramework::Timestamp {
         include AbortsIfNotGenesis;
     }
 
-    /// Helper function to determine if Diem is operating. This is the same as `!is_genesis()` and is provided
+    /// Helper function to determine if Aptos is operating. This is the same as `!is_genesis()` and is provided
     /// for convenience. Testing `is_operating()` is more frequent than `is_genesis()`.
     public fun is_operating(): bool {
         exists<CurrentTimeMicroseconds>(@CoreResources)

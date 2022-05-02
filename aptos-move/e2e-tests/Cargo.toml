@@ -30,14 +30,14 @@ move-vm-runtime = { git = "https://github.com/move-language/move", rev = "f2e758
 move-vm-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
 read-write-set = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
 
-## Diem-Move dependencies
+## Aptos-Move dependencies
 aptos-keygen = { path = "../aptos-keygen" }
 aptos-vm = { path = "../aptos-vm" }
 aptos-writeset-generator = { path = "../writeset-transaction-generator" }
 cached-framework-packages = { path = "../framework/cached-packages" }
 vm-genesis = { path = "../vm-genesis" }
 
-## Other Diem Dependencies
+## Other Aptos Dependencies
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
 aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers" }

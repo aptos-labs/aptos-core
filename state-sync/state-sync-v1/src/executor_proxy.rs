@@ -736,7 +736,7 @@ mod tests {
         //     sequence_number,
         //     genesis_key.clone(),
         //     genesis_key.public_key(),
-        //     Some(aptos_stdlib::encode_update_diem_consensus_config_script_function(
+        //     Some(aptos_stdlib::encode_update_aptos_consensus_config_script_function(
         //         0,
         //         bcs::to_bytes(&OnChainConsensusConfig::V1(ConsensusConfigV1 {
         //             two_chain: false,

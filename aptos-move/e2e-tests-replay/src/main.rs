@@ -20,7 +20,7 @@ struct ReplayArgs {
     #[structopt(short = "t", long = "trace")]
     trace_files: Vec<String>,
 
-    /// Diem selector, if set, replay traces executed in that version instead of the latest version
+    /// Aptos selector, if set, replay traces executed in that version instead of the latest version
     #[structopt(short = "d", long = "aptos-version")]
     aptos_version: Option<u64>,
 

@@ -64,7 +64,7 @@ pub type TraceSeqMapping = (usize, Vec<usize>, Vec<usize>);
 
 /// Provides an environment to run a VM instance.
 ///
-/// This struct is a mock in-memory implementation of the Diem executor.
+/// This struct is a mock in-memory implementation of the Aptos executor.
 #[derive(Debug)]
 pub struct FakeExecutor {
     data_store: FakeDataStore,

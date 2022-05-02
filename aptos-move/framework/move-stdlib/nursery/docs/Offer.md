@@ -8,7 +8,7 @@ Unlike many languages, Move cannot move data from one account to another with
 single-signer transactions. As of this writing, ordinary transactions can only have
 a single signer, and Move code can only store to an address (via <code><b>move_to</b></code>) if it
 can supply a reference to a signer for the destination address (there are special case
-exceptions in Genesis and DiemAccount where there can temporarily be multiple signers).
+exceptions in Genesis and AptosAccount where there can temporarily be multiple signers).
 
 Offer solves this problem by providing an <code><a href="Offer.md#0x1_Offer">Offer</a></code> resource.  To move a struct <code>T</code> from
 account A to B, account A first publishes an <code><a href="Offer.md#0x1_Offer">Offer</a>&lt;T&gt;</code> resource at <code><a href="Offer.md#0x1_Offer_address_of">address_of</a>(A)</code>,

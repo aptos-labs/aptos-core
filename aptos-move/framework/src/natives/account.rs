@@ -27,7 +27,7 @@ pub fn native_create_signer(
     Ok(NativeResult::ok(cost, smallvec![Value::signer(address)]))
 }
 
-/// NOTE: this function will be deprecated after the Diem v3 release, but must
+/// NOTE: this function will be deprecated after the Aptos v3 release, but must
 /// remain for replaying old transactions
 pub fn native_destroy_signer(
     context: &mut NativeContext,

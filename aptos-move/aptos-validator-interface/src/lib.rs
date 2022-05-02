@@ -51,7 +51,7 @@ pub trait AptosValidatorInterface: Sync {
         let mut acc = vec![];
         for module_bytes in self
             .get_account_state_by_version(account_config::CORE_CODE_ADDRESS, version)?
-            .ok_or_else(|| anyhow!("Failure reading diem root address state"))?
+            .ok_or_else(|| anyhow!("Failure reading aptos root address state"))?
             .get_modules()
         {
             acc.push(
@@ -63,8 +63,8 @@ pub trait AptosValidatorInterface: Sync {
     }
 
     /// Get the account states of the most critical accounts, including:
-    /// 1. Diem Framework code address
-    /// 2. Diem Root address
+    /// 1. Aptos Framework code address
+    /// 2. Aptos Root address
     /// 3. All validator addresses
     fn get_admin_accounts(&self, version: Version) -> Result<Vec<(AccountAddress, AccountState)>> {
         let mut result = vec![];

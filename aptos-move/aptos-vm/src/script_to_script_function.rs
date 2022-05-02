@@ -487,7 +487,7 @@ macro_rules! UPDATE_EXCHANGE_RATE_BYTES {
     };
 }
 #[macro_export]
-macro_rules! UPDATE_DIEM_VERSION_BYTES {
+macro_rules! UPDATE_APTOS_VERSION_BYTES {
     () => {
         [
             161, 28, 235, 11, 1, 0, 0, 0, 5, 1, 0, 4, 3, 4, 10, 5, 14, 10, 7, 24, 51, 8, 75, 16, 0,
@@ -598,9 +598,9 @@ pub fn remapping(script_bytes: &[u8]) -> Option<(&'static ModuleId, &'static Ide
         }
 
         // SystemAdministrationScripts
-        UPDATE_DIEM_VERSION_BYTES!() => Some((
+        UPDATE_APTOS_VERSION_BYTES!() => Some((
             &*SYSTEM_ADMINISTRATION_SCRIPTS,
-            ident_str!("update_diem_version"),
+            ident_str!("update_aptos_version"),
         )),
 
         // TreasuryComplianceScripts

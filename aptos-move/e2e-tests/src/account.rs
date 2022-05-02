@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! Test infrastructure for modeling Diem accounts.
+//! Test infrastructure for modeling Aptos accounts.
 
 use crate::gas_costs;
 use anyhow::{Error, Result};
@@ -32,10 +32,10 @@ use vm_genesis::GENESIS_KEYPAIR;
 // TTL is 86400s. Initial time was set to 0.
 pub const DEFAULT_EXPIRATION_TIME: u64 = 40_000;
 
-/// Details about a Diem account.
+/// Details about a Aptos account.
 ///
 /// Tests will typically create a set of `Account` instances to run transactions on. This type
-/// encodes the logic to operate on and verify operations on any Diem account.
+/// encodes the logic to operate on and verify operations on any Aptos account.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Account {
     addr: AccountAddress,
@@ -49,7 +49,7 @@ impl Account {
     /// Creates a new account in memory.
     ///
     /// The account returned by this constructor is a purely logical entity, meaning that it does
-    /// not automatically get added to the Diem store. To add an account to the store, use
+    /// not automatically get added to the Aptos store. To add an account to the store, use
     /// [`AccountData`] instances with
     /// [`FakeExecutor::add_account_data`][crate::executor::FakeExecutor::add_account_data].
     /// This function returns distinct values upon every call.
@@ -105,7 +105,7 @@ impl Account {
         }
     }
 
-    /// Creates a new account representing the diem root account in memory.
+    /// Creates a new account representing the aptos root account in memory.
     ///
     /// The address will be [`aptos_root_address`][account_config::aptos_root_address], and
     /// the account will use [`GENESIS_KEYPAIR`][struct@GENESIS_KEYPAIR] as its keypair.
@@ -345,7 +345,7 @@ impl Balance {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AccountRoleSpecifier {
-    DiemRoot,
+    AptosRoot,
     TreasuryCompliance,
     DesignatedDealer,
     Validator,
@@ -357,7 +357,7 @@ pub enum AccountRoleSpecifier {
 impl AccountRoleSpecifier {
     pub fn id(&self) -> u64 {
         match self {
-            Self::DiemRoot => 0,
+            Self::AptosRoot => 0,
             Self::TreasuryCompliance => 1,
             Self::DesignatedDealer => 2,
             Self::Validator => 3,

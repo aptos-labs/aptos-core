@@ -59,7 +59,7 @@ mod test {
             AccountAddress::from_hex_literal("0xca843279e3427144cead5e4d5999a3d0").unwrap();
 
         let hash_vec =
-            &Vec::from_hex("b641fbed6b7951f0e3882ce29a814b6929ffbc1beb0edefc04b6d16802accac3")
+            &Vec::from_hex("459532feaa6841de67a6b57e0df5eab275618e94e5d0e1d32ae259116f99715b")
                 .expect("You must provide a valid Hex format");
 
         let mut hash = [0u8; 32];
