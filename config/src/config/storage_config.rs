@@ -50,8 +50,8 @@ pub struct StorageConfig {
 
 pub const NO_OP_STORAGE_PRUNER_CONFIG: StoragePrunerConfig = StoragePrunerConfig {
     state_store_prune_window: None,
-    default_prune_window: None,
-    max_version_to_prune_per_batch: Some(100),
+    ledger_prune_window: None,
+    pruning_batch_size: 10_000,
 };
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -63,23 +63,22 @@ pub struct StoragePrunerConfig {
     /// This is the default pruning window for any other store except for state store. State store
     /// being big in size, we might want to configure a smaller window for state store vs other
     /// store.
-    pub default_prune_window: Option<u64>,
-
-    /// Maximum version to prune per batch, should not be too large to avoid spike in disk IO caused
-    /// by large batches in the pruner.
-    pub max_version_to_prune_per_batch: Option<u64>,
+    pub ledger_prune_window: Option<u64>,
+    /// Batch size of the versions to be sent to the pruner - this is to avoid slowdown due to
+    /// issuing too many DB calls and batch prune instead.
+    pub pruning_batch_size: usize,
 }
 
 impl StoragePrunerConfig {
     pub fn new(
         state_store_prune_window: Option<u64>,
-        default_store_prune_window: Option<u64>,
-        max_version_to_prune_per_batch: Option<u64>,
+        ledger_store_prune_window: Option<u64>,
+        pruning_batch_size: usize,
     ) -> Self {
         StoragePrunerConfig {
             state_store_prune_window,
-            default_prune_window: default_store_prune_window,
-            max_version_to_prune_per_batch,
+            ledger_prune_window: ledger_store_prune_window,
+            pruning_batch_size,
         }
     }
 }
@@ -99,8 +98,8 @@ impl Default for StorageConfig {
             // depending on the size of an average account blob.
             storage_pruner_config: StoragePrunerConfig {
                 state_store_prune_window: Some(1_000_000),
-                default_prune_window: Some(10_000_000),
-                max_version_to_prune_per_batch: Some(100),
+                ledger_prune_window: Some(10_000_000),
+                pruning_batch_size: 10_000,
             },
             data_dir: PathBuf::from("/opt/aptos/data"),
             // Default read/write/connection timeout, in milliseconds

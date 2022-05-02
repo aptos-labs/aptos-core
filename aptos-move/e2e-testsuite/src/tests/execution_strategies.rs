@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::{account_config, transaction::SignedTransaction, vm_status::VMStatus};
+use aptos_types::{transaction::SignedTransaction, vm_status::VMStatus};
 use language_e2e_tests::{
     account::Account,
     common_transactions::create_account_txn,
@@ -20,13 +20,7 @@ use language_e2e_tests::{
 fn txn(seq_num: u64) -> SignedTransaction {
     let account = Account::new();
     let aptos_root = Account::new_aptos_root();
-    create_account_txn(
-        &aptos_root,
-        &account,
-        seq_num + 1,
-        0,
-        account_config::xus_tag(),
-    )
+    create_account_txn(&aptos_root, &account, seq_num + 1)
 }
 
 #[test]

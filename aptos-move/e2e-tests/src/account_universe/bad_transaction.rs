@@ -12,7 +12,6 @@ use aptos_crypto::{
 };
 use aptos_proptest_helpers::Index;
 use aptos_types::{
-    account_config::XUS_NAME,
     transaction::{Script, SignedTransaction, TransactionStatus},
     vm_status::StatusCode,
 };
@@ -45,13 +44,7 @@ impl AUTransactionGen for SequenceNumberMismatchGen {
             self.seq
         };
 
-        let txn = empty_txn(
-            sender.account(),
-            seq,
-            gas_costs::TXN_RESERVED,
-            0,
-            XUS_NAME.to_string(),
-        );
+        let txn = empty_txn(sender.account(), seq, gas_costs::TXN_RESERVED, 0);
 
         (
             txn,
@@ -91,7 +84,6 @@ impl AUTransactionGen for InsufficientBalanceGen {
             sender.sequence_number,
             max_gas_unit,
             self.gas_unit_price,
-            XUS_NAME.to_string(),
         );
 
         // TODO: Move such config to AccountUniverse

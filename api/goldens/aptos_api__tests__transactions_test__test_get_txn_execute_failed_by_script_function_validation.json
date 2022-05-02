@@ -1,26 +1,14 @@
 {
   "type": "user_transaction",
   "version": "4",
-  "hash": "0x6bb8523ed342ba8f8142042b77e08c1d4fad3ba6673f109f37cd0865adafbd1c",
-  "state_root_hash": "0xabb172b66702f5d91f5e084674b054a11994dc1f7510f139f0d8366625799e4a",
+  "hash": "0x67d3d83ebf873c54ae08380b8984ee3bef0227c284117384b9e086498c52fb90",
+  "state_root_hash": "0x003951fb3d69e476d49c575491b32f83dd0618ee518a423883746f36518f6f13",
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
-  "gas_used": "26",
+  "gas_used": "21",
   "success": false,
   "vm_status": "Move abort by LIMIT_EXCEEDED - EINSUFFICIENT_BALANCE\n A limit on an amount, e.g. a currency, is exceeded. Example: withdrawal of money after account limits window\n is exhausted.\n Error codes",
-  "accumulator_root_hash": "0xdd25d38068eebe924a415c2cb19a66e7cf6e02286095d8640b8547b94efdf594",
+  "accumulator_root_hash": "0x6a0a857f6cd893347cc49f932acac8294e083f2702f9e4748eda7033435cbecb",
   "changes": [
-    {
-      "type": "write_resource",
-      "address": "0xa550c18",
-      "state_key_hash": "0x79a08e0b94ebb66c0dae37a07c182d46387c347aeb83c07de6109b0503c3a24e",
-      "data": {
-        "type": "0x1::TestCoin::CoinInfo",
-        "data": {
-          "scaling_factor": "1000000",
-          "total_value": "18446744073709551615"
-        }
-      }
-    },
     {
       "type": "write_resource",
       "address": "0xe60912ecb0a8c365d163d258f3b9f1b62f8f9148c207643864d7ed4a2b23159",
@@ -52,7 +40,6 @@
   "sequence_number": "0",
   "max_gas_amount": "2000",
   "gas_unit_price": "0",
-  "gas_currency_code": "XUS",
   "expiration_timestamp_secs": "18446744073709551615",
   "payload": {
     "type": "script_function_payload",
@@ -66,7 +53,7 @@
   "signature": {
     "type": "ed25519_signature",
     "public_key": "0xafb4905e9550cf462a82007824a055d975ae934470c477d9ddbb6d2b264c36fa",
-    "signature": "0xbf29e08e9d3ecad55cf6f00fdd1c4b9792621012a2c572509d9de53f1dd6736e2ac7df52dd617c5fc683ab1e63241833b52882d1050c41fcf9400663ddf2ce07"
+    "signature": "0x54182ebf4aef3031c730e2e63fae4363e0f15540ceb4ab9d064f7f9adc6d8c648ec6a52648097a32024509fce45767ed4aedb0ab3a719baed233633e1264b60c"
   },
   "events": [],
   "timestamp": "2"

@@ -3,15 +3,11 @@
 
 use aptos_types::{
     account_config::{ReceivedEvent, SentEvent},
-    transaction::{SignedTransaction, TransactionOutput, TransactionStatus},
-    vm_status::KeptVMStatus,
+    transaction::{ExecutionStatus, SignedTransaction, TransactionOutput, TransactionStatus},
 };
 use language_e2e_tests::{
-    account::{self, Account},
-    common_transactions::peer_to_peer_txn,
-    executor::FakeExecutor,
-    test_with_different_versions,
-    versioning::CURRENT_RELEASE_VERSIONS,
+    account::Account, common_transactions::peer_to_peer_txn, executor::FakeExecutor,
+    test_with_different_versions, versioning::CURRENT_RELEASE_VERSIONS,
 };
 use std::{convert::TryFrom, time::Instant};
 
@@ -33,7 +29,7 @@ fn single_peer_to_peer_with_event() {
         let output = executor.execute_transaction(txn);
         assert_eq!(
             output.status(),
-            &TransactionStatus::Keep(KeptVMStatus::Executed)
+            &TransactionStatus::Keep(ExecutionStatus::Success)
         );
 
         executor.apply_write_set(output.write_set());
@@ -45,10 +41,10 @@ fn single_peer_to_peer_with_event() {
             .read_account_resource(sender.account())
             .expect("sender must exist");
         let updated_sender_balance = executor
-            .read_balance_resource(sender.account(), account::xus_currency_code())
+            .read_balance_resource(sender.account())
             .expect("sender balance must exist");
         let updated_receiver_balance = executor
-            .read_balance_resource(receiver.account(), account::xus_currency_code())
+            .read_balance_resource(receiver.account())
             .expect("receiver balance must exist");
         let updated_sender_events = executor.read_transfer_event(sender.account()).unwrap();
         let updated_receiver_events = executor.read_transfer_event(receiver.account()).unwrap();
@@ -110,7 +106,7 @@ fn single_peer_to_peer_with_event() {
 
 //         Script::new(
 //             script_bytes,
-//             vec![account_config::xus_tag()],
+//             vec![],
 //             vec![
 //                 TransactionArgument::Address(*receiver.address()),
 //                 TransactionArgument::U64(transfer_amount),
@@ -144,10 +140,10 @@ fn single_peer_to_peer_with_event() {
 //         .read_account_resource(sender.account())
 //         .expect("sender must exist");
 //     let updated_sender_balance = executor
-//         .read_balance_resource(sender.account(), account::xus_currency_code())
+//         .read_balance_resource(sender.account())
 //         .expect("sender balance must exist");
 //     let updated_receiver_balance = executor
-//         .read_balance_resource(receiver.account(), account::xus_currency_code())
+//         .read_balance_resource(receiver.account())
 //         .expect("receiver balance must exist");
 //     assert_eq!(receiver_balance, updated_receiver_balance.coin());
 //     assert_eq!(sender_balance, updated_sender_balance.coin());
@@ -178,7 +174,7 @@ fn few_peer_to_peer_with_event() {
         for (idx, txn_output) in output.iter().enumerate() {
             assert_eq!(
                 txn_output.status(),
-                &TransactionStatus::Keep(KeptVMStatus::Executed)
+                &TransactionStatus::Keep(ExecutionStatus::Success)
             );
 
             // check events
@@ -195,10 +191,10 @@ fn few_peer_to_peer_with_event() {
             }
 
             let original_sender_balance = executor
-                .read_balance_resource(sender.account(), account::xus_currency_code())
+                .read_balance_resource(sender.account())
                 .expect("sender balance must exist");
             let original_receiver_balance = executor
-                .read_balance_resource(receiver.account(), account::xus_currency_code())
+                .read_balance_resource(receiver.account())
                 .expect("receiver balcne must exist");
             executor.apply_write_set(txn_output.write_set());
 
@@ -209,10 +205,10 @@ fn few_peer_to_peer_with_event() {
                 .read_account_resource(sender.account())
                 .expect("sender must exist");
             let updated_sender_balance = executor
-                .read_balance_resource(sender.account(), account::xus_currency_code())
+                .read_balance_resource(sender.account())
                 .expect("sender balance must exist");
             let updated_receiver_balance = executor
-                .read_balance_resource(receiver.account(), account::xus_currency_code())
+                .read_balance_resource(receiver.account())
                 .expect("receiver balance must exist");
             let updated_sender_events = executor.read_transfer_event(sender.account()).unwrap();
             let updated_receiver_events = executor.read_transfer_event(receiver.account()).unwrap();
@@ -345,12 +341,12 @@ pub(crate) fn check_and_apply_transfer_output(
             .read_account_resource(sender)
             .expect("sender must exist");
         let sender_balance = executor
-            .read_balance_resource(sender, account::xus_currency_code())
+            .read_balance_resource(sender)
             .expect("sender balance must exist");
         let sender_initial_balance = sender_balance.coin();
         let sender_seq_num = sender_resource.sequence_number();
         let receiver_initial_balance = executor
-            .read_balance_resource(receiver, account::xus_currency_code())
+            .read_balance_resource(receiver)
             .expect("receiver balance must exist")
             .coin();
 
@@ -365,10 +361,10 @@ pub(crate) fn check_and_apply_transfer_output(
             .read_account_resource(sender)
             .expect("sender must exist");
         let updated_sender_balance = executor
-            .read_balance_resource(sender, account::xus_currency_code())
+            .read_balance_resource(sender)
             .expect("sender balance must exist");
         let updated_receiver_balance = executor
-            .read_balance_resource(receiver, account::xus_currency_code())
+            .read_balance_resource(receiver)
             .expect("receiver balance must exist");
         assert_eq!(receiver_balance, updated_receiver_balance.coin());
         assert_eq!(sender_balance, updated_sender_balance.coin());
@@ -408,7 +404,7 @@ fn cycle_peer_to_peer() {
         for txn_output in &output {
             assert_eq!(
                 txn_output.status(),
-                &TransactionStatus::Keep(KeptVMStatus::Executed)
+                &TransactionStatus::Keep(ExecutionStatus::Success)
             );
         }
         assert_eq!(accounts.len(), output.len());
@@ -453,7 +449,7 @@ fn cycle_peer_to_peer_multi_block() {
             for txn_output in &output {
                 assert_eq!(
                     txn_output.status(),
-                    &TransactionStatus::Keep(KeptVMStatus::Executed)
+                    &TransactionStatus::Keep(ExecutionStatus::Success)
                 );
             }
             assert_eq!(cycle, output.len());
@@ -500,7 +496,7 @@ fn one_to_many_peer_to_peer() {
             for txn_output in &output {
                 assert_eq!(
                     txn_output.status(),
-                    &TransactionStatus::Keep(KeptVMStatus::Executed)
+                    &TransactionStatus::Keep(ExecutionStatus::Success)
                 );
             }
             assert_eq!(cycle - 1, output.len());
@@ -547,7 +543,7 @@ fn many_to_one_peer_to_peer() {
             for txn_output in &output {
                 assert_eq!(
                     txn_output.status(),
-                    &TransactionStatus::Keep(KeptVMStatus::Executed)
+                    &TransactionStatus::Keep(ExecutionStatus::Success)
                 );
             }
             assert_eq!(cycle - 1, output.len());

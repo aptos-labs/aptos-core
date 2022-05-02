@@ -5,13 +5,10 @@ module AptosFramework::Account {
     use Std::Signer;
     use Std::Vector;
     use AptosFramework::ChainId;
-    use AptosFramework::SystemAddresses;
     use AptosFramework::TestCoin;
     use AptosFramework::Timestamp;
     use AptosFramework::TransactionFee;
     use AptosFramework::TransactionPublishingOption;
-    use AptosFramework::ValidatorConfig;
-    use AptosFramework::ValidatorOperatorConfig;
 
     friend AptosFramework::Genesis;
 
@@ -70,6 +67,7 @@ module AptosFramework::Account {
     const PROLOGUE_EMODULE_NOT_ALLOWED: u64 = 1009;
     const PROLOGUE_EINVALID_WRITESET_SENDER: u64 = 1010;
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1011;
+    const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1012;
 
     native fun create_signer(addr: address): signer;
 
@@ -266,17 +264,38 @@ module AptosFramework::Account {
     }
 
     fun multi_agent_script_prologue(
-        _sender: signer,
-        _txn_sequence_number: u64,
-        _txn_sender_public_key: vector<u8>,
-        _secondary_signer_addresses: vector<address>,
-        _secondary_signer_public_key_hashes: vector<vector<u8>>,
-        _txn_gas_price: u64,
-        _txn_max_gas_units: u64,
-        _txn_expiration_time: u64,
-        _chain_id: u8,
-    ) {
-        assert!(false, Errors::invalid_argument(EMULTI_AGENT_NOT_SUPPORTED));
+        sender: signer,
+        txn_sequence_number: u64,
+        txn_sender_public_key: vector<u8>,
+        secondary_signer_addresses: vector<address>,
+        secondary_signer_public_key_hashes: vector<vector<u8>>,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+    ) acquires Account {
+        prologue_common(sender, txn_sequence_number, txn_sender_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id);
+
+        let num_secondary_signers = Vector::length(&secondary_signer_addresses);
+
+        assert!(
+            Vector::length(&secondary_signer_public_key_hashes) == num_secondary_signers,
+            Errors::invalid_argument(PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH),
+        );
+
+        let i = 0;
+        while (i < num_secondary_signers) {
+            let secondary_address = *Vector::borrow(&secondary_signer_addresses, i);
+            assert!(exists_at(secondary_address), Errors::invalid_argument(PROLOGUE_EACCOUNT_DNE));
+
+            let signer_account = borrow_global<Account>(secondary_address);
+            let signer_public_key_hash = *Vector::borrow(&secondary_signer_public_key_hashes, i);
+            assert!(
+                signer_public_key_hash == *&signer_account.authentication_key,
+                Errors::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
+            );
+            i = i + 1;
+        }
     }
 
     fun writeset_epilogue(
@@ -327,44 +346,6 @@ module AptosFramework::Account {
     public(script) fun create_account(auth_key: address) {
         let (signer, _) = create_account_internal(auth_key);
         TestCoin::register(&signer);
-    }
-
-    /// Create a Validator account
-    public(script) fun create_validator_account(
-        core_resource: signer,
-        new_account_address: address,
-        human_name: vector<u8>,
-    ) {
-        create_validator_account_internal(&core_resource, new_account_address, human_name);
-    }
-
-    public fun create_validator_account_internal(
-        core_resource: &signer,
-        new_account_address: address,
-        human_name: vector<u8>,
-    ) {
-        SystemAddresses::assert_core_resource(core_resource);
-        let (new_account, _) = create_account_internal(new_account_address);
-        ValidatorConfig::publish( &new_account, human_name);
-    }
-
-    /// Create a Validator Operator account
-    public(script) fun create_validator_operator_account(
-        core_resource: signer,
-        new_account_address: address,
-        human_name: vector<u8>,
-    ) {
-        create_validator_operator_account_internal(&core_resource, new_account_address, human_name)
-    }
-
-    public fun create_validator_operator_account_internal(
-        core_resource: &signer,
-        new_account_address: address,
-        human_name: vector<u8>,
-    ) {
-        SystemAddresses::assert_core_resource(core_resource);
-        let (new_account, _) = create_account_internal(new_account_address);
-        ValidatorOperatorConfig::publish(&new_account, human_name);
     }
 
     /// Create the account for @AptosFramework to help module upgrades on testnet.

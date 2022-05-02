@@ -56,10 +56,10 @@ class RestClient:
         assert response.status_code == 200, f"{response.text} - {account_address}"
         return response.json()
 
-    def account_resources(self, account_address: str) -> Dict[str, Any]:
-        """Returns all resources associated with the account"""
-
-        response = requests.get(f"{self.url}/accounts/{account_address}/resources")
+    def account_resource(self, account_address: str, resource_type: str) -> Optional[Dict[str, Any]]:
+        response = requests.get(f"{self.url}/accounts/{account_address}/resource/{resource_type}")
+        if response.status_code == 404:
+            return None
         assert response.status_code == 200, response.text
         return response.json()
 #<:!:section_3
@@ -120,17 +120,14 @@ class RestClient:
             assert count < 10, f"transaction {txn_hash} timed out"
             time.sleep(1)
             count += 1
+        response = requests.get(f"{self.url}/transactions/{txn_hash}")
+        assert response.json()["success"], f"{response.text} - {txn_hash}"
 #<:!:section_4
 
 #:!:>section_5
     def account_balance(self, account_address: str) -> Optional[int]:
         """Returns the test coin balance associated with the account"""
-
-        resources = self.account_resources(account_address)
-        for resource in resources:
-            if resource["type"] == "0x1::TestCoin::Balance":
-                return int(resource["data"]["coin"]["value"])
-        return None
+        return self.account_resource(account_address, "0x1::TestCoin::Balance")
 
     def transfer(self, account_from: Account, recipient: str, amount: int) -> str:
         """Transfer a given coin amount from a given Account to the recipient's account address.

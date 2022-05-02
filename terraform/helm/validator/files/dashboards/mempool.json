@@ -31,7 +31,10 @@
   "panels": [
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -49,7 +52,10 @@
       "cacheTimeout": null,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "total number of transactions in mempool",
       "fieldConfig": {
         "defaults": {
@@ -95,7 +101,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "core_mempool_index_size{index=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", index=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -151,7 +157,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of mempool insertion of txn",
       "fieldConfig": {
         "defaults": {
@@ -197,7 +206,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, status) (rate(aptos_shared_mempool_transactions_processed{status=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval]))",
+          "expr": "sum by (owner, role, status) (rate(aptos_shared_mempool_transactions_processed{chain_name=~\"$chain_name\", status=\"success\", owner=~\"$owner\", role=~\"$role\"}[$interval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -251,7 +260,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Rate at which txns are removed (via commit) from mempool",
       "fieldConfig": {
         "defaults": {
@@ -296,7 +308,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(core_mempool_removed_txns_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(core_mempool_removed_txns_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -348,7 +360,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of live peers a node can broadcast to in each network",
       "fieldConfig": {
         "defaults": {
@@ -393,7 +408,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, network) (mempool_active_upstream_peers_count{owner=~\"$owner\", role=~\"$role\"})",
+          "expr": "sum by (owner, role, network) (mempool_active_upstream_peers_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"})",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}  ({{network}} network)",
           "refId": "A"
@@ -445,7 +460,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of submitted txns that failed to pass the VM validation",
       "fieldConfig": {
         "defaults": {
@@ -490,7 +508,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, network, sender) (rate(aptos_shared_mempool_transactions_processed{status=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval]))",
+          "expr": "sum by (owner, role, network, sender) (rate(aptos_shared_mempool_transactions_processed{chain_name=~\"$chain_name\", status=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval]))",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} <- ({{network}} network:{{sender}})",
           "refId": "A"
@@ -539,7 +557,10 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -556,7 +577,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of timeouts on a mempool service request (from consensus/state sync)",
       "fieldConfig": {
         "defaults": {
@@ -601,7 +625,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_service_latency_ms_count{result=\"fail\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_service_latency_ms_count{chain_name=~\"$chain_name\", result=\"fail\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} - {{type}}",
           "refId": "A"
@@ -653,7 +677,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of times a DB error occurred",
       "fieldConfig": {
         "defaults": {
@@ -698,7 +725,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_db_error_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_db_error_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -750,7 +777,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of timeouts in callback to JSON RPC",
       "fieldConfig": {
         "defaults": {
@@ -795,7 +825,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_json_rpc_callback_fail_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_json_rpc_callback_fail_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -847,7 +877,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of times a aptos network send failed",
       "fieldConfig": {
         "defaults": {
@@ -892,7 +925,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_network_send_fail_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_network_send_fail_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -944,7 +977,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of times reconfiguration of VM failed",
       "fieldConfig": {
         "defaults": {
@@ -989,7 +1025,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_vm_reconfig_update_fail_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_vm_reconfig_update_fail_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -1041,7 +1077,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of times core mempool invariant was violated",
       "fieldConfig": {
         "defaults": {
@@ -1086,7 +1125,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_core_mempool_invariant_violated_count{owner=\"$owner\", role=\"$role\"}[$interval])",
+          "expr": "rate(mempool_core_mempool_invariant_violated_count{chain_name=~\"$chain_name\", owner=\"$owner\", role=\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -1138,7 +1177,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of unexpected network messages received",
       "fieldConfig": {
         "defaults": {
@@ -1183,7 +1225,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_unexpected_network_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_unexpected_network_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} <- {{network}}:{{peer}}",
           "refId": "A"
@@ -1232,7 +1274,10 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1249,7 +1294,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of number of transactions that expired in mempool based on client-specified expiration time",
       "fieldConfig": {
         "defaults": {
@@ -1294,7 +1342,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(core_mempool_gc_latency_count{type=\"client_expiration\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(core_mempool_gc_latency_count{chain_name=~\"$chain_name\", type=\"client_expiration\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} : {{status}}",
           "refId": "A"
@@ -1346,7 +1394,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Rate of number of transactions that expired in mempool based on mempool-specified expiration time",
       "fieldConfig": {
         "defaults": {
@@ -1391,7 +1442,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(core_mempool_gc_latency_count{type=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(core_mempool_gc_latency_count{chain_name=~\"$chain_name\", type=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} : {{status}}",
           "refId": "A"
@@ -1443,7 +1494,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of transactions in parking lot index. These transactions are not ready for broadcast or consensus",
       "fieldConfig": {
         "defaults": {
@@ -1488,7 +1542,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "core_mempool_index_size{index=\"parking_lot\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", index=\"parking_lot\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -1540,7 +1594,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of transactions ready for broadcast in core mempool ",
       "fieldConfig": {
         "defaults": {
@@ -1585,7 +1642,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "core_mempool_index_size{index=\"timeline\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", index=\"timeline\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -1637,7 +1694,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "transactions ready for consensus",
       "fieldConfig": {
         "defaults": {
@@ -1682,7 +1742,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "core_mempool_index_size{index=\"priority\", role=\"validator\", owner=~\"$owner\"}",
+          "expr": "core_mempool_index_size{chain_name=~\"$chain_name\", index=\"priority\", role=\"validator\", owner=~\"$owner\"}",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"
@@ -1734,7 +1794,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of transactions that passed VM validation but were rejected from mempool",
       "fieldConfig": {
         "defaults": {
@@ -1779,7 +1842,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_transactions_processed{status!=\"success\", status!=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_transactions_processed{chain_name=~\"$chain_name\", status!=\"success\", status!=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} <- ({{network}} network:{{sender}}) -  {{status}}",
           "refId": "A"
@@ -1831,7 +1894,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Number of times garbage-collection event occurred (regardless of how many txns were actually removed in the event)",
       "fieldConfig": {
         "defaults": {
@@ -1876,7 +1942,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(core_mempool_gc_event_count{type=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(core_mempool_gc_event_count{chain_name=~\"$chain_name\", type=\"system_ttl\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -1928,7 +1994,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "how long a transaction stayed in mempool before being garbage-collected",
       "fieldConfig": {
         "defaults": {
@@ -1973,7 +2042,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(core_mempool_gc_latency_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(core_mempool_gc_latency_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(core_mempool_gc_latency_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])/rate(core_mempool_gc_latency_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -2022,7 +2091,10 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2039,7 +2111,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Rate of accepted transactions committed per second (notified from state sync)",
       "fieldConfig": {
         "defaults": {
@@ -2085,7 +2160,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_service_transactions_sum{type=\"commit_accepted\", owner=~\"$owner\", role=~\"$role\"}[$interval])\n",
+          "expr": "rate(mempool_service_transactions_sum{chain_name=~\"$chain_name\", type=\"commit_accepted\", owner=~\"$owner\", role=~\"$role\"}[$interval])\n",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2140,7 +2215,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "average time it takes for mempool to process a commit of accepted transactions (sent from state sync)",
       "fieldConfig": {
         "defaults": {
@@ -2186,7 +2264,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_service_latency_ms_sum{type=\"commit_accepted\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(mempool_service_latency_ms_count{type=\"commit_accepted\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_service_latency_ms_sum{chain_name=~\"$chain_name\", type=\"commit_accepted\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(mempool_service_latency_ms_count{chain_name=~\"$chain_name\", type=\"commit_accepted\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2240,7 +2318,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of rejected committed transactions (notified from consensus)",
       "fieldConfig": {
         "defaults": {
@@ -2285,7 +2366,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_service_transactions_sum{type=\"commit_rejected\", owner=~\"$owner\", role=~\"$role\"}[$interval])\n",
+          "expr": "rate(mempool_service_transactions_sum{chain_name=~\"$chain_name\", type=\"commit_rejected\", owner=~\"$owner\", role=~\"$role\"}[$interval])\n",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"
@@ -2337,7 +2418,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "avg time it takes to process committed rejected txns",
       "fieldConfig": {
         "defaults": {
@@ -2382,7 +2466,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_service_latency_ms_sum{type=\"commit_rejected\", owner=~\"$owner\"}[$interval])/rate(mempool_service_latency_ms_count{type=\"commit_rejected\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(mempool_service_latency_ms_sum{chain_name=~\"$chain_name\", type=\"commit_rejected\", owner=~\"$owner\"}[$interval])/rate(mempool_service_latency_ms_count{chain_name=~\"$chain_name\", type=\"commit_rejected\", owner=~\"$owner\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"
@@ -2434,7 +2518,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Average size of consensus blocks pulled from mempool",
       "fieldConfig": {
         "defaults": {
@@ -2480,7 +2567,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_service_transactions_sum{type=\"get_block\", owner=~\"$owner\"}[$interval]) / rate(mempool_service_transactions_count{type=\"get_block\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(mempool_service_transactions_sum{chain_name=~\"$chain_name\", type=\"get_block\", owner=~\"$owner\"}[$interval]) / rate(mempool_service_transactions_count{chain_name=~\"$chain_name\", type=\"get_block\", owner=~\"$owner\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2534,7 +2621,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Avg time it takes for consensus to pull block from mempool",
       "fieldConfig": {
         "defaults": {
@@ -2580,7 +2670,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_service_latency_ms_sum{type=\"get_block\", owner=~\"$owner\"}[$interval]) / rate(mempool_service_latency_ms_count{type=\"get_block\", owner=~\"$owner\"}[$interval])",
+          "expr": "rate(mempool_service_latency_ms_sum{chain_name=~\"$chain_name\", type=\"get_block\", owner=~\"$owner\"}[$interval]) / rate(mempool_service_latency_ms_count{chain_name=~\"$chain_name\", type=\"get_block\", owner=~\"$owner\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2631,7 +2721,10 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2648,7 +2741,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of shared mempool events from peers",
       "fieldConfig": {
         "defaults": {
@@ -2694,7 +2790,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_events{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_events{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2748,7 +2844,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "average time it takes for mempool to start an async task",
       "fieldConfig": {
         "defaults": {
@@ -2793,7 +2892,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_bounded_executor_spawn_latency_sum{stage=\"start\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(mempool_bounded_executor_spawn_latency_count{stage=\"start\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_bounded_executor_spawn_latency_sum{chain_name=~\"$chain_name\", stage=\"start\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(mempool_bounded_executor_spawn_latency_count{chain_name=~\"$chain_name\", stage=\"start\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} - {{task}}",
           "refId": "A"
@@ -2842,7 +2941,10 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2859,7 +2961,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of new transactions received from other peers or JSON-RPC",
       "fieldConfig": {
         "defaults": {
@@ -2905,7 +3010,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, network, sender) (rate(aptos_shared_mempool_transactions_processed{owner=~\"$owner\", role=~\"$role\"}[$interval]))",
+          "expr": "sum by (owner, role, network, sender) (rate(aptos_shared_mempool_transactions_processed{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -2959,7 +3064,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of transactions that were successfully validated before mempool insertion\n",
       "fieldConfig": {
         "defaults": {
@@ -3005,7 +3113,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role, network, sender) (rate(aptos_shared_mempool_transactions_processed{status!=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval]))",
+          "expr": "sum by (owner, role, network, sender) (rate(aptos_shared_mempool_transactions_processed{chain_name=~\"$chain_name\", status!=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval]))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -3060,7 +3168,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "avg time it takes to process incoming transactions, per incoming submission",
       "fieldConfig": {
         "defaults": {
@@ -3105,7 +3216,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_request_latency_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_shared_mempool_request_latency_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_request_latency_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_shared_mempool_request_latency_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} <- ({{network}} network:{{sender}})",
           "refId": "A"
@@ -3157,7 +3268,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "avg time it takes to VM-validate txns in a submission",
       "fieldConfig": {
         "defaults": {
@@ -3202,7 +3316,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_process_txn_breakdown_latency_sum{portion=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(mempool_process_txn_breakdown_latency_count{portion=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_process_txn_breakdown_latency_sum{chain_name=~\"$chain_name\", portion=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(mempool_process_txn_breakdown_latency_count{chain_name=~\"$chain_name\", portion=\"vm_validation\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -3254,7 +3368,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "latency of db read when validating transaction",
       "fieldConfig": {
         "defaults": {
@@ -3299,7 +3416,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_process_txn_breakdown_latency_sum{portion=\"storage_fetch\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(mempool_process_txn_breakdown_latency_count{portion=\"storage_fetch\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_process_txn_breakdown_latency_sum{chain_name=~\"$chain_name\", portion=\"storage_fetch\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(mempool_process_txn_breakdown_latency_count{chain_name=~\"$chain_name\", portion=\"storage_fetch\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -3348,7 +3465,10 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -3365,7 +3485,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "average number of transactions in a single broadcast",
       "fieldConfig": {
         "defaults": {
@@ -3410,7 +3533,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_transaction_broadcast_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_shared_mempool_transaction_broadcast_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_transaction_broadcast_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_shared_mempool_transaction_broadcast_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} -> ({{network}} network:{{recipient}})",
           "refId": "A"
@@ -3462,7 +3585,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of transactions broadcasted to other peers",
       "fieldConfig": {
         "defaults": {
@@ -3508,7 +3634,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_transaction_broadcast_sum{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_transaction_broadcast_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -3562,7 +3688,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "avg number of broadcasts / sec",
       "fieldConfig": {
         "defaults": {
@@ -3607,7 +3736,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_broadcast_latency_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_broadcast_latency_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} -> ({{network}} network:{{recipient}})",
           "refId": "A"
@@ -3659,7 +3788,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "avg time it takes to execute a broadcast",
       "fieldConfig": {
         "defaults": {
@@ -3704,7 +3836,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_broadcast_latency_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_broadcast_latency_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_broadcast_latency_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_broadcast_latency_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} -> ({{network}} network,{{recipient}})",
           "refId": "A"
@@ -3756,7 +3888,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "average time b/w broadcast sent and ACK coming back for it",
       "fieldConfig": {
         "defaults": {
@@ -3801,7 +3936,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_broadcast_roundtrip_latency_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_shared_mempool_broadcast_roundtrip_latency_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_broadcast_roundtrip_latency_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_shared_mempool_broadcast_roundtrip_latency_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} -> ({{network}} network:{{recipient}})",
           "refId": "A"
@@ -3853,7 +3988,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of sent broadcasts awaiting an ACK",
       "fieldConfig": {
         "defaults": {
@@ -3898,7 +4036,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_shared_mempool_pending_broadcasts_count{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_shared_mempool_pending_broadcasts_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} -> ({{network}}:{{recipient}})",
           "refId": "A"
@@ -3950,7 +4088,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of broadcasts that are retrying expired braodcasts (that did not get back an ACK in window of time)",
       "fieldConfig": {
         "defaults": {
@@ -3995,7 +4136,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_rebroadcast_count{type=\"expired\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_rebroadcast_count{chain_name=~\"$chain_name\", type=\"expired\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} -> {{network}}:{{recipient}}",
           "refId": "A"
@@ -4047,7 +4188,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of broadcasts that are retrying past broadcasts that received a retry ACK",
       "fieldConfig": {
         "defaults": {
@@ -4092,7 +4236,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_rebroadcast_count{type=\"retry\", owner=~\"$owner\", role=~\"role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_rebroadcast_count{chain_name=~\"$chain_name\", type=\"retry\", owner=~\"$owner\", role=~\"role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} -> ({{network}}:{{recipient}})",
           "refId": "A"
@@ -4144,7 +4288,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of broadcasts that were executed as a backpressure broadcast",
       "fieldConfig": {
         "defaults": {
@@ -4189,7 +4336,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_rebroadcast_count{type=\"backpressure\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_rebroadcast_count{chain_name=~\"$chain_name\", type=\"backpressure\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} -> {{network}}:{{recipient}}",
           "refId": "A"
@@ -4238,7 +4385,10 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -4255,7 +4405,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of backoff/retry ACKs sent",
       "fieldConfig": {
         "defaults": {
@@ -4300,7 +4453,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_shared_mempool_ack_count{direction=\"sent\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_shared_mempool_ack_count{chain_name=~\"$chain_name\", direction=\"sent\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} -> {{network}}:{{recipient}} - {{type}}",
           "refId": "A"
@@ -4352,7 +4505,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of retry/backpressure ACKs received",
       "fieldConfig": {
         "defaults": {
@@ -4397,7 +4553,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_shared_mempool_ack_count{direction=\"received\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_shared_mempool_ack_count{chain_name=~\"$chain_name\", direction=\"received\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}} <- {{network}}:{{recipient}} - {{type}}",
           "refId": "A"
@@ -4446,7 +4602,10 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -4463,7 +4622,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "number of messages dropped from mempool channel sender",
       "fieldConfig": {
         "defaults": {
@@ -4508,7 +4670,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "mempool_pending_network_events{state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "mempool_pending_network_events{chain_name=~\"$chain_name\", state=\"dropped\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -4560,7 +4722,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "rate of messages being enqueued to be sent out",
       "fieldConfig": {
         "defaults": {
@@ -4605,7 +4770,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_pending_network_events{state=\"enqueued\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_pending_network_events{chain_name=~\"$chain_name\", state=\"enqueued\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -4657,7 +4822,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Rate of messages dequeued from mempool network sender",
       "fieldConfig": {
         "defaults": {
@@ -4702,7 +4870,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(mempool_pending_network_events{state=\"dequeued\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(mempool_pending_network_events{chain_name=~\"$chain_name\", state=\"dequeued\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -4754,7 +4922,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Messages currently queued to be sent out",
       "fieldConfig": {
         "defaults": {
@@ -4799,7 +4970,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role) (mempool_pending_network_events{state=\"enqueued\", owner=~\"$owner\", role=~\"$role\"}) - sum by (owner, role)  (mempool_pending_network_events{state=\"dequeued\", owner=~\"$owner\", role=~\"$role\"})",
+          "expr": "sum by (owner, role) (mempool_pending_network_events{chain_name=~\"$chain_name\", state=\"enqueued\", owner=~\"$owner\", role=~\"$role\"}) - sum by (owner, role)  (mempool_pending_network_events{chain_name=~\"$chain_name\", state=\"dequeued\", owner=~\"$owner\", role=~\"$role\"})",
           "interval": "",
           "legendFormat": "{{owner}}:{{role}}",
           "refId": "A"
@@ -4854,6 +5025,53 @@
   "templating": {
     "list": [
       {
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "Datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Datasource}"
+        },
+        "definition": "label_values(chain_name)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "chain_name",
+        "options": [],
+        "query": {
+          "query": "label_values(chain_name)",
+          "refId": "Prometheus-chain-name-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
         "allValue": null,
         "current": {
           "selected": true,
@@ -4864,7 +5082,10 @@
             "$__all"
           ]
         },
-        "datasource": "Prometheus",
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(owner)",
         "hide": 0,
         "includeAll": true,
@@ -4894,7 +5115,10 @@
             "$__all"
           ]
         },
-        "datasource": "Prometheus",
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(role)",
         "hide": 0,
         "includeAll": true,

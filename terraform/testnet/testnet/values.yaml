@@ -1,6 +1,9 @@
 imageTag: latest
 validatorLite: false
 
+# name of the chain for prometheus label
+chain_name:
+
 genesis:
   numValidators: 1
   numPublicFullnodes: 1
@@ -93,6 +96,10 @@ ingress:
 monitoring:
   prometheus:
     useHttps: true
+    remote_write:
+      enabled: false
+      url:
+      region:
     image:
       repo: prom/prometheus
       tag: latest

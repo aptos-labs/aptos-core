@@ -5,10 +5,13 @@ use crate::{
     error::Error,
     logging::{LogEntry, LogSchema},
     metrics,
-    notification_handlers::{CommitNotification, CommittedTransactions, ErrorNotification},
+    notification_handlers::{
+        CommitNotification, CommittedTransactions, ErrorNotification, MempoolNotificationHandler,
+    },
     utils,
 };
 use aptos_config::config::StateSyncDriverConfig;
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -18,8 +21,10 @@ use aptos_types::{
     },
 };
 use data_streaming_service::data_notification::NotificationId;
+use event_notifications::EventSubscriptionService;
 use executor_types::ChunkExecutorTrait;
 use futures::{channel::mpsc, SinkExt, StreamExt};
+use mempool_notifications::MempoolNotificationSender;
 use std::{
     future::Future,
     sync::{
@@ -27,7 +32,7 @@ use std::{
         Arc,
     },
 };
-use storage_interface::DbReaderWriter;
+use storage_interface::{DbReader, DbReaderWriter};
 use tokio::{
     runtime::{Handle, Runtime},
     task::{yield_now, JoinHandle},
@@ -91,7 +96,7 @@ pub struct StorageSynchronizer<ChunkExecutor> {
     // The executor for transaction and transaction output chunks
     chunk_executor: Arc<ChunkExecutor>,
 
-    // A channel through which to notify the driver of committed data
+    // A channel through which to notify the driver of committed account data
     commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
 
     // The configuration of the state sync driver
@@ -136,11 +141,13 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> Clone for StorageSynchronizer<
 
 impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecutor> {
     /// Returns a new storage synchronizer alongside the executor and committer handles
-    pub fn new(
+    pub fn new<MempoolNotifier: MempoolNotificationSender>(
         driver_config: StateSyncDriverConfig,
         chunk_executor: Arc<ChunkExecutor>,
         commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
         error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
+        event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
+        mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
         storage: DbReaderWriter,
         runtime: Option<&Runtime>,
     ) -> (Self, JoinHandle<()>, JoinHandle<()>) {
@@ -162,7 +169,6 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
             executor_listener,
             committer_notifier,
             pending_transaction_chunks.clone(),
-            max_pending_data_chunks as u64,
             runtime.clone(),
         );
 
@@ -170,10 +176,12 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
         let committer_handle = spawn_committer(
             chunk_executor.clone(),
             committer_listener,
-            commit_notification_sender.clone(),
             error_notification_sender.clone(),
+            event_subscription_service,
+            mempool_notification_handler,
             pending_transaction_chunks.clone(),
             runtime.clone(),
+            storage.reader.clone(),
         );
 
         // Initialize the metric gauges
@@ -327,7 +335,6 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
     mut executor_listener: mpsc::Receiver<StorageDataChunk>,
     mut committer_notifier: mpsc::Sender<NotificationId>,
     pending_transaction_chunks: Arc<AtomicU64>,
-    max_pending_data_chunks: u64,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
     // Create an executor
@@ -393,12 +400,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             decrement_pending_data_chunks(pending_transaction_chunks.clone());
                         }
                     }
-
-                    // If the executor begins running too far ahead of the committer
-                    // let's force more yields to avoid unnecessary back pressure.
-                    if load_pending_data_chunks(pending_transaction_chunks.clone()) > max_pending_data_chunks / 2 {
-                        yield_now().await;
-                    }
+                    yield_thread().await;
                 }
             }
         }
@@ -409,13 +411,18 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
 }
 
 /// Spawns a dedicated committer that commits executed (but pending) chunks
-fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
+fn spawn_committer<
+    ChunkExecutor: ChunkExecutorTrait + 'static,
+    MempoolNotifier: MempoolNotificationSender,
+>(
     chunk_executor: Arc<ChunkExecutor>,
     mut committer_listener: mpsc::Receiver<NotificationId>,
-    mut commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
+    event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
+    mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
     pending_transaction_chunks: Arc<AtomicU64>,
     runtime: Option<Handle>,
+    storage: Arc<dyn DbReader>,
 ) -> JoinHandle<()> {
     // Create a committer
     let committer = async move {
@@ -425,20 +432,34 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     // Commit the executed chunk
                     match chunk_executor.commit_chunk() {
                         Ok((events, transactions)) => {
-                            // Update the metrics
+                             // Log the event and update the metrics
+                             debug!(
+                                LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
+                                    "Committed a new transaction chunk! \
+                                    Transaction total: {:?}, event total: {:?}",
+                                   transactions.len(),
+                                   events.len()
+                                ))
+                            );
                             metrics::increment_gauge(
                                 &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                                metrics::StorageSynchronizerOperations::SyncedTransactions
+                                metrics::StorageSynchronizerOperations::Synced
                                     .get_label(),
                                 transactions.len() as u64,
                             );
 
-                            // Send a commit notification to the commit listener
-                            let commit_notification = CommitNotification::new_committed_transactions(events, transactions);
-                            if let Err(error) = commit_notification_sender.send(commit_notification).await {
-                                let error = format!("Failed to send transaction commit notification! Error: {:?}", error);
-                                send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
-                            }
+                            // Handle the committed transaction notification (e.g., notify mempool).
+                            // We do this here due to synchronization issues with mempool and
+                            // storage. See: https://github.com/aptos-labs/aptos-core/issues/553
+                            let committed_transactions = CommittedTransactions {
+                                events,
+                                transactions
+                            };
+                            utils::handle_committed_transactions(committed_transactions,
+                                storage.clone(),
+                                mempool_notification_handler.clone(),
+                                event_subscription_service.clone(),
+                            ).await;
                         }
                         Err(error) => {
                             let error = format!("Failed to commit executed chunk! Error: {:?}", error);
@@ -446,6 +467,7 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         }
                     };
                     decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                    yield_thread().await;
                 }
             }
         }
@@ -519,6 +541,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                         }
 
                                         decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                                        yield_thread().await;
                                         continue; // Wait for the next chunk
                                     }
 
@@ -659,4 +682,15 @@ async fn send_storage_synchronizer_error(
 
     // Update the metrics
     metrics::increment_counter(&metrics::STORAGE_SYNCHRONIZER_ERRORS, error.get_label());
+}
+
+/// This yields the currently executing thread. This is required
+/// to avoid starvation of other threads when the system is under
+/// heavy load (see: https://github.com/aptos-labs/aptos-core/issues/623).
+///
+/// TODO(joshlind): identify a better solution. It likely requires
+/// using spawn_blocking() at a lower level, or merging runtimes.
+async fn yield_thread() {
+    // We have a 50% chance of yielding here.
+    sample!(SampleRate::Frequency(2), yield_now().await;);
 }

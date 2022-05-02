@@ -29,7 +29,6 @@ module AptosFramework::TestCoin {
 
     /// Represnets the metadata of the coin, store @CoreResources.
     struct CoinInfo has key {
-        total_value: u128,
         scaling_factor: u64,
     }
 
@@ -68,7 +67,7 @@ module AptosFramework::TestCoin {
         SystemAddresses::assert_core_resource(core_resource);
         move_to(core_resource, MintCapability {});
         move_to(core_resource, BurnCapability {});
-        move_to(core_resource, CoinInfo { total_value: 0, scaling_factor });
+        move_to(core_resource, CoinInfo { scaling_factor });
         move_to(core_resource, Delegations { inner: Vector::empty() });
         register(core_resource);
     }
@@ -102,11 +101,7 @@ module AptosFramework::TestCoin {
     }
 
     /// Claim the delegated mint capability and destroy the delegated token.
-    public(script) fun claim_mint_capability(account: signer) acquires Delegations {
-        claim_mint_capability_internal(&account);
-    }
-
-    public fun claim_mint_capability_internal(account: &signer) acquires Delegations {
+    public(script) fun claim_mint_capability(account: &signer) acquires Delegations {
         let maybe_index = find_delegation(Signer::address_of(account));
         assert!(Option::is_some(&maybe_index), EDELEGATION_NOT_FOUND);
         let idx = *Option::borrow(&maybe_index);
@@ -134,22 +129,19 @@ module AptosFramework::TestCoin {
 
     /// Mint coins with capability.
     public(script) fun mint(
-        account: signer,
+        account: &signer,
         mint_addr: address,
         amount: u64
-    ) acquires Balance, MintCapability, CoinInfo
+    ) acquires Balance, MintCapability
     {
-        mint_internal(&account, mint_addr, amount);
+        mint_internal(account, mint_addr, amount);
     }
 
-    public fun mint_internal(account: &signer, mint_addr: address, amount: u64) acquires Balance, MintCapability, CoinInfo {
+    public fun mint_internal(account: &signer, mint_addr: address, amount: u64) acquires Balance, MintCapability {
         let sender_addr = Signer::address_of(account);
         let _cap = borrow_global<MintCapability>(sender_addr);
         // Deposit `amount` of tokens to `mint_addr`'s balance
         deposit(mint_addr, Coin { value: amount });
-        // Update the total supply
-        let coin_info = borrow_global_mut<CoinInfo>(@CoreResources);
-        coin_info.total_value = coin_info.total_value + (amount as u128);
     }
 
     public fun exists_at(addr: address): bool{
@@ -162,12 +154,8 @@ module AptosFramework::TestCoin {
         borrow_global<Balance>(owner).coin.value
     }
 
-    public(script) fun transfer(from: signer, to: address, amount: u64) acquires Balance, TransferEvents {
-        transfer_internal(&from, to, amount);
-    }
-
     /// Transfers `amount` of tokens from `from` to `to`.
-    public fun transfer_internal(from: &signer, to: address, amount: u64) acquires Balance, TransferEvents {
+    public(script) fun transfer(from: &signer, to: address, amount: u64) acquires Balance, TransferEvents {
         let check = withdraw(from, amount);
         deposit(to, check);
         // emit events
@@ -203,27 +191,19 @@ module AptosFramework::TestCoin {
     }
 
     /// Burn coins with capability.
-    public fun burn(account: &signer, coins: Coin) acquires BurnCapability, CoinInfo {
+    public fun burn(account: &signer, coins: Coin) acquires BurnCapability {
         let cap = borrow_global<BurnCapability>(Signer::address_of(account));
         burn_with_capability(coins, cap);
     }
 
-    fun burn_with_capability(coins: Coin, _cap: &BurnCapability) acquires  CoinInfo {
-        let Coin { value } = coins;
-        // Update the total supply
-        let coin_info = borrow_global_mut<CoinInfo>(@CoreResources);
-        coin_info.total_value = coin_info.total_value - (value as u128);
+    fun burn_with_capability(coins: Coin, _cap: &BurnCapability) {
+        let Coin { value: _ } = coins;
     }
 
     /// Burn transaction gas.
-    public(friend) fun burn_gas(fee: Coin) acquires BurnCapability, CoinInfo {
+    public(friend) fun burn_gas(fee: Coin) acquires BurnCapability {
         let cap = borrow_global<BurnCapability>(@CoreResources);
         burn_with_capability(fee, cap);
-    }
-
-    /// Get the current total supply of the coin.
-    public fun total_supply(): u128 acquires  CoinInfo {
-        borrow_global<CoinInfo>(@CoreResources).total_value
     }
 
     public fun scaling_factor(): u64 acquires  CoinInfo {
@@ -245,7 +225,7 @@ module AptosFramework::TestCoin {
 
     #[test(account = @0x1)]
     #[expected_failure] // This test should abort
-    fun mint_non_owner(account: signer) acquires Balance, MintCapability, CoinInfo {
+    fun mint_non_owner(account: signer) acquires Balance, MintCapability {
         // Make sure the address we've chosen doesn't match the module
         // owner address
         register(&account);
@@ -256,12 +236,11 @@ module AptosFramework::TestCoin {
     #[test(account = @CoreResources)]
     public(script) fun mint_check_balance_and_supply(
         account: signer,
-    ) acquires Balance, MintCapability, CoinInfo {
+    ) acquires Balance, MintCapability {
         initialize(&account, 1000000);
         let addr = Signer::address_of(&account);
-        mint(account, @CoreResources, 42);
+        mint(&account, @CoreResources, 42);
         assert!(balance_of(addr) == 42, 0);
-        assert!(total_supply() == 42, 0);
     }
 
     #[test(account = @0x1)]
@@ -299,7 +278,7 @@ module AptosFramework::TestCoin {
     }
 
     #[test(account = @CoreResources)]
-    fun can_withdraw_amount(account: signer) acquires Balance, MintCapability, CoinInfo {
+    fun can_withdraw_amount(account: signer) acquires Balance, MintCapability {
         initialize(&account, 1000000);
         let amount = 1000;
         let addr = Signer::address_of(&account);
@@ -309,32 +288,30 @@ module AptosFramework::TestCoin {
     }
 
     #[test(account = @CoreResources)]
-    fun successful_burn(account: signer) acquires Balance, MintCapability, BurnCapability, CoinInfo {
+    fun successful_burn(account: signer) acquires Balance, MintCapability, BurnCapability {
         initialize(&account, 1000000);
         let amount = 1000;
         let addr = Signer::address_of(&account);
         mint_internal(&account, addr, amount);
         burn(&account, withdraw(&account, 100));
         assert!(balance_of(addr) == 900, 0);
-        assert!(total_supply() == 900, 0);
     }
 
     #[test(account = @CoreResources, another = @0x1)]
     #[expected_failure]
-    fun failed_burn(account: signer, another: signer) acquires Balance, MintCapability, BurnCapability, CoinInfo {
+    fun failed_burn(account: signer, another: signer) acquires Balance, MintCapability, BurnCapability {
         initialize(&account, 1000000);
         let amount = 1000;
         let addr = Signer::address_of(&another);
         mint_internal(&account, addr, amount);
         burn(&another, withdraw(&another, 100));
-        assert!(total_supply() == 1000, 0);
     }
 
     #[test(account = @CoreResources, receiver = @0x1)]
     public(script) fun transfer_test(
         account: signer,
         receiver: signer,
-    ) acquires Balance, MintCapability, CoinInfo, TransferEvents {
+    ) acquires Balance, MintCapability, TransferEvents {
         initialize(&account, 1000000);
         register(&receiver);
         let amount = 1000;
@@ -342,14 +319,13 @@ module AptosFramework::TestCoin {
         let addr1 = Signer::address_of(&receiver);
         mint_internal(&account, addr, amount);
 
-        transfer(account, addr1, 400);
+        transfer(&account, addr1, 400);
         assert!(balance_of(addr) == 600, 0);
         assert!(balance_of(addr1) == 400, 0);
-        assert!(total_supply() == 1000, 0);
     }
 
     #[test(account = @CoreResources, account_clone = @CoreResources, delegatee = @0x1)]
-    public(script) fun mint_delegation_success(account: signer, account_clone: signer, delegatee: signer) acquires Balance, CoinInfo, Delegations, MintCapability  {
+    public(script) fun mint_delegation_success(account: signer, account_clone: signer, delegatee: signer) acquires Balance, Delegations, MintCapability  {
         initialize(&account, 1000000);
         register(&delegatee);
         let addr = Signer::address_of(&delegatee);
@@ -357,9 +333,9 @@ module AptosFramework::TestCoin {
         // make sure can delegate more than one
         delegate_mint_capability(account_clone, addr1);
         delegate_mint_capability(account, addr);
-        claim_mint_capability_internal(&delegatee);
+        claim_mint_capability(&delegatee);
 
-        mint(delegatee, addr, 1000);
+        mint(&delegatee, addr, 1000);
         assert!(balance_of(addr) == 1000, 0);
     }
 
@@ -369,7 +345,7 @@ module AptosFramework::TestCoin {
         initialize(&account, 1000000);
         let delegatee = @0x1234;
         delegate_mint_capability(account, delegatee);
-        claim_mint_capability(random);
+        claim_mint_capability(&random);
     }
 
     #[test(account = @CoreResources, random = @0x1)]
@@ -377,5 +353,11 @@ module AptosFramework::TestCoin {
     public(script) fun mint_delegation_delegate_fail(account: signer, random: signer) acquires Delegations  {
         initialize(&account, 1000000);
         delegate_mint_capability(random, @0x1);
+    }
+
+    #[test_only]
+    public fun mint_for_test(account: &signer, amount: u64) acquires Balance {
+        register(account);
+        deposit(Signer::address_of(account), Coin {value: amount});
     }
 }

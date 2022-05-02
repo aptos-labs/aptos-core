@@ -28,12 +28,7 @@ class HelloBlockchainClient(RestClient):
 #:!:>section_2
     def get_message(self, contract_address: str, account_address: str) -> Optional[str]:
         """ Retrieve the resource Message::MessageHolder::message """
-
-        resources = self.account_resources(account_address)
-        for resource in resources:
-            if resource["type"] == f"0x{contract_address}::Message::MessageHolder":
-                return resource["data"]["message"]
-        return None
+        return self.account_resource(account_address, f"0x{contract_address}::Message::MessageHolder")
 #<:!:section_2
 
 #:!:>section_3

@@ -341,7 +341,6 @@ fn create_transaction() -> Transaction {
         transaction_payload,
         0,
         0,
-        "".into(),
         0,
         ChainId::new(10),
     );

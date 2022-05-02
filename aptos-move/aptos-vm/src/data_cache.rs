@@ -5,6 +5,7 @@
 use crate::{counters::CRITICAL_ERRORS, create_access_path, logging::AdapterLogSchema};
 #[allow(unused_imports)]
 use anyhow::format_err;
+use anyhow::Error;
 use aptos_logger::prelude::*;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
@@ -18,9 +19,11 @@ use fail::fail_point;
 use move_binary_format::errors::*;
 use move_core_types::{
     account_address::AccountAddress,
+    gas_schedule::{GasAlgebra, GasCarrier, InternalGasUnits},
     language_storage::{ModuleId, StructTag},
     resolver::{ModuleResolver, ResourceResolver},
 };
+use move_table_extension::{TableHandle, TableOperation, TableResolver};
 use std::{
     collections::btree_map::BTreeMap,
     ops::{Deref, DerefMut},
@@ -149,6 +152,25 @@ impl<'a, S: StateView> ResourceResolver for RemoteStorage<'a, S> {
     }
 }
 
+impl<'a, S: StateView> TableResolver for RemoteStorage<'a, S> {
+    fn resolve_table_entry(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+    ) -> Result<Option<Vec<u8>>, Error> {
+        self.get_state_value(&StateKey::table_item(handle.0, key.to_vec()))
+    }
+
+    fn operation_cost(
+        &self,
+        _op: TableOperation,
+        _key_size: usize,
+        _val_size: usize,
+    ) -> InternalGasUnits<GasCarrier> {
+        InternalGasUnits::new(1)
+    }
+}
+
 impl<'a, S: StateView> ConfigStorage for RemoteStorage<'a, S> {
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
         self.get(&access_path).ok()?
@@ -208,6 +230,26 @@ impl<S: StateView> ResourceResolver for RemoteStorageOwned<S> {
         struct_tag: &StructTag,
     ) -> Result<Option<Vec<u8>>, Self::Error> {
         self.as_move_resolver().get_resource(address, struct_tag)
+    }
+}
+
+impl<S: StateView> TableResolver for RemoteStorageOwned<S> {
+    fn resolve_table_entry(
+        &self,
+        handle: &TableHandle,
+        key: &[u8],
+    ) -> Result<Option<Vec<u8>>, Error> {
+        self.as_move_resolver().resolve_table_entry(handle, key)
+    }
+
+    fn operation_cost(
+        &self,
+        op: TableOperation,
+        key_size: usize,
+        val_size: usize,
+    ) -> InternalGasUnits<GasCarrier> {
+        self.as_move_resolver()
+            .operation_cost(op, key_size, val_size)
     }
 }
 

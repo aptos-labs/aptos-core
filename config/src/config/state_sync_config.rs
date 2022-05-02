@@ -81,6 +81,7 @@ pub struct StateSyncDriverConfig {
     pub continuous_syncing_mode: ContinuousSyncingMode, // The mode by which to sync after bootstrapping
     pub progress_check_interval_ms: u64, // The interval (ms) at which to check state sync progress
     pub max_connection_deadline_secs: u64, // The max time (secs) to wait for connections from peers
+    pub max_consecutive_stream_notifications: u64, // The max number of notifications to process per driver loop
     pub max_pending_data_chunks: u64, // The max number of data chunks pending execution or commit
     pub max_stream_wait_time_ms: u64, // The max time (ms) to wait for a data stream notification
 }
@@ -91,10 +92,11 @@ impl Default for StateSyncDriverConfig {
     fn default() -> Self {
         Self {
             bootstrapping_mode: BootstrappingMode::ApplyTransactionOutputsFromGenesis,
-            enable_state_sync_v2: false,
+            enable_state_sync_v2: true,
             continuous_syncing_mode: ContinuousSyncingMode::ApplyTransactionOutputs,
             progress_check_interval_ms: 100,
             max_connection_deadline_secs: 10,
+            max_consecutive_stream_notifications: 10,
             max_pending_data_chunks: 100,
             max_stream_wait_time_ms: 10_000,
         }
@@ -117,12 +119,12 @@ impl Default for StorageServiceConfig {
     fn default() -> Self {
         Self {
             max_account_states_chunk_sizes: 1000,
-            max_concurrent_requests: 1000,
+            max_concurrent_requests: 4000,
             max_epoch_chunk_size: 100,
             max_network_channel_size: 1000,
             max_transaction_chunk_size: 1000,
             max_transaction_output_chunk_size: 1000,
-            storage_summary_refresh_interval_ms: 1000,
+            storage_summary_refresh_interval_ms: 100,
         }
     }
 }
@@ -156,7 +158,7 @@ pub struct DataStreamingServiceConfig {
 impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
-            global_summary_refresh_interval_ms: 300,
+            global_summary_refresh_interval_ms: 100,
             max_concurrent_requests: 1,
             max_data_stream_channel_sizes: 1000,
             max_request_retry: 3,
@@ -177,7 +179,7 @@ impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
             response_timeout_ms: 10000,
-            summary_poll_interval_ms: 1000,
+            summary_poll_interval_ms: 100,
         }
     }
 }

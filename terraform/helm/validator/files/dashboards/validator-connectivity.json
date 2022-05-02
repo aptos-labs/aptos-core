@@ -3,20 +3,29 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": "-- Grafana --",
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
         "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
         "type": "dashboard"
       }
     ]
   },
   "editable": true,
-  "gnetId": null,
+  "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 67,
-  "iteration": 1611606291018,
+  "id": 13,
+  "iteration": 1650604665160,
   "links": [
     {
       "asDropdown": true,
@@ -28,9 +37,13 @@
       "type": "dashboards"
     }
   ],
+  "liveNow": false,
   "panels": [
     {
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -42,10 +55,12 @@
       "type": "row"
     },
     {
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -85,7 +100,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "targets": [
         {
           "expr": "quantile(0.67, aptos_consensus_current_epoch_validators)",
@@ -97,17 +112,19 @@
           "refId": "A"
         }
       ],
-      "timeFrom": null,
-      "timeShift": null,
       "title": "ValidatorSet",
       "type": "stat"
     },
     {
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "mappings": [],
+          "max": 1,
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -155,7 +172,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "targets": [
         {
           "expr": "1 - (count(rate(aptos_consensus_current_round[10m]) > 0) OR on() vector(0)) / quantile(0.67, aptos_consensus_current_epoch_validators)",
@@ -167,18 +184,20 @@
           "refId": "A"
         }
       ],
-      "timeFrom": null,
-      "timeShift": null,
       "title": "Down node %",
       "type": "stat"
     },
     {
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "align": null,
-            "filterable": false
+            "displayMode": "auto",
+            "filterable": false,
+            "inspect": false
           },
           "mappings": [],
           "thresholds": {
@@ -205,12 +224,19 @@
       },
       "id": 22,
       "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
         "showHeader": false
       },
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "targets": [
         {
-          "expr": "up{job=\"federate\"} == 0 or up{job=\"aptos-procs\", role=\"validator\"} == 0",
+          "expr": "up{chain_name=~\"$chain_name\", job=\"federate\"} == 0 or up{chain_name=~\"$chain_name\", job=\"aptos-procs\", role=\"validator\"} == 0",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -218,8 +244,6 @@
           "refId": "A"
         }
       ],
-      "timeFrom": null,
-      "timeShift": null,
       "title": "Not reporting metrics",
       "transformations": [
         {
@@ -242,23 +266,18 @@
       "type": "table"
     },
     {
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "align": null,
-            "filterable": false
+            "displayMode": "auto",
+            "filterable": false,
+            "inspect": false
           },
-          "mappings": [
-            {
-              "from": "",
-              "id": 0,
-              "operator": "",
-              "text": "",
-              "to": "",
-              "type": 1
-            }
-          ],
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -283,13 +302,20 @@
       },
       "id": 20,
       "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
         "frameIndex": 1,
         "showHeader": false
       },
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "targets": [
         {
-          "expr": "rate(aptos_consensus_current_round{role=\"validator\"}[1m]) == 0",
+          "expr": "rate(aptos_consensus_current_round{chain_name=~\"$chain_name\", role=\"validator\"}[1m]) == 0",
           "format": "table",
           "instant": true,
           "interval": "",
@@ -297,8 +323,6 @@
           "refId": "A"
         }
       ],
-      "timeFrom": null,
-      "timeShift": null,
       "title": "Node not Participating Consensus",
       "transformations": [
         {
@@ -321,7 +345,10 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -338,11 +365,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Total Connected Peers for both inbound and outbound per peer.",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -374,7 +403,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -384,7 +413,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id) (aptos_connections{network_id=\"Validator\", role_type=\"validator\", owner=~\"$owner\"})\n",
+          "expr": "sum by (owner, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\", owner=~\"$owner\"})\n",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -393,9 +422,7 @@
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Total Connected Peers",
       "tooltip": {
         "shared": true,
@@ -404,33 +431,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -438,11 +456,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Total Inbound connected peers. There should be at most one peer with 0 inbound connections.",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -473,7 +493,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -483,16 +503,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id) (aptos_connections{network_id=\"Validator\", role_type=\"validator\", owner=~\"$owner\", direction=\"inbound\"})",
+          "expr": "sum by (owner, role_type, network_id) (aptos_connections{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\", owner=~\"$owner\", direction=\"inbound\"})",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Inbound Connected Peers",
       "tooltip": {
         "shared": true,
@@ -501,33 +519,24 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
@@ -535,11 +544,13 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Total outbound connections per peer. Every node should have an outbound connection.",
       "fieldConfig": {
         "defaults": {
-          "custom": {},
           "links": []
         },
         "overrides": []
@@ -571,7 +582,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -581,16 +592,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by (owner, role_type, network_id)(aptos_connections{network_id=\"Validator\", role_type=\"validator\", owner=~\"$owner\", direction=\"outbound\"})",
+          "expr": "sum by (owner, role_type, network_id)(aptos_connections{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\", owner=~\"$owner\", direction=\"outbound\"})",
           "interval": "",
           "legendFormat": "{{owner}}",
           "refId": "A"
         }
       ],
       "thresholds": [],
-      "timeFrom": null,
       "timeRegions": [],
-      "timeShift": null,
       "title": "Outbound Connected Peers",
       "tooltip": {
         "shared": true,
@@ -599,38 +608,32 @@
       },
       "type": "graph",
       "xaxis": {
-        "buckets": null,
         "mode": "time",
-        "name": null,
         "show": true,
         "values": []
       },
       "yaxes": [
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         },
         {
           "format": "short",
-          "label": null,
           "logBase": 1,
-          "max": null,
-          "min": null,
           "show": true
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": false
       }
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -643,7 +646,10 @@
       "type": "row"
     },
     {
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "An adjacency matrix showing each (validator -> remote validator) connection. Each row shows the \"owner\" node's view of its own connections to each other validator.\n\nA green \"1\" means there is currently a connection, while a red \"0\" means the nodes are not currently connected. An empty square means there is no reported metric for this (owner_i, owner_j) pair, which is expected for (owner_i, owner_i) since we don't allow self-connections.",
       "fieldConfig": {
         "defaults": {
@@ -651,6 +657,7 @@
             "align": "right",
             "displayMode": "auto",
             "filterable": false,
+            "inspect": false,
             "width": 100
           },
           "mappings": [],
@@ -716,6 +723,13 @@
       },
       "id": 24,
       "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
         "showHeader": true,
         "sortBy": [
           {
@@ -724,10 +738,10 @@
           }
         ]
       },
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "v1.0",
       "targets": [
         {
-          "expr": "# Filter out extraneous fields.\nsum by (owner, remote_owner) (\n  (\n    aptos_network_peer_connected{network_id=\"Validator\", role_type=\"validator\"}\n\n  # Do a left join on a table containing labels [\"remote_peer_id\", \"remote_owner\"]\n  # to join in \"remote_owner\" for each \"remote_peer_id\".\n  ) + on(remote_peer_id) group_left(remote_owner) (\n\n    # We can only left join with certain bin-ops, so we force all values to zero\n    # here so we can add without messing up the connection values.\n    clamp_max(\n      # Filter out extraneous fields.\n      sum by (remote_owner, remote_peer_id) (\n        sum without (direction) (\n          # Rename \"peer_id\" -> \"remote_peer_id\" and \"owner\" -> \"remote_owner\" so\n          # these fields don't conflict with those from peer_connected.\n          label_replace(\n            label_replace(\n              aptos_connections{network_id=\"Validator\", role_type=\"validator\"},\n              \"remote_peer_id\", \"$1\",\n              \"peer_id\", \"(.*)\"\n            ),\n            \"remote_owner\", \"$1\",\n            \"owner\", \"(.*)\"\n          )\n        )\n      ),\n      0\n    )\n  )\n)",
+          "expr": "# Filter out extraneous fields.\nsum by (owner, remote_owner) (\n  (\n    aptos_network_peer_connected{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\"}\n\n  # Do a left join on a table containing labels [\"remote_peer_id\", \"remote_owner\"]\n  # to join in \"remote_owner\" for each \"remote_peer_id\".\n  ) + on(remote_peer_id) group_left(remote_owner) (\n\n    # We can only left join with certain bin-ops, so we force all values to zero\n    # here so we can add without messing up the connection values.\n    clamp_max(\n      # Filter out extraneous fields.\n      sum by (remote_owner, remote_peer_id) (\n        sum without (direction) (\n          # Rename \"peer_id\" -> \"remote_peer_id\" and \"owner\" -> \"remote_owner\" so\n          # these fields don't conflict with those from peer_connected.\n          label_replace(\n            label_replace(\n              aptos_connections{chain_name=~\"$chain_name\", network_id=\"Validator\", role_type=\"validator\"},\n              \"remote_peer_id\", \"$1\",\n              \"peer_id\", \"(.*)\"\n            ),\n            \"remote_owner\", \"$1\",\n            \"owner\", \"(.*)\"\n          )\n        )\n      ),\n      0\n    )\n  )\n)",
           "format": "time_series",
           "instant": true,
           "interval": "",
@@ -735,8 +749,6 @@
           "refId": "A"
         }
       ],
-      "timeFrom": null,
-      "timeShift": null,
       "title": "Current Validator Connections",
       "transformations": [
         {
@@ -746,15 +758,18 @@
           }
         },
         {
+          "id": "merge",
+          "options": {}
+        },
+        {
           "id": "organize",
           "options": {
             "excludeByName": {
               "Time": true
             },
             "indexByName": {
-              "Time": 0,
-              "owner": 1,
               "Anchorage": 2,
+              "Time": 0,
               "a16z": 3,
               "bcap": 4,
               "bisontrails": 5,
@@ -769,6 +784,7 @@
               "lyft": 14,
               "mercycorps": 15,
               "novi": 16,
+              "owner": 1,
               "paradigm": 17,
               "payu": 18,
               "ribbit": 19,
@@ -790,13 +806,25 @@
       "type": "table"
     }
   ],
-  "schemaVersion": 26,
+  "schemaVersion": 36,
   "style": "dark",
   "tags": [],
   "templating": {
     "list": [
       {
-        "allValue": null,
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "Datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
         "current": {
           "selected": true,
           "text": [
@@ -806,21 +834,59 @@
             "$__all"
           ]
         },
-        "datasource": "Prometheus",
-        "definition": "label_values(aptos_network_peer_connected, owner)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Datasource}"
+        },
+        "definition": "label_values(chain_name)",
         "hide": 0,
-        "includeAll": true,
-        "label": null,
-        "multi": true,
-        "name": "owner",
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "chain_name",
         "options": [],
-        "query": "label_values(aptos_network_peer_connected, owner)",
+        "query": {
+          "query": "label_values(chain_name)",
+          "refId": "Prometheus-chain-name-Variable-Query"
+        },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
         "tagValuesQuery": "",
-        "tags": [],
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
+        "definition": "label_values(aptos_network_peer_connected, owner)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "owner",
+        "options": [],
+        "query": {
+          "query": "label_values(aptos_network_peer_connected, owner)",
+          "refId": "Prometheus-owner-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
         "tagsQuery": "",
         "type": "query",
         "useTags": false
@@ -859,5 +925,6 @@
   "timezone": "browser",
   "title": "Validator Connectivity",
   "uid": "validator_connectivity",
-  "version": 1
+  "version": 1,
+  "weekStart": ""
 }

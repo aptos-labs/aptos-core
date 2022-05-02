@@ -17,6 +17,7 @@ diesel = { version = "1.4.8", features = ["chrono", "postgres", "r2d2", "numeric
 proptest = "1.0.0"
 tokio = { version = "1.8.1", features = ["full"] }
 reqwest = { version = "0.11.2", features = ["json"] }
+serde_json = "1.0.64"
 
 aptos = { path = "../../crates/aptos" }
 aptos-config = { path = "../../config" }
@@ -31,10 +32,10 @@ aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-h
 cached-framework-packages =  { path = "../../aptos-move/framework/cached-packages" }
 forge = { path = "../forge" }
 hex = "0.4.3"
-move-command-line-common = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
-move-ir-compiler = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
-move-stdlib = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
-move-package = { git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6" }
+move-command-line-common = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
+move-ir-compiler = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
+move-stdlib = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
+move-package = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
 
 
 [dev-dependencies]

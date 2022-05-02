@@ -1,11 +1,10 @@
 {
   "type": "pending_transaction",
-  "hash": "0x2eefdb1220b8b58b7a70f789c604ea5b95b48a60da2bd2606a0f966c85c703ad",
+  "hash": "0x18073cb2536317833aa630d30062383a1f00221dd3604bbce19cd262813e6c36",
   "sender": "0xa550c18",
   "sequence_number": "0",
   "max_gas_amount": "2000",
   "gas_unit_price": "0",
-  "gas_currency_code": "XUS",
   "expiration_timestamp_secs": "18446744073709551615",
   "payload": {
     "type": "script_function_payload",
@@ -18,6 +17,6 @@
   "signature": {
     "type": "ed25519_signature",
     "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-    "signature": "0xbf496107afc5d31cf1b4f1dc79ddc745851e0ceb91cd9c77e938a5896c696e9674d0643ff41a74cb430a376e17878931f020d13c4590a815e58ce89c5431d209"
+    "signature": "0xb66feafc1e1b95ce33a8e25101a212cdfd4e94a7dfd85409ad538ce7fcc150b610326a97e688b1d02bb4703880631498588784c8128824671b219d6aca6edb04"
   }
 }

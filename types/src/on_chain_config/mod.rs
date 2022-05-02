@@ -42,9 +42,9 @@ pub use self::{
 /// 2. Add the config's `ConfigID` to `ON_CHAIN_CONFIG_REGISTRY`
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-pub struct ConfigID(&'static str, &'static str);
+pub struct ConfigID(&'static str, &'static str, &'static str);
 
-const CONFIG_ADDRESS_STR: &str = "0xA550C18";
+pub const CONFIG_ADDRESS_STR: &str = "0xA550C18";
 
 pub fn config_address() -> AccountAddress {
     AccountAddress::from_hex_literal(CONFIG_ADDRESS_STR).expect("failed to get address")
@@ -52,7 +52,7 @@ pub fn config_address() -> AccountAddress {
 
 impl ConfigID {
     pub fn name(&self) -> String {
-        self.1.to_string()
+        self.2.to_string()
     }
 }
 
@@ -69,9 +69,9 @@ impl fmt::Display for ConfigID {
 /// State sync will panic if the value of any config in this registry is uninitialized
 pub const ON_CHAIN_CONFIG_REGISTRY: &[ConfigID] = &[
     VMConfig::CONFIG_ID,
+    ValidatorSet::CONFIG_ID,
     VMPublishingOption::CONFIG_ID,
     Version::CONFIG_ID,
-    ValidatorSet::CONFIG_ID,
     OnChainConsensusConfig::CONFIG_ID,
 ];
 
@@ -128,7 +128,7 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
     // aptos_root_address
     const ADDRESS: &'static str = CONFIG_ADDRESS_STR;
     const IDENTIFIER: &'static str;
-    const CONFIG_ID: ConfigID = ConfigID(Self::ADDRESS, Self::IDENTIFIER);
+    const CONFIG_ID: ConfigID = ConfigID(Self::ADDRESS, Self::IDENTIFIER, Self::IDENTIFIER);
 
     // Single-round BCS deserialization from bytes to `Self`
     // This is the expected deserialization pattern if the Rust representation lives natively in Move.
@@ -195,7 +195,7 @@ pub fn access_path_for_config(config_id: ConfigID) -> AccessPath {
     let struct_tag = StructTag {
         address: CORE_CODE_ADDRESS,
         module: Identifier::new(config_id.1).expect("fail to make identifier"),
-        name: Identifier::new(config_id.1).expect("fail to make identifier"),
+        name: Identifier::new(config_id.2).expect("fail to make identifier"),
         type_params: vec![],
     };
     AccessPath::new(

@@ -64,6 +64,7 @@ impl ParallelAptosVM {
     pub fn execute_block<S: StateView>(
         transactions: Vec<Transaction>,
         state_view: &S,
+        concurrency_level: usize,
     ) -> Result<(Vec<TransactionOutput>, Option<Error<VMStatus>>), VMStatus> {
         // Verify the signatures of all the transactions in parallel.
         // This is time consuming so don't wait and do the checking
@@ -73,8 +74,10 @@ impl ParallelAptosVM {
             .map(|txn| preprocess_transaction::<AptosVM>(txn.clone()))
             .collect();
 
-        match ParallelTransactionExecutor::<PreprocessedTransaction, AptosVMWrapper<S>>::new()
-            .execute_transactions_parallel(state_view, signature_verified_block)
+        match ParallelTransactionExecutor::<PreprocessedTransaction, AptosVMWrapper<S>>::new(
+            concurrency_level,
+        )
+        .execute_transactions_parallel(state_view, signature_verified_block)
         {
             Ok(results) => Ok((
                 results

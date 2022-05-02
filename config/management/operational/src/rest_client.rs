@@ -7,7 +7,7 @@ use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress, account_config, account_config::AccountResource,
     account_state::AccountState, account_state_blob::AccountStateBlob,
-    transaction::SignedTransaction, validator_config::ValidatorConfigResource,
+    transaction::SignedTransaction, validator_config::ValidatorConfig,
     validator_info::ValidatorInfo,
 };
 use std::convert::TryFrom;
@@ -51,7 +51,7 @@ impl RestClient {
     pub async fn validator_config(
         &self,
         account: AccountAddress,
-    ) -> Result<ValidatorConfigResource, Error> {
+    ) -> Result<ValidatorConfig, Error> {
         resource(
             "validator-config-resource",
             self.account_state(account)
@@ -76,7 +76,7 @@ impl RestClient {
         match validator_set {
             Ok(Some(validator_set)) => {
                 let mut validator_infos = vec![];
-                for validator_info in validator_set.payload().iter() {
+                for validator_info in validator_set.payload() {
                     if let Some(account) = account {
                         if validator_info.account_address() == &account {
                             validator_infos.push(validator_info.clone());

@@ -8,7 +8,6 @@ members = [
     "aptos-move/aptos-keygen",
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-transaction-benchmarks",
-    "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
     "aptos-move/e2e-tests",
@@ -97,10 +96,8 @@ members = [
     "state-sync/storage-service/types",
     "storage/accumulator",
     "storage/aptosdb",
-    "storage/aptossum",
     "storage/backup/backup-cli",
     "storage/backup/backup-service",
-    "storage/inspector",
     "storage/jellyfish-merkle",
     "storage/schemadb",
     "storage/scratchpad",
@@ -140,8 +137,6 @@ default-members = [
     "aptos-move/transaction-builder-generator",
     "execution/db-bootstrapper",
     "storage/backup/backup-cli",
-    "storage/aptossum",
-    "storage/inspector",
     "ecosystem/indexer",
 ]
 

@@ -149,7 +149,7 @@ impl Command {
 }
 
 /// These tests depends on running Vault, which can be done by using the provided docker run script
-/// in `docker/vault/run.sh`.
+/// in `docker/testutils/start_vault_container.sh`.
 /// Note: Some of these tests may fail if you run them too quickly one after another due to data
 /// sychronization issues within Vault. It would seem the only way to fix it would be to restart
 /// the Vault service between runs.

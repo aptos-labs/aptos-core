@@ -42,6 +42,7 @@ pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Inf
         .or(events::get_events_by_event_handle(context.clone()))
         .or(state::get_account_resource(context.clone()))
         .or(state::get_account_module(context.clone()))
+        .or(state::get_table_item(context.clone()))
         .or(context.health_check_route().with(metrics("health_check")))
         .with(
             warp::cors()

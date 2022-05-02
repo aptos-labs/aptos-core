@@ -43,6 +43,11 @@ export class HexString {
     return this.hex();
   }
 
+  toShortString(): string {
+    const trimmed = this.hexString.replace(/^0x0*/, "");
+    return `0x${trimmed}`;
+  }
+
   toBuffer(): Buffer {
     return Buffer.from(this.noPrefix(), "hex");
   }

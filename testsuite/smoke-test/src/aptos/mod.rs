@@ -11,3 +11,5 @@ mod module_publish;
 pub use module_publish::*;
 mod error_report;
 pub use error_report::*;
+mod staking;
+pub use staking::*;

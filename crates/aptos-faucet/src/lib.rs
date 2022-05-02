@@ -33,7 +33,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use url::Url;
-use warp::{Filter, Rejection, Reply};
+use warp::{http, Filter, Rejection, Reply};
 
 pub mod mint;
 
@@ -90,7 +90,12 @@ pub fn routes(
                 info.elapsed(),
             )
         }))
-        .with(warp::cors().allow_any_origin().allow_methods(vec!["POST"]))
+        .with(
+            warp::cors()
+                .allow_any_origin()
+                .allow_headers(vec![http::header::CONTENT_TYPE])
+                .allow_methods(vec!["POST"]),
+        )
 }
 
 fn health_route(

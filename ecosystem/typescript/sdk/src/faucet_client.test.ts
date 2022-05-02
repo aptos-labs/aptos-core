@@ -3,6 +3,7 @@ import { FaucetClient } from "./faucet_client";
 import { AptosAccount } from "./aptos_account";
 import { Types } from "./types";
 import { UserTransaction } from "./api/data-contracts";
+import { HexString } from "./hex_string";
 
 import { NODE_URL, FAUCET_URL } from "./util.test";
 
@@ -43,10 +44,18 @@ test(
 
     const res = await client.getAccountTransactions(account1.address(), { start: 0 });
     const tx = res.find((e) => e.type === "user_transaction") as UserTransaction;
-    expect(tx.sender).toBe(account1.address().hex());
+    expect(new HexString(tx.sender).toShortString()).toBe(account1.address().toShortString());
 
     const events = await client.getEventsByEventHandle(tx.sender, "0x1::TestCoin::TransferEvents", "sent_events");
     expect(events[0].type).toBe("0x1::TestCoin::SentEvent");
+
+    const event_subset = await client.getEventsByEventHandle(
+      tx.sender,
+      "0x1::TestCoin::TransferEvents",
+      "sent_events",
+      { start: 0, limit: 1 },
+    );
+    expect(event_subset[0].type).toBe("0x1::TestCoin::SentEvent");
 
     const events2 = await client.getEventsByEventKey(events[0].key);
     expect(events2[0].type).toBe("0x1::TestCoin::SentEvent");

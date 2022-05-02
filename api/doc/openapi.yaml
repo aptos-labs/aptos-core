@@ -442,6 +442,8 @@ paths:
           schema:
             type: string
           example: "sent_events"
+        - $ref: '#/components/parameters/EventStart'
+        - $ref: '#/components/parameters/EventLimit'
       responses:
         "200":
           description: |
@@ -456,6 +458,50 @@ paths:
           $ref: '#/components/responses/400'
         "404":
           $ref: '#/components/responses/404'
+        "500":
+          $ref: '#/components/responses/500'
+  /tables/{table_handle}/items:
+    post:
+      summary: Get table item by handle and key.
+      description: |
+        Gets a table item for a table identified by the handle and the key for the item.
+        Key and value types need to be passed in to help with key serialization and value deserialization.
+      operationId: get_table_item
+      tags:
+        - state
+        - table
+      parameters:
+        - name: table_handle
+          in: path
+          required: true
+          schema:
+            title: Table Handle
+            type: string
+            format: uint128
+            description: the table handle
+          example: "1283023094380"
+      requestBody:
+        description: Table item request
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TableItemRequest'
+      responses:
+        "200":
+          description: Returns the table item value rendered in JSON.
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: '#/components/responses/400'
+        "404":
+          $ref: '#/components/responses/404'
+        "413":
+          $ref: '#/components/responses/413'
+        "415":
+          $ref: '#/components/responses/415'
         "500":
           $ref: '#/components/responses/500'
 components:
@@ -485,6 +531,23 @@ components:
       in: query
       required: false
       description: The max number of transactions should be returned for the page. Default is 25.
+      example: 25
+      schema:
+        type: integer
+    EventStart:
+      name: start
+      in: query
+      required: false
+      description: |
+        The start sequence number in the EVENT STREAM, defaulting to the latest event.
+        The events are returned in the reverse order of sequence numbers.
+      schema:
+        type: integer
+    EventLimit:
+      name: limit
+      in: query
+      required: false
+      description: The number of events to be returned for the page default is 5
       example: 25
       schema:
         type: integer
@@ -1311,8 +1374,10 @@ components:
       oneOf:
         - $ref: '#/components/schemas/DeleteModule'
         - $ref: '#/components/schemas/DeleteResource'
+        - $ref: '#/components/schemas/DeleteTableItem'
         - $ref: '#/components/schemas/WriteModule'
         - $ref: '#/components/schemas/WriteResource'
+        - $ref: '#/components/schemas/WriteTableItem'
       discriminator:
         propertyName: type
     DeleteModule:
@@ -1352,6 +1417,31 @@ components:
           $ref: '#/components/schemas/Address'
         resource:
           $ref: '#/components/schemas/MoveStructTagId'
+    DeleteTableItem:
+      title: Delete Table Item
+      type: object
+      description: Delete table item change.
+      required:
+        - type
+        - state_key_hash
+        - data
+      properties:
+        type:
+          type: string
+          example: "delete_table_item"
+        state_key_hash:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        data:
+          title: Table item deletion
+          type: object
+          required:
+            - handle
+            - key
+          properties:
+            handle:
+              $ref: '#/components/schemas/HexEncodedBytes'
+            key:
+              $ref: '#/components/schemas/HexEncodedBytes'
     WriteModule:
       title: Write Module
       type: object
@@ -1390,6 +1480,34 @@ components:
           $ref: '#/components/schemas/Address'
         data:
           $ref: '#/components/schemas/AccountResource'
+    WriteTableItem:
+      title: Write Table Item
+      type: object
+      description: Write table item
+      required:
+        - type
+        - state_key_hash
+        - data
+      properties:
+        type:
+          type: string
+          example: "write_table_item"
+        state_key_hash:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        data:
+          title: Table item write
+          type: object
+          required:
+            - handle
+            - key
+            - value
+          properties:
+            handle:
+              $ref: '#/components/schemas/HexEncodedBytes'
+            key:
+              $ref: '#/components/schemas/HexEncodedBytes'
+            value:
+              $ref: '#/components/schemas/HexEncodedBytes'
     Script:
       title: Script
       type: object
@@ -1577,3 +1695,17 @@ components:
         - $ref: '#/components/schemas/MultiEd25519Signature'
       discriminator:
         propertyName: type
+    TableItemRequest:
+      title: Table item request
+      type: object
+      required:
+        - key_type
+        - value_type
+        - key
+      properties:
+        key_type:
+          $ref: '#/components/schemas/MoveTypeId'
+        value_type:
+          $ref: '#/components/schemas/MoveTypeId'
+        key:
+          $ref: '#/components/schemas/MoveValue'

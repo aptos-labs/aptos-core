@@ -26,10 +26,10 @@ use aptos_types::{
     on_chain_config::{OnChainConfig, VMPublishingOption, ValidatorSet, Version},
     state_store::state_key::StateKey,
     transaction::{
-        ChangeSet, SignedTransaction, Transaction, TransactionOutput, TransactionStatus,
-        VMValidatorResult,
+        ChangeSet, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
+        TransactionStatus, VMValidatorResult,
     },
-    vm_status::{KeptVMStatus, VMStatus},
+    vm_status::VMStatus,
     write_set::WriteSet,
 };
 use aptos_vm::{
@@ -45,6 +45,7 @@ use move_core_types::{
     move_resource::MoveResource,
 };
 use move_vm_types::gas_schedule::GasStatus;
+use num_cpus;
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
 
@@ -225,11 +226,6 @@ impl FakeExecutor {
         AccountData::new_from_seed(&mut self.rng, balance, seq_num)
     }
 
-    /// Create one instance of [`AccountData`] with XDX balance without saving it to data store.
-    pub fn create_xdx_raw_account_data(&mut self, balance: u64, seq_num: u64) -> AccountData {
-        AccountData::new_xdx_from_seed(&mut self.rng, balance, seq_num)
-    }
-
     /// Creates a number of [`Account`] instances all with the same balance and sequence number,
     /// and publishes them to this executor's data store.
     pub fn create_accounts(&mut self, size: usize, balance: u64, seq_num: u64) -> Vec<Account> {
@@ -287,12 +283,8 @@ impl FakeExecutor {
 
     /// Reads the balance resource value for an account from this executor's data store with the
     /// given balance currency_code.
-    pub fn read_balance_resource(
-        &self,
-        account: &Account,
-        balance_currency_code: Identifier,
-    ) -> Option<BalanceResource> {
-        self.read_balance_resource_at_address(account.address(), balance_currency_code)
+    pub fn read_balance_resource(&self, account: &Account) -> Option<BalanceResource> {
+        self.read_balance_resource_at_address(account.address())
     }
 
     /// Reads the balance resource value for an account under the given address from this executor's
@@ -300,7 +292,6 @@ impl FakeExecutor {
     pub fn read_balance_resource_at_address(
         &self,
         addr: &AccountAddress,
-        _balance_currency_code: Identifier,
     ) -> Option<BalanceResource> {
         self.read_resource(addr)
     }
@@ -346,7 +337,7 @@ impl FakeExecutor {
             TransactionStatus::Keep(status) => {
                 self.apply_write_set(output.write_set());
                 assert!(
-                    status == &KeptVMStatus::Executed,
+                    status == &ExecutionStatus::Success,
                     "transaction failed with {:?}",
                     status
                 );
@@ -361,7 +352,8 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let (result, _) = ParallelAptosVM::execute_block(txn_block, &self.data_store)?;
+        let (result, _) =
+            ParallelAptosVM::execute_block(txn_block, &self.data_store, num_cpus::get())?;
 
         Ok(result)
     }
@@ -469,7 +461,7 @@ impl FakeExecutor {
             0,
             self.block_time,
             vec![],
-            *validator_set.payload()[0].account_address(),
+            *validator_set.payload().next().unwrap().account_address(),
         );
         let output = self
             .execute_transaction_block(vec![Transaction::BlockMetadata(new_block)])

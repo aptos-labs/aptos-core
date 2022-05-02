@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    move_vm_ext::{SessionExt, SessionId},
+    move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
     natives::aptos_natives,
 };
 use move_binary_format::errors::VMResult;
-use move_core_types::resolver::MoveResolver;
+use move_table_extension::NativeTableContext;
 use move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions};
 use std::ops::Deref;
 
@@ -21,13 +21,13 @@ impl MoveVmExt {
         })
     }
 
-    pub fn new_session<'r, S: MoveResolver>(
+    pub fn new_session<'r, S: MoveResolverExt>(
         &self,
         remote: &'r S,
-        _session_id: SessionId,
+        session_id: SessionId,
     ) -> SessionExt<'r, '_, S> {
-        // TODO: install table extension
-        let extensions = NativeContextExtensions::<'r>::default();
+        let mut extensions = NativeContextExtensions::default();
+        extensions.add(NativeTableContext::new(session_id.as_uuid(), remote));
 
         SessionExt::new(self.inner.new_session_with_extensions(remote, extensions))
     }

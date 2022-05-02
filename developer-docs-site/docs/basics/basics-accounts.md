@@ -2,7 +2,7 @@
 title: "Accounts"
 id: "basics-accounts"
 ---
-An account represents a resource on the Aptos Blockchain that can send transactions. Each account is identified by a particular 16-byte account address and is a container for Move modules and Move resources.
+An account represents a resource on the Aptos Blockchain that can send transactions. Each account is identified by a particular 32-byte account address and is a container for Move modules and Move resources.
 
 # Introduction
 
@@ -28,7 +28,7 @@ Each account stores an authentication key. This authentication key enables accou
 To generate an authentication key and account address:
 
 1. **Generate a key-pair**: Generate a fresh key-pair (`pubkey_A`, `privkey_A`). The Aptos Blockchain uses the PureEdDSA scheme over the Ed25519 curve, as defined in RFC 8032.
-2. **Derive a 32-byte authentication key**: Derive a 32-byte authentication key `auth_key = sha3-256(pubkey_A | 0x00)`, where | denotes concatenation. The `0x00` is a 1-byte signature scheme identifier where 0x00 means single-signature. The first 16 bytes of `auth_key` is the "authentication key prefix". The last 16 bytes of `auth_key` is the account address. Any transaction that creates an account needs both an account address and an authentication key prefix, but a transaction that is interacting with an existing account only needs the address.
+2. **Derive a 32-byte authentication key**: Derive a 32-byte authentication key `auth_key = sha3-256(pubkey_A | 0x00)`, where | denotes concatenation. The `0x00` is a 1-byte signature scheme identifier where 0x00 means single-signature. The first 16 bytes of `auth_key` is the "authentication key prefix".
 
 ### Multisigner authentication
 

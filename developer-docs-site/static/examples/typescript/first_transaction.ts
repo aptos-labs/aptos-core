@@ -68,8 +68,11 @@ export class RestClient {
   }
 
   /** Returns all resources associated with the account */
-  async accountResources(accountAddress: string): Promise<Record<string, any> & { type: string }> {
-    const response = await fetch(`${this.url}/accounts/${accountAddress}/resources`, {method: "GET"});
+  async accountResource(accountAddress: string, resourceType: string): Promise<any> {
+    const response = await fetch(`${this.url}/accounts/${accountAddress}/resource/${resourceType}`, {method: "GET"});
+    if (response.status == 404) {
+        return null
+    }
     if (response.status != 200) {
       assert(response.status == 200, await response.text());
     }
@@ -89,7 +92,6 @@ export class RestClient {
       "sequence_number": seqNum.toString(),
       "max_gas_amount": "2000",
       "gas_unit_price": "1",
-      "gas_currency_code": "XUS",
       // Unix timestamp, in seconds + 10 minutes
       "expiration_timestamp_secs": (Math.floor(Date.now() / 1000) + 600).toString(),
       "payload": payload,
@@ -160,14 +162,11 @@ export class RestClient {
   //:!:>section_5
   /** Returns the test coin balance associated with the account */
   async accountBalance(accountAddress: string): Promise<number | null> {
-    const resources = await this.accountResources(accountAddress);
-    for (const key in resources) {
-      const resource = resources[key];
-      if (resource["type"] == "0x1::TestCoin::Balance") {
-        return parseInt(resource["data"]["coin"]["value"]);
-      }
+    const resource = await this.accountResource(accountAddress, "0x1::TestCoin::Balance");
+    if (resource == null) {
+        return null
     }
-    return null;
+    return parseInt(resource["data"]["coin"]["value"]);
   }
 
   /** Transfer a given coin amount from a given Account to the recipient's account address.

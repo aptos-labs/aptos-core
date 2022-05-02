@@ -1,0 +1,9 @@
+[package]
+name = "ApiTest"
+version = "0.0.0"
+
+[addresses]
+# test user address to be installed dynamically on build
+
+[dependencies]
+AptosFramework = { local = "../../aptos-move/framework/aptos-framework" }

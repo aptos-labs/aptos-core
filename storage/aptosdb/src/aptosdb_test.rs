@@ -12,7 +12,8 @@ use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 use aptos_temppath::TempPath;
 #[allow(unused_imports)]
 use aptos_types::account_state_blob::AccountStateBlob;
-use aptos_types::transaction::Transaction;
+#[allow(unused_imports)]
+use aptos_types::transaction::{ExecutionStatus, Transaction};
 #[allow(unused_imports)]
 use aptos_types::{
     account_address::{AccountAddress, HashAccountAddress},
@@ -20,7 +21,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfo,
     proof::SparseMerkleLeafNode,
-    vm_status::{KeptVMStatus, StatusCode},
+    vm_status::StatusCode,
 };
 use proptest::prelude::*;
 use std::collections::HashMap;
@@ -662,7 +663,7 @@ fn test_get_latest_tree_state() {
         HashValue::random(),
         HashValue::random(),
         0,
-        KeptVMStatus::MiscellaneousError,
+        ExecutionStatus::MiscellaneousError(None),
     );
     put_transaction_info(&db, 0, &txn_info);
     let bootstrapped = db.get_latest_tree_state().unwrap();

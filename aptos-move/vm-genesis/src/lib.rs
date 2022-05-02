@@ -105,7 +105,7 @@ pub fn encode_genesis_change_set(
         min_price_per_gas_unit,
     );
     // generate the genesis WriteSet
-    create_and_initialize_owners_operators(&mut session, validators);
+    create_and_initialize_validators(&mut session, validators);
     reconfigure(&mut session);
 
     if enable_parallel_execution {
@@ -212,6 +212,11 @@ fn create_and_initialize_main_accounts(
     let consensus_config_bytes =
         bcs::to_bytes(&consensus_config).expect("Failure serializing genesis consensus config");
 
+    // TODO: make these configurable
+    let epoch_interval = 86400 * 1000000;
+    let minimum_stake = 0;
+    let maximum_stake = 1000000;
+
     exec_function(
         session,
         GENESIS_MODULE_NAME,
@@ -228,6 +233,9 @@ fn create_and_initialize_main_accounts(
             MoveValue::U64(APTOS_MAX_KNOWN_VERSION.major),
             MoveValue::vector_u8(consensus_config_bytes),
             MoveValue::U64(min_price_per_gas_unit),
+            MoveValue::U64(epoch_interval),
+            MoveValue::U64(minimum_stake),
+            MoveValue::U64(maximum_stake),
         ]),
     );
 }
@@ -235,48 +243,39 @@ fn create_and_initialize_main_accounts(
 /// Creates and initializes each validator owner and validator operator. This method creates all
 /// the required accounts, sets the validator operators for each validator owner, and sets the
 /// validator config on-chain.
-fn create_and_initialize_owners_operators(
+fn create_and_initialize_validators(
     session: &mut SessionExt<impl MoveResolver>,
     validators: &[Validator],
 ) {
     let aptos_root_address = account_config::aptos_root_address();
     let mut owners = vec![];
-    let mut owner_names = vec![];
     let mut owner_auth_keys = vec![];
-    let mut operators = vec![];
-    let mut operator_names = vec![];
-    let mut operator_auth_keys = vec![];
     let mut consensus_pubkeys = vec![];
     let mut validator_network_addresses = vec![];
     let mut full_node_network_addresses = vec![];
+    let mut staking_distribution = vec![];
 
     for v in validators {
-        owners.push(MoveValue::Signer(v.address));
-        owner_names.push(MoveValue::vector_u8(v.name.clone()));
+        owners.push(MoveValue::Address(v.address));
         owner_auth_keys.push(MoveValue::vector_u8(v.auth_key.to_vec()));
         consensus_pubkeys.push(MoveValue::vector_u8(v.consensus_pubkey.clone()));
-        operators.push(MoveValue::Signer(v.operator_address));
-        operator_names.push(MoveValue::vector_u8(v.operator_name.clone()));
-        operator_auth_keys.push(MoveValue::vector_u8(v.operator_auth_key.to_vec()));
         validator_network_addresses.push(MoveValue::vector_u8(v.network_address.clone()));
         full_node_network_addresses.push(MoveValue::vector_u8(v.full_node_network_address.clone()));
+        staking_distribution.push(MoveValue::U64(1));
     }
     exec_function(
         session,
         GENESIS_MODULE_NAME,
-        "create_initialize_owners_operators",
+        "create_initialize_validators",
         vec![],
         serialize_values(&vec![
             MoveValue::Signer(aptos_root_address),
             MoveValue::Vector(owners),
-            MoveValue::Vector(owner_names),
             MoveValue::Vector(owner_auth_keys),
             MoveValue::Vector(consensus_pubkeys),
-            MoveValue::Vector(operators),
-            MoveValue::Vector(operator_names),
-            MoveValue::Vector(operator_auth_keys),
             MoveValue::Vector(validator_network_addresses),
             MoveValue::Vector(full_node_network_addresses),
+            MoveValue::Vector(staking_distribution),
         ]),
     );
 }

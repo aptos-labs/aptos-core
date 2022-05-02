@@ -29,11 +29,12 @@ validator:
   config:
     provide_genesis: true
     sync_only: false
+    concurrency_level: 4
     mempool_poll_count:
     round_initial_timeout_ms:
-    default_prune_window: 10000000
+    ledger_prune_window: 10000000
     state_store_prune_window: 1000000
-    max_version_to_prune_per_batch: 100
+    pruning_batch_size: 10000
 
 tools:
   image:
@@ -152,16 +153,6 @@ fullnode:
   affinity: {}
   config:
     max_inbound_connections: 1000
-    inbound_rate_limit:
-      enabled: true
-      ip_byte_bucket_rate: 1048576
-      ip_byte_bucket_size: 1048576
-      initial_bucket_fill_percentage: 25
-    outbound_rate_limit:
-      enabled: true
-      ip_byte_bucket_rate: 1048576
-      ip_byte_bucket_size: 1048576
-      initial_bucket_fill_percentage: 25
 
 keymanager:
   image:

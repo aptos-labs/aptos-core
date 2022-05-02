@@ -23,14 +23,14 @@ pub use rotate_key::*;
 pub use universe::*;
 
 use crate::{
-    account::{self, xus_currency_code, Account, AccountData},
+    account::{Account, AccountData},
     executor::FakeExecutor,
     gas_costs, transaction_status_eq,
 };
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use aptos_types::{
-    transaction::{SignedTransaction, TransactionStatus},
-    vm_status::{known_locations, KeptVMStatus, StatusCode},
+    transaction::{ExecutionStatus, SignedTransaction, TransactionStatus},
+    vm_status::{known_locations, StatusCode},
 };
 use once_cell::sync::Lazy;
 use proptest::{prelude::*, strategy::Union};
@@ -129,7 +129,7 @@ pub struct AccountCurrent {
 
 impl AccountCurrent {
     fn new(initial_data: AccountData) -> Self {
-        let balance = initial_data.balance(&xus_currency_code());
+        let balance = initial_data.balance();
         let sequence_number = initial_data.sequence_number();
         let sent_events_count = initial_data.sent_events_count();
         let received_events_count = initial_data.received_events_count();
@@ -265,7 +265,7 @@ pub fn txn_one_account_result(
             sender.sequence_number += 1;
             sender.sent_events_count += 1;
             sender.balance -= to_deduct;
-            (TransactionStatus::Keep(KeptVMStatus::Executed), true)
+            (TransactionStatus::Keep(ExecutionStatus::Success), true)
         }
         (true, true, false) => {
             // Enough gas to pass validation and to do the transfer, but not enough to succeed
@@ -274,10 +274,10 @@ pub fn txn_one_account_result(
             sender.sequence_number += 1;
             sender.balance -= gas_used * gas_price;
             (
-                TransactionStatus::Keep(KeptVMStatus::MoveAbort(
-                    known_locations::core_account_module_abort(),
-                    6,
-                )),
+                TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                    location: known_locations::core_account_module_abort(),
+                    code: 6,
+                }),
                 false,
             )
         }
@@ -288,10 +288,10 @@ pub fn txn_one_account_result(
             sender.sequence_number += 1;
             sender.balance -= low_gas_used * gas_price;
             (
-                TransactionStatus::Keep(KeptVMStatus::MoveAbort(
-                    known_locations::core_account_module_abort(),
-                    10,
-                )),
+                TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                    location: known_locations::core_account_module_abort(),
+                    code: 10,
+                }),
                 false,
             )
         }
@@ -408,7 +408,7 @@ pub fn assert_accounts_match(
             .read_account_resource(account.account())
             .expect("account resource must exist");
         let resource_balance = executor
-            .read_balance_resource(account.account(), account::xus_currency_code())
+            .read_balance_resource(account.account())
             .expect("account balance resource must exist");
         let auth_key = account.account().auth_key();
         prop_assert_eq!(

@@ -1,19 +1,23 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::utils::{check_if_file_exists, write_to_file};
+use crate::common::{
+    init::DEFAULT_REST_URL,
+    utils::{check_if_file_exists, to_common_result, to_common_success_result, write_to_file},
+};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
-use aptos_logger::{debug, info};
+use aptos_logger::debug;
+use aptos_rest_client::{aptos_api_types::WriteSetChange, Client, Transaction};
 use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
+use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
-use itertools::Itertools;
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     fmt::Debug,
     path::{Path, PathBuf},
     str::FromStr,
@@ -26,8 +30,15 @@ pub type CliResult = Result<String, String>;
 /// A common result to remove need for typing `Result<T, CliError>`
 pub type CliTypedResult<T> = Result<T, CliError>;
 
+/// CLI Errors for reporting through telemetry and outputs
 #[derive(Debug, Error)]
 pub enum CliError {
+    #[error("Aborted command")]
+    AbortedError,
+    #[error("API error: {0}")]
+    ApiError(String),
+    #[error("Error (de)serializing '{0}': {1}")]
+    BCS(&'static str, #[source] bcs::Error),
     #[error("Invalid arguments: {0}")]
     CommandArgumentError(String),
     #[error("Unable to load config: {0} {1}")]
@@ -36,28 +47,65 @@ pub enum CliError {
     ConfigNotFoundError(String),
     #[error("Error accessing '{0}': {1}")]
     IO(String, #[source] std::io::Error),
-    #[error("Error (de)serializing '{0}': {1}")]
-    BCS(&'static str, #[source] bcs::Error),
-    #[error("Unable to parse '{0}': error: {1}")]
-    UnableToParse(&'static str, String),
-    #[error("Unable to read file '{0}', error: {1}")]
-    UnableToReadFile(String, String),
-    #[error("API error: {0}")]
-    ApiError(String),
-    #[error("Unexpected error: {0}")]
-    UnexpectedError(String),
-    #[error("Aborted command")]
-    AbortedError,
     #[error("Move compilation failed: {0}")]
     MoveCompilationError(String),
     #[error("Move unit tests failed: {0}")]
     MoveTestError(String),
+    #[error("Unable to parse '{0}': error: {1}")]
+    UnableToParse(&'static str, String),
+    #[error("Unable to read file '{0}', error: {1}")]
+    UnableToReadFile(String, String),
+    #[error("Unexpected error: {0}")]
+    UnexpectedError(String),
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+impl CliError {
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            CliError::AbortedError => "AbortedError",
+            CliError::ApiError(_) => "ApiError",
+            CliError::BCS(_, _) => "BCS",
+            CliError::CommandArgumentError(_) => "CommandArgumentError",
+            CliError::ConfigLoadError(_, _) => "ConfigLoadError",
+            CliError::ConfigNotFoundError(_) => "ConfigNotFoundError",
+            CliError::IO(_, _) => "IO",
+            CliError::MoveCompilationError(_) => "MoveCompilationError",
+            CliError::MoveTestError(_) => "MoveTestError",
+            CliError::UnableToParse(_, _) => "UnableToParse",
+            CliError::UnableToReadFile(_, _) => "UnableToReadFile",
+            CliError::UnexpectedError(_) => "UnexpectedError",
+        }
+    }
+}
+
+/// Config saved to `.aptos/config.yaml`
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CliConfig {
-    /// Private key for commands.  TODO: Add vault functionality
+    /// Map of profile configs
+    pub profiles: Option<HashMap<String, ProfileConfig>>,
+}
+
+/// An individual profile
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct ProfileConfig {
+    /// Private key for commands.
     pub private_key: Option<Ed25519PrivateKey>,
+    /// Public key for commands
+    pub public_key: Option<Ed25519PublicKey>,
+    /// Account for commands
+    pub account: Option<AccountAddress>,
+    /// URL for the Aptos rest endpoint
+    pub rest_url: Option<String>,
+    /// URL for the Faucet endpoint (if applicable)
+    pub faucet_url: Option<String>,
+}
+
+impl Default for CliConfig {
+    fn default() -> Self {
+        CliConfig {
+            profiles: Some(HashMap::new()),
+        }
+    }
 }
 
 impl CliConfig {
@@ -80,6 +128,19 @@ impl CliConfig {
             .map_err(|err| CliError::ConfigLoadError(format!("{:?}", config_file), err.to_string()))
     }
 
+    pub fn load_profile(profile: &str) -> CliTypedResult<Option<ProfileConfig>> {
+        let mut config = Self::load()?;
+        Ok(config.remove_profile(profile))
+    }
+
+    pub fn remove_profile(&mut self, profile: &str) -> Option<ProfileConfig> {
+        if let Some(ref mut profiles) = self.profiles {
+            profiles.remove(&profile.to_string())
+        } else {
+            None
+        }
+    }
+
     /// Saves the config to ./.aptos/config.yml
     pub fn save(&self) -> CliTypedResult<()> {
         let aptos_folder = Self::aptos_folder()?;
@@ -92,13 +153,12 @@ impl CliConfig {
                     aptos_folder, err
                 ))
             })?;
-            info!("Created .aptos/ folder");
+            debug!("Created .aptos/ folder");
         } else {
             debug!(".aptos/ folder already initialized");
         }
 
         // Save over previous config file
-        // TODO: Ask for saving over?
         let config_file = aptos_folder.join("config.yml");
         let config_bytes = serde_yaml::to_string(&self).map_err(|err| {
             CliError::UnexpectedError(format!("Failed to serialize config {}", err))
@@ -120,7 +180,9 @@ impl CliConfig {
 /// Types of Keys used by the blockchain
 #[derive(ArgEnum, Clone, Copy, Debug)]
 pub enum KeyType {
+    /// Ed25519 key used for signing
     Ed25519,
+    /// X25519 key used for network handshakes and identity
     X25519,
 }
 
@@ -134,6 +196,13 @@ impl FromStr for KeyType {
             _ => Err("Invalid key type"),
         }
     }
+}
+
+#[derive(Debug, Parser)]
+pub struct ProfileOptions {
+    /// Profile to use from config
+    #[clap(long, default_value = "default")]
+    pub profile: String,
 }
 
 /// Types of encodings used by the blockchain
@@ -239,7 +308,11 @@ pub struct PublicKeyInputOptions {
 }
 
 impl ExtractPublicKey for PublicKeyInputOptions {
-    fn extract_public_key(&self, encoding: EncodingType) -> CliTypedResult<Ed25519PublicKey> {
+    fn extract_public_key(
+        &self,
+        encoding: EncodingType,
+        _profile: &str,
+    ) -> CliTypedResult<Ed25519PublicKey> {
         if let Some(ref file) = self.public_key_file {
             encoding.load_key("--public-key-file", file.as_path())
         } else if let Some(ref key) = self.public_key {
@@ -264,13 +337,19 @@ pub struct PrivateKeyInputOptions {
 }
 
 impl PrivateKeyInputOptions {
-    pub fn extract_private_key(&self, encoding: EncodingType) -> CliTypedResult<Ed25519PrivateKey> {
+    pub fn extract_private_key(
+        &self,
+        encoding: EncodingType,
+        profile: &str,
+    ) -> CliTypedResult<Ed25519PrivateKey> {
         if let Some(ref file) = self.private_key_file {
             encoding.load_key("--private-key-file", file.as_path())
         } else if let Some(ref key) = self.private_key {
             let key = key.as_bytes().to_vec();
             encoding.decode_key("--private-key", key)
-        } else if let Some(private_key) = CliConfig::load()?.private_key {
+        } else if let Some(Some(private_key)) =
+            CliConfig::load_profile(profile)?.map(|p| p.private_key)
+        {
             Ok(private_key)
         } else {
             Err(CliError::CommandArgumentError(
@@ -281,20 +360,29 @@ impl PrivateKeyInputOptions {
 }
 
 impl ExtractPublicKey for PrivateKeyInputOptions {
-    fn extract_public_key(&self, encoding: EncodingType) -> CliTypedResult<Ed25519PublicKey> {
-        self.extract_private_key(encoding)
+    fn extract_public_key(
+        &self,
+        encoding: EncodingType,
+        profile: &str,
+    ) -> CliTypedResult<Ed25519PublicKey> {
+        self.extract_private_key(encoding, profile)
             .map(|private_key| private_key.public_key())
     }
 }
 
 pub trait ExtractPublicKey {
-    fn extract_public_key(&self, encoding: EncodingType) -> CliTypedResult<Ed25519PublicKey>;
+    fn extract_public_key(
+        &self,
+        encoding: EncodingType,
+        profile: &str,
+    ) -> CliTypedResult<Ed25519PublicKey>;
 
     fn extract_x25519_public_key(
         &self,
         encoding: EncodingType,
+        profile: &str,
     ) -> CliTypedResult<x25519::PublicKey> {
-        let key = self.extract_public_key(encoding)?;
+        let key = self.extract_public_key(encoding, profile)?;
         x25519::PublicKey::from_ed25519_public_bytes(&key.to_bytes()).map_err(|err| {
             CliError::UnexpectedError(format!("Failed to convert ed25519 to x25519 {:?}", err))
         })
@@ -334,12 +422,24 @@ pub struct RestOptions {
     /// URL to a fullnode on the network
     ///
     /// Defaults to https://fullnode.devnet.aptoslabs.com
-    #[clap(
-        long,
-        parse(try_from_str),
-        default_value = "https://fullnode.devnet.aptoslabs.com"
-    )]
-    pub url: reqwest::Url,
+    #[clap(long, parse(try_from_str))]
+    pub url: Option<reqwest::Url>,
+}
+
+impl RestOptions {
+    /// Retrieve the URL from the profile or the command line
+    pub fn url(&self, profile: &str) -> CliTypedResult<reqwest::Url> {
+        if let Some(ref url) = self.url {
+            Ok(url.clone())
+        } else if let Some(Some(url)) = CliConfig::load_profile(profile)?.map(|p| p.rest_url) {
+            reqwest::Url::parse(&url)
+                .map_err(|err| CliError::UnableToParse("Rest URL", err.to_string()))
+        } else {
+            reqwest::Url::parse(DEFAULT_REST_URL).map_err(|err| {
+                CliError::UnexpectedError(format!("Failed to parse default rest URL {}", err))
+            })
+        }
+    }
 }
 
 /// Options specific to submitting a private key to the Rest endpoint
@@ -349,14 +449,24 @@ pub struct WriteTransactionOptions {
     pub private_key_options: PrivateKeyInputOptions,
     #[clap(flatten)]
     pub rest_options: RestOptions,
-    /// ChainId for the network
-    #[clap(long)]
-    pub chain_id: ChainId,
     /// Maximum gas to be used to publish the package
     ///
     /// Defaults to 1000 gas units
     #[clap(long, default_value_t = 1000)]
     pub max_gas: u64,
+}
+
+impl WriteTransactionOptions {
+    /// Retrieve the chain id from onchain via the Rest API
+    pub async fn chain_id(&self, profile: &str) -> CliTypedResult<ChainId> {
+        let client = Client::new(self.rest_options.url(profile)?);
+        let state = client
+            .get_ledger_information()
+            .await
+            .map_err(|err| CliError::ApiError(err.to_string()))?
+            .into_inner();
+        Ok(ChainId::new(state.chain_id))
+    }
 }
 
 /// Options for compiling a move package dir
@@ -375,39 +485,167 @@ pub struct MovePackageDir {
     /// Example: alice=0x1234, bob=0x5678
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
-    #[clap(long, parse(try_from_str = parse_map), default_value = "")]
-    pub named_addresses: BTreeMap<String, AccountAddress>,
+    #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
+    named_addresses: BTreeMap<String, AccountAddressWrapper>,
 }
 
-const PARSE_MAP_SYNTAX_MSG: &str = "Invalid syntax for map.  Example: Name=Value,Name2=Value";
+impl MovePackageDir {
+    /// Retrieve the NamedAddresses, resolving all the account addresses accordingly
+    pub fn named_addresses(&self) -> BTreeMap<String, AccountAddress> {
+        self.named_addresses
+            .clone()
+            .into_iter()
+            .map(|(key, value)| (key, value.account_address))
+            .collect()
+    }
+}
 
-/// Parses an inline map of values
-///
-/// Example: Name=Value,Name2=Value
-pub fn parse_map<K: FromStr + Ord, V: FromStr>(str: &str) -> anyhow::Result<BTreeMap<K, V>>
-where
-    K::Err: 'static + std::error::Error + Send + Sync,
-    V::Err: 'static + std::error::Error + Send + Sync,
-{
-    let mut map = BTreeMap::new();
+/// A wrapper around `AccountAddress` to be more flexible from strings than AccountAddress
+#[derive(Clone, Copy, Debug)]
+pub struct AccountAddressWrapper {
+    pub account_address: AccountAddress,
+}
 
-    // Split pairs by commas
-    for pair in str.split_terminator(',') {
-        // Split pairs by = then trim off any spacing
-        let (first, second): (&str, &str) = pair
-            .split_terminator('=')
-            .collect_tuple()
-            .ok_or_else(|| anyhow::Error::msg(PARSE_MAP_SYNTAX_MSG))?;
-        let first = first.trim();
-        let second = second.trim();
-        if first.is_empty() || second.is_empty() {
-            return Err(anyhow::Error::msg(PARSE_MAP_SYNTAX_MSG));
+impl FromStr for AccountAddressWrapper {
+    type Err = CliError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(AccountAddressWrapper {
+            account_address: load_account_arg(s)?,
+        })
+    }
+}
+
+/// Loads an account arg and allows for naming based on profiles
+pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
+    if str.starts_with("0x") {
+        AccountAddress::from_hex_literal(str).map_err(|err| {
+            CliError::CommandArgumentError(format!("Failed to parse AccountAddress {}", err))
+        })
+    } else if let Ok(account_address) = AccountAddress::from_str(str) {
+        Ok(account_address)
+    } else if let Some(Some(private_key)) = CliConfig::load_profile(str)?.map(|p| p.private_key) {
+        let public_key = private_key.public_key();
+        Ok(account_address_from_public_key(&public_key))
+    } else {
+        Err(CliError::CommandArgumentError(
+            "'--account-address' or '--profile' after using aptos init must be provided"
+                .to_string(),
+        ))
+    }
+}
+
+/// A common trait for all CLI commands to have consistent outputs
+#[async_trait]
+pub trait CliCommand<T: Serialize + Send>: Sized + Send {
+    /// Returns a name for logging purposes
+    fn command_name(&self) -> &'static str;
+
+    /// Executes the command, returning a command specific type
+    async fn execute(self) -> CliTypedResult<T>;
+
+    /// Executes the command, and serializes it to the common JSON output type
+    async fn execute_serialized(self) -> CliResult {
+        let command_name = self.command_name();
+        to_common_result(command_name, self.execute().await).await
+    }
+
+    /// Executes the command, and throws away Ok(result) for the string Success
+    async fn execute_serialized_success(self) -> CliResult {
+        let command_name = self.command_name();
+        to_common_success_result(command_name, self.execute().await).await
+    }
+}
+
+/// A shortened transaction output
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct TransactionSummary {
+    changes: Vec<ChangeSummary>,
+    gas_used: Option<u64>,
+    success: bool,
+    version: Option<u64>,
+    vm_status: String,
+}
+
+impl From<Transaction> for TransactionSummary {
+    fn from(transaction: Transaction) -> Self {
+        let mut summary = TransactionSummary {
+            success: transaction.success(),
+            version: transaction.version(),
+            vm_status: transaction.vm_status(),
+            ..Default::default()
+        };
+
+        if let Ok(info) = transaction.transaction_info() {
+            summary.gas_used = Some(info.gas_used.0);
+            summary.changes = info
+                .changes
+                .iter()
+                .map(|change| match change {
+                    WriteSetChange::DeleteModule { module, .. } => ChangeSummary {
+                        event: change.type_str(),
+                        module: Some(module.to_string()),
+                        ..Default::default()
+                    },
+                    WriteSetChange::DeleteResource {
+                        address, resource, ..
+                    } => ChangeSummary {
+                        event: change.type_str(),
+                        address: Some(*address.inner()),
+                        resource: Some(resource.to_string()),
+                        ..Default::default()
+                    },
+                    WriteSetChange::DeleteTableItem { handle, key, .. } => ChangeSummary {
+                        event: change.type_str(),
+                        handle: Some(handle.to_string()),
+                        key: Some(key.to_string()),
+                        ..Default::default()
+                    },
+                    WriteSetChange::WriteModule { address, .. } => ChangeSummary {
+                        event: change.type_str(),
+                        address: Some(*address.inner()),
+                        ..Default::default()
+                    },
+                    WriteSetChange::WriteResource { address, data, .. } => ChangeSummary {
+                        event: change.type_str(),
+                        address: Some(*address.inner()),
+                        resource: Some(data.typ.to_string()),
+                        data: Some(serde_json::to_value(&data.data).unwrap_or_default()),
+                        ..Default::default()
+                    },
+                    WriteSetChange::WriteTableItem {
+                        handle, key, value, ..
+                    } => ChangeSummary {
+                        event: change.type_str(),
+                        handle: Some(handle.to_string()),
+                        key: Some(key.to_string()),
+                        value: Some(value.to_string()),
+                        ..Default::default()
+                    },
+                })
+                .collect();
         }
 
-        // At this point, we just give error messages appropriate to parsing
-        let key: K = K::from_str(first)?;
-        let value: V = V::from_str(second)?;
-        map.insert(key, value);
+        summary
     }
-    Ok(map)
+}
+
+/// A summary of a [`WriteSetChange`] for easy printing
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct ChangeSummary {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    address: Option<AccountAddress>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data: Option<serde_json::Value>,
+    event: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    handle: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    module: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    resource: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    value: Option<String>,
 }

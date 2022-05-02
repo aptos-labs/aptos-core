@@ -35,7 +35,7 @@ aptos-temppath = { path = "../../crates/aptos-temppath", optional = true }
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 executor-types = { path = "../../execution/executor-types", optional = true }
-move-core-types = {git = "https://github.com/move-language/move", rev = "476305d239ce6afafce15a297c8c3839dd8465b6", features=["address32"]}
+move-core-types = {git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e", features=["address32"]}
 num-variants = { path = "../../crates/num-variants" }
 schemadb = { path = "../schemadb" }
 scratchpad = { path = "../scratchpad", optional = true }
@@ -56,5 +56,4 @@ scratchpad = { path = "../scratchpad", features = ["fuzzing"] }
 
 [features]
 default = []
-aptossum = []
 fuzzing = ["proptest", "proptest-derive", "aptos-proptest-helpers", "aptos-temppath", "aptos-crypto/fuzzing", "aptos-jellyfish-merkle/fuzzing", "aptos-types/fuzzing", "executor-types/fuzzing", "schemadb/fuzzing", "scratchpad/fuzzing"]

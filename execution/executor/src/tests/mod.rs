@@ -22,10 +22,10 @@ use aptos_types::{
     proof::definition::LeafCount,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionListWithProof,
-        TransactionOutput, TransactionPayload, TransactionStatus, Version,
+        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
+        TransactionListWithProof, TransactionOutput, TransactionPayload, TransactionStatus,
+        Version,
     },
-    vm_status::KeptVMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use aptosdb::AptosDB;
@@ -342,7 +342,6 @@ fn create_test_transaction(sequence_number: u64) -> Transaction {
         transaction_payload,
         0,
         0,
-        "".into(),
         0,
         ChainId::new(10),
     );
@@ -375,7 +374,7 @@ fn apply_transaction_by_writeset(
                     write_set.clone(),
                     vec![],
                     0,
-                    TransactionStatus::Keep(KeptVMStatus::MiscellaneousError),
+                    TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)),
                 ),
             )
         })

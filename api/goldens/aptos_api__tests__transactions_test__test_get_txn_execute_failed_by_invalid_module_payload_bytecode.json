@@ -1,13 +1,13 @@
 {
   "type": "user_transaction",
   "version": "2",
-  "hash": "0xcb799b84973fe9a6646599d7f35a797145cf6147fdbd374b680d86e95bc6be52",
-  "state_root_hash": "0x613919682e21fac2dfeb169c98f88a8e265b2cc107c529e55c5cc393e73413e1",
+  "hash": "0xf1d9819d9c3890f1d3e515be30cf920bd5bba8a7616dc02f21438c3ce08e27fa",
+  "state_root_hash": "0x3cd5c847adbb63eacd7a588a2ac23ff98f5d64a5ec0e82eeca02acece5d3b446",
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "1",
   "success": false,
-  "vm_status": "Move bytecode deserialization / verification failed, including script function not found or invalid arguments",
-  "accumulator_root_hash": "0xd6180a5ad70a30d41abd41e426d90a06617b12a0a8ec55576479a3419a706063",
+  "vm_status": "Transaction Executed and Committed with Error MALFORMED",
+  "accumulator_root_hash": "0x33158c7e0638a88ea8ffa7b20129a10e0bbc821c6dbd35b971548a379b84fcf9",
   "changes": [
     {
       "type": "write_resource",
@@ -30,20 +30,8 @@
         "type": "0x1::TestCoin::Balance",
         "data": {
           "coin": {
-            "value": "18446744073709551615"
+            "value": "18446744073709551614"
           }
-        }
-      }
-    },
-    {
-      "type": "write_resource",
-      "address": "0xa550c18",
-      "state_key_hash": "0x79a08e0b94ebb66c0dae37a07c182d46387c347aeb83c07de6109b0503c3a24e",
-      "data": {
-        "type": "0x1::TestCoin::CoinInfo",
-        "data": {
-          "scaling_factor": "1000000",
-          "total_value": "18446744073709551615"
         }
       }
     }
@@ -52,7 +40,6 @@
   "sequence_number": "0",
   "max_gas_amount": "2000",
   "gas_unit_price": "0",
-  "gas_currency_code": "XUS",
   "expiration_timestamp_secs": "18446744073709551615",
   "payload": {
     "type": "module_bundle_payload",
@@ -66,7 +53,7 @@
   "signature": {
     "type": "ed25519_signature",
     "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-    "signature": "0x0b1b9a7c0277b837634135f65c62b2be96ed29e63073f227e6d14e67d6b9e17864b6fa227540d7b47034e06af492e8e35ce3146c4030670b74434b150e860106"
+    "signature": "0xf6523e24249fbe46e68a0035f7c7daac2cf6c3653ac0192f9f85101116c92fa901238088b8ecaf459c5afbca229cffde00b214626c5be6cb70ce6120d655a80f"
   },
   "events": [],
   "timestamp": "1"

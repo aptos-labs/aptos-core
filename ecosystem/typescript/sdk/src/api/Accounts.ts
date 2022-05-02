@@ -146,11 +146,13 @@ export class Accounts<SecurityDataType = unknown> {
     address: Address,
     eventHandleStruct: MoveStructTagId,
     fieldName: string,
+    query?: { start?: number; limit?: number },
     params: RequestParams = {},
   ) =>
     this.http.request<Event[], AptosError>({
       path: `/accounts/${address}/events/${eventHandleStruct}/${fieldName}`,
       method: "GET",
+      query: query,
       format: "json",
       ...params,
     });

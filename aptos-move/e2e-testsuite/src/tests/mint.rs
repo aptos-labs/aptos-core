@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_transaction_builder::aptos_stdlib::encode_mint_script_function;
-use aptos_types::{transaction::TransactionStatus, vm_status::KeptVMStatus};
+use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 use language_e2e_tests::{
     gas_costs::TXN_RESERVED, test_with_different_versions, versioning::CURRENT_RELEASE_VERSIONS,
 };
@@ -31,7 +31,7 @@ fn mint_to_new_account() {
 
         assert_eq!(
             output.status(),
-            &TransactionStatus::Keep(KeptVMStatus::Executed),
+            &TransactionStatus::Keep(ExecutionStatus::Success),
         );
     }
     }

@@ -253,7 +253,6 @@ fn validator_config(
         .ok_or_else(|| Error::UnexpectedError("ValidatorSet does not exist".into()))?;
     let info = validator_set
         .payload()
-        .iter()
         .find(|vi| vi.account_address() == &validator_account)
         .ok_or_else(|| {
             Error::UnexpectedError(format!(

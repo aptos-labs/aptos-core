@@ -54,10 +54,8 @@ fn verify_state_in_store(
 #[test]
 fn test_state_store_pruner() {
     let address = AccountAddress::new([1u8; AccountAddress::LENGTH]);
-    let value0 = AccountStateBlob::from(vec![0x01]);
-    let value1 = AccountStateBlob::from(vec![0x02]);
-    let value2 = AccountStateBlob::from(vec![0x03]);
-
+    let prune_batch_size = 10;
+    let num_versions = 25;
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let db = aptos_db.db;
@@ -67,34 +65,27 @@ fn test_state_store_pruner() {
         Arc::clone(&db),
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
-            default_prune_window: Some(0),
-            max_version_to_prune_per_batch: Some(100),
+            ledger_prune_window: Some(0),
+            pruning_batch_size: prune_batch_size,
         },
         Arc::clone(transaction_store),
         Arc::clone(&aptos_db.ledger_store),
         Arc::clone(&aptos_db.event_store),
     );
 
-    let _root0 = put_account_state_set(
-        &db,
-        state_store,
-        vec![(address, value0.clone())],
-        0, /* version */
-    );
-    let _root1 = put_account_state_set(
-        &db,
-        state_store,
-        vec![(address, value1.clone())],
-        1, /* version */
-    );
-    let _root2 = put_account_state_set(
-        &db,
-        state_store,
-        vec![(address, value2.clone())],
-        2, /* version */
-    );
+    let mut root_hashes = vec![];
+    // Insert 25 values in the db.
+    for i in 0..num_versions {
+        let value = AccountStateBlob::from(vec![i as u8]);
+        root_hashes.push(put_account_state_set(
+            &db,
+            state_store,
+            vec![(address, value.clone())],
+            i as u64, /* version */
+        ));
+    }
 
-    // Prune till version=0.
+    // Prune till version=0. This should basically be a no-op
     {
         pruner
             .wake_and_wait(
@@ -102,40 +93,47 @@ fn test_state_store_pruner() {
                 PrunerIndex::StateStorePrunerIndex as usize,
             )
             .unwrap();
-        verify_state_in_store(state_store, address, Some(&value0), 0);
-        verify_state_in_store(state_store, address, Some(&value1), 1);
-        verify_state_in_store(state_store, address, Some(&value2), 2);
+        for i in 0..num_versions {
+            verify_state_in_store(
+                state_store,
+                address,
+                Some(&AccountStateBlob::from(vec![i as u8])),
+                i,
+            );
+        }
     }
-    // Prune till version=1.
+
+    // Test for batched pruning, since we use a batch size of 10, updating the latest version to
+    // less than 10 should not perform any actual pruning.
+    assert!(pruner
+        .wake_and_wait(
+            5, /* latest_version */
+            PrunerIndex::StateStorePrunerIndex as usize,
+        )
+        .is_err());
+
+    // Notify the pruner to update the version to be 10 - since we use a batch size of 10,
+    // we expect versions 0 to 9 to be pruned.
     {
         pruner
             .wake_and_wait(
-                1, /* latest_version */
+                prune_batch_size as u64, /* latest_version */
                 PrunerIndex::StateStorePrunerIndex as usize,
             )
             .unwrap();
-        // root0 is gone.
-        assert!(state_store
-            .get_value_with_proof_by_version(&StateKey::AccountAddressKey(address), 0)
-            .is_err());
-        // root1 is still there.
-        verify_state_in_store(state_store, address, Some(&value1), 1);
-        verify_state_in_store(state_store, address, Some(&value2), 2);
-    }
-    // Prune till version=2.
-    {
-        pruner
-            .wake_and_wait(
-                2, /* latest_version */
-                PrunerIndex::StateStorePrunerIndex as usize,
-            )
-            .unwrap();
-        // root1 is gone.
-        assert!(state_store
-            .get_value_with_proof_by_version(&StateKey::AccountAddressKey(address), 1)
-            .is_err());
-        // root2 is still there.
-        verify_state_in_store(state_store, address, Some(&value2), 2);
+        for i in 0..prune_batch_size {
+            assert!(state_store
+                .get_value_with_proof_by_version(&StateKey::AccountAddressKey(address), i as u64)
+                .is_err());
+        }
+        for i in prune_batch_size..num_versions as usize {
+            verify_state_in_store(
+                state_store,
+                address,
+                Some(&AccountStateBlob::from(vec![i as u8])),
+                i as u64,
+            );
+        }
     }
 }
 
@@ -183,12 +181,12 @@ fn test_worker_quit_eagerly() {
         );
         command_sender
             .send(Command::Prune {
-                target_db_versions: vec![1, 0, 0, 0, 0],
+                target_db_versions: vec![1, 0],
             })
             .unwrap();
         command_sender
             .send(Command::Prune {
-                target_db_versions: vec![2, 0, 0, 0, 0],
+                target_db_versions: vec![2, 0],
             })
             .unwrap();
         command_sender.send(Command::Quit).unwrap();

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::account_config::constants::{
-    CORE_ACCOUNT_MODULE_IDENTIFIER, CORE_CODE_ADDRESS, DIEM_ACCOUNT_MODULE_IDENTIFIER,
+    APTOS_ACCOUNT_MODULE_IDENTIFIER, CORE_ACCOUNT_MODULE_IDENTIFIER, CORE_CODE_ADDRESS,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 pub static DPN_CHAIN_INFO: Lazy<ChainSpecificAccountInfo> =
     Lazy::new(|| ChainSpecificAccountInfo {
         module_addr: CORE_CODE_ADDRESS,
-        module_name: DIEM_ACCOUNT_MODULE_IDENTIFIER.to_owned(),
+        module_name: APTOS_ACCOUNT_MODULE_IDENTIFIER.to_owned(),
         script_prologue_name: Identifier::new("script_prologue").unwrap(),
         module_prologue_name: Identifier::new("module_prologue").unwrap(),
         writeset_prologue_name: Identifier::new("writeset_prologue").unwrap(),

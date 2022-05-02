@@ -9,12 +9,13 @@ use serde::{Deserialize, Deserializer};
 use std::{convert::Infallible, str::FromStr};
 
 pub type AddressParam = Param<Address>;
-pub type TransactionIdParam = Param<TransactionId>;
-pub type TransactionVersionParam = Param<u64>;
-pub type LedgerVersionParam = Param<u64>;
 pub type EventKeyParam = Param<EventKey>;
+pub type LedgerVersionParam = Param<u64>;
 pub type MoveStructTagParam = Param<MoveStructTag>;
 pub type MoveIdentifierParam = Param<Identifier>;
+pub type TableHandleParam = Param<u128>;
+pub type TransactionIdParam = Param<TransactionId>;
+pub type TransactionVersionParam = Param<u64>;
 
 /// `Param` is designed for parsing `warp` path parameter or query string
 /// into a type specified by the generic type parameter of `Param`.

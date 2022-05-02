@@ -1,12 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
-    multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
-    PrivateKey, SigningKey, Uniform,
-};
-use aptos_keygen::KeyGen;
+use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_transaction_builder::aptos_stdlib::encode_transfer_script_function;
 use aptos_types::{
     account_address::AccountAddress,
@@ -14,29 +9,20 @@ use aptos_types::{
     chain_id::ChainId,
     on_chain_config::VMPublishingOption,
     test_helpers::transaction_test_helpers,
-    transaction::{
-        authenticator::{AccountAuthenticator, AuthenticationKey, MAX_NUM_OF_SIGS},
-        RawTransactionWithData, Script, SignedTransaction, TransactionArgument, TransactionStatus,
-    },
-    vm_status::{KeptVMStatus, StatusCode},
+    transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
+    vm_status::StatusCode,
 };
 use language_e2e_tests::{
-    assert_prologue_disparity, assert_prologue_parity,
-    common_transactions::{
-        multi_agent_mint_script, multi_agent_swap_script, raw_multi_agent_swap_txn, rotate_key_txn,
-        EMPTY_SCRIPT,
-    },
-    compile::compile_module,
-    current_function_name,
-    executor::FakeExecutor,
-    test_with_different_versions, transaction_status_eq,
-    versioning::CURRENT_RELEASE_VERSIONS,
+    assert_prologue_disparity, assert_prologue_parity, common_transactions::EMPTY_SCRIPT,
+    compile::compile_module, current_function_name, executor::FakeExecutor,
+    test_with_different_versions, transaction_status_eq, versioning::CURRENT_RELEASE_VERSIONS,
 };
 use move_binary_format::file_format::CompiledModule;
 use move_core_types::{
     gas_schedule::{GasAlgebra, GasConstants, MAX_TRANSACTION_SIZE_IN_BYTES},
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
+    vm_status::StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER,
 };
 use move_ir_compiler::Compiler;
 
@@ -67,62 +53,6 @@ fn verify_signature() {
         );
     }
     }
-}
-
-#[ignore]
-#[test]
-fn verify_multi_agent() {
-    let mut executor = FakeExecutor::from_genesis_file();
-    executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_010, 10);
-    let secondary_signer = executor.create_raw_account_data(100_100, 100);
-
-    executor.add_account_data(&sender);
-    executor.add_account_data(&secondary_signer);
-
-    let signed_txn = transaction_test_helpers::get_test_unchecked_multi_agent_txn(
-        *sender.address(),
-        vec![*secondary_signer.address()],
-        10,
-        &sender.account().privkey,
-        sender.account().pubkey.clone(),
-        vec![&secondary_signer.account().privkey],
-        vec![secondary_signer.account().pubkey.clone()],
-        Some(multi_agent_swap_script(10, 10)),
-    );
-    assert_eq!(executor.verify_transaction(signed_txn).status(), None);
-}
-
-#[ignore]
-#[test]
-fn verify_multi_agent_multiple_secondary_signers() {
-    let mut executor = FakeExecutor::from_genesis_file();
-    executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_010, 10);
-    let secondary_signer = executor.create_raw_account_data(100_100, 100);
-    let third_signer = executor.create_raw_account_data(100_100, 100);
-
-    executor.add_account_data(&sender);
-    executor.add_account_data(&secondary_signer);
-    executor.add_account_data(&third_signer);
-
-    let signed_txn = transaction_test_helpers::get_test_unchecked_multi_agent_txn(
-        *sender.address(),
-        vec![*secondary_signer.address(), *third_signer.address()],
-        10,
-        &sender.account().privkey,
-        sender.account().pubkey.clone(),
-        vec![
-            &secondary_signer.account().privkey,
-            &third_signer.account().privkey,
-        ],
-        vec![
-            secondary_signer.account().pubkey.clone(),
-            third_signer.account().pubkey.clone(),
-        ],
-        Some(multi_agent_mint_script(100, 0)),
-    );
-    assert_eq!(executor.verify_transaction(signed_txn).status(), None);
 }
 
 #[test]
@@ -186,154 +116,6 @@ fn verify_multi_agent_invalid_secondary_signature() {
     );
 }
 
-#[ignore]
-#[test]
-fn verify_multi_agent_num_sigs_exceeds() {
-    let mut executor = FakeExecutor::from_genesis_file();
-    executor.set_golden_file(current_function_name!());
-    let mut sender_seq_num = 10;
-    let secondary_signer_seq_num = 100;
-    let sender = executor.create_raw_account_data(1_000_010, sender_seq_num);
-    let secondary_signer = executor.create_raw_account_data(100_100, secondary_signer_seq_num);
-
-    executor.add_account_data(&sender);
-    executor.add_account_data(&secondary_signer);
-
-    // create two multisigs with `MAX_NUM_OF_SIGS/MAX_NUM_OF_SIGS` policy.
-    let mut keygen = KeyGen::from_seed([9u8; 32]);
-    let threshold = MAX_NUM_OF_SIGS as u8;
-
-    let (sender_privkeys, sender_pubkeys): (Vec<Ed25519PrivateKey>, Vec<Ed25519PublicKey>) =
-        (0..threshold).map(|_| keygen.generate_keypair()).unzip();
-    let sender_multi_ed_public_key = MultiEd25519PublicKey::new(sender_pubkeys, threshold).unwrap();
-    let sender_new_auth_key = AuthenticationKey::multi_ed25519(&sender_multi_ed_public_key);
-
-    let (secondary_signer_privkeys, secondary_signer_pubkeys) =
-        (0..threshold).map(|_| keygen.generate_keypair()).unzip();
-    let secondary_signer_multi_ed_public_key =
-        MultiEd25519PublicKey::new(secondary_signer_pubkeys, threshold).unwrap();
-    let secondary_signer_new_auth_key =
-        AuthenticationKey::multi_ed25519(&secondary_signer_multi_ed_public_key);
-
-    // (1) rotate keys to multisigs
-    let sender_output = &executor.execute_transaction(rotate_key_txn(
-        sender.account(),
-        sender_new_auth_key.to_vec(),
-        sender_seq_num,
-    ));
-    assert_eq!(
-        sender_output.status(),
-        &TransactionStatus::Keep(KeptVMStatus::Executed),
-    );
-    executor.apply_write_set(sender_output.write_set());
-    sender_seq_num += 1;
-
-    let secondary_signer_output = &executor.execute_transaction(rotate_key_txn(
-        secondary_signer.account(),
-        secondary_signer_new_auth_key.to_vec(),
-        secondary_signer_seq_num,
-    ));
-    assert_eq!(
-        secondary_signer_output.status(),
-        &TransactionStatus::Keep(KeptVMStatus::Executed),
-    );
-    executor.apply_write_set(secondary_signer_output.write_set());
-
-    // (2) sign a txn with new multisig private keys
-    let txn = raw_multi_agent_swap_txn(
-        sender.account(),
-        secondary_signer.account(),
-        sender_seq_num,
-        0,
-        0,
-    );
-    let raw_txn_with_data =
-        RawTransactionWithData::new_multi_agent(txn.clone(), vec![*secondary_signer.address()]);
-    let sender_sig = MultiEd25519PrivateKey::new(sender_privkeys, threshold)
-        .unwrap()
-        .sign(&raw_txn_with_data);
-    let secondary_signer_sig = MultiEd25519PrivateKey::new(secondary_signer_privkeys, threshold)
-        .unwrap()
-        .sign(&raw_txn_with_data);
-    let signed_txn = SignedTransaction::new_multi_agent(
-        txn,
-        AccountAuthenticator::multi_ed25519(sender_multi_ed_public_key, sender_sig),
-        vec![*secondary_signer.address()],
-        vec![AccountAuthenticator::multi_ed25519(
-            secondary_signer_multi_ed_public_key,
-            secondary_signer_sig,
-        )],
-    );
-
-    // Transaction will fail validation because the number of signatures exceeds the maximum number
-    // of signatures allowed.
-    assert_prologue_parity!(
-        executor.verify_transaction(signed_txn.clone()).status(),
-        executor.execute_transaction(signed_txn).status(),
-        StatusCode::INVALID_SIGNATURE
-    );
-}
-
-#[ignore]
-#[test]
-fn verify_multi_agent_wrong_number_of_signer() {
-    let mut executor = FakeExecutor::from_genesis_file();
-    executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_010, 10);
-    let secondary_signer = executor.create_raw_account_data(100_100, 100);
-    let third_signer = executor.create_raw_account_data(100_100, 100);
-
-    executor.add_account_data(&sender);
-    executor.add_account_data(&secondary_signer);
-    executor.add_account_data(&third_signer);
-
-    // Number of secondary signers according is 2 but we only
-    // include the signature of one of the secondary signers.
-    let signed_txn = transaction_test_helpers::get_test_unchecked_multi_agent_txn(
-        *sender.address(),
-        vec![*secondary_signer.address(), *third_signer.address()],
-        10,
-        &sender.account().privkey,
-        sender.account().pubkey.clone(),
-        vec![&secondary_signer.account().privkey],
-        vec![secondary_signer.account().pubkey.clone()],
-        Some(multi_agent_mint_script(10, 0)),
-    );
-    assert_prologue_parity!(
-        executor.verify_transaction(signed_txn.clone()).status(),
-        executor.execute_transaction(signed_txn).status(),
-        StatusCode::SECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH
-    );
-}
-
-#[ignore]
-#[test]
-fn verify_multi_agent_duplicate_sender() {
-    let mut executor = FakeExecutor::from_genesis_file();
-    executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_010, 10);
-    let secondary_signer = executor.create_raw_account_data(100_100, 100);
-
-    executor.add_account_data(&sender);
-    executor.add_account_data(&secondary_signer);
-    // Duplicates in signers: sender and secondary signer have the same address.
-    let signed_txn = transaction_test_helpers::get_test_unchecked_multi_agent_txn(
-        *sender.address(),
-        vec![*sender.address()],
-        10,
-        &sender.account().privkey,
-        sender.account().pubkey.clone(),
-        vec![&sender.account().privkey],
-        vec![sender.account().pubkey.clone()],
-        Some(multi_agent_swap_script(10, 10)),
-    );
-    assert_prologue_parity!(
-        executor.verify_transaction(signed_txn.clone()).status(),
-        executor.execute_transaction(signed_txn).status(),
-        StatusCode::SIGNERS_CONTAIN_DUPLICATES
-    );
-}
-
 #[test]
 fn verify_multi_agent_duplicate_secondary_signer() {
     let mut executor = FakeExecutor::from_genesis_file();
@@ -373,34 +155,6 @@ fn verify_multi_agent_duplicate_secondary_signer() {
         executor.verify_transaction(signed_txn.clone()).status(),
         executor.execute_transaction(signed_txn).status(),
         StatusCode::SIGNERS_CONTAIN_DUPLICATES
-    );
-}
-
-#[ignore]
-#[test]
-fn verify_multi_agent_nonexistent_secondary_signer() {
-    let mut executor = FakeExecutor::from_genesis_file();
-    executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_010, 10);
-    let secondary_signer = executor.create_raw_account_data(100_100, 100);
-
-    executor.add_account_data(&sender);
-
-    // Duplicates in signers: sender and secondary signer have the same address.
-    let signed_txn = transaction_test_helpers::get_test_unchecked_multi_agent_txn(
-        *sender.address(),
-        vec![*secondary_signer.address()],
-        10,
-        &sender.account().privkey,
-        sender.account().pubkey.clone(),
-        vec![&secondary_signer.account().privkey],
-        vec![secondary_signer.account().pubkey.clone()],
-        Some(multi_agent_swap_script(10, 10)),
-    );
-    assert_prologue_parity!(
-        executor.verify_transaction(signed_txn.clone()).status(),
-        executor.execute_transaction(signed_txn).status(),
-        StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST
     );
 }
 
@@ -667,8 +421,8 @@ fn verify_simple_payment() {
         let output = executor.execute_transaction(txn);
         assert_eq!(
             output.status(),
-            // StatusCode::TYPE_MISMATCH
-            &TransactionStatus::Keep(KeptVMStatus::MiscellaneousError)
+            &TransactionStatus::Keep(
+                ExecutionStatus::MiscellaneousError(Some(StatusCode::NUMBER_OF_ARGUMENTS_MISMATCH)))
         );
     }
     }
@@ -702,7 +456,9 @@ pub fn test_arbitrary_script_execution() {
     assert_eq!(
         status.status(),
         // StatusCode::CODE_DESERIALIZATION_ERROR
-        Ok(KeptVMStatus::MiscellaneousError)
+        Ok(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::CODE_DESERIALIZATION_ERROR
+        )))
     );
 }
 
@@ -771,7 +527,6 @@ fn verify_expiration_time() {
             None, /* script */
             0,    /* expiration_time */
             0,    /* gas_unit_price */
-            account_config::XUS_NAME.to_owned(),
             None, /* max_gas_amount */
         );
         assert_prologue_parity!(
@@ -790,7 +545,6 @@ fn verify_expiration_time() {
             None, /* script */
             0,    /* expiration_time */
             0,    /* gas_unit_price */
-            account_config::XUS_NAME.to_owned(),
             None, /* max_gas_amount */
         );
         assert_prologue_parity!(
@@ -841,7 +595,6 @@ fn verify_max_sequence_number() {
             None,     /* script */
             u64::MAX, /* expiration_time */
             0,        /* gas_unit_price */
-            "XUS".to_string(),
             None, /* max_gas_amount */
         );
         assert_prologue_parity!(
@@ -909,7 +662,10 @@ pub fn test_open_publishing_invalid_address() {
     let output = executor.execute_transaction(txn);
     if let TransactionStatus::Keep(status) = output.status() {
         // assert!(status.status_code() == StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER)
-        assert!(status == &KeptVMStatus::MiscellaneousError);
+        assert!(
+            status
+                == &ExecutionStatus::MiscellaneousError(Some(MODULE_ADDRESS_DOES_NOT_MATCH_SENDER))
+        );
     } else {
         panic!("Unexpected execution status: {:?}", output)
     };
@@ -960,7 +716,7 @@ pub fn test_open_publishing() {
     assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
     assert_eq!(
         executor.execute_transaction(txn).status(),
-        &TransactionStatus::Keep(KeptVMStatus::Executed)
+        &TransactionStatus::Keep(ExecutionStatus::Success)
     );
 }
 

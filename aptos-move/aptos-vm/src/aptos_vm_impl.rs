@@ -7,7 +7,7 @@ use crate::{
     data_cache::RemoteStorage,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     logging::AdapterLogSchema,
-    move_vm_ext::{MoveVmExt, SessionExt, SessionId},
+    move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
     transaction_metadata::TransactionMetadata,
 };
 use aptos_crypto::HashValue;
@@ -15,15 +15,15 @@ use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
-    account_config::{ChainSpecificAccountInfo, CurrencyInfoResource},
+    account_config::ChainSpecificAccountInfo,
     contract_event::ContractEvent,
     event::EventKey,
     on_chain_config::{
         ConfigStorage, OnChainConfig, VMConfig, VMPublishingOption, Version, APTOS_VERSION_3,
     },
     state_store::state_key::StateKey,
-    transaction::{SignedTransaction, TransactionOutput, TransactionStatus},
-    vm_status::{KeptVMStatus, StatusCode, VMStatus},
+    transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
+    vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use fail::fail_point;
@@ -35,12 +35,12 @@ use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet as MoveChangeSet, Event as MoveEvent},
     gas_schedule::{CostTable, GasAlgebra, GasCarrier, GasUnits, InternalGasUnits},
-    identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, TypeTag},
+    language_storage::ModuleId,
     move_resource::MoveStructType,
-    resolver::{MoveResolver, ResourceResolver},
+    resolver::ResourceResolver,
     value::{serialize_values, MoveValue},
 };
+use move_table_extension::TableChangeSet;
 use move_vm_runtime::{logging::expect_no_verification_errors, session::Session};
 use move_vm_types::gas_schedule::{calculate_intrinsic_gas, GasStatus};
 use std::{convert::TryFrom, sync::Arc};
@@ -237,27 +237,16 @@ impl AptosVMImpl {
         Ok(())
     }
 
-    fn get_gas_currency_args(&self, account_currency_symbol: &IdentStr) -> Vec<TypeTag> {
-        if self.chain_info().currency_code_required {
-            vec![account_config::type_tag_for_currency_code(
-                account_currency_symbol.to_owned(),
-            )]
-        } else {
-            vec![]
-        }
-    }
-
     /// Run the prologue of a transaction by calling into either `SCRIPT_PROLOGUE_NAME` function
     /// or `MULTI_AGENT_SCRIPT_PROLOGUE_NAME` function stored in the `ACCOUNT_MODULE` on chain.
-    pub(crate) fn run_script_prologue<S: MoveResolver>(
+    pub(crate) fn run_script_prologue<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
         txn_data: &TransactionMetadata,
-        account_currency_symbol: &IdentStr,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let chain_specific_info = self.chain_info();
-        let gas_currency = self.get_gas_currency_args(account_currency_symbol);
+        let gas_currency = vec![];
         let txn_sequence_number = txn_data.sequence_number();
         let txn_public_key = txn_data.authentication_key_preimage().to_vec();
         let txn_gas_price = txn_data.gas_unit_price().get();
@@ -315,15 +304,14 @@ impl AptosVMImpl {
 
     /// Run the prologue of a transaction by calling into `MODULE_PROLOGUE_NAME` function stored
     /// in the `ACCOUNT_MODULE` on chain.
-    pub(crate) fn run_module_prologue<S: MoveResolver>(
+    pub(crate) fn run_module_prologue<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
         txn_data: &TransactionMetadata,
-        account_currency_symbol: &IdentStr,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let chain_specific_info = self.chain_info();
-        let gas_currency = self.get_gas_currency_args(account_currency_symbol);
+        let gas_currency = vec![];
         let txn_sequence_number = txn_data.sequence_number();
         let txn_public_key = txn_data.authentication_key_preimage().to_vec();
         let txn_gas_price = txn_data.gas_unit_price().get();
@@ -354,12 +342,11 @@ impl AptosVMImpl {
 
     /// Run the epilogue of a transaction by calling into `EPILOGUE_NAME` function stored
     /// in the `ACCOUNT_MODULE` on chain.
-    pub(crate) fn run_success_epilogue<S: MoveResolver>(
+    pub(crate) fn run_success_epilogue<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
         gas_status: &mut GasStatus,
         txn_data: &TransactionMetadata,
-        account_currency_symbol: &IdentStr,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         fail_point!("move_adapter::run_success_epilogue", |_| {
@@ -368,7 +355,7 @@ impl AptosVMImpl {
             ))
         });
 
-        let gas_currency = self.get_gas_currency_args(account_currency_symbol);
+        let gas_currency = vec![];
         let chain_specific_info = self.chain_info();
         let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price().get();
@@ -395,15 +382,14 @@ impl AptosVMImpl {
 
     /// Run the failure epilogue of a transaction by calling into `USER_EPILOGUE_NAME` function
     /// stored in the `ACCOUNT_MODULE` on chain.
-    pub(crate) fn run_failure_epilogue<S: MoveResolver>(
+    pub(crate) fn run_failure_epilogue<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
         gas_status: &mut GasStatus,
         txn_data: &TransactionMetadata,
-        account_currency_symbol: &IdentStr,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        let gas_currency = self.get_gas_currency_args(account_currency_symbol);
+        let gas_currency = vec![];
         let chain_specific_info = self.chain_info();
         let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price().get();
@@ -436,7 +422,7 @@ impl AptosVMImpl {
 
     /// Run the prologue of a transaction by calling into `PROLOGUE_NAME` function stored
     /// in the `WRITESET_MODULE` on chain.
-    pub(crate) fn run_writeset_prologue<S: MoveResolver>(
+    pub(crate) fn run_writeset_prologue<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
         txn_data: &TransactionMetadata,
@@ -470,7 +456,7 @@ impl AptosVMImpl {
 
     /// Run the epilogue of a transaction by calling into `WRITESET_EPILOGUE_NAME` function stored
     /// in the `WRITESET_MODULE` on chain.
-    pub(crate) fn run_writeset_epilogue<S: MoveResolver>(
+    pub(crate) fn run_writeset_epilogue<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
         txn_data: &TransactionMetadata,
@@ -502,7 +488,7 @@ impl AptosVMImpl {
             })
     }
 
-    pub fn new_session<'r, R: MoveResolver>(
+    pub fn new_session<'r, R: MoveResolverExt>(
         &self,
         r: &'r R,
         session_id: SessionId,
@@ -510,7 +496,7 @@ impl AptosVMImpl {
         self.move_vm.new_session(r, session_id)
     }
 
-    pub fn load_module<'r, R: MoveResolver>(
+    pub fn load_module<'r, R: MoveResolverExt>(
         &self,
         module_id: &ModuleId,
         remote: &'r R,
@@ -564,17 +550,28 @@ pub fn convert_changeset_and_events(
     changeset: MoveChangeSet,
     events: Vec<MoveEvent>,
 ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
-    convert_changeset_and_events_cached(&mut (), changeset, events)
+    let mut out_write_set = WriteSetMut::new(vec![]);
+    let mut out_events = Vec::new();
+    convert_changeset_and_events_cached(
+        &mut (),
+        changeset,
+        events,
+        &mut out_write_set,
+        &mut out_events,
+    )?;
+    let ws = out_write_set
+        .freeze()
+        .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR))?;
+    Ok((ws, out_events))
 }
 
 pub fn convert_changeset_and_events_cached<C: AccessPathCache>(
     ap_cache: &mut C,
     changeset: MoveChangeSet,
     events: Vec<MoveEvent>,
-) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
-    // TODO: Cache access path computations if necessary.
-    let mut ops = vec![];
-
+    out_write_set: &mut WriteSetMut,
+    out_events: &mut Vec<ContractEvent>,
+) -> Result<(), VMStatus> {
     for (addr, account_changeset) in changeset.into_inner() {
         let (modules, resources) = account_changeset.into_inner();
         for (struct_tag, blob_opt) in resources {
@@ -583,7 +580,7 @@ pub fn convert_changeset_and_events_cached<C: AccessPathCache>(
                 None => WriteOp::Deletion,
                 Some(blob) => WriteOp::Value(blob),
             };
-            ops.push((StateKey::AccessPath(ap), op))
+            out_write_set.push((StateKey::AccessPath(ap), op))
         }
 
         for (name, blob_opt) in modules {
@@ -593,13 +590,9 @@ pub fn convert_changeset_and_events_cached<C: AccessPathCache>(
                 Some(blob) => WriteOp::Value(blob),
             };
 
-            ops.push((StateKey::AccessPath(ap), op))
+            out_write_set.push((StateKey::AccessPath(ap), op))
         }
     }
-
-    let ws = WriteSetMut::new(ops)
-        .freeze()
-        .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR))?;
 
     let events = events
         .into_iter()
@@ -610,10 +603,29 @@ pub fn convert_changeset_and_events_cached<C: AccessPathCache>(
         })
         .collect::<Result<Vec<_>, VMStatus>>()?;
 
-    Ok((ws, events))
+    out_events.extend(events.into_iter());
+    Ok(())
 }
 
-pub(crate) fn charge_global_write_gas_usage<R: MoveResolver>(
+pub fn convert_table_changeset(
+    table_changeset: TableChangeSet,
+    out_write_set: &mut WriteSetMut,
+) -> Result<(), VMStatus> {
+    for (handle, change) in table_changeset.changes {
+        for (key, value_opt) in change.entries {
+            let state_key = StateKey::table_item(handle.0, key);
+            if let Some(bytes) = value_opt {
+                out_write_set.push((state_key, WriteOp::Value(bytes)))
+            } else {
+                out_write_set.push((state_key, WriteOp::Deletion))
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub(crate) fn charge_global_write_gas_usage<R: MoveResolverExt>(
     gas_status: &mut GasStatus,
     session: &Session<R>,
     sender: &AccountAddress,
@@ -630,12 +642,12 @@ pub(crate) fn charge_global_write_gas_usage<R: MoveResolver>(
         .map_err(|p_err| p_err.finish(Location::Undefined).into_vm_status())
 }
 
-pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolver>(
+pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
     ap_cache: &mut A,
     session: SessionExt<S>,
     gas_left: GasUnits<GasCarrier>,
     txn_data: &TransactionMetadata,
-    status: KeptVMStatus,
+    status: ExecutionStatus,
 ) -> Result<TransactionOutput, VMStatus> {
     let gas_used: u64 = txn_data.max_gas_amount().sub(gas_left).get();
 
@@ -648,30 +660,6 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolver>(
         gas_used,
         TransactionStatus::Keep(status),
     ))
-}
-
-pub(crate) fn get_gas_currency_code(txn: &SignedTransaction) -> Result<Identifier, VMStatus> {
-    let currency_code_string = txn.gas_currency_code();
-    match account_config::from_currency_code_string(currency_code_string) {
-        Ok(code) => Ok(code),
-        Err(_) => Err(VMStatus::Error(StatusCode::INVALID_GAS_SPECIFIER)),
-    }
-}
-
-pub(crate) fn get_currency_info<S: MoveResolver>(
-    currency_code: &IdentStr,
-    remote_cache: &S,
-) -> Result<CurrencyInfoResource, VMStatus> {
-    if let Ok(Some(blob)) = remote_cache.get_resource(
-        &account_config::aptos_root_address(),
-        &CurrencyInfoResource::struct_tag_for(currency_code.to_owned()),
-    ) {
-        let x = bcs::from_bytes::<CurrencyInfoResource>(&blob)
-            .map_err(|_| VMStatus::Error(StatusCode::CURRENCY_INFO_DOES_NOT_EXIST))?;
-        Ok(x)
-    } else {
-        Err(VMStatus::Error(StatusCode::CURRENCY_INFO_DOES_NOT_EXIST))
-    }
 }
 
 #[test]

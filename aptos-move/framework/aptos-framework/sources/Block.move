@@ -2,13 +2,16 @@
 module AptosFramework::Block {
     use Std::Errors;
     use Std::Event;
-    use AptosFramework::ValidatorSet;
     use AptosFramework::Timestamp;
     use AptosFramework::SystemAddresses;
+    use AptosFramework::Reconfiguration;
+    use AptosFramework::Stake;
 
     struct BlockMetadata has key {
         /// Height of the current block
         height: u64,
+        /// Time period between epochs.
+        epoch_internal: u64,
         /// Handle where events with the time of new blocks are emitted
         new_block_events: Event::EventHandle<Self::NewBlockEvent>,
     }
@@ -29,7 +32,7 @@ module AptosFramework::Block {
 
     /// This can only be invoked by the Association address, and only a single time.
     /// Currently, it is invoked in the genesis transaction
-    public fun initialize_block_metadata(account: &signer) {
+    public fun initialize_block_metadata(account: &signer, epoch_internal: u64) {
         Timestamp::assert_genesis();
         // Operational constraint, only callable by the Association address
         SystemAddresses::assert_core_resource(account);
@@ -39,6 +42,7 @@ module AptosFramework::Block {
             account,
             BlockMetadata {
                 height: 0,
+                epoch_internal,
                 new_block_events: Event::new_event_handle<Self::NewBlockEvent>(account),
             }
         );
@@ -64,7 +68,7 @@ module AptosFramework::Block {
 
         // Authorization
         assert!(
-            proposer == @VMReserved || ValidatorSet::is_validator(proposer),
+            proposer == @VMReserved || Stake::is_current_validator(proposer),
             Errors::requires_address(EVM_OR_VALIDATOR)
         );
 
@@ -80,6 +84,10 @@ module AptosFramework::Block {
                 time_microseconds: timestamp,
             }
         );
+
+        if (timestamp - Reconfiguration::last_reconfiguration_time() > block_metadata_ref.epoch_internal) {
+            Reconfiguration::reconfigure();
+        }
     }
 
     /// Get the current block height

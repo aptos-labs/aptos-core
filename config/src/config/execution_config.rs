@@ -19,6 +19,7 @@ pub struct ExecutionConfig {
     pub genesis: Option<Transaction>,
     pub genesis_file_location: PathBuf,
     pub network_timeout_ms: u64,
+    pub concurrency_level: u16,
 }
 
 impl std::fmt::Debug for ExecutionConfig {
@@ -44,6 +45,8 @@ impl Default for ExecutionConfig {
             genesis_file_location: PathBuf::new(),
             // Default value of 30 seconds for the network timeout.
             network_timeout_ms: 30_000,
+            // Sequential execution by default.
+            concurrency_level: 1,
         }
     }
 }

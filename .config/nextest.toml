@@ -1,12 +1,10 @@
 [profile.ci]
-# Detect flaky tests.
-retries = 3
 # Show skipped tests in the CI output.
 status-level = "skip"
 # Show output for all tests as soon as they fail and at the end of the test run.
 failure-output = "immediate-final"
-# Do not cancel test run on the first failure.
-fail-fast = false
+# Cancel test run on the first failure. Accounts for retries.
+fail-fast = true
 
 [profile.ci.junit]
 path = "junit.xml"

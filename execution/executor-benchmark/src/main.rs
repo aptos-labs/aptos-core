@@ -35,9 +35,6 @@ enum Command {
 
         #[structopt(long)]
         default_store_prune_window: Option<u64>,
-
-        #[structopt(long)]
-        max_version_to_prune_per_batch: Option<u64>,
     },
     RunExecutor {
         #[structopt(
@@ -77,7 +74,6 @@ fn main() {
             init_account_balance,
             state_store_prune_window,
             default_store_prune_window,
-            max_version_to_prune_per_batch,
         } => {
             executor_benchmark::db_generator::run(
                 num_accounts,
@@ -87,7 +83,7 @@ fn main() {
                 StoragePrunerConfig::new(
                     Some(state_store_prune_window.unwrap_or(1_000_000)),
                     Some(default_store_prune_window.unwrap_or(10_000_000)),
-                    Some(max_version_to_prune_per_batch.unwrap_or(100)),
+                    10_000,
                 ),
             );
         }

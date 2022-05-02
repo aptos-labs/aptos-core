@@ -16,10 +16,14 @@ full_node_networks:
   {{- end }}
   seeds:
     {{- (get .Values.aptos_chains .Values.chain.name).seeds | default dict | toYaml | nindent 6 }}
+  {{- if .Values.fullnode_inbound_rate_limit }}
   inbound_rate_limit_config:
     {{- .Values.fullnode_inbound_rate_limit | toYaml | nindent 6 }}
+  {{- end }}
+  {{- if .Values.fullnode_outbound_rate_limit }}
   outbound_rate_limit_config:
     {{- .Values.fullnode_outbound_rate_limit | toYaml | nindent 6 }}
+  {{- end }}
   max_inbound_connections: {{ .Values.fullnode_max_inbound_connections }}
 storage:
   backup_service_address: "0.0.0.0:6186"

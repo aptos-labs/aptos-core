@@ -18,7 +18,7 @@ where
     K: PartialOrd + Send + Sync + Clone + Hash + Eq + 'static,
     V: Send + Sync + Debug + Clone + Eq + 'static,
 {
-    let output = ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new()
+    let output = ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new(num_cpus::get())
         .execute_transactions_parallel((), transactions.clone());
 
     let baseline = ExpectedOutput::generate_baseline(&transactions);

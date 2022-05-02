@@ -9,10 +9,7 @@ use crate::{
     executor::FakeExecutor,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
-use aptos_types::{
-    account_config,
-    transaction::{authenticator::AuthenticationKey, SignedTransaction},
-};
+use aptos_types::transaction::{authenticator::AuthenticationKey, SignedTransaction};
 use once_cell::sync::Lazy;
 
 /// The gas each transaction is configured to reserve. If the gas available in the account,
@@ -30,13 +27,7 @@ pub static CREATE_ACCOUNT_FIRST: Lazy<u64> = Lazy::new(|| {
     executor.add_account_data(&sender);
     let receiver = Account::new();
 
-    let txn = create_account_txn(
-        sender.account(),
-        &receiver,
-        10,
-        20_000,
-        account_config::xus_tag(),
-    );
+    let txn = create_account_txn(sender.account(), &receiver, 10);
     compute_gas_used(txn, &mut executor)
 });
 
@@ -50,20 +41,8 @@ pub static CREATE_ACCOUNT_NEXT: Lazy<u64> = Lazy::new(|| {
     executor.add_account_data(&sender);
 
     let txns = vec![
-        create_account_txn(
-            sender.account(),
-            &Account::new(),
-            10,
-            20_000,
-            account_config::xus_tag(),
-        ),
-        create_account_txn(
-            sender.account(),
-            &Account::new(),
-            11,
-            20_000,
-            account_config::xus_tag(),
-        ),
+        create_account_txn(sender.account(), &Account::new(), 10),
+        create_account_txn(sender.account(), &Account::new(), 11),
     ];
     let output = &executor
         .execute_block(txns)
@@ -85,13 +64,7 @@ pub static CREATE_ACCOUNT_TOO_LOW_FIRST: Lazy<u64> = Lazy::new(|| {
     executor.add_account_data(&sender);
     let receiver = Account::new();
 
-    let txn = create_account_txn(
-        sender.account(),
-        &receiver,
-        10,
-        balance + 1,
-        account_config::xus_tag(),
-    );
+    let txn = create_account_txn(sender.account(), &receiver, 10);
     compute_gas_used(txn, &mut executor)
 });
 
@@ -108,20 +81,8 @@ pub static CREATE_ACCOUNT_TOO_LOW_NEXT: Lazy<u64> = Lazy::new(|| {
     executor.add_account_data(&sender);
 
     let txns = vec![
-        create_account_txn(
-            sender.account(),
-            &Account::new(),
-            10,
-            10,
-            account_config::xus_tag(),
-        ),
-        create_account_txn(
-            sender.account(),
-            &Account::new(),
-            11,
-            balance,
-            account_config::xus_tag(),
-        ),
+        create_account_txn(sender.account(), &Account::new(), 10),
+        create_account_txn(sender.account(), &Account::new(), 11),
     ];
     let output = &executor
         .execute_block(txns)
@@ -141,13 +102,7 @@ pub static CREATE_EXISTING_ACCOUNT_FIRST: Lazy<u64> = Lazy::new(|| {
     executor.add_account_data(&sender);
     executor.add_account_data(&receiver);
 
-    let txn = create_account_txn(
-        sender.account(),
-        receiver.account(),
-        10,
-        20_000,
-        account_config::xus_tag(),
-    );
+    let txn = create_account_txn(sender.account(), receiver.account(), 10);
     compute_gas_used(txn, &mut executor)
 });
 
@@ -163,20 +118,8 @@ pub static CREATE_EXISTING_ACCOUNT_NEXT: Lazy<u64> = Lazy::new(|| {
     executor.add_account_data(&receiver);
 
     let txns = vec![
-        create_account_txn(
-            sender.account(),
-            &Account::new(),
-            10,
-            20_000,
-            account_config::xus_tag(),
-        ),
-        create_account_txn(
-            sender.account(),
-            receiver.account(),
-            11,
-            20_000,
-            account_config::xus_tag(),
-        ),
+        create_account_txn(sender.account(), &Account::new(), 10),
+        create_account_txn(sender.account(), receiver.account(), 11),
     ];
     let output = &executor
         .execute_block(txns)

@@ -85,14 +85,20 @@ impl RestClient {
     }
 
     /// Returns all resources associated with the account
-    pub fn account_resources(&self, account_address: &str) -> serde_json::Value {
+    pub fn account_resource(
+        &self,
+        account_address: &str,
+        resource_type: &str,
+    ) -> Option<serde_json::Value> {
         let res = reqwest::blocking::get(format!(
-            "{}/accounts/{}/resources",
-            self.url, account_address
+            "{}/accounts/{}/resource/{}",
+            self.url, account_address, resource_type,
         ))
         .unwrap();
 
-        if res.status() != 200 {
+        if res.status() == 404 {
+            None
+        } else if res.status() != 200 {
             assert_eq!(
                 res.status(),
                 200,
@@ -100,9 +106,10 @@ impl RestClient {
                 res.text().unwrap_or("".to_string()),
                 account_address,
             );
+            unreachable!()
+        } else {
+            Some(res.json().unwrap())
         }
-
-        res.json().unwrap()
     }
     //<:!:section_3
     //:!:>section_4
@@ -241,25 +248,10 @@ impl RestClient {
     //:!:>section_5
     /// Returns the test coin balance associated with the account
     pub fn account_balance(&self, account_address: &str) -> Option<u64> {
-        self.account_resources(account_address)
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|x| {
-                x.get("type")
-                    .map(|v| v.as_str().unwrap() == "0x1::TestCoin::Balance".to_string())
-                    .unwrap_or(false)
-            })
-            .and_then(|coin| {
-                coin.get("data")
-                    .unwrap()
-                    .get("coin")
-                    .unwrap()
-                    .get("value")
-                    .unwrap()
-                    .as_str()
-                    .and_then(|s| s.parse::<u64>().ok())
-            })
+        self.account_resource(account_address, "0x1::TestCoin::Balance")
+            .unwrap()["data"]["coin"]["value"]
+            .as_str()
+            .and_then(|s| s.parse::<u64>().ok())
     }
 
     /// Transfer a given coin amount from a given Account to the recipient's account address.

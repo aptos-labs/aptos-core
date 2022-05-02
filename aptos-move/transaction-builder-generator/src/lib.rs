@@ -34,7 +34,10 @@ fn get_abi_paths(dir: &Path) -> std::io::Result<Vec<String>> {
             if path.is_dir() {
                 abi_paths.append(&mut get_abi_paths(&path)?);
             } else if let Some("abi") = path.extension().and_then(OsStr::to_str) {
-                abi_paths.push(path.to_str().unwrap().to_string());
+                // not read Genesis abi (script builder doesn't work with the script function there)
+                if !path.to_str().map(|s| s.contains("Genesis")).unwrap() {
+                    abi_paths.push(path.to_str().unwrap().to_string());
+                }
             }
         }
     }

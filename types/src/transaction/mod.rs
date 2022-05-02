@@ -3,7 +3,6 @@
 
 use crate::{
     account_address::AccountAddress,
-    account_config::XUS_NAME,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
@@ -38,7 +37,6 @@ use std::{
 
 pub mod authenticator;
 mod change_set;
-pub mod helpers;
 mod module;
 mod script;
 mod transaction_argument;
@@ -51,6 +49,7 @@ pub use script::{
 };
 
 use crate::state_store::{state_key::StateKey, state_value::StateValue};
+use move_core_types::vm_status::AbortLocation;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
 pub use transaction_argument::{parse_transaction_argument, TransactionArgument, VecBytes};
 
@@ -81,10 +80,6 @@ pub struct RawTransaction {
     /// Price to be paid per gas unit.
     gas_unit_price: u64,
 
-    /// The currency code, e.g., "XUS", used to pay for gas. The `max_gas_amount`
-    /// and `gas_unit_price` values refer to units of this currency.
-    gas_currency_code: String,
-
     /// Expiration timestamp for this transaction, represented
     /// as seconds from the Unix Epoch. If the current blockchain timestamp
     /// is greater than or equal to this time, then the transaction has
@@ -107,7 +102,6 @@ impl RawTransaction {
         payload: TransactionPayload,
         max_gas_amount: u64,
         gas_unit_price: u64,
-        gas_currency_code: String,
         expiration_timestamp_secs: u64,
         chain_id: ChainId,
     ) -> Self {
@@ -117,7 +111,6 @@ impl RawTransaction {
             payload,
             max_gas_amount,
             gas_unit_price,
-            gas_currency_code,
             expiration_timestamp_secs,
             chain_id,
         }
@@ -132,7 +125,6 @@ impl RawTransaction {
         script: Script,
         max_gas_amount: u64,
         gas_unit_price: u64,
-        gas_currency_code: String,
         expiration_timestamp_secs: u64,
         chain_id: ChainId,
     ) -> Self {
@@ -142,7 +134,6 @@ impl RawTransaction {
             payload: TransactionPayload::Script(script),
             max_gas_amount,
             gas_unit_price,
-            gas_currency_code,
             expiration_timestamp_secs,
             chain_id,
         }
@@ -157,7 +148,6 @@ impl RawTransaction {
         script_function: ScriptFunction,
         max_gas_amount: u64,
         gas_unit_price: u64,
-        gas_currency_code: String,
         expiration_timestamp_secs: u64,
         chain_id: ChainId,
     ) -> Self {
@@ -167,7 +157,6 @@ impl RawTransaction {
             payload: TransactionPayload::ScriptFunction(script_function),
             max_gas_amount,
             gas_unit_price,
-            gas_currency_code,
             expiration_timestamp_secs,
             chain_id,
         }
@@ -183,7 +172,6 @@ impl RawTransaction {
         module: Module,
         max_gas_amount: u64,
         gas_unit_price: u64,
-        gas_currency_code: String,
         expiration_timestamp_secs: u64,
         chain_id: ChainId,
     ) -> Self {
@@ -193,7 +181,6 @@ impl RawTransaction {
             payload: TransactionPayload::ModuleBundle(ModuleBundle::from(module)),
             max_gas_amount,
             gas_unit_price,
-            gas_currency_code,
             expiration_timestamp_secs,
             chain_id,
         }
@@ -209,7 +196,6 @@ impl RawTransaction {
         modules: ModuleBundle,
         max_gas_amount: u64,
         gas_unit_price: u64,
-        gas_currency_code: String,
         expiration_timestamp_secs: u64,
         chain_id: ChainId,
     ) -> Self {
@@ -219,7 +205,6 @@ impl RawTransaction {
             payload: TransactionPayload::ModuleBundle(modules),
             max_gas_amount,
             gas_unit_price,
-            gas_currency_code,
             expiration_timestamp_secs,
             chain_id,
         }
@@ -252,7 +237,6 @@ impl RawTransaction {
             // Since write-set transactions bypass the VM, these fields aren't relevant.
             max_gas_amount: 0,
             gas_unit_price: 0,
-            gas_currency_code: XUS_NAME.to_owned(),
             // Write-set transactions are special and important and shouldn't expire.
             expiration_timestamp_secs: u64::max_value(),
             chain_id,
@@ -276,7 +260,6 @@ impl RawTransaction {
             // Since write-set transactions bypass the VM, these fields aren't relevant.
             max_gas_amount: 0,
             gas_unit_price: 0,
-            gas_currency_code: XUS_NAME.to_owned(),
             // Write-set transactions are special and important and shouldn't expire.
             expiration_timestamp_secs: u64::max_value(),
             chain_id,
@@ -386,7 +369,6 @@ impl RawTransaction {
              \t}}, \n\
              \tmax_gas_amount: {}, \n\
              \tgas_unit_price: {}, \n\
-             \tgas_currency_code: {}, \n\
              \texpiration_timestamp_secs: {:#?}, \n\
              \tchain_id: {},
              }}",
@@ -396,7 +378,6 @@ impl RawTransaction {
             f_args,
             self.max_gas_amount,
             self.gas_unit_price,
-            self.gas_currency_code,
             self.expiration_timestamp_secs,
             self.chain_id,
         )
@@ -625,10 +606,6 @@ impl SignedTransaction {
         self.raw_txn.gas_unit_price
     }
 
-    pub fn gas_currency_code(&self) -> &str {
-        &self.raw_txn.gas_currency_code
-    }
-
     pub fn expiration_timestamp_secs(&self) -> u64 {
         self.raw_txn.expiration_timestamp_secs
     }
@@ -762,6 +739,52 @@ impl TransactionWithProof {
     }
 }
 
+/// The status of VM execution, which contains more detailed failure info
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
+pub enum ExecutionStatus {
+    Success,
+    OutOfGas,
+    MoveAbort {
+        location: AbortLocation,
+        code: u64,
+    },
+    ExecutionFailure {
+        location: AbortLocation,
+        function: u16,
+        code_offset: u16,
+    },
+    MiscellaneousError(Option<StatusCode>),
+}
+
+impl From<KeptVMStatus> for ExecutionStatus {
+    fn from(kept_status: KeptVMStatus) -> Self {
+        match kept_status {
+            KeptVMStatus::Executed => ExecutionStatus::Success,
+            KeptVMStatus::OutOfGas => ExecutionStatus::OutOfGas,
+            KeptVMStatus::MoveAbort(location, code) => {
+                ExecutionStatus::MoveAbort { location, code }
+            }
+            KeptVMStatus::ExecutionFailure {
+                location: loc,
+                function: func,
+                code_offset: offset,
+            } => ExecutionStatus::ExecutionFailure {
+                location: loc,
+                function: func,
+                code_offset: offset,
+            },
+            KeptVMStatus::MiscellaneousError => ExecutionStatus::MiscellaneousError(None),
+        }
+    }
+}
+
+impl ExecutionStatus {
+    pub fn is_success(&self) -> bool {
+        matches!(self, ExecutionStatus::Success)
+    }
+}
 /// The status of executing a transaction. The VM decides whether or not we should `Keep` the
 /// transaction output or `Discard` it based upon the execution of the transaction. We wrap these
 /// decisions around a `VMStatus` that provides more detail on the final execution state of the VM.
@@ -771,14 +794,14 @@ pub enum TransactionStatus {
     Discard(DiscardedVMStatus),
 
     /// Keep the transaction output
-    Keep(KeptVMStatus),
+    Keep(ExecutionStatus),
 
     /// Retry the transaction, e.g., after a reconfiguration
     Retry,
 }
 
 impl TransactionStatus {
-    pub fn status(&self) -> Result<KeptVMStatus, StatusCode> {
+    pub fn status(&self) -> Result<ExecutionStatus, StatusCode> {
         match self {
             TransactionStatus::Keep(status) => Ok(status.clone()),
             TransactionStatus::Discard(code) => Err(*code),
@@ -794,7 +817,7 @@ impl TransactionStatus {
         }
     }
 
-    pub fn as_kept_status(&self) -> Result<KeptVMStatus> {
+    pub fn as_kept_status(&self) -> Result<ExecutionStatus> {
         match self {
             TransactionStatus::Keep(s) => Ok(s.clone()),
             _ => Err(format_err!("Not Keep.")),
@@ -804,16 +827,22 @@ impl TransactionStatus {
 
 impl From<VMStatus> for TransactionStatus {
     fn from(vm_status: VMStatus) -> Self {
+        let status_code = vm_status.status_code();
         match vm_status.keep_or_discard() {
-            Ok(recorded) => TransactionStatus::Keep(recorded),
+            Ok(recorded) => match recorded {
+                KeptVMStatus::MiscellaneousError => {
+                    TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)))
+                }
+                _ => TransactionStatus::Keep(recorded.into()),
+            },
             Err(code) => TransactionStatus::Discard(code),
         }
     }
 }
 
-impl From<KeptVMStatus> for TransactionStatus {
-    fn from(kept_vm_status: KeptVMStatus) -> Self {
-        TransactionStatus::Keep(kept_vm_status)
+impl From<ExecutionStatus> for TransactionStatus {
+    fn from(txn_execution_status: ExecutionStatus) -> Self {
+        TransactionStatus::Keep(txn_execution_status)
     }
 }
 
@@ -940,7 +969,7 @@ impl TransactionInfo {
         state_change_hash: HashValue,
         event_root_hash: HashValue,
         gas_used: u64,
-        status: KeptVMStatus,
+        status: ExecutionStatus,
     ) -> Self {
         Self::V0(TransactionInfoV0::new(
             transaction_hash,
@@ -952,7 +981,7 @@ impl TransactionInfo {
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
-    pub fn new_placeholder(gas_used: u64, status: KeptVMStatus) -> Self {
+    pub fn new_placeholder(gas_used: u64, status: ExecutionStatus) -> Self {
         Self::new(
             HashValue::default(),
             HashValue::default(),
@@ -982,7 +1011,7 @@ pub struct TransactionInfoV0 {
     /// The vm status. If it is not `Executed`, this will provide the general error class. Execution
     /// failures and Move abort's receive more detailed information. But other errors are generally
     /// categorized with no status code or other information
-    status: KeptVMStatus,
+    status: ExecutionStatus,
 
     /// The hash of this transaction.
     transaction_hash: HashValue,
@@ -1007,7 +1036,7 @@ impl TransactionInfoV0 {
         state_change_hash: HashValue,
         event_root_hash: HashValue,
         gas_used: u64,
-        status: KeptVMStatus,
+        status: ExecutionStatus,
     ) -> Self {
         Self {
             gas_used,
@@ -1035,7 +1064,7 @@ impl TransactionInfoV0 {
         self.gas_used
     }
 
-    pub fn status(&self) -> &KeptVMStatus {
+    pub fn status(&self) -> &ExecutionStatus {
         &self.status
     }
 }
@@ -1112,7 +1141,7 @@ impl TransactionToCommit {
         self.transaction_info.gas_used
     }
 
-    pub fn status(&self) -> &KeptVMStatus {
+    pub fn status(&self) -> &ExecutionStatus {
         &self.transaction_info.status
     }
 }

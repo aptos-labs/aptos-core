@@ -29,7 +29,10 @@
   "panels": [
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -46,7 +49,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -106,7 +112,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "(count by (failure_domain_beta_kubernetes_io_region\n) (count by (owner, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes))) / ignoring(failure_domain_beta_kubernetes_io_region) group_left count(count by (owner, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes))",
+          "expr": "(count by (failure_domain_beta_kubernetes_io_region\n) (count by (owner, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\"}))) / ignoring(failure_domain_beta_kubernetes_io_region) group_left count(count by (owner, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\"}))",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -161,7 +167,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -221,7 +230,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"ip.*\"})) / (count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"ip.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"aks.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"gke.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"scw.*\"})))",
+          "expr": "count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"ip.*\"})) / (count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"ip.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"aks.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"gke.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"scw.*\"})))",
           "hide": false,
           "instant": false,
           "interval": "",
@@ -229,7 +238,7 @@
           "refId": "A"
         },
         {
-          "expr": "count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"aks.*\"})) / (count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"ip.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"aks.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"gke.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"scw.*\"})))",
+          "expr": "count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"aks.*\"})) / (count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"ip.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"aks.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"gke.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"scw.*\"})))",
           "hide": false,
           "instant": false,
           "interval": "",
@@ -237,7 +246,7 @@
           "refId": "B"
         },
         {
-          "expr": "count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"gke.*\"})) / (count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"ip.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"aks.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"gke.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"scw.*\"})))",
+          "expr": "count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"gke.*\"})) / (count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"ip.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"aks.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"gke.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"scw.*\"})))",
           "hide": false,
           "instant": false,
           "interval": "",
@@ -245,7 +254,7 @@
           "refId": "C"
         },
         {
-          "expr": "count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"scw.*\"})) / (count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"ip.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"aks.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"gke.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"scw.*\"})))",
+          "expr": "count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"scw.*\"})) / (count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"ip.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"aks.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"gke.*\"})) + count(count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"scw.*\"})))",
           "hide": false,
           "instant": false,
           "interval": "",
@@ -300,7 +309,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -360,7 +372,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "count by (beta_kubernetes_io_instance_type\n) (count by (owner, beta_kubernetes_io_instance_type\n) (kubelet_volume_stats_used_bytes))",
+          "expr": "count by (beta_kubernetes_io_instance_type\n) (count by (owner, beta_kubernetes_io_instance_type\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\"}))",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -415,7 +427,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -475,7 +490,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "count by (owner, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes)",
+          "expr": "count by (owner, failure_domain_beta_kubernetes_io_region\n) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\"})",
           "format": "time_series",
           "instant": false,
           "interval": "",
@@ -530,7 +545,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -590,7 +608,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"ip.*\"})",
+          "expr": "count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"ip.*\"})",
           "hide": false,
           "instant": false,
           "interval": "",
@@ -598,7 +616,7 @@
           "refId": "A"
         },
         {
-          "expr": "count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"aks.*\"})",
+          "expr": "count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"aks.*\"})",
           "hide": false,
           "instant": false,
           "interval": "",
@@ -606,7 +624,7 @@
           "refId": "B"
         },
         {
-          "expr": "count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"gke.*\"})",
+          "expr": "count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"gke.*\"})",
           "hide": false,
           "instant": false,
           "interval": "",
@@ -614,7 +632,7 @@
           "refId": "C"
         },
         {
-          "expr": "count by (owner) (kubelet_volume_stats_used_bytes{instance=~\"scw.*\"})",
+          "expr": "count by (owner) (kubelet_volume_stats_used_bytes{chain_name=~\"$chain_name\", instance=~\"scw.*\"})",
           "hide": false,
           "instant": false,
           "interval": "",
@@ -669,7 +687,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {}
@@ -712,7 +733,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(kubernetes_build_info) by (owner, git_version)",
+          "expr": "sum(kubernetes_build_info{chain_name=~\"$chain_name\"}) by (owner, git_version)",
           "interval": "",
           "legendFormat": "{{owner}}-{{git_version}}",
           "refId": "A"
@@ -766,7 +787,55 @@
   "style": "dark",
   "tags": [],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "Datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Datasource}"
+        },
+        "definition": "label_values(chain_name)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "chain_name",
+        "options": [],
+        "query": {
+          "query": "label_values(chain_name)",
+          "refId": "Prometheus-chain-name-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      }
+    ]
   },
   "time": {
     "from": "now-24h",

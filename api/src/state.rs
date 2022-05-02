@@ -5,11 +5,14 @@ use crate::{
     context::Context,
     failpoint::fail_point,
     metrics::metrics,
-    param::{AddressParam, LedgerVersionParam, MoveIdentifierParam, MoveStructTagParam},
+    param::{
+        AddressParam, LedgerVersionParam, MoveIdentifierParam, MoveStructTagParam, TableHandleParam,
+    },
     version::Version,
 };
+use anyhow::anyhow;
 use aptos_api_types::{
-    AsConverter, Error, LedgerInfo, MoveModuleBytecode, Response, TransactionId,
+    AsConverter, Error, LedgerInfo, MoveModuleBytecode, Response, TableItemRequest, TransactionId,
 };
 use aptos_state_view::StateView;
 use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
@@ -51,6 +54,23 @@ pub fn get_account_module(context: Context) -> BoxedFilter<(impl Reply,)> {
         .boxed()
 }
 
+// GET /tables/<table_handle>/item
+pub fn get_table_item(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("tables" / TableHandleParam / "item")
+        .and(warp::post())
+        .and(warp::body::content_length_limit(
+            context.content_length_limit(),
+        ))
+        .and(warp::body::json::<TableItemRequest>())
+        .and(context.filter())
+        .and(warp::query::<Version>())
+        .map(|handle, body, ctx, version: Version| (version.version, handle, body, ctx))
+        .untuple_one()
+        .and_then(handle_get_table_item)
+        .with(metrics("get_table_item"))
+        .boxed()
+}
+
 async fn handle_get_account_resource(
     ledger_version: Option<LedgerVersionParam>,
     address: AddressParam,
@@ -79,6 +99,16 @@ async fn handle_get_account_module(
         address.parse("account address")?.into(),
         name.parse("module name")?,
     )?)
+}
+
+async fn handle_get_table_item(
+    ledger_version: Option<LedgerVersionParam>,
+    handle: TableHandleParam,
+    body: TableItemRequest,
+    context: Context,
+) -> Result<impl Reply, Rejection> {
+    fail_point("endpoint_get_table_item")?;
+    Ok(State::new(ledger_version, context)?.table_item(handle.parse("table handle")?, body)?)
 }
 
 pub(crate) struct State {
@@ -148,5 +178,35 @@ impl State {
             .try_parse_abi()
             .map_err(Error::internal)?;
         Response::new(self.latest_ledger_info, &module)
+    }
+
+    pub fn table_item(self, handle: u128, body: TableItemRequest) -> Result<impl Reply, Error> {
+        let TableItemRequest {
+            key_type,
+            value_type,
+            key,
+        } = body;
+        let key_type = key_type.try_into()?;
+        let value_type = value_type.try_into()?;
+
+        let resolver = self.state_view.as_move_resolver();
+        let converter = resolver.as_converter();
+
+        let vm_key = converter
+            .try_into_vm_value(&key_type, key.clone())
+            .map_err(Error::bad_request)?;
+        let raw_key = vm_key
+            .undecorate()
+            .simple_serialize()
+            .ok_or_else(|| Error::internal(anyhow!("Key failed to serialize.")))?;
+
+        let state_key = StateKey::table_item(handle, raw_key);
+        let bytes = self
+            .state_view
+            .get_state_value(&state_key)?
+            .ok_or_else(|| Error::not_found("table handle or item", key, self.ledger_version))?;
+
+        let move_value = converter.try_into_move_value(&value_type, &bytes)?;
+        Response::new(self.latest_ledger_info, &move_value)
     }
 }

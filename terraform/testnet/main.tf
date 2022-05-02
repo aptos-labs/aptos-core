@@ -44,7 +44,7 @@ module "validator" {
   node_pool_sizes = var.validator_lite_mode ? {
     utilities  = var.num_utilities_instance > 0 ? var.num_utilities_instance : 3
     validators = var.num_validator_instance > 0 ? var.num_validator_instance : var.num_validators + var.num_public_fullnodes
-  } : {
+    } : {
     utilities  = var.num_utilities_instance > 0 ? var.num_utilities_instance : 3 * var.num_validators
     validators = var.num_validator_instance > 0 ? var.num_validator_instance : 3 * var.num_validators + var.num_public_fullnodes + 1
   }
@@ -86,6 +86,7 @@ resource "helm_release" "testnet" {
     jsonencode({
       imageTag          = local.image_tag
       validatorLite     = var.validator_lite_mode
+      chain_name        = "aptos-${terraform.workspace}"
       localVaultBackend = var.enable_dev_vault # Toggle dev vault mode
       genesis = {
         numValidators      = var.num_validators

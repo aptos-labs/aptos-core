@@ -3,6 +3,7 @@
 
 use crate::{
     adapter_common::PreprocessedTransaction,
+    move_vm_ext::MoveResolverExt,
     script_to_script_function::remapping,
     system_module_names::{BLOCK_MODULE, BLOCK_PROLOGUE, SCRIPT_PROLOGUE_NAME, USER_EPILOGUE_NAME},
 };
@@ -16,7 +17,7 @@ use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, ResourceKey, StructTag, TypeTag},
-    resolver::{ModuleResolver, MoveResolver},
+    resolver::ModuleResolver,
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
@@ -35,17 +36,17 @@ pub fn add_on_functions_list() -> Vec<(ModuleId, Identifier)> {
     vec![
         (BLOCK_MODULE.clone(), BLOCK_PROLOGUE.to_owned()),
         (
-            account_config::constants::DIEM_ACCOUNT_MODULE.clone(),
+            account_config::constants::APTOS_ACCOUNT_MODULE.clone(),
             SCRIPT_PROLOGUE_NAME.to_owned(),
         ),
         (
-            account_config::constants::DIEM_ACCOUNT_MODULE.clone(),
+            account_config::constants::APTOS_ACCOUNT_MODULE.clone(),
             USER_EPILOGUE_NAME.to_owned(),
         ),
     ]
 }
 
-impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
+impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
     /// Create a Diem transaction read/write set analysis from a generic Move module read/write set
     /// analysis and a view of the current blockchain for module fetching and access concretization.
     pub fn new(rw: &'a NormalizedReadWriteSetAnalysis, blockchain_view: &'a R) -> Self {
@@ -211,11 +212,8 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
         concretize: bool,
     ) -> Result<(Vec<ResourceKey>, Vec<ResourceKey>)> {
         let signers = vec![tx.sender()];
-        let gas_currency = account_config::type_tag_for_currency_code(
-            account_config::from_currency_code_string(tx.gas_currency_code())?,
-        );
         let prologue_accesses = self.get_partially_concretized_summary(
-            &account_config::constants::DIEM_ACCOUNT_MODULE,
+            &account_config::constants::APTOS_ACCOUNT_MODULE,
             SCRIPT_PROLOGUE_NAME,
             &signers,
             &serialize_values(&vec![
@@ -227,12 +225,12 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
                 MoveValue::U8(tx.chain_id().id()),
                 MoveValue::vector_u8(vec![]), // script_hash; it's ignored
             ]),
-            &[gas_currency.clone()],
+            &[],
             &self.module_cache,
         )?;
 
         let epilogue_accesses = self.get_partially_concretized_summary(
-            &account_config::constants::DIEM_ACCOUNT_MODULE,
+            &account_config::constants::APTOS_ACCOUNT_MODULE,
             USER_EPILOGUE_NAME,
             &signers,
             &serialize_values(&vec![
@@ -241,7 +239,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
                 MoveValue::U64(tx.max_gas_amount()),
                 MoveValue::U64(0), // gas_units_remaining
             ]),
-            &[gas_currency.clone()],
+            &[],
             &self.module_cache,
         )?;
 
@@ -279,7 +277,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
                 address: account_config::CORE_CODE_ADDRESS,
                 module: TRANSACTION_FEES_NAME.to_owned(),
                 name: TRANSACTION_FEES_NAME.to_owned(),
-                type_params: vec![gas_currency],
+                type_params: vec![],
             };
             keys_written.retain(|r| r.type_() != &tx_fees_tag);
         }
@@ -288,7 +286,7 @@ impl<'a, R: MoveResolver> ReadWriteSetAnalysis<'a, R> {
     }
 }
 
-impl<'a, R: MoveResolver> Deref for ReadWriteSetAnalysis<'a, R> {
+impl<'a, R: MoveResolverExt> Deref for ReadWriteSetAnalysis<'a, R> {
     type Target = NormalizedReadWriteSetAnalysis;
 
     fn deref(&self) -> &Self::Target {

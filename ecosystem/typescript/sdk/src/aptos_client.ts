@@ -55,7 +55,7 @@ export class AptosClient {
 
     // `withCredentials` ensures cookie handling
     this.client = new HttpClient<unknown>({
-      withCredentials: true,
+      withCredentials: false,
       baseURL: nodeUrl,
       validateStatus: () => true, // Don't explode here on error responses; let our code handle it
       ...(config || {}),
@@ -191,11 +191,13 @@ export class AptosClient {
     address: MaybeHexString,
     eventHandleStruct: Types.MoveStructTagId,
     fieldName: string,
+    query?: { start?: number; limit?: number },
   ): Promise<Types.Event[]> {
     const response = await this.accounts.getEventsByEventHandle(
       HexString.ensure(address).hex(),
       eventHandleStruct,
       fieldName,
+      query,
     );
     raiseForStatus(200, response, { address, eventHandleStruct, fieldName });
     return response.data;

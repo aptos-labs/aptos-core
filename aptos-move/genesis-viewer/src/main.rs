@@ -9,8 +9,8 @@ use aptos_types::{
     transaction::ChangeSet,
     write_set::{WriteOp, WriteSet},
 };
+use aptos_vm::move_vm_ext::MoveResolverExt;
 use move_binary_format::CompiledModule;
-use move_core_types::resolver::MoveResolver;
 use move_vm_test_utils::InMemoryStorage;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -121,7 +121,7 @@ pub fn main() {
     }
 }
 
-fn print_all(storage: &impl MoveResolver, cs: &ChangeSet) {
+fn print_all(storage: &impl MoveResolverExt, cs: &ChangeSet) {
     print_write_set_by_type(storage, cs.write_set());
     println!("* Events:");
     print_events(storage, cs.events());
@@ -161,14 +161,14 @@ fn print_events_key(events: &[ContractEvent]) {
     }
 }
 
-fn print_write_set_by_type(storage: &impl MoveResolver, ws: &WriteSet) {
+fn print_write_set_by_type(storage: &impl MoveResolverExt, ws: &WriteSet) {
     println!("* Modules:");
     print_modules(ws);
     println!("* Resources:");
     print_resources(storage, ws);
 }
 
-fn print_events(storage: &impl MoveResolver, events: &[ContractEvent]) {
+fn print_events(storage: &impl MoveResolverExt, events: &[ContractEvent]) {
     let annotator = AptosValueAnnotator::new(storage);
 
     for event in events {
@@ -207,7 +207,7 @@ fn print_modules(ws: &WriteSet) {
     }
 }
 
-fn print_resources(storage: &impl MoveResolver, ws: &WriteSet) {
+fn print_resources(storage: &impl MoveResolverExt, ws: &WriteSet) {
     let mut resources: BTreeMap<AccessPath, Vec<u8>> = BTreeMap::new();
     for (k, v) in ws {
         let ap =
@@ -237,7 +237,7 @@ fn print_resources(storage: &impl MoveResolver, ws: &WriteSet) {
     }
 }
 
-fn print_account_states(storage: &impl MoveResolver, ws: &WriteSet) {
+fn print_account_states(storage: &impl MoveResolverExt, ws: &WriteSet) {
     let mut accounts: BTreeMap<AccountAddress, Vec<(AccessPath, Vec<u8>)>> = BTreeMap::new();
     for (k, v) in ws {
         let ap =

@@ -1,152 +1,113 @@
-/// This module provides a temporary solution for tables by providing a layer on top of Vector
+/// Type of large-scale storage tables.
+/// source: https://github.com/move-language/move/blob/1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e/language/extensions/move-table-extension/sources/Table.move#L1
+///
+/// This is a exact copy from the Move repo. It implements the Table type which supports individual table items to
+/// be represented by separate global state items. The number of items and a unique handle are tracked on the table
+/// struct itself, while the operations are implemented as native functions. No traversal is provided.
 module AptosFramework::Table {
     use Std::Errors;
-    use Std::Option;
-    use Std::Vector;
 
-    const EKEY_ALREADY_EXISTS: u64 = 0;
-    const EKEY_NOT_FOUND: u64 = 1;
+    // native code raises this with Errors::invalid_arguments()
+    const EALREADY_EXISTS: u64 = 100;
+    // native code raises this with Errors::invalid_arguments()
+    const ENOT_FOUND: u64 = 101;
+    const ENOT_EMPTY: u64 = 102;
 
-    struct Table<Key: store, Value: store> has store {
-      data: vector<TableElement<Key, Value>>,
+    /// Type of tables
+    struct Table<phantom K, phantom V> has store {
+        handle: u128,
+        length: u64,
     }
 
-    struct TableElement<Key: store, Value: store> has store {
-        key: Key,
-        value: Value,
-    }
-
-    public fun count<Key: store, Value: store>(table: &Table<Key, Value>): u64 {
-        Vector::length(&table.data)
-    }
-
-    public fun create<Key: store, Value: store>(): Table<Key, Value> {
-        Table {
-            data: Vector::empty(),
+    /// Create a new Table.
+    public fun new<K, V: store>(): Table<K, V> {
+        Table{
+            handle: new_table_handle(),
+            length: 0,
         }
     }
 
-    public fun borrow<Key: store, Value: store>(
-        table: &Table<Key, Value>,
-        key: &Key,
-    ): &Value {
-        let maybe_idx = find(table, key);
-        assert!(Option::is_some(&maybe_idx), Errors::invalid_argument(EKEY_NOT_FOUND));
-        let idx = *Option::borrow(&maybe_idx);
-        &Vector::borrow(&table.data, idx).value
+    /// Destroy a table. The table must be empty to succeed.
+    public fun destroy_empty<K, V>(table: Table<K, V>) {
+        assert!(table.length == 0, Errors::invalid_state(ENOT_EMPTY));
+        destroy_empty_box<K, V, Box<V>>(&table);
+        drop_unchecked_box<K, V, Box<V>>(table)
     }
 
-    public fun borrow_mut<Key: store, Value: store>(
-        table: &mut Table<Key, Value>,
-        key: &Key,
-    ): &mut Value {
-        let maybe_idx = find(table, key);
-        assert!(Option::is_some(&maybe_idx), Errors::invalid_argument(EKEY_NOT_FOUND));
-        let idx = *Option::borrow(&maybe_idx);
-        &mut Vector::borrow_mut(&mut table.data, idx).value
+    /// Add a new entry to the table. Aborts if an entry for this
+    /// key already exists. The entry itself is not stored in the
+    /// table, and cannot be discovered from it.
+    public fun add<K, V>(table: &mut Table<K, V>, key: &K, val: V) {
+        add_box<K, V, Box<V>>(table, key, Box{val});
+        table.length = table.length + 1
     }
 
-    public fun contains_key<Key: store, Value: store>(
-        table: &Table<Key, Value>,
-        key: &Key,
-    ): bool {
-        Option::is_some(&find(table, key))
+    /// Acquire an immutable reference to the value which `key` maps to.
+    /// Aborts if there is no entry for `key`.
+    public fun borrow<K, V>(table: &Table<K, V>, key: &K): &V {
+        &borrow_box<K, V, Box<V>>(table, key).val
     }
 
-    public fun destroy_empty<Key: store, Value: store>(table: Table<Key, Value>) {
-        let Table { data } = table;
-        Vector::destroy_empty(data);
+    /// Acquire a mutable reference to the value which `key` maps to.
+    /// Aborts if there is no entry for `key`.
+    public fun borrow_mut<K, V>(table: &mut Table<K, V>, key: &K): &mut V {
+        &mut borrow_box_mut<K, V, Box<V>>(table, key).val
     }
 
-    public fun insert<Key: store, Value: store>(
-        table: &mut Table<Key, Value>,
-        key: Key,
-        value: Value,
-    ) {
-        let maybe_idx = find(table, &key);
-        assert!(Option::is_none(&maybe_idx), Errors::invalid_argument(EKEY_ALREADY_EXISTS));
-        Vector::push_back(&mut table.data, TableElement { key, value });
+    /// Returns the length of the table, i.e. the number of entries.
+    public fun length<K, V>(table: &Table<K, V>): u64 {
+        table.length
     }
 
-    public fun remove<Key: store, Value: store>(
-        table: &mut Table<Key, Value>,
-        key: &Key,
-    ): (Key, Value) {
-        let maybe_idx = find(table, key);
-        assert!(Option::is_some(&maybe_idx), Errors::invalid_argument(EKEY_NOT_FOUND));
-        let idx = *Option::borrow(&maybe_idx);
-        let TableElement { key, value } = Vector::swap_remove(&mut table.data, idx);
-        (key, value)
+    /// Returns true if this table is empty.
+    public fun empty<K, V>(table: &Table<K, V>): bool {
+        table.length == 0
     }
 
-    fun find<Key: store, Value: store>(
-        table: &Table<Key, Value>,
-        key: &Key,
-    ): Option::Option<u64> {
-        let size = Vector::length(&table.data);
-        let idx = 0;
-        while (idx < size) {
-            if (&Vector::borrow(&table.data, idx).key == key) {
-                return Option::some(idx)
-            };
-            idx = idx + 1
+    /// Acquire a mutable reference to the value which `key` maps to.
+    /// Insert the pair (`key`, `default`) first if there is no entry for `key`.
+    public fun borrow_mut_with_default<K, V: drop>(table: &mut Table<K, V>, key: &K, default: V): &mut V {
+        if (!contains(table, key)) {
+            add(table, key, default)
         };
-
-        Option::none()
+        borrow_mut(table, key)
     }
 
-    #[test]
-    public fun add_remove_many() {
-        let table = create<u64, u64>();
-
-        assert!(count(&table) == 0, 0);
-        assert!(!contains_key(&table, &3), 1);
-        insert(&mut table, 3, 1);
-        assert!(count(&table) == 1, 2);
-        assert!(contains_key(&table, &3), 3);
-        assert!(borrow(&table, &3) == &1, 4);
-        *borrow_mut(&mut table, &3) = 2;
-        assert!(borrow(&table, &3) == &2, 5);
-
-        assert!(!contains_key(&table, &2), 6);
-        insert(&mut table, 2, 5);
-        assert!(count(&table) == 2, 7);
-        assert!(contains_key(&table, &2), 8);
-        assert!(borrow(&table, &2) == &5, 9);
-        *borrow_mut(&mut table, &2) = 9;
-        assert!(borrow(&table, &2) == &9, 10);
-
-        remove(&mut table, &2);
-        assert!(count(&table) == 1, 11);
-        assert!(!contains_key(&table, &2), 12);
-        assert!(borrow(&table, &3) == &2, 13);
-
-        remove(&mut table, &3);
-        assert!(count(&table) == 0, 14);
-        assert!(!contains_key(&table, &3), 15);
-
-        destroy_empty(table);
+    /// Remove from `table` and return the value which `key` maps to.
+    /// Aborts if there is no entry for `key`.
+    public fun remove<K, V>(table: &mut Table<K, V>, key: &K): V {
+        let Box{val} = remove_box<K, V, Box<V>>(table, key);
+        table.length = table.length - 1;
+        val
     }
 
-    #[test]
-    #[expected_failure]
-    public fun insert_twice() {
-        let table = create<u64, u64>();
-        insert(&mut table, 3, 1);
-        insert(&mut table, 3, 1);
-
-        remove(&mut table, &3);
-        destroy_empty(table);
+    /// Returns true iff `table` contains an entry for `key`.
+    public fun contains<K, V>(table: &Table<K, V>, key: &K): bool {
+        contains_box<K, V, Box<V>>(table, key)
     }
 
-    #[test]
-    #[expected_failure]
-    public fun remove_twice() {
-        let table = create<u64, u64>();
-        insert(&mut table, 3, 1);
-        remove(&mut table, &3);
-        remove(&mut table, &3);
-
-        destroy_empty(table);
+    #[test_only]
+    /// Testing only: allows to drop a table even if it is not empty.
+    public fun drop_unchecked<K, V>(table: Table<K, V>) {
+        drop_unchecked_box<K, V, Box<V>>(table)
     }
+
+    // ======================================================================================================
+    // Internal API
+
+    /// Wrapper for values. Required for making values appear as resources in the implementation.
+    struct Box<V> has key, drop, store {
+        val: V
+    }
+
+    // Primitives which take as an additional type parameter `Box<V>`, so the implementation
+    // can use this to determine serialization layout.
+    native fun new_table_handle(): u128;
+    native fun add_box<K, V, B>(table: &mut Table<K, V>, key: &K, val: Box<V>);
+    native fun borrow_box<K, V, B>(table: &Table<K, V>, key: &K): &Box<V>;
+    native fun borrow_box_mut<K, V, B>(table: &mut Table<K, V>, key: &K): &mut Box<V>;
+    native fun contains_box<K, V, B>(table: &Table<K, V>, key: &K): bool;
+    native fun remove_box<K, V, B>(table: &mut Table<K, V>, key: &K): Box<V>;
+    native fun destroy_empty_box<K, V, B>(table: &Table<K, V>);
+    native fun drop_unchecked_box<K, V, B>(table: Table<K, V>);
 }

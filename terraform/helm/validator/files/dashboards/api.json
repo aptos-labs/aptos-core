@@ -26,7 +26,10 @@
   "links": [],
   "panels": [
     {
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "All requests processed per second, including bad requests",
       "fieldConfig": {
         "defaults": {
@@ -98,7 +101,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum by (status) (rate(aptos_api_response_status_count{role=~\"$role\", owner=~\"$owner\", status=~\"$status\"}[$interval]))",
+          "expr": "sum by (status) (rate(aptos_api_response_status_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\", status=~\"$status\"}[$interval]))",
           "interval": "",
           "legendFormat": "{{status}}",
           "refId": "A"
@@ -108,7 +111,10 @@
       "type": "timeseries"
     },
     {
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Request count by endpoint per $interval",
       "fieldConfig": {
         "defaults": {
@@ -180,7 +186,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum by (operation_id) (rate(aptos_api_requests_count{role=~\"$role\", owner=~\"$owner\", operation_id=~\"$endpoint\", status=~\"$status\"}[$interval]))",
+          "expr": "sum by (operation_id) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\", operation_id=~\"$endpoint\", status=~\"$status\"}[$interval]))",
           "instant": false,
           "interval": "",
           "legendFormat": "{{operation_id}}",
@@ -191,7 +197,10 @@
       "type": "timeseries"
     },
     {
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Aggregated endpoints latency per $interval, can be filtered by $endpoint",
       "fieldConfig": {
         "defaults": {
@@ -263,7 +272,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "histogram_quantile(0.90, sum by (le) (rate(aptos_api_requests_bucket{operation_id=~\"$endpoint\"}[$interval])))",
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", operation_id=~\"$endpoint\"}[$interval])))",
           "format": "time_series",
           "interval": "",
           "legendFormat": "p90",
@@ -271,7 +280,7 @@
         },
         {
           "exemplar": true,
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(aptos_api_requests_bucket{operation_id=~\"$endpoint\"}[$interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", operation_id=~\"$endpoint\"}[$interval])))",
           "hide": false,
           "interval": "",
           "legendFormat": "p99",
@@ -279,7 +288,7 @@
         },
         {
           "exemplar": true,
-          "expr": "histogram_quantile(1, sum by (le) (rate(aptos_api_requests_bucket{operation_id=~\"$endpoint\"}[$interval])))",
+          "expr": "histogram_quantile(1, sum by (le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", operation_id=~\"$endpoint\"}[$interval])))",
           "hide": false,
           "interval": "",
           "legendFormat": "p100",
@@ -290,7 +299,10 @@
       "type": "timeseries"
     },
     {
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "Server Internal Errors (response code 500) while processing requests, grouped by endpoints",
       "fieldConfig": {
         "defaults": {
@@ -362,7 +374,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum by (operation_id) (rate(aptos_api_requests_count{role=~\"$role\", owner=~\"$owner\", operation_id=~\"$endpoint\", status=\"500\"}[$interval]))",
+          "expr": "sum by (operation_id) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", role=~\"$role\", owner=~\"$owner\", operation_id=~\"$endpoint\", status=\"500\"}[$interval]))",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -378,6 +390,53 @@
   "templating": {
     "list": [
       {
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "Datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Datasource}"
+        },
+        "definition": "label_values(chain_name)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "chain_name",
+        "options": [],
+        "query": {
+          "query": "label_values(chain_name)",
+          "refId": "Prometheus-chain-name-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
         "allValue": null,
         "current": {
           "selected": false,
@@ -388,7 +447,10 @@
             "$__all"
           ]
         },
-        "datasource": null,
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(operation_id)",
         "description": null,
         "error": null,
@@ -419,7 +481,10 @@
             "$__all"
           ]
         },
-        "datasource": null,
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(role)",
         "description": null,
         "error": null,
@@ -450,7 +515,10 @@
             "$__all"
           ]
         },
-        "datasource": null,
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(owner)",
         "description": null,
         "error": null,
@@ -553,7 +621,10 @@
             "$__all"
           ]
         },
-        "datasource": null,
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(status)",
         "description": null,
         "error": null,

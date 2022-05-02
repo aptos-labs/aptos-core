@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{current_function_name, tests::new_test_context};
-use aptos_api_types::{AsConverter, MoveConverter, MoveType};
-use aptos_vm::data_cache::AsMoveResolver;
+use aptos_api_types::{new_vm_ascii_string, AsConverter, MoveConverter, MoveType};
+use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::MoveResolverExt};
 use move_core_types::{
     account_address::AccountAddress,
-    resolver::MoveResolver,
     value::{MoveStruct, MoveValue as VmMoveValue},
 };
 use serde::Serialize;
@@ -27,6 +26,12 @@ async fn test_value_conversion() {
     assert_value_conversion(&converter, "u128", "1", VmMoveValue::U128(1));
     assert_value_conversion(&converter, "bool", true, VmMoveValue::Bool(true));
     assert_value_conversion(&converter, "address", "0x1", VmMoveValue::Address(address));
+    assert_value_conversion(
+        &converter,
+        "0x1::ASCII::String",
+        "hello",
+        new_vm_ascii_string("hello"),
+    );
     assert_value_conversion(
         &converter,
         "vector<u8>",
@@ -50,7 +55,7 @@ async fn test_value_conversion() {
     );
 }
 
-fn assert_value_conversion<'r, R: MoveResolver, V: Serialize>(
+fn assert_value_conversion<'r, R: MoveResolverExt, V: Serialize>(
     converter: &MoveConverter<'r, R>,
     json_move_type: &str,
     json_value: V,

@@ -133,7 +133,7 @@ impl TransactionBenchState {
             0,
             1,
             vec![],
-            *validator_set.payload()[0].account_address(),
+            *validator_set.payload().next().unwrap().account_address(),
         );
 
         state
@@ -193,8 +193,12 @@ impl TransactionBenchState {
     fn execute_parallel(self) {
         // The output is ignored here since we're just testing transaction performance, not trying
         // to assert correctness.
-        ParallelAptosVM::execute_block(self.transactions, self.executor.get_state_view())
-            .expect("VM should not fail to start");
+        ParallelAptosVM::execute_block(
+            self.transactions,
+            self.executor.get_state_view(),
+            num_cpus::get(),
+        )
+        .expect("VM should not fail to start");
     }
 }
 

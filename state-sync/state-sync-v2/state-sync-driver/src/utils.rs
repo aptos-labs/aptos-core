@@ -5,7 +5,11 @@ use crate::{
     error::Error,
     logging::{LogEntry, LogSchema},
     metrics,
+    notification_handlers::{
+        CommitNotification, CommittedTransactions, MempoolNotificationHandler,
+    },
 };
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_change::Verifier, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
@@ -14,9 +18,11 @@ use aptos_types::{
 use data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, NotificationFeedback, StreamingServiceClient},
+    streaming_client::{DataStreamingClient, NotificationFeedback},
 };
+use event_notifications::EventSubscriptionService;
 use futures::StreamExt;
+use mempool_notifications::MempoolNotificationSender;
 use std::{sync::Arc, time::Duration};
 use storage_interface::{DbReader, StartupInfo};
 use tokio::time::timeout;
@@ -125,8 +131,8 @@ pub async fn get_data_notification(
 }
 
 /// Terminates the stream with the provided notification ID and feedback
-pub async fn terminate_stream_with_feedback(
-    streaming_service_client: &mut StreamingServiceClient,
+pub async fn terminate_stream_with_feedback<StreamingClient: DataStreamingClient + Clone>(
+    streaming_client: &mut StreamingClient,
     notification_id: NotificationId,
     notification_feedback: NotificationFeedback,
 ) -> Result<(), Error> {
@@ -135,7 +141,7 @@ pub async fn terminate_stream_with_feedback(
         notification_feedback, notification_id
     )));
 
-    streaming_service_client
+    streaming_client
         .terminate_stream_with_feedback(notification_id, notification_feedback)
         .await
         .map_err(|error| error.into())
@@ -143,8 +149,10 @@ pub async fn terminate_stream_with_feedback(
 
 /// Handles the end of stream notification or an invalid payload by terminating
 /// the stream appropriately.
-pub async fn handle_end_of_stream_or_invalid_payload(
-    streaming_service_client: &mut StreamingServiceClient,
+pub async fn handle_end_of_stream_or_invalid_payload<
+    StreamingClient: DataStreamingClient + Clone,
+>(
+    streaming_client: &mut StreamingClient,
     data_notification: DataNotification,
 ) -> Result<(), Error> {
     // Terminate the stream with the appropriate feedback
@@ -153,7 +161,7 @@ pub async fn handle_end_of_stream_or_invalid_payload(
         _ => NotificationFeedback::PayloadTypeIsIncorrect,
     };
     terminate_stream_with_feedback(
-        streaming_service_client,
+        streaming_client,
         data_notification.notification_id,
         notification_feedback,
     )
@@ -214,7 +222,7 @@ pub fn initialize_sync_version_gauges(storage: Arc<dyn DbReader>) -> Result<(), 
     let metrics = [
         metrics::StorageSynchronizerOperations::AppliedTransactionOutputs,
         metrics::StorageSynchronizerOperations::ExecutedTransactions,
-        metrics::StorageSynchronizerOperations::SyncedTransactions,
+        metrics::StorageSynchronizerOperations::Synced,
     ];
 
     for metric in metrics {
@@ -226,4 +234,49 @@ pub fn initialize_sync_version_gauges(storage: Arc<dyn DbReader>) -> Result<(), 
     }
 
     Ok(())
+}
+
+/// Handles a notification for committed transactions by
+/// notifying mempool and the event subscription service.
+pub async fn handle_committed_transactions<M: MempoolNotificationSender>(
+    committed_transactions: CommittedTransactions,
+    storage: Arc<dyn DbReader>,
+    mempool_notification_handler: MempoolNotificationHandler<M>,
+    event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
+) {
+    // Fetch the latest synced version and ledger info from storage
+    let (latest_synced_version, latest_synced_ledger_info) =
+        match fetch_latest_synced_version(storage.clone()) {
+            Ok(latest_synced_version) => match fetch_latest_synced_ledger_info(storage.clone()) {
+                Ok(latest_synced_ledger_info) => (latest_synced_version, latest_synced_ledger_info),
+                Err(error) => {
+                    error!(LogSchema::new(LogEntry::SynchronizerNotification)
+                        .error(&error)
+                        .message("Failed to fetch latest synced ledger info!"));
+                    return;
+                }
+            },
+            Err(error) => {
+                error!(LogSchema::new(LogEntry::SynchronizerNotification)
+                    .error(&error)
+                    .message("Failed to fetch latest synced version!"));
+                return;
+            }
+        };
+
+    // Handle the commit notification
+    if let Err(error) = CommitNotification::handle_transaction_notification(
+        committed_transactions.events,
+        committed_transactions.transactions,
+        latest_synced_version,
+        latest_synced_ledger_info,
+        mempool_notification_handler,
+        event_subscription_service,
+    )
+    .await
+    {
+        error!(LogSchema::new(LogEntry::SynchronizerNotification)
+            .error(&error)
+            .message("Failed to handle a transaction commit notification!"));
+    }
 }

@@ -16,15 +16,17 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
-    transaction::{ModuleBundle, RawTransaction, Script, ScriptFunction, SignedTransaction},
-    vm_status::{AbortLocation, KeptVMStatus},
+    transaction::{
+        ExecutionStatus, ModuleBundle, RawTransaction, Script, ScriptFunction, SignedTransaction,
+    },
+    vm_status::AbortLocation,
     write_set::WriteOp,
 };
+use aptos_vm::move_vm_ext::MoveResolverExt;
 use move_binary_format::file_format::FunctionHandleIndex;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::MoveResolver,
     value::{MoveStructLayout, MoveTypeLayout},
 };
 use move_resource_viewer::MoveValueAnnotator;
@@ -39,7 +41,7 @@ pub struct MoveConverter<'a, R: ?Sized> {
     inner: MoveValueAnnotator<'a, R>,
 }
 
-impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
+impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     pub fn new(inner: &'a R) -> Self {
         Self {
             inner: MoveValueAnnotator::new(inner),
@@ -204,17 +206,17 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         state_key: StateKey,
         op: WriteOp,
     ) -> Result<WriteSetChange> {
+        let hash = state_key.hash().to_hex_literal();
+
         match state_key {
             StateKey::AccessPath(access_path) => {
-                self.try_access_path_into_write_set_change(access_path, op)
+                self.try_access_path_into_write_set_change(hash, access_path, op)
             }
-            // We should not expect account address here.
-            StateKey::AccountAddressKey(_) => Err(format_err!(
-                "Can't convert account address key {:?} to WriteSetChange",
-                state_key
-            )),
-            StateKey::Raw(_) => Err(format_err!(
-                "Can't convert account raw key {:?} to WriteSetChange",
+            StateKey::TableItem { handle, key } => {
+                self.try_table_item_into_write_set_change(hash, handle, key, op)
+            }
+            StateKey::AccountAddressKey(_) | StateKey::Raw(_) => Err(format_err!(
+                "Can't convert state key {:?} to WriteSetChange",
                 state_key
             )),
         }
@@ -222,12 +224,10 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
 
     pub fn try_access_path_into_write_set_change(
         &self,
+        state_key_hash: String,
         access_path: AccessPath,
         op: WriteOp,
     ) -> Result<WriteSetChange> {
-        let state_key_hash = StateKey::AccessPath(access_path.clone())
-            .hash()
-            .to_hex_literal();
         let ret = match op {
             WriteOp::Deletion => match access_path.get_path() {
                 Path::Code(module_id) => WriteSetChange::DeleteModule {
@@ -252,6 +252,31 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     state_key_hash,
                     data: self.try_into_resource(&typ, &val)?,
                 },
+            },
+        };
+        Ok(ret)
+    }
+
+    pub fn try_table_item_into_write_set_change(
+        &self,
+        state_key_hash: String,
+        handle: u128,
+        key: Vec<u8>,
+        op: WriteOp,
+    ) -> Result<WriteSetChange> {
+        let handle = handle.to_be_bytes().to_vec().into();
+        let key = key.into();
+        let ret = match op {
+            WriteOp::Deletion => WriteSetChange::DeleteTableItem {
+                state_key_hash,
+                handle,
+                key,
+            },
+            WriteOp::Value(value) => WriteSetChange::WriteTableItem {
+                state_key_hash,
+                handle,
+                key,
+                value: value.into(),
             },
         };
         Ok(ret)
@@ -293,7 +318,6 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             sequence_number,
             max_gas_amount,
             gas_unit_price,
-            gas_currency_code,
             expiration_timestamp_secs,
             payload,
             signature: _,
@@ -304,7 +328,6 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             self.try_into_aptos_core_transaction_payload(payload)?,
             max_gas_amount.into(),
             gas_unit_price.into(),
-            gas_currency_code,
             expiration_timestamp_secs.into(),
             chain_id,
         ))
@@ -444,7 +467,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         type_tag: &TypeTag,
         val: Value,
     ) -> Result<move_core_types::value::MoveValue> {
-        let layout = self.inner.get_type_layout_with_fields(type_tag)?;
+        let layout = self.inner.get_type_layout_with_types(type_tag)?;
 
         self.try_into_vm_value_from_layout(&layout, val)
     }
@@ -498,14 +521,21 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         layout: &MoveStructLayout,
         val: Value,
     ) -> Result<move_core_types::value::MoveValue> {
-        let field_layouts = if let MoveStructLayout::WithFields(fields) = layout {
-            fields
-        } else {
-            bail!(
-                "Expecting `MoveStructLayout::WithFields, getting {:?}",
-                layout
-            );
-        };
+        let (struct_tag, field_layouts) =
+            if let MoveStructLayout::WithTypes { type_, fields } = layout {
+                (type_, fields)
+            } else {
+                bail!(
+                    "Expecting `MoveStructLayout::WithTypes`, getting {:?}",
+                    layout
+                );
+            };
+        if MoveValue::is_ascii_string(struct_tag) {
+            let string = val
+                .as_str()
+                .ok_or_else(|| format_err!("failed to parse ASCII::String."))?;
+            return Ok(new_vm_ascii_string(string));
+        }
 
         let mut field_values = if let Value::Object(fields) = val {
             fields
@@ -530,11 +560,11 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         ))
     }
 
-    fn explain_vm_status(&self, status: &KeptVMStatus) -> String {
+    fn explain_vm_status(&self, status: &ExecutionStatus) -> String {
         match status {
-            KeptVMStatus::MoveAbort(location, abort_code) => match &location {
+            ExecutionStatus::MoveAbort { location, code} => match &location {
                 AbortLocation::Module(module_id) => {
-                    let explanation = error_explain::get_explanation(module_id, *abort_code);
+                    let explanation = error_explain::get_explanation(module_id, *code);
                     explanation
                         .map(|ec| {
                             format!(
@@ -546,14 +576,14 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                             )
                         })
                         .unwrap_or_else(|| {
-                            format!("Move abort: code {} at {}", abort_code, location)
+                            format!("Move abort: code {} at {}", code, location)
                         })
                 }
-                AbortLocation::Script => format!("Move abort: code {}", abort_code),
+                AbortLocation::Script => format!("Move abort: code {}", code),
             },
-            KeptVMStatus::Executed => "Executed successfully".to_owned(),
-            KeptVMStatus::OutOfGas => "Out of gas".to_owned(),
-            KeptVMStatus::ExecutionFailure {
+            ExecutionStatus::Success => "Executed successfully".to_owned(),
+            ExecutionStatus::OutOfGas => "Out of gas".to_owned(),
+            ExecutionStatus::ExecutionFailure {
                 location,
                 function,
                 code_offset,
@@ -570,9 +600,13 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                     func_name, code_offset
                 )
             }
-            KeptVMStatus::MiscellaneousError => {
-                "Move bytecode deserialization / verification failed, including script function not found or invalid arguments"
-                    .to_owned()
+            ExecutionStatus::MiscellaneousError( code ) => {
+                code.map_or(
+                    "Move bytecode deserialization / verification failed, including script function not found or invalid arguments".to_owned(),
+                    |e| format!(
+                        "Transaction Executed and Committed with Error {:#?}", e
+                    )
+                )
             }
         }
     }
@@ -593,8 +627,22 @@ pub trait AsConverter<R> {
     fn as_converter(&self) -> MoveConverter<R>;
 }
 
-impl<R: MoveResolver> AsConverter<R> for R {
+impl<R: MoveResolverExt> AsConverter<R> for R {
     fn as_converter(&self) -> MoveConverter<R> {
         MoveConverter::new(self)
     }
+}
+
+pub fn new_vm_ascii_string(string: &str) -> move_core_types::value::MoveValue {
+    use move_core_types::value::{MoveStruct, MoveValue};
+
+    let byte_vector = MoveValue::Vector(
+        string
+            .as_bytes()
+            .iter()
+            .map(|byte| MoveValue::U8(*byte))
+            .collect(),
+    );
+    let move_string = MoveStruct::Runtime(vec![byte_vector]);
+    MoveValue::Struct(move_string)
 }

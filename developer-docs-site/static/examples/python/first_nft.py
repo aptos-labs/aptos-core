@@ -3,6 +3,8 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
+import json
+import requests
 from typing import Any, Dict
 import sys
 
@@ -16,7 +18,7 @@ class TokenClient(RestClient):
         self.wait_for_transaction(res["hash"])
 
 #:!:>section_1
-    def create_collection(self, account: Account, description: str, name: str, uri: str):
+    def create_collection(self, account: Account, name: str, description, uri: str):
         """Creates a new collection within the specified account"""
 
         payload = {
@@ -24,8 +26,8 @@ class TokenClient(RestClient):
             "function": f"0x1::Token::create_unlimited_collection_script",
             "type_arguments": [],
             "arguments": [
-                description.encode("utf-8").hex(),
                 name.encode("utf-8").hex(),
+                description.encode("utf-8").hex(),
                 uri.encode("utf-8").hex(),
             ]
         }
@@ -37,19 +39,20 @@ class TokenClient(RestClient):
             self,
             account: Account,
             collection_name: str,
-            description: str,
             name: str,
+            description: str,
             supply: int,
             uri: str,
     ):
         payload = {
             "type": "script_function_payload",
-            "function": f"0x1::Token::create_token_script",
+            "function": f"0x1::Token::create_unlimited_token_script",
             "type_arguments": [],
             "arguments": [
-                collection_name.encode("utf-8").hex(),    
-                description.encode("utf-8").hex(),
+                collection_name.encode("utf-8").hex(),
                 name.encode("utf-8").hex(),
+                description.encode("utf-8").hex(),
+                True,
                 str(supply),
                 uri.encode("utf-8").hex(),
             ]
@@ -63,7 +66,8 @@ class TokenClient(RestClient):
             account: Account,
             receiver: str,
             creator: str,
-            token_creation_num: int,
+            collection_name: str,
+            token_name: str,
             amount: int
     ):
         payload = {
@@ -73,20 +77,22 @@ class TokenClient(RestClient):
             "arguments": [
                 receiver,
                 creator,
-                str(token_creation_num),
+                collection_name.encode("utf-8").hex(),
+                token_name.encode("utf-8").hex(),
                 str(amount),
             ]
         }
         self.submit_transaction_helper(account, payload)
 #<:!:section_4
-            
+
 #:!:>section_5
     def claim_token(
             self,
             account: Account,
             sender: str,
             creator: str,
-            token_creation_num: int,
+            collection_name: str,
+            token_name: str,
     ):
         payload = {
             "type": "script_function_payload",
@@ -95,18 +101,64 @@ class TokenClient(RestClient):
             "arguments": [
                 sender,
                 creator,
-                str(token_creation_num),
+                collection_name.encode("utf-8").hex(),
+                token_name.encode("utf-8").hex(),
             ]
         }
         self.submit_transaction_helper(account, payload)
 #<:!:section_5
-            
+
+#:!:>section_3
+    def get_table_item(self, handle: str, key_type: str, value_type: str, key: Any) -> Any:
+        response = requests.post(f"{self.url}/tables/{handle}/item", json={
+            "key_type": key_type,
+            "value_type": value_type,
+            "key": key,
+        })
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    def get_token_balance(self, owner: str, creator: str, collection_name: str, token_name: str) -> Any:
+        token_store = self.account_resource(owner, "0x1::Token::TokenStore")["data"]["tokens"]["handle"]
+
+        token_id = {
+            "creator": creator,
+            "collection": collection_name,
+            "name": token_name,
+        }
+
+        return self.get_table_item(
+            token_store,
+            "0x1::Token::TokenId",
+            "0x1::Token::Token",
+            token_id,
+        )["value"]
+
+    def get_token_data(self, creator: str, collection_name: str, token_name: str) -> Any:
+        token_data = self.account_resource(creator, "0x1::Token::Collections")["data"]["token_data"]["handle"]
+
+        token_id = {
+            "creator": creator,
+            "collection": collection_name,
+            "name": token_name,
+        }
+
+        return self.get_table_item(
+            token_data,
+            "0x1::Token::TokenId",
+            "0x1::Token::TokenData",
+            token_id,
+        )
+
+#<:!:section_3
+
     def cancel_token_offer(
             self,
             account: Account,
             receiver: str,
             creator: str,
-            token_creation_num: int,
+            collection_name: str,
+            token_name: str,
     ):
         payload = {
             "type": "script_function_payload",
@@ -115,30 +167,11 @@ class TokenClient(RestClient):
             "arguments": [
                 receiver,
                 creator,
-                str(token_creation_num),
+                collection_name.encode("utf-8").hex(),
+                name.encode("utf-8").hex(),
             ]
         }
         self.submit_transaction_helper(account, payload)
-            
-#:!:>section_3
-    def get_token_id(self, creator: str, collection_name: str, token_name: str) -> int:
-        """ Retrieve the token's creation_num, which is useful for non-creator operations """
-
-        resources = self.account_resources(creator)
-        collections = []
-        tokens = []
-        for resource in resources:
-            if resource["type"] == f"0x1::Token::Collections":
-                collections = resource["data"]["collections"]["data"]
-        for collection in collections:
-            if collection["key"] == collection_name:
-                tokens = collection["value"]["tokens"]["data"]
-        for token in tokens:
-            if token["key"] == token_name:
-                return int(token["value"]["id"]["creation_num"])
-            
-        assert False
-#<:!:section_3
 
 
 if __name__ == "__main__":
@@ -147,6 +180,8 @@ if __name__ == "__main__":
 
     alice = Account()
     bob = Account()
+    collection_name = "Alice's"
+    token_name = "Alice's first token"
 
     print("\n=== Addresses ===")
     print(f"Alice: {alice.address()}")
@@ -159,16 +194,15 @@ if __name__ == "__main__":
     print(f"Alice: {client.account_balance(alice.address())}")
     print(f"Bob: {client.account_balance(bob.address())}")
 
-    client.create_collection(alice, "Alice's simple collection", "Alice's", "https://aptos.dev")
-    client.create_token(alice, "Alice's", "Alice's simple token", "Alice's first token", 1, "https://aptos.dev/img/nyan.jpeg")
-
     print("\n=== Creating Collection and Token ===")
-    token_id = client.get_token_id(alice.address(), "Alice's", "Alice's first token")
-    print(f"Alice's token's identifier: {token_id}")
-    print(f"See {client.url}/accounts/{alice.address()}/resources")
+
+    client.create_collection(alice, collection_name, "Alice's simple collection", "https://aptos.dev")
+    client.create_token(alice, collection_name, token_name, "Alice's simple token", 1, "https://aptos.dev/img/nyan.jpeg")
+    print(f"Alice's token balance: {client.get_token_balance(alice.address(), alice.address(), collection_name, token_name)}")
+    print(f"Alice's token data: {client.get_token_data(alice.address(), collection_name, token_name)}")
 
     print("\n=== Transferring the token to Bob ===")
-    client.offer_token(alice, bob.address(), alice.address(), token_id, 1)
-    client.claim_token(bob, alice.address(), alice.address(), token_id)
-
-    print(f"See {client.url}/accounts/{bob.address()}/resources")
+    client.offer_token(alice, bob.address(), alice.address(), collection_name, token_name, 1)
+    client.claim_token(bob, alice.address(), alice.address(), collection_name, token_name)
+    print(f"Alice's token balance: {client.get_token_balance(alice.address(), alice.address(), collection_name, token_name)}")
+    print(f"Bob's token balance: {client.get_token_balance(bob.address(), alice.address(), collection_name, token_name)}")

@@ -5,13 +5,13 @@ base:
     waypoint:
         # Update this value to that which the blockchain publicly provides. Please regard the directions
         # below on how to safely manage your genesis_file_location with respect to the waypoint.
-        from_config: "0:01234567890ABCDEFFEDCA098765421001234567890ABCDEFFEDCA0987654210"
+        from_file: "/full/path/to/waypoint.txt"
 
 execution:
     # Update this to the location to where the genesis.blob is stored, prefer fullpaths
     # Note, this must be paired with a waypoint. If you update your waypoint without a
     # corresponding genesis, the file location should be an empty path.
-    genesis_file_location: "/full/path/to/genesis"
+    genesis_file_location: "/full/path/to/genesis.blob"
 
 full_node_networks:
     - discovery_method: "onchain"

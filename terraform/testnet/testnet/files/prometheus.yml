@@ -1,6 +1,8 @@
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+  external_labels:
+    chain_name: {{ .Values.chain_name }}
 
 # Alertmanager configuration
 alerting:
@@ -129,3 +131,16 @@ scrape_configs:
   {{- end }}
   {{- end }}
   - targets: ['{{ .Values.vault.prometheusTarget }}']
+
+{{ if .Values.monitoring.prometheus.remote_write.enabled }}
+{{ with .Values.monitoring.prometheus.remote_write }}
+remote_write:
+  - url: {{ .url }}
+    sigv4:
+      region: {{ .region }}
+    queue_config:
+      max_samples_per_send: 1000
+      max_shards: 200
+      capacity: 2500
+{{ end }}
+{{ end }}

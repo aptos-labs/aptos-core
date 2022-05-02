@@ -26,9 +26,6 @@ pub struct ValidatorInfo {
     consensus_voting_power: u64,
     // Validator config
     config: ValidatorConfig,
-    // The time of last recofiguration invoked by this validator
-    // in microseconds
-    last_config_update_time: u64,
 }
 
 impl fmt::Display for ValidatorInfo {
@@ -51,7 +48,6 @@ impl ValidatorInfo {
             account_address,
             consensus_voting_power,
             config,
-            last_config_update_time: 0,
         }
     }
 
@@ -72,7 +68,6 @@ impl ValidatorInfo {
             account_address,
             consensus_voting_power,
             config,
-            last_config_update_time: 0,
         }
     }
 

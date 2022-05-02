@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{account_address::AccountAddress, network_address::NetworkAddress};
+use crate::network_address::NetworkAddress;
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use move_core_types::{
     ident_str,
@@ -12,19 +12,12 @@ use move_core_types::{
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize, Clone, Eq, PartialEq, Default)]
-pub struct ValidatorConfigResource {
-    pub validator_config: Option<ValidatorConfig>,
-    pub delegated_account: Option<AccountAddress>,
-    pub human_name: Vec<u8>,
-}
-
-impl MoveStructType for ValidatorConfigResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("ValidatorConfig");
+impl MoveStructType for ValidatorConfig {
+    const MODULE_NAME: &'static IdentStr = ident_str!("Stake");
     const STRUCT_NAME: &'static IdentStr = ident_str!("ValidatorConfig");
 }
 
-impl MoveResource for ValidatorConfigResource {}
+impl MoveResource for ValidatorConfig {}
 
 #[derive(Debug, Deserialize, Serialize, Clone, Eq, PartialEq, Default)]
 pub struct ValidatorOperatorConfigResource {

@@ -11,12 +11,11 @@ use aptos_types::{
 };
 use aptos_vm::{
     data_cache::RemoteStorage,
-    move_vm_ext::{MoveVmExt, SessionExt, SessionId},
+    move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
 };
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
-    resolver::MoveResolver,
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
@@ -25,7 +24,7 @@ use move_vm_types::gas_schedule::GasStatus;
 
 pub struct GenesisSession<'r, 'l, S>(SessionExt<'r, 'l, S>);
 
-impl<'r, 'l, S: MoveResolver> GenesisSession<'r, 'l, S> {
+impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
     pub fn exec_func(
         &mut self,
         module_name: &str,

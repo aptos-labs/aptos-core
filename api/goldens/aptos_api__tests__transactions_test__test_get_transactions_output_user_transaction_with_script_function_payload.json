@@ -3,12 +3,12 @@
     "type": "block_metadata_transaction",
     "version": "1",
     "hash": "0xa8fc186c28fc0f95b8233651438093e8e215a51dcd16475f5e68c0a421f6305c",
-    "state_root_hash": "0xf835a02cb0000e4aff512ff859ad55cb912f2392198b4568ad7349fd8eff8105",
+    "state_root_hash": "0xd9e5574895eb9c509bfaece5d792d95b4c28508512e0430f894254c51fe1ce16",
     "event_root_hash": "0xd62c85b93234824cf825e9c028c3bcc59b06926039721bd7edd76b56ae9fcecf",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x98f45b65a2803ef4b16c97adcc3c9485b95de05be62435421b051823ce88f4b7",
+    "accumulator_root_hash": "0x8e99bc6db50ff6792fd076da5a9f0ac3ea3f72f522a97ba6caaca62a9476ee98",
     "changes": [
       {
         "type": "write_resource",
@@ -17,6 +17,7 @@
         "data": {
           "type": "0x1::Block::BlockMetadata",
           "data": {
+            "epoch_internal": "86400000000",
             "height": "1",
             "new_block_events": {
               "counter": "1",
@@ -54,13 +55,13 @@
   {
     "type": "user_transaction",
     "version": "2",
-    "hash": "0x2eefdb1220b8b58b7a70f789c604ea5b95b48a60da2bd2606a0f966c85c703ad",
-    "state_root_hash": "0xece2fe110f4337d052467eb72f5ba19c74678813dc2b155bdc3cf63af90a87c5",
+    "hash": "0x18073cb2536317833aa630d30062383a1f00221dd3604bbce19cd262813e6c36",
+    "state_root_hash": "0x25af3deecfaca1bc963e775cd0c73c75a306c92fa5456e080aa4bb75ed15a648",
     "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
     "gas_used": "92",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0xa18468709765e5ad75940aeaed145e8af265b8f31148e5d3b860deb8e50b1c3e",
+    "accumulator_root_hash": "0x3445e79d8be413432882aa0f045632462556456f3de287b02de551ebd85af5fc",
     "changes": [
       {
         "type": "write_resource",
@@ -83,20 +84,8 @@
           "type": "0x1::TestCoin::Balance",
           "data": {
             "coin": {
-              "value": "18446744073709551615"
+              "value": "18446744073709551614"
             }
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0xa550c18",
-        "state_key_hash": "0x79a08e0b94ebb66c0dae37a07c182d46387c347aeb83c07de6109b0503c3a24e",
-        "data": {
-          "type": "0x1::TestCoin::CoinInfo",
-          "data": {
-            "scaling_factor": "1000000",
-            "total_value": "18446744073709551615"
           }
         }
       },
@@ -176,7 +165,6 @@
     "sequence_number": "0",
     "max_gas_amount": "2000",
     "gas_unit_price": "0",
-    "gas_currency_code": "XUS",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
       "type": "script_function_payload",
@@ -189,7 +177,7 @@
     "signature": {
       "type": "ed25519_signature",
       "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-      "signature": "0xbf496107afc5d31cf1b4f1dc79ddc745851e0ceb91cd9c77e938a5896c696e9674d0643ff41a74cb430a376e17878931f020d13c4590a815e58ce89c5431d209"
+      "signature": "0xb66feafc1e1b95ce33a8e25101a212cdfd4e94a7dfd85409ad538ce7fcc150b610326a97e688b1d02bb4703880631498588784c8128824671b219d6aca6edb04"
     },
     "events": [],
     "timestamp": "1"

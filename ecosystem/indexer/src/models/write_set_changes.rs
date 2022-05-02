@@ -4,6 +4,7 @@
 use crate::{models::transactions::Transaction, schema::write_set_changes};
 use aptos_rest_client::aptos_api_types::WriteSetChange as APIWriteSetChange;
 use serde::Serialize;
+use serde_json::json;
 
 #[derive(AsChangeset, Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
 #[diesel(table_name = "write_set_changes")]
@@ -57,6 +58,23 @@ impl WriteSetChange {
                 data: Default::default(),
                 inserted_at: chrono::Utc::now().naive_utc(),
             },
+            APIWriteSetChange::DeleteTableItem {
+                state_key_hash,
+                handle,
+                key,
+            } => WriteSetChange {
+                transaction_hash,
+                hash: state_key_hash.clone(),
+                type_: write_set_change.type_str().to_string(),
+                address: "".to_owned(),
+                module: Default::default(),
+                resource: Default::default(),
+                data: json!({
+                    "handle": handle,
+                    "key": key,
+                }),
+                inserted_at: chrono::Utc::now().naive_utc(),
+            },
             APIWriteSetChange::WriteModule {
                 address,
                 state_key_hash,
@@ -83,6 +101,25 @@ impl WriteSetChange {
                 module: Default::default(),
                 resource: Default::default(),
                 data: serde_json::to_value(data).unwrap(),
+                inserted_at: chrono::Utc::now().naive_utc(),
+            },
+            APIWriteSetChange::WriteTableItem {
+                state_key_hash,
+                handle,
+                key,
+                value,
+            } => WriteSetChange {
+                transaction_hash,
+                hash: state_key_hash.clone(),
+                type_: write_set_change.type_str().to_string(),
+                address: "".to_owned(),
+                module: Default::default(),
+                resource: Default::default(),
+                data: json!({
+                    "handle": handle,
+                    "key": key,
+                    "value": value,
+                }),
                 inserted_at: chrono::Utc::now().naive_utc(),
             },
         }

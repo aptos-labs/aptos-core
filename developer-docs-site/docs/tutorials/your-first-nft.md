@@ -133,13 +133,16 @@ TODO
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
 
-TODO
+For this tutorial, will be focusing on `first_nft.ts` and re-using the `first_transaction.ts` library from the previous tutorial.
+
+You can find the typescript project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript)
 
   </TabItem>
 </Tabs>
+
 ### Creating a Collection
 
-THe Aptos Token enables creators to create finite or unlimited collections. Many NFTs are of a limited nature, where the creator only intends on creating a certain amount forever, this enforces scarcity. Whereas other tokens may have an unlimited nature, for example, a collection used for utility may see new tokens appear over time. SimpleToken collections can be instantiated with either behavior by using the appropriate script function:
+The Aptos Token enables creators to create finite or unlimited collections. Many NFTs are of a limited nature, where the creator only intends on creating a certain amount forever, this enforces scarcity. Whereas other tokens may have an unlimited nature, for example, a collection used for utility may see new tokens appear over time. SimpleToken collections can be instantiated with either behavior by using the appropriate script function:
 
 Finite, that is no more than a `maximum` number of tokens can ever be minted:
 ```rust
@@ -177,7 +180,10 @@ TODO
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
 
-TODO
+```typescript
+:!: static/examples/typescript/first_nft.ts section_1
+```
+
   </TabItem>
 </Tabs>
 
@@ -211,7 +217,9 @@ TODO
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
 
-TODO
+```typescript
+:!: static/examples/typescript/first_nft.ts section_2
+```
   </TabItem>
 </Tabs>
 
@@ -236,7 +244,9 @@ TODO
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
 
-TODO
+```typescript
+:!: static/examples/typescript/first_nft.ts section_3
+```
   </TabItem>
 </Tabs>
 
@@ -267,7 +277,9 @@ TODO
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
 
-TODO
+```typescript
+:!: static/examples/typescript/first_nft.ts section_4
+```
   </TabItem>
 </Tabs>
 
@@ -296,7 +308,10 @@ public(script) fun claim_script(
 TODO
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
-TODO
+
+```typescript
+:!: static/examples/typescript/first_nft.ts section_5
+```
   </TabItem>
 </Tabs>
 

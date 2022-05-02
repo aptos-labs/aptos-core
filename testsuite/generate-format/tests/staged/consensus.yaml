@@ -263,7 +263,6 @@ RawTransaction:
         TYPENAME: TransactionPayload
     - max_gas_amount: U64
     - gas_unit_price: U64
-    - gas_currency_code: STR
     - expiration_timestamp_secs: U64
     - chain_id:
         TYPENAME: ChainId
@@ -304,6 +303,11 @@ StateKey:
         NEWTYPE:
           TYPENAME: AccessPath
     2:
+      TableItem:
+        STRUCT:
+          - handle: U128
+          - key: BYTES
+    3:
       Raw:
         NEWTYPE: BYTES
 StructTag:

@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::driver::DriverConfiguration;
+use aptos_config::config::{RoleType, StateSyncDriverConfig};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
     HashValue, PrivateKey, Uniform,
@@ -10,6 +12,7 @@ use aptos_types::{
     block_info::BlockInfo,
     chain_id::ChainId,
     contract_event::ContractEvent,
+    epoch_state::EpochState,
     event::EventKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::{
@@ -17,19 +20,39 @@ use aptos_types::{
     },
     state_store::state_value::StateValueChunkWithProof,
     transaction::{
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionInfo,
+        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction, TransactionInfo,
         TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
         TransactionPayload, TransactionStatus, Version,
     },
-    vm_status::KeptVMStatus,
+    waypoint::Waypoint,
     write_set::WriteSet,
 };
+use data_streaming_service::streaming_client::Epoch;
 use move_core_types::language_storage::TypeTag;
 use std::collections::BTreeMap;
+use storage_interface::{StartupInfo, TreeState};
 
 /// Creates a test epoch ending ledger info
 pub fn create_epoch_ending_ledger_info() -> LedgerInfoWithSignatures {
-    let ledger_info = LedgerInfo::new(BlockInfo::random(0), HashValue::random());
+    let ledger_info = LedgerInfo::new(BlockInfo::random(0), HashValue::zero());
+    LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
+}
+
+/// Creates a random epoch ending ledger info with the specified values
+pub fn create_random_epoch_ending_ledger_info(
+    version: Version,
+    epoch: Epoch,
+) -> LedgerInfoWithSignatures {
+    let block_info = BlockInfo::new(
+        epoch,
+        0,
+        HashValue::zero(),
+        HashValue::random(),
+        version,
+        0,
+        Some(EpochState::empty()),
+    );
+    let ledger_info = LedgerInfo::new(block_info, HashValue::random());
     LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
 }
 
@@ -41,6 +64,19 @@ pub fn create_event() -> ContractEvent {
         TypeTag::Bool,
         bcs::to_bytes(&0).unwrap(),
     )
+}
+
+/// Creates a test driver configuration for full nodes
+pub fn create_full_node_driver_configuration() -> DriverConfiguration {
+    let config = StateSyncDriverConfig::default();
+    let role = RoleType::FullNode;
+    let waypoint = Waypoint::default();
+
+    DriverConfiguration {
+        config,
+        role,
+        waypoint,
+    }
 }
 
 /// Creates a new ledger info with signatures at the specified version
@@ -61,6 +97,34 @@ pub fn create_output_list_with_proof() -> TransactionOutputListWithProof {
     )
 }
 
+/// Creates a test startup info
+pub fn create_startup_info() -> StartupInfo {
+    StartupInfo::new(
+        create_epoch_ending_ledger_info(),
+        Some(EpochState::empty()),
+        TreeState::new(0, vec![], HashValue::random()),
+        None,
+    )
+}
+
+/// Creates a test state value chunk with proof
+pub fn create_state_value_chunk_with_proof(last_chunk: bool) -> StateValueChunkWithProof {
+    let right_siblings = if last_chunk {
+        vec![]
+    } else {
+        vec![HashValue::random()]
+    };
+    StateValueChunkWithProof {
+        first_index: 0,
+        last_index: 100,
+        first_key: HashValue::random(),
+        last_key: HashValue::random(),
+        raw_values: vec![],
+        proof: SparseMerkleRangeProof::new(right_siblings),
+        root_hash: HashValue::random(),
+    }
+}
+
 /// Creates a single test transaction
 pub fn create_transaction() -> Transaction {
     let private_key = Ed25519PrivateKey::generate_for_testing();
@@ -73,7 +137,6 @@ pub fn create_transaction() -> Transaction {
         transaction_payload,
         0,
         0,
-        "".into(),
         0,
         ChainId::new(10),
     );
@@ -93,7 +156,7 @@ pub fn create_transaction_info() -> TransactionInfo {
         HashValue::random(),
         HashValue::random(),
         0,
-        KeptVMStatus::Executed,
+        ExecutionStatus::Success,
     )
 }
 
@@ -120,26 +183,8 @@ pub fn create_transaction_list_with_proof() -> TransactionListWithProof {
 pub fn create_transaction_output() -> TransactionOutput {
     TransactionOutput::new(
         WriteSet::default(),
-        vec![],
+        vec![create_event()],
         0,
-        TransactionStatus::Keep(KeptVMStatus::Executed),
+        TransactionStatus::Keep(ExecutionStatus::Success),
     )
-}
-
-/// Creates a test StateValueChunkWithProof
-pub fn create_state_value_chunk_with_proof(last_chunk: bool) -> StateValueChunkWithProof {
-    let right_siblings = if last_chunk {
-        vec![]
-    } else {
-        vec![HashValue::random()]
-    };
-    StateValueChunkWithProof {
-        first_index: 0,
-        last_index: 100,
-        first_key: HashValue::random(),
-        last_key: HashValue::random(),
-        raw_values: vec![],
-        proof: SparseMerkleRangeProof::new(right_siblings),
-        root_hash: HashValue::random(),
-    }
 }

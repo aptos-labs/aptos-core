@@ -66,6 +66,7 @@ pub fn run_benchmark(
 
     let (mut config, genesis_key) = aptos_genesis_tool::test_config();
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
+    AptosVM::set_concurrency_level_once(config.execution.concurrency_level as usize);
 
     let (db, executor) = init_db_and_executor(&config);
     let parent_block_id = executor.committed_block_id();

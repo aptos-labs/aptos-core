@@ -27,7 +27,7 @@ use aptos_types::{
 use data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, NotificationFeedback, StreamingServiceClient},
+    streaming_client::{DataStreamingClient, NotificationFeedback},
 };
 use futures::channel::oneshot;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
@@ -35,7 +35,7 @@ use storage_interface::DbReader;
 
 /// A simple container for verified epoch states and epoch ending ledger infos
 /// that have been fetched from the network.
-struct VerifiedEpochStates {
+pub(crate) struct VerifiedEpochStates {
     // If new epoch ending ledger infos have been fetched from the network
     fetched_epoch_ending_ledger_infos: bool,
 
@@ -271,7 +271,7 @@ impl AccountStateSyncer {
 }
 
 /// A simple component that manages the bootstrapping of the node
-pub struct Bootstrapper<StorageSyncer> {
+pub struct Bootstrapper<StorageSyncer, StreamingClient> {
     // The component used to sync account states (if downloading accounts)
     account_state_syncer: AccountStateSyncer,
 
@@ -291,7 +291,7 @@ pub struct Bootstrapper<StorageSyncer> {
     speculative_stream_state: Option<SpeculativeStreamState>,
 
     // The client through which to stream data from the Aptos network
-    streaming_service_client: StreamingServiceClient,
+    streaming_client: StreamingClient,
 
     // The interface to read from storage
     storage: Arc<dyn DbReader>,
@@ -303,10 +303,14 @@ pub struct Bootstrapper<StorageSyncer> {
     verified_epoch_states: VerifiedEpochStates,
 }
 
-impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSyncer> {
+impl<
+        StorageSyncer: StorageSynchronizerInterface + Clone,
+        StreamingClient: DataStreamingClient + Clone,
+    > Bootstrapper<StorageSyncer, StreamingClient>
+{
     pub fn new(
         driver_configuration: DriverConfiguration,
-        streaming_service_client: StreamingServiceClient,
+        streaming_client: StreamingClient,
         storage: Arc<dyn DbReader>,
         storage_synchronizer: StorageSyncer,
     ) -> Self {
@@ -322,7 +326,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
             bootstrapped: false,
             driver_configuration,
             speculative_stream_state: None,
-            streaming_service_client,
+            streaming_client,
             storage,
             storage_synchronizer,
             verified_epoch_states,
@@ -469,7 +473,11 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
 
     /// Processes any notifications already pending on the active stream
     async fn process_active_stream_notifications(&mut self) -> Result<(), Error> {
-        loop {
+        for _ in 0..self
+            .driver_configuration
+            .config
+            .max_consecutive_stream_notifications
+        {
             // Fetch and process any data notifications
             let data_notification = self.fetch_next_data_notification().await?;
             match data_notification.data_payload {
@@ -515,6 +523,8 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
                 }
             }
         }
+
+        Ok(())
     }
 
     /// Fetches all account states (as required to bootstrap the node)
@@ -541,7 +551,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
             .transaction_output_to_sync
             .is_none()
         {
-            self.streaming_service_client
+            self.streaming_client
                 .get_all_transaction_outputs(
                     highest_known_ledger_version,
                     highest_known_ledger_version,
@@ -550,7 +560,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
                 .await?
         } else {
             let start_account_index = Some(self.account_state_syncer.next_account_index_to_commit);
-            self.streaming_service_client
+            self.streaming_client
                 .get_all_accounts(highest_known_ledger_version, start_account_index)
                 .await?
         };
@@ -575,7 +585,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
             .expect("No higher epoch ending version known!");
         let data_stream = match self.driver_configuration.config.bootstrapping_mode {
             BootstrappingMode::ApplyTransactionOutputsFromGenesis => {
-                self.streaming_service_client
+                self.streaming_client
                     .get_all_transaction_outputs(
                         next_version,
                         end_version,
@@ -584,7 +594,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
                     .await?
             }
             BootstrappingMode::ExecuteTransactionsFromGenesis => {
-                self.streaming_service_client
+                self.streaming_client
                     .get_all_transactions(
                         next_version,
                         end_version,
@@ -659,7 +669,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
                 Error::IntegerOverflow("The next epoch end has overflown!".into())
             })?;
             let epoch_ending_stream = self
-                .streaming_service_client
+                .streaming_client
                 .get_all_epoch_ending_ledger_infos(next_epoch_end)
                 .await?;
             self.active_data_stream = Some(epoch_ending_stream);
@@ -1223,7 +1233,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
         self.reset_active_stream();
 
         utils::handle_end_of_stream_or_invalid_payload(
-            &mut self.streaming_service_client,
+            &mut self.streaming_client,
             data_notification,
         )
         .await
@@ -1238,7 +1248,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
         self.reset_active_stream();
 
         utils::terminate_stream_with_feedback(
-            &mut self.streaming_service_client,
+            &mut self.streaming_client,
             notification_id,
             notification_feedback,
         )
@@ -1285,5 +1295,11 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> Bootstrapper<StorageSy
         self.account_state_syncer.reset_speculative_state();
         self.speculative_stream_state = None;
         self.active_data_stream = None;
+    }
+
+    /// Returns the verified epoch states struct for testing purposes.
+    #[cfg(test)]
+    pub(crate) fn get_verified_epoch_states(&mut self) -> &mut VerifiedEpochStates {
+        &mut self.verified_epoch_states
     }
 }

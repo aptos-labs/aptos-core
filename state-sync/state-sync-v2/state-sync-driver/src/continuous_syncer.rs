@@ -19,13 +19,13 @@ use aptos_types::{
 use data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, NotificationFeedback, StreamingServiceClient},
+    streaming_client::{DataStreamingClient, NotificationFeedback},
 };
 use std::{sync::Arc, time::Duration};
 use storage_interface::DbReader;
 
 /// A simple component that manages the continuous syncing of the node
-pub struct ContinuousSyncer<StorageSyncer> {
+pub struct ContinuousSyncer<StorageSyncer, StreamingClient> {
     // The currently active data stream (provided by the data streaming service)
     active_data_stream: Option<DataStreamListener>,
 
@@ -36,7 +36,7 @@ pub struct ContinuousSyncer<StorageSyncer> {
     speculative_stream_state: Option<SpeculativeStreamState>,
 
     // The client through which to stream data from the Aptos network
-    streaming_service_client: StreamingServiceClient,
+    streaming_client: StreamingClient,
 
     // The interface to read from storage
     storage: Arc<dyn DbReader>,
@@ -45,10 +45,14 @@ pub struct ContinuousSyncer<StorageSyncer> {
     storage_synchronizer: StorageSyncer,
 }
 
-impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<StorageSyncer> {
+impl<
+        StorageSyncer: StorageSynchronizerInterface + Clone,
+        StreamingClient: DataStreamingClient + Clone,
+    > ContinuousSyncer<StorageSyncer, StreamingClient>
+{
     pub fn new(
         driver_configuration: DriverConfiguration,
-        streaming_service_client: StreamingServiceClient,
+        streaming_client: StreamingClient,
         storage: Arc<dyn DbReader>,
         storage_synchronizer: StorageSyncer,
     ) -> Self {
@@ -56,7 +60,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
             active_data_stream: None,
             driver_configuration,
             speculative_stream_state: None,
-            streaming_service_client,
+            streaming_client,
             storage,
             storage_synchronizer,
         }
@@ -109,7 +113,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
             .map(|sync_request| sync_request.get_sync_target());
         let active_data_stream = match self.driver_configuration.config.continuous_syncing_mode {
             ContinuousSyncingMode::ApplyTransactionOutputs => {
-                self.streaming_service_client
+                self.streaming_client
                     .continuously_stream_transaction_outputs(
                         next_version,
                         highest_synced_epoch,
@@ -118,7 +122,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
                     .await?
             }
             ContinuousSyncingMode::ExecuteTransactions => {
-                self.streaming_service_client
+                self.streaming_client
                     .continuously_stream_transactions(
                         next_version,
                         highest_synced_epoch,
@@ -157,7 +161,11 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
         &mut self,
         consensus_sync_request: Arc<Mutex<Option<ConsensusSyncRequest>>>,
     ) -> Result<(), Error> {
-        loop {
+        for _ in 0..self
+            .driver_configuration
+            .config
+            .max_consecutive_stream_notifications
+        {
             // Fetch and process any data notifications
             let data_notification = self.fetch_next_data_notification().await?;
             match data_notification.data_payload {
@@ -199,6 +207,8 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
                 }
             }
         }
+
+        Ok(())
     }
 
     /// Returns the highest synced version and epoch in storage
@@ -374,7 +384,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
         self.reset_active_stream();
 
         utils::handle_end_of_stream_or_invalid_payload(
-            &mut self.streaming_service_client,
+            &mut self.streaming_client,
             data_notification,
         )
         .await
@@ -389,7 +399,7 @@ impl<StorageSyncer: StorageSynchronizerInterface + Clone> ContinuousSyncer<Stora
         self.reset_active_stream();
 
         utils::terminate_stream_with_feedback(
-            &mut self.streaming_service_client,
+            &mut self.streaming_client,
             notification_id,
             notification_feedback,
         )

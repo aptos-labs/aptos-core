@@ -4,6 +4,7 @@
 import assert from "assert";
 
 import { Account, RestClient, TESTNET_URL, FAUCET_URL, FaucetClient } from "./first_transaction";
+import fetch from "cross-fetch";
 
 export class TokenClient {
     restClient: RestClient;
@@ -19,48 +20,55 @@ export class TokenClient {
         await this.restClient.waitForTransaction(res["hash"])
     }
 
+//:!:>section_1
     /** Creates a new collection within the specified account */
-    async createCollection(account: Account, description: string, name: string, uri: string) {
+    async createCollection(account: Account, name: string, description: string, uri: string) {
         const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
             type: "script_function_payload",
             function: "0x1::Token::create_unlimited_collection_script",
             type_arguments: [],
             arguments: [
-                Buffer.from(description).toString("hex"),
                 Buffer.from(name).toString("hex"),
+                Buffer.from(description).toString("hex"),
                 Buffer.from(uri).toString("hex"),
             ]
         };
         await this.submitTransactionHelper(account, payload);
     }
+//<:!:section_1
 
+//:!:>section_2
     async createToken(
         account: Account,
         collection_name: string,
-        description: string,
         name: string,
+        description: string,
         supply: number,
         uri: string) {
-        const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
+        const payload: { function: string; arguments: any[]; type: string; type_arguments: any[] } = {
             type: "script_function_payload",
-            function: "0x1::Token::create_token_script",
+            function: "0x1::Token::create_unlimited_token_script",
             type_arguments: [],
             arguments: [
                 Buffer.from(collection_name).toString("hex"),
-                Buffer.from(description).toString("hex"),
                 Buffer.from(name).toString("hex"),
+                Buffer.from(description).toString("hex"),
+                true,
                 supply.toString(),
                 Buffer.from(uri).toString("hex")
             ]
         }
         await this.submitTransactionHelper(account, payload);
     }
+//<:!:section_2
 
+//:!:>section_4
     async offerToken(
         account: Account,
         receiver: string,
         creator: string,
-        token_creation_num: number,
+        collection_name: string,
+        token_name: string,
         amount: number) {
         const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
             type: "script_function_payload",
@@ -69,18 +77,22 @@ export class TokenClient {
             arguments: [
                 receiver,
                 creator,
-                token_creation_num.toString(),
+                Buffer.from(collection_name).toString("hex"),
+                Buffer.from(token_name).toString("hex"),
                 amount.toString()
             ]
         }
         await this.submitTransactionHelper(account, payload);
     }
+//<:!:section_4
 
+//:!:>section_5
     async claimToken(
         account: Account,
         sender: string,
         creator: string,
-        token_creation_num: number) {
+        collection_name: string,
+        token_name: string) {
         const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
             type: "script_function_payload",
             function: "0x1::TokenTransfers::claim_script",
@@ -88,11 +100,13 @@ export class TokenClient {
             arguments: [
                 sender,
                 creator,
-                token_creation_num.toString(),
+                Buffer.from(collection_name).toString("hex"),
+                Buffer.from(token_name).toString("hex"),
             ]
         }
         await this.submitTransactionHelper(account, payload);
     }
+//<:!:section_5
 
     async cancelTokenOffer(
         account: Account,
@@ -112,28 +126,62 @@ export class TokenClient {
         await this.submitTransactionHelper(account, payload);
     }
 
-    /** Retrieve the token's creation_num, which is useful for non-creator operations */
-    async getTokenId(creator: string, collection_name: string, token_name: string): Promise<number> {
-        const resources = await this.restClient.accountResources(creator);
-        let collections = []
-        let tokens = []
-        for (var resource in resources) {
-            if (resources[resource]["type"] == "0x1::Token::Collections") {
-                collections = resources[resource]["data"]["collections"]["data"];
-            }
-        } 
-        for (var collection in collections) {
-            if (collections[collection]["key"] == collection_name) {
-                tokens = collections[collection]["value"]["tokens"]["data"];
-            }
+//:!:>section_3
+    async tableItem(handle: string, keyType: string, valueType: string, key: any): Promise<any> {
+        const response = await fetch(`${this.restClient.url}/tables/${handle}/item`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                "key_type": keyType,
+                "value_type": valueType,
+                "key": key
+            })
+        });
+
+        if (response.status == 404) {
+            return null
+        } else if (response.status != 200) {
+            assert(response.status == 200, await response.text());
+        } else {
+            return await response.json();
         }
-        for (var token in tokens) {
-            if (tokens[token]["key"] == token_name) {
-                return parseInt(tokens[token]["value"]["id"]["creation_num"]);
-            }
-        }
-        assert(false);
     }
+
+    async getTokenBalance(owner: string, creator: string, collection_name: string, token_name: string): Promise<number> {
+        const token_store = await this.restClient.accountResource(creator, "0x1::Token::TokenStore");
+
+        const token_id = {
+            creator: creator,
+            collection: collection_name,
+            name: token_name,
+        };
+
+        const token = await this.tableItem(
+            token_store["data"]["tokens"]["handle"],
+            "0x1::Token::TokenId",
+            "0x1::Token::Token",
+            token_id,
+        );
+        return token["value"];
+    }
+
+    async getTokenData(creator: string, collection_name: string, token_name: string): Promise<any> {
+        const collections = await this.restClient.accountResource(creator, "0x1::Token::Collections");
+
+        const token_id = {
+            creator: creator,
+            collection: collection_name,
+            name: token_name,
+        };
+
+        return await this.tableItem(
+            collections["data"]["token_data"]["handle"],
+            "0x1::Token::TokenId",
+            "0x1::Token::TokenData",
+            token_id,
+        );
+    }
+//<:!:section_3
   }
 
 
@@ -145,6 +193,8 @@ async function main() {
 
     const alice = new Account();
     const bob = new Account();
+    const collection_name = "Alice's";
+    const token_name = "Alice's first token";
 
     console.log("\n=== Addresses ===");
     console.log(`Alice: ${alice.address()}. Key Seed: ${Buffer.from(alice.signingKey.secretKey).toString("hex").slice(0, 64)}`);
@@ -157,19 +207,24 @@ async function main() {
     console.log(`Alice: ${await restClient.accountBalance(alice.address())}`);
     console.log(`Bob: ${await restClient.accountBalance(bob.address())}`);
 
-    await client.createCollection(alice, "Alice's simple collection", "Alice's", "https://aptos.dev");
-    await client.createToken(alice, "Alice's", "Alice's simple token", "Alice's first token", 1, "https://aptos.dev/img/nyan.jpeg");
-
     console.log("\n=== Creating Collection and Token ===");
-    const token_id = await client.getTokenId(alice.address(), "Alice's", "Alice's first token");
-    console.log(`Alice's token's identifier: ${token_id}`);
-    console.log(`See ${restClient.url}/accounts/${alice.address()}/resources`);
+
+    await client.createCollection(alice, collection_name, "Alice's simple collection", "https://aptos.dev");
+    await client.createToken(alice, collection_name, token_name, "Alice's simple token",  1, "https://aptos.dev/img/nyan.jpeg");
+
+    let token_balance = await client.getTokenBalance(alice.address(), alice.address(), collection_name, token_name);
+    console.log(`Alice's token balance: ${token_balance}`)
+    const token_data = await client.getTokenData(alice.address(), collection_name, token_name);
+    console.log(`Alice's token data: ${JSON.stringify(token_data)}`)
 
     console.log("\n=== Transferring the token to Bob ===")
-    await client.offerToken(alice, bob.address(), alice.address(), token_id, 1);
-    await client.claimToken(bob, alice.address(), alice.address(), token_id);
+    await client.offerToken(alice, bob.address(), alice.address(), collection_name, token_name, 1);
+    await client.claimToken(bob, alice.address(), alice.address(), collection_name, token_name);
 
-    console.log(`See ${restClient.url}/accounts/${bob.address()}/resources`);
+    token_balance = await client.getTokenBalance(alice.address(), alice.address(), collection_name, token_name);
+    console.log(`Alice's token balance: ${token_balance}`)
+    token_balance = await client.getTokenBalance(bob.address(), alice.address(), collection_name, token_name);
+    console.log(`Bob's token balance: ${token_balance}`)
 }
 
 if (require.main === module) {

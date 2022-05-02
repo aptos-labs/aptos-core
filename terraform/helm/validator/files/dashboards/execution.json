@@ -31,7 +31,10 @@
   "panels": [
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -48,7 +51,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "p50, p95 and p99 of the time spent to execute a block",
       "fieldConfig": {
         "defaults": {
@@ -94,7 +100,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(aptos_executor_execute_block_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
+          "expr": "histogram_quantile(0.50, sum(rate(aptos_executor_execute_block_seconds_bucket{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -149,7 +155,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "p50, p95 and p99 of the time spent to execute a block",
       "fieldConfig": {
         "defaults": {
@@ -195,7 +204,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.90, sum(rate(aptos_executor_execute_block_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
+          "expr": "histogram_quantile(0.90, sum(rate(aptos_executor_execute_block_seconds_bucket{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -250,7 +259,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "p50, p95 and p99 of the time spent to execute a block",
       "fieldConfig": {
         "defaults": {
@@ -296,7 +308,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum(rate(aptos_executor_execute_block_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
+          "expr": "histogram_quantile(0.99, sum(rate(aptos_executor_execute_block_seconds_bucket{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -351,7 +363,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "p50, p95 and p99 of the time spent for persisting execution result to storage when committing blocks",
       "fieldConfig": {
         "defaults": {
@@ -397,7 +412,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(aptos_executor_save_transactions_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role,le))",
+          "expr": "histogram_quantile(0.50, sum(rate(aptos_executor_save_transactions_seconds_bucket{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role,le))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -451,7 +466,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "p50, p95 and p99 of the time spent for persisting execution result to storage when committing blocks",
       "fieldConfig": {
         "defaults": {
@@ -497,7 +515,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.90, sum(rate(aptos_executor_save_transactions_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role,le))",
+          "expr": "histogram_quantile(0.90, sum(rate(aptos_executor_save_transactions_seconds_bucket{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role,le))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -551,7 +569,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "p50, p95 and p99 of the time spent for persisting execution result to storage when committing blocks",
       "fieldConfig": {
         "defaults": {
@@ -597,7 +618,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum(rate(aptos_executor_save_transactions_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role,le))",
+          "expr": "histogram_quantile(0.99, sum(rate(aptos_executor_save_transactions_seconds_bucket{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role,le))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -651,7 +672,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "p50, p95 and p99 of the time spent to execute a block in VM",
       "fieldConfig": {
         "defaults": {
@@ -697,7 +721,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(aptos_executor_vm_execute_block_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
+          "expr": "histogram_quantile(0.50, sum(rate(aptos_executor_vm_execute_block_seconds_bucket{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -751,7 +775,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "p50, p95 and p99 of the time spent to execute a block in VM",
       "fieldConfig": {
         "defaults": {
@@ -797,7 +824,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.90, sum(rate(aptos_executor_vm_execute_block_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
+          "expr": "histogram_quantile(0.90, sum(rate(aptos_executor_vm_execute_block_seconds_bucket{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -851,7 +878,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "p50, p95 and p99 of the time spent to execute a block in VM",
       "fieldConfig": {
         "defaults": {
@@ -897,7 +927,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum(rate(aptos_executor_vm_execute_block_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
+          "expr": "histogram_quantile(0.99, sum(rate(aptos_executor_vm_execute_block_seconds_bucket{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -951,7 +981,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "p50, p95 and p99 of the time spent to commit blocks",
       "fieldConfig": {
         "defaults": {
@@ -997,7 +1030,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(aptos_executor_commit_blocks_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
+          "expr": "histogram_quantile(0.50, sum(rate(aptos_executor_commit_blocks_seconds_bucket{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1052,7 +1085,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "p50, p95 and p99 of the time spent to commit blocks",
       "fieldConfig": {
         "defaults": {
@@ -1098,7 +1134,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.90, sum(rate(aptos_executor_commit_blocks_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
+          "expr": "histogram_quantile(0.90, sum(rate(aptos_executor_commit_blocks_seconds_bucket{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1153,7 +1189,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "p50, p95 and p99 of the time spent to commit blocks",
       "fieldConfig": {
         "defaults": {
@@ -1199,7 +1238,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum(rate(aptos_executor_commit_blocks_seconds_bucket{owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
+          "expr": "histogram_quantile(0.99, sum(rate(aptos_executor_commit_blocks_seconds_bucket{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])) by (owner, role, le))",
           "format": "time_series",
           "hide": false,
           "interval": "",
@@ -1251,7 +1290,10 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1268,7 +1310,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The average time spent to execute a block",
       "fieldConfig": {
         "defaults": {
@@ -1314,7 +1359,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_executor_execute_block_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_executor_execute_block_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_executor_execute_block_seconds_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_executor_execute_block_seconds_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1368,7 +1413,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The average time spent to execute a block in VM",
       "fieldConfig": {
         "defaults": {
@@ -1414,7 +1462,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_executor_vm_execute_block_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_executor_vm_execute_block_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_executor_vm_execute_block_seconds_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_executor_vm_execute_block_seconds_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1468,7 +1516,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The average time spent to commit blocks",
       "fieldConfig": {
         "defaults": {
@@ -1514,7 +1565,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_executor_commit_blocks_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_executor_commit_blocks_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_executor_commit_blocks_seconds_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_executor_commit_blocks_seconds_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1568,7 +1619,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The average time spent for persisting execution result to storage when committing blocks",
       "fieldConfig": {
         "defaults": {
@@ -1614,7 +1668,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_executor_save_transactions_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_executor_save_transactions_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_executor_save_transactions_seconds_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_executor_save_transactions_seconds_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -1668,7 +1722,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The average time spent for executing and committing each chunk in state-syncing",
       "fieldConfig": {
         "defaults": {
@@ -1712,7 +1769,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(aptos_executor_execute_and_commit_chunk_seconds_sum{owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_executor_execute_and_commit_chunk_seconds_count{owner=~\"$owner\", role=~\"$role\"}[$interval])",
+          "expr": "rate(aptos_executor_execute_and_commit_chunk_seconds_sum{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval]) / rate(aptos_executor_execute_and_commit_chunk_seconds_count{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}[$interval])",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -1764,7 +1821,10 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": {
+        "uid": "${Datasource}",
+        "type": "prometheus"
+      },
       "description": "The counter that indicates the number of errors reported.",
       "fieldConfig": {
         "defaults": {
@@ -1808,7 +1868,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_executor_error_total{owner=~\"$owner\", role=~\"$role\"}",
+          "expr": "aptos_executor_error_total{chain_name=~\"$chain_name\", owner=~\"$owner\", role=~\"$role\"}",
           "interval": "",
           "legendFormat": "{{owner}}-{{role}}",
           "refId": "A"
@@ -1862,6 +1922,53 @@
   "templating": {
     "list": [
       {
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "Datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${Datasource}"
+        },
+        "definition": "label_values(chain_name)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": false,
+        "name": "chain_name",
+        "options": [],
+        "query": {
+          "query": "label_values(chain_name)",
+          "refId": "Prometheus-chain-name-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
         "allValue": null,
         "current": {
           "selected": true,
@@ -1872,7 +1979,10 @@
             "$__all"
           ]
         },
-        "datasource": "Prometheus",
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(owner)",
         "hide": 0,
         "includeAll": true,
@@ -1902,7 +2012,10 @@
             "validator"
           ]
         },
-        "datasource": "Prometheus",
+        "datasource": {
+          "uid": "${Datasource}",
+          "type": "prometheus"
+        },
         "definition": "label_values(role)",
         "hide": 0,
         "includeAll": true,
