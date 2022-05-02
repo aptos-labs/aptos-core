@@ -1,0 +1,147 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "aptos-validator.fullname" . }}-fullnode
+  labels:
+    {{- include "aptos-validator.labels" . | nindent 4 }}
+
+{{- range .Values.fullnode.groups }}
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "aptos-validator.fullname" $ }}-{{ .name }}
+  labels:
+    {{- include "aptos-validator.labels" $ | nindent 4 }}
+spec:
+  selector:
+    {{- include "aptos-validator.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/name: fullnode
+    group: {{ .name }}
+  ports:
+  - name: aptosnet
+    port: 6182
+  - name: metrics
+    port: 9101
+  - name: api
+    port: 8080
+
+---
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "aptos-validator.fullname" $ }}-{{ .name }}-e{{ $.Values.chain.era }}
+  labels:
+    {{- include "aptos-validator.labels" $ | nindent 4 }}
+    app.kubernetes.io/name: fullnode
+    group: {{ .name }}
+spec:
+  serviceName: {{ include "aptos-validator.fullname" $ }}-{{ .name }}
+  replicas: {{ .replicas }}
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      {{- include "aptos-validator.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/name: fullnode
+      group: {{ .name }}
+  volumeClaimTemplates:
+  - metadata:
+      name: fn
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      storageClassName: {{ $.Values.fullnode.storage.class }}
+      resources:
+        requests:
+          storage: {{ $.Values.fullnode.storage.size }}
+  template:
+    metadata:
+      labels:
+        {{- include "aptos-validator.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/name: fullnode
+        group: {{ .name }}
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: runtime/default
+        checksum/fullnode.yaml: {{ tpl ($.Files.Get "files/configs/fullnode.yaml") $ | sha256sum }}
+    spec:
+      terminationGracePeriodSeconds: 0
+      containers:
+      - name: fullnode
+        image: {{ $.Values.validator.image.repo }}:{{ $.Values.validator.image.tag | default $.Values.imageTag }}
+        imagePullPolicy: {{ $.Values.validator.image.pullPolicy }}
+        command: ["/opt/aptos/bin/aptos-node", "-f", "/opt/aptos/etc/fullnode.yaml"]
+      {{- with $.Values.fullnode }}
+        resources:
+          {{- toYaml .resources | nindent 10 }}
+        env:
+        - name: RUST_LOG
+          value: {{ .rust_log }}
+        - name: RUST_LOG_REMOTE
+          value: {{ .rust_log_remote }}
+      {{- end }}
+        - name: RUST_BACKTRACE
+          value: "1"
+        volumeMounts:
+        - name: aptos-config
+          mountPath: /opt/aptos/etc
+        - name: genesis-config
+          mountPath: /opt/aptos/genesis
+        - name: fn
+          mountPath: /opt/aptos/data
+        ports:
+        - containerPort: 6181
+        - containerPort: 6182
+        - containerPort: 8080
+        - containerPort: 9101
+        livenessProbe:
+          tcpSocket:
+            port: 9101
+          initialDelaySeconds: 30
+        readinessProbe:
+          tcpSocket:
+            port: 6182
+        securityContext:
+          {{- if $.Values.enablePrivilegedMode }}
+          privileged: true
+          {{- else }}
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          {{- end }}
+      {{- with $.Values.fullnode }}
+      {{- with .nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 6180
+        runAsGroup: 6180
+        fsGroup: 6180
+      {{- end }}
+      volumes:
+      - name: aptos-config
+        configMap:
+          name: {{ include "aptos-validator.fullname" $ }}
+      - name: genesis-config
+        secret:
+          secretName: {{ include "aptos-validator.fullname" $ }}-genesis-e{{ $.Values.chain.era }}
+      serviceAccountName: {{ include "aptos-validator.fullname" $ }}-fullnode
+      {{- if $.Values.imagePullSecret }}
+      imagePullSecrets:
+      - name: {{ $.Values.imagePullSecret }}
+      {{- end }}
+
+{{- end }}

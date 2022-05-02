@@ -1,0 +1,102 @@
+chain:
+  name: testnet
+  era: 1
+  chain_id: 4
+
+imageTag: testnet
+
+validator:
+  name:
+  image:
+    repo: aptoslab/validator
+    tag:
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 3.5
+      memory: 6Gi
+    requests:
+      cpu: 3.5
+      memory: 6Gi
+  storage:
+    class:
+    size: 350Gi
+  rust_log: info
+  rust_log_remote: debug,hyper=off
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  config:
+    provide_genesis: true
+    sync_only: false
+    concurrency_level: 4
+    mempool_poll_count:
+    round_initial_timeout_ms:
+    ledger_prune_window: 10000000
+    state_store_prune_window: 1000000
+    pruning_batch_size: 10000
+  exposeRestApi: false
+
+fullnode:
+  groups:
+  - name: fullnode
+    replicas: 1
+    enableRestApi: true
+  resources:
+    limits:
+      cpu: 3.5
+      memory: 6Gi
+    requests:
+      cpu: 3.5
+      memory: 6Gi
+  storage:
+    class:
+    size: 350Gi
+  rust_log: info
+  rust_log_remote: debug,hyper=off
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  config:
+    max_inbound_connections: 100
+
+haproxy:
+  replicas: 1
+  image:
+    repo: haproxy
+    tag: 2.2.14@sha256:36aa98fff27dcb2d12c93e68515a6686378c783ea9b1ab1d01ce993a5cbc73e1
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 1.5
+      memory: 2Gi
+    requests:
+      cpu: 1.5
+      memory: 2Gi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  limits:
+    validator:
+      connectionsPerIPPerMin: 2
+  config:
+    send_proxy_protocol: false
+  tls_secret:
+
+service:
+  external:
+    type: LoadBalancer
+  validator:
+    loadBalancerSourceRanges:
+  fullnode:
+    loadBalancerSourceRanges:
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name:
+
+# Load test-data for starting a test network
+loadTestGenesis: false

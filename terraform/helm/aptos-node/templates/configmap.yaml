@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "aptos-validator.fullname" . }}
+  labels:
+    {{- include "aptos-validator.labels" . | nindent 4 }}
+data:
+{{ tpl (.Files.Glob "files/configs/*.yaml").AsConfig . | indent 2 }}
+
+{{- if .Values.loadTestGenesis }}
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "aptos-validator.fullname" . }}-genesis-e{{ .Values.chain.era }}
+  labels:
+    {{- include "aptos-validator.labels" . | nindent 4 }}
+data:
+  waypoint.txt: |-
+{{ .Files.Get "files/test-data/waypoint.txt" | indent 4 }}
+  private-keys.yml: |-
+{{ .Files.Get "files/test-data/private-keys.yml" | indent 4 }}
+binaryData:
+  genesis.blob: {{ .Files.Get "files/test-data/genesis.blob" | b64enc }}
+
+{{- end }}
