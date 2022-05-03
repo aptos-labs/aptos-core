@@ -179,7 +179,7 @@ pub struct TestPackage {
     move_options: MovePackageDir,
 
     /// A filter string to determine which unit tests to run
-    #[clap(name = "filter", short = 'f', long = "filter")]
+    #[clap(long)]
     pub filter: Option<String>,
 }
 
