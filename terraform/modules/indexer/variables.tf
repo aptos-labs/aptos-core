@@ -31,6 +31,11 @@ variable "vpc_id" {
   description = "VPC ID to create resources in"
 }
 
+variable "db_sources_ipv4" {
+  description = "List of CIDR subnets which can access the DB"
+  default     = ["0.0.0.0/0"]
+}
+
 variable "indexer_helm_values" {
   default = {}
 }
