@@ -10,17 +10,17 @@ use aptos_management::{
     config::ConfigPath, error::Error, secure_backend::ValidatorBackend,
     storage::StorageWrapper as Storage,
 };
+use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_temppath::TempPath;
 use aptos_types::{
-    account_address::AccountAddress, account_config, account_state::AccountState,
+    account_address::AccountAddress, account_config, account_view::AccountView,
     network_address::NetworkAddress, on_chain_config::ValidatorSet,
-    state_store::state_key::StateKey, validator_config::ValidatorConfig, waypoint::Waypoint,
+    validator_config::ValidatorConfig, waypoint::Waypoint,
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use executor::db_bootstrapper;
 use std::{
-    convert::TryFrom,
     fmt::Write,
     fs::File,
     io::Read,
@@ -28,7 +28,7 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
-use storage_interface::{DbReader, DbReaderWriter};
+use storage_interface::{state_view::LatestDbStateView, DbReader, DbReaderWriter};
 use structopt::StructOpt;
 
 /// Prints the public information within a store
@@ -239,15 +239,13 @@ fn validator_config(
     validator_account: AccountAddress,
     reader: Arc<dyn DbReader>,
 ) -> Result<ValidatorConfig, Error> {
-    let blob = reader
-        .get_latest_state_value(StateKey::AccountAddressKey(
-            account_config::validator_set_address(),
-        ))
-        .map_err(|e| Error::UnexpectedError(format!("ValidatorSet Account issue {}", e)))?
-        .ok_or_else(|| Error::UnexpectedError("ValidatorSet Account not found".into()))?;
-    let account_state = AccountState::try_from(&blob)
-        .map_err(|e| Error::UnexpectedError(format!("Failed to parse blob: {}", e)))?;
-    let validator_set: ValidatorSet = account_state
+    let db_state_view = reader
+        .latest_state_view()
+        .map_err(|e| Error::UnexpectedError(format!("Can't create latest db state view {}", e)))?;
+    let address = account_config::validator_set_address();
+    let account_state_view = db_state_view.as_account_with_state_view(&address);
+
+    let validator_set: ValidatorSet = account_state_view
         .get_validator_set()
         .map_err(|e| Error::UnexpectedError(format!("ValidatorSet issue {}", e)))?
         .ok_or_else(|| Error::UnexpectedError("ValidatorSet does not exist".into()))?;

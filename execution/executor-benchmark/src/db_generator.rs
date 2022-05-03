@@ -106,7 +106,7 @@ pub fn run(
     exe_thread.join().unwrap();
     commit_thread.join().unwrap();
     // Do a sanity check on the sequence number to make sure all transactions are committed.
-    generator.verify_sequence_number(db.as_ref());
+    generator.verify_sequence_number(db.clone());
 
     let final_version = generator.version();
     // Write metadata

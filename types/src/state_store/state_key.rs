@@ -7,7 +7,6 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_crypto_derive::CryptoHasher;
-use move_core_types::account_address::AccountAddress;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
@@ -19,7 +18,6 @@ use thiserror::Error;
 )]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 pub enum StateKey {
-    AccountAddressKey(AccountAddress),
     AccessPath(AccessPath),
     TableItem {
         handle: u128,
@@ -34,7 +32,6 @@ pub enum StateKey {
 #[repr(u8)]
 #[derive(Clone, Debug, FromPrimitive, ToPrimitive)]
 pub enum StateKeyTag {
-    AccountAddress,
     AccessPath,
     TableItem,
     Raw = 255,
@@ -46,9 +43,6 @@ impl StateKey {
         let mut out = vec![];
 
         let (prefix, raw_key) = match self {
-            StateKey::AccountAddressKey(account_address) => {
-                (StateKeyTag::AccountAddress, bcs::to_bytes(account_address)?)
-            }
             StateKey::AccessPath(access_path) => {
                 (StateKeyTag::AccessPath, bcs::to_bytes(access_path)?)
             }
@@ -73,9 +67,6 @@ impl StateKey {
         let state_key_tag =
             StateKeyTag::from_u8(tag).ok_or(StateKeyDecodeErr::UnknownTag { unknown_tag: tag })?;
         match state_key_tag {
-            StateKeyTag::AccountAddress => {
-                Ok(StateKey::AccountAddressKey(bcs::from_bytes(&val[1..])?))
-            }
             StateKeyTag::AccessPath => Ok(StateKey::AccessPath(bcs::from_bytes(&val[1..])?)),
             StateKeyTag::TableItem => {
                 const HANDLE_SIZE: usize = std::mem::size_of::<u128>();

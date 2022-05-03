@@ -6,17 +6,15 @@ mod bisection_tests;
 use crate::AptosValidatorInterface;
 use anyhow::{bail, Result};
 use aptos_types::{
-    access_path::AccessPath,
     account_address::AccountAddress,
     account_state::AccountState,
-    account_state_blob::AccountStateBlob,
     contract_event::EventWithProof,
     event::EventKey,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, Version, WriteSetPayload},
     write_set::WriteOp,
 };
-use std::{collections::HashMap, convert::TryFrom};
+use std::collections::HashMap;
 use vm_genesis::{generate_genesis_change_set_for_testing, GenesisOptions};
 
 pub struct TestInterface {
@@ -51,26 +49,13 @@ impl TestInterface {
         let changeset = generate_genesis_change_set_for_testing(GenesisOptions::Compiled);
         let mut state_db = HashMap::new();
         for (key, op) in changeset.write_set().iter() {
-            let ap = AccessPath::try_from(key.clone())
-                .expect("State key can't be converted to access path");
             match op {
-                WriteOp::Value(v) => state_db
-                    .entry((0, ap.address))
-                    .or_insert_with(AccountState::default)
-                    .insert(ap.path.clone(), v.clone()),
+                WriteOp::Value(v) => state_db.insert((0, key.clone()), StateValue::from(v.clone())),
                 _ => panic!("Unexpected delete"),
             };
         }
         Self {
-            state_db: state_db
-                .into_iter()
-                .map(|((version, address), account_state)| {
-                    (
-                        (version, StateKey::AccountAddressKey(address)),
-                        StateValue::from(AccountStateBlob::try_from(&account_state).unwrap()),
-                    )
-                })
-                .collect(),
+            state_db,
             transaction_store: vec![Transaction::GenesisTransaction(WriteSetPayload::Direct(
                 changeset,
             ))],
@@ -82,13 +67,10 @@ impl TestInterface {
 impl AptosValidatorInterface for TestInterface {
     fn get_account_state_by_version(
         &self,
-        account: AccountAddress,
-        version: Version,
+        _account: AccountAddress,
+        _version: Version,
     ) -> Result<Option<AccountState>> {
-        self.state_db
-            .get(&(version, StateKey::AccountAddressKey(account)))
-            .map(AccountState::try_from)
-            .transpose()
+        unimplemented!()
     }
 
     fn get_state_value_by_version(

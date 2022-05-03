@@ -33,6 +33,7 @@ AWS_ACCOUNT = (
 
 # ================ Kube job ================
 def create_forge_job(context, user, tag, base_tag, timeout_secs, forge_envs, forge_args):
+    """Create the Forge K8s Job template"""
     job_name = f"forge-{user}-{int(time.time())}"
     job_name = job_name.replace("_", "-")  # underscore not allowed in pod name
     cluster_name = get_cluster_name_from_context(context)
@@ -95,14 +96,17 @@ def create_forge_job(context, user, tag, base_tag, timeout_secs, forge_envs, for
 
 
 def get_cluster_context(cluster_name):
+    """Get the Forge cluster context for use with kubectl"""
     return f"arn:aws:eks:us-west-2:{AWS_ACCOUNT}:cluster/aptos-{cluster_name}"
 
 
 def get_cluster_name_from_context(context):
+    """Get the Forge cluster name from the context"""
     return context.split("/")[1]
 
 
 def kube_ensure_cluster(clusters):
+    """Returns the workspace name of a cluster that is free, otherwise None"""
     attempts = 360
     for attempt in range(attempts):
         for cluster in clusters:
@@ -140,16 +144,19 @@ def kube_ensure_cluster(clusters):
     return None
 
 
-# randomly select a cluster that is free based on its pod status:
-# - no other forge pods currently Running or Pending
-# - all monitoring pods are ready
 def kube_select_cluster():
+    """
+    randomly select a cluster that is free based on its pod status:
+    - no other forge pods currently Running or Pending
+    - all monitoring pods are ready
+    """
     shuffled_clusters = random.sample(
         FORGE_K8S_CLUSTERS, len(FORGE_K8S_CLUSTERS))
     return kube_ensure_cluster(shuffled_clusters)
 
 
 def kube_wait_job(job_name, context):
+    """Wait for a K8s Job to be in a healthy state"""
     attempts = 360
     for _ in range(attempts):
         try:
@@ -173,8 +180,6 @@ def kube_wait_job(job_name, context):
             f"kubectl --context='{context}' get pod --selector=job-name={job_name} | grep -i -e ImagePullBackOff -e "
             f"InvalidImageName -e ErrImagePull",
             shell=True,
-            # stdout=subprocess.DEVNULL,
-            # stderr=subprocess.DEVNULL,
         )
         if ret == 0:
             image_name = get_forge_image_name(job_name, context)
@@ -194,8 +199,8 @@ def kube_wait_job(job_name, context):
     return 1
 
 
-# init the kube context for each available cluster
 def kube_init_context(workspace=None):
+    """Init the kube context for each available cluster, to ensure we can reach it"""
     try:
         subprocess.run(
             [
@@ -233,6 +238,7 @@ def kube_init_context(workspace=None):
 
 
 def get_forge_pods_by_phase(context, phase):
+    """Get all Forge pods by phase"""
     try:
         return json.loads(
             subprocess.check_output(
@@ -254,6 +260,7 @@ def get_forge_pods_by_phase(context, phase):
 
 
 def get_monitoring_pod(context):
+    """Get all monitoring pods"""
     return json.loads(
         subprocess.check_output(
             [
@@ -271,16 +278,19 @@ def get_monitoring_pod(context):
 
 
 def get_forge_image_name(job_name, context):
+    """Get the image name of the specified Forge job"""
     return get_forge_job_jsonpath(
         job_name, context, "{.items[0].spec.containers[0].image}"
     )
 
 
 def get_forge_job_phase(job_name, context):
+    """Get the current phase of the specified Forge job"""
     return get_forge_job_jsonpath(job_name, context, "{.items[0].status.phase}")
 
 
 def get_forge_job_jsonpath(job_name, context, jsonpath):
+    """Get the Forge job spec at the specified jsonpath"""
     return subprocess.check_output(
         [
             "kubectl",
@@ -296,6 +306,7 @@ def get_forge_job_jsonpath(job_name, context, jsonpath):
 
 
 def helm_s3_init(workspace):
+    """Initializes the S3 bucket used as an internal Helm repo for Forge"""
     bucket_url = WORKSPACE_CHART_BUCKETS[workspace]
     subprocess.run(
         f"helm plugin install https://github.com/hypnoglow/helm-s3.git || true",
@@ -314,6 +325,7 @@ def helm_s3_init(workspace):
 
 
 def helm_package_push(chart_path, chart_name, workspace, dir):
+    """Packages the helm charts at the given path and pushes it to the internal helm repo on S3"""
     subprocess.run(
         [
             "helm",
@@ -336,6 +348,10 @@ def helm_package_push(chart_path, chart_name, workspace, dir):
 
 
 def push_helm_charts(workspace):
+    """
+    Push all helm charts for usage by Forge
+    Run from aptos-core root directory
+    """
     helm_s3_init(workspace)
     tempdir = tempfile.mkdtemp()
     helm_package_push("terraform/testnet/testnet",

@@ -149,6 +149,7 @@ impl Client {
             if resp.status() != StatusCode::NOT_FOUND {
                 let txn_resp: Response<Transaction> = self.json(resp).await?;
                 let (transaction, state) = txn_resp.into_parts();
+
                 if !transaction.is_pending() {
                     if !transaction.success() {
                         return Err(anyhow!(

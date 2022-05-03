@@ -36,7 +36,7 @@ export default function WalletHeader () {
         >
           Address
         </Text>
-        <Tooltip label={hasCopied ? 'Copied!' : 'Copy address'}>
+        <Tooltip label={hasCopied ? 'Copied!' : 'Copy address'} closeDelay={300}>
           <Text whiteSpace="nowrap" as="span">
             <Text
               fontSize="xs"

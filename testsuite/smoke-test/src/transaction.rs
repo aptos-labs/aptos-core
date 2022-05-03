@@ -53,7 +53,7 @@ impl AptosTest for ExternalTransactionSigner {
 
         let unsigned_txn = ctx
             .transaction_factory()
-            .payload(aptos_stdlib::encode_transfer_script_function(
+            .payload(aptos_stdlib::encode_test_coin_transfer(
                 receiver.address(),
                 amount,
             ))

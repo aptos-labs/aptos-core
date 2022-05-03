@@ -41,8 +41,8 @@ itertools = { version = "0.10.3", features = ["use_alloc", "use_std"] }
 libc = { version = "0.2.124", features = ["std"] }
 log = { version = "0.4.16", default-features = false, features = ["serde", "std"] }
 memchr = { version = "2.4.1", features = ["std", "use_std"] }
-move-unit-test = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e", default-features = false, features = ["table-extension"] }
-move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e", features = ["move-table-extension", "table-extension"] }
+move-unit-test = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", default-features = false, features = ["table-extension"] }
+move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["move-table-extension", "table-extension"] }
 num-integer = { version = "0.1.44", features = ["i128", "std"] }
 num-traits = { version = "0.2.14", features = ["i128", "std"] }
 parking_lot = { version = "0.12.0", features = ["send_guard"] }
@@ -96,8 +96,8 @@ itertools = { version = "0.10.3", features = ["use_alloc", "use_std"] }
 libc = { version = "0.2.124", features = ["std"] }
 log = { version = "0.4.16", default-features = false, features = ["serde", "std"] }
 memchr = { version = "2.4.1", features = ["std", "use_std"] }
-move-unit-test = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e", default-features = false, features = ["table-extension"] }
-move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e", features = ["move-table-extension", "table-extension"] }
+move-unit-test = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", default-features = false, features = ["table-extension"] }
+move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["move-table-extension", "table-extension"] }
 num-integer = { version = "0.1.44", features = ["i128", "std"] }
 num-traits = { version = "0.2.14", features = ["i128", "std"] }
 parking_lot = { version = "0.12.0", features = ["send_guard"] }

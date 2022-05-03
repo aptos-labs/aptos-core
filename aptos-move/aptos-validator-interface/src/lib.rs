@@ -113,23 +113,9 @@ impl<'a> DebuggerStateView<'a> {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<Vec<u8>>> {
-        match state_key {
-            // This is a temporary hack until we rollout fine grained staorage for account resources
-            // in the DB.
-            StateKey::AccessPath(access_path) => {
-                match self
-                    .db
-                    .get_account_state_by_version(access_path.address, version)?
-                {
-                    None => Ok(None),
-                    Some(account_state) => Ok(account_state.get(&access_path.path).cloned()),
-                }
-            }
-
-            _ => match self.db.get_state_value_by_version(state_key, version)? {
-                None => Ok(None),
-                Some(state_value) => Ok(state_value.maybe_bytes.as_ref().cloned()),
-            },
+        match self.db.get_state_value_by_version(state_key, version)? {
+            None => Ok(None),
+            Some(state_value) => Ok(state_value.maybe_bytes),
         }
     }
 }

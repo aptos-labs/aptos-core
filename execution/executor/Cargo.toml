@@ -26,7 +26,7 @@ aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-secure-net = { path = "../../secure/net" }
 aptos-state-view = { path = "../../storage/state-view" }
 aptos-types = { path = "../../types" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e", features=["address32"] }
+move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["address32"] }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 scratchpad = { path = "../../storage/scratchpad" }
@@ -41,7 +41,7 @@ aptos-config = { path = "../../config" }
 aptos-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptosdb = { path = "../../storage/aptosdb" }
-move-ir-compiler = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
+move-ir-compiler = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
 storage-interface = { path = "../../storage/storage-interface", features=["fuzzing"] }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 vm-genesis = { path = "../../aptos-move/vm-genesis" }

@@ -8,7 +8,6 @@ use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus}
 use aptos_types::{
     account_address::AccountAddress,
     account_state::AccountState,
-    account_state_blob::AccountStateBlob,
     chain_id::ChainId,
     contract_event::ContractEvent,
     event::EventKey,
@@ -18,13 +17,10 @@ use aptos_types::{
 use storage_interface::{DbReader, Order};
 
 use anyhow::{ensure, format_err, Result};
-use aptos_types::{state_store::state_key::StateKey, transaction::Version};
+use aptos_types::{state_store::state_key_prefix::StateKeyPrefix, transaction::Version};
 use aptos_vm::data_cache::{IntoMoveResolver, RemoteStorageOwned};
 use futures::{channel::oneshot, SinkExt};
-use std::{
-    convert::{Infallible, TryFrom},
-    sync::Arc,
-};
+use std::{convert::Infallible, sync::Arc};
 use storage_interface::state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateView};
 use warp::{filters::BoxedFilter, Filter, Reply};
 
@@ -100,25 +96,11 @@ impl Context {
         address: AccountAddress,
         version: u64,
     ) -> Result<Option<AccountState>> {
-        let state = self.get_account_state_blob(address, version)?;
-        Ok(match state {
-            Some(blob) => Some(AccountState::try_from(&blob)?),
-            None => None,
-        })
-    }
-
-    pub fn get_account_state_blob(
-        &self,
-        account: AccountAddress,
-        version: u64,
-    ) -> Result<Option<AccountStateBlob>> {
-        let (state_value, _) = self.db.get_state_value_with_proof_by_version(
-            &StateKey::AccountAddressKey(account),
-            version,
-        )?;
-        Ok(state_value.map(|x| {
-            AccountStateBlob::try_from(x).expect("Can't convert state value to account state blob")
-        }))
+        AccountState::from_access_paths_and_values(
+            &self
+                .db
+                .get_state_values_by_key_prefix(&StateKeyPrefix::from(address), version)?,
+        )
     }
 
     pub fn get_block_timestamp(&self, version: u64) -> Result<u64> {

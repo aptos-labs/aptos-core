@@ -1,20 +1,19 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{format_err, Result};
+use anyhow::{anyhow, format_err, Result};
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::aptos_root_address,
-    account_state::AccountState,
     contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     move_resource::MoveStorage,
-    on_chain_config::{access_path_for_config, dpn_access_path_for_config, ConfigID},
+    on_chain_config::{access_path_for_config, ConfigID},
     proof::{
         definition::LeafCount, AccumulatorConsistencyProof, SparseMerkleProof,
         SparseMerkleRangeProof, TransactionAccumulatorSummary,
@@ -22,6 +21,7 @@ use aptos_types::{
     state_proof::StateProof,
     state_store::{
         state_key::StateKey,
+        state_key_prefix::StateKeyPrefix,
         state_value::{
             StateKeyAndValue, StateValue, StateValueChunkWithProof, StateValueWithProof,
         },
@@ -32,7 +32,7 @@ use aptos_types::{
     },
 };
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
 #[cfg(any(feature = "testing", feature = "fuzzing"))]
@@ -324,6 +324,17 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
+    /// Returns the key, value pairs for a particular state key prefix at at desired version. This
+    /// API can be used to get all resources of an account by passing the account address as the
+    /// key prefix.
+    fn get_state_values_by_key_prefix(
+        &self,
+        key_prefix: &StateKeyPrefix,
+        version: Version,
+    ) -> Result<HashMap<StateKey, StateValue>> {
+        unimplemented!()
+    }
+
     /// Returns the latest ledger info, if any.
     fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>> {
         unimplemented!()
@@ -525,48 +536,28 @@ impl MoveStorage for &dyn DbReader {
         access_path: AccessPath,
         version: Version,
     ) -> Result<Vec<u8>> {
-        let (state_value, _) = self.get_state_value_with_proof_by_version(
-            &StateKey::AccountAddressKey(access_path.address),
-            version,
-        )?;
-        let account_state =
-            AccountState::try_from(&state_value.ok_or_else(|| {
-                format_err!("missing blob in account state/account does not exist")
-            })?)?;
+        let (state_value, _) = self
+            .get_state_value_with_proof_by_version(&StateKey::AccessPath(access_path), version)?;
 
-        Ok(account_state
-            .get(&access_path.path)
-            .ok_or_else(|| format_err!("no value found in account state"))?
-            .clone())
+        state_value
+            .ok_or_else(|| format_err!("no value found in DB"))?
+            .maybe_bytes
+            .ok_or_else(|| format_err!("no value found in DB"))
     }
 
     fn fetch_config_by_version(&self, config_id: ConfigID, version: Version) -> Result<Vec<u8>> {
-        let aptos_root_state = AccountState::try_from(
-            &self
-                .get_state_value_with_proof_by_version(
-                    &StateKey::AccountAddressKey(aptos_root_address()),
-                    version,
-                )?
-                .0
-                .ok_or_else(|| {
-                    format_err!("missing blob in account state/account does not exist")
-                })?,
-        )?;
-
-        match aptos_root_state.get(&access_path_for_config(config_id).path) {
-            Some(config) => Ok(config.to_vec()),
-            _ => aptos_root_state
-                .get(&dpn_access_path_for_config(config_id).path)
-                .map_or_else(
-                    || {
-                        Err(format_err!(
-                            "no config {} found in aptos root account state",
-                            config_id
-                        ))
-                    },
-                    |bytes| Ok(bytes.to_vec()),
-                ),
-        }
+        let config_value_option = self
+            .get_state_value_with_proof_by_version(
+                &StateKey::AccessPath(AccessPath::new(
+                    aptos_root_address(),
+                    access_path_for_config(config_id).path,
+                )),
+                version,
+            )?
+            .0;
+        config_value_option
+            .and_then(|x| x.maybe_bytes)
+            .ok_or_else(|| anyhow!("no config {} found in aptos root account state", config_id))
     }
 
     fn fetch_synced_version(&self) -> Result<u64> {

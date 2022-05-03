@@ -5,21 +5,18 @@
 
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
+use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_temppath::TempPath;
-use aptos_transaction_builder::aptos_stdlib::{
-    encode_create_account_script_function, encode_mint_script_function,
-    encode_transfer_script_function,
-};
+use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::{aptos_root_address, BalanceResource},
-    account_state::AccountState,
+    account_view::AccountView,
     contract_event::ContractEvent,
     on_chain_config,
     on_chain_config::{
-        access_path_for_config, config_address, dpn_access_path_for_config, ConfigurationResource,
-        OnChainConfig, ValidatorSet,
+        access_path_for_config, config_address, ConfigurationResource, OnChainConfig, ValidatorSet,
     },
     proof::SparseMerkleRangeProof,
     state_store::{state_key::StateKey, state_value::StateKeyAndValue},
@@ -48,8 +45,10 @@ use move_core_types::{
     move_resource::{MoveResource, MoveStructType},
 };
 use rand::SeedableRng;
-use std::{convert::TryFrom, sync::Arc};
-use storage_interface::{DbReader, DbReaderWriter, StateSnapshotReceiver};
+use std::sync::Arc;
+use storage_interface::{
+    state_view::LatestDbStateView, DbReader, DbReaderWriter, StateSnapshotReceiver,
+};
 
 #[test]
 fn test_empty_db() {
@@ -132,7 +131,7 @@ fn get_demo_accounts() -> (
     (account1, privkey1, account2, privkey2)
 }
 
-fn get_mint_transaction(
+fn get_test_coin_mint_transaction(
     aptos_root_key: &Ed25519PrivateKey,
     aptos_root_seq_num: u64,
     account: &AccountAddress,
@@ -143,7 +142,7 @@ fn get_mint_transaction(
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
-        Some(encode_mint_script_function(*account, amount)),
+        Some(aptos_stdlib::encode_test_coin_mint(*account, amount)),
     )
 }
 
@@ -158,11 +157,11 @@ fn get_account_transaction(
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
-        Some(encode_create_account_script_function(*account)),
+        Some(aptos_stdlib::encode_account_create_account(*account)),
     )
 }
 
-fn get_transfer_transaction(
+fn get_test_coin_transfer_transaction(
     sender: AccountAddress,
     sender_seq_number: u64,
     sender_key: &Ed25519PrivateKey,
@@ -174,32 +173,28 @@ fn get_transfer_transaction(
         sender_seq_number,
         sender_key.clone(),
         sender_key.public_key(),
-        Some(encode_transfer_script_function(recipient, amount)),
+        Some(aptos_stdlib::encode_test_coin_transfer(recipient, amount)),
     )
 }
 
 fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
-    let account_state_blob = db
-        .reader
-        .get_latest_state_value(StateKey::AccountAddressKey(*account))
-        .unwrap()
-        .unwrap();
-    let account_state = AccountState::try_from(&account_state_blob).unwrap();
-    account_state
-        .get_balance_resources()
+    let db_state_view = db.reader.latest_state_view().unwrap();
+    let account_state_view = db_state_view.as_account_with_state_view(account);
+    account_state_view
+        .get_balance_resource()
         .unwrap()
         .unwrap()
         .coin()
 }
 
 fn get_configuration(db: &DbReaderWriter) -> ConfigurationResource {
-    let config_blob = db
-        .reader
-        .get_latest_state_value(StateKey::AccountAddressKey(config_address()))
+    let db_state_view = db.reader.latest_state_view().unwrap();
+    let config_address = config_address();
+    let config_account_state_view = db_state_view.as_account_with_state_view(&config_address);
+    config_account_state_view
+        .get_configuration_resource()
         .unwrap()
-        .unwrap();
-    let config_state = AccountState::try_from(&config_blob).unwrap();
-    config_state.get_configuration_resource().unwrap().unwrap()
+        .unwrap()
 }
 
 fn get_state_backup(
@@ -254,14 +249,15 @@ fn test_pre_genesis() {
     let tmp_dir = TempPath::new();
     let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(&tmp_dir));
     let signer = ValidatorSigner::new(genesis.1[0].data.address, genesis.1[0].key.clone());
+
     let waypoint = bootstrap_genesis::<AptosVM>(&db_rw, &genesis_txn).unwrap();
 
     // Mint for 2 demo accounts.
     let (account1, account1_key, account2, account2_key) = get_demo_accounts();
     let txn1 = get_account_transaction(genesis_key, 0, &account1, &account1_key);
     let txn2 = get_account_transaction(genesis_key, 1, &account2, &account2_key);
-    let txn3 = get_mint_transaction(genesis_key, 2, &account1, 2000);
-    let txn4 = get_mint_transaction(genesis_key, 3, &account2, 2000);
+    let txn3 = get_test_coin_mint_transaction(genesis_key, 2, &account1, 2000);
+    let txn4 = get_test_coin_mint_transaction(genesis_key, 3, &account2, 2000);
     execute_and_commit(vec![txn1, txn2, txn3, txn4], &db_rw, &signer);
     assert_eq!(get_balance(&account1, &db_rw), 2000);
     assert_eq!(get_balance(&account2, &db_rw), 2000);
@@ -278,12 +274,20 @@ fn test_pre_genesis() {
     // Nor is it able to boot BlockExecutor.
     assert!(db_rw.reader.get_startup_info().unwrap().is_none());
 
+    let config_resource = ConfigurationResource::default().bump_epoch_for_test();
     // New genesis transaction: set validator set and overwrite account1 balance
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
         WriteSetMut::new(vec![
             (
                 StateKey::AccessPath(access_path_for_config(ValidatorSet::CONFIG_ID)),
                 WriteOp::Value(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
+            ),
+            (
+                StateKey::AccessPath(AccessPath::new(
+                    config_address(),
+                    ConfigurationResource::resource_path(),
+                )),
+                WriteOp::Value(bcs::to_bytes(&config_resource).unwrap()),
             ),
             (
                 StateKey::AccessPath(AccessPath::new(account1, BalanceResource::resource_path())),
@@ -339,8 +343,8 @@ fn test_new_genesis() {
     let (account1, account1_key, account2, account2_key) = get_demo_accounts();
     let txn1 = get_account_transaction(genesis_key, 0, &account1, &account1_key);
     let txn2 = get_account_transaction(genesis_key, 1, &account2, &account2_key);
-    let txn3 = get_mint_transaction(genesis_key, 2, &account1, 2_000_000);
-    let txn4 = get_mint_transaction(genesis_key, 3, &account2, 2_000_000);
+    let txn3 = get_test_coin_mint_transaction(genesis_key, 2, &account1, 2_000_000);
+    let txn4 = get_test_coin_mint_transaction(genesis_key, 3, &account2, 2_000_000);
     execute_and_commit(vec![txn1, txn2, txn3, txn4], &db, &signer);
     assert_eq!(get_balance(&account1, &db), 2_000_000);
     assert_eq!(get_balance(&account2, &db), 2_000_000);
@@ -361,7 +365,7 @@ fn test_new_genesis() {
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::new(
         WriteSetMut::new(vec![
             (
-                StateKey::AccessPath(dpn_access_path_for_config(ValidatorSet::CONFIG_ID)),
+                StateKey::AccessPath(access_path_for_config(ValidatorSet::CONFIG_ID)),
                 WriteOp::Value(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
             ),
             (
@@ -412,7 +416,7 @@ fn test_new_genesis() {
     assert_eq!(get_balance(&account2, &db), 2_000_000);
 
     // Transfer some money.
-    let txn = get_transfer_transaction(account1, 0, &account1_key, account2, 500_000);
+    let txn = get_test_coin_transfer_transaction(account1, 0, &account1_key, account2, 500_000);
     execute_and_commit(vec![txn], &db, &signer);
 
     // And verify.

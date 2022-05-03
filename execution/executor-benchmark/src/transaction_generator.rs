@@ -7,12 +7,12 @@ use aptos_crypto::{
 };
 use aptos_logger::info;
 use aptos_sdk::transaction_builder::TransactionFactory;
+use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{aptos_root_address, AccountResource},
-    account_state_blob::AccountStateBlob,
+    account_config::aptos_root_address,
+    account_view::AccountView,
     chain_id::ChainId,
-    state_store::state_key::StateKey,
     transaction::{RawTransaction, SignedTransaction, Transaction, Version},
 };
 use chrono::Local;
@@ -20,14 +20,13 @@ use indicatif::{ProgressBar, ProgressStyle};
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::{
-    convert::TryFrom,
     fs::File,
     io::{Read, Write},
     path::Path,
-    sync::mpsc,
+    sync::{mpsc, Arc},
     time::Instant,
 };
-use storage_interface::DbReader;
+use storage_interface::{state_view::LatestDbStateView, DbReader};
 
 const META_FILENAME: &str = "metadata.toml";
 const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
@@ -331,7 +330,7 @@ impl TransactionGenerator {
     }
 
     /// Verifies the sequence numbers in storage match what we have locally.
-    pub fn verify_sequence_number(&self, db: &dyn DbReader) {
+    pub fn verify_sequence_number(&self, db: Arc<dyn DbReader>) {
         println!(
             "[{}] verify {} account sequence numbers.",
             now_fmt!(),
@@ -340,14 +339,16 @@ impl TransactionGenerator {
         let bar = get_progress_bar(self.accounts_cache.len());
         for account in &self.accounts_cache {
             let address = account.address;
-            let state_value = db
-                .get_latest_state_value(StateKey::AccountAddressKey(address))
-                .expect("Failed to query storage.")
-                .expect("Account must exist.");
-            let account_resource =
-                AccountResource::try_from(&AccountStateBlob::try_from(state_value).unwrap())
-                    .unwrap();
-            assert_eq!(account_resource.sequence_number(), account.sequence_number);
+            let db_state_view = db.latest_state_view().unwrap();
+            let address_account_view = db_state_view.as_account_with_state_view(&address);
+            assert_eq!(
+                address_account_view
+                    .get_account_resource()
+                    .unwrap()
+                    .unwrap()
+                    .sequence_number(),
+                account.sequence_number
+            );
             bar.inc(1);
         }
         bar.finish();

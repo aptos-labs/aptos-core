@@ -23,9 +23,6 @@ const walletStateLocalStorageKey = 'aptosWalletState'
 
 export default function useWalletState () {
   const [localStorageState, setLocalStorageState] = useState<LocalStorageState>(() => {
-    if (typeof window === 'undefined') {
-      return defaultValue
-    }
     try {
       // Get from local storage by key
       const item = window.localStorage.getItem(walletStateLocalStorageKey)
@@ -37,9 +34,6 @@ export default function useWalletState () {
   })
 
   const [aptosAccount, setAptosAccount] = useState<AptosAccountState>(() => {
-    if (typeof window === 'undefined') {
-      return undefined
-    }
     try {
       const item = window.localStorage.getItem(walletStateLocalStorageKey)
       const localStorageState: AptosAccountObject = item ? JSON.parse(item) : defaultValue
@@ -51,15 +45,11 @@ export default function useWalletState () {
         return undefined
       }
     } catch (err) {
-      console.log(err)
       return undefined
     }
   })
 
   const updateWalletState = useCallback(({ aptosAccountState }: UpdateWalletStateProps) => {
-    if (typeof window === 'undefined') {
-      return
-    }
     try {
       const privateKeyObject = aptosAccountState?.toPrivateKeyObject()
       setAptosAccount(aptosAccountState)
@@ -70,7 +60,13 @@ export default function useWalletState () {
     }
   }, [])
 
-  return { walletState: localStorageState, aptosAccount, updateWalletState }
+  const signOut = useCallback(() => {
+    setAptosAccount(undefined)
+    setLocalStorageState({ aptosAccountObject: undefined })
+    window.localStorage.removeItem(walletStateLocalStorageKey)
+  }, [])
+
+  return { walletState: localStorageState, aptosAccount, updateWalletState, signOut }
 }
 
 export const [WalletStateProvider, useWalletStateContext] = constate(useWalletState)

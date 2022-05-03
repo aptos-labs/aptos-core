@@ -6,6 +6,7 @@ use crate::{
     test_utils::{create_and_fund_account, transfer_and_reconfig, transfer_coins},
 };
 use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
+use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::LocalAccount;
 use aptos_types::{account_address::AccountAddress, PeerId};
@@ -491,6 +492,11 @@ fn stop_validator_and_delete_storage(swarm: &mut LocalSwarm, validator: AccountA
     // Delete the validator storage
     let node_config = swarm.validator_mut(validator).unwrap().config().clone();
     let state_db_path = node_config.storage.dir().join("aptosdb");
+    info!(
+        "Deleting state db path {:?} for validator {:?}",
+        state_db_path.as_path(),
+        validator
+    );
     assert!(state_db_path.as_path().exists());
     fs::remove_dir_all(state_db_path).unwrap();
 }

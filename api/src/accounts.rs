@@ -20,11 +20,12 @@ use aptos_types::{
 };
 
 use anyhow::Result;
+use aptos_types::account_state_blob::AccountStateBlob;
 use move_core_types::{
     identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
     value::MoveValue,
 };
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use warp::{filters::BoxedFilter, Filter, Rejection, Reply};
 
 // GET /accounts/<address>
@@ -37,7 +38,7 @@ pub fn get_account(context: Context) -> BoxedFilter<(impl Reply,)> {
         .boxed()
 }
 
-// GET /accounts/<address>
+// GET /accounts/<address>/blob
 pub fn get_account_state_blob(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("accounts" / AddressParam / "blob")
         .and(warp::get())
@@ -85,7 +86,7 @@ async fn handle_get_account_state_blob(
     address: AddressParam,
     context: Context,
 ) -> Result<impl Reply, Rejection> {
-    fail_point("endpoint_get_account")?;
+    fail_point("endpoint_get_account_state_blob")?;
     Ok(Account::new(None, address, context)?.account_state_blob()?)
 }
 
@@ -152,11 +153,11 @@ impl Account {
     }
 
     pub fn account_state_blob(self) -> Result<impl Reply, Error> {
-        let blob: Vec<u8> = self
+        let state = self
             .context
-            .get_account_state_blob(self.address.into(), self.ledger_version)?
-            .ok_or_else(|| self.account_not_found())?
-            .into();
+            .get_account_state(self.address.into(), self.ledger_version)?
+            .ok_or_else(|| self.account_not_found())?;
+        let blob: Vec<u8> = AccountStateBlob::try_from(&state)?.into();
         Response::new(self.latest_ledger_info, &blob)
     }
 
