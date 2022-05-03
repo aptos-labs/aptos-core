@@ -275,9 +275,6 @@ impl ValidatorBuilder {
             validator_identity.peer_id_name,
             SecureBackend::OnDiskStorage(validator.storage_config.clone()),
         );
-        validator_network.network_address_key_backend = Some(SecureBackend::OnDiskStorage(
-            validator.storage_config.clone(),
-        ));
 
         // By default we don't start a swarm with VFNs, so make sure the public fullnode endpoint
         // really is publicly accessable

@@ -71,8 +71,6 @@ pub struct NetworkConfig {
     // Select this to enforce that both peers should authenticate each other, otherwise
     // authentication only occurs for outgoing connections.
     pub mutual_authentication: bool,
-    // Used to store network address encryption keys for validator nodes
-    pub network_address_key_backend: Option<SecureBackend>,
     pub network_id: NetworkId,
     // Addresses of initial peers to connect to. In a mutual_authentication network,
     // we will extract the public keys from these addresses to set our initial
@@ -114,7 +112,6 @@ impl NetworkConfig {
             identity: Identity::None,
             listen_address: "/ip4/0.0.0.0/tcp/6180".parse().unwrap(),
             mutual_authentication: false,
-            network_address_key_backend: None,
             network_id,
             seed_addrs: HashMap::new(),
             seeds: PeerSet::default(),
