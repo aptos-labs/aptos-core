@@ -39,11 +39,9 @@ export const CredentialRow = ({
   return (
     <SimpleGrid columns={2} width="100%">
       <Flex alignItems="flex-start">
-        <Tooltip label={hasCopied ? 'Copied!' : 'Copy'} closeDelay={300}>
-          <Text fontSize="xs" color={secondaryTextColor[colorMode]}>
-            {header}
-          </Text>
-        </Tooltip>
+        <Text fontSize="xs" color={secondaryTextColor[colorMode]}>
+          {header}
+        </Text>
       </Flex>
       <Flex alignItems="flex-end">
         <Tooltip label={hasCopied ? 'Copied!' : 'Copy'} closeDelay={300}>
@@ -76,7 +74,7 @@ const Account = () => {
     <WalletLayout>
       <VStack width="100%" paddingTop={8}>
         <Box px={4} pb={4}>
-          <Heading fontSize="xl" >Account</Heading>
+          <Heading fontSize="xl">Account</Heading>
           <Flex pb={2} pt={1}>
             <Button
               fontSize="sm"

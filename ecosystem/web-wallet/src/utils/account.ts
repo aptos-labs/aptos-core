@@ -3,7 +3,7 @@
 
 import { AptosAccount, AptosAccountObject } from 'aptos'
 import { Buffer } from 'buffer'
-import { KEY_LENGTH, walletStateLocalStorageKey } from '../constants'
+import { KEY_LENGTH, WALLET_STATE_LOCAL_STORAGE_KEY } from '../constants'
 import { AptosAccountState, LocalStorageState, Result, err, ok } from '../types'
 
 export function loginAccount (key: string): Result<AptosAccount, Error> {
@@ -29,7 +29,7 @@ export function createNewAccount (): AptosAccount {
 
 export function getLocalStorageState (): LocalStorageState | null {
   // Get from local storage by key
-  const item = window.localStorage.getItem(walletStateLocalStorageKey)
+  const item = window.localStorage.getItem(WALLET_STATE_LOCAL_STORAGE_KEY)
   if (item) {
     const accountObject: AptosAccountObject = JSON.parse(item)
     return { aptosAccountObject: accountObject }

@@ -20,8 +20,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
       signTransaction(account, request.transaction, sendResponse)
       break
     default:
-      // method not handled
-      break
+      throw new Error(request.method + ' method is not supported')
   }
   return true
 })
