@@ -5,12 +5,12 @@
 
 use crate::{
     logging::{LogEntry, LogSchema},
-    metrics::{increment_counter, start_timer},
+    metrics::{increment_counter, start_timer, LRU_CACHE_HIT, LRU_CACHE_PROBE},
     network::StorageServiceNetworkEvents,
 };
 use ::network::ProtocolId;
 use aptos_config::config::StorageServiceConfig;
-use aptos_infallible::RwLock;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
@@ -20,6 +20,7 @@ use aptos_types::{
 };
 use bounded_executor::BoundedExecutor;
 use futures::stream::StreamExt;
+use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::Duration};
 use storage_interface::DbReader;
@@ -67,17 +68,20 @@ impl Error {
 /// The server-side actor for the storage service. Handles inbound storage
 /// service requests from clients.
 pub struct StorageServiceServer<T> {
-    config: StorageServiceConfig,
     bounded_executor: BoundedExecutor,
-    storage: T,
-    // TODO(philiphayes): would like a "multi-network" stream here, so we only
-    // need one service for all networks.
+    config: StorageServiceConfig,
     network_requests: StorageServiceNetworkEvents,
+    storage: T,
     time_service: TimeService,
 
     // We maintain a cached storage server summary to avoid hitting the DB for
     // every request. This is refreshed periodically.
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+
+    // We maintain a LRU cache for commonly requested data items. This is
+    // separate from the cached storage summary because these responses
+    // should never change (the storage summary changes over time).
+    lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
 }
 
 impl<T: StorageReaderInterface> StorageServiceServer<T> {
@@ -91,6 +95,9 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
         let bounded_executor =
             BoundedExecutor::new(config.max_concurrent_requests as usize, executor);
         let cached_storage_server_summary = Arc::new(RwLock::new(StorageServerSummary::default()));
+        let lru_storage_cache = Arc::new(Mutex::new(LruCache::new(
+            config.max_lru_cache_size as usize,
+        )));
 
         Self {
             config,
@@ -99,6 +106,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             network_requests,
             time_service,
             cached_storage_server_summary,
+            lru_storage_cache,
         }
     }
 
@@ -158,10 +166,12 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
             // avoid starving other async tasks on the same runtime.
             let storage = self.storage.clone();
             let cached_storage_server_summary = self.cached_storage_server_summary.clone();
+            let lru_storage_cache = self.lru_storage_cache.clone();
             self.bounded_executor
                 .spawn_blocking(move || {
-                    let response = Handler::new(storage, cached_storage_server_summary)
-                        .call(protocol, request);
+                    let response =
+                        Handler::new(storage, cached_storage_server_summary, lru_storage_cache)
+                            .call(protocol, request);
                     log_storage_response(&response);
                     response_sender.send(response);
                 })
@@ -206,16 +216,19 @@ fn refresh_cached_storage_summary<T: StorageReaderInterface>(
 pub struct Handler<T> {
     storage: T,
     cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+    lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
 }
 
 impl<T: StorageReaderInterface> Handler<T> {
     pub fn new(
         storage: T,
         cached_storage_server_summary: Arc<RwLock<StorageServerSummary>>,
+        lru_storage_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     ) -> Self {
         Self {
             storage,
             cached_storage_server_summary,
+            lru_storage_cache,
         }
     }
 
@@ -240,23 +253,9 @@ impl<T: StorageReaderInterface> Handler<T> {
 
         // Process the request
         let response = match &request {
-            StorageServiceRequest::GetAccountStatesChunkWithProof(request) => {
-                self.get_account_states_chunk_with_proof(request)
-            }
-            StorageServiceRequest::GetEpochEndingLedgerInfos(request) => {
-                self.get_epoch_ending_ledger_infos(request)
-            }
-            StorageServiceRequest::GetNumberOfAccountsAtVersion(version) => {
-                self.get_number_of_accounts_at_version(*version)
-            }
             StorageServiceRequest::GetServerProtocolVersion => self.get_server_protocol_version(),
             StorageServiceRequest::GetStorageServerSummary => self.get_storage_server_summary(),
-            StorageServiceRequest::GetTransactionOutputsWithProof(request) => {
-                self.get_transaction_outputs_with_proof(request)
-            }
-            StorageServiceRequest::GetTransactionsWithProof(request) => {
-                self.get_transactions_with_proof(request)
-            }
+            _ => self.process_cachable_request(protocol, &request),
         };
 
         // Process the response and handle any errors
@@ -288,6 +287,48 @@ impl<T: StorageReaderInterface> Handler<T> {
                 Ok(response)
             }
         }
+    }
+
+    fn process_cachable_request(
+        &self,
+        protocol: ProtocolId,
+        request: &StorageServiceRequest,
+    ) -> Result<StorageServiceResponse, Error> {
+        increment_counter(&metrics::LRU_CACHE_EVENT, protocol, LRU_CACHE_PROBE.into());
+
+        // Check if the response is already in the cache
+        if let Some(response) = self.lru_storage_cache.lock().get(request) {
+            increment_counter(&metrics::LRU_CACHE_EVENT, protocol, LRU_CACHE_HIT.into());
+            return Ok(response.clone());
+        }
+
+        // Fetch the response from storage
+        let response = match request {
+            StorageServiceRequest::GetAccountStatesChunkWithProof(request) => {
+                self.get_account_states_chunk_with_proof(request)
+            }
+            StorageServiceRequest::GetEpochEndingLedgerInfos(request) => {
+                self.get_epoch_ending_ledger_infos(request)
+            }
+            StorageServiceRequest::GetNumberOfAccountsAtVersion(version) => {
+                self.get_number_of_accounts_at_version(*version)
+            }
+            StorageServiceRequest::GetTransactionOutputsWithProof(request) => {
+                self.get_transaction_outputs_with_proof(request)
+            }
+            StorageServiceRequest::GetTransactionsWithProof(request) => {
+                self.get_transactions_with_proof(request)
+            }
+            _ => unreachable!("Received an unexpected request: {:?}", request),
+        }?;
+
+        // Cache the response before returning
+        let _ = self
+            .lru_storage_cache
+            .lock()
+            .put(request.clone(), response.clone());
+
+        Ok(response)
     }
 
     fn get_account_states_chunk_with_proof(

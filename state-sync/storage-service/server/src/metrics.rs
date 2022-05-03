@@ -7,6 +7,20 @@ use aptos_metrics::{
 use network::ProtocolId;
 use once_cell::sync::Lazy;
 
+/// Useful metric constants for the storage service
+pub const LRU_CACHE_HIT: &str = "lru_cache_hit";
+pub const LRU_CACHE_PROBE: &str = "lru_cache_probe";
+
+/// Counter for lru cache events in the storage service (server-side)
+pub static LRU_CACHE_EVENT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_storage_service_server_lru_cache",
+        "Counters for lru cache events in the storage server",
+        &["protocol", "event"]
+    )
+    .unwrap()
+});
+
 /// Counter for pending network events to the storage service (server-side)
 pub static PENDING_STORAGE_SERVER_NETWORK_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
