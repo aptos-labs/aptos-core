@@ -5,10 +5,9 @@ use crate::{
     bootstrap_genesis, gen_block_id, gen_ledger_info_with_sigs, get_test_signed_transaction,
 };
 use anyhow::{anyhow, ensure, Result};
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
+use aptos_crypto::{PrivateKey};
 use aptos_transaction_builder::stdlib::{
     encode_create_parent_vasp_account_script_function,
-    encode_peer_to_peer_with_metadata_script_function,
 };
 use aptos_sdk::transaction_builder::TransactionFactory;
 use aptos_types::{
@@ -20,7 +19,7 @@ use aptos_types::{
     event::EventKey,
     state_store::{state_key::StateKey, state_value::StateValueWithProof},
     transaction::{
-        authenticator::AuthenticationKey, Transaction, TransactionListWithProof,
+        Transaction, TransactionListWithProof,
         TransactionWithProof, WriteSetPayload
     },
     trusted_state::{TrustedState, TrustedStateChange},
@@ -53,7 +52,6 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         validators[0].key.clone(),
     );
 
-
     // This generates accounts that do not overlap with genesis
     let seed = [3u8; 32];
     let mut rng = ::rand::rngs::StdRng::from_seed(seed);
@@ -71,11 +69,10 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account3_auth_key = local_account3.authentication_key();
     let account3 = account3_auth_key.derived_address();
 
-    let mut local_account4 = LocalAccount::generate(&mut rng);
+    let local_account4 = LocalAccount::generate(&mut rng);
     let account4_auth_key = local_account4.authentication_key();
     let account4 = account4_auth_key.derived_address();
-    
-    
+
     let genesis_account = testnet_dd_account_address();
     let tc_account = treasury_compliance_account_address();
 
@@ -128,16 +125,16 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     // Create account1 with 2M coins.
     let txn1 = local_account1.sign_with_transaction_builder(txn_factory.mint(account1, 2_000_000));
-    
+
 
     // Create account2 with 1.2M coins.
     let txn2 = local_account2.sign_with_transaction_builder(txn_factory.mint(account2, 1_200_000));
 
     // Create account3 with 1M coins.
     let txn3 = local_account3.sign_with_transaction_builder(txn_factory.mint(account3, 1_000_000));
-   
 
-    
+
+
     // Transfer 20k coins from account1 to account2.
     // balance: <1.98M, 1.22M, 1M
     let txn4 = local_account1.sign_with_transaction_builder( txn_factory.transfer(account2, 20_000));
@@ -156,8 +153,8 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let block2_id = gen_block_id(2);
 
     // Create 14 txns transferring 10k from account1 to account3 each.
-    for i in 2..=15 {
-        block2.push( UserTransaction(local_account1.sign_with_transaction_builder( txn_factory.transfer(account3, 70_000))))
+    for _i in 2..=15 {
+        block2.push(UserTransaction(local_account1.sign_with_transaction_builder( txn_factory.transfer(account3, 70_000))))
     }
 
     let output1 = executor

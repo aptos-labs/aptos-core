@@ -3,7 +3,7 @@
 
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
-    PrivateKey, SigningKey, Uniform,
+    PrivateKey, SigningKey
 };
 use aptos_logger::info;
 use aptos_sdk::transaction_builder::TransactionFactory;
@@ -214,7 +214,7 @@ impl TransactionGenerator {
                     &self.genesis_key,
                     self.genesis_key.public_key(),
                     Self::transaction_factory()
-                        .create_user_account(&account.public_key)
+                        .create_user_account(&account.public_key())
                         .sender(root_address)
                         .sequence_number((i * block_size + j) as u64)
                         .build(),
@@ -253,7 +253,7 @@ impl TransactionGenerator {
                     &self.genesis_key,
                     self.genesis_key.public_key(),
                     Self::transaction_factory()
-                        .mint(account.address, init_account_balance)
+                        .mint(account.address(), init_account_balance)
                         .sender(root_address)
                         .sequence_number((total_accounts + i * block_size + j) as u64)
                         .build(),
@@ -292,12 +292,12 @@ impl TransactionGenerator {
                 let sender = &self.accounts_cache[sender_idx];
                 let receiver = &self.accounts_cache[receiver_idx];
                 let txn = create_transaction(
-                    &sender.private_key,
-                    sender.public_key.clone(),
+                    &sender.private_key(),
+                    sender.public_key().clone(),
                     Self::transaction_factory()
-                        .transfer(receiver.address, 1)
-                        .sender(sender.address)
-                        .sequence_number(sender.sequence_number)
+                        .transfer(receiver.address(), 1)
+                        .sender(sender.address())
+                        .sequence_number(sender.sequence_number())
                         .build(),
                 );
                 transactions.push(txn);
@@ -323,7 +323,7 @@ impl TransactionGenerator {
         );
         let bar = get_progress_bar(self.accounts_cache.len());
         for account in &self.accounts_cache {
-            let address = account.address;
+            let address = account.address();
             let state_value = db
                 .get_latest_state_value(StateKey::AccountAddressKey(address))
                 .expect("Failed to query storage.")
@@ -331,7 +331,7 @@ impl TransactionGenerator {
             let account_resource =
                 AccountResource::try_from(&AccountStateBlob::try_from(state_value).unwrap())
                     .unwrap();
-            assert_eq!(account_resource.sequence_number(), account.sequence_number);
+            assert_eq!(account_resource.sequence_number(), account.sequence_number());
             bar.inc(1);
         }
         bar.finish();
