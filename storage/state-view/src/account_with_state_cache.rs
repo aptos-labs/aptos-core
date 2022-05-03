@@ -32,8 +32,8 @@ impl<'a> AccountView for AccountWithStateCache<'a> {
             .and_then(|x| x.maybe_bytes.clone()))
     }
 
-    fn get_account_address(&self) -> &AccountAddress {
-        self.account_address
+    fn get_account_address(&self) -> anyhow::Result<Option<AccountAddress>> {
+        Ok(Some(*self.account_address))
     }
 }
 

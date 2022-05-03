@@ -24,8 +24,8 @@ impl<'a> AccountView for AccountWithStateView<'a> {
         self.state_view.get_state_value(state_key)
     }
 
-    fn get_account_address(&self) -> &AccountAddress {
-        self.account_address
+    fn get_account_address(&self) -> anyhow::Result<Option<AccountAddress>> {
+        Ok(Some(*self.account_address))
     }
 }
 

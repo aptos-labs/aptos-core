@@ -37,6 +37,7 @@ use aptos_types::{
     account_address::{from_identity_public_key, AccountAddress},
     account_state::AccountState,
     account_state_blob::AccountStateBlob,
+    account_view::AccountView,
     block_info::BlockInfo,
     ledger_info::LedgerInfo,
     network_address::NetworkAddress,

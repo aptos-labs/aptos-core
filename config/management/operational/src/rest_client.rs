@@ -6,7 +6,7 @@ use aptos_management::error::Error;
 use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress, account_config, account_config::AccountResource,
-    account_state::AccountState, account_state_blob::AccountStateBlob,
+    account_state::AccountState, account_state_blob::AccountStateBlob, account_view::AccountView,
     transaction::SignedTransaction, validator_config::ValidatorConfig,
     validator_info::ValidatorInfo,
 };
