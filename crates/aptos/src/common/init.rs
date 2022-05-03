@@ -8,7 +8,7 @@ use crate::{
             account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
             EncodingOptions, PrivateKeyInputOptions, ProfileConfig, ProfileOptions, PromptOptions,
         },
-        utils::prompt_yes_with_override,
+        utils::{prompt_yes_with_override, read_line},
     },
     op::key::GenerateKey,
 };
@@ -174,14 +174,4 @@ impl CliCommand<()> for InitTool {
         eprintln!("Aptos is now set up for account {}!  Run `aptos help` for more information about commands", address);
         Ok(())
     }
-}
-
-/// Reads a line from input
-fn read_line(input_name: &'static str) -> CliTypedResult<String> {
-    let mut input_buf = String::new();
-    let _ = std::io::stdin()
-        .read_line(&mut input_buf)
-        .map_err(|err| CliError::IO(input_name.to_string(), err))?;
-
-    Ok(input_buf)
 }

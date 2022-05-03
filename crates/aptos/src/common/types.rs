@@ -78,6 +78,36 @@ impl CliError {
     }
 }
 
+impl From<aptos_config::config::Error> for CliError {
+    fn from(e: aptos_config::config::Error) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
+impl From<aptos_github_client::Error> for CliError {
+    fn from(e: aptos_github_client::Error) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
+impl From<serde_yaml::Error> for CliError {
+    fn from(e: serde_yaml::Error) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
+impl From<base64::DecodeError> for CliError {
+    fn from(e: base64::DecodeError) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
+impl From<std::string::FromUtf8Error> for CliError {
+    fn from(e: std::string::FromUtf8Error) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
 /// Config saved to `.aptos/config.yaml`
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CliConfig {

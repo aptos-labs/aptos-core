@@ -276,3 +276,13 @@ pub async fn submit_transaction(
 pub fn current_dir() -> PathBuf {
     env::current_dir().unwrap()
 }
+
+/// Reads a line from input
+pub fn read_line(input_name: &'static str) -> CliTypedResult<String> {
+    let mut input_buf = String::new();
+    let _ = std::io::stdin()
+        .read_line(&mut input_buf)
+        .map_err(|err| CliError::IO(input_name.to_string(), err))?;
+
+    Ok(input_buf)
+}

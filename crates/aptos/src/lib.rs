@@ -6,6 +6,7 @@
 pub mod account;
 pub mod common;
 pub mod config;
+pub mod genesis;
 pub mod move_tool;
 pub mod op;
 
@@ -21,11 +22,13 @@ pub enum Tool {
     Account(account::AccountTool),
     #[clap(subcommand)]
     Config(config::ConfigTool),
+    #[clap(subcommand)]
+    Genesis(genesis::GenesisTool),
     Init(common::init::InitTool),
     #[clap(subcommand)]
-    Move(move_tool::MoveTool),
-    #[clap(subcommand)]
     Key(op::key::KeyTool),
+    #[clap(subcommand)]
+    Move(move_tool::MoveTool),
 }
 
 impl Tool {
@@ -34,9 +37,10 @@ impl Tool {
             Tool::Account(tool) => tool.execute().await,
             Tool::Config(tool) => tool.execute().await,
             // TODO: Replace entirely with config init
+            Tool::Genesis(tool) => tool.execute().await,
             Tool::Init(tool) => tool.execute_serialized_success().await,
-            Tool::Move(tool) => tool.execute().await,
             Tool::Key(tool) => tool.execute().await,
+            Tool::Move(tool) => tool.execute().await,
         }
     }
 }

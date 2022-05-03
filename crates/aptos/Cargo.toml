@@ -33,7 +33,9 @@ uuid = { version = "0.8.2", features = ["v4", "serde"] }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto" }
 aptos-logger = { path = "../aptos-logger" }
+aptos-management = { path = "../../config/management" }
 aptos-secure-storage = { path = "../../secure/storage" }
+aptos-github-client = { path = "../../secure/storage/github" }
 aptos-telemetry = { path = "../aptos-telemetry" }
 aptos-temppath = { path = "../aptos-temppath" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
