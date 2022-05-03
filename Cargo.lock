@@ -1163,6 +1163,7 @@ name = "aptos-workspace-hack"
 version = "0.1.0"
 dependencies = [
  "Inflector",
+ "ahash",
  "anyhow",
  "arrayvec",
  "backtrace",
@@ -2632,7 +2633,7 @@ dependencies = [
  "diesel_derives",
  "num-bigint 0.2.6",
  "num-integer",
- "num-traits 0.2.14",
+ "num-traits 0.1.43",
  "pq-sys",
  "r2d2",
  "serde_json",
@@ -3652,6 +3653,9 @@ name = "hashbrown"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
+dependencies = [
+ "ahash",
+]
 
 [[package]]
 name = "hashbrown"
@@ -4382,6 +4386,15 @@ checksum = "6389c490849ff5bc16be905ae24bc913a9c8892e19b2341dbc175e14c341c2b8"
 dependencies = [
  "cfg-if 1.0.0",
  "serde 1.0.136",
+]
+
+[[package]]
+name = "lru"
+version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32613e41de4c47ab04970c348ca7ae7382cf116625755af070b008a15516a889"
+dependencies = [
+ "hashbrown 0.11.2",
 ]
 
 [[package]]
@@ -7781,6 +7794,8 @@ dependencies = [
  "channel",
  "claim",
  "futures",
+ "lru",
+ "mockall",
  "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=f2e7585b1ed5bd2810163d6bdebafe5a388881d3)",
  "network",
  "once_cell",

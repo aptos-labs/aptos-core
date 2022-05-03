@@ -51,7 +51,7 @@ pub enum StorageServiceMessage {
 }
 
 /// A storage service request.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum StorageServiceRequest {
     GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest), // Fetches a list of account states with a proof
     GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest), // Fetches a list of epoch ending ledger infos
@@ -229,7 +229,7 @@ impl TryFrom<StorageServiceResponse> for TransactionListWithProof {
 
 /// A storage service request for fetching a list of account states at a
 /// specified version.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct AccountStatesChunkWithProofRequest {
     pub version: u64,             // The version to fetch the account states at
     pub start_account_index: u64, // The account index to start fetching account states
@@ -238,7 +238,7 @@ pub struct AccountStatesChunkWithProofRequest {
 
 /// A storage service request for fetching a transaction output list with a
 /// corresponding proof.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct TransactionOutputsWithProofRequest {
     pub proof_version: u64, // The version the proof should be relative to
     pub start_version: u64, // The starting version of the transaction output list
@@ -247,7 +247,7 @@ pub struct TransactionOutputsWithProofRequest {
 
 /// A storage service request for fetching a transaction list with a
 /// corresponding proof.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct TransactionsWithProofRequest {
     pub proof_version: u64,   // The version the proof should be relative to
     pub start_version: u64,   // The starting version of the transaction list
@@ -256,7 +256,7 @@ pub struct TransactionsWithProofRequest {
 }
 
 /// A storage service request for fetching a list of epoch ending ledger infos.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct EpochEndingLedgerInfoRequest {
     pub start_epoch: u64,
     pub expected_end_epoch: u64,

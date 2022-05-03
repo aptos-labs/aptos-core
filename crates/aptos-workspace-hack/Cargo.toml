@@ -12,6 +12,7 @@ edition = "2018"
 ### BEGIN HAKARI SECTION
 [dependencies]
 Inflector = { version = "0.11.4", features = ["heavyweight", "lazy_static", "regex"] }
+ahash = { version = "0.7.6", features = ["std"] }
 anyhow = { version = "1.0.57", features = ["backtrace", "std"] }
 arrayvec = { version = "0.5.2", features = ["array-sizes-33-128", "std"] }
 backtrace = { version = "0.3.58", features = ["addr2line", "gimli-symbolize", "miniz_oxide", "object", "serde", "std"] }
@@ -34,6 +35,7 @@ futures-sink = { version = "0.3.21", features = ["alloc", "std"] }
 futures-util = { version = "0.3.17", features = ["alloc", "async-await", "async-await-macro", "channel", "futures-channel", "futures-io", "futures-macro", "futures-sink", "io", "memchr", "proc-macro-hack", "proc-macro-nested", "sink", "slab", "std"] }
 generic-array = { version = "0.14.5", default-features = false, features = ["more_lengths"] }
 getrandom = { version = "0.2.6", default-features = false, features = ["std"] }
+hashbrown = { version = "0.11.2", features = ["ahash", "inline-more", "raw"] }
 hyper = { version = "0.14.18", features = ["client", "full", "h2", "http1", "http2", "runtime", "server", "socket2", "stream", "tcp"] }
 include_dir = { version = "0.7.2", features = ["glob"] }
 indexmap = { version = "1.8.1", default-features = false, features = ["std"] }
@@ -66,6 +68,7 @@ zeroize = { version = "1.5.4", features = ["alloc", "zeroize_derive"] }
 
 [build-dependencies]
 Inflector = { version = "0.11.4", features = ["heavyweight", "lazy_static", "regex"] }
+ahash = { version = "0.7.6", features = ["std"] }
 anyhow = { version = "1.0.57", features = ["backtrace", "std"] }
 arrayvec = { version = "0.5.2", features = ["array-sizes-33-128", "std"] }
 backtrace = { version = "0.3.58", features = ["addr2line", "gimli-symbolize", "miniz_oxide", "object", "serde", "std"] }
@@ -89,6 +92,7 @@ futures-sink = { version = "0.3.21", features = ["alloc", "std"] }
 futures-util = { version = "0.3.17", features = ["alloc", "async-await", "async-await-macro", "channel", "futures-channel", "futures-io", "futures-macro", "futures-sink", "io", "memchr", "proc-macro-hack", "proc-macro-nested", "sink", "slab", "std"] }
 generic-array = { version = "0.14.5", default-features = false, features = ["more_lengths"] }
 getrandom = { version = "0.2.6", default-features = false, features = ["std"] }
+hashbrown = { version = "0.11.2", features = ["ahash", "inline-more", "raw"] }
 hyper = { version = "0.14.18", features = ["client", "full", "h2", "http1", "http2", "runtime", "server", "socket2", "stream", "tcp"] }
 include_dir = { version = "0.7.2", features = ["glob"] }
 indexmap = { version = "1.8.1", default-features = false, features = ["std"] }
@@ -119,17 +123,5 @@ tracing = { version = "0.1.34", features = ["attributes", "log", "std", "tracing
 tracing-core = { version = "0.1.26", features = ["lazy_static", "std"] }
 warp = { version = "0.3.2", features = ["multipart", "tls", "tokio-rustls", "tokio-tungstenite", "websocket"] }
 zeroize = { version = "1.5.4", features = ["alloc", "zeroize_derive"] }
-
-[target.x86_64-unknown-linux-gnu.dependencies]
-hashbrown = { version = "0.11.2", default-features = false, features = ["inline-more", "raw"] }
-
-[target.x86_64-unknown-linux-gnu.build-dependencies]
-hashbrown = { version = "0.11.2", default-features = false, features = ["inline-more", "raw"] }
-
-[target.x86_64-apple-darwin.dependencies]
-hashbrown = { version = "0.11.2", default-features = false, features = ["inline-more", "raw"] }
-
-[target.x86_64-apple-darwin.build-dependencies]
-hashbrown = { version = "0.11.2", default-features = false, features = ["inline-more", "raw"] }
 
 ### END HAKARI SECTION
