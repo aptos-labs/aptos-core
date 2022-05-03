@@ -237,7 +237,7 @@ where
     let seq_numbers = transactions
         .par_iter()
         .map(|t| {
-            get_account_sequence_number(smp.db.as_ref(), t.sender()).map_err(|e| {
+            get_account_sequence_number(smp.db.clone(), t.sender()).map_err(|e| {
                 error!(LogSchema::new(LogEntry::DBError).error(&e));
                 counters::DB_ERROR.inc();
                 e

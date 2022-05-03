@@ -451,16 +451,16 @@ where
         let mut result = Vec::with_capacity(update_batch.len());
         for updates in update_batch {
             // sort and dedup the accounts
-            let accounts = updates
+            let keys = updates
                 .iter()
-                .map(|(account, _)| *account)
+                .map(|(key, _)| *key)
                 .collect::<BTreeSet<_>>()
                 .into_iter()
                 .collect::<Vec<_>>();
             current_state_tree = current_state_tree.batch_update(updates, proof_reader)?;
             result.push((
                 current_state_tree.smt.root_hash(),
-                current_state_tree.generate_node_hashes(accounts),
+                current_state_tree.generate_node_hashes(keys),
             ));
         }
         Ok((result, current_state_tree))

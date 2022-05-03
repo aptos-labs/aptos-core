@@ -2,12 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::DbReader;
-use anyhow::{ensure, Result};
+use anyhow::Result;
 use aptos_state_view::StateView;
-use aptos_types::{
-    account_state::AccountState, state_store::state_key::StateKey, transaction::Version,
-};
-use std::{convert::TryFrom, sync::Arc};
+use aptos_types::{state_store::state_key::StateKey, transaction::Version};
+use std::sync::Arc;
 
 pub struct DbStateView {
     db: Arc<dyn DbReader>,
@@ -31,18 +29,7 @@ impl DbStateView {
 
 impl StateView for DbStateView {
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
-        match state_key {
-            // Deal with the account state blob.
-            StateKey::AccessPath(path) => {
-                let blob_opt = self.get(&StateKey::AccountAddressKey(path.address))?;
-                if let Some(blob) = blob_opt {
-                    Ok(AccountState::try_from(&blob)?.get(&path.path).cloned())
-                } else {
-                    Ok(None)
-                }
-            }
-            _ => self.get(state_key),
-        }
+        self.get(state_key)
     }
 
     fn is_genesis(&self) -> bool {
@@ -69,14 +56,6 @@ pub trait DbStateViewAtVersion {
 
 impl DbStateViewAtVersion for Arc<dyn DbReader> {
     fn state_view_at_version(&self, version: Option<Version>) -> Result<DbStateView> {
-        if let Some(some_version) = version {
-            let ledger_version = self.get_latest_version()?;
-            ensure!(
-                some_version <= ledger_version,
-                "Asking for state view newer than ledger version."
-            );
-        }
-
         Ok(DbStateView {
             db: self.clone(),
             version,

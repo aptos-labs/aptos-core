@@ -21,8 +21,8 @@ export function loginAccount (key: string): Result<AptosAccount, Error> {
   }
 }
 
-export function createNewAccount (): Result<AptosAccount, Error> {
+export function createNewAccount (): AptosAccount {
   const account = new AptosAccount()
   // todo: make request to create account on chain
-  return ok(account)
+  return account
 }

@@ -5,6 +5,7 @@ use crate::{
     access_path::AccessPath,
     account_address::{self, AccountAddress},
     account_config::{AccountResource, BalanceResource},
+    account_state::AccountState,
     account_state_blob::AccountStateBlob,
     block_info::{BlockInfo, Round},
     block_metadata::BlockMetadata,
@@ -43,7 +44,7 @@ use proptest::{
 use proptest_derive::Arbitrary;
 use serde_json::Value;
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap},
     convert::{TryFrom, TryInto},
     iter::Iterator,
 };
@@ -783,21 +784,34 @@ impl TransactionToCommitGen {
             .collect();
         // Account states must be materialized last, to reflect the latest account and event
         // sequence numbers.
-        let account_states = self
+        let account_states: HashMap<AccountAddress, AccountStateBlob> = self
             .account_state_gens
             .into_iter()
             .map(|(index, blob_gen)| {
                 (
-                    StateKey::AccountAddressKey(universe.get_account_info(index).address),
-                    StateValue::from(blob_gen.materialize(index, universe)),
+                    universe.get_account_info(index).address,
+                    blob_gen.materialize(index, universe),
                 )
             })
             .collect();
 
+        let mut state_updates = HashMap::new();
+        for (account_address, blob) in account_states {
+            AccountState::try_from(&blob)
+                .unwrap()
+                .iter()
+                .for_each(|(key, value)| {
+                    state_updates.insert(
+                        StateKey::AccessPath(AccessPath::new(account_address, key.clone())),
+                        StateValue::from(value.clone()),
+                    );
+                });
+        }
+
         TransactionToCommit::new(
             Transaction::UserTransaction(transaction),
             TransactionInfo::new_placeholder(self.gas_used, self.status),
-            account_states,
+            state_updates,
             None,
             self.write_set,
             events,

@@ -38,6 +38,7 @@ aptos-types = { path = "../types" }
 aptos-vm = { path = "../aptos-move/aptos-vm" }
 aptos-workspace-hack = { version = "0.1", path = "../crates/aptos-workspace-hack" }
 aptosdb = { path = "../storage/aptosdb" }
+aptos-state-view = { path = "../storage/state-view" }
 backup-service = { path = "../storage/backup/backup-service" }
 cached-framework-packages = { path = "../aptos-move/framework/cached-packages" }
 consensus = { path = "../consensus" }

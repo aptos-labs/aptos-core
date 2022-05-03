@@ -21,6 +21,7 @@ aptos-infallible = { path = "../../../crates/aptos-infallible" }
 aptos-types = { path = "../../../types" }
 aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
 storage-interface = { path = "../../../storage/storage-interface" }
+aptos-state-view = { path = "../../../storage/state-view" }
 
 
 [dev-dependencies]

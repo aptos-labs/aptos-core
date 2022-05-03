@@ -16,6 +16,8 @@ rand = "0.8.3"
 executor = { path = "../executor" }
 executor-types = { path = "../executor-types" }
 aptosdb = { path = "../../storage/aptosdb", features = ["fuzzing"] }
+aptos-state-view = { path = "../../storage/state-view" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e", version = "0.0.4", features=["address32"] }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }

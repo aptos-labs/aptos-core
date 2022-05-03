@@ -71,6 +71,7 @@ use aptos_types::{
     state_proof::StateProof,
     state_store::{
         state_key::StateKey,
+        state_key_prefix::StateKeyPrefix,
         state_value::{
             StateKeyAndValue, StateValue, StateValueChunkWithProof, StateValueWithProof,
         },
@@ -677,6 +678,17 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_state_values_by_key_prefix(
+        &self,
+        key_prefix: &StateKeyPrefix,
+        version: Version,
+    ) -> Result<HashMap<StateKey, StateValue>> {
+        gauged_api("get_state_values_by_key_prefix", || {
+            self.state_store
+                .get_values_by_key_prefix(key_prefix, version)
+        })
+    }
+
     fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>> {
         gauged_api("get_latest_ledger_info_option", || {
             Ok(self.ledger_store.get_latest_ledger_info_option())
@@ -984,7 +996,7 @@ impl DbReader for AptosDB {
         version: Version,
         ledger_version: Version,
     ) -> Result<StateValueWithProof> {
-        gauged_api("get_value_with_proof", || {
+        gauged_api("get_state_value_with_proof", || {
             ensure!(
                 version <= ledger_version,
                 "The queried version {} should be equal to or older than ledger version {}.",

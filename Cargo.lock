@@ -189,6 +189,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-util 0.6.9",
+ "toml",
  "uuid",
 ]
 
@@ -483,6 +484,7 @@ dependencies = [
  "aptos-global-constants",
  "aptos-management",
  "aptos-secure-storage",
+ "aptos-state-view",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
@@ -723,6 +725,7 @@ dependencies = [
  "aptos-mempool",
  "aptos-metrics",
  "aptos-secure-storage",
+ "aptos-state-view",
  "aptos-telemetry",
  "aptos-temppath",
  "aptos-time-service",
@@ -953,6 +956,11 @@ dependencies = [
  "aptos-crypto",
  "aptos-types",
  "aptos-workspace-hack",
+ "bcs",
+ "move-core-types",
+ "serde 1.0.136",
+ "serde_bytes",
+ "serde_json",
 ]
 
 [[package]]
@@ -2914,6 +2922,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-id-generator",
  "aptos-infallible",
+ "aptos-state-view",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
@@ -2980,6 +2989,7 @@ dependencies = [
  "aptos-logger",
  "aptos-sdk",
  "aptos-secure-push-metrics",
+ "aptos-state-view",
  "aptos-temppath",
  "aptos-transaction-builder",
  "aptos-types",
@@ -3010,6 +3020,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-genesis-tool",
+ "aptos-state-view",
  "aptos-temppath",
  "aptos-transaction-builder",
  "aptos-types",
@@ -3018,6 +3029,7 @@ dependencies = [
  "aptosdb",
  "executor",
  "executor-types",
+ "move-core-types",
  "rand 0.8.4",
  "storage-interface",
  "storage-service",

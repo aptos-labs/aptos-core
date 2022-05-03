@@ -295,19 +295,15 @@ SignedTransaction:
 StateKey:
   ENUM:
     0:
-      AccountAddressKey:
-        NEWTYPE:
-          TYPENAME: AccountAddress
-    1:
       AccessPath:
         NEWTYPE:
           TYPENAME: AccessPath
-    2:
+    1:
       TableItem:
         STRUCT:
           - handle: U128
           - key: BYTES
-    3:
+    2:
       Raw:
         NEWTYPE: BYTES
 StructTag:

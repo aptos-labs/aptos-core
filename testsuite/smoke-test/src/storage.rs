@@ -110,6 +110,7 @@ async fn test_db_restore() {
         20,
     )
     .await;
+
     assert_balance(&client_1, &account_0, expected_balance_0).await;
     assert_balance(&client_1, &account_1, expected_balance_1).await;
 
