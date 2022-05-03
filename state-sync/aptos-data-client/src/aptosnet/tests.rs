@@ -578,6 +578,7 @@ async fn optimal_chunk_size_calculations() {
         max_account_states_chunk_sizes,
         max_concurrent_requests: 0,
         max_epoch_chunk_size,
+        max_lru_cache_size: 0,
         max_network_channel_size: 0,
         max_transaction_chunk_size,
         max_transaction_output_chunk_size,
