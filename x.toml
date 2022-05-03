@@ -228,6 +228,7 @@ root-members = [
 root-members = [
     "backup-cli",
     "db-bootstrapper",
+    "aptos",
     "aptos-genesis-tool",
     "aptos-node",
     "aptos-operational-tool",

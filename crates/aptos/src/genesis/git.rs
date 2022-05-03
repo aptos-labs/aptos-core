@@ -1,0 +1,216 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::{
+    common::types::{CliError, CliTypedResult},
+    genesis::config::Layout,
+    CliCommand,
+};
+use aptos_config::config::Token;
+use aptos_github_client::Client as GithubClient;
+use async_trait::async_trait;
+use clap::Parser;
+use serde::{de::DeserializeOwned, Serialize};
+use std::{
+    io::{Read, Write},
+    path::PathBuf,
+    str::FromStr,
+};
+
+pub const LAYOUT_NAME: &str = "layout";
+
+/// Setup a shared Github repository for Genesis
+///
+#[derive(Parser)]
+pub struct SetupGit {
+    #[clap(flatten)]
+    git_options: GitOptions,
+    /// Path to `Layout` which defines where all the files are
+    #[clap(long, parse(from_os_str))]
+    layout_path: PathBuf,
+}
+
+#[async_trait]
+impl CliCommand<()> for SetupGit {
+    fn command_name(&self) -> &'static str {
+        "SetupGit"
+    }
+
+    async fn execute(self) -> CliTypedResult<()> {
+        let layout = Layout::from_disk(&self.layout_path)?;
+
+        // Upload layout file to ensure we can read later
+        let client = self.git_options.get_client()?;
+        client.put(LAYOUT_NAME, &layout)?;
+
+        // Make a place for the modules to be uploaded
+        client.create_dir(&layout.modules_folder)?;
+
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct GithubRepo {
+    owner: String,
+    repository: String,
+}
+
+impl FromStr for GithubRepo {
+    type Err = CliError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<_> = s.split('/').collect();
+        if parts.len() != 2 {
+            Err(CliError::CommandArgumentError("Invalid repository must be of the form 'owner/repository` e.g. 'aptos-labs/aptos-core'".to_string()))
+        } else {
+            Ok(GithubRepo {
+                owner: parts.get(0).unwrap().to_string(),
+                repository: parts.get(0).unwrap().to_string(),
+            })
+        }
+    }
+}
+
+#[derive(Clone, Parser)]
+pub struct GitOptions {
+    /// Github repository e.g. 'aptos-labs/aptos-core'
+    #[clap(long)]
+    github_repository: Option<GithubRepo>,
+    /// Github repository branch e.g. main
+    #[clap(long, default_value = "main")]
+    github_branch: String,
+    /// Path to Github API token.  Token must have repo:* permissions
+    #[clap(long, parse(from_os_str))]
+    github_token_path: Option<PathBuf>,
+    /// Path to local git repo.
+    #[clap(long, parse(from_os_str))]
+    local_repository_path: Option<PathBuf>,
+}
+
+impl GitOptions {
+    pub fn get_client(self) -> CliTypedResult<GitClient> {
+        if self.github_repository.is_none()
+            && self.github_token_path.is_none()
+            && self.local_repository_path.is_some()
+        {
+            Ok(GitClient::local(self.local_repository_path.unwrap()))
+        } else if self.github_repository.is_some()
+            && self.github_token_path.is_some()
+            && self.local_repository_path.is_none()
+        {
+            GitClient::github(
+                self.github_repository.unwrap(),
+                self.github_branch,
+                self.github_token_path.unwrap(),
+            )
+        } else {
+            Err(CliError::CommandArgumentError("Must provide either only --local-repository-path or both --github-repository and --github-token-path".to_string()))
+        }
+    }
+}
+
+/// A Git client for abstracting away local vs Github
+///
+/// Note: Writes do not commit locally
+pub enum GitClient {
+    Local(PathBuf),
+    Github(GithubClient),
+}
+
+impl GitClient {
+    pub fn local(path: PathBuf) -> GitClient {
+        GitClient::Local(path)
+    }
+
+    pub fn github(
+        repository: GithubRepo,
+        branch: String,
+        token_path: PathBuf,
+    ) -> CliTypedResult<GitClient> {
+        let token = Token::FromDisk(token_path).read_token()?;
+        Ok(GitClient::Github(GithubClient::new(
+            repository.owner,
+            repository.repository,
+            branch,
+            token,
+        )))
+    }
+
+    /// Retrieves an object as a YAML encoded file from the appropriate storage
+    pub fn get<T: DeserializeOwned>(&self, name: &str) -> CliTypedResult<T> {
+        match self {
+            GitClient::Local(local_repository_path) => {
+                let path = local_repository_path.join(format!("{}.yml", name));
+                let mut file = std::fs::File::open(path.clone())
+                    .map_err(|e| CliError::IO(path.display().to_string(), e))?;
+                let mut contents = String::new();
+                file.read_to_string(&mut contents)
+                    .map_err(|e| CliError::IO(path.display().to_string(), e))?;
+                from_yaml(&contents)
+            }
+            GitClient::Github(client) => {
+                from_base64_encoded_yaml(&client.get_file(&format!("{}.yml", name))?)
+            }
+        }
+    }
+
+    /// Puts an object as a YAML encoded file to the appropriate storage
+    pub fn put<T: Serialize + ?Sized>(&self, name: &str, input: &T) -> CliTypedResult<()> {
+        match self {
+            GitClient::Local(local_repository_path) => {
+                let path = local_repository_path.join(format!("{}.yml", name));
+                let mut file = if path.exists() {
+                    std::fs::File::open(path.clone())
+                        .map_err(|e| CliError::IO(path.display().to_string(), e))?
+                } else {
+                    std::fs::File::create(path.clone())
+                        .map_err(|e| CliError::IO(path.display().to_string(), e))?
+                };
+
+                file.write_all(to_yaml(input)?.as_bytes())
+                    .map_err(|e| CliError::IO(path.display().to_string(), e))?;
+            }
+            GitClient::Github(client) => {
+                client.put(&format!("{}.yml", name), &to_base64_encoded_yaml(input)?)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn create_dir(&self, name: &str) -> CliTypedResult<()> {
+        match self {
+            GitClient::Local(local_repository_path) => {
+                let path = local_repository_path.join(name);
+                if path.exists() && path.is_dir() {
+                    // Do nothing
+                } else {
+                    std::fs::create_dir(path.clone())
+                        .map_err(|e| CliError::IO(path.display().to_string(), e))?
+                };
+            }
+            GitClient::Github(_) => {
+                // There's no such thing as an empty directory in Git, so do nothing
+            }
+        }
+
+        Ok(())
+    }
+}
+
+pub fn to_yaml<T: Serialize + ?Sized>(input: &T) -> CliTypedResult<String> {
+    Ok(serde_yaml::to_string(input)?)
+}
+
+pub fn from_yaml<T: DeserializeOwned>(input: &str) -> CliTypedResult<T> {
+    Ok(serde_yaml::from_str(input)?)
+}
+
+pub fn to_base64_encoded_yaml<T: Serialize + ?Sized>(input: &T) -> CliTypedResult<String> {
+    Ok(base64::encode(to_yaml(input)?))
+}
+
+pub fn from_base64_encoded_yaml<T: DeserializeOwned>(input: &str) -> CliTypedResult<T> {
+    from_yaml(&String::from_utf8(base64::decode(input)?)?)
+}
