@@ -1,0 +1,3 @@
+*.tfstate
+*.tfstate.backup
+*.yml
