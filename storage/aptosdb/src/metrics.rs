@@ -7,7 +7,7 @@ use aptos_metrics::{
 };
 use once_cell::sync::Lazy;
 
-pub static APTOS_STORAGE_LEDGER: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static LEDGER_COUNTER: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         // metric name
         "aptos_storage_ledger",
@@ -19,7 +19,7 @@ pub static APTOS_STORAGE_LEDGER: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static APTOS_STORAGE_COMMITTED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
+pub static COMMITTED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_storage_committed_txns",
         "Aptos storage committed transactions"
@@ -27,7 +27,7 @@ pub static APTOS_STORAGE_COMMITTED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static APTOS_STORAGE_LATEST_TXN_VERSION: Lazy<IntGauge> = Lazy::new(|| {
+pub static LATEST_TXN_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_storage_latest_transaction_version",
         "Aptos storage latest transaction version"
@@ -35,7 +35,7 @@ pub static APTOS_STORAGE_LATEST_TXN_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static APTOS_STORAGE_LEDGER_VERSION: Lazy<IntGauge> = Lazy::new(|| {
+pub static LEDGER_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_storage_ledger_version",
         "Version in the latest saved ledger info."
@@ -43,7 +43,7 @@ pub static APTOS_STORAGE_LEDGER_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static APTOS_STORAGE_NEXT_BLOCK_EPOCH: Lazy<IntGauge> = Lazy::new(|| {
+pub static NEXT_BLOCK_EPOCH: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_storage_next_block_epoch",
         "ledger_info.next_block_epoch() for the latest saved ledger info."
@@ -51,20 +51,28 @@ pub static APTOS_STORAGE_NEXT_BLOCK_EPOCH: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static APTOS_STORAGE_LATEST_ACCOUNT_COUNT: Lazy<IntGauge> = Lazy::new(|| {
+pub static STATE_ITEM_COUNT: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "aptos_storage_latest_account_count",
-        "Total number of account in the StateDB at the latest version."
+        "aptos_storage_state_item_count",
+        "Total number of entries in the StateDB at the latest version."
     )
     .unwrap()
 });
 
-pub static APTOS_STORAGE_PRUNE_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!("aptos_storage_prune_window", "Aptos storage prune window").unwrap()
+pub static PRUNER_WINDOW: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        // metric name
+        "aptos_storage_prune_window",
+        // metric description
+        "Aptos storage prune window",
+        // metric labels (dimensions)
+        &["pruner_name",]
+    )
+    .unwrap()
 });
 
 /// DB pruner least readable versions
-pub static APTOS_PRUNER_LEAST_READABLE_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static PRUNER_LEAST_READABLE_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         // metric name
         "aptos_pruner_least_readable_version",
@@ -76,7 +84,10 @@ pub static APTOS_PRUNER_LEAST_READABLE_VERSION: Lazy<IntGaugeVec> = Lazy::new(||
     .unwrap()
 });
 
-pub static APTOS_STORAGE_API_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+pub static PRUNER_BATCH_SIZE: Lazy<IntGauge> =
+    Lazy::new(|| register_int_gauge!("pruner_batch_size", "Aptos pruner batch size").unwrap());
+
+pub static API_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
         "aptos_storage_api_latency_seconds",
@@ -88,7 +99,7 @@ pub static APTOS_STORAGE_API_LATENCY_SECONDS: Lazy<HistogramVec> = Lazy::new(|| 
     .unwrap()
 });
 
-pub static APTOS_STORAGE_OTHER_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+pub static OTHER_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
         "aptos_storage_other_timers_seconds",
@@ -101,7 +112,7 @@ pub static APTOS_STORAGE_OTHER_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(||
 });
 
 /// Rocksdb metrics
-pub static APTOS_STORAGE_ROCKSDB_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static ROCKSDB_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         // metric name
         "aptos_rocksdb_properties",

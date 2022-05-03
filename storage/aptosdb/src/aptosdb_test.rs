@@ -3,7 +3,7 @@
 
 use crate::{
     get_first_seq_num_and_limit, schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    test_helper, test_helper::arb_blocks_to_commit, AptosDB, APTOS_STORAGE_ROCKSDB_PROPERTIES,
+    test_helper, test_helper::arb_blocks_to_commit, AptosDB, ROCKSDB_PROPERTIES,
 };
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
@@ -129,7 +129,7 @@ fn test_get_latest_tree_state() {
 #[test]
 fn test_rocksdb_properties_reporter() {
     fn get_metric() -> i64 {
-        APTOS_STORAGE_ROCKSDB_PROPERTIES
+        ROCKSDB_PROPERTIES
             .get_metric_with_label_values(&[
                 "transaction_info",
                 "aptos_rocksdb_is-file-deletions-enabled",

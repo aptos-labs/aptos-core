@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    metrics::APTOS_PRUNER_LEAST_READABLE_VERSION,
+    metrics::PRUNER_LEAST_READABLE_VERSION,
     pruner::{
         db_pruner::DBPruner,
         db_sub_pruner::DBSubPruner,
@@ -37,10 +37,14 @@ impl DBPruner for LedgerPruner {
     }
 
     fn prune(&self, db_batch: &mut SchemaBatch, max_versions: u64) -> anyhow::Result<Version> {
+        if !self.is_pruning_pending() {
+            return Ok(self.least_readable_version());
+        }
         let least_readable_version = self.least_readable_version();
         // Current target version might be less than the target version to ensure we don't prune
         // more than max_version in one go.
         let current_target_version = self.get_currrent_batch_target(max_versions);
+
         self.transaction_store_pruner.prune(
             db_batch,
             least_readable_version,
@@ -53,6 +57,7 @@ impl DBPruner for LedgerPruner {
             least_readable_version,
             current_target_version,
         )?;
+
         self.event_store_pruner
             .prune(db_batch, least_readable_version, current_target_version)?;
 
@@ -82,7 +87,7 @@ impl DBPruner for LedgerPruner {
     fn record_progress(&self, least_readable_version: Version) {
         self.least_readable_version
             .store(least_readable_version, Ordering::Relaxed);
-        APTOS_PRUNER_LEAST_READABLE_VERSION
+        PRUNER_LEAST_READABLE_VERSION
             .with_label_values(&["ledger_pruner"])
             .set(least_readable_version as i64);
     }

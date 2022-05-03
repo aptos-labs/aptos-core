@@ -525,6 +525,11 @@ pub trait DbReader: Send + Sync {
     fn get_state_prune_window(&self) -> Result<Option<usize>> {
         unimplemented!()
     }
+
+    /// Get the ledger prune window config value.
+    fn get_ledger_prune_window(&self) -> Result<Option<usize>> {
+        unimplemented!()
+    }
 }
 
 impl MoveStorage for &dyn DbReader {

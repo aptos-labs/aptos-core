@@ -38,10 +38,8 @@ use crate::{
     ledger_counters::LedgerCounters,
     ledger_store::LedgerStore,
     metrics::{
-        APTOS_STORAGE_API_LATENCY_SECONDS, APTOS_STORAGE_COMMITTED_TXNS,
-        APTOS_STORAGE_LATEST_ACCOUNT_COUNT, APTOS_STORAGE_LATEST_TXN_VERSION,
-        APTOS_STORAGE_LEDGER_VERSION, APTOS_STORAGE_NEXT_BLOCK_EPOCH,
-        APTOS_STORAGE_OTHER_TIMERS_SECONDS, APTOS_STORAGE_ROCKSDB_PROPERTIES,
+        API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
+        OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES, STATE_ITEM_COUNT,
     },
     pruner::{utils, Pruner},
     schema::*,
@@ -153,12 +151,12 @@ fn gen_rocksdb_options(config: &RocksdbConfig) -> Options {
 }
 
 fn update_rocksdb_properties(db: &DB) -> Result<()> {
-    let _timer = APTOS_STORAGE_OTHER_TIMERS_SECONDS
+    let _timer = OTHER_TIMERS_SECONDS
         .with_label_values(&["update_rocksdb_properties"])
         .start_timer();
     for cf_name in AptosDB::column_families() {
         for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
-            APTOS_STORAGE_ROCKSDB_PROPERTIES
+            ROCKSDB_PROPERTIES
                 .with_label_values(&[cf_name, aptos_rocksdb_property_name])
                 .set(db.get_property(cf_name, rockdb_property_name)? as i64);
         }
@@ -576,7 +574,7 @@ impl AptosDB {
 
         // Account state updates. Gather account state root hashes
         {
-            let _timer = APTOS_STORAGE_OTHER_TIMERS_SECONDS
+            let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["save_transactions_state"])
                 .start_timer();
 
@@ -595,7 +593,7 @@ impl AptosDB {
 
         // Event updates. Gather event accumulator root hashes.
         {
-            let _timer = APTOS_STORAGE_OTHER_TIMERS_SECONDS
+            let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["save_transactions_events"])
                 .start_timer();
             zip_eq(first_version..=last_version, txns_to_commit)
@@ -606,7 +604,7 @@ impl AptosDB {
         }
 
         let new_root_hash = {
-            let _timer = APTOS_STORAGE_OTHER_TIMERS_SECONDS
+            let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["save_transactions_txn_infos"])
                 .start_timer();
             zip_eq(first_version..=last_version, txns_to_commit).try_for_each(
@@ -1211,6 +1209,15 @@ impl DbReader for AptosDB {
                 .map(|x| x.get_state_store_pruner_window() as usize))
         })
     }
+
+    fn get_ledger_prune_window(&self) -> Result<Option<usize>> {
+        gauged_api("get_ledger_prune_window", || {
+            Ok(self
+                .pruner
+                .as_ref()
+                .map(|x| x.get_ledger_pruner_window() as usize))
+        })
+    }
 }
 
 impl DbWriter for AptosDB {
@@ -1277,7 +1284,7 @@ impl DbWriter for AptosDB {
             // Persist.
             let (sealed_cs, counters) = self.seal_change_set(first_version, num_txns, cs)?;
             {
-                let _timer = APTOS_STORAGE_OTHER_TIMERS_SECONDS
+                let _timer = OTHER_TIMERS_SECONDS
                     .with_label_values(&["save_transactions_commit"])
                     .start_timer();
                 self.commit(sealed_cs)?;
@@ -1288,13 +1295,13 @@ impl DbWriter for AptosDB {
             if num_txns > 0 {
                 let last_version = first_version + num_txns - 1;
                 self.state_store.set_latest_version(last_version);
-                APTOS_STORAGE_COMMITTED_TXNS.inc_by(num_txns);
-                APTOS_STORAGE_LATEST_TXN_VERSION.set(last_version as i64);
+                COMMITTED_TXNS.inc_by(num_txns);
+                LATEST_TXN_VERSION.set(last_version as i64);
                 counters
                     .expect("Counters should be bumped with transactions being saved.")
                     .bump_op_counters();
                 // -1 for "not fully migrated", -2 for "error on get_account_count()"
-                APTOS_STORAGE_LATEST_ACCOUNT_COUNT.set(
+                STATE_ITEM_COUNT.set(
                     self.state_store
                         .get_value_count(last_version)
                         .map_or(-1, |c| c as i64),
@@ -1307,8 +1314,8 @@ impl DbWriter for AptosDB {
             if let Some(x) = ledger_info_with_sigs {
                 self.ledger_store.set_latest_ledger_info(x.clone());
 
-                APTOS_STORAGE_LEDGER_VERSION.set(x.ledger_info().version() as i64);
-                APTOS_STORAGE_NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);
+                LEDGER_VERSION.set(x.ledger_info().version() as i64);
+                NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);
             }
 
             Ok(())
@@ -1461,7 +1468,7 @@ where
             "Err"
         }
     };
-    APTOS_STORAGE_API_LATENCY_SECONDS
+    API_LATENCY_SECONDS
         .with_label_values(&[api_name, res_type])
         .observe(timer.elapsed().as_secs_f64());
 

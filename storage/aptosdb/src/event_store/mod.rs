@@ -392,19 +392,47 @@ impl EventStore {
     }
 
     /// Prunes events by accumulator store for a range of version in [begin, end)
-    pub fn prune_event_accumulator(
+    fn prune_event_accumulator(
         &self,
         begin: Version,
         end: Version,
         db_batch: &mut SchemaBatch,
     ) -> anyhow::Result<()> {
-        db_batch.delete_range::<EventAccumulatorSchema>(
-            &(begin, Position::from_inorder_index(0)),
-            &(end, Position::from_inorder_index(0)),
-        )
+        let mut iter = self.db.iter::<EventAccumulatorSchema>(Default::default())?;
+        iter.seek(&(begin, Position::from_inorder_index(0)))?;
+        while let Some(((version, position), _)) = iter.next().transpose()? {
+            if version >= end {
+                return Ok(());
+            }
+            db_batch.delete::<EventAccumulatorSchema>(&(version, position))?;
+        }
+        Ok(())
     }
 
-    /// Prunes events by version store for a set of events in version range [begin, end)
+    /// Prune a set of candidate events in the range of version in [begin, end) and all related indices
+    pub fn prune_events(
+        &self,
+        start: Version,
+        end: Version,
+        db_batch: &mut SchemaBatch,
+    ) -> anyhow::Result<()> {
+        let mut current_version = start;
+        for events in self.get_events_by_version_iter(start, (end - start) as usize)? {
+            for (current_index, event) in (events?).into_iter().enumerate() {
+                db_batch.delete::<EventByVersionSchema>(&(
+                    *event.key(),
+                    current_version as u64,
+                    event.sequence_number(),
+                ))?;
+                db_batch.delete::<EventByKeySchema>(&(*event.key(), event.sequence_number()))?;
+                db_batch.delete::<EventSchema>(&(current_version as u64, current_index as u64))?;
+            }
+            current_version += 1;
+        }
+        self.prune_event_accumulator(start, end, db_batch)?;
+        Ok(())
+    }
+
     pub fn prune_events_by_version(
         &self,
         event_keys: HashSet<EventKey>,

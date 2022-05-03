@@ -127,6 +127,7 @@ fn verify_txn_store_pruner(
             )
             .unwrap();
         // ensure that all transaction up to i * 2 has been pruned
+        assert_eq!(*pruner.last_version_sent_to_pruners.lock(), i as u64);
         for j in 0..i {
             verify_txn_not_in_store(transaction_store, &txns, j as u64, ledger_version);
         }

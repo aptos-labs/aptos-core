@@ -173,10 +173,6 @@ mock! {
             fetch_events: bool,
         ) -> Result<TransactionWithProof>;
 
-        fn get_first_txn_version(&self) -> Result<Option<Version>>;
-
-        fn get_first_write_set_version(&self) -> Result<Option<Version>>;
-
         fn get_transaction_outputs(
             &self,
             start_version: Version,
