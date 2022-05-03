@@ -102,7 +102,8 @@ pub(crate) struct PeerStates {
     config: StorageServiceConfig,
     peer_to_state: HashMap<PeerNetworkId, PeerState>,
     polled_peers: HashSet<PeerNetworkId>, // The peers already marked as polled
-    polled_peer_queue: VecDeque<PeerNetworkId>, // The order in which peers were polled
+    prioritized_peer_queue: VecDeque<PeerNetworkId>, // The order in which high-priority peers were polled
+    regular_peer_queue: VecDeque<PeerNetworkId>,     // The order in which regular peers were polled
 }
 
 impl PeerStates {
@@ -111,7 +112,8 @@ impl PeerStates {
             config,
             peer_to_state: HashMap::new(),
             polled_peers: HashSet::new(),
-            polled_peer_queue: VecDeque::new(),
+            prioritized_peer_queue: VecDeque::new(),
+            regular_peer_queue: VecDeque::new(),
         }
     }
 
@@ -173,9 +175,14 @@ impl PeerStates {
     }
 
     /// Marks the given peer as polled
-    pub fn add_polled_peer(&mut self, peer: PeerNetworkId) {
-        self.polled_peer_queue.push_front(peer);
-        let _ = self.polled_peers.insert(peer);
+    pub fn mark_peer_as_polled(&mut self, peer: &PeerNetworkId) {
+        let _ = self.polled_peers.insert(*peer);
+
+        if is_priority_peer(peer) {
+            self.prioritized_peer_queue.push_front(*peer);
+        } else {
+            self.regular_peer_queue.push_front(*peer);
+        }
     }
 
     /// Returns true iff the given peer has already been polled
@@ -183,9 +190,14 @@ impl PeerStates {
         self.polled_peers.contains(peer)
     }
 
-    /// Returns the peer that was last polled and contains the oldest data
-    pub fn oldest_polled_peer(&mut self) -> Option<PeerNetworkId> {
-        self.polled_peer_queue.pop_back()
+    /// Returns the high-priority peer that was last polled and contains the oldest data
+    pub fn oldest_polled_priority_peer(&mut self) -> Option<PeerNetworkId> {
+        self.prioritized_peer_queue.pop_back()
+    }
+
+    /// Returns the regular peer that was last polled and contains the oldest data
+    pub fn oldest_polled_regular_peer(&mut self) -> Option<PeerNetworkId> {
+        self.regular_peer_queue.pop_back()
     }
 
     /// Updates the storage summary for the given peer
@@ -290,6 +302,13 @@ pub(crate) fn calculate_optimal_chunk_sizes(
         transaction_chunk_size,
         transaction_output_chunk_size,
     }
+}
+
+/// Returns true iff the given peer is high-priority.
+///
+/// TODO(joshlind): make this less hacky using network topological awareness.
+fn is_priority_peer(peer: &PeerNetworkId) -> bool {
+    peer.network_id().is_validator_network()
 }
 
 /// Calculates the median of the given set of values (if it exists)
