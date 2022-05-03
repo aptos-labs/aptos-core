@@ -10,6 +10,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::aptos_root_address,
     account_state::AccountState,
+    account_view::AccountView,
     contract_event::{ContractEvent, EventWithProof},
     event::EventKey,
     transaction::{ChangeSet, Transaction, TransactionOutput, Version, WriteSetPayload},

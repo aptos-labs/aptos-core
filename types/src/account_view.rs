@@ -8,15 +8,16 @@ use crate::{
         access_path_for_config, ConfigurationResource, OnChainConfig, ValidatorSet, Version,
     },
     state_store::state_key::StateKey,
-    validator_config::ValidatorConfig,
+    validator_config::{ValidatorConfig, ValidatorOperatorConfigResource},
 };
+use anyhow::anyhow;
 use move_core_types::{account_address::AccountAddress, move_resource::MoveResource};
 use serde::de::DeserializeOwned;
 
 pub trait AccountView {
     fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>>;
 
-    fn get_account_address(&self) -> &AccountAddress;
+    fn get_account_address(&self) -> anyhow::Result<Option<AccountAddress>>;
 
     fn get_validator_set(&self) -> anyhow::Result<Option<ValidatorSet>> {
         self.get_on_chain_config::<ValidatorSet>()
@@ -27,17 +28,21 @@ pub trait AccountView {
     }
 
     fn get_move_resource<T: MoveResource>(&self) -> anyhow::Result<Option<T>> {
-        let state_key = self.get_state_key_for_path(T::struct_tag().access_vector());
-        self.get_resource_impl(&state_key)
+        self.get_resource_impl(T::struct_tag().access_vector())
     }
 
     fn get_validator_config_resource(&self) -> anyhow::Result<Option<ValidatorConfig>> {
         self.get_resource::<ValidatorConfig>()
     }
 
+    fn get_validator_operator_config_resource(
+        &self,
+    ) -> anyhow::Result<Option<ValidatorOperatorConfigResource>> {
+        self.get_resource::<ValidatorOperatorConfigResource>()
+    }
+
     fn get_on_chain_config<T: OnChainConfig>(&self) -> anyhow::Result<Option<T>> {
-        let state_key = self.get_state_key_for_path(access_path_for_config(T::CONFIG_ID).path);
-        self.get_resource_impl(&state_key)
+        self.get_resource_impl(access_path_for_config(T::CONFIG_ID).path)
     }
 
     fn get_version(&self) -> anyhow::Result<Option<Version>> {
@@ -45,7 +50,7 @@ pub trait AccountView {
     }
 
     fn get_resource<T: MoveResource>(&self) -> anyhow::Result<Option<T>> {
-        self.get_resource_impl(&self.get_state_key_for_path(T::struct_tag().access_vector()))
+        self.get_resource_impl(T::struct_tag().access_vector())
     }
 
     fn get_chain_id_resource(&self) -> anyhow::Result<Option<ChainIdResource>> {
@@ -60,19 +65,23 @@ pub trait AccountView {
         self.get_resource::<BalanceResource>()
     }
 
-    fn get_state_key_for_path(&self, path: Vec<u8>) -> StateKey {
-        StateKey::AccessPath(AccessPath::new(*self.get_account_address(), path))
+    fn get_state_key_for_path(&self, path: Vec<u8>) -> anyhow::Result<StateKey> {
+        let account_address = self
+            .get_account_address()?
+            .ok_or_else(|| anyhow!("Could not fetch account address"))?;
+        Ok(StateKey::AccessPath(AccessPath::new(account_address, path)))
     }
 
     fn get_account_resource(&self) -> anyhow::Result<Option<AccountResource>> {
         self.get_resource::<AccountResource>()
     }
 
-    fn get_resource_impl<T: DeserializeOwned>(
-        &self,
-        state_key: &StateKey,
-    ) -> anyhow::Result<Option<T>> {
-        self.get_state_value(state_key)?
+    fn get_config<T: OnChainConfig>(&self) -> anyhow::Result<Option<T>> {
+        self.get_resource_impl(access_path_for_config(T::CONFIG_ID).path)
+    }
+
+    fn get_resource_impl<T: DeserializeOwned>(&self, path: Vec<u8>) -> anyhow::Result<Option<T>> {
+        self.get_state_value(&self.get_state_key_for_path(path)?)?
             .map(|bytes| bcs::from_bytes(&bytes))
             .transpose()
             .map_err(Into::into)

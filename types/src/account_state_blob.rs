@@ -4,6 +4,7 @@
 use crate::{
     account_config::{AccountResource, BalanceResource},
     account_state::AccountState,
+    account_view::AccountView,
     state_store::state_value::StateValue,
 };
 use anyhow::{anyhow, format_err, Error, Result};

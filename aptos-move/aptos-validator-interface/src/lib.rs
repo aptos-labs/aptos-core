@@ -11,6 +11,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config,
     account_state::AccountState,
+    account_view::AccountView,
     contract_event::EventWithProof,
     event::EventKey,
     on_chain_config::ValidatorSet,
