@@ -18,9 +18,5 @@
   "background": {
     "scripts": ["background.ts"],
     "persistent": true
-  },
-  "externally_connectable": {
-    "matches": ["http://localhost/*"],
-    "ids": ["*"]
   }
 }

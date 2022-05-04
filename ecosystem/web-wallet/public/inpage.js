@@ -1,31 +1,49 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-const extensionId = 'jmmhmakollmjgkjgnbeppkccgddmjnib'
-
 class Web3 {
+  requestId;
+
+  constructor() {
+    this.requestId = 0
+  }
+
   account () {
+    const id = this.requestId++
     return new Promise(function (resolve, reject) {
-      chrome.runtime.sendMessage(extensionId, { method: 'getAccountAddress' }, function (response) {
-        if (response.address) {
-          resolve(response.address)
-        } else {
-          reject(response.error ?? 'Error')
+      const method = 'getAccountAddress'
+      window.postMessage({ method, id })
+      window.addEventListener('message', function handler (event) {
+        if (event.data.responseMethod === method
+            && event.data.id === id ) {
+          const response = event.data.response
+          this.removeEventListener('message', handler);
+          if (response.address) {
+            resolve(response.address)
+          } else {
+            reject(response.error ?? 'Error')
+          }
         }
-        return true
       })
     })
   }
 
-  signTransaction (transaction, completion) {
+  signTransaction (transaction) {
+    const id = this.requestId++
     return new Promise(function (resolve, reject) {
-      chrome.runtime.sendMessage(extensionId, { method: 'signTransaction', transaction }, function (response) {
-        if (response.transaction) {
-          resolve(response.transaction)
-        } else {
-          reject(response.error ?? 'Error')
+      const method = 'signTransaction'
+      window.postMessage({ method, transaction, id})
+      window.addEventListener('message', function handler (event) {
+        if (event.data.responseMethod === method
+            && event.data.id === id ) {
+          const response = event.data.response
+          this.removeEventListener('message', handler);
+          if (response.transaction) {
+            resolve(response.transaction)
+          } else {
+            reject(response.error ?? 'Error')
+          }
         }
-        return true
       })
     })
   }
