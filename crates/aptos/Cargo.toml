@@ -32,6 +32,7 @@ uuid = { version = "0.8.2", features = ["v4", "serde"] }
 
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto" }
+aptosdb = { path = "../../storage/aptosdb" }
 aptos-logger = { path = "../aptos-logger" }
 aptos-management = { path = "../../config/management" }
 aptos-secure-storage = { path = "../../secure/storage" }
@@ -45,6 +46,7 @@ aptos-rest-client = { path = "../../crates/aptos-rest-client"}
 aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 bcs = "0.1.2"
+executor = { path = "../../execution/executor" }
 short-hex-str = { path = "../short-hex-str" }
 cached-framework-packages =  { path = "../../aptos-move/framework/cached-packages" }
 move-binary-format = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
@@ -57,6 +59,7 @@ move-stdlib = { git = "https://github.com/move-language/move", rev = "f2e7585b1e
 move-vm-runtime = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["testing"] }
 framework = { path = '../../aptos-move/framework' }
 move-table-extension = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
+storage-interface = { path = "../../storage/storage-interface" }
 vm-genesis = { path = "../../aptos-move/vm-genesis" }
 
 [build-dependencies]

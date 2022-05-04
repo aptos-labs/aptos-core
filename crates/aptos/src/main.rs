@@ -16,7 +16,7 @@ async fn main() {
     logger
         .channel_size(1000)
         .is_async(false)
-        .level(Level::Info)
+        .level(Level::Warn)
         .read_env();
     logger.build();
 
