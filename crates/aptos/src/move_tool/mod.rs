@@ -89,7 +89,7 @@ impl CliCommand<()> for InitPackage {
 
     async fn execute(self) -> CliTypedResult<()> {
         let move_toml = self.package_dir.join(SourcePackageLayout::Manifest.path());
-        check_if_file_exists(move_toml.as_path(), self.prompt_options.assume_yes)?;
+        check_if_file_exists(move_toml.as_path(), self.prompt_options)?;
         create_dir_all(self.package_dir.join(SourcePackageLayout::Sources.path())).map_err(
             |err| {
                 CliError::IO(
