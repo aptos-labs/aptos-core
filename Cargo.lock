@@ -197,6 +197,7 @@ dependencies = [
  "tokio-util 0.6.9",
  "toml",
  "uuid",
+ "vm-genesis",
 ]
 
 [[package]]

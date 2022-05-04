@@ -5,10 +5,23 @@ use crate::{
     common::types::{CliError, CliTypedResult},
     genesis::git::from_yaml,
 };
+use aptos_config::config::HANDSHAKE_VERSION;
 use aptos_crypto::{ed25519::Ed25519PublicKey, x25519};
-use aptos_types::{chain_id::ChainId, network_address::DnsName};
+use aptos_types::{
+    chain_id::ChainId,
+    network_address::{DnsName, NetworkAddress, Protocol},
+    transaction::authenticator::AuthenticationKey,
+};
 use serde::{Deserialize, Serialize};
-use std::{fs::File, io::Read, path::PathBuf, str::FromStr};
+use std::{
+    convert::TryFrom,
+    fs::File,
+    io::Read,
+    net::{Ipv4Addr, Ipv6Addr},
+    path::PathBuf,
+    str::FromStr,
+};
+use vm_genesis::Validator;
 
 /// Template for setting up Github for Genesis
 ///
@@ -39,7 +52,7 @@ impl Layout {
 
 /// A set of configuration needed to add a Validator to genesis
 ///
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ValidatorConfiguration {
     /// Key used for signing in consensus
     pub consensus_key: Ed25519PublicKey,
@@ -53,11 +66,66 @@ pub struct ValidatorConfiguration {
     pub full_node_host: Option<HostAndPort>,
 }
 
+impl From<ValidatorConfiguration> for Validator {
+    fn from(config: ValidatorConfiguration) -> Self {
+        let auth_key = AuthenticationKey::ed25519(&config.account_key);
+        let validator_addresses = vec![config
+            .validator_host
+            .as_network_address(config.network_key)
+            .unwrap()];
+        let full_node_addresses = if let Some(full_node_host) = config.full_node_host {
+            vec![full_node_host
+                .as_network_address(config.network_key)
+                .unwrap()]
+        } else {
+            vec![]
+        };
+
+        Validator {
+            address: auth_key.derived_address(),
+            name: vec![], // TODO: To remove
+            consensus_pubkey: bcs::to_bytes(&config.consensus_key).unwrap(),
+            operator_address: auth_key.derived_address(),
+            operator_name: vec![], // TODO: To remove
+            network_address: bcs::to_bytes(&validator_addresses).unwrap(),
+            full_node_network_address: bcs::to_bytes(&full_node_addresses).unwrap(),
+            operator_auth_key: auth_key,
+            auth_key,
+        }
+    }
+}
+
 /// Combined Host (DnsName or IP) and port
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HostAndPort {
     pub host: DnsName,
     pub port: u16,
+}
+
+impl HostAndPort {
+    pub fn as_network_address(&self, key: x25519::PublicKey) -> CliTypedResult<NetworkAddress> {
+        let host = self.host.to_string();
+
+        // Since DnsName supports IPs as well, let's properly fix what the type is
+        let host_protocol = if let Ok(ip) = Ipv4Addr::from_str(&host) {
+            Protocol::Ip4(ip)
+        } else if let Ok(ip) = Ipv6Addr::from_str(&host) {
+            Protocol::Ip6(ip)
+        } else {
+            Protocol::Dns(self.host.clone())
+        };
+        let port_protocol = Protocol::Tcp(self.port);
+        let noise_protocol = Protocol::NoiseIK(key);
+        let handshake_protocol = Protocol::Handshake(HANDSHAKE_VERSION);
+
+        NetworkAddress::try_from(vec![
+            host_protocol,
+            port_protocol,
+            noise_protocol,
+            handshake_protocol,
+        ])
+        .map_err(|e| CliError::UnexpectedError(e.to_string()))
+    }
 }
 
 impl FromStr for HostAndPort {

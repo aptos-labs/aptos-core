@@ -22,7 +22,8 @@ const NETWORK_KEY_FILE: &str = "network.key";
 /// Generate account key, consensus key, and network key for a validator
 #[derive(Parser)]
 pub struct GenerateKeys {
-    #[clap(long, parse(from_os_str))]
+    /// Output path for the three keys
+    #[clap(long, parse(from_os_str), default_value = ".")]
     output_path: PathBuf,
 }
 
@@ -43,7 +44,7 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
     }
 }
 
-/// Upload ValidatorCredentials
+/// Set ValidatorConfiguration for a single validator in the git repository
 #[derive(Parser)]
 pub struct SetValidatorConfiguration {
     /// Username
@@ -52,7 +53,7 @@ pub struct SetValidatorConfiguration {
     #[clap(flatten)]
     git_options: GitOptions,
     /// Path to credentials
-    #[clap(long, parse(from_os_str), default_value = ".aptos/")]
+    #[clap(long, parse(from_os_str), default_value = ".")]
     credentials_path: PathBuf,
     /// Host and port pair for the validator e.g. 127.0.0.1:6180
     #[clap(long)]

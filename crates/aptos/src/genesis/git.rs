@@ -142,7 +142,7 @@ impl GitClient {
         match self {
             GitClient::Local(local_repository_path) => {
                 let path = local_repository_path.join(format!("{}.yml", name));
-                let mut file = std::fs::File::open(path.clone())
+                let mut file = std::fs::File::open(path.as_path())
                     .map_err(|e| CliError::IO(path.display().to_string(), e))?;
                 let mut contents = String::new();
                 file.read_to_string(&mut contents)
@@ -161,10 +161,10 @@ impl GitClient {
             GitClient::Local(local_repository_path) => {
                 let path = local_repository_path.join(format!("{}.yml", name));
                 let mut file = if path.exists() {
-                    std::fs::File::open(path.clone())
+                    std::fs::File::open(path.as_path())
                         .map_err(|e| CliError::IO(path.display().to_string(), e))?
                 } else {
-                    std::fs::File::create(path.clone())
+                    std::fs::File::create(path.as_path())
                         .map_err(|e| CliError::IO(path.display().to_string(), e))?
                 };
 
@@ -186,7 +186,7 @@ impl GitClient {
                 if path.exists() && path.is_dir() {
                     // Do nothing
                 } else {
-                    std::fs::create_dir(path.clone())
+                    std::fs::create_dir(path.as_path())
                         .map_err(|e| CliError::IO(path.display().to_string(), e))?
                 };
             }
@@ -196,6 +196,52 @@ impl GitClient {
         }
 
         Ok(())
+    }
+
+    /// Retrieve bytecode Move modules from a module folder
+    pub fn get_modules(&self, name: &str) -> CliTypedResult<Vec<Vec<u8>>> {
+        let mut modules = Vec::new();
+
+        match self {
+            GitClient::Local(local_repository_path) => {
+                let module_folder = local_repository_path.join(name);
+                if !module_folder.is_dir() {
+                    return Err(CliError::UnexpectedError(format!(
+                        "{} is not a directory!",
+                        module_folder.display()
+                    )));
+                }
+
+                let files = std::fs::read_dir(module_folder.as_path())
+                    .map_err(|e| CliError::IO(module_folder.display().to_string(), e))?;
+
+                for maybe_file in files {
+                    let file = maybe_file
+                        .map_err(|e| CliError::UnexpectedError(e.to_string()))?
+                        .path();
+                    let extension = file.extension();
+
+                    // Only collect move files
+                    if file.is_file() && extension.is_some() && extension.unwrap() == "mv" {
+                        modules.push(
+                            std::fs::read(file.as_path())
+                                .map_err(|e| CliError::IO(file.display().to_string(), e))?,
+                        );
+                    }
+                }
+            }
+            GitClient::Github(client) => {
+                let files = client.get_directory(name)?;
+
+                for file in files {
+                    // Only collect .mv files
+                    if file.ends_with(".mv") {
+                        modules.push(base64::decode(client.get_file(&file)?)?)
+                    }
+                }
+            }
+        }
+        Ok(modules)
     }
 }
 
