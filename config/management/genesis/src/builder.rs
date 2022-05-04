@@ -224,8 +224,6 @@ impl<S: KVStorage> GenesisBuilder<S> {
             publishing_option,
             consensus_config,
             chain_id,
-            // TODO: Make this flag configurable via cli command.
-            false,
             min_price_per_gas_unit,
         );
 

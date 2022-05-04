@@ -15,8 +15,7 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::{
-        ConsensusConfigV1, OnChainConsensusConfig, ReadWriteSetAnalysis, VMPublishingOption,
-        APTOS_MAX_KNOWN_VERSION,
+        ConsensusConfigV1, OnChainConsensusConfig, VMPublishingOption, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
@@ -57,7 +56,6 @@ pub fn encode_genesis_transaction(
     vm_publishing_option: Option<VMPublishingOption>,
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
-    enable_parallel_execution: bool,
     min_price_per_gas_unit: u64,
 ) -> Transaction {
     Transaction::GenesisTransaction(WriteSetPayload::Direct(encode_genesis_change_set(
@@ -67,7 +65,6 @@ pub fn encode_genesis_transaction(
         vm_publishing_option.unwrap_or_else(VMPublishingOption::open),
         consensus_config,
         chain_id,
-        enable_parallel_execution,
         min_price_per_gas_unit,
     )))
 }
@@ -79,7 +76,6 @@ pub fn encode_genesis_change_set(
     vm_publishing_option: VMPublishingOption,
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
-    enable_parallel_execution: bool,
     min_price_per_gas_unit: u64,
 ) -> ChangeSet {
     let mut stdlib_modules = Vec::new();
@@ -107,28 +103,6 @@ pub fn encode_genesis_change_set(
     // generate the genesis WriteSet
     create_and_initialize_validators(&mut session, validators);
     reconfigure(&mut session);
-
-    if enable_parallel_execution {
-        let payload = bcs::to_bytes(&ReadWriteSetAnalysis::V1(
-            read_write_set::analyze(&stdlib_modules)
-                .expect("Failed to get ReadWriteSet for current Diem Framework")
-                .normalize_all_scripts(aptos_vm::read_write_set_analysis::add_on_functions_list())
-                .trim()
-                .into_inner(),
-        ))
-        .expect("Failed to serialize analyze result");
-
-        exec_function(
-            &mut session,
-            "ParallelExecutionConfig",
-            "enable_parallel_execution_with_config",
-            vec![],
-            serialize_values(&vec![
-                MoveValue::Signer(account_config::aptos_root_address()),
-                MoveValue::vector_u8(payload),
-            ]),
-        )
-    }
 
     let (mut changeset1, mut events1, _) = session.finish().unwrap().unpack();
 
@@ -350,7 +324,7 @@ pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) 
         GenesisOptions::Fresh => framework::aptos::module_blobs(),
     };
 
-    generate_test_genesis(&modules, VMPublishingOption::open(), None, false).0
+    generate_test_genesis(&modules, VMPublishingOption::open(), None).0
 }
 
 pub fn test_genesis_transaction() -> Transaction {
@@ -365,7 +339,6 @@ pub fn test_genesis_change_set_and_validators(
         cached_framework_packages::module_blobs(),
         VMPublishingOption::open(),
         count,
-        false,
     )
 }
 
@@ -436,7 +409,6 @@ pub fn generate_test_genesis(
     stdlib_modules: &[Vec<u8>],
     vm_publishing_option: VMPublishingOption,
     count: Option<usize>,
-    enable_parallel_execution: bool,
 ) -> (ChangeSet, Vec<TestValidator>) {
     let test_validators = TestValidator::new_test_set(count);
     let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
@@ -449,7 +421,6 @@ pub fn generate_test_genesis(
         vm_publishing_option,
         OnChainConsensusConfig::V1(ConsensusConfigV1 { two_chain: true }),
         ChainId::test(),
-        enable_parallel_execution,
         0,
     );
     (genesis, test_validators)

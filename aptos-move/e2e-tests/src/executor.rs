@@ -200,20 +200,8 @@ impl FakeExecutor {
             genesis_modules,
             publishing_options,
             validator_accounts,
-            false,
         );
         Self::from_genesis(genesis.0.write_set())
-    }
-
-    pub fn parallel_genesis() -> Self {
-        let genesis = vm_genesis::generate_test_genesis(
-            cached_framework_packages::module_blobs(),
-            VMPublishingOption::open(),
-            None,
-            true,
-        )
-        .0;
-        FakeExecutor::from_genesis(genesis.write_set())
     }
 
     /// Create one instance of [`AccountData`] without saving it to data store.
