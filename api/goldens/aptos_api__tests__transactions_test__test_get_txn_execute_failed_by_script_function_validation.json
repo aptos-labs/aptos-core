@@ -2,12 +2,12 @@
   "type": "user_transaction",
   "version": "4",
   "hash": "0xb60f7bb176918849ad6f73c01695881dd1c1aa074d766174a5a6e43e7b8c557c",
-  "state_root_hash": "0x8ee95abc981028781b8a69851c8d5080999d99e9de99bf25d8205683ba7faaca",
+  "state_root_hash": "0x989b8988cba89d8576c4dbf06ad3b7eb718b2e5ecb0c94219f0746b2fbcab92d",
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "21",
   "success": false,
   "vm_status": "Move abort by LIMIT_EXCEEDED - EINSUFFICIENT_BALANCE\n A limit on an amount, e.g. a currency, is exceeded. Example: withdrawal of money after account limits window\n is exhausted.\n Error codes",
-  "accumulator_root_hash": "0x0e90265a87f415c2c975d21d549ab0526d087f79ed8985e441d6436372ef5fe8",
+  "accumulator_root_hash": "0x67d596953ae7f6b8db109af1a317d98e92709d6a154969ee3d5253505a5b5991",
   "changes": [
     {
       "type": "write_resource",

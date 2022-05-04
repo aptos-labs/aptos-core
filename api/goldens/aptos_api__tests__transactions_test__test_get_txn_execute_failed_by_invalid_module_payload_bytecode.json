@@ -2,12 +2,12 @@
   "type": "user_transaction",
   "version": "2",
   "hash": "0x92227dd758094fca1efa07a1316d3fede8dd9ebd0eff8f90ed55d288787de528",
-  "state_root_hash": "0x9dd9b394e722becec025904a320b60376b2e579ad4bc50e259fdace259e16ffd",
+  "state_root_hash": "0xc8f134b5401270b473ed503db7724ec3326baff78f8c71f5ccce39451bcb9635",
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "1",
   "success": false,
   "vm_status": "Transaction Executed and Committed with Error MALFORMED",
-  "accumulator_root_hash": "0x992a867d12af9c17262ce2913b8b707dc6363598c71dcbf8210bac984a723426",
+  "accumulator_root_hash": "0x83365487d9ebd71f8187aa263a8f89673d8c7c7f35b4d44edc51b618e3e187e2",
   "changes": [
     {
       "type": "write_resource",
