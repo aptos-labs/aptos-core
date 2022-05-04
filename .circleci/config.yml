@@ -340,7 +340,8 @@ commands:
       - run: cat $HOME/.cargo/env >> $BASH_ENV
   deploy-setup:
     steps:
-      - kubernetes/install-kubectl
+      - kubernetes/install-kubectl:
+          kubectl-version: v1.23.4
       - run:
           name: Install Helm
           # https://helm.sh/docs/intro/install/#from-apt-debianubuntu
