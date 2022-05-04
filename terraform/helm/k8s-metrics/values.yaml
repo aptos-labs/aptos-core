@@ -5,6 +5,8 @@ coredns:
 autoscaler:
   enabled:
   clusterName:
+  scaleDownUnneededTime: 15m
+  scaleDownDelayAfterAdd: 5m
   image:
     repo: k8s.gcr.io/autoscaling/cluster-autoscaler
     tag: v1.21.0

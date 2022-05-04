@@ -164,6 +164,8 @@ spec:
             - --node-group-auto-discovery=asg:tag=k8s.io/cluster-autoscaler/enabled,k8s.io/cluster-autoscaler/{{ .Values.autoscaler.clusterName }}
             - --balance-similar-node-groups
             - --skip-nodes-with-system-pods=false
+            - --scale-down-unneeded-time={{ .Values.autoscaler.scaleDownUnneededTime }}
+            - --scale-down-delay-after-add={{ .Values.autoscaler.scaleDownDelayAfterAdd }}
           volumeMounts:
             - name: ssl-certs
               mountPath: /etc/ssl/certs/ca-certificates.crt #/etc/ssl/certs/ca-bundle.crt for Amazon Linux Worker Nodes
