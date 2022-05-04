@@ -26,7 +26,7 @@ pub struct SetupGit {
     git_options: GitOptions,
     /// Path to `Layout` which defines where all the files are
     #[clap(long, parse(from_os_str))]
-    layout_path: PathBuf,
+    layout_file: PathBuf,
 }
 
 #[async_trait]
@@ -36,14 +36,14 @@ impl CliCommand<()> for SetupGit {
     }
 
     async fn execute(self) -> CliTypedResult<()> {
-        let layout = Layout::from_disk(&self.layout_path)?;
+        let layout = Layout::from_disk(&self.layout_file)?;
 
         // Upload layout file to ensure we can read later
         let client = self.git_options.get_client()?;
         client.put(LAYOUT_NAME, &layout)?;
 
         // Make a place for the modules to be uploaded
-        client.create_dir(&layout.modules_folder)?;
+        client.create_dir(&layout.modules_dir)?;
 
         Ok(())
     }
@@ -81,27 +81,27 @@ pub struct GitOptions {
     github_branch: String,
     /// Path to Github API token.  Token must have repo:* permissions
     #[clap(long, parse(from_os_str))]
-    github_token_path: Option<PathBuf>,
-    /// Path to local git repo.
+    github_token_file: Option<PathBuf>,
+    /// Path to local git repository
     #[clap(long, parse(from_os_str))]
-    local_repository_path: Option<PathBuf>,
+    local_repository_dir: Option<PathBuf>,
 }
 
 impl GitOptions {
     pub fn get_client(self) -> CliTypedResult<GitClient> {
         if self.github_repository.is_none()
-            && self.github_token_path.is_none()
-            && self.local_repository_path.is_some()
+            && self.github_token_file.is_none()
+            && self.local_repository_dir.is_some()
         {
-            Ok(GitClient::local(self.local_repository_path.unwrap()))
+            Ok(GitClient::local(self.local_repository_dir.unwrap()))
         } else if self.github_repository.is_some()
-            && self.github_token_path.is_some()
-            && self.local_repository_path.is_none()
+            && self.github_token_file.is_some()
+            && self.local_repository_dir.is_none()
         {
             GitClient::github(
                 self.github_repository.unwrap(),
                 self.github_branch,
-                self.github_token_path.unwrap(),
+                self.github_token_file.unwrap(),
             )
         } else {
             Err(CliError::CommandArgumentError("Must provide either only --local-repository-path or both --github-repository and --github-token-path".to_string()))
@@ -143,6 +143,7 @@ impl GitClient {
                 let path = local_repository_path.join(format!("{}.yml", name));
                 let mut file = std::fs::File::open(path.as_path())
                     .map_err(|e| CliError::IO(path.display().to_string(), e))?;
+
                 let mut contents = String::new();
                 file.read_to_string(&mut contents)
                     .map_err(|e| CliError::IO(path.display().to_string(), e))?;
