@@ -352,8 +352,6 @@ pub fn test_genesis_change_set_and_validators(
 pub struct Validator {
     /// The Aptos account address of the validator
     pub address: AccountAddress,
-    /// UTF8-encoded name for the validator
-    pub name: Vec<u8>,
     /// Authentication key for the validator
     pub auth_key: AuthenticationKey,
     /// Ed25519 public key used to sign consensus messages
@@ -361,8 +359,6 @@ pub struct Validator {
     /// The Aptos account address of the validator's operator (same as `address` if the validator is
     /// its own operator)
     pub operator_address: AccountAddress,
-    /// UTF8-encoded name of the operator
-    pub operator_name: Vec<u8>,
     /// Authentication key for the operator
     pub operator_auth_key: AuthenticationKey,
     /// `NetworkAddress` for the validator
@@ -392,17 +388,14 @@ impl TestValidator {
         let consensus_pubkey = key.public_key().to_bytes().to_vec();
         let operator_auth_key = auth_key;
         let operator_address = operator_auth_key.derived_address();
-        let operator_name = name.clone();
         let network_address = [0u8; 0].to_vec();
         let full_node_network_address = [0u8; 0].to_vec();
 
         let data = Validator {
             address,
-            name,
             auth_key,
             consensus_pubkey,
             operator_address,
-            operator_name,
             operator_auth_key,
             network_address,
             full_node_network_address,

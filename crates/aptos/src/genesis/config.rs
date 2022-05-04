@@ -83,10 +83,8 @@ impl From<ValidatorConfiguration> for Validator {
 
         Validator {
             address: auth_key.derived_address(),
-            name: vec![], // TODO: To remove
             consensus_pubkey: bcs::to_bytes(&config.consensus_key).unwrap(),
             operator_address: auth_key.derived_address(),
-            operator_name: vec![], // TODO: To remove
             network_address: bcs::to_bytes(&validator_addresses).unwrap(),
             full_node_network_address: bcs::to_bytes(&full_node_addresses).unwrap(),
             operator_auth_key: auth_key,
