@@ -85,6 +85,11 @@ module AptosFramework::Coin {
         borrow_global<CoinInfo<CoinType>>(coin_address).supply
     }
 
+    /// Returns the `value` of the passed in `coin`. 
+    public fun value<CoinType>(coin: &Coin<CoinType>): u64 {
+        coin.value
+    }
+
     // Public functions
 
     /// Burn coin with capability.
