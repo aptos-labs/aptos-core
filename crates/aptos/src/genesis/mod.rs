@@ -38,7 +38,7 @@ pub enum GenesisTool {
 impl GenesisTool {
     pub async fn execute(self) -> CliResult {
         match self {
-            GenesisTool::GenerateGenesis(tool) => tool.execute_serialized().await,
+            GenesisTool::GenerateGenesis(tool) => tool.execute_serialized_success().await,
             GenesisTool::GenerateKeys(tool) => tool.execute_serialized().await,
             GenesisTool::SetupGit(tool) => tool.execute_serialized_success().await,
             GenesisTool::SetValidatorConfiguration(tool) => tool.execute_serialized_success().await,
