@@ -57,6 +57,7 @@ move-stdlib = { git = "https://github.com/move-language/move", rev = "f2e7585b1e
 move-vm-runtime = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["testing"] }
 framework = { path = '../../aptos-move/framework' }
 move-table-extension = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
+vm-genesis = { path = "../../aptos-move/vm-genesis" }
 
 [build-dependencies]
 shadow-rs = "0.11.0"

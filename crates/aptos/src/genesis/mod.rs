@@ -14,10 +14,15 @@ use crate::{
     CliCommand, CliResult,
 };
 use aptos_crypto::ed25519::Ed25519PublicKey;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{
+    chain_id::ChainId,
+    on_chain_config::{ConsensusConfigV2, OnChainConsensusConfig, VMPublishingOption},
+};
 use async_trait::async_trait;
 use clap::Parser;
-use serde::Serialize;
+use vm_genesis::Validator;
+
+const MIN_PRICE_PER_GAS_UNIT: u64 = 1;
 
 /// Tool for setting up and building the Genesis transaction
 ///
@@ -40,7 +45,7 @@ impl GenesisTool {
     }
 }
 
-/// Generate genesis from a git repo
+/// Generate genesis from a git repository
 #[derive(Parser)]
 pub struct GenerateGenesis {
     #[clap(flatten)]
@@ -48,36 +53,60 @@ pub struct GenerateGenesis {
 }
 
 #[async_trait]
-impl CliCommand<GenesisInfo> for GenerateGenesis {
+impl CliCommand<()> for GenerateGenesis {
     fn command_name(&self) -> &'static str {
         "GenerateGenesis"
     }
 
-    async fn execute(self) -> CliTypedResult<GenesisInfo> {
-        // TODO: Generate genesis, this right now just reads all users
-        fetch_genesis_info(self.github_options)
+    async fn execute(self) -> CliTypedResult<()> {
+        let genesis_info = fetch_genesis_info(self.github_options)?;
+
+        let consensus_config = OnChainConsensusConfig::V2(ConsensusConfigV2 {
+            two_chain: true,
+            decoupled_execution: true,
+            back_pressure_limit: 10,
+            exclude_round: 20,
+        });
+
+        vm_genesis::encode_genesis_transaction(
+            genesis_info.root_key.clone(),
+            &genesis_info.validators,
+            &genesis_info.modules,
+            Some(VMPublishingOption::open()), // TODO: Remove
+            consensus_config,                 // TODO: Remove
+            genesis_info.chain_id,
+            MIN_PRICE_PER_GAS_UNIT,
+        );
+
+        Ok(())
     }
 }
 
+/// Retrieves all information for genesis from the Git repository
 pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo> {
     let client = git_options.get_client()?;
     let layout: Layout = client.get(LAYOUT_NAME)?;
 
-    let mut configs = Vec::new();
+    let mut validators = Vec::new();
     for user in &layout.users {
-        configs.push(client.get(user)?);
+        validators.push(client.get::<ValidatorConfiguration>(user)?.into());
     }
+
+    let modules = client.get_modules(&layout.modules_folder)?;
 
     Ok(GenesisInfo {
         chain_id: layout.chain_id,
         root_key: layout.root_key,
-        participants: configs,
+        validators,
+        modules,
     })
 }
 
-#[derive(Debug, Serialize)]
+/// Holder object for all pieces needed to generate a genesis transaction
+#[derive(Clone)]
 pub struct GenesisInfo {
     chain_id: ChainId,
     root_key: Ed25519PublicKey,
-    participants: Vec<ValidatorConfiguration>,
+    validators: Vec<Validator>,
+    modules: Vec<Vec<u8>>,
 }
