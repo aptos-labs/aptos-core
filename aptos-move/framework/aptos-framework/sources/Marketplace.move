@@ -1,8 +1,7 @@
 module AptosFramework::Marketplace {
-    use Std::GUID::{Self, ID};
     use Std::Signer;
     use AptosFramework::Table::{Self, Table};
-    use AptosFramework::Token::{Self, Token};
+    use AptosFramework::Token::{Self, Token, TokenId};
     use AptosFramework::TestCoin;
 
     const ERROR_INVALID_BUYER: u64 = 0;
@@ -14,29 +13,30 @@ module AptosFramework::Marketplace {
 	}
 
 	struct Market has key {
-		market_items: Table<ID, MarketItem>,
+		market_items: Table<TokenId, MarketItem>,
         listing_fee: u64,
 	}
 
 	public(script) fun init_market_script(market_owner: &signer, listing_fee: u64) {
-		let market_items = Table::new<ID, MarketItem>();
+		let market_items = Table::new<TokenId, MarketItem>();
 		move_to<Market>(market_owner, Market {market_items, listing_fee})
 	}
 
     public(script) fun list_token_for_sale_script(
         seller: &signer,
         creator: address,
-        token_creation_num: u64,
+        collection: vector<u8>,
+        name: vector<u8>,
 		price: u64,
 		market_owner_addr: address,
     ) acquires Market {
-        let token_id = GUID::create_id(creator, token_creation_num);
+        let token_id = Token::create_token_id_raw(creator, collection, name);
         list_token_for_sale(seller, &token_id, price, market_owner_addr);
     }
 
     public(script) fun list_token_for_sale(
         seller: &signer,
-        token_id: &ID,
+        token_id: &TokenId,
 		price: u64,
 		market_owner_addr: address,
     ) acquires Market {
@@ -51,17 +51,18 @@ module AptosFramework::Marketplace {
         buyer: &signer,
         seller: address,
         creator: address,
-        token_creation_num: u64,
+        collection: vector<u8>,
+        name: vector<u8>,
 		market_owner_addr: address,
     ) acquires Market {
-        let token_id = GUID::create_id(creator, token_creation_num);
+        let token_id = Token::create_token_id_raw(creator, collection, name);
         buy_token(buyer, seller, &token_id, market_owner_addr);
 	}
 
     public(script) fun buy_token(
         buyer: &signer,
         seller: address,
-        token_id: &ID,
+        token_id: &TokenId,
 		market_owner_addr: address,
     ) acquires Market {
         let listing_fee = borrow_global<Market>(market_owner_addr).listing_fee;
@@ -79,7 +80,7 @@ module AptosFramework::Marketplace {
         Token::deposit_token(buyer, token)
 	}
 
-    fun create_token(creator: &signer, amount: u64): ID {
+    fun create_token(creator: &signer, amount: u64): TokenId {
         use Std::ASCII;
         use Std::Option;
 
@@ -96,7 +97,9 @@ module AptosFramework::Marketplace {
             collection_name,
             ASCII::string(b"Token: Hello, Token"),
             ASCII::string(b"Hello, Token"),
+            false,
             amount,
+            Option::none(),
             ASCII::string(b"https://aptos.dev"),
         )
     }
