@@ -1,10 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosAccount } from 'aptos'
+import { AptosAccount, AptosAccountObject } from 'aptos'
 import { Buffer } from 'buffer'
-import { KEY_LENGTH } from '../constants'
-import { Result, err, ok } from '../types'
+import { KEY_LENGTH, walletStateLocalStorageKey } from '../constants'
+import { AptosAccountState, LocalStorageState, Result, err, ok } from '../types'
 
 export function loginAccount (key: string): Result<AptosAccount, Error> {
   if (key.length === KEY_LENGTH) {
@@ -21,8 +21,29 @@ export function loginAccount (key: string): Result<AptosAccount, Error> {
   }
 }
 
-export function createNewAccount (): Result<AptosAccount, Error> {
+export function createNewAccount (): AptosAccount {
   const account = new AptosAccount()
   // todo: make request to create account on chain
-  return ok(account)
+  return account
+}
+
+export function getLocalStorageState (): LocalStorageState | null {
+  // Get from local storage by key
+  const item = window.localStorage.getItem(walletStateLocalStorageKey)
+  if (item) {
+    const accountObject: AptosAccountObject = JSON.parse(item)
+    return { aptosAccountObject: accountObject }
+  } else {
+    return null
+  }
+}
+
+export function getAptosAccountState (): AptosAccountState {
+  const localStorage = getLocalStorageState()
+  if (localStorage) {
+    const { aptosAccountObject } = localStorage
+    return aptosAccountObject ? AptosAccount.fromAptosAccountObject(aptosAccountObject) : undefined
+  } else {
+    return undefined
+  }
 }

@@ -121,10 +121,10 @@ impl Default for StorageServiceConfig {
             max_account_states_chunk_sizes: 1000,
             max_concurrent_requests: 4000,
             max_epoch_chunk_size: 100,
-            max_network_channel_size: 1000,
+            max_network_channel_size: 4000,
             max_transaction_chunk_size: 1000,
             max_transaction_output_chunk_size: 1000,
-            storage_summary_refresh_interval_ms: 100,
+            storage_summary_refresh_interval_ms: 50,
         }
     }
 }
@@ -158,7 +158,7 @@ pub struct DataStreamingServiceConfig {
 impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
-            global_summary_refresh_interval_ms: 100,
+            global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: 1,
             max_data_stream_channel_sizes: 1000,
             max_request_retry: 3,

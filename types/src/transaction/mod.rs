@@ -1409,7 +1409,7 @@ impl AccountTransactionsWithProof {
     }
 
     // TODO(philiphayes): this will need to change to support CRSNs
-    // (Conflict-Resistant Sequence Numbers)[https://github.com/diem/dip/blob/main/dips/dip-168.md].
+    // (Conflict-Resistant Sequence Numbers)[https://github.com/aptos/dip/blob/main/dips/dip-168.md].
     //
     // If we use a separate event stream under each account for sequence numbers,
     // we'll probably need to always `include_events: true`, find the sequence
@@ -1460,7 +1460,7 @@ impl AccountTransactionsWithProof {
     }
 }
 
-/// `Transaction` will be the transaction type used internally in the diem node to represent the
+/// `Transaction` will be the transaction type used internally in the aptos node to represent the
 /// transaction to be processed and persisted.
 ///
 /// We suppress the clippy warning here as we would expect most of the transaction to be user

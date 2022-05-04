@@ -1,18 +1,18 @@
 {
   "type": "user_transaction",
   "version": "2",
-  "hash": "0x97053ab47cdf9d0bee6a38b61d4ca5366090474be9191c589377dad77b3fab66",
-  "state_root_hash": "0x3cd5c847adbb63eacd7a588a2ac23ff98f5d64a5ec0e82eeca02acece5d3b446",
+  "hash": "0x247ddbc48e7a7ae25419fcdba2d3ee47c822fa86817bd63a071bc46e1021ce8b",
+  "state_root_hash": "0x9dd9b394e722becec025904a320b60376b2e579ad4bc50e259fdace259e16ffd",
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "1",
   "success": false,
   "vm_status": "Transaction Executed and Committed with Error LINKER_ERROR",
-  "accumulator_root_hash": "0x1b0e003884dd80c962669303d00ce6eed67351de816f9e7ba95117bed1e16d68",
+  "accumulator_root_hash": "0xa2935f8c12a7b8664717784232caf1ae29f172f7e7ee1cad522a725380ff7b37",
   "changes": [
     {
       "type": "write_resource",
       "address": "0xa550c18",
-      "state_key_hash": "0x04a62513032e695c923632ca1b9248d11e49c9b1e83bba39974adf50bbabdd8f",
+      "state_key_hash": "0x1e24e72081eba6c211d081095185a977809a76010b12dfa2a8983ccb1113ad71",
       "data": {
         "type": "0x1::Account::Account",
         "data": {
@@ -25,7 +25,7 @@
     {
       "type": "write_resource",
       "address": "0xa550c18",
-      "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
+      "state_key_hash": "0x515bab035b131fd25d8298be2c7f8b5afb409adea378f3d87a5b0dd170236d28",
       "data": {
         "type": "0x1::TestCoin::Balance",
         "data": {
@@ -53,7 +53,7 @@
   "signature": {
     "type": "ed25519_signature",
     "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-    "signature": "0xcff4e485f98cf52f88f493cde50370192e26834236d04e5692dc51b019110c84f1bce5981114fdcbc24ccec86f407ec87ffd332a76c8e4e7fa2ea3b97f6b760e"
+    "signature": "0x812ffe56b64e6183f5202c05b9eb8fd2295a1a23ed16a934ef75c1b9e8ebdaafe3dc672e4f8130c192208170e3b891f1a58920f734e1ee9ec05ad86c1efef104"
   },
   "events": [],
   "timestamp": "1"

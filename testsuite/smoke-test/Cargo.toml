@@ -32,10 +32,10 @@ aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-h
 cached-framework-packages =  { path = "../../aptos-move/framework/cached-packages" }
 forge = { path = "../forge" }
 hex = "0.4.3"
-move-command-line-common = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
-move-ir-compiler = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
-move-stdlib = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
-move-package = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
+move-command-line-common = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
+move-ir-compiler = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
+move-stdlib = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
+move-package = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
 
 
 [dev-dependencies]

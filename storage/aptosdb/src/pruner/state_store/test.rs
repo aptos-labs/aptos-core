@@ -1,34 +1,28 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{change_set::ChangeSet, pruner::*, state_store::StateStore, AptosDB};
+use std::collections::HashMap;
+
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
-use aptos_types::{
-    account_address::AccountAddress,
-    account_state_blob::AccountStateBlob,
-    state_store::{state_key::StateKey, state_value::StateValue},
-};
-use std::{collections::HashMap, convert::TryFrom};
+use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
 
-fn put_account_state_set(
+use crate::{change_set::ChangeSet, pruner::*, state_store::StateStore, AptosDB};
+
+fn put_value_set(
     db: &DB,
     state_store: &StateStore,
-    account_state_set: Vec<(AccountAddress, AccountStateBlob)>,
+    value_set: Vec<(StateKey, StateValue)>,
     version: Version,
 ) -> HashValue {
     let mut cs = ChangeSet::new();
-    let value_state_set: HashMap<_, _> = account_state_set
+    let value_set: HashMap<_, _> = value_set
         .iter()
-        .map(|(address, blob)| {
-            (
-                StateKey::AccountAddressKey(*address),
-                StateValue::from(blob.clone()),
-            )
-        })
+        .map(|(key, value)| (key.clone(), value.clone()))
         .collect();
+
     let root = state_store
-        .put_value_sets(vec![&value_state_set], None, version, &mut cs)
+        .put_value_sets(vec![&value_set], None, version, &mut cs)
         .unwrap()[0];
     db.write_schemas(cs.batch).unwrap();
 
@@ -37,23 +31,21 @@ fn put_account_state_set(
 
 fn verify_state_in_store(
     state_store: &StateStore,
-    address: AccountAddress,
-    expected_value: Option<&AccountStateBlob>,
+    key: StateKey,
+    expected_value: Option<&StateValue>,
     version: Version,
 ) {
     let (value, _proof) = state_store
-        .get_value_with_proof_by_version(&StateKey::AccountAddressKey(address), version)
+        .get_value_with_proof_by_version(&key, version)
         .unwrap();
 
-    assert_eq!(
-        &AccountStateBlob::try_from(value.unwrap()).unwrap(),
-        expected_value.unwrap()
-    );
+    assert_eq!(value.as_ref(), expected_value);
 }
 
 #[test]
 fn test_state_store_pruner() {
-    let address = AccountAddress::new([1u8; AccountAddress::LENGTH]);
+    let key = StateKey::Raw(String::from("test_key1").into_bytes());
+
     let prune_batch_size = 10;
     let num_versions = 25;
     let tmp_dir = TempPath::new();
@@ -76,11 +68,11 @@ fn test_state_store_pruner() {
     let mut root_hashes = vec![];
     // Insert 25 values in the db.
     for i in 0..num_versions {
-        let value = AccountStateBlob::from(vec![i as u8]);
-        root_hashes.push(put_account_state_set(
+        let value = StateValue::from(vec![i as u8]);
+        root_hashes.push(put_value_set(
             &db,
             state_store,
-            vec![(address, value.clone())],
+            vec![(key.clone(), value.clone())],
             i as u64, /* version */
         ));
     }
@@ -96,8 +88,8 @@ fn test_state_store_pruner() {
         for i in 0..num_versions {
             verify_state_in_store(
                 state_store,
-                address,
-                Some(&AccountStateBlob::from(vec![i as u8])),
+                key.clone(),
+                Some(&StateValue::from(vec![i as u8])),
                 i,
             );
         }
@@ -123,14 +115,14 @@ fn test_state_store_pruner() {
             .unwrap();
         for i in 0..prune_batch_size {
             assert!(state_store
-                .get_value_with_proof_by_version(&StateKey::AccountAddressKey(address), i as u64)
+                .get_value_with_proof_by_version(&key, i as u64)
                 .is_err());
         }
         for i in prune_batch_size..num_versions as usize {
             verify_state_in_store(
                 state_store,
-                address,
-                Some(&AccountStateBlob::from(vec![i as u8])),
+                key.clone(),
+                Some(&StateValue::from(vec![i as u8])),
                 i as u64,
             );
         }
@@ -139,32 +131,33 @@ fn test_state_store_pruner() {
 
 #[test]
 fn test_worker_quit_eagerly() {
-    let address = AccountAddress::new([1u8; AccountAddress::LENGTH]);
-    let value0 = AccountStateBlob::from(vec![0x01]);
-    let value1 = AccountStateBlob::from(vec![0x02]);
-    let value2 = AccountStateBlob::from(vec![0x03]);
+    let key = StateKey::Raw(String::from("test_key1").into_bytes());
+
+    let value0 = StateValue::from(String::from("test_val1").into_bytes());
+    let value1 = StateValue::from(String::from("test_val2").into_bytes());
+    let value2 = StateValue::from(String::from("test_val3").into_bytes());
 
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let db = aptos_db.db;
     let state_store = &StateStore::new(Arc::clone(&db));
 
-    let _root0 = put_account_state_set(
+    let _root0 = put_value_set(
         &db,
         state_store,
-        vec![(address, value0.clone())],
+        vec![(key.clone(), value0.clone())],
         0, /* version */
     );
-    let _root1 = put_account_state_set(
+    let _root1 = put_value_set(
         &db,
         state_store,
-        vec![(address, value1.clone())],
+        vec![(key.clone(), value1.clone())],
         1, /* version */
     );
-    let _root2 = put_account_state_set(
+    let _root2 = put_value_set(
         &db,
         state_store,
-        vec![(address, value2.clone())],
+        vec![(key.clone(), value2.clone())],
         2, /* version */
     );
 
@@ -192,8 +185,8 @@ fn test_worker_quit_eagerly() {
         command_sender.send(Command::Quit).unwrap();
         // Worker quits immediately although `Command::Quit` is not the first command sent.
         worker.work();
-        verify_state_in_store(state_store, address, Some(&value0), 0);
-        verify_state_in_store(state_store, address, Some(&value1), 1);
-        verify_state_in_store(state_store, address, Some(&value2), 2);
+        verify_state_in_store(state_store, key.clone(), Some(&value0), 0);
+        verify_state_in_store(state_store, key.clone(), Some(&value1), 1);
+        verify_state_in_store(state_store, key, Some(&value2), 2);
     }
 }

@@ -117,7 +117,7 @@ use tiny_keccak::{Hasher, Sha3};
 /// A prefix used to begin the salt of every hashable structure. The salt
 /// consists in this global prefix, concatenated with the specified
 /// serialization name of the struct.
-pub(crate) const HASH_PREFIX: &[u8] = b"DIEM::";
+pub(crate) const HASH_PREFIX: &[u8] = b"APTOS::";
 
 /// Output value of our hash function. Intentionally opaque for safety and modularity.
 #[derive(Clone, Copy, Eq, Hash, PartialEq, PartialOrd, Ord)]

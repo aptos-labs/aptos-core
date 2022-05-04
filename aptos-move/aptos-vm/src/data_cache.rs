@@ -29,7 +29,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-/// A local cache for a given a `StateView`. The cache is private to the Diem layer
+/// A local cache for a given a `StateView`. The cache is private to the Aptos layer
 /// but can be used as a one shot cache for systems that need a simple `RemoteCache`
 /// implementation (e.g. tests or benchmarks).
 ///

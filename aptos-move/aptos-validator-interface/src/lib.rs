@@ -51,7 +51,7 @@ pub trait AptosValidatorInterface: Sync {
         let mut acc = vec![];
         for module_bytes in self
             .get_account_state_by_version(account_config::CORE_CODE_ADDRESS, version)?
-            .ok_or_else(|| anyhow!("Failure reading diem root address state"))?
+            .ok_or_else(|| anyhow!("Failure reading aptos root address state"))?
             .get_modules()
         {
             acc.push(
@@ -63,8 +63,8 @@ pub trait AptosValidatorInterface: Sync {
     }
 
     /// Get the account states of the most critical accounts, including:
-    /// 1. Diem Framework code address
-    /// 2. Diem Root address
+    /// 1. Aptos Framework code address
+    /// 2. Aptos Root address
     /// 3. All validator addresses
     fn get_admin_accounts(&self, version: Version) -> Result<Vec<(AccountAddress, AccountState)>> {
         let mut result = vec![];
@@ -113,23 +113,9 @@ impl<'a> DebuggerStateView<'a> {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<Vec<u8>>> {
-        match state_key {
-            // This is a temporary hack until we rollout fine grained staorage for account resources
-            // in the DB.
-            StateKey::AccessPath(access_path) => {
-                match self
-                    .db
-                    .get_account_state_by_version(access_path.address, version)?
-                {
-                    None => Ok(None),
-                    Some(account_state) => Ok(account_state.get(&access_path.path).cloned()),
-                }
-            }
-
-            _ => match self.db.get_state_value_by_version(state_key, version)? {
-                None => Ok(None),
-                Some(state_value) => Ok(state_value.maybe_bytes.as_ref().cloned()),
-            },
+        match self.db.get_state_value_by_version(state_key, version)? {
+            None => Ok(None),
+            Some(state_value) => Ok(state_value.maybe_bytes),
         }
     }
 }

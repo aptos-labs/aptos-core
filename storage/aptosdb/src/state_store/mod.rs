@@ -15,37 +15,31 @@ use crate::{
     state_value_index::StateValueIndexSchema,
     AptosDbError,
 };
-#[cfg(test)]
-use anyhow::anyhow;
-use anyhow::{ensure, Result};
+use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_jellyfish_merkle::{
     iterator::JellyfishMerkleIterator, node_type::NodeKey, restore::JellyfishMerkleRestore,
     JellyfishMerkleTree, TreeReader, TreeWriter,
 };
-#[cfg(test)]
-use aptos_types::state_store::state_key_prefix::StateKeyPrefix;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProof, SparseMerkleRangeProof},
     state_store::{
         state_key::StateKey,
+        state_key_prefix::StateKeyPrefix,
         state_value::{StateKeyAndValue, StateValue, StateValueChunkWithProof},
     },
     transaction::Version,
 };
 use itertools::process_results;
 use schemadb::{SchemaBatch, DB};
-#[cfg(test)]
-use std::cmp::Ordering;
-use std::{collections::HashMap, sync::Arc};
+use std::{cmp::Ordering, collections::HashMap, sync::Arc};
 use storage_interface::StateSnapshotReceiver;
 
 type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKeyAndValue>;
 type Node = aptos_jellyfish_merkle::node_type::Node<StateKeyAndValue>;
 type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKeyAndValue>;
 
-#[cfg(test)]
 pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 
 #[derive(Debug)]
@@ -72,7 +66,6 @@ impl StateStore {
         ))
     }
 
-    #[cfg(test)]
     fn get_node_keys_by_key_prefix(
         &self,
         key_prefix: &StateKeyPrefix,
@@ -138,7 +131,6 @@ impl StateStore {
     /// Returns the key, value pairs for a particular state key prefix at at desired version. This
     /// API can be used to get all resources of an account by passing the account address as the
     /// key prefix.
-    #[cfg(test)]
     pub fn get_values_by_key_prefix(
         &self,
         key_prefix: &StateKeyPrefix,
@@ -169,7 +161,6 @@ impl StateStore {
         }
     }
 
-    #[cfg(test)]
     fn get_value_by_node_key(&self, node_key: &NodeKey) -> Result<Option<StateValue>> {
         if let Some(Node::Leaf(leaf)) = self.db.get::<JellyfishMerkleNodeSchema>(node_key)? {
             Ok(Some(leaf.value().value.clone()))

@@ -14,7 +14,7 @@ use serde_generate::{
     rust, CodeGeneratorConfig,
 };
 
-use heck::{CamelCase, ShoutySnakeCase};
+use heck::{CamelCase, ShoutySnakeCase, SnakeCase};
 use serde_reflection::ContainerFormat;
 use std::{
     collections::BTreeMap,
@@ -149,7 +149,7 @@ where
         };
         let mut script_function_registry: BTreeMap<_, _> = vec![(
             "ScriptFunctionCall".to_string(),
-            common::make_abi_enum_container(script_fun_abis.as_slice()),
+            common::make_namespaced_abi_enum_container(script_fun_abis.as_slice()),
         )]
         .into_iter()
         .collect();
@@ -166,7 +166,12 @@ where
                             "ScriptFunctionCall"
                         }
                         .to_string(),
-                        abi.name().to_camel_case(),
+                        match abi {
+                            ScriptABI::ScriptFunction(sf) => {
+                                format!("{}{}", sf.module_name().name(), abi.name().to_camel_case())
+                            }
+                            _ => abi.name().to_camel_case(),
+                        },
                     ],
                     common::prepare_doc_string(abi.doc()),
                 )
@@ -277,7 +282,7 @@ pub fn encode(self) -> Script {{"#
         writeln!(self.out, "use ScriptCall::*;\nmatch self {{")?;
         self.out.indent();
         for abi in abis {
-            self.output_variant_encoder(&ScriptABI::TransactionScript(abi.clone()), false)?;
+            self.output_variant_encoder(&ScriptABI::TransactionScript(abi.clone()))?;
         }
         self.out.unindent();
         writeln!(self.out, "}}")?;
@@ -296,7 +301,7 @@ pub fn encode(self) -> TransactionPayload {{"#
         writeln!(self.out, "use ScriptFunctionCall::*;\nmatch self {{")?;
         self.out.indent();
         for abi in abis {
-            self.output_variant_encoder(&ScriptABI::ScriptFunction(abi.clone()), true)?;
+            self.output_variant_encoder(&ScriptABI::ScriptFunction(abi.clone()))?;
         }
         self.out.unindent();
         writeln!(self.out, "}}")?;
@@ -304,19 +309,27 @@ pub fn encode(self) -> TransactionPayload {{"#
         writeln!(self.out, "}}\n")
     }
 
-    fn output_variant_encoder(&mut self, abi: &ScriptABI, is_script_fun: bool) -> Result<()> {
+    fn output_variant_encoder(&mut self, abi: &ScriptABI) -> Result<()> {
         let params = std::iter::empty()
             .chain(abi.ty_args().iter().map(TypeArgumentABI::name))
             .chain(abi.args().iter().map(ArgumentABI::name))
             .collect::<Vec<_>>()
             .join(", ");
+
+        let prefix = if let ScriptABI::ScriptFunction(sf) = abi {
+            sf.module_name().name().to_string()
+        } else {
+            String::new()
+        };
         writeln!(
             self.out,
-            "{0}{{{2}}} => encode_{1}_script{3}({2}),",
+            "{5}{0}{{{2}}} => encode_{3}{4}{1}({2}),",
             abi.name().to_camel_case(),
             abi.name(),
             params,
-            if is_script_fun { "_function" } else { "" },
+            prefix.to_snake_case(),
+            if prefix.is_empty() { "" } else { "_" },
+            prefix,
         )
     }
 
@@ -452,7 +465,8 @@ Script {{
     fn emit_script_function_encoder_function(&mut self, abi: &ScriptFunctionABI) -> Result<()> {
         write!(
             self.out,
-            "pub fn encode_{}_script_function({}) -> TransactionPayload {{",
+            "pub fn encode_{}_{}({}) -> TransactionPayload {{",
+            abi.module_name().name().to_string().to_snake_case(),
             abi.name(),
             [
                 Self::quote_type_parameters(abi.ty_args()),
@@ -515,9 +529,11 @@ TransactionPayload::ScriptFunction(ScriptFunction {{
 
     fn emit_script_function_decoder_function(&mut self, abi: &ScriptFunctionABI) -> Result<()> {
         // `payload` is always used, so don't need to fix warning "unused variable" by prefixing with "_"
+        //
         writeln!(
             self.out,
-            "\nfn decode_{}_script_function(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {{",
+            "\nfn decode_{}_{}(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {{",
+            abi.module_name().name().to_string().to_snake_case(),
             abi.name(),
         )?;
         self.out.indent();
@@ -534,7 +550,8 @@ TransactionPayload::ScriptFunction(ScriptFunction {{
         self.out.indent();
         writeln!(
             self.out,
-            "Some(ScriptFunctionCall::{} {{",
+            "Some(ScriptFunctionCall::{}{} {{",
+            abi.module_name().name(),
             abi.name().to_camel_case(),
         )?;
         self.out.indent();
@@ -661,9 +678,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         for abi in abis {
             writeln!(
                 self.out,
-                "map.insert(\"{}{}\".to_string(), Box::new(decode_{}_script_function));",
+                "map.insert(\"{}{}\".to_string(), Box::new(decode_{}_{}));",
                 abi.module_name().name(),
                 abi.name(),
+                abi.module_name().name().to_string().to_snake_case(),
                 abi.name()
             )?;
         }

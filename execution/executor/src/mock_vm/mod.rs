@@ -9,12 +9,11 @@ use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{aptos_root_address, validator_set_address},
     chain_id::ChainId,
     contract_event::ContractEvent,
     event::EventKey,
     on_chain_config::{
-        config_address, dpn_access_path_for_config, new_epoch_event_key, ConfigurationResource,
+        access_path_for_config, config_address, new_epoch_event_key, ConfigurationResource,
         OnChainConfig, ValidatorSet,
     },
     state_store::state_key::StateKey,
@@ -146,8 +145,14 @@ impl VMExecutor for MockVM {
                     ));
                 }
                 MockVMTransaction::Reconfiguration => {
-                    read_balance_from_storage(state_view, &balance_ap(validator_set_address()));
-                    read_balance_from_storage(state_view, &balance_ap(aptos_root_address()));
+                    read_state_value_from_storage(
+                        state_view,
+                        &access_path_for_config(ValidatorSet::CONFIG_ID),
+                    );
+                    read_state_value_from_storage(
+                        state_view,
+                        &AccessPath::new(config_address(), ConfigurationResource::resource_path()),
+                    );
                     outputs.push(TransactionOutput::new(
                         // WriteSet cannot be empty so use genesis writeset only for testing.
                         gen_genesis_writeset(),
@@ -208,6 +213,15 @@ fn read_u64_from_storage(state_view: &impl StateView, access_path: &AccessPath) 
         .map_or(0, |bytes| decode_bytes(&bytes))
 }
 
+fn read_state_value_from_storage(
+    state_view: &impl StateView,
+    access_path: &AccessPath,
+) -> Option<Vec<u8>> {
+    state_view
+        .get_state_value(&StateKey::AccessPath(access_path.clone()))
+        .expect("Failed to query storage.")
+}
+
 fn decode_bytes(bytes: &[u8]) -> u64 {
     let mut buf = [0; 8];
     buf.copy_from_slice(bytes);
@@ -224,7 +238,7 @@ fn seqnum_ap(account: AccountAddress) -> AccessPath {
 
 fn gen_genesis_writeset() -> WriteSet {
     let mut write_set = WriteSetMut::default();
-    let validator_set_ap = dpn_access_path_for_config(ValidatorSet::CONFIG_ID);
+    let validator_set_ap = access_path_for_config(ValidatorSet::CONFIG_ID);
     write_set.push((
         StateKey::AccessPath(validator_set_ap),
         WriteOp::Value(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),

@@ -329,6 +329,52 @@ On the available node testers, it shows that I am not syncing.
 ###  Answer:
 Check your public_full_node.yaml if you have added some working seed peers. To check if seed peers are working, you can enter the peer-nodes IP address in any of the node testers and check their status.
 
+---
+
+### Question(s):
+How should my public_full_node.yaml look like once everything is added?
+### Answer:
+```
+base:
+    data_dir: "/opt/aptos/data"
+    role: "full_node"
+    waypoint:
+        from_file: "/opt/aptos/etc/waypoint.txt"
+        
+state_sync:
+    state_sync_driver:
+        enable_state_sync_v2: true
+    
+execution:
+    genesis_file_location: "/opt/aptos/etc/genesis.blob"
+
+full_node_networks:
+    - network_id: "public"
+      discovery_method: "onchain"
+      listen_address: "/ip4/127.0.0.1/tcp/6180"  # change to "/ip4/0.0.0.0/tcp/6180" if you want to make you node accessible to others
+      identity:
+        type: "from_config"
+        key: "<PRIVATE_KEY>"
+        peer_id: "<PEER_ID>"
+      seeds:
+        bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a:
+            addresses:
+            - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/ln-handshake/0"
+            role: "Upstream"
+        7fe8523388084607cdf78ff40e3e717652173b436ae1809df4a5fcfc67f8fc61:
+            addresses:
+            - "/dns4/pfn1.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/7fe8523388084607cdf78ff40e3e717652173b436ae1809df4a5fcfc67f8fc61/ln-handshake/0"
+            role: "Upstream"
+        f6b135a59591677afc98168791551a0a476222516fdc55869d2b649c614d965b:
+            addresses:
+            - "/dns4/pfn2.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/f6b135a59591677afc98168791551a0a476222516fdc55869d2b649c614d965b/ln-handshake/0"
+            role: "Upstream"
+
+api:
+    address: 0.0.0.0:8080
+```
+Note: replace `<PRIVATE_KEY>` and `<PEER_ID>` with your very own node ID.
+
 
 [pfn_config_file]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/public_full_node.yaml
 [pfn_docker_compose]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/docker-compose.yaml

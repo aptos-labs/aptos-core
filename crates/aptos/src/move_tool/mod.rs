@@ -4,10 +4,11 @@
 use crate::{
     common::{
         types::{
-            load_account_arg, CliError, CliTypedResult, EncodingOptions, MovePackageDir,
-            ProfileOptions, TransactionSummary, WriteTransactionOptions,
+            load_account_arg, AccountAddressWrapper, CliError, CliTypedResult, EncodingOptions,
+            MovePackageDir, ProfileOptions, PromptOptions, TransactionSummary,
+            WriteTransactionOptions,
         },
-        utils::submit_transaction,
+        utils::{check_if_file_exists, submit_transaction},
     },
     CliCommand, CliResult,
 };
@@ -16,21 +17,32 @@ use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload}
 use aptos_vm::natives::aptos_natives;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
-use move_cli::package::cli::{run_move_unit_tests, UnitTestResult};
+use move_cli::package::cli::UnitTestResult;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
 };
-use move_package::{compilation::compiled_package::CompiledPackage, BuildConfig};
+use move_package::{
+    compilation::compiled_package::CompiledPackage, source_package::layout::SourcePackageLayout,
+    BuildConfig,
+};
 use move_unit_test::UnitTestingConfig;
-use std::{convert::TryFrom, path::Path, str::FromStr};
+use std::{
+    collections::BTreeMap,
+    convert::TryFrom,
+    fs::create_dir_all,
+    io::Write,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 /// CLI tool for performing Move tasks
 ///
 #[derive(Subcommand)]
 pub enum MoveTool {
     Compile(CompilePackage),
+    Init(InitPackage),
     Publish(PublishPackage),
     Run(RunFunction),
     Test(TestPackage),
@@ -40,10 +52,92 @@ impl MoveTool {
     pub async fn execute(self) -> CliResult {
         match self {
             MoveTool::Compile(tool) => tool.execute_serialized().await,
+            MoveTool::Init(tool) => tool.execute_serialized_success().await,
             MoveTool::Publish(tool) => tool.execute_serialized().await,
             MoveTool::Run(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
         }
+    }
+}
+
+/// Creates a new Move package at the given location
+#[derive(Parser)]
+pub struct InitPackage {
+    /// Name of the new move package
+    #[clap(long)]
+    name: String,
+    /// Path to create the new move package
+    #[clap(long, parse(from_os_str), default_value_os_t = crate::common::utils::current_dir())]
+    package_dir: PathBuf,
+    /// Named addresses for the move binary
+    ///
+    /// Example: alice=0x1234, bob=0x5678
+    ///
+    /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
+    #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
+    named_addresses: BTreeMap<String, AccountAddressWrapper>,
+    #[clap(flatten)]
+    prompt_options: PromptOptions,
+}
+
+#[async_trait]
+impl CliCommand<()> for InitPackage {
+    fn command_name(&self) -> &'static str {
+        "InitPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<()> {
+        let move_toml = self.package_dir.join(SourcePackageLayout::Manifest.path());
+        check_if_file_exists(move_toml.as_path(), self.prompt_options.assume_yes)?;
+        create_dir_all(self.package_dir.join(SourcePackageLayout::Sources.path())).map_err(
+            |err| {
+                CliError::IO(
+                    format!(
+                        "Failed to create {} move package directories",
+                        self.package_dir.display()
+                    ),
+                    err,
+                )
+            },
+        )?;
+        let mut w = std::fs::File::create(move_toml.as_path()).map_err(|err| {
+            CliError::UnexpectedError(format!(
+                "Failed to create {}: {}",
+                self.package_dir.join(Path::new("Move.toml")).display(),
+                err
+            ))
+        })?;
+
+        let addresses: BTreeMap<String, String> = self
+            .named_addresses
+            .clone()
+            .into_iter()
+            .map(|(key, value)| (key, value.account_address.to_hex_literal()))
+            .collect();
+
+        // TODO: Support Git as default when Github credentials are properly handled from GH CLI
+        writeln!(
+            &mut w,
+            "[package]
+name = \"{}\"
+version = \"0.0.0\"
+
+[dependencies]
+AptosFramework = {{ git = \"https://github.com/aptos-labs/aptos-core.git\", subdir = \"aptos-move/framework/aptos-framework/\", rev = \"main\" }}
+
+[addresses]
+{}
+",
+            self.name,
+            toml::to_string(&addresses).unwrap()
+        )
+        .map_err(|err| {
+            CliError::UnexpectedError(format!(
+                "Failed to write {:?}: {}",
+                self.package_dir.join(Path::new("Move.toml")),
+                err
+            ))
+        })
     }
 }
 
@@ -83,6 +177,10 @@ impl CliCommand<Vec<String>> for CompilePackage {
 pub struct TestPackage {
     #[clap(flatten)]
     move_options: MovePackageDir,
+
+    /// A filter string to determine which unit tests to run
+    #[clap(long)]
+    pub filter: Option<String>,
 }
 
 #[async_trait]
@@ -98,10 +196,13 @@ impl CliCommand<&'static str> for TestPackage {
             install_dir: self.move_options.output_dir.clone(),
             ..Default::default()
         };
-        let result = run_move_unit_tests(
+        let result = move_cli::package::cli::run_move_unit_tests(
             self.move_options.package_dir.as_path(),
             config,
-            UnitTestingConfig::default_with_bound(Some(100_000)),
+            UnitTestingConfig {
+                filter: self.filter,
+                ..UnitTestingConfig::default_with_bound(Some(100_000))
+            },
             aptos_natives(),
             false,
         )

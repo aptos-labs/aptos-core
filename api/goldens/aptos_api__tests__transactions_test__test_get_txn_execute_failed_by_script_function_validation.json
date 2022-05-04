@@ -1,18 +1,18 @@
 {
   "type": "user_transaction",
   "version": "4",
-  "hash": "0x67d3d83ebf873c54ae08380b8984ee3bef0227c284117384b9e086498c52fb90",
-  "state_root_hash": "0x003951fb3d69e476d49c575491b32f83dd0618ee518a423883746f36518f6f13",
+  "hash": "0xb60f7bb176918849ad6f73c01695881dd1c1aa074d766174a5a6e43e7b8c557c",
+  "state_root_hash": "0x8ee95abc981028781b8a69851c8d5080999d99e9de99bf25d8205683ba7faaca",
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "21",
   "success": false,
   "vm_status": "Move abort by LIMIT_EXCEEDED - EINSUFFICIENT_BALANCE\n A limit on an amount, e.g. a currency, is exceeded. Example: withdrawal of money after account limits window\n is exhausted.\n Error codes",
-  "accumulator_root_hash": "0x6a0a857f6cd893347cc49f932acac8294e083f2702f9e4748eda7033435cbecb",
+  "accumulator_root_hash": "0x0e90265a87f415c2c975d21d549ab0526d087f79ed8985e441d6436372ef5fe8",
   "changes": [
     {
       "type": "write_resource",
       "address": "0xe60912ecb0a8c365d163d258f3b9f1b62f8f9148c207643864d7ed4a2b23159",
-      "state_key_hash": "0xd1742838da5b852a3ff4714b21e88a0e8f09cc97d2a2d7d78aea7705fa3c51cd",
+      "state_key_hash": "0xeb42628da452dfc4a6564af882404470cc00947b20e6c905a19b7190323279b3",
       "data": {
         "type": "0x1::Account::Account",
         "data": {
@@ -25,7 +25,7 @@
     {
       "type": "write_resource",
       "address": "0xe60912ecb0a8c365d163d258f3b9f1b62f8f9148c207643864d7ed4a2b23159",
-      "state_key_hash": "0xdfe49d4e38fbd3f272555234ca2bfff43df59d18ed84d8d91e2abc56c0512ffa",
+      "state_key_hash": "0x6e7806edb7df1ab080c860700cff2395d80186f0312412f1b22dff8e81eef6d8",
       "data": {
         "type": "0x1::TestCoin::Balance",
         "data": {
@@ -53,7 +53,7 @@
   "signature": {
     "type": "ed25519_signature",
     "public_key": "0xafb4905e9550cf462a82007824a055d975ae934470c477d9ddbb6d2b264c36fa",
-    "signature": "0x54182ebf4aef3031c730e2e63fae4363e0f15540ceb4ab9d064f7f9adc6d8c648ec6a52648097a32024509fce45767ed4aedb0ab3a719baed233633e1264b60c"
+    "signature": "0x378c0f879daa66f62eba8ec8a493fc6f1c7ee8ec832b9f783095f1f2e156e758e66130dfd4cde331dc80f60a680ee9c821f9e7539779352e50adddad3ce84302"
   },
   "events": [],
   "timestamp": "2"

@@ -3,6 +3,7 @@
 
 import {
   Button,
+  Grid,
   Heading,
   HStack,
   Input,
@@ -28,8 +29,8 @@ import { AccountResource } from 'aptos/dist/api/data-contracts'
 import { FaFaucet } from 'react-icons/fa'
 import { IoIosSend } from 'react-icons/io'
 import numeral from 'numeral'
-import { secondaryBgColor } from './Login'
-import { devnetNodeUrl, faucetUrl } from '../constants'
+import { DEVNET_NODE_URL, FAUCET_URL, secondaryBgColor, secondaryErrorMessageColor } from '../constants'
+import WalletFooter from '../components/WalletFooter'
 
 /**
  * TODO: Will be fixed in upcoming Chakra-UI 2.0.0
@@ -44,7 +45,7 @@ interface GetAccountResourcesProps {
 }
 
 export const getAccountResources = async ({
-  nodeUrl = devnetNodeUrl,
+  nodeUrl = DEVNET_NODE_URL,
   address
 }: GetAccountResourcesProps) => {
   const client = new AptosClient(nodeUrl)
@@ -64,11 +65,16 @@ interface FundWithFaucetProps {
   address?: string;
 }
 
+const TransferError = Object.freeze({
+  UndefinedAccount: 'Account does not exist',
+  IncorrectPayload: 'Incorrect transaction payload'
+} as const)
+
 const fundWithFaucet = async ({
-  nodeUrl = devnetNodeUrl,
+  nodeUrl = DEVNET_NODE_URL,
   address
 }: FundWithFaucetProps): Promise<void> => {
-  const faucetClient = new FaucetClient(nodeUrl, faucetUrl)
+  const faucetClient = new FaucetClient(nodeUrl, FAUCET_URL)
   if (address) {
     await faucetClient.fundAccount(address, 5000)
   }
@@ -85,7 +91,7 @@ const submitTransaction = async ({
   toAddress,
   fromAddress,
   amount,
-  nodeUrl = devnetNodeUrl
+  nodeUrl = DEVNET_NODE_URL
 }: SubmitTransactionProps) => {
   const client = new AptosClient(nodeUrl)
   const payload: Types.TransactionPayload = {
@@ -103,7 +109,7 @@ const submitTransaction = async ({
 const Wallet = () => {
   const { colorMode } = useColorMode()
   const { aptosAccount } = useWalletState()
-  const { register, watch, handleSubmit } = useForm()
+  const { register, watch, handleSubmit, setError, formState: { errors } } = useForm()
   const { onOpen, onClose, isOpen } = useDisclosure()
   const [accountResources, setAccountResources] = useState<AccountResource[] | undefined>(undefined)
   const [refreshState, setRefreshState] = useState(true)
@@ -121,14 +127,36 @@ const Wallet = () => {
     event?.preventDefault()
     if (toAddress && aptosAccount && transferAmount) {
       setIsTransferLoading(true)
-      await submitTransaction({
-        toAddress,
-        fromAddress: aptosAccount,
-        amount: transferAmount
-      })
-      setRefreshState(!refreshState)
-      setIsTransferLoading(false)
-      onClose()
+      try {
+        const accountResponse = await getAccountResources({
+          nodeUrl: DEVNET_NODE_URL,
+          address: toAddress
+        })
+        if (accountResponse?.status !== 200) {
+          throw new Error(TransferError.UndefinedAccount)
+        }
+        await submitTransaction({
+          toAddress,
+          fromAddress: aptosAccount,
+          amount: transferAmount
+        })
+        setRefreshState(!refreshState)
+        setIsTransferLoading(false)
+        onClose()
+      } catch (e) {
+        const err = (e as Error).message
+        switch (err) {
+          case TransferError.UndefinedAccount: {
+            setError('toAddress', { type: 'custom', message: TransferError.UndefinedAccount })
+            break
+          }
+          default: {
+            setError('toAddress', { type: 'custom', message: TransferError.IncorrectPayload })
+          }
+        }
+        setRefreshState(!refreshState)
+        setIsTransferLoading(false)
+      }
     }
   }
 
@@ -147,10 +175,11 @@ const Wallet = () => {
   }, [refreshState])
 
   return (
-    <VStack
+    <Grid
       height="100%"
-      maxW="100%"
       width="100%"
+      maxW="100%"
+      templateRows="30px 1fr 50px"
       bgColor={secondaryBgColor[colorMode]}
     >
       <WalletHeader />
@@ -189,6 +218,9 @@ const Wallet = () => {
                       <Input
                         variant="filled"
                         placeholder="To address"
+                        required={true}
+                        maxLength={70}
+                        minLength={60}
                         {...register('toAddress')}
                       />
                     </InputGroup>
@@ -197,12 +229,17 @@ const Wallet = () => {
                         type="number"
                         variant="filled"
                         placeholder="Transfer amount"
+                        min={0}
+                        required={true}
                         {...register('transferAmount')}
                       />
                       <InputRightAddon>
                         tokens
                       </InputRightAddon>
                     </InputGroup>
+                    <Text fontSize="xs" color={secondaryErrorMessageColor[colorMode]}>
+                      {(errors?.toAddress?.message)}
+                    </Text>
                     <Button isDisabled={isTransferLoading} type="submit">
                       Submit
                     </Button>
@@ -213,7 +250,8 @@ const Wallet = () => {
           </Popover>
         </HStack>
       </VStack>
-    </VStack>
+      <WalletFooter />
+    </Grid>
   )
 }
 

@@ -867,7 +867,7 @@ pub fn create_account_request(
     let preimage = AuthenticationKeyPreimage::ed25519(pubkey);
     let auth_key = AuthenticationKey::from_preimage(&preimage);
     creation_account.sign_with_transaction_builder(txn_factory.payload(
-        aptos_stdlib::encode_create_account_script_function(auth_key.derived_address()),
+        aptos_stdlib::encode_account_create_account(auth_key.derived_address()),
     ))
 }
 
@@ -889,7 +889,7 @@ pub fn gen_transfer_txn_request(
 ) -> SignedTransaction {
     sender.sign_with_transaction_builder(
         txn_factory
-            .payload(aptos_stdlib::encode_transfer_script_function(
+            .payload(aptos_stdlib::encode_test_coin_transfer(
                 *receiver, num_coins,
             ))
             .gas_unit_price(gas_price),

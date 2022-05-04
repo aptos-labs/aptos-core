@@ -1,11 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::vm_validator::{TransactionValidation, VMValidator};
+use crate::vm_validator::{get_account_sequence_number, TransactionValidation, VMValidator};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
-use aptos_transaction_builder::aptos_stdlib::{
-    encode_mint_script_function, encode_transfer_script_function,
-};
+use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     account_address, account_config,
     chain_id::ChainId,
@@ -15,7 +13,10 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
-use move_core_types::gas_schedule::{GasAlgebra, GasConstants, MAX_TRANSACTION_SIZE_IN_BYTES};
+use move_core_types::{
+    account_address::AccountAddress,
+    gas_schedule::{GasAlgebra, GasConstants, MAX_TRANSACTION_SIZE_IN_BYTES},
+};
 use rand::SeedableRng;
 use storage_interface::DbReaderWriter;
 
@@ -64,21 +65,21 @@ impl std::ops::Deref for TestValidator {
 // * SEQUENCE_NUMBER_TOO_NEW -- This error is filtered out when running validation; it is only
 //   testable when running the executor.
 // * INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE -- This is tested in verify_txn.rs.
-// * SENDING_ACCOUNT_FROZEN: Tested in functional-tests/tests/diem_account/freezing.move.
+// * SENDING_ACCOUNT_FROZEN: Tested in functional-tests/tests/aptos_account/freezing.move.
 // * Errors arising from deserializing the code -- these are tested in
-//   - diem/language/move-binary-format/src/unit_tests/deserializer_tests.rs
-//   - diem/language/move-binary-format/tests/serializer_tests.rs
+//   - move-language/move/language/move-binary-format/src/unit_tests/deserializer_tests.rs
+//   - move-language/move/language/move-binary-format/tests/serializer_tests.rs
 // * Errors arising from calls to `static_verify_program` -- this is tested separately in tests for
 //   the bytecode verifier.
 // * Testing for invalid genesis write sets -- this is tested in
-//   diem/language/e2e-testsuite/src/tests/genesis.rs
+//   move-language/move/language/e2e-testsuite/src/tests/genesis.rs
 
 #[test]
 fn test_validate_transaction() {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_root_address();
-    let program = encode_mint_script_function(address, 100);
+    let program = aptos_stdlib::encode_test_coin_mint(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
         1,
@@ -99,7 +100,7 @@ fn test_validate_invalid_signature() {
     // Submit with an account using an different private/public keypair
 
     let address = account_config::aptos_root_address();
-    let program = encode_transfer_script_function(address, 100);
+    let program = aptos_stdlib::encode_test_coin_transfer(address, 100);
     let transaction = transaction_test_helpers::get_test_unchecked_txn(
         address,
         1,
@@ -196,6 +197,27 @@ fn test_validate_max_gas_units_below_min() {
 }
 
 #[test]
+fn test_get_account_sequence_number() {
+    let vm_validator = TestValidator::new();
+    let root_address = account_config::aptos_root_address();
+    assert_eq!(
+        get_account_sequence_number(vm_validator.vm_validator.db_reader.clone(), root_address,)
+            .unwrap()
+            .min_seq(),
+        0
+    );
+    assert_eq!(
+        get_account_sequence_number(
+            vm_validator.vm_validator.db_reader,
+            AccountAddress::new([5u8; AccountAddress::LENGTH]),
+        )
+        .unwrap()
+        .min_seq(),
+        0
+    );
+}
+
+#[test]
 fn test_validate_max_gas_price_above_bounds() {
     let vm_validator = TestValidator::new();
 
@@ -225,7 +247,7 @@ fn test_validate_max_gas_price_below_bounds() {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_root_address();
-    let program = encode_transfer_script_function(address, 100);
+    let program = aptos_stdlib::encode_test_coin_transfer(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         address,
         1,
@@ -288,7 +310,7 @@ fn test_validate_invalid_auth_key() {
     // Submit with an account using an different private/public keypair
 
     let address = account_config::aptos_root_address();
-    let program = encode_transfer_script_function(address, 100);
+    let program = aptos_stdlib::encode_test_coin_transfer(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
         1,
@@ -306,7 +328,7 @@ fn test_validate_account_doesnt_exist() {
 
     let address = account_config::aptos_root_address();
     let random_account_addr = account_address::AccountAddress::random();
-    let program = encode_transfer_script_function(address, 100);
+    let program = aptos_stdlib::encode_test_coin_transfer(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         random_account_addr,
         1,
@@ -329,7 +351,7 @@ fn test_validate_sequence_number_too_new() {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_root_address();
-    let program = encode_transfer_script_function(address, 100);
+    let program = aptos_stdlib::encode_test_coin_transfer(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
         1,
@@ -346,7 +368,7 @@ fn test_validate_invalid_arguments() {
     let vm_validator = TestValidator::new();
 
     let address = account_config::aptos_root_address();
-    let program = encode_transfer_script_function(address, 100);
+    let program = aptos_stdlib::encode_test_coin_transfer(address, 100);
     let transaction = transaction_test_helpers::get_test_signed_txn(
         address,
         1,

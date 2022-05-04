@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Result};
+use aptos_api_types::mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE;
 pub use aptos_api_types::{self, MoveModuleBytecode, PendingTransaction, Transaction};
 use aptos_crypto::HashValue;
 use aptos_types::{
@@ -25,7 +26,6 @@ use crate::aptos::{AptosVersion, Balance};
 pub use types::{Account, Resource, RestError};
 pub mod aptos;
 
-const BCS_CONTENT_TYPE: &str = "application/x.diem.signed_transaction+bcs";
 const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
 
 #[derive(Clone, Debug)]
@@ -149,6 +149,7 @@ impl Client {
             if resp.status() != StatusCode::NOT_FOUND {
                 let txn_resp: Response<Transaction> = self.json(resp).await?;
                 let (transaction, state) = txn_resp.into_parts();
+
                 if !transaction.is_pending() {
                     if !transaction.success() {
                         return Err(anyhow!(

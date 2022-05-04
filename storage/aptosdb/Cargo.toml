@@ -35,7 +35,7 @@ aptos-temppath = { path = "../../crates/aptos-temppath", optional = true }
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
 executor-types = { path = "../../execution/executor-types", optional = true }
-move-core-types = {git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e", features=["address32"]}
+move-core-types = {git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["address32"]}
 num-variants = { path = "../../crates/num-variants" }
 schemadb = { path = "../schemadb" }
 scratchpad = { path = "../scratchpad", optional = true }

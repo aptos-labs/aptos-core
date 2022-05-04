@@ -3,9 +3,9 @@
 
 #![forbid(unsafe_code)]
 
-//! Test infrastructure for the Diem VM.
+//! Test infrastructure for the Aptos VM.
 //!
-//! This crate contains helpers for executing tests against the Diem VM.
+//! This crate contains helpers for executing tests against the Aptos VM.
 
 use aptos_types::{transaction::TransactionStatus, vm_status::KeptVMStatus};
 

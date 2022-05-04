@@ -215,10 +215,7 @@ mod tests {
     use super::*;
     use aptos_crypto::{ed25519::*, PrivateKey, Uniform};
     use aptos_infallible::RwLock;
-    use aptos_transaction_builder::aptos_stdlib::{
-        encode_set_validator_config_and_reconfigure_script_function,
-        encode_set_version_script_function, encode_transfer_script_function,
-    };
+    use aptos_transaction_builder::aptos_stdlib;
     use aptos_types::{
         account_address::AccountAddress,
         account_config::aptos_root_address,
@@ -694,12 +691,14 @@ mod tests {
             sequence_number,
             operator_key,
             operator_public_key,
-            Some(encode_set_validator_config_and_reconfigure_script_function(
-                validator.data.address,
-                new_consensus_key.to_bytes().to_vec(),
-                Vec::new(),
-                Vec::new(),
-            )),
+            Some(
+                aptos_stdlib::encode_validator_set_script_set_validator_config_and_reconfigure(
+                    validator.data.address,
+                    new_consensus_key.to_bytes().to_vec(),
+                    Vec::new(),
+                    Vec::new(),
+                ),
+            ),
         )
     }
 
@@ -722,7 +721,7 @@ mod tests {
             sequence_number,
             genesis_key.clone(),
             genesis_key.public_key(),
-            Some(encode_set_version_script_function(
+            Some(aptos_stdlib::encode_version_set_version(
                 7, // version
             )),
         )
@@ -737,7 +736,7 @@ mod tests {
         //     sequence_number,
         //     genesis_key.clone(),
         //     genesis_key.public_key(),
-        //     Some(encode_update_diem_consensus_config_script_function(
+        //     Some(aptos_stdlib::encode_update_aptos_consensus_config_script_function(
         //         0,
         //         bcs::to_bytes(&OnChainConsensusConfig::V1(ConsensusConfigV1 {
         //             two_chain: false,
@@ -758,7 +757,7 @@ mod tests {
             sequence_number,
             genesis_key.clone(),
             genesis_key.public_key(),
-            Some(encode_transfer_script_function(
+            Some(aptos_stdlib::encode_test_coin_transfer(
                 validator_account,
                 1_000_000,
             )),

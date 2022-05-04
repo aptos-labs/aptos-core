@@ -186,7 +186,7 @@ module AptosFramework::Stake {
     }
 
     /// Initiate by the validator info owner
-    public(script) fun join_validator_set(account: &signer) acquires StakePool, ValidatorConfig, ValidatorSet {
+    public(friend) fun join_validator_set(account: &signer) acquires StakePool, ValidatorConfig, ValidatorSet {
         let addr = Signer::address_of(account);
         let stake_pool = borrow_global<StakePool>(addr);
         let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
@@ -201,7 +201,7 @@ module AptosFramework::Stake {
     }
 
     /// Initiate by the validator info owner.
-    public(script) fun leave_validator_set(account: &signer) acquires ValidatorSet {
+    public(friend) fun leave_validator_set(account: &signer) acquires ValidatorSet {
         let addr = Signer::address_of(account);
         let validator_set = borrow_global_mut<ValidatorSet>(@CoreResources);
 

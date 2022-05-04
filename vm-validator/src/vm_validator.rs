@@ -2,21 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_state_view::StateViewId;
+use aptos_state_view::{account_with_state_view::AsAccountWithStateView, StateViewId};
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{AccountResource, AccountSequenceInfo},
-    account_state::AccountState,
-    account_state_blob::AccountStateBlob,
+    account_config::AccountSequenceInfo,
+    account_view::AccountView,
     on_chain_config::OnChainConfigPayload,
-    state_store::state_key::StateKey,
     transaction::{SignedTransaction, VMValidatorResult},
 };
 use aptos_vm::AptosVM;
 use executor::components::apply_chunk_output::IntoLedgerView;
 use fail::fail_point;
-use std::{convert::TryFrom, sync::Arc};
-use storage_interface::{verified_state_view::VerifiedStateView, DbReader};
+use std::sync::Arc;
+use storage_interface::{
+    state_view::LatestDbStateView, verified_state_view::VerifiedStateView, DbReader,
+};
 
 #[cfg(test)]
 #[path = "unit_tests/vm_validator_test.rs"]
@@ -104,7 +104,7 @@ impl TransactionValidation for VMValidator {
 
 /// returns account's sequence number from storage
 pub fn get_account_sequence_number(
-    storage: &dyn DbReader,
+    storage: Arc<dyn DbReader>,
     address: AccountAddress,
 ) -> Result<AccountSequenceInfo> {
     fail_point!("vm_validator::get_account_sequence_number", |_| {
@@ -112,18 +112,21 @@ pub fn get_account_sequence_number(
             "Injected error in get_account_sequence_number"
         ))
     });
-    match storage.get_latest_state_value(StateKey::AccountAddressKey(address))? {
-        Some(blob) => {
-            if let Ok(Some(crsn)) = AccountState::try_from(&blob)?.get_crsn_resource() {
-                return Ok(AccountSequenceInfo::CRSN {
-                    min_nonce: crsn.min_nonce(),
-                    size: crsn.size(),
-                });
-            }
-            let seqno =
-                AccountResource::try_from(&AccountStateBlob::try_from(blob)?)?.sequence_number();
-            Ok(AccountSequenceInfo::Sequential(seqno))
-        }
+    let db_state_view = storage.latest_state_view()?;
+
+    let account_state_view = db_state_view.as_account_with_state_view(&address);
+
+    if let Ok(Some(crsn)) = account_state_view.get_crsn_resource() {
+        return Ok(AccountSequenceInfo::CRSN {
+            min_nonce: crsn.min_nonce(),
+            size: crsn.size(),
+        });
+    }
+
+    match account_state_view.get_account_resource()? {
+        Some(account_resource) => Ok(AccountSequenceInfo::Sequential(
+            account_resource.sequence_number(),
+        )),
         None => Ok(AccountSequenceInfo::Sequential(0)),
     }
 }

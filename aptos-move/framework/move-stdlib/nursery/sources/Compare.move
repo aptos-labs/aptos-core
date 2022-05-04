@@ -36,7 +36,7 @@ module Std::Compare {
     /// Keep this in mind when using this function to compare addresses.
     ///
     /// > TODO: there is currently no specification for this function, which causes no problem because it is not yet
-    /// > used in the Diem framework. However, should this functionality be needed in specification, a customized
+    /// > used in the Aptos framework. However, should this functionality be needed in specification, a customized
     /// > native abstraction is needed in the prover framework.
     public fun cmp_bcs_bytes(v1: &vector<u8>, v2: &vector<u8>): u8 {
         let i1 = Vector::length(v1);

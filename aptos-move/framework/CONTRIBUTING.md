@@ -4,14 +4,14 @@ This guide describes the process for adding, removing, and changing the Move mod
 
 ## Overview
 
-Every state change in the Diem blockchain occurs via executing a Move *transaction script* embedded in a [SignedTransaction](../../types/src/transaction/mod.rs). A transaction script invokes procedures of Move *modules* that update published *resources*. The Move standard library consists of:
+Every state change in the Aptos blockchain occurs via executing a Move *transaction script* embedded in a [SignedTransaction](../../types/src/transaction/mod.rs). A transaction script invokes procedures of Move *modules* that update published *resources*. The Move standard library consists of:
 
 1. The [modules](modules/) published in the genesis transaction.
-2. The authorized [transaction scripts](transaction_scripts/) that can be included in a Diem transaction. A transaction with an unauthorized script will be discarded by validators.
+2. The authorized [transaction scripts](transaction_scripts/) that can be included in a Aptos transaction. A transaction with an unauthorized script will be discarded by validators.
 
 ## Environment Setup
 
-Start by following the general Diem setup advice [here](../../CONTRIBUTING.md). Nothing else is strictly required, but you may want to consider a Move syntax highlighter for your editor (asking it to interpret `.move` files as Rust source is a decent start).
+Start by following the general Aptos setup advice [here](../../CONTRIBUTING.md). Nothing else is strictly required, but you may want to consider a Move syntax highlighter for your editor (asking it to interpret `.move` files as Rust source is a decent start).
 
 <!-- TODO: editor-specific suggestions, bash aliases -->
 
@@ -56,12 +56,12 @@ flux. Below is the temporary. This will be updated once the new way of defining 
 ## Coding conventions
 
 ### Naming
-- **Module names**: are camel case e.g., `DiemAccount`, `Diem`
+- **Module names**: are camel case e.g., `AptosAccount`, `Aptos`
 - **Type names**: are camel case e.g., `WithdrawalCapability`, `KeyRotationCapability`
 - **Function names**: are lower snake case e.g., `register_currency`
 - **Constant names**: are upper snake case e.g., `TREASURY_COMPLIANCE_ADDRESS`
-- Generic types should be descriptive, or anti-descriptive where appropriate (e.g. `T` for the Vector generic type parameter, `DiemAccount` for the core `DiemAccount` resource, `deposit<CoinType>(t: CoinType)` for depositing a token in the `Diem` module). Most of the time the "main" type in a module should be the same name as the module e.g., `Diem::Diem`, `DiemAccount::DiemAccount`.
-- **Module file names**: are the same as the module name e.g., `DiemAccount.move`
+- Generic types should be descriptive, or anti-descriptive where appropriate (e.g. `T` for the Vector generic type parameter, `AptosAccount` for the core `AptosAccount` resource, `deposit<CoinType>(t: CoinType)` for depositing a token in the `Aptos` module). Most of the time the "main" type in a module should be the same name as the module e.g., `Aptos::Aptos`, `AptosAccount::AptosAccount`.
+- **Module file names**: are the same as the module name e.g., `AptosAccount.move`
 - **Script file names**: should be lower snake case and named after the name of the “main” function in the script.
 - **Mixed file names**: If the file contains multiple modules and/or scripts, the file name should be lower_snake_case, where the name does not match any particular module/script inside.
 

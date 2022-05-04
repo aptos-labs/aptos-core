@@ -128,9 +128,9 @@ pub fn build_validator_config_transaction<S: KVStorage + CryptoStorage>(
 
     // Generate the validator config script
     let transaction_callback = if reconfigure {
-        transaction_builder::encode_set_validator_config_and_reconfigure_script_function
+        transaction_builder::encode_validator_set_script_set_validator_config_and_reconfigure
     } else {
-        transaction_builder::encode_register_validator_config_script_function
+        transaction_builder::encode_validator_set_script_register_validator_config
     };
     let validator_config_script = transaction_callback(
         owner_account,

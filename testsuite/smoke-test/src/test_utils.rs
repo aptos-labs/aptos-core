@@ -32,7 +32,7 @@ pub async fn transfer_coins_non_blocking(
     amount: u64,
 ) -> SignedTransaction {
     let txn = sender.sign_with_transaction_builder(transaction_factory.payload(
-        aptos_stdlib::encode_transfer_script_function(receiver.address(), amount),
+        aptos_stdlib::encode_test_coin_transfer(receiver.address(), amount),
     ));
 
     client.submit(&txn).await.unwrap();
@@ -68,7 +68,7 @@ pub async fn transfer_and_reconfig(
             let aptos_version = client.get_aptos_version().await.unwrap();
             let current_version = *aptos_version.into_inner().major.inner();
             let txn = root_account.sign_with_transaction_builder(transaction_factory.payload(
-                aptos_stdlib::encode_set_version_script_function(current_version + 1),
+                aptos_stdlib::encode_version_set_version(current_version + 1),
             ));
             client.submit_and_wait(&txn).await.unwrap();
 

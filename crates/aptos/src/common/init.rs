@@ -22,6 +22,8 @@ pub const DEFAULT_FAUCET_URL: &str = "https://faucet.devnet.aptoslabs.com";
 const NUM_DEFAULT_COINS: u64 = 10000;
 
 /// Tool to initialize current directory for the aptos tool
+///
+/// Configuration will be pushed into .aptos/config.yaml
 #[derive(Debug, Parser)]
 pub struct InitTool {
     #[clap(flatten)]

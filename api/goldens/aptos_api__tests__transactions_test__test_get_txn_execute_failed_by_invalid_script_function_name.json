@@ -1,18 +1,18 @@
 {
   "type": "user_transaction",
   "version": "2",
-  "hash": "0xc00c694596b002f38c4a5eb5b8b20a772cb2bc7e5aacd3b2637e73bec802796e",
-  "state_root_hash": "0x3cd5c847adbb63eacd7a588a2ac23ff98f5d64a5ec0e82eeca02acece5d3b446",
+  "hash": "0xb0fe2740ac760ccdfd8dd7cd33a95e8da3a40daeefb0f9c0ebb963b9b07c530a",
+  "state_root_hash": "0x9dd9b394e722becec025904a320b60376b2e579ad4bc50e259fdace259e16ffd",
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "1",
   "success": false,
   "vm_status": "Transaction Executed and Committed with Error FUNCTION_RESOLUTION_FAILURE",
-  "accumulator_root_hash": "0xf0bca4611a15359ba2929e8139da9875e742c7d60ed920eeab8bbe6fb0c3f54b",
+  "accumulator_root_hash": "0x891c41e6783e956d5f88373c0f9becc8e4b3dfae16b9ab65ae150e5caaa8cc35",
   "changes": [
     {
       "type": "write_resource",
       "address": "0xa550c18",
-      "state_key_hash": "0x04a62513032e695c923632ca1b9248d11e49c9b1e83bba39974adf50bbabdd8f",
+      "state_key_hash": "0x1e24e72081eba6c211d081095185a977809a76010b12dfa2a8983ccb1113ad71",
       "data": {
         "type": "0x1::Account::Account",
         "data": {
@@ -25,7 +25,7 @@
     {
       "type": "write_resource",
       "address": "0xa550c18",
-      "state_key_hash": "0x0429c60e9038d8b98b6cbddf810e3517cf3b029b8655d701962e6b1bfec59e04",
+      "state_key_hash": "0x515bab035b131fd25d8298be2c7f8b5afb409adea378f3d87a5b0dd170236d28",
       "data": {
         "type": "0x1::TestCoin::Balance",
         "data": {
@@ -53,7 +53,7 @@
   "signature": {
     "type": "ed25519_signature",
     "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-    "signature": "0x892be42783ef9c1b512e10ec1e9b0a38c820999d286607af02bf4b9e2ffeb6d536e9ba0f0fc5823b7635d7ccac987186f15c438a10a58a11319435c06c38200a"
+    "signature": "0x0f9df12ef4bffaa4f1b1aaa232d01e496a44d0e5950da21ab6a56a05dce09322e0ea0dd867fdfff2b37b1afa091bbb2335357202a76f65a60fa449f96774b40c"
   },
   "events": [],
   "timestamp": "1"

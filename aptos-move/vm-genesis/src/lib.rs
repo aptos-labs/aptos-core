@@ -111,7 +111,7 @@ pub fn encode_genesis_change_set(
     if enable_parallel_execution {
         let payload = bcs::to_bytes(&ReadWriteSetAnalysis::V1(
             read_write_set::analyze(&stdlib_modules)
-                .expect("Failed to get ReadWriteSet for current Diem Framework")
+                .expect("Failed to get ReadWriteSet for current Aptos Framework")
                 .normalize_all_scripts(aptos_vm::read_write_set_analysis::add_on_functions_list())
                 .trim()
                 .into_inner(),
@@ -371,7 +371,7 @@ pub fn test_genesis_change_set_and_validators(
 
 #[derive(Debug, Clone)]
 pub struct Validator {
-    /// The Diem account address of the validator
+    /// The Aptos account address of the validator
     pub address: AccountAddress,
     /// UTF8-encoded name for the validator
     pub name: Vec<u8>,
@@ -379,7 +379,7 @@ pub struct Validator {
     pub auth_key: AuthenticationKey,
     /// Ed25519 public key used to sign consensus messages
     pub consensus_pubkey: Vec<u8>,
-    /// The Diem account address of the validator's operator (same as `address` if the validator is
+    /// The Aptos account address of the validator's operator (same as `address` if the validator is
     /// its own operator)
     pub operator_address: AccountAddress,
     /// UTF8-encoded name of the operator

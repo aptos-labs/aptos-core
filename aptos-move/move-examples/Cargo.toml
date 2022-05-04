@@ -12,13 +12,12 @@ edition = "2018"
 aptos-vm = { path = "../aptos-vm" }
 aptos-types = {path = "../../types"}
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
-
-move-compiler = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
-move-package = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
-move-stdlib = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
-move-unit-test = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
 clap = "3.1.8"
+move-compiler = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
+move-package = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
+move-stdlib = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
+move-unit-test = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["table-extension"] }
 
 [dev-dependencies]
-move-cli = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e" }
+move-cli = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
 tempfile = "3.2.0"

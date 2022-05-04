@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! A model to test properties of common Diem transactions.
+//! A model to test properties of common Aptos transactions.
 //!
-//! The structs and functions in this module together form a simplified *model* of how common Diem
+//! The structs and functions in this module together form a simplified *model* of how common Aptos
 //! transactions should behave. This model is then used as an *oracle* for property-based tests --
 //! the results of executing transactions through the VM should match the results computed using
 //! this model.
@@ -250,7 +250,7 @@ pub fn txn_one_account_result(
     gas_used: u64,
     low_gas_used: u64,
 ) -> (TransactionStatus, bool) {
-    // The transactions set the gas cost to 1 microdiem.
+    // The transactions set the gas cost to 1 microaptos.
     let enough_max_gas = sender.balance >= gas_costs::TXN_RESERVED * gas_price;
     // This means that we'll get through the main part of the transaction.
     let enough_to_transfer = sender.balance >= amount;

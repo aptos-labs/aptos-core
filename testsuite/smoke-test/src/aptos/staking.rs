@@ -39,11 +39,7 @@ impl AptosTest for Staking {
             + locked_period;
         for account in &mut accounts {
             let txn = account.sign_with_transaction_builder(txn_factory.payload(
-                aptos_stdlib::encode_delegate_stake_script_function(
-                    validator_addr,
-                    100,
-                    current_time,
-                ),
+                aptos_stdlib::encode_stake_delegate_stake(validator_addr, 100, current_time),
             ));
             ctx.client().submit_and_wait(&txn).await?;
         }
@@ -54,7 +50,7 @@ impl AptosTest for Staking {
         );
         // force epoch change to make pending changes take effect
         let txn = ctx.root_account().sign_with_transaction_builder(
-            txn_factory.payload(aptos_stdlib::encode_force_reconfigure_script_function()),
+            txn_factory.payload(aptos_stdlib::encode_reconfiguration_force_reconfigure()),
         );
         ctx.client().submit_and_wait(&txn).await?;
         let stake_pool = stake_pool_from_addr(ctx, validator_addr).await;

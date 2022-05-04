@@ -28,7 +28,7 @@ impl AptosTest for AccountCreation {
             let new_account = ctx.random_account();
             let txn =
                 account.sign_with_transaction_builder(ctx.aptos_transaction_factory().payload(
-                    aptos_stdlib::encode_create_account_script_function(new_account.address()),
+                    aptos_stdlib::encode_account_create_account(new_account.address()),
                 ));
             ctx.client().submit_and_wait(&txn).await?;
         }

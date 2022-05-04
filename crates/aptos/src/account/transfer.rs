@@ -55,7 +55,7 @@ impl CliCommand<TransferSummary> for TransferCoins {
                 .chain_id(&self.profile_options.profile)
                 .await?,
             sender_key,
-            aptos_stdlib::encode_transfer_script_function(self.account, self.amount),
+            aptos_stdlib::encode_test_coin_transfer(self.account, self.amount),
             self.write_options.max_gas,
         )
         .await

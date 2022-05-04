@@ -23,11 +23,14 @@
     "react-icons": "^4.3.1",
     "react-router-dom": "^6.3.0",
     "react-scripts": "5.0.1",
-    "typescript": "^4.6.3"
+    "webextension-polyfill": "^0.9.0"
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "prebuild": "rimraf build",
+    "build": "npm-run-all build:*",
+    "build:app": "INLINE_RUNTIME_CHUNK=false react-scripts build",
+    "build:bg": "webpack --mode production ./src/background.ts --output-path ./build --output-filename background.ts",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -50,7 +53,9 @@
     ]
   },
   "devDependencies": {
+    "@types/chrome": "^0.0.183",
     "@types/react": "^18.0.6",
+    "@types/webextension-polyfill": "^0.8.3",
     "@typescript-eslint/eslint-plugin": "^5.20.0",
     "@typescript-eslint/parser": "^5.20.0",
     "eslint": "^8.13.0",
@@ -58,6 +63,10 @@
     "eslint-plugin-import": "^2.26.0",
     "eslint-plugin-n": "^15.1.0",
     "eslint-plugin-promise": "^6.0.0",
-    "eslint-plugin-react": "^7.29.4"
+    "eslint-plugin-react": "^7.29.4",
+    "npm-run-all": "^4.1.5",
+    "ts-loader": "^9.3.0",
+    "typescript": "^4.6.3",
+    "webpack-cli": "^4.9.2"
   }
 }

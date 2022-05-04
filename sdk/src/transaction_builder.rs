@@ -131,17 +131,17 @@ impl TransactionFactory {
 
     pub fn create_user_account(&self, public_key: &Ed25519PublicKey) -> TransactionBuilder {
         let preimage = AuthenticationKeyPreimage::ed25519(public_key);
-        self.payload(aptos_stdlib::encode_create_account_script_function(
+        self.payload(aptos_stdlib::encode_account_create_account(
             AuthenticationKey::from_preimage(&preimage).derived_address(),
         ))
     }
 
     pub fn transfer(&self, to: AccountAddress, amount: u64) -> TransactionBuilder {
-        self.payload(aptos_stdlib::encode_transfer_script_function(to, amount))
+        self.payload(aptos_stdlib::encode_test_coin_transfer(to, amount))
     }
 
     pub fn mint(&self, to: AccountAddress, amount: u64) -> TransactionBuilder {
-        self.payload(aptos_stdlib::encode_mint_script_function(to, amount))
+        self.payload(aptos_stdlib::encode_test_coin_mint(to, amount))
     }
 
     //
@@ -182,7 +182,7 @@ impl DualAttestationMessage {
         let mut message = metadata.into();
         bcs::serialize_into(&mut message, &reciever).unwrap();
         bcs::serialize_into(&mut message, &amount).unwrap();
-        message.extend(b"@@$$DIEM_ATTEST$$@@");
+        message.extend(b"@@$$APTOS_ATTEST$$@@");
 
         Self {
             message: message.into(),

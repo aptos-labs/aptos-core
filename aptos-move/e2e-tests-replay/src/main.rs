@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use structopt::StructOpt;
 
 use aptos_types::on_chain_config::{Version, APTOS_MAX_KNOWN_VERSION};
+use move_compiler::shared::PackagePaths;
 use move_model::run_model_builder;
 use move_stackless_bytecode_interpreter::{
     concrete::settings::InterpreterSettings, StacklessBytecodeInterpreter,
@@ -19,7 +20,7 @@ struct ReplayArgs {
     #[structopt(short = "t", long = "trace")]
     trace_files: Vec<String>,
 
-    /// Diem selector, if set, replay traces executed in that version instead of the latest version
+    /// Aptos selector, if set, replay traces executed in that version instead of the latest version
     #[structopt(short = "d", long = "aptos-version")]
     aptos_version: Option<u64>,
 
@@ -91,10 +92,13 @@ pub fn main() -> Result<()> {
         settings.no_expr_check = true;
     }
 
-    let env = run_model_builder(
-        vec![(framework::aptos::files(), BTreeMap::<String, _>::new())],
-        vec![],
-    )?;
+    let targets = vec![PackagePaths {
+        name: None,
+        paths: framework::aptos::files(),
+        named_address_map: BTreeMap::<String, _>::new(),
+    }];
+
+    let env = run_model_builder(targets, vec![])?;
     let interpreter = StacklessBytecodeInterpreter::new(&env, None, settings);
     for trace in args.trace_files {
         aptos_e2e_tests_replay::replay(trace, &interpreter, &flags)?;

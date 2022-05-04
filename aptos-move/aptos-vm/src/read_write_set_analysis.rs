@@ -47,7 +47,7 @@ pub fn add_on_functions_list() -> Vec<(ModuleId, Identifier)> {
 }
 
 impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
-    /// Create a Diem transaction read/write set analysis from a generic Move module read/write set
+    /// Create a Aptos transaction read/write set analysis from a generic Move module read/write set
     /// analysis and a view of the current blockchain for module fetching and access concretization.
     pub fn new(rw: &'a NormalizedReadWriteSetAnalysis, blockchain_view: &'a R) -> Self {
         ReadWriteSetAnalysis {
@@ -271,7 +271,7 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
         keys_written.sort();
         keys_written.dedup();
         // Hack: remove GasFees accesses from epilogue if gas_price is zero. This is sound
-        // to do as of Diem 1.4, but should be re-evaluated if the epilogue changes
+        // to do as of Aptos 1.4, but should be re-evaluated if the epilogue changes
         if tx.gas_unit_price() == 0 {
             let tx_fees_tag = StructTag {
                 address: account_config::CORE_CODE_ADDRESS,

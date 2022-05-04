@@ -20,6 +20,7 @@ use serde::Serialize;
 use shadow_rs::shadow;
 use std::{
     collections::{BTreeMap, HashMap},
+    env,
     fs::File,
     io::Write,
     path::{Path, PathBuf},
@@ -265,4 +266,8 @@ pub async fn submit_transaction(
         .map_err(|err| CliError::ApiError(err.to_string()))?;
 
     Ok(response.into_inner())
+}
+
+pub fn current_dir() -> PathBuf {
+    env::current_dir().unwrap()
 }

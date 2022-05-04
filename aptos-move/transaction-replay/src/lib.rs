@@ -408,16 +408,15 @@ fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {
 }
 
 fn compile_move_script(file_path: &str) -> Result<Vec<u8>> {
-    let cur_path = file_path.to_owned();
-    let targets = vec![(vec![cur_path], framework::aptos::named_addresses())];
-    let deps = vec![(
+    let cur_path = vec![file_path.to_owned()];
+
+    let (files, units_or_diags) = Compiler::from_files(
+        cur_path,
         framework::aptos::files(),
         framework::aptos::named_addresses(),
-    )];
-
-    let (files, units_or_diags) = Compiler::new(targets, deps)
-        .set_flags(Flags::empty().set_sources_shadow_deps(false))
-        .build()?;
+    )
+    .set_flags(Flags::empty().set_sources_shadow_deps(false))
+    .build()?;
     let unit = match units_or_diags {
         Err(diags) => {
             let diag_buffer =
