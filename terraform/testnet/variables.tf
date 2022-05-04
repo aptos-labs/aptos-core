@@ -188,6 +188,11 @@ variable "enable_k8s_metrics_server" {
   default     = false
 }
 
+variable "enable_cluster_autoscaler" {
+  description = "Enable cluster autoscaler: https://docs.aws.amazon.com/eks/latest/userguide/autoscaling.html"
+  default     = false
+}
+
 variable "coredns_min_replicas" {
   description = "Minimal replica numbers for core dns"
   default     = 2

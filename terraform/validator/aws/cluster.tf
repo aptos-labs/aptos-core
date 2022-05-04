@@ -78,7 +78,7 @@ resource "aws_eks_node_group" "nodes" {
 
   scaling_config {
     desired_size = lookup(var.node_pool_sizes, each.key, each.value.size)
-    min_size     = lookup(var.node_pool_sizes, each.key, each.value.size)
+    min_size     = 1
     max_size     = lookup(var.node_pool_sizes, each.key, each.value.size) * var.max_node_pool_surge
   }
 
