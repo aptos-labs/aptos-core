@@ -4,11 +4,7 @@
 use crate::builder::GenesisBuilder;
 use aptos_management::{config::ConfigPath, error::Error, secure_backend::SharedBackend};
 use aptos_secure_storage::Storage;
-use aptos_types::{
-    chain_id::ChainId,
-    on_chain_config::{ConsensusConfigV2, OnChainConsensusConfig, VMPublishingOption},
-    transaction::Transaction,
-};
+use aptos_types::{chain_id::ChainId, transaction::Transaction};
 use std::{fs::File, io::Write, path::PathBuf};
 use structopt::StructOpt;
 
@@ -39,16 +35,7 @@ impl Genesis {
         let chain_id = config.chain_id;
         let storage = Storage::from(&config.shared_backend);
         let genesis = GenesisBuilder::new(storage)
-            .build(
-                chain_id,
-                Some(VMPublishingOption::open()),
-                OnChainConsensusConfig::V2(ConsensusConfigV2 {
-                    two_chain: true,
-                    decoupled_execution: true,
-                    back_pressure_limit: 10,
-                    exclude_round: 20,
-                }),
-            )
+            .build(chain_id)
             .map_err(|e| Error::UnexpectedError(e.to_string()))?;
 
         if let Some(path) = self.path {

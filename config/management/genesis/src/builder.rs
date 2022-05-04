@@ -11,7 +11,6 @@ use aptos_management::constants::{self, VALIDATOR_CONFIG, VALIDATOR_OPERATOR};
 use aptos_secure_storage::{KVStorage, Namespaced};
 use aptos_types::{
     chain_id::ChainId,
-    on_chain_config::{OnChainConsensusConfig, VMPublishingOption},
     transaction::{
         authenticator::AuthenticationKey, ScriptFunction, Transaction, TransactionPayload,
     },
@@ -206,12 +205,7 @@ impl<S: KVStorage> GenesisBuilder<S> {
             .map_err(Into::into)
     }
 
-    pub fn build(
-        &self,
-        chain_id: ChainId,
-        publishing_option: Option<VMPublishingOption>,
-        consensus_config: OnChainConsensusConfig,
-    ) -> Result<Transaction> {
+    pub fn build(&self, chain_id: ChainId) -> Result<Transaction> {
         let aptos_root_key = self.root_key()?;
         let validators = self.validators()?;
         let move_modules = self.move_modules()?;
@@ -221,8 +215,6 @@ impl<S: KVStorage> GenesisBuilder<S> {
             aptos_root_key,
             &validators,
             &move_modules,
-            publishing_option,
-            consensus_config,
             chain_id,
             min_price_per_gas_unit,
         );

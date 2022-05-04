@@ -26,7 +26,6 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::VMPublishingOption,
     transaction::{Transaction, TransactionStatus},
 };
 use aptos_vm::AptosVM;
@@ -54,7 +53,6 @@ pub fn new_test_context(test_name: &'static str) -> TestContext {
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
     let builder =
         ValidatorBuilder::new(&tmp_dir, cached_framework_packages::module_blobs().to_vec())
-            .publishing_option(VMPublishingOption::open())
             .min_price_per_gas_unit(0)
             .randomize_first_validator_ports(false);
 

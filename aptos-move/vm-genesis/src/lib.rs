@@ -15,7 +15,8 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::{
-        ConsensusConfigV1, OnChainConsensusConfig, VMPublishingOption, APTOS_MAX_KNOWN_VERSION,
+        ConsensusConfigV1, ConsensusConfigV2, OnChainConsensusConfig, VMPublishingOption,
+        APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
@@ -53,16 +54,21 @@ pub fn encode_genesis_transaction(
     aptos_root_key: Ed25519PublicKey,
     validators: &[Validator],
     stdlib_module_bytes: &[Vec<u8>],
-    vm_publishing_option: Option<VMPublishingOption>,
-    consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     min_price_per_gas_unit: u64,
 ) -> Transaction {
+    let consensus_config = OnChainConsensusConfig::V2(ConsensusConfigV2 {
+        two_chain: true,
+        decoupled_execution: true,
+        back_pressure_limit: 10,
+        exclude_round: 20,
+    });
+
     Transaction::GenesisTransaction(WriteSetPayload::Direct(encode_genesis_change_set(
         &aptos_root_key,
         validators,
         stdlib_module_bytes,
-        vm_publishing_option.unwrap_or_else(VMPublishingOption::open),
+        VMPublishingOption::open(),
         consensus_config,
         chain_id,
         min_price_per_gas_unit,

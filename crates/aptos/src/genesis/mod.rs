@@ -14,10 +14,7 @@ use crate::{
     CliCommand, CliResult,
 };
 use aptos_crypto::ed25519::Ed25519PublicKey;
-use aptos_types::{
-    chain_id::ChainId,
-    on_chain_config::{ConsensusConfigV2, OnChainConsensusConfig, VMPublishingOption},
-};
+use aptos_types::chain_id::ChainId;
 use async_trait::async_trait;
 use clap::Parser;
 use vm_genesis::Validator;
@@ -61,19 +58,10 @@ impl CliCommand<()> for GenerateGenesis {
     async fn execute(self) -> CliTypedResult<()> {
         let genesis_info = fetch_genesis_info(self.github_options)?;
 
-        let consensus_config = OnChainConsensusConfig::V2(ConsensusConfigV2 {
-            two_chain: true,
-            decoupled_execution: true,
-            back_pressure_limit: 10,
-            exclude_round: 20,
-        });
-
         vm_genesis::encode_genesis_transaction(
             genesis_info.root_key.clone(),
             &genesis_info.validators,
             &genesis_info.modules,
-            Some(VMPublishingOption::open()), // TODO: Remove
-            consensus_config,                 // TODO: Remove
             genesis_info.chain_id,
             MIN_PRICE_PER_GAS_UNIT,
         );
