@@ -43,7 +43,7 @@ impl CliCommand<()> for SetupGit {
         client.put(LAYOUT_NAME, &layout)?;
 
         // Make a place for the modules to be uploaded
-        client.create_dir(&layout.modules_dir)?;
+        client.create_dir("framework")?;
 
         Ok(())
     }

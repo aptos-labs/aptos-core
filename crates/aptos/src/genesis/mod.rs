@@ -95,7 +95,7 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
         validators.push(client.get::<ValidatorConfiguration>(user)?.into());
     }
 
-    let modules = client.get_modules(&layout.modules_dir)?;
+    let modules = client.get_modules("framework")?;
 
     Ok(GenesisInfo {
         chain_id: layout.chain_id,

@@ -34,8 +34,6 @@ pub struct Layout {
     pub users: Vec<String>,
     /// ChainId for the target network
     pub chain_id: ChainId,
-    /// Modules folder
-    pub modules_dir: String,
 }
 
 impl Layout {
