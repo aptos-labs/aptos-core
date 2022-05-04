@@ -273,8 +273,11 @@ test_res = 'failed'
 # perf report
 test_report = []
 read_lines = False
+read_error_caused_by = False
+error_caused_by = "Forge test failure"
 with open(f"{FORGE_OUTPUT_TEE}", 'r') as file:
     for line in file.readlines():
+        # get the json report
         if 'json-report-end' in line:
             read_lines = False
         if read_lines:
@@ -283,10 +286,23 @@ with open(f"{FORGE_OUTPUT_TEE}", 'r') as file:
             read_lines = True
         if 'test result: ok' in line:
             test_res = 'passed'
+
+        # attempt to get the error
+        if read_error_caused_by:
+            error_caused_by = line
+            read_error_caused_by = False
+        if 'Caused by:' in line:
+            read_error_caused_by = True
 if len(test_report) == 0:
-    # If Forge emits no report, return a generic error
+    # If Forge emits no report (during test setup), return a generic error
     test_report.append("{\"text\": \"Forge test runner is terminated\"}")
+
 temp_forge_report = json.loads(''.join(test_report))
+
+# If Forge emits a report but no text, attempt to return the failure
+if not temp_forge_report["text"]:
+    temp_forge_report["text"] = error_caused_by
+
 temp_forge_report["logs"] = LOGGING_LINK
 temp_forge_report["dashboard"] = DASHBOARD_LINK
 if args.report:
