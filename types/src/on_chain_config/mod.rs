@@ -19,7 +19,6 @@ use std::{collections::HashMap, fmt, sync::Arc};
 
 mod aptos_version;
 mod consensus_config;
-mod parallel_execution_config;
 mod registered_currencies;
 mod validator_set;
 mod vm_config;
@@ -30,7 +29,6 @@ pub use self::{
         Version, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
     },
     consensus_config::{ConsensusConfigV1, ConsensusConfigV2, OnChainConsensusConfig},
-    parallel_execution_config::{ParallelExecutionConfig, ReadWriteSetAnalysis},
     registered_currencies::RegisteredCurrencies,
     validator_set::ValidatorSet,
     vm_config::VMConfig,
