@@ -6,7 +6,10 @@ pub mod git;
 pub mod keys;
 
 use crate::{
-    common::types::CliTypedResult,
+    common::{
+        types::{CliError, CliTypedResult, PromptOptions},
+        utils::{check_if_file_exists, write_to_file},
+    },
     genesis::{
         config::{Layout, ValidatorConfiguration},
         git::{GitOptions, LAYOUT_NAME},
@@ -17,6 +20,7 @@ use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_types::chain_id::ChainId;
 use async_trait::async_trait;
 use clap::Parser;
+use std::path::PathBuf;
 use vm_genesis::Validator;
 
 const MIN_PRICE_PER_GAS_UNIT: u64 = 1;
@@ -46,7 +50,11 @@ impl GenesisTool {
 #[derive(Parser)]
 pub struct GenerateGenesis {
     #[clap(flatten)]
+    prompt_options: PromptOptions,
+    #[clap(flatten)]
     github_options: GitOptions,
+    #[clap(long, parse(from_os_str), default_value = ".")]
+    output_dir: PathBuf,
 }
 
 #[async_trait]
@@ -57,8 +65,10 @@ impl CliCommand<()> for GenerateGenesis {
 
     async fn execute(self) -> CliTypedResult<()> {
         let genesis_info = fetch_genesis_info(self.github_options)?;
+        let genesis_file = self.output_dir.join("genesis.blob");
+        check_if_file_exists(genesis_file.as_path(), self.prompt_options)?;
 
-        vm_genesis::encode_genesis_transaction(
+        let txn = vm_genesis::encode_genesis_transaction(
             genesis_info.root_key.clone(),
             &genesis_info.validators,
             &genesis_info.modules,
@@ -66,6 +76,11 @@ impl CliCommand<()> for GenerateGenesis {
             MIN_PRICE_PER_GAS_UNIT,
         );
 
+        write_to_file(
+            genesis_file.as_path(),
+            "genesis.blob",
+            &bcs::to_bytes(&txn).map_err(|e| CliError::BCS("genesis.blob", e))?,
+        )?;
         Ok(())
     }
 }
