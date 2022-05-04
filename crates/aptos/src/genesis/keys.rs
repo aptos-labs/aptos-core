@@ -24,7 +24,7 @@ const NETWORK_KEY_FILE: &str = "network.key";
 pub struct GenerateKeys {
     /// Output path for the three keys
     #[clap(long, parse(from_os_str), default_value = ".")]
-    output_path: PathBuf,
+    output_dir: PathBuf,
 }
 
 #[async_trait]
@@ -34,9 +34,9 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
     }
 
     async fn execute(self) -> CliTypedResult<Vec<PathBuf>> {
-        let account_key_path = self.output_path.join(ACCOUNT_KEY_FILE);
-        let consensus_key_path = self.output_path.join(CONSENSUS_KEY_FILE);
-        let network_key_path = self.output_path.join(NETWORK_KEY_FILE);
+        let account_key_path = self.output_dir.join(ACCOUNT_KEY_FILE);
+        let consensus_key_path = self.output_dir.join(CONSENSUS_KEY_FILE);
+        let network_key_path = self.output_dir.join(NETWORK_KEY_FILE);
         let _ = key::GenerateKey::generate_ed25519(EncodingType::Hex, &account_key_path).await?;
         let _ = key::GenerateKey::generate_ed25519(EncodingType::Hex, &consensus_key_path).await?;
         let _ = key::GenerateKey::generate_x25519(EncodingType::Hex, &network_key_path).await?;
@@ -52,9 +52,9 @@ pub struct SetValidatorConfiguration {
     username: String,
     #[clap(flatten)]
     git_options: GitOptions,
-    /// Path to credentials
+    /// Path to folder with account.key, consensus.key, and network.key
     #[clap(long, parse(from_os_str), default_value = ".")]
-    credentials_path: PathBuf,
+    keys_dir: PathBuf,
     /// Host and port pair for the validator e.g. 127.0.0.1:6180
     #[clap(long)]
     validator_host: HostAndPort,
@@ -70,9 +70,9 @@ impl CliCommand<()> for SetValidatorConfiguration {
     }
 
     async fn execute(self) -> CliTypedResult<()> {
-        let account_key_path = self.credentials_path.join(ACCOUNT_KEY_FILE);
-        let consensus_key_path = self.credentials_path.join(CONSENSUS_KEY_FILE);
-        let network_key_path = self.credentials_path.join(NETWORK_KEY_FILE);
+        let account_key_path = self.keys_dir.join(ACCOUNT_KEY_FILE);
+        let consensus_key_path = self.keys_dir.join(CONSENSUS_KEY_FILE);
+        let network_key_path = self.keys_dir.join(NETWORK_KEY_FILE);
         let account_key: Ed25519PrivateKey =
             EncodingType::Hex.load_key(ACCOUNT_KEY_FILE, &account_key_path)?;
         let consensus_key: Ed25519PrivateKey =

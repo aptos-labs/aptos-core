@@ -35,7 +35,7 @@ pub struct Layout {
     /// ChainId for the target network
     pub chain_id: ChainId,
     /// Modules folder
-    pub modules_folder: String,
+    pub modules_dir: String,
 }
 
 impl Layout {
