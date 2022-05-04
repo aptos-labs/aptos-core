@@ -27,6 +27,7 @@ validator:
   tolerations: []
   affinity: {}
   config:
+    enable_state_sync_v2: false
     provide_genesis: true
     sync_only: false
     concurrency_level: 4

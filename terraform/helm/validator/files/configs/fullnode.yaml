@@ -18,6 +18,10 @@ execution:
   genesis_file_location: ""
   {{- end}}
 
+state_sync:
+  state_sync_driver:
+    enable_state_sync_v2: {{ .Values.validator.config.enable_state_sync_v2 }}
+
 
 storage:
   backup_service_address: "0.0.0.0:6186"
