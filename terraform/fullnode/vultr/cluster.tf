@@ -1,6 +1,6 @@
 resource "vultr_kubernetes" "k8" {
   region  = var.fullnode_region
-  label   = "aptos-devnet"
+  label   = "aptos-${terraform.workspace}"
   version = "v1.23.5+3"
 
   node_pools {

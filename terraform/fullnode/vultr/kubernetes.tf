@@ -43,7 +43,7 @@ resource "helm_release" "fullnode" {
         tag = var.image_tag
       }
       nodeSelector = {
-        "vke.vultr.com/node-pool" = "node"
+        "vke.vultr.com/node-pool" = "aptos-fullnode"
       }
       storage = {
         class = kubernetes_storage_class.ssd.metadata[0].name
