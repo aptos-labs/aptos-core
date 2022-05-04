@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::types::{CliError, CliTypedResult},
+    common::{
+        types::{CliError, CliTypedResult},
+        utils::write_to_file,
+    },
     genesis::config::Layout,
     CliCommand,
 };
@@ -11,11 +14,7 @@ use aptos_github_client::Client as GithubClient;
 use async_trait::async_trait;
 use clap::Parser;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{
-    io::{Read, Write},
-    path::PathBuf,
-    str::FromStr,
-};
+use std::{io::Read, path::PathBuf, str::FromStr};
 
 pub const LAYOUT_NAME: &str = "layout";
 
@@ -160,16 +159,11 @@ impl GitClient {
         match self {
             GitClient::Local(local_repository_path) => {
                 let path = local_repository_path.join(format!("{}.yml", name));
-                let mut file = if path.exists() {
-                    std::fs::File::open(path.as_path())
-                        .map_err(|e| CliError::IO(path.display().to_string(), e))?
-                } else {
-                    std::fs::File::create(path.as_path())
-                        .map_err(|e| CliError::IO(path.display().to_string(), e))?
-                };
-
-                file.write_all(to_yaml(input)?.as_bytes())
-                    .map_err(|e| CliError::IO(path.display().to_string(), e))?;
+                write_to_file(
+                    path.as_path(),
+                    &path.display().to_string(),
+                    to_yaml(input)?.as_bytes(),
+                )?;
             }
             GitClient::Github(client) => {
                 client.put(&format!("{}.yml", name), &to_base64_encoded_yaml(input)?)?;
