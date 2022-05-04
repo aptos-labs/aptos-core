@@ -121,7 +121,6 @@ impl<S: KVStorage> GenesisBuilder<S> {
                     AuthenticationKey::ed25519(&k)
                 });
             let operator = self.operator(owner)?;
-            let operator_name = operator.as_bytes().to_vec();
             let operator_auth_key = AuthenticationKey::ed25519(&self.operator_key(&operator)?);
             let operator_address = operator_auth_key.derived_address();
             let validator_config = self.validator_config(&operator)?;
@@ -130,11 +129,9 @@ impl<S: KVStorage> GenesisBuilder<S> {
             let full_node_network_address = bcs::from_bytes(&validator_config.args()[3])?;
             validators.push(Validator {
                 address,
-                name,
                 auth_key,
                 consensus_pubkey,
                 operator_address,
-                operator_name,
                 operator_auth_key,
                 network_address,
                 full_node_network_address,
