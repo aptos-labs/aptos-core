@@ -65,7 +65,7 @@ impl FromStr for GithubRepo {
         } else {
             Ok(GithubRepo {
                 owner: parts.get(0).unwrap().to_string(),
-                repository: parts.get(0).unwrap().to_string(),
+                repository: parts.get(1).unwrap().to_string(),
             })
         }
     }
