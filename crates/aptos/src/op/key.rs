@@ -212,10 +212,7 @@ impl SaveKey {
     pub fn check_key_file(&self) -> CliTypedResult<()> {
         // Check if file already exists
         self.file_options.check_file()?;
-        check_if_file_exists(
-            &self.public_key_file()?,
-            self.file_options.prompt_options.assume_yes,
-        )
+        check_if_file_exists(&self.public_key_file()?, self.file_options.prompt_options)
     }
 
     /// Saves a key to a file encoded in a string

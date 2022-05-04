@@ -282,11 +282,14 @@ impl FromStr for EncodingType {
 }
 
 /// An insertable option for use with prompts.
-#[derive(Debug, Parser)]
+#[derive(Clone, Copy, Debug, Parser)]
 pub struct PromptOptions {
     /// Assume yes for all yes/no prompts
-    #[clap(long)]
+    #[clap(long, group = "prompt_options")]
     pub assume_yes: bool,
+    /// Assume no for all yes/no prompts
+    #[clap(long, group = "prompt_options")]
+    pub assume_no: bool,
 }
 
 /// An insertable option for use with encodings.
@@ -407,7 +410,7 @@ pub struct SaveFile {
 impl SaveFile {
     /// Check if the key file exists already
     pub fn check_file(&self) -> CliTypedResult<()> {
-        check_if_file_exists(self.output_file.as_path(), self.prompt_options.assume_yes)
+        check_if_file_exists(self.output_file.as_path(), self.prompt_options)
     }
 
     /// Save to the `output_file`
