@@ -13,6 +13,7 @@ fullnode_identity:
   # If not set, it will generate a random one on startup.
 
 fullnode_max_inbound_connections: 1000
+enable_state_sync_v2: true
 
 rust_log: info
 

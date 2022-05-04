@@ -6,6 +6,10 @@ base:
 execution:
   genesis_file_location: "/opt/aptos/genesis/genesis.blob"
 
+state_sync:
+  state_sync_driver:
+    enable_state_sync_v2: {{ .Values.enable_state_sync_v2 }}
+
 full_node_networks:
 - network_id: "public"
   discovery_method: "onchain"
