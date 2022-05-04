@@ -260,8 +260,9 @@ module AptosFramework::Coin {
         assert!(*Option::borrow(&supply<FakeMoney>()) == 100, 3);
 
         let coin = withdraw<FakeMoney>(&source, 10);
+        assert!(value(&coin) == 10, 4);
         burn(&source, coin);
-        assert!(*Option::borrow(&supply<FakeMoney>()) == 90, 4);
+        assert!(*Option::borrow(&supply<FakeMoney>()) == 90, 5);
     }
 
     #[test(source = @0x1, destination = @0x2)]
