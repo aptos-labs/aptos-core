@@ -38,9 +38,7 @@ class Web3 {
             event.data.id === id) {
           const response = event.data.response
           this.removeEventListener('message', handler)
-          console.log('response: ' + response)
           if (response.error) {
-            console.log('error: ' + JSON.stringify(response.error, null, 4))
             reject(response.error ?? 'Error')
           } else {
             resolve(response)

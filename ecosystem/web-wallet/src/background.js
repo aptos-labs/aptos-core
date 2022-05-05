@@ -49,7 +49,6 @@ async function signTransaction (account, transaction, sendResponse) {
     const response = await client.submitTransaction(account, { signature: transactionSignature, ...txn })
     sendResponse(response)
   } catch (error) {
-    console.log('why the fucckkkk + ' + error)
     sendResponse({ error })
   }
 }

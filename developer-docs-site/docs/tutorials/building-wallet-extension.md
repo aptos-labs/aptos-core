@@ -36,32 +36,22 @@ The wallet has implemented some of the basics of interacting with Aptos
 ## Step 3) dApp Integration
 Currently we have two requests a dApp webpage can make to the wallet:
 - `account()`: gets the address of the account signed into the wallet
-- `signTransaction(transaction)`: signs the given transaction and returns the signed transaction to be submitted to chain
+- `signAndSubmitTransaction(transaction)`: signs the given transaction and submits to chain
 
 ### Usage
-*Note: you will want to use our [typescript sdk](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk) - `npm install aptos`*
 
 ```typescript
-import { AptosAccount, AptosClient } from 'aptos'
-
 // Gets the address of the account signed into the wallet
 const accountAddress = await (window as any).aptos.account()
 
-// Create a transaction
-const client = new AptosClient('https://fullnode.devnet.aptoslabs.com')
-const receiverAddress = '40b389daf74a98401f430ce8e73254dbffc5ce036ea32c33c15f14b858be3daf'
-const amount = '1337'
-const payload: Types.TransactionPayload = {
+// Create a transaction dictionary
+const transaction = {
     type: 'script_function_payload',
     function: '0x1::TestCoin::transfer',
     type_arguments: [],
     arguments: [receiverAddress, amount]
 }
-const transaction = await client.generateTransaction(accountAddress, payload)
 
-// Send transaction to the extension to be signed
-const response = await (window as any).aptos.signTransaction(transaction)
-
-// Submit signed transaction to chain
-await client.submitTransaction(new AptosAccount(), response)
+// Send transaction to the extension to be signed and submitted to chain
+const response = await (window as any).aptos.signAndSubmitTransaction(transaction)
 ```
