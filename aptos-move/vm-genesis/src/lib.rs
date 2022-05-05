@@ -21,7 +21,6 @@ use aptos_types::{
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
 use aptos_vm::{
-    convert_changeset_and_events,
     data_cache::{IntoMoveResolver, StateViewCache},
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
@@ -110,7 +109,7 @@ pub fn encode_genesis_change_set(
     create_and_initialize_validators(&mut session, validators);
     reconfigure(&mut session);
 
-    let (mut changeset1, mut events1, _) = session.finish().unwrap().unpack();
+    let mut session1_out = session.finish().unwrap();
 
     let state_view = GenesisStateView::new();
     let data_cache = StateViewCache::new(&state_view).into_move_resolver();
@@ -122,16 +121,17 @@ pub fn encode_genesis_change_set(
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
 
     publish_stdlib(&mut session, Modules::new(stdlib_modules.iter()));
-    let (changeset2, events2, _) = session.finish().unwrap().unpack();
+    let session2_out = session.finish().unwrap();
 
-    changeset1.squash(changeset2).unwrap();
-    events1.extend(events2);
+    session1_out.squash(session2_out).unwrap();
+    let change_set = session1_out.into_change_set(&mut ()).unwrap();
 
-    let (write_set, events) = convert_changeset_and_events(changeset1, events1).unwrap();
-
-    assert!(!write_set.iter().any(|(_, op)| op.is_deletion()));
-    verify_genesis_write_set(&events);
-    ChangeSet::new(write_set, events)
+    assert!(!change_set
+        .write_set()
+        .iter()
+        .any(|(_, op)| op.is_deletion()));
+    verify_genesis_write_set(change_set.events());
+    change_set
 }
 
 fn exec_function(
