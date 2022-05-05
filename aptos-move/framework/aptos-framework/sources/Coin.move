@@ -91,6 +91,14 @@ module AptosFramework::Coin {
         coin.value
     }
 
+    /// Returns `true` if the type `CoinType` is a registered coin.
+    /// Returns `false` otherwise.
+    public fun is_coin<CoinType>(): bool {
+        let type_info = TypeInfo::type_of<CoinType>();
+        let coin_address = TypeInfo::account_address(&type_info);
+        exists<CoinInfo<CoinType>>(coin_address)
+    }
+
     // Public functions
 
     /// Create a new `Coin<CoinType>` with a value of `0`.
@@ -254,6 +262,13 @@ module AptosFramework::Coin {
     //
     #[test_only]
     struct FakeMoney { }
+
+    #[test(source = @0x1)]
+    public(script) fun test_is_coin(source: signer) {
+        assert!(!is_coin<FakeMoney>(), 0);
+        initialize<FakeMoney>(&source, b"Fake money", 1, true);
+        assert!(is_coin<FakeMoney>(), 1);
+    }
 
     #[test]
     fun test_zero() {
