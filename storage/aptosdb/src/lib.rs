@@ -187,10 +187,7 @@ impl RocksdbPropertyReporter {
                 );
             }
             // report rocksdb properties each 10 seconds
-            #[cfg(not(test))]
-            const TIMEOUT_MS: u64 = 10000;
-            #[cfg(test)]
-            const TIMEOUT_MS: u64 = 10;
+            const TIMEOUT_MS: u64 = if cfg!(test) { 10 } else { 10000 };
 
             match recv.recv_timeout(Duration::from_millis(TIMEOUT_MS)) {
                 Ok(_) => break,
