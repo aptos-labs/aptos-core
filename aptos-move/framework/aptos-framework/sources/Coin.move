@@ -16,6 +16,7 @@ module AptosFramework::Coin {
     const EINSUFFICIENT_BALANCE: u64 = 5;
     const ENO_BURN_CAPABILITY: u64 = 6;
     const ENO_MINT_CAPABILITY: u64 = 7;
+    const EDESTRUCTION_OF_NONZERO_TOKEN: u64 = 8;
 
     // Core data structures
 
@@ -91,6 +92,21 @@ module AptosFramework::Coin {
     }
 
     // Public functions
+
+    /// Create a new `Coin<CoinType>` with a value of `0`.
+    public fun zero<CoinType>(): Coin<CoinType> {
+        Coin<CoinType> {
+            value: 0
+        }
+    }
+
+    /// Destroy a zero-value coin. Calls will fail if the `value` in the passed-in `token` is non-zero
+    /// so it is impossible to "burn" any non-zero amount of `Coin` without having
+    /// a `BurnCapability` for the specific `CoinType`.
+    public fun destroy_zero<CoinType>(zero_coin: Coin<CoinType>) {
+        let Coin { value } = zero_coin;
+        assert!(value == 0, Errors::invalid_argument(EDESTRUCTION_OF_NONZERO_TOKEN))
+    }
 
     /// Burn coin with capability.
     public fun burn<CoinType>(
@@ -236,8 +252,15 @@ module AptosFramework::Coin {
     //
     // Tests
     //
-
+    #[test_only]
     struct FakeMoney { }
+
+    #[test]
+    fun test_zero() {
+        let zero = zero<FakeMoney>();
+        assert!(value(&zero) == 0, 1);
+        destroy_zero(zero);
+    }
 
     #[test(source = @0x1, destination = @0x2)]
     public(script) fun end_to_end(
