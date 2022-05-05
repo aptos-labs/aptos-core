@@ -37,15 +37,19 @@ function getAccountAddress (account, sendResponse) {
 async function signTransaction (account, transaction, sendResponse) {
   try {
     const client = new AptosClient(DEVNET_NODE_URL)
-    const message = await client.createSigningMessage(transaction)
+    const address = account.address()
+    const txn = await client.generateTransaction(address, transaction)
+    const message = await client.createSigningMessage(txn)
     const signatureHex = account.signHexString(message.substring(2))
     const transactionSignature = {
       type: 'ed25519_signature',
       public_key: account.pubKey().hex(),
       signature: signatureHex.hex()
     }
-    sendResponse({ transaction: { signature: transactionSignature, ...transaction } })
+    const response = await client.submitTransaction(account, { signature: transactionSignature, ...txn })
+    sendResponse(response)
   } catch (error) {
-    sendResponse({ error: 'Problem with transaction' })
+    console.log('why the fucckkkk + ' + error)
+    sendResponse({ error })
   }
 }
