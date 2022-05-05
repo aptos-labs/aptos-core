@@ -20,8 +20,8 @@ use move_core_types::{
     effects::{ChangeSet as MoveChangeSet, Event as MoveEvent},
     vm_status::{StatusCode, VMStatus},
 };
-use move_table_extension::NativeTableContext;
-use move_vm_runtime::{native_extensions::NativeContextExtensions, session::Session};
+use move_table_extension::{NativeTableContext, TableChange, TableChangeSet};
+use move_vm_runtime::session::Session;
 use serde::{Deserialize, Serialize};
 use std::{
     convert::TryInto,
@@ -96,12 +96,17 @@ where
         Self { inner }
     }
 
-    pub fn finish(self) -> VMResult<SessionOutput<'r>> {
-        let (change_set, events, extensions) = self.inner.finish_with_extensions()?;
+    pub fn finish(self) -> VMResult<SessionOutput> {
+        let (change_set, events, mut extensions) = self.inner.finish_with_extensions()?;
+        let table_context: NativeTableContext = extensions.remove();
+        let table_change_set = table_context
+            .into_change_set()
+            .map_err(|e| e.finish(Location::Undefined))?;
+
         Ok(SessionOutput {
             change_set,
             events,
-            extensions,
+            table_change_set,
         })
     }
 }
@@ -120,15 +125,15 @@ impl<'r, 'l, S> DerefMut for SessionExt<'r, 'l, S> {
     }
 }
 
-pub struct SessionOutput<'r> {
+pub struct SessionOutput {
     pub change_set: MoveChangeSet,
     pub events: Vec<MoveEvent>,
-    pub extensions: NativeContextExtensions<'r>,
+    pub table_change_set: TableChangeSet,
 }
 
-impl<'r> SessionOutput<'r> {
+impl SessionOutput {
     pub fn into_change_set<C: AccessPathCache>(
-        mut self,
+        self,
         ap_cache: &mut C,
     ) -> Result<ChangeSet, VMStatus> {
         let mut out_write_set = WriteSetMut::new(Vec::new());
@@ -141,11 +146,7 @@ impl<'r> SessionOutput<'r> {
             &mut out_events,
         )?;
 
-        let table_context: NativeTableContext = self.extensions.remove();
-        let table_changeset = table_context
-            .into_change_set()
-            .map_err(|e| e.finish(Location::Undefined))?;
-        convert_table_changeset(table_changeset, &mut out_write_set)?;
+        convert_table_changeset(self.table_change_set, &mut out_write_set)?;
 
         let ws = out_write_set
             .freeze()
@@ -153,7 +154,40 @@ impl<'r> SessionOutput<'r> {
         Ok(ChangeSet::new(ws, out_events))
     }
 
-    pub fn unpack(self) -> (MoveChangeSet, Vec<MoveEvent>, NativeContextExtensions<'r>) {
-        (self.change_set, self.events, self.extensions)
+    pub fn unpack(self) -> (MoveChangeSet, Vec<MoveEvent>, TableChangeSet) {
+        (self.change_set, self.events, self.table_change_set)
+    }
+
+    pub fn squash(&mut self, other: Self) -> Result<(), VMStatus> {
+        self.change_set
+            .squash(other.change_set)
+            .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR))?;
+        self.events.extend(other.events.into_iter());
+
+        // Squash the table changes
+        self.table_change_set
+            .new_tables
+            .extend(other.table_change_set.new_tables);
+        for removed_table in &self.table_change_set.removed_tables {
+            self.table_change_set.new_tables.remove(removed_table);
+        }
+        // There's chance that a table is added in `self`, and an item is added to that table in
+        // `self`, and later the item is deleted in `other`, netting to a NOOP for that item,
+        // but this is an tricky edge case that we don't expect to happen too much, it doesn't hurt
+        // too much to just keep the deletion. It's safe as long as we do it that way consistently.
+        self.table_change_set
+            .removed_tables
+            .extend(other.table_change_set.removed_tables.into_iter());
+        for (handle, changes) in other.table_change_set.changes.into_iter() {
+            let my_changes = self
+                .table_change_set
+                .changes
+                .entry(handle)
+                .or_insert(TableChange {
+                    entries: Default::default(),
+                });
+            my_changes.entries.extend(changes.entries.into_iter());
+        }
+        Ok(())
     }
 }
