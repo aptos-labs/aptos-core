@@ -88,17 +88,17 @@ pub struct GitOptions {
 }
 
 impl GitOptions {
-    pub fn get_client(self) -> CliTypedResult<GitClient> {
+    pub fn get_client(self) -> CliTypedResult<Client> {
         if self.github_repository.is_none()
             && self.github_token_file.is_none()
             && self.local_repository_dir.is_some()
         {
-            Ok(GitClient::local(self.local_repository_dir.unwrap()))
+            Ok(Client::local(self.local_repository_dir.unwrap()))
         } else if self.github_repository.is_some()
             && self.github_token_file.is_some()
             && self.local_repository_dir.is_none()
         {
-            GitClient::github(
+            Client::github(
                 self.github_repository.unwrap(),
                 self.github_branch,
                 self.github_token_file.unwrap(),
@@ -109,26 +109,26 @@ impl GitOptions {
     }
 }
 
-/// A Git client for abstracting away local vs Github
+/// A client for abstracting away local vs Github storage
 ///
 /// Note: Writes do not commit locally
-pub enum GitClient {
+pub enum Client {
     Local(PathBuf),
     Github(GithubClient),
 }
 
-impl GitClient {
-    pub fn local(path: PathBuf) -> GitClient {
-        GitClient::Local(path)
+impl Client {
+    pub fn local(path: PathBuf) -> Client {
+        Client::Local(path)
     }
 
     pub fn github(
         repository: GithubRepo,
         branch: String,
         token_path: PathBuf,
-    ) -> CliTypedResult<GitClient> {
+    ) -> CliTypedResult<Client> {
         let token = Token::FromDisk(token_path).read_token()?;
-        Ok(GitClient::Github(GithubClient::new(
+        Ok(Client::Github(GithubClient::new(
             repository.owner,
             repository.repository,
             branch,
@@ -139,7 +139,7 @@ impl GitClient {
     /// Retrieves an object as a YAML encoded file from the appropriate storage
     pub fn get<T: DeserializeOwned>(&self, name: &str) -> CliTypedResult<T> {
         match self {
-            GitClient::Local(local_repository_path) => {
+            Client::Local(local_repository_path) => {
                 let path = local_repository_path.join(format!("{}.yml", name));
                 let mut file = std::fs::File::open(path.as_path())
                     .map_err(|e| CliError::IO(path.display().to_string(), e))?;
@@ -149,7 +149,7 @@ impl GitClient {
                     .map_err(|e| CliError::IO(path.display().to_string(), e))?;
                 from_yaml(&contents)
             }
-            GitClient::Github(client) => {
+            Client::Github(client) => {
                 from_base64_encoded_yaml(&client.get_file(&format!("{}.yml", name))?)
             }
         }
@@ -158,7 +158,7 @@ impl GitClient {
     /// Puts an object as a YAML encoded file to the appropriate storage
     pub fn put<T: Serialize + ?Sized>(&self, name: &str, input: &T) -> CliTypedResult<()> {
         match self {
-            GitClient::Local(local_repository_path) => {
+            Client::Local(local_repository_path) => {
                 let path = local_repository_path.join(format!("{}.yml", name));
                 write_to_file(
                     path.as_path(),
@@ -166,7 +166,7 @@ impl GitClient {
                     to_yaml(input)?.as_bytes(),
                 )?;
             }
-            GitClient::Github(client) => {
+            Client::Github(client) => {
                 client.put(&format!("{}.yml", name), &to_base64_encoded_yaml(input)?)?;
             }
         }
@@ -176,7 +176,7 @@ impl GitClient {
 
     pub fn create_dir(&self, name: &str) -> CliTypedResult<()> {
         match self {
-            GitClient::Local(local_repository_path) => {
+            Client::Local(local_repository_path) => {
                 let path = local_repository_path.join(name);
                 if path.exists() && path.is_dir() {
                     // Do nothing
@@ -185,7 +185,7 @@ impl GitClient {
                         .map_err(|e| CliError::IO(path.display().to_string(), e))?
                 };
             }
-            GitClient::Github(_) => {
+            Client::Github(_) => {
                 // There's no such thing as an empty directory in Git, so do nothing
             }
         }
@@ -198,7 +198,7 @@ impl GitClient {
         let mut modules = Vec::new();
 
         match self {
-            GitClient::Local(local_repository_path) => {
+            Client::Local(local_repository_path) => {
                 let module_folder = local_repository_path.join(name);
                 if !module_folder.is_dir() {
                     return Err(CliError::UnexpectedError(format!(
@@ -225,7 +225,7 @@ impl GitClient {
                     }
                 }
             }
-            GitClient::Github(client) => {
+            Client::Github(client) => {
                 let files = client.get_directory(name)?;
 
                 for file in files {
