@@ -2,11 +2,12 @@ import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { Accounts } from "./api/Accounts";
 import { Events } from "./api/Events";
 import { Transactions } from "./api/Transactions";
-import { HttpClient } from "./api/http-client";
+import { HttpClient, RequestParams } from "./api/http-client";
 import { HexString, MaybeHexString } from "./hex_string";
 import { sleep } from "./util";
 import { AptosAccount } from "./aptos_account";
 import { Types } from "./types";
+import { Tables } from "./api/Tables";
 
 export class RequestError extends Error {
   response?: AxiosResponse<any, Types.AptosError>;
@@ -46,6 +47,8 @@ export class AptosClient {
   // These are the different routes
   accounts: Accounts;
 
+  tables: Tables;
+
   events: Events;
 
   transactions: Transactions;
@@ -63,6 +66,7 @@ export class AptosClient {
 
     // Initialize routes
     this.accounts = new Accounts(this.client);
+    this.tables = new Tables(this.client);
     this.events = new Events(this.client);
     this.transactions = new Transactions(this.client);
   }
@@ -247,5 +251,14 @@ export class AptosClient {
         throw new Error(`Waiting for transaction ${txnHash} timed out!`);
       }
     }
+  }
+
+  async getTableItem(handle: string, data: Types.TableItemRequest, params?: RequestParams): Promise<any> {
+    const tableItem = await this.tables.getTableItem(
+      handle,
+      data,
+      params,
+    );
+    return tableItem;
   }
 }

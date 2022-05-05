@@ -25,11 +25,11 @@ export class Tables<SecurityDataType = unknown> {
    * @tags state, table
    * @name GetTableItem
    * @summary Get table item by handle and key.
-   * @request POST:/tables/{table_handle}/items
+   * @request POST:/tables/{table_handle}/item
    */
   getTableItem = (tableHandle: string, data: TableItemRequest, params: RequestParams = {}) =>
     this.http.request<object, AptosError>({
-      path: `/tables/${tableHandle}/items`,
+      path: `/tables/${tableHandle}/item`,
       method: "POST",
       body: data,
       type: ContentType.Json,
