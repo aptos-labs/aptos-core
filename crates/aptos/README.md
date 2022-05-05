@@ -242,14 +242,14 @@ The `aptos` CLI can be used to compile a Move package locally.
 The below example uses the `HelloBlockchain` in [move-examples](../../aptos-move/move-examples/).
 
 ```bash
-aptos move compile --package-dir aptos-move/move-examples/
+aptos move compile --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71
 ```
 
 The above command will generate the below terminal output:
 ```bash
 {
   "Result": [
-    "000000000000000000000000000000000000000000000000000000000000E110::Message"
+    "8946741E5C907C43C9E042B3739993F32904723F8E2D1491564D38959B59AC71::Message"
   ]
 }
 ```
@@ -260,7 +260,7 @@ The `aptos` CLI can also be used to compile and run unit tests locally.
 In this example, we'll use the `HelloBlockchain` in [move-examples](../../aptos-move/move-examples/).
 
 ```bash
-aptos move test --package-dir aptos-move/move-examples/
+aptos move test --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71
 ```
 The above command will generate the following terminal output:
 ```bash
@@ -268,8 +268,8 @@ BUILDING MoveStdlib
 BUILDING AptosFramework
 BUILDING Examples
 Running Move unit tests
-[ PASS    ] 0xe110::Message::sender_can_set_message
-[ PASS    ] 0xe110::MessageTests::sender_can_set_message
+[ PASS    ] 0x8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71::Message::sender_can_set_message
+[ PASS    ] 0x8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71::MessageTests::sender_can_set_message
 Test result: OK. Total tests: 2; passed: 2; failed: 0
 {
   "Result": "Success"
@@ -312,33 +312,20 @@ Operand Stack:
 ```
 
 
-### Publishing a Move Package
+### Publishing a Move Package with a named address
 
 In this example, we'll use the `HelloBlockchain` in [move-examples](../../aptos-move/move-examples/).
 
-The compiler doesn't like it when named addresses are specified twice, so we have to remove the `HelloBlockchain` variable
-under `[addresses]` in the [Move.toml](../../aptos-move/move-examples/Move.toml).
+Publish the package with your account address set for `HelloBlockchain`.
 
-#### Step 1) Remove variable from `Move.toml`
-If you forget to do this, you'll get an error like:
+Here, you need to change 8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71 to your account address.
 ```bash
-{
-  "Error": "Move compiliation failed: Unable to resolve packages for package 'Examples'"
-}
-```
-
-#### Step 2) Publish Move package with a named address
-After you remove the `HelloBlockchain`variable under `[addresses]` in the [Move.toml](../../aptos-move/move-examples/Move.toml),
-you can now publish the modules in the Move package.
-
-Publish the package with your account address set for `HelloBlockchain`
-```bash
-aptos move publish --package-dir aptos-move/move-examples/ --named-addresses HelloBlockchain=8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71
+aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71
 ```
 
 You can additionally use named profiles for the addresses.  The first placeholder is `default`
 ```bash
-aptos move publish --package-dir aptos-move/move-examples/ --named-addresses HelloBlockchain=default
+aptos move publish --package-dir aptos-move/move-examples/hello_blockchain/ --named-addresses HelloBlockchain=default
 ```
 
 ### Running a Move Function
