@@ -81,7 +81,7 @@ impl From<ValidatorConfiguration> for Validator {
 
         Validator {
             address: auth_key.derived_address(),
-            consensus_pubkey: bcs::to_bytes(&config.consensus_key).unwrap(),
+            consensus_pubkey: config.consensus_key.to_bytes().to_vec(),
             operator_address: auth_key.derived_address(),
             network_address: bcs::to_bytes(&validator_addresses).unwrap(),
             full_node_network_address: bcs::to_bytes(&full_node_addresses).unwrap(),
