@@ -290,6 +290,20 @@ module AptosFramework::Coin {
     }
 
     #[test(source = @0x1)]
+    #[expected_failure(abort_code = 2055)]
+    public(script) fun test_destroy_non_zero(source: signer) acquires CoinInfo, CoinStore, MintCapability {
+        let source_addr = Signer::address_of(&source);
+
+        initialize<FakeMoney>(&source, b"Fake money", 1, true);
+        register<FakeMoney>(&source);
+
+        mint<FakeMoney>(&source, source_addr, 100);
+        let coin = withdraw<FakeMoney>(&source, 100);
+
+        destroy_zero(coin);
+    }
+
+    #[test(source = @0x1)]
     public(script) fun test_extract(source: signer) acquires CoinInfo, CoinStore, MintCapability {
         let source_addr = Signer::address_of(&source);
 
