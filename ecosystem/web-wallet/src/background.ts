@@ -15,13 +15,13 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
   switch (request.method) {
     case MessageMethod.GET_ACCOUNT_ADDRESS:
       getAccountAddress(account, sendResponse)
-      break;
+      break
     case MessageMethod.SIGN_TRANSACTION:
       signTransaction(account, request.transaction, sendResponse)
-      break;
+      break
     default:
       // method not handled
-      break;
+      break
   }
   return true
 })
