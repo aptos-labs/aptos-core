@@ -11,7 +11,6 @@ use aptos_management::constants::{self, VALIDATOR_CONFIG, VALIDATOR_OPERATOR};
 use aptos_secure_storage::{KVStorage, Namespaced};
 use aptos_types::{
     chain_id::ChainId,
-    on_chain_config::{OnChainConsensusConfig, VMPublishingOption},
     transaction::{
         authenticator::AuthenticationKey, ScriptFunction, Transaction, TransactionPayload,
     },
@@ -122,7 +121,6 @@ impl<S: KVStorage> GenesisBuilder<S> {
                     AuthenticationKey::ed25519(&k)
                 });
             let operator = self.operator(owner)?;
-            let operator_name = operator.as_bytes().to_vec();
             let operator_auth_key = AuthenticationKey::ed25519(&self.operator_key(&operator)?);
             let operator_address = operator_auth_key.derived_address();
             let validator_config = self.validator_config(&operator)?;
@@ -131,11 +129,9 @@ impl<S: KVStorage> GenesisBuilder<S> {
             let full_node_network_address = bcs::from_bytes(&validator_config.args()[3])?;
             validators.push(Validator {
                 address,
-                name,
                 auth_key,
                 consensus_pubkey,
                 operator_address,
-                operator_name,
                 operator_auth_key,
                 network_address,
                 full_node_network_address,
@@ -206,12 +202,7 @@ impl<S: KVStorage> GenesisBuilder<S> {
             .map_err(Into::into)
     }
 
-    pub fn build(
-        &self,
-        chain_id: ChainId,
-        publishing_option: Option<VMPublishingOption>,
-        consensus_config: OnChainConsensusConfig,
-    ) -> Result<Transaction> {
+    pub fn build(&self, chain_id: ChainId) -> Result<Transaction> {
         let aptos_root_key = self.root_key()?;
         let validators = self.validators()?;
         let move_modules = self.move_modules()?;
@@ -221,8 +212,6 @@ impl<S: KVStorage> GenesisBuilder<S> {
             aptos_root_key,
             &validators,
             &move_modules,
-            publishing_option,
-            consensus_config,
             chain_id,
             min_price_per_gas_unit,
         );

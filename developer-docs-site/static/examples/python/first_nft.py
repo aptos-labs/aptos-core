@@ -150,6 +150,15 @@ class TokenClient(RestClient):
             token_id,
         )
 
+    def get_collection(self, creator: str, collection_name: str) -> Any:
+        token_data = self.account_resource(creator, "0x1::Token::Collections")["data"]["collections"]["handle"]
+
+        return self.get_table_item(
+            token_data,
+            "0x1::ASCII::String",
+            "0x1::Token::Collection",
+            collection_name,
+        )
 #<:!:section_3
 
     def cancel_token_offer(
@@ -198,6 +207,7 @@ if __name__ == "__main__":
 
     client.create_collection(alice, collection_name, "Alice's simple collection", "https://aptos.dev")
     client.create_token(alice, collection_name, token_name, "Alice's simple token", 1, "https://aptos.dev/img/nyan.jpeg")
+    print(f"Alice's collection: {client.get_collection(alice.address(), collection_name)}")
     print(f"Alice's token balance: {client.get_token_balance(alice.address(), alice.address(), collection_name, token_name)}")
     print(f"Alice's token data: {client.get_token_data(alice.address(), collection_name, token_name)}")
 

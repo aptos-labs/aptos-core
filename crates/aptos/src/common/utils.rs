@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::types::{CliError, CliTypedResult},
+    common::types::{CliError, CliTypedResult, PromptOptions},
     CliResult,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
@@ -149,18 +149,23 @@ impl<T> From<CliTypedResult<T>> for ResultWrapper<T> {
     }
 }
 
-/// Checks if a file exists, being overridden by `--assume-yes`
-pub fn check_if_file_exists(file: &Path, assume_yes: bool) -> CliTypedResult<()> {
-    if file.exists()
-        && !assume_yes
-        && !prompt_yes(
-            format!(
+/// Checks if a file exists, being overridden by `PromptOptions`
+pub fn check_if_file_exists(file: &Path, prompt_options: PromptOptions) -> CliTypedResult<()> {
+    if file.exists() {
+        prompt_yes_with_override(
+            &format!(
                 "{:?} already exists, are you sure you want to overwrite it?",
-                file.as_os_str()
-            )
-            .as_str(),
-        )
-    {
+                file.as_os_str(),
+            ),
+            prompt_options,
+        )?
+    }
+
+    Ok(())
+}
+
+pub fn prompt_yes_with_override(prompt: &str, prompt_options: PromptOptions) -> CliTypedResult<()> {
+    if prompt_options.assume_no || (!prompt_options.assume_yes && !prompt_yes(prompt)) {
         Err(CliError::AbortedError)
     } else {
         Ok(())
@@ -270,4 +275,14 @@ pub async fn submit_transaction(
 
 pub fn current_dir() -> PathBuf {
     env::current_dir().unwrap()
+}
+
+/// Reads a line from input
+pub fn read_line(input_name: &'static str) -> CliTypedResult<String> {
+    let mut input_buf = String::new();
+    let _ = std::io::stdin()
+        .read_line(&mut input_buf)
+        .map_err(|err| CliError::IO(input_name.to_string(), err))?;
+
+    Ok(input_buf)
 }

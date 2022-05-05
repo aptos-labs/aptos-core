@@ -15,7 +15,8 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::{
-        ConsensusConfigV1, OnChainConsensusConfig, VMPublishingOption, APTOS_MAX_KNOWN_VERSION,
+        ConsensusConfigV1, ConsensusConfigV2, OnChainConsensusConfig, VMPublishingOption,
+        APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
@@ -53,16 +54,21 @@ pub fn encode_genesis_transaction(
     aptos_root_key: Ed25519PublicKey,
     validators: &[Validator],
     stdlib_module_bytes: &[Vec<u8>],
-    vm_publishing_option: Option<VMPublishingOption>,
-    consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     min_price_per_gas_unit: u64,
 ) -> Transaction {
+    let consensus_config = OnChainConsensusConfig::V2(ConsensusConfigV2 {
+        two_chain: true,
+        decoupled_execution: true,
+        back_pressure_limit: 10,
+        exclude_round: 20,
+    });
+
     Transaction::GenesisTransaction(WriteSetPayload::Direct(encode_genesis_change_set(
         &aptos_root_key,
         validators,
         stdlib_module_bytes,
-        vm_publishing_option.unwrap_or_else(VMPublishingOption::open),
+        VMPublishingOption::open(),
         consensus_config,
         chain_id,
         min_price_per_gas_unit,
@@ -346,8 +352,6 @@ pub fn test_genesis_change_set_and_validators(
 pub struct Validator {
     /// The Aptos account address of the validator
     pub address: AccountAddress,
-    /// UTF8-encoded name for the validator
-    pub name: Vec<u8>,
     /// Authentication key for the validator
     pub auth_key: AuthenticationKey,
     /// Ed25519 public key used to sign consensus messages
@@ -355,8 +359,6 @@ pub struct Validator {
     /// The Aptos account address of the validator's operator (same as `address` if the validator is
     /// its own operator)
     pub operator_address: AccountAddress,
-    /// UTF8-encoded name of the operator
-    pub operator_name: Vec<u8>,
     /// Authentication key for the operator
     pub operator_auth_key: AuthenticationKey,
     /// `NetworkAddress` for the validator
@@ -386,17 +388,14 @@ impl TestValidator {
         let consensus_pubkey = key.public_key().to_bytes().to_vec();
         let operator_auth_key = auth_key;
         let operator_address = operator_auth_key.derived_address();
-        let operator_name = name.clone();
         let network_address = [0u8; 0].to_vec();
         let full_node_network_address = [0u8; 0].to_vec();
 
         let data = Validator {
             address,
-            name,
             auth_key,
             consensus_pubkey,
             operator_address,
-            operator_name,
             operator_auth_key,
             network_address,
             full_node_network_address,

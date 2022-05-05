@@ -21,12 +21,8 @@ use aptos_telemetry::{
 };
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_config::aptos_root_address,
-    account_view::AccountView,
-    chain_id::ChainId,
-    move_resource::MoveStorage,
-    on_chain_config::{VMPublishingOption, ON_CHAIN_CONFIG_REGISTRY},
-    waypoint::Waypoint,
+    account_config::aptos_root_address, account_view::AccountView, chain_id::ChainId,
+    move_resource::MoveStorage, on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
@@ -129,7 +125,6 @@ pub fn load_test_environment<R>(
     config_path: Option<PathBuf>,
     random_ports: bool,
     lazy: bool,
-    publishing_option: Option<VMPublishingOption>,
     genesis_modules: Vec<Vec<u8>>,
     rng: R,
 ) where
@@ -173,15 +168,13 @@ pub fn load_test_environment<R>(
             template.consensus.mempool_poll_count = u64::MAX;
         }
 
-        let mut builder = aptos_genesis_tool::validator_builder::ValidatorBuilder::new(
+        let builder = aptos_genesis_tool::validator_builder::ValidatorBuilder::new(
             &config_path,
             genesis_modules,
         )
         .template(template)
         .randomize_first_validator_ports(random_ports);
-        if let Some(publishing_option) = publishing_option {
-            builder = builder.publishing_option(publishing_option);
-        }
+
         let (root_keys, _genesis, genesis_waypoint, validators) = builder.build(rng).unwrap();
 
         let serialized_keys = bcs::to_bytes(&root_keys.root_key).unwrap();

@@ -121,7 +121,7 @@ class RestClient:
             time.sleep(1)
             count += 1
         response = requests.get(f"{self.url}/transactions/{txn_hash}")
-        assert response.json()["success"], f"{response.text} - {txn_hash}"
+        assert "success" in response.json(), f"{response.text} - {txn_hash}"
 #<:!:section_4
 
 #:!:>section_5

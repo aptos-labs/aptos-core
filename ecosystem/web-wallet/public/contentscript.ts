@@ -14,3 +14,14 @@ function injectScript () {
 }
 
 injectScript()
+
+// inpage -> contentscript
+window.addEventListener('message', function (event) {
+  if (event.data.method) {
+    // contentscript -> background
+    chrome.runtime.sendMessage(event.data, function (response) {
+      // contentscript -> inpage
+      window.postMessage({ responseMethod: event.data.method, id: event.data.id, response })
+    })
+  }
+})

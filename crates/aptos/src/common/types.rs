@@ -78,6 +78,36 @@ impl CliError {
     }
 }
 
+impl From<aptos_config::config::Error> for CliError {
+    fn from(e: aptos_config::config::Error) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
+impl From<aptos_github_client::Error> for CliError {
+    fn from(e: aptos_github_client::Error) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
+impl From<serde_yaml::Error> for CliError {
+    fn from(e: serde_yaml::Error) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
+impl From<base64::DecodeError> for CliError {
+    fn from(e: base64::DecodeError) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
+impl From<std::string::FromUtf8Error> for CliError {
+    fn from(e: std::string::FromUtf8Error) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
 /// Config saved to `.aptos/config.yaml`
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CliConfig {
@@ -282,11 +312,14 @@ impl FromStr for EncodingType {
 }
 
 /// An insertable option for use with prompts.
-#[derive(Debug, Parser)]
+#[derive(Clone, Copy, Debug, Parser)]
 pub struct PromptOptions {
     /// Assume yes for all yes/no prompts
-    #[clap(long)]
+    #[clap(long, group = "prompt_options")]
     pub assume_yes: bool,
+    /// Assume no for all yes/no prompts
+    #[clap(long, group = "prompt_options")]
+    pub assume_no: bool,
 }
 
 /// An insertable option for use with encodings.
@@ -337,16 +370,14 @@ pub struct PrivateKeyInputOptions {
 }
 
 impl PrivateKeyInputOptions {
+    /// Extract private key from CLI args with fallback to config
     pub fn extract_private_key(
         &self,
         encoding: EncodingType,
         profile: &str,
     ) -> CliTypedResult<Ed25519PrivateKey> {
-        if let Some(ref file) = self.private_key_file {
-            encoding.load_key("--private-key-file", file.as_path())
-        } else if let Some(ref key) = self.private_key {
-            let key = key.as_bytes().to_vec();
-            encoding.decode_key("--private-key", key)
+        if let Some(key) = self.extract_private_key_cli(encoding)? {
+            Ok(key)
         } else if let Some(Some(private_key)) =
             CliConfig::load_profile(profile)?.map(|p| p.private_key)
         {
@@ -355,6 +386,23 @@ impl PrivateKeyInputOptions {
             Err(CliError::CommandArgumentError(
                 "One of ['--private-key', '--private-key-file'] must be used".to_string(),
             ))
+        }
+    }
+
+    /// Extract private key from CLI args
+    pub fn extract_private_key_cli(
+        &self,
+        encoding: EncodingType,
+    ) -> CliTypedResult<Option<Ed25519PrivateKey>> {
+        if let Some(ref file) = self.private_key_file {
+            Ok(Some(
+                encoding.load_key("--private-key-file", file.as_path())?,
+            ))
+        } else if let Some(ref key) = self.private_key {
+            let key = key.as_bytes().to_vec();
+            Ok(Some(encoding.decode_key("--private-key", key)?))
+        } else {
+            Ok(None)
         }
     }
 }
@@ -407,7 +455,7 @@ pub struct SaveFile {
 impl SaveFile {
     /// Check if the key file exists already
     pub fn check_file(&self) -> CliTypedResult<()> {
-        check_if_file_exists(self.output_file.as_path(), self.prompt_options.assume_yes)
+        check_if_file_exists(self.output_file.as_path(), self.prompt_options)
     }
 
     /// Save to the `output_file`
