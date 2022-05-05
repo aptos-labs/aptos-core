@@ -21,7 +21,7 @@ window.addEventListener('message', function (event) {
     // contentscript -> background
     chrome.runtime.sendMessage(event.data, function (response) {
       // contentscript -> inpage
-      window.postMessage( { responseMethod: event.data.method, id: event.data.id, response })
+      window.postMessage({ responseMethod: event.data.method, id: event.data.id, response })
     })
   }
 })

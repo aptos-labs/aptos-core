@@ -84,7 +84,7 @@ function Login () {
           </Box>
         </Center>
         <Heading textAlign="center">Wallet</Heading>
-        <Text textAlign="center" pb={8} color={secondaryTextColor[colorMode]}>The official Aptos crypto wallet</Text>
+        <Text textAlign="center" pb={8} color={secondaryTextColor[colorMode]}>An Aptos crypto wallet</Text>
         <form onSubmit={handleSubmit(onSubmit)}>
           <VStack spacing={4}>
             <Center minW="100%" px={4}>
