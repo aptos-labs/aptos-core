@@ -15,8 +15,10 @@ use aptos_types::{
     transaction::{Script, SignedTransaction, TransactionStatus},
     vm_status::StatusCode,
 };
-use move_core_types::gas_schedule::{AbstractMemorySize, GasAlgebra, GasCarrier, GasConstants};
-use move_vm_types::gas_schedule::calculate_intrinsic_gas;
+use move_deps::{
+    move_core_types::gas_schedule::{AbstractMemorySize, GasAlgebra, GasCarrier, GasConstants},
+    move_vm_types::gas_schedule::calculate_intrinsic_gas,
+};
 use proptest::prelude::*;
 use proptest_derive::Arbitrary;
 use std::sync::Arc;

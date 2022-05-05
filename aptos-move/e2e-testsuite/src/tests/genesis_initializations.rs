@@ -3,7 +3,7 @@
 
 use aptos_types::account_config;
 use language_e2e_tests::executor::FakeExecutor;
-use move_core_types::{
+use move_deps::move_core_types::{
     account_address::AccountAddress,
     value::{serialize_values, MoveValue},
 };

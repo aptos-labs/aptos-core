@@ -12,7 +12,7 @@ use aptos_writeset_generator::build_changeset;
 use language_e2e_tests::{
     account::Account, compile::compile_module, current_function_name, executor::FakeExecutor,
 };
-use move_ir_compiler::Compiler;
+use move_deps::move_ir_compiler::Compiler;
 
 #[ignore] // writeset is not supported in aptos-framework
 #[test]

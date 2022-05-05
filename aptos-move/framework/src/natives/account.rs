@@ -1,15 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::errors::PartialVMResult;
-use move_core_types::account_address::AccountAddress;
-use move_vm_runtime::native_functions::NativeContext;
-use move_vm_types::{
-    gas_schedule::NativeCostIndex,
-    loaded_data::runtime_types::Type,
-    natives::function::{native_gas, NativeResult},
-    pop_arg,
-    values::Value,
+use move_deps::{
+    move_binary_format::errors::PartialVMResult,
+    move_core_types::account_address::AccountAddress,
+    move_vm_runtime::native_functions::NativeContext,
+    move_vm_types::{
+        gas_schedule::NativeCostIndex,
+        loaded_data::runtime_types::Type,
+        natives::function::{native_gas, NativeResult},
+        pop_arg,
+        values::Value,
+    },
 };
 use smallvec::smallvec;
 use std::collections::VecDeque;

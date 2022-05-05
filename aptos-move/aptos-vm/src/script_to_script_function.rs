@@ -5,7 +5,7 @@
 //! function
 
 use aptos_types::account_config::CORE_CODE_ADDRESS;
-use move_core_types::{ident_str, identifier::IdentStr, language_storage::ModuleId};
+use move_deps::move_core_types::{ident_str, identifier::IdentStr, language_storage::ModuleId};
 use once_cell::sync::Lazy;
 
 #[macro_export]

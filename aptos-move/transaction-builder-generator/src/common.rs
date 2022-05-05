@@ -5,7 +5,7 @@ use aptos_types::transaction::{
     ArgumentABI, ScriptABI, ScriptFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
 use heck::CamelCase;
-use move_core_types::language_storage::TypeTag;
+use move_deps::move_core_types::language_storage::TypeTag;
 use serde_reflection::{ContainerFormat, Format, Named, VariantFormat};
 use std::collections::{BTreeMap, BTreeSet};
 

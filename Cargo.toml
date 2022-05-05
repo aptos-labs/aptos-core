@@ -16,6 +16,7 @@ members = [
     "aptos-move/framework",
     "aptos-move/framework/cached-packages",
     "aptos-move/genesis-viewer",
+    "aptos-move/move-deps",
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
     "aptos-move/parallel-executor",

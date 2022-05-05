@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use include_dir::{include_dir, Dir, DirEntry};
-use move_binary_format::file_format::CompiledModule;
-use move_bytecode_utils::Modules;
-use move_core_types::abi::ScriptABI;
+use move_deps::{
+    move_binary_format::file_format::CompiledModule, move_bytecode_utils::Modules,
+    move_core_types::abi::ScriptABI,
+};
 use once_cell::sync::Lazy;
 
 pub mod aptos_stdlib;

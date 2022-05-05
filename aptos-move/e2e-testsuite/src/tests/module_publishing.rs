@@ -9,7 +9,7 @@ use language_e2e_tests::{
     account::Account, compile::compile_module, current_function_name, executor::FakeExecutor,
     transaction_status_eq,
 };
-use move_core_types::vm_status::StatusCode;
+use move_deps::move_core_types::vm_status::StatusCode;
 
 // A module with an address different from the sender's address should be rejected
 #[test]

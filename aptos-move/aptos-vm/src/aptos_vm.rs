@@ -37,20 +37,22 @@ use aptos_types::{
     write_set::{WriteSet, WriteSetMut},
 };
 use fail::fail_point;
-use move_binary_format::{
-    access::ModuleAccess,
-    errors::{verification_error, Location, VMResult},
-    CompiledModule, IndexKind,
+use move_deps::{
+    move_binary_format::{
+        access::ModuleAccess,
+        errors::{verification_error, Location, VMResult},
+        CompiledModule, IndexKind,
+    },
+    move_core_types::{
+        account_address::AccountAddress,
+        gas_schedule::{GasAlgebra, GasUnits},
+        language_storage::ModuleId,
+        transaction_argument::convert_txn_args,
+        value::{serialize_values, MoveValue},
+    },
+    move_vm_runtime::session::LoadedFunctionInstantiation,
+    move_vm_types::{gas_schedule::GasStatus, loaded_data::runtime_types::Type},
 };
-use move_core_types::{
-    account_address::AccountAddress,
-    gas_schedule::{GasAlgebra, GasUnits},
-    language_storage::ModuleId,
-    transaction_argument::convert_txn_args,
-    value::{serialize_values, MoveValue},
-};
-use move_vm_runtime::session::LoadedFunctionInstantiation;
-use move_vm_types::{gas_schedule::GasStatus, loaded_data::runtime_types::Type};
 use num_cpus;
 use once_cell::sync::OnceCell;
 use std::{
@@ -112,7 +114,7 @@ impl AptosVM {
     }
 
     fn is_valid_for_constant_type(typ: &Type) -> bool {
-        use move_vm_types::loaded_data::runtime_types::Type::*;
+        use move_deps::move_vm_types::loaded_data::runtime_types::Type::*;
         match typ {
             Bool | U8 | U64 | U128 | Address => true,
             Vector(inner) => AptosVM::is_valid_for_constant_type(&(*inner)),

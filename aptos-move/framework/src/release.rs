@@ -1,13 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::{compatibility::Compatibility, normalized::Module, CompiledModule};
-use move_command_line_common::files::{
-    extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_ERROR_DESC_EXTENSION,
+use move_deps::{
+    move_binary_format::{compatibility::Compatibility, normalized::Module, CompiledModule},
+    move_command_line_common::files::{
+        extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_ERROR_DESC_EXTENSION,
+    },
+    move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule},
+    move_core_types::language_storage::ModuleId,
+    move_package::{BuildConfig, ModelConfig},
 };
-use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
-use move_core_types::language_storage::ModuleId;
-use move_package::{BuildConfig, ModelConfig};
 use std::{
     collections::BTreeMap,
     fs::{create_dir_all, remove_dir_all, File},
@@ -80,7 +82,7 @@ impl ReleaseOptions {
         }
         std::fs::create_dir_all(output_path.parent().unwrap()).unwrap();
 
-        let build_config = move_package::BuildConfig {
+        let build_config = move_deps::move_package::BuildConfig {
             generate_docs: !self.build_docs,
             generate_abis: !self.script_abis,
             install_dir: Some(output_path.clone()),
@@ -138,7 +140,7 @@ fn generate_error_map(package_path: &Path, output_path: &Path, build_config: Bui
 
     recreate_dir(&errmap_path.parent().unwrap());
 
-    let errmap_options = move_errmapgen::ErrmapOptions {
+    let errmap_options = move_deps::move_errmapgen::ErrmapOptions {
         output_file: errmap_path.to_string_lossy().to_string(),
         ..Default::default()
     };
@@ -153,7 +155,7 @@ fn generate_error_map(package_path: &Path, output_path: &Path, build_config: Bui
         )
         .unwrap();
 
-    let mut emapgen = move_errmapgen::ErrmapGen::new(&model, &errmap_options);
+    let mut emapgen = move_deps::move_errmapgen::ErrmapGen::new(&model, &errmap_options);
     emapgen.gen();
     emapgen.save_result();
 }

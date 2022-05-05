@@ -6,7 +6,7 @@ use aptos_types::transaction::{
     ArgumentABI, ScriptABI, ScriptFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
 use heck::{CamelCase, ShoutySnakeCase};
-use move_core_types::{
+use move_deps::move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, TypeTag},
 };
