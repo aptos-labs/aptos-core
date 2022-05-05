@@ -102,7 +102,7 @@ const submitTransaction = async ({
   }
   const txnRequest = await client.generateTransaction(fromAddress.address(), payload)
   const signedTxn = await client.signTransaction(fromAddress, txnRequest)
-  const transactionRes = await client.submitTransaction(fromAddress, signedTxn)
+  const transactionRes = await client.submitTransaction(signedTxn)
   await client.waitForTransaction(transactionRes.hash)
 }
 
@@ -136,7 +136,6 @@ const Wallet = () => {
           throw new Error(TransferError.UndefinedAccount)
         }
         await submitTransaction({
-          toAddress,
           fromAddress: aptosAccount,
           amount: transferAmount
         })

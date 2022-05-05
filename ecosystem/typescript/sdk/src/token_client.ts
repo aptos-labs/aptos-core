@@ -15,7 +15,7 @@ export class TokenClient {
       max_gas_amount: "4000",
     });
     const signedTxn = await this.aptosClient.signTransaction(account, txnRequest);
-    const res = await this.aptosClient.submitTransaction(account, signedTxn);
+    const res = await this.aptosClient.submitTransaction(signedTxn);
     await this.aptosClient.waitForTransaction(res.hash);
     return Promise.resolve(res.hash);
   }

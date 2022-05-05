@@ -12,7 +12,7 @@
     "@types/numeral": "^2.0.2",
     "@types/react-dom": "^18.0.2",
     "@types/react-router-dom": "^5.3.3",
-    "aptos": "^0.0.17",
+    "aptos": "^0.0.19",
     "buffer": "^6.0.3",
     "constate": "^3.3.2",
     "framer-motion": "^6",

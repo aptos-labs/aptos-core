@@ -209,7 +209,6 @@ export class AptosClient {
 
   /** Submits a signed transaction to the blockchain. */
   async submitTransaction(
-    accountFrom: AptosAccount,
     signedTxnRequest: Types.SubmitTransactionRequest,
   ): Promise<Types.PendingTransaction> {
     const response = await this.transactions.submitTransaction(signedTxnRequest);
