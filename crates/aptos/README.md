@@ -7,13 +7,13 @@ This document describes how to install the `aptos` CLI tool and how to use it.
 You will need the `cargo` package manager to install the `aptos` CLI tool.  Follow the below steps.
 1. Follow the `cargo` [installation instructions on this page](https://doc.rust-lang.org/cargo/getting-started/installation.html)
    and install `cargo`.  Proceed only after you successfully install `cargo`.
-2. Execute teh below step to ensure that your current shell environment konws where `cargo` is.
+2. Execute the below step to ensure that your current shell environment knows where `cargo` is.
 ```bash
 source $HOME/.cargo/env
 ```
 ### Install the `aptos` CLI
-1. Install the `aptos` CLIU tool by running the below command.  You can run this command from any directory.  The `aptos`
-   CLI tool will be installed into your `CARGO_HOME`, usually `~.cargo`:
+1. Install the `aptos` CLI tool by running the below command.  You can run this command from any directory.  The `aptos`
+   CLI tool will be installed into your `CARGO_HOME`, usually `~/.cargo`:
 ```bash
 cargo install --git https://github.com/aptos-labs/aptos-core.git aptos
 ```
@@ -224,7 +224,7 @@ The above command will generate the following output on the terminal:
 }
 ```
 
-The peer_config.yaml file will be created in your current working directory, with the contents as shown in the below example:
+The `peer_config.yaml` file will be created in your current working directory, with the contents as shown in the below example:
 ```bash
 ---
 8946741e5c907c43c9e042b3739993f32904723f8e2d1491564d38959b59ac71:
