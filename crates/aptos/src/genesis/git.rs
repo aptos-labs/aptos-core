@@ -104,7 +104,7 @@ impl GitOptions {
                 self.github_token_file.unwrap(),
             )
         } else {
-            Err(CliError::CommandArgumentError("Must provide either only --local-repository-path or both --github-repository and --github-token-path".to_string()))
+            Err(CliError::CommandArgumentError("Must provide either only --local-repository-dir or both --github-repository and --github-token-path".to_string()))
         }
     }
 }
