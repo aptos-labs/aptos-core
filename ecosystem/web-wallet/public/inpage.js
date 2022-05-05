@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 class Web3 {
-  requestId;
+  requestId
 
-  constructor() {
+  constructor () {
     this.requestId = 0
   }
 
@@ -14,10 +14,10 @@ class Web3 {
       const method = 'getAccountAddress'
       window.postMessage({ method, id })
       window.addEventListener('message', function handler (event) {
-        if (event.data.responseMethod === method
-            && event.data.id === id ) {
+        if (event.data.responseMethod === method &&
+            event.data.id === id) {
           const response = event.data.response
-          this.removeEventListener('message', handler);
+          this.removeEventListener('message', handler)
           if (response.address) {
             resolve(response.address)
           } else {
@@ -32,12 +32,12 @@ class Web3 {
     const id = this.requestId++
     return new Promise(function (resolve, reject) {
       const method = 'signTransaction'
-      window.postMessage({ method, transaction, id})
+      window.postMessage({ method, transaction, id })
       window.addEventListener('message', function handler (event) {
-        if (event.data.responseMethod === method
-            && event.data.id === id ) {
+        if (event.data.responseMethod === method &&
+            event.data.id === id) {
           const response = event.data.response
-          this.removeEventListener('message', handler);
+          this.removeEventListener('message', handler)
           if (response.transaction) {
             resolve(response.transaction)
           } else {
