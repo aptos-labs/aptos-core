@@ -26,6 +26,7 @@ source ~/.cargo/env
 * [Your first NFT](/tutorials/your-first-nft)
 * [Run a local testnet](/tutorials/run-a-local-testnet)
 * [Run a FullNode](/tutorials/run-a-fullnode)
+* [Wallet Extension With dApp Integration](/tutorials/building-wallet-extension)
 
 ## Start Developing Move Modules
 
