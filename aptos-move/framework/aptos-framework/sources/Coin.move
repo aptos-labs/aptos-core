@@ -116,6 +116,26 @@ module AptosFramework::Coin {
         assert!(value == 0, Errors::invalid_argument(EDESTRUCTION_OF_NONZERO_TOKEN))
     }
 
+    /// Extract `amount` from the passed-in `coin`, where the original token is modified in place.
+    public fun extract<CoinType>(coin: &mut Coin<CoinType>, amount: u64): Coin<CoinType> {
+        assert!(coin.value >= amount, Errors::invalid_argument(EINSUFFICIENT_BALANCE));
+        coin.value = coin.value - amount;
+        Coin { value: amount }
+    }
+
+    /// Removes `amount` of value from the passed in `coin` and returns original coin and new one contains `amount`.
+    public fun split<CoinType>(coin: Coin<CoinType>, amount: u64): (Coin<CoinType>, Coin<CoinType>) {
+        let other = extract(&mut coin, amount);
+        (coin, other)
+    }
+
+    /// "Merges" the two coins.
+    /// The coin passed in as `dst_coin` will have a value equal to the sum of the two tokens (`dst_coin` and `source_coin`).
+    public fun merge<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: Coin<CoinType>) {
+        dst_coin.value = dst_coin.value + source_coin.value;
+        let Coin { value: _ } = source_coin;
+    }
+
     /// Burn coin with capability.
     public fun burn<CoinType>(
         account: &signer,
@@ -184,11 +204,6 @@ module AptosFramework::Coin {
         move_to(account, MintCapability<CoinType> { });
     }
 
-    public fun merge<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: Coin<CoinType>) {
-        dst_coin.value = dst_coin.value + source_coin.value;
-        let Coin { value: _ } = source_coin;
-    }
-
     /// Create new coins and deposit them into dst_addr's account.
     public(script) fun mint<CoinType>(
         account: &signer,
@@ -251,10 +266,7 @@ module AptosFramework::Coin {
             WithdrawEvent { amount },
         );
 
-        let balance = &mut coin_store.coin.value;
-        *balance = *balance - amount;
-
-        Coin { value: amount }
+        extract(&mut coin_store.coin, amount)
     }
 
     //
@@ -275,6 +287,31 @@ module AptosFramework::Coin {
         let zero = zero<FakeMoney>();
         assert!(value(&zero) == 0, 1);
         destroy_zero(zero);
+    }
+
+    #[test(source = @0x1)]
+    public(script) fun test_extract(source: signer) acquires CoinInfo, CoinStore, MintCapability {
+        let source_addr = Signer::address_of(&source);
+
+        initialize<FakeMoney>(&source, b"Fake money", 1, true);
+        register<FakeMoney>(&source);
+
+        mint<FakeMoney>(&source, source_addr, 100);
+        let coin = withdraw<FakeMoney>(&source, 100);
+
+        let extracted = extract(&mut coin, 25);
+        assert!(value(&coin) == 75, 0);
+        assert!(value(&extracted) == 25, 1);
+
+        let (s1, s2) = split(extracted, 12);
+        assert!(value(&s1) == 13, 2);
+        assert!(value(&s2) == 12, 3);
+
+        deposit(source_addr, coin);
+        deposit(source_addr, s1);
+        deposit(source_addr, s2);
+
+        assert!(balance<FakeMoney>(source_addr) == 100, 4);
     }
 
     #[test(source = @0x1, destination = @0x2)]
