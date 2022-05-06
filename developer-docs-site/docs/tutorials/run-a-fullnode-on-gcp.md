@@ -8,7 +8,7 @@ sidebar_position: 11
 
 This tutorial explains how to configure and deploy a public FullNode to connect to the Aptos devnet using Google Cloud (GCP). Running a FullNode in the cloud usually provides better stability and availability compared to running it on your laptop. If you're looking for deploying a production grade FullNode, we recommend you to deploy it on the cloud.
 
-> **Note:** Please read [Run a Fullnode](run-a-fullnode) if you want other alternatives for deployment, using Cloud comes with a cost, and it varies depends on how you configure it.
+> **Note:** Please read [Run a Fullnode](full-node/run-a-fullnode) if you want other alternatives for deployment, using Cloud comes with a cost, and it varies depends on how you configure it.
 >
 
 ## Prerequisites
