@@ -8,6 +8,7 @@ import { sleep } from "./util";
 import { AptosAccount } from "./aptos_account";
 import { Types } from "./types";
 import { Tables } from "./api/Tables";
+import { Address, AptosError, LedgerVersion, MoveModule } from "./api/data-contracts";
 
 export class RequestError extends Error {
   response?: AxiosResponse<any, Types.AptosError>;
@@ -208,9 +209,7 @@ export class AptosClient {
   }
 
   /** Submits a signed transaction to the blockchain. */
-  async submitTransaction(
-    signedTxnRequest: Types.SubmitTransactionRequest,
-  ): Promise<Types.PendingTransaction> {
+  async submitTransaction(signedTxnRequest: Types.SubmitTransactionRequest): Promise<Types.PendingTransaction> {
     const response = await this.transactions.submitTransaction(signedTxnRequest);
     raiseForStatus(202, response, signedTxnRequest);
     return response.data;
@@ -252,12 +251,18 @@ export class AptosClient {
     }
   }
 
+  async getLedgerInfo(params: RequestParams = {}): Promise<Types.LedgerInfo> {
+    const result = await this.client.request<Types.LedgerInfo, AptosError>({
+      path: "/",
+      method: "GET",
+      format: "json",
+      ...params,
+    });
+    return result.data;
+  }
+
   async getTableItem(handle: string, data: Types.TableItemRequest, params?: RequestParams): Promise<any> {
-    const tableItem = await this.tables.getTableItem(
-      handle,
-      data,
-      params,
-    );
+    const tableItem = await this.tables.getTableItem(handle, data, params);
     return tableItem;
   }
 }
