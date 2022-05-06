@@ -12,7 +12,7 @@
     "@types/numeral": "^2.0.2",
     "@types/react-dom": "^18.0.2",
     "@types/react-router-dom": "^5.3.3",
-    "aptos": "^0.0.17",
+    "aptos": "^0.0.18",
     "buffer": "^6.0.3",
     "constate": "^3.3.2",
     "framer-motion": "^6",
@@ -30,7 +30,7 @@
     "prebuild": "rimraf build",
     "build": "npm-run-all build:*",
     "build:app": "INLINE_RUNTIME_CHUNK=false react-scripts build",
-    "build:bg": "webpack --mode production ./src/background.ts --output-path ./build --output-filename background.ts",
+    "build:bg": "webpack --mode production ./src/background.js --output-path ./build --output-filename background.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

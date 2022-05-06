@@ -45,7 +45,8 @@ function Login () {
   const onSubmit: SubmitHandler<Inputs> = async (data, event) => {
     event?.preventDefault()
     try {
-      const encodedKey = Uint8Array.from(Buffer.from(key, 'hex'))
+      const nonHexKey = (key.startsWith('0x')) ? key.substring(2) : key
+      const encodedKey = Uint8Array.from(Buffer.from(nonHexKey, 'hex'))
       const account = new AptosAccount(encodedKey, undefined)
       const response = await getAccountResources({ address: account.address().hex() })
       if (response?.status !== 200) {

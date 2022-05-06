@@ -41,7 +41,7 @@ class MessageboardUtil {
     ): Promise<Types.HexEncodedBytes> {
         var txnRequest = await client.generateTransaction(account.address(), payload);
         var signedTxn = await client.signTransaction(account, txnRequest);
-        var transactionRes = await client.submitTransaction(account, signedTxn);
+        var transactionRes = await client.submitTransaction(signedTxn);
         await client.waitForTransaction(transactionRes.hash);
         return transactionRes.hash;
     }

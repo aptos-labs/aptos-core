@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosAccount, AptosClient, Types } from 'aptos'
+import { AptosClient } from 'aptos'
 import { DEVNET_NODE_URL } from './constants'
 import { MessageMethod } from './types'
 import { getAptosAccountState } from './utils/account'
@@ -20,13 +20,12 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
       signTransaction(account, request.transaction, sendResponse)
       break
     default:
-      // method not handled
-      break
+      throw new Error(request.method + ' method is not supported')
   }
   return true
 })
 
-function getAccountAddress (account: AptosAccount, sendResponse: (response?: any) => void) {
+function getAccountAddress (account, sendResponse) {
   if (account.address()) {
     sendResponse({ address: account.address().hex() })
   } else {
@@ -34,14 +33,21 @@ function getAccountAddress (account: AptosAccount, sendResponse: (response?: any
   }
 }
 
-async function signTransaction (account: AptosAccount, transaction: Types.UserTransactionRequest, sendResponse: (response?: any) => void) {
-  const client = new AptosClient(DEVNET_NODE_URL)
-  const message = await client.createSigningMessage(transaction)
-  const signatureHex = account.signHexString(message.substring(2))
-  const transactionSignature = {
-    type: 'ed25519_signature',
-    public_key: account.pubKey().hex(),
-    signature: signatureHex.hex()
+async function signTransaction (account, transaction, sendResponse) {
+  try {
+    const client = new AptosClient(DEVNET_NODE_URL)
+    const address = account.address()
+    const txn = await client.generateTransaction(address, transaction)
+    const message = await client.createSigningMessage(txn)
+    const signatureHex = account.signHexString(message.substring(2))
+    const transactionSignature = {
+      type: 'ed25519_signature',
+      public_key: account.pubKey().hex(),
+      signature: signatureHex.hex()
+    }
+    const response = await client.submitTransaction(account, { signature: transactionSignature, ...txn })
+    sendResponse(response)
+  } catch (error) {
+    sendResponse({ error })
   }
-  sendResponse({ transaction: { signature: transactionSignature, ...transaction } })
 }

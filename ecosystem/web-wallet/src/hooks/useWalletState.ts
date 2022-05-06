@@ -4,7 +4,7 @@
 import { useState, useCallback } from 'react'
 import constate from 'constate'
 import { getAptosAccountState, getLocalStorageState } from '../utils/account'
-import { walletStateLocalStorageKey } from '../constants'
+import { WALLET_STATE_LOCAL_STORAGE_KEY } from '../constants'
 import { AptosAccountState, LocalStorageState } from '../types'
 
 const defaultValue: LocalStorageState = {
@@ -29,7 +29,7 @@ export default function useWalletState () {
       const privateKeyObject = aptosAccountState?.toPrivateKeyObject()
       setAptosAccount(aptosAccountState)
       setLocalStorageState({ aptosAccountObject: privateKeyObject })
-      window.localStorage.setItem(walletStateLocalStorageKey, JSON.stringify(privateKeyObject))
+      window.localStorage.setItem(WALLET_STATE_LOCAL_STORAGE_KEY, JSON.stringify(privateKeyObject))
     } catch (error) {
       console.log(error)
     }
@@ -38,7 +38,7 @@ export default function useWalletState () {
   const signOut = useCallback(() => {
     setAptosAccount(undefined)
     setLocalStorageState({ aptosAccountObject: undefined })
-    window.localStorage.removeItem(walletStateLocalStorageKey)
+    window.localStorage.removeItem(WALLET_STATE_LOCAL_STORAGE_KEY)
   }, [])
 
   return { walletState: localStorageState, aptosAccount, updateWalletState, signOut }

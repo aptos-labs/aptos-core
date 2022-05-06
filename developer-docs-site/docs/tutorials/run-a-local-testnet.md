@@ -186,4 +186,4 @@ At this point, you will have a special root account at `0x1` that can perform th
 
 * [Your first transaction](/tutorials/your-first-transaction) to learn how to submit transactions.
 * [Your first Move module](/tutorials/your-first-move-module) to learn how to create Move modules.
-* [Interacting with the Aptos Blockchain](/transactions/interacting-with-the-aptos-blockchain) to learn how to mint coins.
+* [Interacting with the Aptos Blockchain](/guides/interacting-with-the-aptos-blockchain) to learn how to mint coins.

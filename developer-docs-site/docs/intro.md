@@ -20,7 +20,7 @@ Make sure to fill out our [Developer Network Typeform][typeform] to receive acce
 
 ### 🤿 Want to dive in?
 
-Start with the basics, such as how [Accounts](/basics/basics-accounts) work. Want something a bit more interactive? You can dive right in to our [tutorials](/tutorials/getting-started).
+Start with the basics, such as how [Accounts](/basics/basics-accounts) work. Want something a bit more interactive? You can dive right in to our [tutorials](/guides/getting-started).
 
 Or you can go straight to the [source](https://github.com/aptos-labs/aptos-core) (ha ha) and help us build the Layer 1 for everyone.
 

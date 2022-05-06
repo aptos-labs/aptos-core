@@ -323,10 +323,13 @@ module AptosFramework::Account {
             Errors::limit_exceeded(EGAS)
         );
         let transaction_fee_amount = txn_gas_price * gas_used;
+        let addr = Signer::address_of(&account);
+        // it's important to maintain the error code consistent with vm
+        // to do failed transaction cleanup.
+        assert!(TestCoin::balance_of(addr) >= transaction_fee_amount, Errors::limit_exceeded(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
         let coin = TestCoin::withdraw(&account, transaction_fee_amount);
         TransactionFee::burn_fee(coin);
 
-        let addr = Signer::address_of(&account);
         let old_sequence_number = get_sequence_number(addr);
 
         assert!(

@@ -25,12 +25,14 @@ source ~/.cargo/env
 * [Your first Move module](/tutorials/your-first-move-module)
 * [Your first NFT](/tutorials/your-first-nft)
 * [Run a local testnet](/tutorials/run-a-local-testnet)
-* [Run a FullNode](/tutorials/run-a-fullnode)
+* [Run a FullNode](/tutorials/full-node/run-a-fullnode)
+* [Wallet Extension With dApp Integration](/tutorials/building-wallet-extension)
 
 ## Start Developing Move Modules
 
 * Read the [Move book](https://diem.github.io/move/)
-* Learn more about [interacting with the Aptos Blockchain](/transactions/interacting-with-the-aptos-blockchain)
+* Learn more about [interacting with the Aptos Blockchain](/guides/interacting-with-the-aptos-blockchain)
+* Learn more about [Aptos Move](/guides/move)
 * Explore the [Framework documentation](https://github.com/aptos-labs/aptos-core/tree/framework-docs)
 * Start building and publishing your own modules on our public Devnet or on your own Testnet
 

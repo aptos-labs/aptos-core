@@ -28,15 +28,19 @@ test(
 
     await tokenClient.createToken(
       alice,
-      "AliceCollection",
-      "AliceToken",
+      collection_name,
+      token_name,
       "Alice's simple token",
       1,
       "https://aptos.dev/img/nyan.jpeg",
     );
 
     // Transfer Token from Alice's Account to Bob's Account
-    const token_id = await tokenClient.getTokenId(alice.address().hex(), collection_name, token_name);
+    await tokenClient.getCollectionData(alice.address().hex(), collection_name);
+    await tokenClient.getTokenBalance(alice.address().hex(), collection_name, token_name);
+    await tokenClient.getTokenData(alice.address().hex(), collection_name, token_name);
+    await tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), collection_name, token_name, 1);
+    await tokenClient.cancelTokenOffer(alice, bob.address().hex(), alice.address().hex(), collection_name, token_name);
     await tokenClient.offerToken(alice, bob.address().hex(), alice.address().hex(), collection_name, token_name, 1);
     await tokenClient.claimToken(bob, alice.address().hex(), alice.address().hex(), collection_name, token_name);
   },

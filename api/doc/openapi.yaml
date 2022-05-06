@@ -460,7 +460,7 @@ paths:
           $ref: '#/components/responses/404'
         "500":
           $ref: '#/components/responses/500'
-  /tables/{table_handle}/items:
+  /tables/{table_handle}/item:
     post:
       summary: Get table item by handle and key.
       description: |

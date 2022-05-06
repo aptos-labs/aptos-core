@@ -3,7 +3,7 @@
 
 import {
   Button,
-  Grid,
+  Flex,
   Heading,
   HStack,
   Input,
@@ -17,11 +17,12 @@ import {
   Text,
   useColorMode,
   useDisclosure,
+  useToast,
   VStack
 } from '@chakra-ui/react'
 import { SubmitHandler, useForm } from 'react-hook-form'
 import React, { useEffect, useState } from 'react'
-import WalletHeader, { seconaryAddressFontColor } from '../components/WalletHeader'
+import { seconaryAddressFontColor } from '../components/WalletHeader'
 import withSimulatedExtensionContainer from '../components/WithSimulatedExtensionContainer'
 import useWalletState from '../hooks/useWalletState'
 import { AptosAccount, AptosClient, FaucetClient, Types } from 'aptos'
@@ -29,8 +30,13 @@ import { AccountResource } from 'aptos/dist/api/data-contracts'
 import { FaFaucet } from 'react-icons/fa'
 import { IoIosSend } from 'react-icons/io'
 import numeral from 'numeral'
-import { DEVNET_NODE_URL, FAUCET_URL, secondaryBgColor, secondaryErrorMessageColor } from '../constants'
-import WalletFooter from '../components/WalletFooter'
+import {
+  FAUCET_URL,
+  NODE_URL,
+  secondaryErrorMessageColor,
+  STATIC_GAS_AMOUNT
+} from '../constants'
+import WalletLayout from '../Layouts/WalletLayout'
 
 /**
  * TODO: Will be fixed in upcoming Chakra-UI 2.0.0
@@ -45,7 +51,7 @@ interface GetAccountResourcesProps {
 }
 
 export const getAccountResources = async ({
-  nodeUrl = DEVNET_NODE_URL,
+  nodeUrl = NODE_URL,
   address
 }: GetAccountResourcesProps) => {
   const client = new AptosClient(nodeUrl)
@@ -65,13 +71,16 @@ interface FundWithFaucetProps {
   address?: string;
 }
 
-const TransferError = Object.freeze({
+const TransferResult = Object.freeze({
   UndefinedAccount: 'Account does not exist',
-  IncorrectPayload: 'Incorrect transaction payload'
+  AmountOverLimit: 'Amount is over limit',
+  AmountWithGasOverLimit: 'Amount with gas is over limit',
+  IncorrectPayload: 'Incorrect transaction payload',
+  Success: 'Transaction executed successfully'
 } as const)
 
 const fundWithFaucet = async ({
-  nodeUrl = DEVNET_NODE_URL,
+  nodeUrl = NODE_URL,
   address
 }: FundWithFaucetProps): Promise<void> => {
   const faucetClient = new FaucetClient(nodeUrl, FAUCET_URL)
@@ -91,7 +100,7 @@ const submitTransaction = async ({
   toAddress,
   fromAddress,
   amount,
-  nodeUrl = DEVNET_NODE_URL
+  nodeUrl = NODE_URL
 }: SubmitTransactionProps) => {
   const client = new AptosClient(nodeUrl)
   const payload: Types.TransactionPayload = {
@@ -106,6 +115,17 @@ const submitTransaction = async ({
   await client.waitForTransaction(transactionRes.hash)
 }
 
+const getAccountBalanceFromAccountResources = (
+  accountResources: AccountResource[] | undefined
+): Number => {
+  if (accountResources) {
+    const accountResource = (accountResources) ? accountResources?.find((r) => r.type === '0x1::TestCoin::Balance') : undefined
+    const tokenBalance = (accountResource) ? (accountResource.data as { coin: { value: string } }).coin.value : undefined
+    return Number(tokenBalance)
+  }
+  return -1
+}
+
 const Wallet = () => {
   const { colorMode } = useColorMode()
   const { aptosAccount } = useWalletState()
@@ -115,6 +135,10 @@ const Wallet = () => {
   const [refreshState, setRefreshState] = useState(true)
   const [isFaucetLoading, setIsFaucetLoading] = useState(false)
   const [isTransferLoading, setIsTransferLoading] = useState(false)
+  const [lastBalance, setLastBalance] = useState<number>(-1)
+  const [lastTransferAmount, setLastTransferAmount] = useState<number>(-1)
+  const [lastTransactionStatus, setLastTransactionStatus] = useState<string>(TransferResult.Success)
+  const toast = useToast()
 
   const address = aptosAccount?.address().hex()
   const accountResource = (accountResources) ? accountResources?.find((r) => r.type === '0x1::TestCoin::Balance') : undefined
@@ -127,35 +151,38 @@ const Wallet = () => {
     event?.preventDefault()
     if (toAddress && aptosAccount && transferAmount) {
       setIsTransferLoading(true)
+      setLastBalance(Number(tokenBalance))
+      setLastTransferAmount(Number(transferAmount))
       try {
+        // TODO: awaiting Zekun's changes, @see PR #821
+        if (Number(transferAmount) >= Number(tokenBalance) - STATIC_GAS_AMOUNT) {
+          setLastTransactionStatus(TransferResult.AmountWithGasOverLimit)
+          throw new Error(TransferResult.AmountOverLimit)
+        }
         const accountResponse = await getAccountResources({
-          nodeUrl: DEVNET_NODE_URL,
+          nodeUrl: NODE_URL,
           address: toAddress
         })
         if (accountResponse?.status !== 200) {
-          throw new Error(TransferError.UndefinedAccount)
+          setLastTransactionStatus(TransferResult.UndefinedAccount)
+          throw new Error(TransferResult.UndefinedAccount)
         }
         await submitTransaction({
-          toAddress,
           fromAddress: aptosAccount,
+          toAddress: toAddress,
           amount: transferAmount
         })
+        setLastTransactionStatus(TransferResult.Success)
         setRefreshState(!refreshState)
-        setIsTransferLoading(false)
         onClose()
       } catch (e) {
         const err = (e as Error).message
-        switch (err) {
-          case TransferError.UndefinedAccount: {
-            setError('toAddress', { type: 'custom', message: TransferError.UndefinedAccount })
-            break
-          }
-          default: {
-            setError('toAddress', { type: 'custom', message: TransferError.IncorrectPayload })
-          }
+        if (err !== TransferResult.IncorrectPayload && err !== TransferResult.Success) {
+          setIsTransferLoading(false)
         }
+        setLastTransactionStatus(err)
+        setError('toAddress', { type: 'custom', message: err })
         setRefreshState(!refreshState)
-        setIsTransferLoading(false)
       }
     }
   }
@@ -169,20 +196,24 @@ const Wallet = () => {
 
   useEffect(() => {
     getAccountResources({ address })?.then((data) => {
+      if (isTransferLoading && (lastTransactionStatus === TransferResult.Success || lastTransactionStatus === TransferResult.IncorrectPayload)) {
+        const newTokenBalance = getAccountBalanceFromAccountResources(data?.data)
+        toast({
+          title: (lastTransactionStatus === TransferResult.Success) ? 'Transaction succeeded' : 'Transaction failed',
+          description: lastTransactionStatus + `. Amount transferred: ${lastTransferAmount}, gas consumed: ${lastBalance - lastTransferAmount - Number(newTokenBalance)}`,
+          status: (lastTransactionStatus === TransferResult.Success) ? 'success' : 'error',
+          isClosable: true,
+          duration: 7000
+        })
+      }
+      setIsTransferLoading(false)
       const tempAccountResources = data?.data
       setAccountResources(tempAccountResources)
     })
   }, [refreshState])
 
   return (
-    <Grid
-      height="100%"
-      width="100%"
-      maxW="100%"
-      templateRows="30px 1fr 50px"
-      bgColor={secondaryBgColor[colorMode]}
-    >
-      <WalletHeader />
+    <WalletLayout>
       <VStack width="100%" paddingTop={8}>
         <Text fontSize="sm" color={seconaryAddressFontColor[colorMode]}>Account balance</Text>
         <Heading>{tokenBalanceString}</Heading>
@@ -237,9 +268,15 @@ const Wallet = () => {
                         tokens
                       </InputRightAddon>
                     </InputGroup>
-                    <Text fontSize="xs" color={secondaryErrorMessageColor[colorMode]}>
-                      {(errors?.toAddress?.message)}
-                    </Text>
+                    <Flex overflowY="auto" maxH="100px">
+                      <Text
+                        fontSize="xs"
+                        color={secondaryErrorMessageColor[colorMode]}
+                        wordBreak="break-word"
+                      >
+                        {(errors?.toAddress?.message)}
+                      </Text>
+                    </Flex>
                     <Button isDisabled={isTransferLoading} type="submit">
                       Submit
                     </Button>
@@ -250,8 +287,7 @@ const Wallet = () => {
           </Popover>
         </HStack>
       </VStack>
-      <WalletFooter />
-    </Grid>
+    </WalletLayout>
   )
 }
 

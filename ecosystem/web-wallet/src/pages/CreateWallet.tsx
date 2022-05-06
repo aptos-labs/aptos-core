@@ -18,7 +18,7 @@ import React, { useState } from 'react'
 import ChakraLink from '../components/ChakraLink'
 import CreateWalletHeader from '../components/CreateWalletHeader'
 import withSimulatedExtensionContainer from '../components/WithSimulatedExtensionContainer'
-import { DEVNET_NODE_URL, FAUCET_URL, secondaryBgColor } from '../constants'
+import { NODE_URL, FAUCET_URL, secondaryBgColor } from '../constants'
 import useWalletState from '../hooks/useWalletState'
 import { createNewAccount } from '../utils/account'
 
@@ -56,7 +56,7 @@ const NewAccountState = () => {
 
   const createAccountOnClick = async () => {
     setIsAccountBeingCreated(true)
-    const faucetClient = new FaucetClient(DEVNET_NODE_URL, FAUCET_URL)
+    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL)
     const account = createNewAccount()
     await faucetClient.fundAccount(account.address(), 0)
     updateWalletState({ aptosAccountState: account })

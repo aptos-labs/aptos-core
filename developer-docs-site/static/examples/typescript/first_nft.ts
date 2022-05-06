@@ -16,7 +16,7 @@ export class TokenClient {
     async submitTransactionHelper(account: Account, payload: Record<string, any>) {
         const txn_request = await this.restClient.generateTransaction(account.address(), payload)
         const signed_txn = await this.restClient.signTransaction(account, txn_request)
-        const res = await this.restClient.submitTransaction(account, signed_txn)
+        const res = await this.restClient.submitTransaction(signed_txn)
         await this.restClient.waitForTransaction(res["hash"])
     }
 

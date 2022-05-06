@@ -15,7 +15,7 @@ export class TokenClient {
       max_gas_amount: "4000",
     });
     const signedTxn = await this.aptosClient.signTransaction(account, txnRequest);
-    const res = await this.aptosClient.submitTransaction(account, signedTxn);
+    const res = await this.aptosClient.submitTransaction(signedTxn);
     await this.aptosClient.waitForTransaction(res.hash);
     return Promise.resolve(res.hash);
   }
@@ -52,14 +52,13 @@ export class TokenClient {
   ): Promise<Types.HexEncodedBytes> {
     const payload: Types.TransactionPayload = {
       type: "script_function_payload",
-      function: "0x1::Token::create_limited_token_script",
+      function: "0x1::Token::create_unlimited_token_script",
       type_arguments: [],
       arguments: [
         Buffer.from(collectionName).toString("hex"),
         Buffer.from(name).toString("hex"),
         Buffer.from(description).toString("hex"),
         true,
-        supply.toString(),
         supply.toString(),
         Buffer.from(uri).toString("hex"),
       ],
@@ -129,7 +128,7 @@ export class TokenClient {
       function: "0x1::TokenTransfers::cancel_offer_script",
       type_arguments: [],
       arguments: [
-        sender,
+        receiver,
         creator,
         Buffer.from(collectionName).toString("hex"),
         Buffer.from(name).toString("hex"),
@@ -139,27 +138,75 @@ export class TokenClient {
     return transactionHash;
   }
 
-  // Retrieve the token's creation_num, which is useful for non-creator operations
-  async getTokenId(creator: MaybeHexString, collectionName: string, tokenName: string): Promise<number> {
-    const resources: Types.AccountResource[] = await this.aptosClient.getAccountResources(creator);
-    let collections: any[] = [];
-    let tokens = [];
+  async getCollectionData(
+    creator: MaybeHexString,
+    collectionName: string,
+  ): Promise<any> {
+    const resources = await this.aptosClient.getAccountResources(creator);
     const accountResource: { type: string; data: any } = resources.find((r) => r.type === "0x1::Token::Collections");
-    collections = accountResource.data.collections.data;
+    const { handle }: { handle: string } = accountResource.data.collections;
+    const getCollectionTableItemRequest: Types.TableItemRequest = {
+      key_type: "0x1::ASCII::String",
+      value_type: "0x1::Token::Collection",
+      key: collectionName,
+    };
+    // eslint-disable-next-line no-unused-vars
+    const collectionTable = await this.aptosClient.getTableItem(
+      handle,
+      getCollectionTableItemRequest,
+    );
+    return collectionTable;
+  }
 
-    for (let index = 0; index < collections.length; index += 1) {
-      if (collections[index].key === collectionName) {
-        tokens = collections[index].value.tokens.data;
-        break;
-      }
-    }
+  // Retrieve the token's creation_num, which is useful for non-creator operations
+  async getTokenData(creator: MaybeHexString, collectionName: string, tokenName: string): Promise<number> {
+    const collection: { type: string, data: any } = await this.aptosClient.getAccountResource(
+      creator,
+      "0x1::Token::Collections",
+    );
+    const { handle } = collection.data.token_data;
+    const tokenId = {
+      creator,
+      collection: collectionName,
+      name: tokenName,
+    };
 
-    for (let index = 0; index < tokens.length; index += 1) {
-      if (tokens[index].key === tokenName) {
-        return parseInt(tokens[index].value.id.creation_num, 10);
-      }
-    }
+    const getTokenTableItemRequest: Types.TableItemRequest = {
+      key_type: "0x1::Token::TokenId",
+      value_type: "0x1::Token::TokenData",
+      key: tokenId,
+    };
 
-    return null;
+    const tableItem = await this.aptosClient.getTableItem(
+      handle,
+      getTokenTableItemRequest,
+    );
+    return tableItem;
+  }
+
+  // Retrieve the token's creation_num, which is useful for non-creator operations
+  async getTokenBalance(creator: MaybeHexString, collectionName: string, tokenName: string): Promise<number> {
+    const tokenStore: { type: string, data: any } = await this.aptosClient.getAccountResource(
+      creator,
+      "0x1::Token::TokenStore",
+    );
+    const { handle } = tokenStore.data.tokens;
+    const tokenId = {
+      creator,
+      collection: collectionName,
+      name: tokenName,
+    };
+
+    const getTokenTableItemRequest: Types.TableItemRequest = {
+      key_type: "0x1::Token::TokenId",
+      value_type: "0x1::Token::Token",
+      key: tokenId,
+    };
+
+    const tableItem = await this.aptosClient.getTableItem(
+      handle,
+      getTokenTableItemRequest,
+    );
+    return tableItem;
   }
 }
