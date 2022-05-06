@@ -111,7 +111,7 @@ const submitTransaction = async ({
   }
   const txnRequest = await client.generateTransaction(fromAddress.address(), payload)
   const signedTxn = await client.signTransaction(fromAddress, txnRequest)
-  const transactionRes = await client.submitTransaction(signedTxn)
+  const transactionRes = await client.submitTransaction(fromAddress, signedTxn)
   await client.waitForTransaction(transactionRes.hash)
 }
 
@@ -169,6 +169,7 @@ const Wallet = () => {
         }
         await submitTransaction({
           fromAddress: aptosAccount,
+          toAddress: toAddress,
           amount: transferAmount
         })
         setLastTransactionStatus(TransferResult.Success)
