@@ -11,7 +11,7 @@ edition = "2018"
 
 [dependencies]
 arc-swap = "1.2.0"
-bitvec = {version = "0.19.4", optional = true}
+bitvec = { version = "0.19.4" }
 itertools = "0.10.0"
 once_cell = "1.7.2"
 proptest = { version = "1.0.0", optional = true }
@@ -25,7 +25,6 @@ aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-h
 
 
 [dev-dependencies]
-bitvec = "0.19.4"
 criterion = "0.3.4"
 rand = "0.8.3"
 once_cell = "1.7.2"
@@ -35,8 +34,8 @@ aptos-types = { path = "../../types", features = ["fuzzing"] }
 storage-interface = { path = "../storage-interface" }
 
 [features]
-fuzzing = ["bitvec", "aptos-types/fuzzing", "proptest"]
-bench = ["bitvec", "proptest"]
+fuzzing = ["aptos-types/fuzzing", "proptest"]
+bench = ["proptest"]
 
 [[bench]]
 name = "sparse_merkle"
