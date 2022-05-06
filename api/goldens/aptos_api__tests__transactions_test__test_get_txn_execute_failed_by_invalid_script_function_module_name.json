@@ -2,12 +2,12 @@
   "type": "user_transaction",
   "version": "2",
   "hash": "0x482239a738fb8f7c9cf0f96a6e20bb75d69ef328cacc6b52ef5f74d28fd27ce3",
-  "state_root_hash": "0xcd0ab7e66b72e3d3b26375bdd125bb7e15213d67a63b04f0ed1a70d61d459d3a",
+  "state_root_hash": "0xd00fb29dec0ff75b945fa5fe39514dc1850667a781c49d65aa8cb3a4c5641cfb",
   "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
   "gas_used": "1",
   "success": false,
   "vm_status": "Transaction Executed and Committed with Error LINKER_ERROR",
-  "accumulator_root_hash": "0xf11eaa489caf5034d337b9c8cc78e08c0cab18f1391e93ae4c2d95821bb9b86f",
+  "accumulator_root_hash": "0xaf549ad6a988ba68fc81f2fa3a61c9f3106142182592f7385a0a0ab09115b12f",
   "changes": [
     {
       "type": "write_resource",
