@@ -1,3 +1,5 @@
+# Copyright (c) Aptos
+# SPDX-License-Identifier: Apache-2.0
 # frozen_string_literal: true
 
 # This file is auto-generated from the current state of the database. Instead

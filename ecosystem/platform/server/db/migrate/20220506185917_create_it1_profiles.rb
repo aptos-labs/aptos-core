@@ -1,3 +1,5 @@
+# Copyright (c) Aptos
+# SPDX-License-Identifier: Apache-2.0
 # frozen_string_literal: true
 
 class CreateIt1Profiles < ActiveRecord::Migration[7.0]
