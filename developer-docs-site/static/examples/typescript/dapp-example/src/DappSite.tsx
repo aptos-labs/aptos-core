@@ -1,5 +1,5 @@
 import * as React from "react";
-import { AptosClient, AptosAccount } from "aptos";
+import { AptosClient } from "aptos";
 
 type Props = {
   userAddress: string | null;
@@ -33,23 +33,13 @@ aptos move publish --package-dir /path/to/aptos-core/aptos-move/move-examples/he
 
 async function submitContent(address: string, content: string) {
   const hexEncoded = textToHex(content);
-  let payload: {
-    function: string;
-    arguments: any[];
-    type: string;
-    type_arguments: any[];
-  };
-  payload = {
+  const transaction = {
     type: "script_function_payload",
     function: `${address}::Message::set_message`,
     type_arguments: [],
     arguments: [hexEncoded],
   };
-
-  const txnRequest = await client.generateTransaction(address, payload);
-  const result = await (window as any).aptos.signTransaction(txnRequest);
-  const randomAcc = new AptosAccount();
-  return client.submitTransaction(randomAcc, result);
+  return (window as any).aptos.signAndSubmitTransaction(transaction);
 }
 
 export function DappSite({ userAddress, address }: Props) {
