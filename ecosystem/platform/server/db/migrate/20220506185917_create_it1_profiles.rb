@@ -3,10 +3,10 @@
 class CreateIt1Profiles < ActiveRecord::Migration[7.0]
   def change
     create_table :it1_profiles do |t|
-      t.references :user, null: false, foreign_key: true
-      t.string :consensus_key
-      t.string :account_key
-      t.string :network_key
+      t.references :user, null: false, foreign_key: true, unique: true
+      t.string :consensus_key, unique: true
+      t.string :account_key, unique: true
+      t.string :network_key, unique: true
       t.string :validator_address
       t.integer :validator_port
       t.integer :metrics_port

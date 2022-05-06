@@ -6,6 +6,7 @@ class It1ProfilesController < ApplicationController
 
   # GET /it1_profiles/new
   def new
+    redirect_to overview_index_path if current_user.it1_profile.present?
     @it1_profile = It1Profile.new
   end
 

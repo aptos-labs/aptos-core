@@ -2,6 +2,7 @@
 
 class It1Profile < ApplicationRecord
   belongs_to :user
+  validates :user_id, uniqueness: true
 
   validates :consensus_key, presence: true, uniqueness: true, format: { with: /\A0x[a-f0-9]{64}\z/i }
   validates :account_key, presence: true, uniqueness: true, format: { with: /\A0x[a-f0-9]{64}\z/i }

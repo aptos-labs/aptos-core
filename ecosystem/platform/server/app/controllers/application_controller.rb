@@ -18,12 +18,11 @@ class ApplicationController < ActionController::Base
   end
 
   def after_sign_in_path_for(user)
-    stored_location_for(user) ||
-      if user.email.nil?
-        onboarding_email_path
-      else
-        overview_index_path
-      end
+    if user.email.nil?
+      onboarding_email_path
+    else
+      stored_location_for(user) || overview_index_path
+    end
   end
 
   def admin_access_denied(_exception)
