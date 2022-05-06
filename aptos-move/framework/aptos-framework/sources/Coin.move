@@ -68,6 +68,14 @@ module AptosFramework::Coin {
         borrow_global<CoinStore<CoinType>>(owner).coin.value
     }
 
+    /// Returns `true` if the type `CoinType` is a registered coin.
+    /// Returns `false` otherwise.
+    public fun is_coin<CoinType>(): bool {
+        let type_info = TypeInfo::type_of<CoinType>();
+        let coin_address = TypeInfo::account_address(&type_info);
+        exists<CoinInfo<CoinType>>(coin_address)
+    }
+
     public fun name<CoinType>(): ASCII::String acquires CoinInfo {
         let type_info = TypeInfo::type_of<CoinType>();
         let coin_address = TypeInfo::account_address(&type_info);
@@ -91,50 +99,7 @@ module AptosFramework::Coin {
         coin.value
     }
 
-    /// Returns `true` if the type `CoinType` is a registered coin.
-    /// Returns `false` otherwise.
-    public fun is_coin<CoinType>(): bool {
-        let type_info = TypeInfo::type_of<CoinType>();
-        let coin_address = TypeInfo::account_address(&type_info);
-        exists<CoinInfo<CoinType>>(coin_address)
-    }
-
     // Public functions
-
-    /// Create a new `Coin<CoinType>` with a value of `0`.
-    public fun zero<CoinType>(): Coin<CoinType> {
-        Coin<CoinType> {
-            value: 0
-        }
-    }
-
-    /// Destroy a zero-value coin. Calls will fail if the `value` in the passed-in `token` is non-zero
-    /// so it is impossible to "burn" any non-zero amount of `Coin` without having
-    /// a `BurnCapability` for the specific `CoinType`.
-    public fun destroy_zero<CoinType>(zero_coin: Coin<CoinType>) {
-        let Coin { value } = zero_coin;
-        assert!(value == 0, Errors::invalid_argument(EDESTRUCTION_OF_NONZERO_TOKEN))
-    }
-
-    /// Extract `amount` from the passed-in `coin`, where the original token is modified in place.
-    public fun extract<CoinType>(coin: &mut Coin<CoinType>, amount: u64): Coin<CoinType> {
-        assert!(coin.value >= amount, Errors::invalid_argument(EINSUFFICIENT_BALANCE));
-        coin.value = coin.value - amount;
-        Coin { value: amount }
-    }
-
-    /// Removes `amount` of value from the passed in `coin` and returns original coin and new one contains `amount`.
-    public fun split<CoinType>(coin: Coin<CoinType>, amount: u64): (Coin<CoinType>, Coin<CoinType>) {
-        let other = extract(&mut coin, amount);
-        (coin, other)
-    }
-
-    /// "Merges" the two coins.
-    /// The coin passed in as `dst_coin` will have a value equal to the sum of the two tokens (`dst_coin` and `source_coin`).
-    public fun merge<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: Coin<CoinType>) {
-        dst_coin.value = dst_coin.value + source_coin.value;
-        let Coin { value: _ } = source_coin;
-    }
 
     /// Burn coin with capability.
     public fun burn<CoinType>(
@@ -174,6 +139,21 @@ module AptosFramework::Coin {
         merge(&mut coin_store.coin, coin);
     }
 
+    /// Destroy a zero-value coin. Calls will fail if the `value` in the passed-in `token` is non-zero
+    /// so it is impossible to "burn" any non-zero amount of `Coin` without having
+    /// a `BurnCapability` for the specific `CoinType`.
+    public fun destroy_zero<CoinType>(zero_coin: Coin<CoinType>) {
+        let Coin { value } = zero_coin;
+        assert!(value == 0, Errors::invalid_argument(EDESTRUCTION_OF_NONZERO_TOKEN))
+    }
+
+    /// Extract `amount` from the passed-in `coin`, where the original token is modified in place.
+    public fun extract<CoinType>(coin: &mut Coin<CoinType>, amount: u64): Coin<CoinType> {
+        assert!(coin.value >= amount, Errors::invalid_argument(EINSUFFICIENT_BALANCE));
+        coin.value = coin.value - amount;
+        Coin { value: amount }
+    }
+
     public(script) fun initialize<CoinType>(
         account: &signer,
         name: vector<u8>,
@@ -202,6 +182,13 @@ module AptosFramework::Coin {
 
         move_to(account, BurnCapability<CoinType> { });
         move_to(account, MintCapability<CoinType> { });
+    }
+
+    /// "Merges" the two coins.
+    /// The coin passed in as `dst_coin` will have a value equal to the sum of the two tokens (`dst_coin` and `source_coin`).
+    public fun merge<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: Coin<CoinType>) {
+        dst_coin.value = dst_coin.value + source_coin.value;
+        let Coin { value: _ } = source_coin;
     }
 
     /// Create new coins and deposit them into dst_addr's account.
@@ -269,64 +256,18 @@ module AptosFramework::Coin {
         extract(&mut coin_store.coin, amount)
     }
 
+    /// Create a new `Coin<CoinType>` with a value of `0`.
+    public fun zero<CoinType>(): Coin<CoinType> {
+        Coin<CoinType> {
+            value: 0
+        }
+    }
+
     //
     // Tests
     //
     #[test_only]
     struct FakeMoney { }
-
-    #[test(source = @0x1)]
-    public(script) fun test_is_coin(source: signer) {
-        assert!(!is_coin<FakeMoney>(), 0);
-        initialize<FakeMoney>(&source, b"Fake money", 1, true);
-        assert!(is_coin<FakeMoney>(), 1);
-    }
-
-    #[test]
-    fun test_zero() {
-        let zero = zero<FakeMoney>();
-        assert!(value(&zero) == 0, 1);
-        destroy_zero(zero);
-    }
-
-    #[test(source = @0x1)]
-    #[expected_failure(abort_code = 2055)]
-    public(script) fun test_destroy_non_zero(source: signer) acquires CoinInfo, CoinStore, MintCapability {
-        let source_addr = Signer::address_of(&source);
-
-        initialize<FakeMoney>(&source, b"Fake money", 1, true);
-        register<FakeMoney>(&source);
-
-        mint<FakeMoney>(&source, source_addr, 100);
-        let coin = withdraw<FakeMoney>(&source, 100);
-
-        destroy_zero(coin);
-    }
-
-    #[test(source = @0x1)]
-    public(script) fun test_extract(source: signer) acquires CoinInfo, CoinStore, MintCapability {
-        let source_addr = Signer::address_of(&source);
-
-        initialize<FakeMoney>(&source, b"Fake money", 1, true);
-        register<FakeMoney>(&source);
-
-        mint<FakeMoney>(&source, source_addr, 100);
-        let coin = withdraw<FakeMoney>(&source, 100);
-
-        let extracted = extract(&mut coin, 25);
-        assert!(value(&coin) == 75, 0);
-        assert!(value(&extracted) == 25, 1);
-
-        let (s1, s2) = split(extracted, 12);
-        assert!(value(&s1) == 13, 2);
-        assert!(value(&s2) == 12, 3);
-
-        deposit(source_addr, coin);
-        deposit(source_addr, s1);
-        deposit(source_addr, s2);
-
-        assert!(balance<FakeMoney>(source_addr) == 100, 4);
-    }
 
     #[test(source = @0x1, destination = @0x2)]
     public(script) fun end_to_end(
@@ -433,5 +374,53 @@ module AptosFramework::Coin {
         mint<FakeMoney>(&source, source_addr, 100);
         let coin = withdraw<FakeMoney>(&source, 10);
         burn(&destination, coin);
+    }
+
+    #[test(source = @0x1)]
+    #[expected_failure(abort_code = 2055)]
+    public(script) fun test_destroy_non_zero(source: signer) acquires CoinInfo, CoinStore, MintCapability {
+        let source_addr = Signer::address_of(&source);
+
+        initialize<FakeMoney>(&source, b"Fake money", 1, true);
+        register<FakeMoney>(&source);
+
+        mint<FakeMoney>(&source, source_addr, 100);
+        let coin = withdraw<FakeMoney>(&source, 100);
+
+        destroy_zero(coin);
+    }
+
+    #[test(source = @0x1)]
+    public(script) fun test_extract(source: signer) acquires CoinInfo, CoinStore, MintCapability {
+        let source_addr = Signer::address_of(&source);
+
+        initialize<FakeMoney>(&source, b"Fake money", 1, true);
+        register<FakeMoney>(&source);
+
+        mint<FakeMoney>(&source, source_addr, 100);
+        let coin = withdraw<FakeMoney>(&source, 100);
+
+        let extracted = extract(&mut coin, 25);
+        assert!(value(&coin) == 75, 0);
+        assert!(value(&extracted) == 25, 1);
+
+        deposit(source_addr, coin);
+        deposit(source_addr, extracted);
+
+        assert!(balance<FakeMoney>(source_addr) == 100, 4);
+    }
+
+    #[test(source = @0x1)]
+    public(script) fun test_is_coin(source: signer) {
+        assert!(!is_coin<FakeMoney>(), 0);
+        initialize<FakeMoney>(&source, b"Fake money", 1, true);
+        assert!(is_coin<FakeMoney>(), 1);
+    }
+
+    #[test]
+    fun test_zero() {
+        let zero = zero<FakeMoney>();
+        assert!(value(&zero) == 0, 1);
+        destroy_zero(zero);
     }
 }
