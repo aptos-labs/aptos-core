@@ -94,11 +94,6 @@ module AptosFramework::Coin {
         borrow_global<CoinInfo<CoinType>>(coin_address).supply
     }
 
-    /// Returns the `value` of the passed in `coin`. 
-    public fun value<CoinType>(coin: &Coin<CoinType>): u64 {
-        coin.value
-    }
-
     // Public functions
 
     /// Burn coin with capability.
@@ -235,6 +230,11 @@ module AptosFramework::Coin {
     ) acquires CoinStore {
         let coin = withdraw<CoinType>(from, amount);
         deposit(to, coin);
+    }
+
+    /// Returns the `value` of the passed in `coin`.
+    public fun value<CoinType>(coin: &Coin<CoinType>): u64 {
+        coin.value
     }
 
     public fun withdraw<CoinType>(
@@ -411,10 +411,10 @@ module AptosFramework::Coin {
     }
 
     #[test(source = @0x1)]
-    public(script) fun test_is_coin(source: signer) {
-        assert!(!is_coin<FakeMoney>(), 0);
+    public(script) fun test_is_registered(source: signer) {
+        assert!(!is_registered<FakeMoney>(), 0);
         initialize<FakeMoney>(&source, b"Fake money", 1, true);
-        assert!(is_coin<FakeMoney>(), 1);
+        assert!(is_registered<FakeMoney>(), 1);
     }
 
     #[test]
