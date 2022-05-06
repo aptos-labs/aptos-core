@@ -25,6 +25,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     str::FromStr,
+    time::{Duration, Instant},
 };
 
 shadow!(build);
@@ -50,19 +51,28 @@ pub fn prompt_yes(prompt: &str) -> bool {
 }
 
 /// Convert any successful response to Success
-pub async fn to_common_success_result<T>(command: &str, result: CliTypedResult<T>) -> CliResult {
-    to_common_result(command, result.map(|_| "Success")).await
+pub async fn to_common_success_result<T>(
+    command: &str,
+    start_time: Instant,
+    result: CliTypedResult<T>,
+) -> CliResult {
+    to_common_result(command, start_time, result.map(|_| "Success")).await
 }
 
 /// For pretty printing outputs in JSON
-pub async fn to_common_result<T: Serialize>(command: &str, result: CliTypedResult<T>) -> CliResult {
+pub async fn to_common_result<T: Serialize>(
+    command: &str,
+    start_time: Instant,
+    result: CliTypedResult<T>,
+) -> CliResult {
+    let latency = start_time.elapsed();
     let is_err = result.is_err();
     let error = if let Err(ref e) = result {
         e.to_str()
     } else {
         "None"
     };
-    let metrics = collect_metrics(command, !is_err, error);
+    let metrics = collect_metrics(command, !is_err, latency, error);
     aptos_telemetry::send_data(
         APTOS_CLI_PUSH_METRICS.to_string(),
         uuid::Uuid::new_v4().to_string(),
@@ -79,8 +89,14 @@ pub async fn to_common_result<T: Serialize>(command: &str, result: CliTypedResul
 }
 
 /// Collect build and command metrics for better debugging of CLI
-fn collect_metrics(command: &str, successful: bool, error: &str) -> HashMap<String, String> {
+fn collect_metrics(
+    command: &str,
+    successful: bool,
+    latency: Duration,
+    error: &str,
+) -> HashMap<String, String> {
     let mut metrics = HashMap::new();
+    metrics.insert("Latency".to_string(), latency.as_millis().to_string());
     metrics.insert("Command".to_string(), command.to_string());
     metrics.insert("Successful".to_string(), successful.to_string());
     metrics.insert("Error".to_string(), error.to_string());

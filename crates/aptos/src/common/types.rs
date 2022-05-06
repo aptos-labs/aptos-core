@@ -21,6 +21,7 @@ use std::{
     fmt::Debug,
     path::{Path, PathBuf},
     str::FromStr,
+    time::Instant,
 };
 use thiserror::Error;
 
@@ -595,13 +596,15 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
     /// Executes the command, and serializes it to the common JSON output type
     async fn execute_serialized(self) -> CliResult {
         let command_name = self.command_name();
-        to_common_result(command_name, self.execute().await).await
+        let start_time = Instant::now();
+        to_common_result(command_name, start_time, self.execute().await).await
     }
 
     /// Executes the command, and throws away Ok(result) for the string Success
     async fn execute_serialized_success(self) -> CliResult {
         let command_name = self.command_name();
-        to_common_success_result(command_name, self.execute().await).await
+        let start_time = Instant::now();
+        to_common_success_result(command_name, start_time, self.execute().await).await
     }
 }
 
