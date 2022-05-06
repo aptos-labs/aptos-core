@@ -10,7 +10,8 @@
     "matches": ["<all_urls>"],
     "js": [
       "contentscript.js"
-    ]
+    ],
+    "run_at": "document_start"
   }],
   "web_accessible_resources": [
     "inpage.js"
