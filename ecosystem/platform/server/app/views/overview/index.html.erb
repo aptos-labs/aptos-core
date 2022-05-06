@@ -7,6 +7,12 @@
       <p class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded"><%= alert %></p>
     <% end %>
 
+    <% if current_user.confirmed_at.nil? %>
+      <p class="bg-gray-100 border border-gray-400 text-gray-700 px-4 py-3 rounded">
+      Your email has not yet been verified. Didn't receive a verification email? <%= link_to "Re-send verification email", onboarding_email_path, class: "underline" %>
+      </p>
+    <% end %>
+
     <p class="bg-gray-100 border border-gray-400 text-gray-700 px-4 py-3 rounded">
       <% if current_user.it1_profile %>
         IT1 application received.

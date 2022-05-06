@@ -1,10 +1,22 @@
 <h2>Welcome, <%= @oauth_username %></h2>
 <p>Please verify your email to continue the signup process</p>
 
+<% if current_user.errors.any? %>
+  <div id="error_explanation" class="bg-red-50 text-red-500 px-3 py-2 font-medium rounded-lg mt-3">
+    <h2><%= pluralize(current_user.errors.count, "error") %> prohibited this user from being saved:</h2>
+
+    <ul>
+      <% current_user.errors.each do |error| %>
+        <li><%= error.full_message %></li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
+
 <%= form_with(model: current_user, url: onboarding_email_path, method: :post) do |f| %>
   <div class="field">
     <%= f.label :email %><br />
-    <%= f.email_field :email, autofocus: true, autocomplete: "email", value: @oauth_email %>
+    <%= f.email_field :email, autofocus: true, autocomplete: "email", value: current_user.email || @oauth_email %>
   </div>
 
   <div class="actions">

@@ -1,10 +1,9 @@
 # frozen_string_literal: true
 
 class OnboardingController < ApplicationController
-  def email
-    @oauth_username = current_user.authorizations.pluck(:username).first
-    @oauth_email = current_user.authorizations.pluck(:email).first
-  end
+  before_action :set_oauth_data
+
+  def email; end
 
   def email_update
     email_params = params.require(:user).permit(:email)
@@ -14,5 +13,12 @@ class OnboardingController < ApplicationController
     else
       render :email, status: :unprocessable_entity
     end
+  end
+
+  private
+
+  def set_oauth_data
+    @oauth_username = current_user.authorizations.pluck(:username).first
+    @oauth_email = current_user.authorizations.pluck(:email).first
   end
 end
