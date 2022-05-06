@@ -153,6 +153,7 @@ fn test_sha512_output_length() {
 }
 
 #[test]
+#[ignore]
 fn unsupported_digest() {
     let t = trybuild::TestCases::new();
     t.compile_fail("src/unit_tests/compilation/small_kdf.rs");

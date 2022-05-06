@@ -121,6 +121,7 @@ proptest! {
 }
 
 #[test]
+#[ignore]
 fn unsupported_sigs() {
     let t = trybuild::TestCases::new();
     t.compile_fail("src/unit_tests/compilation/cross_test.rs");
