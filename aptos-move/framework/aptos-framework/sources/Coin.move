@@ -70,7 +70,7 @@ module AptosFramework::Coin {
 
     /// Returns `true` if the type `CoinType` is a registered coin.
     /// Returns `false` otherwise.
-    public fun is_coin<CoinType>(): bool {
+    public fun is_registered<CoinType>(): bool {
         let type_info = TypeInfo::type_of<CoinType>();
         let coin_address = TypeInfo::account_address(&type_info);
         exists<CoinInfo<CoinType>>(coin_address)
