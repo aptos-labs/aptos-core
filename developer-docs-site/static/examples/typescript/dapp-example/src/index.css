@@ -1,0 +1,21 @@
+pre, textarea, code {
+  margin: 0;
+  font-size: 20px;
+  font-family: ui-monospace, 
+             Menlo, Monaco, 
+             "Cascadia Mono", "Segoe UI Mono", 
+             "Roboto Mono", 
+             "Oxygen Mono", 
+             "Ubuntu Monospace", 
+             "Source Code Pro",
+             "Fira Mono", 
+             "Droid Sans Mono", 
+             "Courier New", monospace;
+}
+
+textarea {
+  border: 0;
+  width: 100%;
+  min-height: 50vh;
+  outline: 0;
+}
