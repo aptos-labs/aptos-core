@@ -19,7 +19,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::{
         AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleRangeProof,
-        TransactionAccumulatorSummary, TransactionInfoListWithProof,
+        TransactionAccumulatorSummary,
     },
     state_proof::StateProof,
     state_store::{
@@ -27,15 +27,17 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof, StateValueWithProof},
     },
     transaction::{
-        AccountTransactionsWithProof, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
-        TransactionPayload, TransactionWithProof, Version,
+        AccountTransactionsWithProof, ExecutionStatus, RawTransaction, Script, SignedTransaction,
+        Transaction, TransactionInfo, TransactionListWithProof, TransactionOutput,
+        TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
+        TransactionWithProof, Version,
     },
+    write_set::WriteSet,
     PeerId,
 };
 use channel::aptos_channel;
-use claim::assert_matches;
-use futures::channel::oneshot;
+use claim::{assert_matches, assert_none};
+use futures::channel::{oneshot, oneshot::Receiver};
 use mockall::{
     mock,
     predicate::{always, eq},
@@ -47,16 +49,19 @@ use network::{
         network::NewNetworkEvents, rpc::InboundRpcRequest, wire::handshake::v1::ProtocolId,
     },
 };
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use storage_interface::{DbReader, Order, StartupInfo, TreeState};
 use storage_service_types::{
     AccountStatesChunkWithProofRequest, CompleteDataRange, DataSummary, Epoch,
-    EpochEndingLedgerInfoRequest, ProtocolMetadata, ServerProtocolVersion, StorageServerSummary,
+    EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
+    NewTransactionsWithProofRequest, ProtocolMetadata, ServerProtocolVersion, StorageServerSummary,
     StorageServiceError, StorageServiceMessage, StorageServiceRequest, StorageServiceResponse,
     TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
+use tokio::time::timeout;
 
 /// Various test constants for storage
+const MAX_RESPONSE_TIMEOUT_SECS: u64 = 10;
 const PROTOCOL_VERSION: u64 = 1;
 
 #[tokio::test]
@@ -111,13 +116,13 @@ async fn test_cachable_requests_eviction() {
                 end_account_index,
             },
         );
-        let _ = mock_client.send_request(request).await.unwrap();
+        let _ = mock_client.process_request(request).await.unwrap();
     }
 
     // Process enough requests to evict the previously cached response
     for version in 0..max_lru_cache_size {
         let request = StorageServiceRequest::GetNumberOfAccountsAtVersion(version);
-        let _ = mock_client.send_request(request).await.unwrap();
+        let _ = mock_client.process_request(request).await.unwrap();
     }
 
     // Process a request to fetch the account states chunk again. This requires refetching the data.
@@ -127,7 +132,7 @@ async fn test_cachable_requests_eviction() {
             start_account_index,
             end_account_index,
         });
-    let _ = mock_client.send_request(request).await.unwrap();
+    let _ = mock_client.process_request(request).await.unwrap();
 }
 
 #[tokio::test]
@@ -182,7 +187,7 @@ async fn test_cachable_requests_data_versions() {
                 });
 
             // Process the request
-            let response = mock_client.send_request(request).await.unwrap();
+            let response = mock_client.process_request(request).await.unwrap();
 
             // Verify the response is correct
             match response {
@@ -203,7 +208,7 @@ async fn test_get_server_protocol_version() {
 
     // Process a request to fetch the protocol version
     let request = StorageServiceRequest::GetServerProtocolVersion;
-    let response = mock_client.send_request(request).await.unwrap();
+    let response = mock_client.process_request(request).await.unwrap();
 
     // Verify the response is correct
     let expected_response = StorageServiceResponse::ServerProtocolVersion(ServerProtocolVersion {
@@ -259,7 +264,7 @@ async fn test_get_account_states_with_proof() {
                 end_account_index,
             },
         );
-        let response = mock_client.send_request(request).await.unwrap();
+        let response = mock_client.process_request(request).await.unwrap();
 
         // Verify the response is correct
         assert_eq!(
@@ -288,9 +293,361 @@ async fn test_get_account_states_with_proof_invalid() {
         );
 
         // Process and verify the response
-        let response = mock_client.send_request(request).await.unwrap_err();
+        let response = mock_client.process_request(request).await.unwrap_err();
         assert_matches!(response, StorageServiceError::InvalidRequest(_));
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_get_new_transactions() {
+    // Test small and large chunk sizes
+    for chunk_size in [
+        1,
+        100,
+        StorageServiceConfig::default().max_transaction_chunk_size,
+    ] {
+        // Test event inclusion
+        for include_events in [true, false] {
+            // Create test data
+            let highest_version = 45576;
+            let highest_epoch = 43;
+            let lowest_version = 4566;
+            let peer_version = highest_version - chunk_size;
+            let highest_ledger_info =
+                create_test_ledger_info_with_sigs(highest_epoch, highest_version);
+            let transaction_list_with_proof = create_transaction_list_with_proof(
+                peer_version + 1,
+                highest_version,
+                highest_version,
+                include_events,
+            );
+
+            // Create the mock db reader
+            let mut db_reader =
+                create_mock_db_for_subscription(highest_ledger_info.clone(), lowest_version);
+            expect_get_transactions(
+                &mut db_reader,
+                peer_version + 1,
+                highest_version - peer_version,
+                highest_version,
+                include_events,
+                transaction_list_with_proof.clone(),
+            );
+
+            // Create the storage client and server
+            let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader));
+            tokio::spawn(service.start());
+
+            // Send a request to subscribe to new transactions
+            let mut response_receiver = send_new_transaction_request(
+                &mut mock_client,
+                peer_version,
+                highest_epoch,
+                include_events,
+            )
+            .await;
+
+            // Verify no subscription response has been received yet
+            assert_none!(response_receiver.try_recv().unwrap());
+
+            // Elapse enough time to force the subscription thread to work
+            wait_for_subscription_service_to_refresh(&mut mock_client, &mock_time).await;
+
+            // Verify a response is received and that it contains the correct data
+            verify_new_transactions_with_proof(
+                &mut mock_client,
+                response_receiver,
+                transaction_list_with_proof,
+                highest_ledger_info,
+            )
+            .await;
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_get_new_transactions_epoch_change() {
+    // Test event inclusion
+    for include_events in [true, false] {
+        // Create test data
+        let highest_version = 45576;
+        let highest_epoch = 1032;
+        let lowest_version = 4566;
+        let peer_version = highest_version - 100;
+        let peer_epoch = highest_epoch - 20;
+        let epoch_change_version = peer_version + 45;
+        let epoch_change_proof = EpochChangeProof {
+            ledger_info_with_sigs: vec![create_test_ledger_info_with_sigs(
+                peer_epoch,
+                epoch_change_version,
+            )],
+            more: false,
+        };
+        let transaction_list_with_proof = create_transaction_list_with_proof(
+            peer_version + 1,
+            epoch_change_version,
+            epoch_change_version,
+            include_events,
+        );
+
+        // Create the mock db reader
+        let mut db_reader = create_mock_db_for_subscription(
+            create_test_ledger_info_with_sigs(highest_epoch, highest_version),
+            lowest_version,
+        );
+        expect_get_transactions(
+            &mut db_reader,
+            peer_version + 1,
+            epoch_change_version - peer_version,
+            epoch_change_version,
+            include_events,
+            transaction_list_with_proof.clone(),
+        );
+        expect_get_epoch_ending_ledger_infos(
+            &mut db_reader,
+            peer_epoch,
+            epoch_change_proof.clone(),
+        );
+
+        // Create the storage client and server
+        let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader));
+        tokio::spawn(service.start());
+
+        // Send a request to subscribe to new transactions
+        let response_receiver = send_new_transaction_request(
+            &mut mock_client,
+            peer_version,
+            peer_epoch,
+            include_events,
+        )
+        .await;
+
+        // Elapse enough time to force the subscription thread to work
+        wait_for_subscription_service_to_refresh(&mut mock_client, &mock_time).await;
+
+        // Verify a response is received and that it contains the correct data
+        verify_new_transactions_with_proof(
+            &mut mock_client,
+            response_receiver,
+            transaction_list_with_proof,
+            epoch_change_proof.ledger_info_with_sigs[0].clone(),
+        )
+        .await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_get_new_transactions_max_chunk() {
+    // Test event inclusion
+    for include_events in [true, false] {
+        // Create test data
+        let highest_version = 1034556;
+        let highest_epoch = 343;
+        let lowest_version = 3453;
+        let max_chunk_size = StorageServiceConfig::default().max_transaction_chunk_size;
+        let requested_chunk_size = max_chunk_size + 1;
+        let peer_version = highest_version - requested_chunk_size;
+        let highest_ledger_info = create_test_ledger_info_with_sigs(highest_epoch, highest_version);
+        let transaction_list_with_proof = create_transaction_list_with_proof(
+            peer_version + 1,
+            peer_version + requested_chunk_size,
+            peer_version + requested_chunk_size,
+            include_events,
+        );
+
+        // Create the mock db reader
+        let mut db_reader =
+            create_mock_db_for_subscription(highest_ledger_info.clone(), lowest_version);
+        expect_get_transactions(
+            &mut db_reader,
+            peer_version + 1,
+            max_chunk_size,
+            highest_version,
+            include_events,
+            transaction_list_with_proof.clone(),
+        );
+
+        // Create the storage client and server
+        let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader));
+        tokio::spawn(service.start());
+
+        // Send a request to subscribe to new transactions
+        let response_receiver = send_new_transaction_request(
+            &mut mock_client,
+            peer_version,
+            highest_epoch,
+            include_events,
+        )
+        .await;
+
+        // Elapse enough time to force the subscription thread to work
+        wait_for_subscription_service_to_refresh(&mut mock_client, &mock_time).await;
+
+        // Verify a response is received and that it contains the correct data
+        verify_new_transactions_with_proof(
+            &mut mock_client,
+            response_receiver,
+            transaction_list_with_proof,
+            highest_ledger_info,
+        )
+        .await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_get_new_transaction_outputs() {
+    // Test small and large chunk sizes
+    for chunk_size in [
+        1,
+        100,
+        StorageServiceConfig::default().max_transaction_output_chunk_size,
+    ] {
+        // Create test data
+        let highest_version = 5060;
+        let highest_epoch = 30;
+        let lowest_version = 101;
+        let peer_version = highest_version - chunk_size;
+        let highest_ledger_info = create_test_ledger_info_with_sigs(highest_epoch, highest_version);
+        let output_list_with_proof =
+            create_output_list_with_proof(peer_version + 1, highest_version, highest_version);
+
+        // Create the mock db reader
+        let mut db_reader =
+            create_mock_db_for_subscription(highest_ledger_info.clone(), lowest_version);
+        expect_get_transaction_outputs(
+            &mut db_reader,
+            peer_version + 1,
+            highest_version - peer_version,
+            highest_version,
+            output_list_with_proof.clone(),
+        );
+
+        // Create the storage client and server
+        let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader));
+        tokio::spawn(service.start());
+
+        // Send a request to subscribe to new transaction outputs
+        let mut response_receiver =
+            send_new_transaction_output_request(&mut mock_client, peer_version, highest_epoch)
+                .await;
+
+        // Verify no subscription response has been received yet
+        assert_none!(response_receiver.try_recv().unwrap());
+
+        // Elapse enough time to force the subscription thread to work
+        wait_for_subscription_service_to_refresh(&mut mock_client, &mock_time).await;
+
+        // Verify a response is received and that it contains the correct data
+        verify_new_transaction_outputs_with_proof(
+            &mut mock_client,
+            response_receiver,
+            output_list_with_proof,
+            highest_ledger_info,
+        )
+        .await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_get_new_transaction_outputs_epoch_change() {
+    // Create test data
+    let highest_version = 10000;
+    let highest_epoch = 10000;
+    let lowest_version = 0;
+    let peer_version = highest_version - 1000;
+    let peer_epoch = highest_epoch - 1000;
+    let epoch_change_version = peer_version + 1;
+    let epoch_change_proof = EpochChangeProof {
+        ledger_info_with_sigs: vec![create_test_ledger_info_with_sigs(
+            peer_epoch,
+            epoch_change_version,
+        )],
+        more: false,
+    };
+    let output_list_with_proof =
+        create_output_list_with_proof(peer_version + 1, epoch_change_version, epoch_change_version);
+
+    // Create the mock db reader
+    let mut db_reader = create_mock_db_for_subscription(
+        create_test_ledger_info_with_sigs(highest_epoch, highest_version),
+        lowest_version,
+    );
+    expect_get_transaction_outputs(
+        &mut db_reader,
+        peer_version + 1,
+        epoch_change_version - peer_version,
+        epoch_change_version,
+        output_list_with_proof.clone(),
+    );
+    expect_get_epoch_ending_ledger_infos(&mut db_reader, peer_epoch, epoch_change_proof.clone());
+
+    // Create the storage client and server
+    let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader));
+    tokio::spawn(service.start());
+
+    // Send a request to subscribe to new transaction outputs
+    let response_receiver =
+        send_new_transaction_output_request(&mut mock_client, peer_version, peer_epoch).await;
+
+    // Elapse enough time to force the subscription thread to work
+    wait_for_subscription_service_to_refresh(&mut mock_client, &mock_time).await;
+
+    // Verify a response is received and that it contains the correct data
+    verify_new_transaction_outputs_with_proof(
+        &mut mock_client,
+        response_receiver,
+        output_list_with_proof,
+        epoch_change_proof.ledger_info_with_sigs[0].clone(),
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_get_new_transaction_outputs_max_chunk() {
+    // Create test data
+    let highest_version = 65660;
+    let highest_epoch = 30;
+    let lowest_version = 101;
+    let max_chunk_size = StorageServiceConfig::default().max_transaction_output_chunk_size;
+    let requested_chunk_size = max_chunk_size + 1;
+    let peer_version = highest_version - requested_chunk_size;
+    let highest_ledger_info = create_test_ledger_info_with_sigs(highest_epoch, highest_version);
+    let output_list_with_proof = create_output_list_with_proof(
+        peer_version + 1,
+        peer_version + requested_chunk_size,
+        highest_version,
+    );
+
+    // Create the mock db reader
+    let mut db_reader =
+        create_mock_db_for_subscription(highest_ledger_info.clone(), lowest_version);
+    expect_get_transaction_outputs(
+        &mut db_reader,
+        peer_version + 1,
+        max_chunk_size,
+        highest_version,
+        output_list_with_proof.clone(),
+    );
+
+    // Create the storage client and server
+    let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader));
+    tokio::spawn(service.start());
+
+    // Send a request to subscribe to new transaction outputs
+    let response_receiver =
+        send_new_transaction_output_request(&mut mock_client, peer_version, highest_epoch).await;
+
+    // Elapse enough time to force the subscription thread to work
+    wait_for_subscription_service_to_refresh(&mut mock_client, &mock_time).await;
+
+    // Verify a response is received and that it contains the correct data
+    verify_new_transaction_outputs_with_proof(
+        &mut mock_client,
+        response_receiver,
+        output_list_with_proof,
+        highest_ledger_info,
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -313,7 +670,7 @@ async fn test_get_number_of_accounts_at_version() {
 
     // Process a request to fetch the number of accounts at a version
     let request = StorageServiceRequest::GetNumberOfAccountsAtVersion(version);
-    let response = mock_client.send_request(request).await.unwrap();
+    let response = mock_client.process_request(request).await.unwrap();
 
     // Verify the response is correct
     assert_eq!(
@@ -341,7 +698,7 @@ async fn test_get_number_of_accounts_at_version_invalid() {
 
     // Process a request to fetch the number of accounts at a version
     let request = StorageServiceRequest::GetNumberOfAccountsAtVersion(version);
-    let response = mock_client.send_request(request).await.unwrap_err();
+    let response = mock_client.process_request(request).await.unwrap_err();
 
     // Verify the response is correct
     assert_matches!(response, StorageServiceError::InternalError(_));
@@ -382,21 +739,20 @@ async fn test_get_storage_server_summary() {
 
     // Fetch the storage summary and verify we get a default summary response
     let request = StorageServiceRequest::GetStorageServerSummary;
-    let response = mock_client.send_request(request).await.unwrap();
+    let response = mock_client.process_request(request).await.unwrap();
     let default_response =
         StorageServiceResponse::StorageServerSummary(StorageServerSummary::default());
     assert_eq!(response, default_response);
 
     // Elapse enough time to force a cache update
-    let default_storage_config = StorageServiceConfig::default();
-    let cache_update_freq_ms = default_storage_config.storage_summary_refresh_interval_ms;
-    mock_time.advance_ms_async(cache_update_freq_ms).await;
+    advance_storage_refresh_time(&mock_time).await;
 
     // Process another request to fetch the storage summary
     let request = StorageServiceRequest::GetStorageServerSummary;
-    let response = mock_client.send_request(request).await.unwrap();
+    let response = mock_client.process_request(request).await.unwrap();
 
     // Verify the response is correct (after the cache update)
+    let default_storage_config = StorageServiceConfig::default();
     let expected_server_summary = StorageServerSummary {
         protocol_metadata: ProtocolMetadata {
             max_epoch_chunk_size: default_storage_config.max_epoch_chunk_size,
@@ -476,7 +832,7 @@ async fn test_get_transactions_with_proof() {
                 });
 
             // Process the request
-            let response = mock_client.send_request(request).await.unwrap();
+            let response = mock_client.process_request(request).await.unwrap();
 
             // Verify the response is correct
             match response {
@@ -508,7 +864,7 @@ async fn test_get_transactions_with_proof_invalid() {
             });
 
         // Process and verify the response
-        let response = mock_client.send_request(request).await.unwrap_err();
+        let response = mock_client.process_request(request).await.unwrap_err();
         assert_matches!(response, StorageServiceError::InvalidRequest(_));
     }
 }
@@ -555,7 +911,7 @@ async fn test_get_transaction_outputs_with_proof() {
         );
 
         // Process the request
-        let response = mock_client.send_request(request).await.unwrap();
+        let response = mock_client.process_request(request).await.unwrap();
 
         // Verify the response is correct
         match response {
@@ -589,7 +945,7 @@ async fn test_get_transaction_outputs_with_proof_invalid() {
         );
 
         // Process and verify the response
-        let response = mock_client.send_request(request).await.unwrap_err();
+        let response = mock_client.process_request(request).await.unwrap_err();
         assert_matches!(response, StorageServiceError::InvalidRequest(_));
     }
 }
@@ -630,7 +986,7 @@ async fn test_get_epoch_ending_ledger_infos() {
             });
 
         // Process the request
-        let response = mock_client.send_request(request).await.unwrap();
+        let response = mock_client.process_request(request).await.unwrap();
 
         // Verify the response is correct
         match response {
@@ -659,7 +1015,7 @@ async fn test_get_epoch_ending_ledger_infos_invalid() {
             });
 
         // Process and verify the response
-        let response = mock_client.send_request(request).await.unwrap_err();
+        let response = mock_client.process_request(request).await.unwrap_err();
         assert_matches!(response, StorageServiceError::InvalidRequest(_));
     }
 }
@@ -703,11 +1059,22 @@ impl MockClient {
         (mock_client, storage_server, mock_time_service.into_mock())
     }
 
-    async fn send_request(
+    /// Send the given storage request and wait for a response
+    async fn process_request(
         &mut self,
         request: StorageServiceRequest,
     ) -> Result<StorageServiceResponse, StorageServiceError> {
-        // craft the inbound Rpc notification
+        let receiver = self.send_request(request).await;
+        self.wait_for_response(receiver).await
+    }
+
+    /// Send the specified storage request and return the receiver on which to
+    /// expect a result.
+    async fn send_request(
+        &mut self,
+        request: StorageServiceRequest,
+    ) -> Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>> {
+        // Create the inbound rpc request
         let peer_id = PeerId::ZERO;
         let protocol_id = ProtocolId::StorageServiceRpc;
         let data = protocol_id
@@ -721,21 +1088,165 @@ impl MockClient {
         };
         let notif = PeerManagerNotification::RecvRpc(peer_id, inbound_rpc);
 
-        // push it up to the storage service
+        // Push the request up to the storage service
         self.peer_mgr_notifs_tx
             .push((peer_id, protocol_id), notif)
             .unwrap();
 
-        // wait for the response and deserialize
-        let response = res_rx.await.unwrap().unwrap();
-        let response = protocol_id
-            .from_bytes::<StorageServiceMessage>(&response)
-            .unwrap();
-        match response {
-            StorageServiceMessage::Response(response) => response,
-            _ => panic!("Unexpected response message: {:?}", response),
+        res_rx
+    }
+
+    /// Helper method to wait for and deserialize a response on the specified receiver
+    async fn wait_for_response(
+        &mut self,
+        receiver: Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>>,
+    ) -> Result<StorageServiceResponse, StorageServiceError> {
+        if let Ok(response) =
+            timeout(Duration::from_secs(MAX_RESPONSE_TIMEOUT_SECS), receiver).await
+        {
+            let response = ProtocolId::StorageServiceRpc
+                .from_bytes::<StorageServiceMessage>(&response.unwrap().unwrap())
+                .unwrap();
+            match response {
+                StorageServiceMessage::Response(response) => response,
+                _ => panic!("Unexpected response message: {:?}", response),
+            }
+        } else {
+            panic!("Timed out while waiting for a response from the storage service!")
         }
     }
+}
+
+/// Waits until the storage summary has refreshed for the first time
+async fn wait_for_storage_to_refresh(mock_client: &mut MockClient, mock_time: &MockTimeService) {
+    while mock_client
+        .process_request(StorageServiceRequest::GetStorageServerSummary)
+        .await
+        .unwrap()
+        == StorageServiceResponse::StorageServerSummary(StorageServerSummary::default())
+    {
+        advance_storage_refresh_time(mock_time).await;
+    }
+}
+
+/// Advances enough time that the subscription service is able to refresh
+async fn wait_for_subscription_service_to_refresh(
+    mock_client: &mut MockClient,
+    mock_time: &MockTimeService,
+) {
+    // Elapse enough time to force storage to be updated
+    wait_for_storage_to_refresh(mock_client, mock_time).await;
+
+    // Elapse enough time to force the subscription thread to work
+    advance_storage_refresh_time(mock_time).await;
+}
+
+/// Advances the given timer by the amount of time it takes to refresh storage
+async fn advance_storage_refresh_time(mock_time: &MockTimeService) {
+    let default_storage_config = StorageServiceConfig::default();
+    let cache_update_freq_ms = default_storage_config.storage_summary_refresh_interval_ms;
+    mock_time.advance_ms_async(cache_update_freq_ms).await;
+}
+
+/// Creates and sends a request for new transaction outputs
+async fn send_new_transaction_output_request(
+    mock_client: &mut MockClient,
+    known_version: u64,
+    known_epoch: u64,
+) -> Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>> {
+    let request = StorageServiceRequest::GetNewTransactionOutputsWithProof(
+        NewTransactionOutputsWithProofRequest {
+            known_version,
+            known_epoch,
+        },
+    );
+    mock_client.send_request(request).await
+}
+
+/// Creates and sends a request for new transactions
+async fn send_new_transaction_request(
+    mock_client: &mut MockClient,
+    known_version: u64,
+    known_epoch: u64,
+    include_events: bool,
+) -> Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>> {
+    let request =
+        StorageServiceRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
+            known_version,
+            known_epoch,
+            include_events,
+        });
+    mock_client.send_request(request).await
+}
+
+/// Creates a mock db with the basic expectations required to handle subscription requests
+fn create_mock_db_for_subscription(
+    highest_ledger_info_clone: LedgerInfoWithSignatures,
+    lowest_version: Version,
+) -> MockDatabaseReader {
+    let mut db_reader = create_mock_db_reader();
+    db_reader
+        .expect_get_latest_ledger_info()
+        .return_once(move || Ok(highest_ledger_info_clone));
+    db_reader
+        .expect_get_first_txn_version()
+        .return_once(move || Ok(Some(lowest_version)));
+    db_reader
+        .expect_get_first_write_set_version()
+        .return_once(move || Ok(Some(lowest_version)));
+    db_reader
+        .expect_get_state_prune_window()
+        .return_once(move || Ok(Some(100)));
+    db_reader
+}
+
+/// Sets an expectation on the given mock db for a call to fetch transactions
+fn expect_get_transactions(
+    mock_db: &mut MockDatabaseReader,
+    start_version: u64,
+    num_items: u64,
+    proof_version: u64,
+    include_events: bool,
+    transaction_list: TransactionListWithProof,
+) {
+    mock_db
+        .expect_get_transactions()
+        .times(1)
+        .with(
+            eq(start_version),
+            eq(num_items),
+            eq(proof_version),
+            eq(include_events),
+        )
+        .return_once(move |_, _, _, _| Ok(transaction_list));
+}
+
+/// Sets an expectation on the given mock db for a call to fetch transaction outputs
+fn expect_get_transaction_outputs(
+    mock_db: &mut MockDatabaseReader,
+    start_version: u64,
+    num_items: u64,
+    proof_version: u64,
+    output_list: TransactionOutputListWithProof,
+) {
+    mock_db
+        .expect_get_transaction_outputs()
+        .times(1)
+        .with(eq(start_version), eq(num_items), eq(proof_version))
+        .return_once(move |_, _, _| Ok(output_list));
+}
+
+/// Sets an expectation on the given mock db for a call to fetch an epoch change proof
+fn expect_get_epoch_ending_ledger_infos(
+    mock_db: &mut MockDatabaseReader,
+    epoch_to_end: u64,
+    epoch_change_proof: EpochChangeProof,
+) {
+    mock_db
+        .expect_get_epoch_ending_ledger_infos()
+        .times(1)
+        .with(eq(epoch_to_end), eq(epoch_to_end + 1))
+        .return_once(move |_, _| Ok(epoch_change_proof));
 }
 
 /// Creates a test epoch change proof
@@ -753,13 +1264,21 @@ fn create_epoch_ending_ledger_infos(
 /// Creates a test transaction output list with proof
 fn create_output_list_with_proof(
     start_version: u64,
-    _end_version: u64,
-    _proof_version: u64,
+    end_version: u64,
+    proof_version: u64,
 ) -> TransactionOutputListWithProof {
+    let transaction_list_with_proof =
+        create_transaction_list_with_proof(start_version, end_version, proof_version, false);
+    let transactions_and_outputs = transaction_list_with_proof
+        .transactions
+        .iter()
+        .map(|txn| (txn.clone(), create_test_transaction_output()))
+        .collect();
+
     TransactionOutputListWithProof::new(
-        vec![],
+        transactions_and_outputs,
         Some(start_version),
-        TransactionInfoListWithProof::new_empty(),
+        transaction_list_with_proof.proof,
     )
 }
 
@@ -779,6 +1298,16 @@ fn create_test_ledger_info_with_sigs(epoch: u64, version: u64) -> LedgerInfoWith
         HashValue::zero(),
     );
     LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
+}
+
+/// Creates a test transaction output
+fn create_test_transaction_output() -> TransactionOutput {
+    TransactionOutput::new(
+        WriteSet::default(),
+        vec![],
+        0,
+        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)),
+    )
 }
 
 /// Creates a test user transaction
@@ -828,6 +1357,52 @@ fn create_transaction_list_with_proof(
     transaction_list_with_proof.transactions = transactions;
 
     transaction_list_with_proof
+}
+
+/// Verifies that a new transaction outputs with proof response is received
+/// and that the response contains the correct data.
+async fn verify_new_transaction_outputs_with_proof(
+    mock_client: &mut MockClient,
+    receiver: Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>>,
+    output_list_with_proof: TransactionOutputListWithProof,
+    expected_ledger_info: LedgerInfoWithSignatures,
+) {
+    match mock_client.wait_for_response(receiver).await.unwrap() {
+        StorageServiceResponse::NewTransactionOutputsWithProof((
+            outputs_with_proof,
+            ledger_info,
+        )) => {
+            assert_eq!(outputs_with_proof, output_list_with_proof);
+            assert_eq!(ledger_info, expected_ledger_info);
+        }
+        response => panic!(
+            "Expected new transaction outputs with proof but got: {:?}",
+            response
+        ),
+    };
+}
+
+/// Verifies that a new transactions with proof response is received
+/// and that the response contains the correct data.
+async fn verify_new_transactions_with_proof(
+    mock_client: &mut MockClient,
+    receiver: Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>>,
+    expected_transactions_with_proof: TransactionListWithProof,
+    expected_ledger_info: LedgerInfoWithSignatures,
+) {
+    match mock_client.wait_for_response(receiver).await.unwrap() {
+        StorageServiceResponse::NewTransactionsWithProof((
+            transactions_with_proof,
+            ledger_info,
+        )) => {
+            assert_eq!(transactions_with_proof, expected_transactions_with_proof);
+            assert_eq!(ledger_info, expected_ledger_info);
+        }
+        response => panic!(
+            "Expected new transaction with proof but got: {:?}",
+            response
+        ),
+    };
 }
 
 /// Initializes the Aptos logger for tests

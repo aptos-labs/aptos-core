@@ -812,6 +812,7 @@ async fn optimal_chunk_size_calculations() {
         max_epoch_chunk_size,
         max_lru_cache_size: 0,
         max_network_channel_size: 0,
+        max_subscription_period_ms: 0,
         max_transaction_chunk_size,
         max_transaction_output_chunk_size,
         storage_summary_refresh_interval_ms: 0,

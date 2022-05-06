@@ -111,6 +111,7 @@ pub struct StorageServiceConfig {
     pub max_epoch_chunk_size: u64,           // Max num of epoch ending ledger infos per chunk
     pub max_lru_cache_size: u64,             // Max num of items in the lru cache before eviction
     pub max_network_channel_size: u64,       // Max num of pending network messages
+    pub max_subscription_period_ms: u64,     // Max period (ms) of pending subscription requests
     pub max_transaction_chunk_size: u64,     // Max num of transactions per chunk
     pub max_transaction_output_chunk_size: u64, // Max num of transaction outputs per chunk
     pub storage_summary_refresh_interval_ms: u64, // The interval (ms) to refresh the storage summary
@@ -124,6 +125,7 @@ impl Default for StorageServiceConfig {
             max_epoch_chunk_size: 100,
             max_lru_cache_size: 100,
             max_network_channel_size: 4000,
+            max_subscription_period_ms: 10000,
             max_transaction_chunk_size: 1000,
             max_transaction_output_chunk_size: 1000,
             storage_summary_refresh_interval_ms: 50,
