@@ -39,7 +39,7 @@ const createToken = async (
   const aptosClient = new AptosClient(NODE_URL)
   const txnRequest = await aptosClient.generateTransaction(account.address(), payload)
   const signedTxn = await aptosClient.signTransaction(account, txnRequest)
-  const res = await aptosClient.submitTransaction(account, signedTxn)
+  const res = await aptosClient.submitTransaction(signedTxn)
   await aptosClient.waitForTransaction(res.hash)
   return Promise.resolve(res.hash)
 }
@@ -63,7 +63,7 @@ const createCollection = async (
   const aptosClient = new AptosClient(NODE_URL)
   const txnRequest = await aptosClient.generateTransaction(account.address(), payload)
   const signedTxn = await aptosClient.signTransaction(account, txnRequest)
-  const res = await aptosClient.submitTransaction(account, signedTxn)
+  const res = await aptosClient.submitTransaction(signedTxn)
   await aptosClient.waitForTransaction(res.hash)
   return Promise.resolve(res.hash)
 }
