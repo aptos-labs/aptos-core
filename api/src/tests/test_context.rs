@@ -128,7 +128,12 @@ impl TestContext {
         if self.golden_output.is_none() {
             self.golden_output = Some(GoldenOutputs::new(self.test_name.replace(':', "_")));
         }
-        self.golden_output.as_ref().unwrap().log(&pretty(&msg));
+
+        let msg = pretty(&msg);
+        let re = regex::Regex::new("hash\": \".*\"").unwrap();
+        let msg = re.replace_all(&msg, "hash\": \"\"");
+
+        self.golden_output.as_ref().unwrap().log(&msg);
     }
 
     pub fn rng(&mut self) -> &mut rand::rngs::StdRng {

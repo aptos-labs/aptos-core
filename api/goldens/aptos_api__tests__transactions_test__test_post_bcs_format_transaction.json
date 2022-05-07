@@ -1,6 +1,6 @@
 {
   "type": "pending_transaction",
-  "hash": "0xab573777842a7e334ebe7c269717baa8a7bc4bdf28cdc2d288099ef267f09ccd",
+  "hash": "",
   "sender": "0xa550c18",
   "sequence_number": "0",
   "max_gas_amount": "2000",

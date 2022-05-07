@@ -1,18 +1,18 @@
 {
   "type": "user_transaction",
   "version": "2",
-  "hash": "0xcbdb69429665e6815b49119ed46e86cb059151be73c762f0daada3b56cee6d22",
-  "state_root_hash": "0x54061777332aaa8e10aa5c756e3214a973ad064c5beed231fcf425c66c90a28d",
-  "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
+  "hash": "",
+  "state_root_hash": "",
+  "event_root_hash": "",
   "gas_used": "1",
   "success": false,
   "vm_status": "Transaction Executed and Committed with Error CODE_DESERIALIZATION_ERROR",
-  "accumulator_root_hash": "0xdded7ee2ca15601cb4c484564b8488f1ea26b2f97b25431ff3ca02158cf64c61",
+  "accumulator_root_hash": "",
   "changes": [
     {
       "type": "write_resource",
       "address": "0xa550c18",
-      "state_key_hash": "0x1e24e72081eba6c211d081095185a977809a76010b12dfa2a8983ccb1113ad71",
+      "state_key_hash": "",
       "data": {
         "type": "0x1::Account::Account",
         "data": {
@@ -25,7 +25,7 @@
     {
       "type": "write_resource",
       "address": "0xa550c18",
-      "state_key_hash": "0x515bab035b131fd25d8298be2c7f8b5afb409adea378f3d87a5b0dd170236d28",
+      "state_key_hash": "",
       "data": {
         "type": "0x1::TestCoin::Balance",
         "data": {

@@ -236,6 +236,7 @@ dependencies = [
  "once_cell",
  "percent-encoding",
  "rand 0.8.4",
+ "regex",
  "reqwest",
  "serde 1.0.136",
  "serde_json",
