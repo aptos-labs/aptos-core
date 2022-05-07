@@ -63,4 +63,53 @@ storage-interface = { path = "../../storage/storage-interface" }
 vm-genesis = { path = "../../aptos-move/vm-genesis" }
 
 [build-dependencies]
+clap_complete = "3.1.3"
+anyhow = "1.0.52"
+async-trait = "0.1.42"
+base64 = "0.13.0"
+clap = "3.1.8"
+hex = "0.4.3"
+itertools = "0.10.3"
+rand = "0.8.3"
+reqwest = { version = "0.11.2", features = ["blocking", "json"] }
+serde = "1.0.124"
+serde_json = "1.0.64"
+serde_yaml = "0.8.17"
 shadow-rs = "0.11.0"
+thiserror = "1.0.24"
+tempfile = "3.2.0"
+tokio = { version = "1.8.1", features = ["full"] }
+tokio-util = { version = "0.6.4", features = ["compat"] }
+toml = "0.5.9"
+uuid = { version = "0.8.2", features = ["v4", "serde"] }
+
+aptos-config = { path = "../../config" }
+aptos-crypto = { path = "../aptos-crypto" }
+aptos-logger = { path = "../aptos-logger" }
+aptos-management = { path = "../../config/management" }
+aptos-secure-storage = { path = "../../secure/storage" }
+aptos-github-client = { path = "../../secure/storage/github" }
+aptos-telemetry = { path = "../aptos-telemetry" }
+aptos-temppath = { path = "../aptos-temppath" }
+aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
+aptos-types = { path = "../../types" }
+aptos-sdk = { path = "../../sdk" }
+aptos-rest-client = { path = "../../crates/aptos-rest-client"}
+aptos-vm = { path = "../../aptos-move/aptos-vm" }
+bcs = "0.1.2"
+short-hex-str = { path = "../short-hex-str" }
+cached-framework-packages =  { path = "../../aptos-move/framework/cached-packages" }
+move-binary-format = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
+move-cli = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["address32"] }
+move-package = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
+move-unit-test = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
+move-vm-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
+move-stdlib = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["testing"] }
+move-vm-runtime = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["testing"] }
+framework = { path = '../../aptos-move/framework' }
+move-table-extension = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
+vm-genesis = { path = "../../aptos-move/vm-genesis" }
+storage-interface = { path = "../../storage/storage-interface" }
+aptosdb = { path = "../../storage/aptosdb" }
+executor = { path = "../../execution/executor" }

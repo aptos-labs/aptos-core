@@ -17,7 +17,6 @@ use itertools::Itertools;
 use move_core_types::account_address::AccountAddress;
 use reqwest::Url;
 use serde::Serialize;
-use shadow_rs::shadow;
 use std::{
     collections::{BTreeMap, HashMap},
     env,
@@ -27,8 +26,6 @@ use std::{
     str::FromStr,
     time::{Duration, Instant},
 };
-
-shadow!(build);
 
 /// Prompts for confirmation until a yes or no is given explicitly
 pub fn prompt_yes(prompt: &str) -> bool {
@@ -100,38 +97,6 @@ fn collect_metrics(
     metrics.insert("Command".to_string(), command.to_string());
     metrics.insert("Successful".to_string(), successful.to_string());
     metrics.insert("Error".to_string(), error.to_string());
-    metrics.insert("Version".to_string(), build::VERSION.to_string());
-    metrics.insert("PkgVersion".to_string(), build::PKG_VERSION.to_string());
-    metrics.insert(
-        "ClapVersion".to_string(),
-        build::CLAP_LONG_VERSION.to_string(),
-    );
-    metrics.insert("Commit".to_string(), build::COMMIT_HASH.to_string());
-    metrics.insert("Branch".to_string(), build::BRANCH.to_string());
-    metrics.insert("Tag".to_string(), build::TAG.to_string());
-    metrics.insert("BUILD_OS".to_string(), build::BUILD_OS.to_string());
-    metrics.insert(
-        "BUILD_TARGET_OS".to_string(),
-        build::BUILD_TARGET.to_string(),
-    );
-    metrics.insert(
-        "BUILD_TARGET_ARCH".to_string(),
-        build::BUILD_TARGET_ARCH.to_string(),
-    );
-    metrics.insert(
-        "BUILD_RUST_CHANNEL".to_string(),
-        build::BUILD_RUST_CHANNEL.to_string(),
-    );
-    metrics.insert("BUILD_TIME".to_string(), build::BUILD_TIME.to_string());
-    metrics.insert("RUST_VERSION".to_string(), build::RUST_VERSION.to_string());
-    metrics.insert(
-        "RUST_TOOLCHAIN".to_string(),
-        build::RUST_CHANNEL.to_string(),
-    );
-    metrics.insert(
-        "CARGO_VERSION".to_string(),
-        build::CARGO_VERSION.to_string(),
-    );
 
     metrics
 }
