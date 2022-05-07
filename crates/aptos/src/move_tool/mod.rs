@@ -162,6 +162,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
             install_dir: self.move_options.output_dir.clone(),
             ..Default::default()
         };
+        println!("{:#?}", build_config);
         let compiled_package = compile_move(build_config, self.move_options.package_dir.as_path())?;
         let mut ids = Vec::new();
         compiled_package
