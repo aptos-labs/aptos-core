@@ -123,7 +123,7 @@ pub mod script_to_script_function;
 pub mod system_module_names;
 pub mod transaction_metadata;
 
-pub use crate::{aptos_vm::AptosVM, aptos_vm_impl::convert_changeset_and_events};
+pub use crate::aptos_vm::AptosVM;
 
 use aptos_state_view::StateView;
 use aptos_types::{

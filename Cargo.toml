@@ -11,7 +11,6 @@ members = [
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
     "aptos-move/e2e-tests",
-    "aptos-move/e2e-tests-replay",
     "aptos-move/e2e-testsuite",
     "aptos-move/framework",
     "aptos-move/framework/cached-packages",

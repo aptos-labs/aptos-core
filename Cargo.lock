@@ -384,22 +384,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-e2e-tests-replay"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-types",
- "aptos-vm",
- "aptos-workspace-hack",
- "bcs",
- "framework",
- "language-e2e-tests",
- "move-deps",
- "structopt",
- "walkdir",
-]
-
-[[package]]
 name = "aptos-faucet"
 version = "0.1.0"
 dependencies = [

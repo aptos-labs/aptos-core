@@ -2,23 +2,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    access_path_cache::AccessPathCache,
-    aptos_vm_impl::{convert_changeset_and_events_cached, convert_table_changeset},
-    move_vm_ext::MoveResolverExt,
+    access_path_cache::AccessPathCache, move_vm_ext::MoveResolverExt,
     transaction_metadata::TransactionMetadata,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     block_metadata::BlockMetadata,
+    contract_event::ContractEvent,
+    event::EventKey,
+    state_store::state_key::StateKey,
     transaction::{ChangeSet, SignatureCheckedTransaction},
-    write_set::WriteSetMut,
+    write_set::{WriteOp, WriteSetMut},
 };
 use move_deps::{
     move_binary_format::errors::{Location, VMResult},
     move_core_types::{
         account_address::AccountAddress,
         effects::{ChangeSet as MoveChangeSet, Event as MoveEvent},
+        language_storage::ModuleId,
         vm_status::{StatusCode, VMStatus},
     },
     move_table_extension::{NativeTableContext, TableChange, TableChangeSet},
@@ -26,7 +28,7 @@ use move_deps::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    convert::TryInto,
+    convert::{TryFrom, TryInto},
     ops::{Deref, DerefMut},
 };
 
@@ -138,26 +140,60 @@ impl SessionOutput {
         self,
         ap_cache: &mut C,
     ) -> Result<ChangeSet, VMStatus> {
-        let mut out_write_set = WriteSetMut::new(Vec::new());
-        let mut out_events = Vec::new();
-        convert_changeset_and_events_cached(
-            ap_cache,
-            self.change_set,
-            self.events,
-            &mut out_write_set,
-            &mut out_events,
-        )?;
+        let Self {
+            change_set,
+            events,
+            table_change_set,
+        } = self;
 
-        convert_table_changeset(self.table_change_set, &mut out_write_set)?;
+        let mut write_set_mut = WriteSetMut::new(Vec::new());
+        for (addr, account_changeset) in change_set.into_inner() {
+            let (modules, resources) = account_changeset.into_inner();
+            for (struct_tag, blob_opt) in resources {
+                let ap = ap_cache.get_resource_path(addr, struct_tag);
+                let op = match blob_opt {
+                    None => WriteOp::Deletion,
+                    Some(blob) => WriteOp::Value(blob),
+                };
+                write_set_mut.push((StateKey::AccessPath(ap), op))
+            }
 
-        let ws = out_write_set
+            for (name, blob_opt) in modules {
+                let ap = ap_cache.get_module_path(ModuleId::new(addr, name));
+                let op = match blob_opt {
+                    None => WriteOp::Deletion,
+                    Some(blob) => WriteOp::Value(blob),
+                };
+
+                write_set_mut.push((StateKey::AccessPath(ap), op))
+            }
+        }
+
+        for (handle, change) in table_change_set.changes {
+            for (key, value_opt) in change.entries {
+                let state_key = StateKey::table_item(handle.0, key);
+                if let Some(bytes) = value_opt {
+                    write_set_mut.push((state_key, WriteOp::Value(bytes)))
+                } else {
+                    write_set_mut.push((state_key, WriteOp::Deletion))
+                }
+            }
+        }
+
+        let write_set = write_set_mut
             .freeze()
             .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR))?;
-        Ok(ChangeSet::new(ws, out_events))
-    }
 
-    pub fn unpack(self) -> (MoveChangeSet, Vec<MoveEvent>, TableChangeSet) {
-        (self.change_set, self.events, self.table_change_set)
+        let events = events
+            .into_iter()
+            .map(|(guid, seq_num, ty_tag, blob)| {
+                let key = EventKey::try_from(guid.as_slice())
+                    .map_err(|_| VMStatus::Error(StatusCode::EVENT_KEY_MISMATCH))?;
+                Ok(ContractEvent::new(key, seq_num, ty_tag, blob))
+            })
+            .collect::<Result<Vec<_>, VMStatus>>()?;
+
+        Ok(ChangeSet::new(write_set, events))
     }
 
     pub fn squash(&mut self, other: Self) -> Result<(), VMStatus> {

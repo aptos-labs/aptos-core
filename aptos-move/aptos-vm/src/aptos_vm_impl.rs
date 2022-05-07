@@ -16,15 +16,11 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
     account_config::ChainSpecificAccountInfo,
-    contract_event::ContractEvent,
-    event::EventKey,
     on_chain_config::{
         ConfigStorage, OnChainConfig, VMConfig, VMPublishingOption, Version, APTOS_VERSION_3,
     },
-    state_store::state_key::StateKey,
     transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
-    write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use fail::fail_point;
 use move_deps::{
@@ -34,18 +30,16 @@ use move_deps::{
     },
     move_core_types::{
         account_address::AccountAddress,
-        effects::{ChangeSet as MoveChangeSet, Event as MoveEvent},
         gas_schedule::{CostTable, GasAlgebra, GasCarrier, GasUnits, InternalGasUnits},
         language_storage::ModuleId,
         move_resource::MoveStructType,
         resolver::ResourceResolver,
         value::{serialize_values, MoveValue},
     },
-    move_table_extension::TableChangeSet,
     move_vm_runtime::{logging::expect_no_verification_errors, session::Session},
     move_vm_types::gas_schedule::{calculate_intrinsic_gas, GasStatus},
 };
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 
 #[derive(Clone)]
 /// A wrapper to make VMRuntime standalone and thread safe.
@@ -546,85 +540,6 @@ impl<'a> AptosVMInternals<'a> {
         let session = self.move_vm().new_session(&remote_storage, session_id);
         f(session)
     }
-}
-
-pub fn convert_changeset_and_events(
-    changeset: MoveChangeSet,
-    events: Vec<MoveEvent>,
-) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
-    let mut out_write_set = WriteSetMut::new(vec![]);
-    let mut out_events = Vec::new();
-    convert_changeset_and_events_cached(
-        &mut (),
-        changeset,
-        events,
-        &mut out_write_set,
-        &mut out_events,
-    )?;
-    let ws = out_write_set
-        .freeze()
-        .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR))?;
-    Ok((ws, out_events))
-}
-
-pub fn convert_changeset_and_events_cached<C: AccessPathCache>(
-    ap_cache: &mut C,
-    changeset: MoveChangeSet,
-    events: Vec<MoveEvent>,
-    out_write_set: &mut WriteSetMut,
-    out_events: &mut Vec<ContractEvent>,
-) -> Result<(), VMStatus> {
-    for (addr, account_changeset) in changeset.into_inner() {
-        let (modules, resources) = account_changeset.into_inner();
-        for (struct_tag, blob_opt) in resources {
-            let ap = ap_cache.get_resource_path(addr, struct_tag);
-            let op = match blob_opt {
-                None => WriteOp::Deletion,
-                Some(blob) => WriteOp::Value(blob),
-            };
-            out_write_set.push((StateKey::AccessPath(ap), op))
-        }
-
-        for (name, blob_opt) in modules {
-            let ap = ap_cache.get_module_path(ModuleId::new(addr, name));
-            let op = match blob_opt {
-                None => WriteOp::Deletion,
-                Some(blob) => WriteOp::Value(blob),
-            };
-
-            out_write_set.push((StateKey::AccessPath(ap), op))
-        }
-    }
-
-    let events = events
-        .into_iter()
-        .map(|(guid, seq_num, ty_tag, blob)| {
-            let key = EventKey::try_from(guid.as_slice())
-                .map_err(|_| VMStatus::Error(StatusCode::EVENT_KEY_MISMATCH))?;
-            Ok(ContractEvent::new(key, seq_num, ty_tag, blob))
-        })
-        .collect::<Result<Vec<_>, VMStatus>>()?;
-
-    out_events.extend(events.into_iter());
-    Ok(())
-}
-
-pub fn convert_table_changeset(
-    table_changeset: TableChangeSet,
-    out_write_set: &mut WriteSetMut,
-) -> Result<(), VMStatus> {
-    for (handle, change) in table_changeset.changes {
-        for (key, value_opt) in change.entries {
-            let state_key = StateKey::table_item(handle.0, key);
-            if let Some(bytes) = value_opt {
-                out_write_set.push((state_key, WriteOp::Value(bytes)))
-            } else {
-                out_write_set.push((state_key, WriteOp::Deletion))
-            }
-        }
-    }
-
-    Ok(())
 }
 
 pub(crate) fn charge_global_write_gas_usage<R: MoveResolverExt>(
