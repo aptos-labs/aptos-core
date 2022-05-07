@@ -19,8 +19,8 @@ Aptos-core strives towards being the safest and most scalable layer one blockcha
 
 * [Aptos Labs](https://aptoslabs.com/)
 * [Aptos Developer Network](https://aptos.dev)
-* [Getting Started](https://aptos.dev/tutorials/getting-started)
-* [Life of a Transaction](https://aptos.dev/transactions/basics-life-of-txn)
+* [Getting Started](https://aptos.dev/guides/getting-started)
+* [Life of a Transaction](https://aptos.dev/guides/basics-life-of-txn)
 * Join us on the [Aptos Discord](https://discord.gg/aptoslabs).
 
 ## Contributing

@@ -39,26 +39,28 @@ use language_e2e_tests::{
         TRACE_FILE_ERROR, TRACE_FILE_NAME,
     },
 };
-use move_binary_format::{errors::VMResult, CompiledModule};
-use move_core_types::{
-    gas_schedule::GasAlgebra,
-    identifier::IdentStr,
-    language_storage::{ModuleId, TypeTag},
-    resolver::MoveResolver,
-    value::MoveValue,
-    vm_status::VMStatus,
-};
-use move_stackless_bytecode_interpreter::{
-    concrete::{
-        runtime::{convert_move_struct_tag, convert_move_value},
-        ty::BaseType,
-        value::GlobalState,
+use move_deps::{
+    move_binary_format::{errors::VMResult, CompiledModule},
+    move_core_types::{
+        gas_schedule::GasAlgebra,
+        identifier::IdentStr,
+        language_storage::{ModuleId, TypeTag},
+        resolver::MoveResolver,
+        value::MoveValue,
+        vm_status::VMStatus,
     },
-    shared::bridge::{adapt_move_vm_change_set, adapt_move_vm_result},
-    StacklessBytecodeInterpreter,
+    move_stackless_bytecode_interpreter::{
+        concrete::{
+            runtime::{convert_move_struct_tag, convert_move_value},
+            ty::BaseType,
+            value::GlobalState,
+        },
+        shared::bridge::{adapt_move_vm_change_set, adapt_move_vm_result},
+        StacklessBytecodeInterpreter,
+    },
+    move_vm_runtime::session::SerializedReturnValues,
+    move_vm_types::gas_schedule::GasStatus,
 };
-use move_vm_runtime::session::SerializedReturnValues;
-use move_vm_types::gas_schedule::GasStatus;
 
 const MOVE_VM_TRACING_ENV_VAR_NAME: &str = "MOVE_VM_TRACE";
 const MOVE_VM_TRACING_LOG_FILENAME: &str = "move_vm_trace.log";

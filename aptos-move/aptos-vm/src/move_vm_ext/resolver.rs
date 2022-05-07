@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use move_core_types::resolver::MoveResolver;
-use move_table_extension::TableResolver;
+use move_deps::{move_core_types::resolver::MoveResolver, move_table_extension::TableResolver};
 use std::fmt::Debug;
 
 pub trait MoveResolverExt: MoveResolver<Err = Self::ExtError> + TableResolver {

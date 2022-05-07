@@ -38,13 +38,15 @@ use aptos_vm::{
     parallel_executor::ParallelAptosVM,
     AptosVM, VMExecutor, VMValidator,
 };
-use move_core_types::{
-    account_address::AccountAddress,
-    identifier::Identifier,
-    language_storage::{ModuleId, ResourceKey, TypeTag},
-    move_resource::MoveResource,
+use move_deps::{
+    move_core_types::{
+        account_address::AccountAddress,
+        identifier::Identifier,
+        language_storage::{ModuleId, ResourceKey, TypeTag},
+        move_resource::MoveResource,
+    },
+    move_vm_types::gas_schedule::GasStatus,
 };
-use move_vm_types::gas_schedule::GasStatus;
 use num_cpus;
 
 static RNG_SEED: [u8; 32] = [9u8; 32];

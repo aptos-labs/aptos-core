@@ -16,14 +16,16 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet},
 };
 use fail::fail_point;
-use move_binary_format::errors::*;
-use move_core_types::{
-    account_address::AccountAddress,
-    gas_schedule::{GasAlgebra, GasCarrier, InternalGasUnits},
-    language_storage::{ModuleId, StructTag},
-    resolver::{ModuleResolver, ResourceResolver},
+use move_deps::{
+    move_binary_format::errors::*,
+    move_core_types::{
+        account_address::AccountAddress,
+        gas_schedule::{GasAlgebra, GasCarrier, InternalGasUnits},
+        language_storage::{ModuleId, StructTag},
+        resolver::{ModuleResolver, ResourceResolver},
+    },
+    move_table_extension::{TableHandle, TableOperation, TableResolver},
 };
-use move_table_extension::{TableHandle, TableOperation, TableResolver};
 use std::{
     collections::btree_map::BTreeMap,
     ops::{Deref, DerefMut},

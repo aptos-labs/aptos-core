@@ -104,12 +104,7 @@ export class TokenClient {
       type: "script_function_payload",
       function: "0x1::TokenTransfers::claim_script",
       type_arguments: [],
-      arguments: [
-        sender,
-        creator,
-        Buffer.from(collectionName).toString("hex"),
-        Buffer.from(name).toString("hex"),
-      ],
+      arguments: [sender, creator, Buffer.from(collectionName).toString("hex"), Buffer.from(name).toString("hex")],
     };
     const transactionHash = await this.submitTransactionHelper(account, payload);
     return transactionHash;
@@ -127,21 +122,13 @@ export class TokenClient {
       type: "script_function_payload",
       function: "0x1::TokenTransfers::cancel_offer_script",
       type_arguments: [],
-      arguments: [
-        receiver,
-        creator,
-        Buffer.from(collectionName).toString("hex"),
-        Buffer.from(name).toString("hex"),
-      ],
+      arguments: [receiver, creator, Buffer.from(collectionName).toString("hex"), Buffer.from(name).toString("hex")],
     };
     const transactionHash = await this.submitTransactionHelper(account, payload);
     return transactionHash;
   }
 
-  async getCollectionData(
-    creator: MaybeHexString,
-    collectionName: string,
-  ): Promise<any> {
+  async getCollectionData(creator: MaybeHexString, collectionName: string): Promise<any> {
     const resources = await this.aptosClient.getAccountResources(creator);
     const accountResource: { type: string; data: any } = resources.find((r) => r.type === "0x1::Token::Collections");
     const { handle }: { handle: string } = accountResource.data.collections;
@@ -151,16 +138,13 @@ export class TokenClient {
       key: collectionName,
     };
     // eslint-disable-next-line no-unused-vars
-    const collectionTable = await this.aptosClient.getTableItem(
-      handle,
-      getCollectionTableItemRequest,
-    );
+    const collectionTable = await this.aptosClient.getTableItem(handle, getCollectionTableItemRequest);
     return collectionTable;
   }
 
   // Retrieve the token's creation_num, which is useful for non-creator operations
   async getTokenData(creator: MaybeHexString, collectionName: string, tokenName: string): Promise<number> {
-    const collection: { type: string, data: any } = await this.aptosClient.getAccountResource(
+    const collection: { type: string; data: any } = await this.aptosClient.getAccountResource(
       creator,
       "0x1::Token::Collections",
     );
@@ -177,16 +161,13 @@ export class TokenClient {
       key: tokenId,
     };
 
-    const tableItem = await this.aptosClient.getTableItem(
-      handle,
-      getTokenTableItemRequest,
-    );
+    const tableItem = await this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
     return tableItem;
   }
 
   // Retrieve the token's creation_num, which is useful for non-creator operations
   async getTokenBalance(creator: MaybeHexString, collectionName: string, tokenName: string): Promise<number> {
-    const tokenStore: { type: string, data: any } = await this.aptosClient.getAccountResource(
+    const tokenStore: { type: string; data: any } = await this.aptosClient.getAccountResource(
       creator,
       "0x1::Token::TokenStore",
     );
@@ -203,10 +184,7 @@ export class TokenClient {
       key: tokenId,
     };
 
-    const tableItem = await this.aptosClient.getTableItem(
-      handle,
-      getTokenTableItemRequest,
-    );
+    const tableItem = await this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
     return tableItem;
   }
 }

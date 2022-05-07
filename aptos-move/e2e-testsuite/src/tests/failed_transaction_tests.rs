@@ -16,12 +16,14 @@ use language_e2e_tests::{
     common_transactions::peer_to_peer_txn, test_with_different_versions,
     versioning::CURRENT_RELEASE_VERSIONS,
 };
-use move_binary_format::file_format::NUMBER_OF_NATIVE_FUNCTIONS;
-use move_core_types::{
-    gas_schedule::{GasAlgebra, GasPrice, GasUnits},
-    vm_status::StatusCode::TYPE_MISMATCH,
+use move_deps::{
+    move_binary_format::file_format::NUMBER_OF_NATIVE_FUNCTIONS,
+    move_core_types::{
+        gas_schedule::{GasAlgebra, GasPrice, GasUnits},
+        vm_status::StatusCode::TYPE_MISMATCH,
+    },
+    move_vm_types::gas_schedule::{zero_cost_schedule, GasStatus},
 };
-use move_vm_types::gas_schedule::{zero_cost_schedule, GasStatus};
 
 #[test]
 fn failed_transaction_cleanup_test() {

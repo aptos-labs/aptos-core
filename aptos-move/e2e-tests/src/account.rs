@@ -20,12 +20,14 @@ use aptos_types::{
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use move_core_types::{
-    language_storage::{ResourceKey, StructTag},
-    move_resource::MoveStructType,
-    value::{MoveStructLayout, MoveTypeLayout},
+use move_deps::{
+    move_core_types::{
+        language_storage::{ResourceKey, StructTag},
+        move_resource::MoveStructType,
+        value::{MoveStructLayout, MoveTypeLayout},
+    },
+    move_vm_types::values::{Struct, Value},
 };
-use move_vm_types::values::{Struct, Value};
 use std::str::FromStr;
 use vm_genesis::GENESIS_KEYPAIR;
 
