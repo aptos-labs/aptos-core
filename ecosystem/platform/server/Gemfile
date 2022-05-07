@@ -63,17 +63,31 @@ gem 'tzinfo-data', platforms: %i[mingw mswin x64_mingw jruby]
 # Reduces boot times through caching; required in config/boot.rb
 gem 'bootsnap', require: false
 
+gem 'httparty'
+
 # Use Sass to process CSS
 gem 'sassc-rails'
+
+# IP -> GEO via MaxMind
+gem 'maxmind-geoip2'
+
+# Postgresql backed DelayedJob
+gem 'delayed'
 
 # mailchimp
 # https://github.com/mailchimp/mailchimp-transactional-ruby/
 gem 'MailchimpTransactional'
 
+gem 'recaptcha', '~> 5.10'
+
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
 # gem "image_processing", "~> 1.2"
 
 gem 'tailwindcss-rails', '~> 2.0'
+
+# Monitoring
+gem 'sentry-rails'
+gem 'sentry-ruby'
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
@@ -109,5 +123,3 @@ group :test do
   gem 'selenium-webdriver'
   gem 'webdrivers'
 end
-
-gem 'recaptcha', '~> 5.10'

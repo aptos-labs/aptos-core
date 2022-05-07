@@ -1,24 +1,19 @@
-# README
+# Community Platform
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+### Run Server
 
-Things you may want to cover:
+```bash
+bundle exec rails s
+```
 
-* Ruby version
+### Run Tailwind Recompile Watcher
 
-* System dependencies
+```bash
+bundle exec rails tailwindcss:watch
+```
 
-* Configuration
+### Run Mailcatcher
 
-* Database creation
-
-* Database initialization
-
-* How to run the test suite
-
-* Services (job queues, cache servers, search engines, etc.)
-
-* Deployment instructions
-
-* ...
+```bash
+docker run -p 1080:1080 -p 1025:1025 stpaquet/alpinemailcatcher:latest
+```

@@ -3,15 +3,18 @@
 # frozen_string_literal: true
 
 class OnboardingController < ApplicationController
+  before_action :authenticate_user!
   before_action :set_oauth_data
 
   def email; end
 
   def email_update
-    email_params = params.require(:user).permit(:email)
+    return redirect_to overview_index_path if current_user.confirmed?
+
+    email_params = params.require(:user).permit(:email, :username)
     if verify_recaptcha(model: current_user) && current_user.update(email_params)
       current_user.send_confirmation_instructions
-      redirect_to overview_index_path
+      redirect_to onboarding_email_path, notice: "Verification email sent to #{email_params[:email]}"
     else
       render :email, status: :unprocessable_entity
     end

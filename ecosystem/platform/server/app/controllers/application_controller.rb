@@ -28,4 +28,8 @@ class ApplicationController < ActionController::Base
   def admin_access_denied(_exception)
     head :forbidden
   end
+
+  def ensure_confirmed!
+    redirect_to onboarding_email_path unless current_user.confirmed?
+  end
 end

@@ -1,5 +1,11 @@
 <h2>Welcome, <%= @oauth_username %></h2>
-<p>Please verify your email to continue the signup process</p>
+<% if current_user.username %>
+  <p>Please set and verify your email to continue the signup process</p>
+<% else %>
+  <p>Please set a username and verify your email to continue the signup process</p>
+<% end %>
+
+<%= render "layouts/flash" %>
 
 <% if current_user.errors.any? %>
   <div id="error_explanation" class="bg-red-50 text-red-500 px-3 py-2 font-medium rounded-lg mt-3">
@@ -13,7 +19,16 @@
   </div>
 <% end %>
 
+<%= render "shared/captcha_helper" %>
+
 <%= form_with(model: current_user, url: onboarding_email_path, method: :post, data: {turbo: false}) do |f| %>
+  <% unless current_user.username %>
+    <div class="field">
+      <%= f.label :username %><br/>
+      <%= f.text_field :username, autofocus: false, autocomplete: "username", value: current_user.username %>
+    </div>
+  <% end %>
+
   <div class="field">
     <%= f.label :email %><br />
     <%= f.email_field :email, autofocus: true, autocomplete: "email", value: current_user.email || @oauth_email %>

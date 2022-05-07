@@ -4,6 +4,7 @@
 
 class OverviewController < ApplicationController
   before_action :authenticate_user!
+  before_action :ensure_confirmed!
 
   def index; end
 end

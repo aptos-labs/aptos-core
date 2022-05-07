@@ -1,2 +1,42 @@
-<h2>Incentivized Testnet</h2>
-<%= link_to "Click here to start", new_it1_profile_path %>
+<h2>Incentivized Testnet Registration Landing Page</h2>
+
+<%= render "layouts/flash" %>
+
+<p>
+  Welcome!
+</p>
+<p>
+  You must do two things to be eligible for the incentivized testnet:
+</p>
+
+<%
+  node_verification_path = current_user.it1_profile.present? ? edit_it1_profile_path(current_user.it1_profile) : new_it1_profile_path
+
+  if current_user.it1_profile&.validator_verified?
+    link_args = {
+      class: "text-sky-500 hover:text-sky-600",
+    }
+    href = current_user.kyc_url
+  else
+    link_args = {
+      class: "text-sky-500 hover:text-sky-600",
+      style: "cursor: not-allowed; opacity: 0.5; text-decoration: none;",
+      onclick: "javascript:event.preventDefault();",
+      title: "This link will unlock once you have verified your node."
+    }
+    href = "#"
+  end
+%>
+<p>
+<ol>
+  <% if current_user.it1_profile&.validator_verified? %>
+    <li>1. Node verification
+      complete! <%= link_to "Edit your details.", node_verification_path, class: "text-sky-500 hover:text-sky-600" %> </li>
+  <% else %>
+    <li>1. Complete
+      the <%= link_to "Node Verification", node_verification_path, class: "text-sky-500 hover:text-sky-600" %> </li>
+  <% end %>
+  <li>2. Once finished with Node Verification, you
+    must <%= link_to "go through KYC", href, **link_args %> </li>
+</ol>
+</p>

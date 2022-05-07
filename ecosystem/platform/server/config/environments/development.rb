@@ -69,6 +69,10 @@ Rails.application.configure do
   # Highlight code that triggered database queries in logs.
   config.active_record.verbose_query_logs = true
 
+  # Allow serving from any host, for easier debugging
+  config.hosts << '*'
+  config.hosts << 'capcap.ngrok.io'
+
   # Suppress logger output for asset requests.
   config.assets.quiet = true
 

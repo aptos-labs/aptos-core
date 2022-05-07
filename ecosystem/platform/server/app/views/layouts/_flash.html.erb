@@ -1,0 +1,7 @@
+<% flash.each do |type, msg| %>
+  <% if type == "notice" %>
+    <p class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded"><%= msg %></p>
+  <% elsif type == "alert" %>
+    <p class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded"><%= msg %></p>
+  <% end %>
+<% end %>

@@ -24,7 +24,7 @@ Rails.application.routes.draw do
   post 'onboarding/email', to: 'onboarding#email_update'
 
   resources :overview, only: %i[index]
-  resources :it1_profiles, except: %i[show index destroy]
+  resources :it1_profiles, except: %i[index destroy]
 
   get 'it1', to: 'welcome#it1'
   root 'welcome#index'

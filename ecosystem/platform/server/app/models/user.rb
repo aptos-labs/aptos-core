@@ -6,7 +6,7 @@
 class User < ApplicationRecord
   include RailsStateMachine::Model
 
-  # Include default devise modules. Others available are:
+  # Include devise modules. Others available are:
   # :lockable, :timeoutable, :recoverable,
   devise :database_authenticatable, :confirmable,
          :rememberable, :trackable, :validatable,
@@ -25,6 +25,7 @@ class User < ApplicationRecord
   # TODO: this state machine
   state_machine :kyc_status do
     state :not_started, initial: true
+    state :exempted
   end
 
   def self.from_omniauth(auth, current_user = nil)
@@ -66,6 +67,11 @@ class User < ApplicationRecord
   #   end
   # end
 
+  def kyc_url
+    # TODO: fill this out
+    '#'
+  end
+
   def providers
     authorizations.map(&:provider)
   end
@@ -84,7 +90,6 @@ class User < ApplicationRecord
       secret: data['credentials']['secret'],
       refresh_token: data['credentials']['refresh_token'],
       expires_at:,
-
       email: data['info']['email'].downcase,
       profile_url: data['info']['image']
     }
