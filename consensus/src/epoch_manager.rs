@@ -186,6 +186,7 @@ impl EpochManager {
             ConsensusProposerType::LeaderReputation(heuristic_config) => {
                 let backend = Box::new(AptosDBBackend::new(
                     proposers.len(),
+                    onchain_config.leader_reputation_exclude_round() + 10,
                     self.storage.aptos_db(),
                 ));
                 let heuristic = Box::new(ActiveInactiveHeuristic::new(

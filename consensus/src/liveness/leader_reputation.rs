@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters::{COMMITTED_PROPOSALS_IN_WINDOW, COMMITTED_VOTES_IN_WINDOW},
+    counters::{
+        COMMITTED_PROPOSALS_IN_WINDOW, COMMITTED_VOTES_IN_WINDOW, LEADER_REPUTATION_WINDOW_SIZE,
+    },
     liveness::proposer_election::{next, ProposerElection},
 };
 use aptos_crypto::HashValue;
@@ -29,14 +31,16 @@ pub trait MetadataBackend: Send + Sync {
 
 pub struct AptosDBBackend {
     window_size: usize,
+    seek_len: u64,
     aptos_db: Arc<dyn DbReader>,
     window: Mutex<Vec<(u64, NewBlockEvent)>>,
 }
 
 impl AptosDBBackend {
-    pub fn new(window_size: usize, aptos_db: Arc<dyn DbReader>) -> Self {
+    pub fn new(window_size: usize, seek_len: u64, aptos_db: Arc<dyn DbReader>) -> Self {
         Self {
             window_size,
+            seek_len,
             aptos_db,
             window: Mutex::new(vec![]),
         }
@@ -44,12 +48,11 @@ impl AptosDBBackend {
 
     fn refresh_window(&self, target_round: Round) -> anyhow::Result<()> {
         // assumes target round is not too far from latest commit
-        let buffer = 10;
         let events = self.aptos_db.get_events(
             &new_block_event_key(),
             u64::max_value(),
             Order::Descending,
-            self.window_size as u64 + buffer,
+            self.window_size as u64 + self.seek_len,
         )?;
         let mut result = vec![];
         for (v, e) in events {
@@ -139,6 +142,7 @@ impl ReputationHeuristic for ActiveInactiveHeuristic {
 
         COMMITTED_PROPOSALS_IN_WINDOW.set(committed_proposals as i64);
         COMMITTED_VOTES_IN_WINDOW.set(committed_votes as i64);
+        LEADER_REPUTATION_WINDOW_SIZE.set(history.len() as i64);
 
         candidates
             .iter()

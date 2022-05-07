@@ -98,6 +98,15 @@ pub static COMMITTED_VOTES_IN_WINDOW: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+/// The number of block events the LeaderReputation uses
+pub static LEADER_REPUTATION_WINDOW_SIZE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_leader_reputation_window_size",
+        "Total number of new block events in the current reputation window"
+    )
+    .unwrap()
+});
+
 //////////////////////
 // RoundState COUNTERS
 //////////////////////
