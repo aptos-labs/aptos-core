@@ -27,22 +27,24 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use fail::fail_point;
-use move_binary_format::{
-    errors::{Location, VMResult},
-    CompiledModule,
+use move_deps::{
+    move_binary_format::{
+        errors::{Location, VMResult},
+        CompiledModule,
+    },
+    move_core_types::{
+        account_address::AccountAddress,
+        effects::{ChangeSet as MoveChangeSet, Event as MoveEvent},
+        gas_schedule::{CostTable, GasAlgebra, GasCarrier, GasUnits, InternalGasUnits},
+        language_storage::ModuleId,
+        move_resource::MoveStructType,
+        resolver::ResourceResolver,
+        value::{serialize_values, MoveValue},
+    },
+    move_table_extension::TableChangeSet,
+    move_vm_runtime::{logging::expect_no_verification_errors, session::Session},
+    move_vm_types::gas_schedule::{calculate_intrinsic_gas, GasStatus},
 };
-use move_core_types::{
-    account_address::AccountAddress,
-    effects::{ChangeSet as MoveChangeSet, Event as MoveEvent},
-    gas_schedule::{CostTable, GasAlgebra, GasCarrier, GasUnits, InternalGasUnits},
-    language_storage::ModuleId,
-    move_resource::MoveStructType,
-    resolver::ResourceResolver,
-    value::{serialize_values, MoveValue},
-};
-use move_table_extension::TableChangeSet;
-use move_vm_runtime::{logging::expect_no_verification_errors, session::Session};
-use move_vm_types::gas_schedule::{calculate_intrinsic_gas, GasStatus};
 use std::{convert::TryFrom, sync::Arc};
 
 #[derive(Clone)]

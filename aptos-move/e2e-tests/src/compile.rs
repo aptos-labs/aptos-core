@@ -3,10 +3,10 @@
 
 //! Support for compiling scripts and modules in tests.
 
-use move_ir_compiler::Compiler;
+use move_deps::move_ir_compiler::Compiler;
 
 use aptos_types::transaction::{Module, Script};
-use move_binary_format::CompiledModule;
+use move_deps::move_binary_format::CompiledModule;
 
 /// Compile the provided Move code into a blob which can be used as the code to be published
 /// (a Module).

@@ -12,16 +12,18 @@ use aptos_types::{
     account_config,
     transaction::{SignedTransaction, TransactionPayload},
 };
-use move_bytecode_utils::module_cache::SyncModuleCache;
-use move_core_types::{
-    ident_str,
-    identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, ResourceKey, StructTag, TypeTag},
-    resolver::ModuleResolver,
-    transaction_argument::convert_txn_args,
-    value::{serialize_values, MoveValue},
+use move_deps::{
+    move_bytecode_utils::module_cache::SyncModuleCache,
+    move_core_types::{
+        ident_str,
+        identifier::{IdentStr, Identifier},
+        language_storage::{ModuleId, ResourceKey, StructTag, TypeTag},
+        resolver::ModuleResolver,
+        transaction_argument::convert_txn_args,
+        value::{serialize_values, MoveValue},
+    },
+    read_write_set_dynamic::{ConcretizedFormals, NormalizedReadWriteSetAnalysis},
 };
-use read_write_set_dynamic::{ConcretizedFormals, NormalizedReadWriteSetAnalysis};
 use std::ops::Deref;
 
 pub struct ReadWriteSetAnalysis<'a, R: ModuleResolver> {

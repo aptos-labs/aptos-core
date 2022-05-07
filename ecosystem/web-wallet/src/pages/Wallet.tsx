@@ -169,7 +169,7 @@ const Wallet = () => {
         }
         await submitTransaction({
           fromAddress: aptosAccount,
-          toAddress: toAddress,
+          toAddress,
           amount: transferAmount
         })
         setLastTransactionStatus(TransferResult.Success)

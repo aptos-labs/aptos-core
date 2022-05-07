@@ -3,14 +3,16 @@
 
 #![forbid(unsafe_code)]
 
-use move_command_line_common::files::{
-    extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION,
+use move_deps::{
+    move_command_line_common::files::{
+        extension_equals, find_filenames, MOVE_COMPILED_EXTENSION, MOVE_EXTENSION,
+    },
+    move_compiler::{
+        compiled_unit::{CompiledUnit, NamedCompiledModule},
+        shared::{NumberFormat, NumericalAddress},
+    },
+    move_package::compilation::compiled_package::CompiledPackage,
 };
-use move_compiler::{
-    compiled_unit::{CompiledUnit, NamedCompiledModule},
-    shared::{NumberFormat, NumericalAddress},
-};
-use move_package::compilation::compiled_package::CompiledPackage;
 use std::{collections::BTreeMap, path::PathBuf};
 use tempfile::tempdir;
 
@@ -77,7 +79,7 @@ pub(crate) fn named_addresses(pkg: &CompiledPackage) -> BTreeMap<String, Numeric
 }
 
 pub(crate) fn package(name: &str) -> CompiledPackage {
-    let build_config = move_package::BuildConfig {
+    let build_config = move_deps::move_package::BuildConfig {
         install_dir: Some(tempdir().unwrap().path().to_path_buf()),
         ..Default::default()
     };

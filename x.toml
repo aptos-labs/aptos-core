@@ -71,6 +71,9 @@ workspace-members = [
     "x",
     "x-core",
     "x-lint",
+
+    # Don't consider since it includes excluded move crates
+    "move-deps",
 ]
 
 [hakari.final-excludes]

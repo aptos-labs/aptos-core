@@ -18,7 +18,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, Version},
 };
-use move_binary_format::file_format::CompiledModule;
+use move_deps::move_binary_format::file_format::CompiledModule;
 
 // TODO(skedia) Clean up this interfact to remove account specific logic and move to state store
 // key-value interface with fine grained storage project

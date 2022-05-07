@@ -1,16 +1,18 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::errors::PartialVMResult;
-use move_core_types::{
-    gas_schedule::GasCost,
-    language_storage::{StructTag, TypeTag},
-};
-use move_vm_runtime::native_functions::NativeContext;
-use move_vm_types::{
-    loaded_data::runtime_types::Type,
-    natives::function::NativeResult,
-    values::{Struct, Value},
+use move_deps::{
+    move_binary_format::errors::PartialVMResult,
+    move_core_types::{
+        gas_schedule::GasCost,
+        language_storage::{StructTag, TypeTag},
+    },
+    move_vm_runtime::native_functions::NativeContext,
+    move_vm_types::{
+        loaded_data::runtime_types::Type,
+        natives::function::NativeResult,
+        values::{Struct, Value},
+    },
 };
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, fmt::Write};
@@ -62,8 +64,10 @@ fn type_of_internal(struct_tag: &StructTag) -> Result<SmallVec<[Value; 1]>, std:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use move_core_types::{account_address::AccountAddress, identifier::Identifier};
-    use move_vm_types::values::VMValueCast;
+    use move_deps::{
+        move_core_types::{account_address::AccountAddress, identifier::Identifier},
+        move_vm_types::values::VMValueCast,
+    };
 
     #[test]
     fn test_type_of_internal() {

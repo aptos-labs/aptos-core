@@ -2,14 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{ed25519, traits::*};
-use move_binary_format::errors::PartialVMResult;
-use move_vm_runtime::native_functions::NativeContext;
-use move_vm_types::{
-    gas_schedule::NativeCostIndex,
-    loaded_data::runtime_types::Type,
-    natives::function::{native_gas, NativeResult},
-    pop_arg,
-    values::Value,
+use move_deps::{
+    move_binary_format::errors::PartialVMResult,
+    move_vm_runtime::native_functions::NativeContext,
+    move_vm_types::{
+        gas_schedule::NativeCostIndex,
+        loaded_data::runtime_types::Type,
+        natives::function::{native_gas, NativeResult},
+        pop_arg,
+        values::Value,
+    },
 };
 use smallvec::smallvec;
 use std::{collections::VecDeque, convert::TryFrom};

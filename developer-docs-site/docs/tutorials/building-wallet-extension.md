@@ -8,6 +8,8 @@ import TabItem from '@theme/TabItem';
 
 # Building the Wallet Extension
 
+*Note: Wallet is very early in development and not secure or production ready*
+
 This tutorial goes through how to build the wallet extension and how to use it with your dApp 
 1. Install the wallet on Chrome
 2. Wallet functionality

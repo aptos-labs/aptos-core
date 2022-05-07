@@ -38,14 +38,8 @@ async function signTransaction (account, transaction, sendResponse) {
     const client = new AptosClient(DEVNET_NODE_URL)
     const address = account.address()
     const txn = await client.generateTransaction(address, transaction)
-    const message = await client.createSigningMessage(txn)
-    const signatureHex = account.signHexString(message.substring(2))
-    const transactionSignature = {
-      type: 'ed25519_signature',
-      public_key: account.pubKey().hex(),
-      signature: signatureHex.hex()
-    }
-    const response = await client.submitTransaction(account, { signature: transactionSignature, ...txn })
+    const signedTxn = await client.signTransaction(account, txn)
+    const response = await client.submitTransaction(account, signedTxn)
     sendResponse(response)
   } catch (error) {
     sendResponse({ error })

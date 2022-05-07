@@ -5,9 +5,11 @@ use crate::{
     move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
     natives::aptos_natives,
 };
-use move_binary_format::errors::VMResult;
-use move_table_extension::NativeTableContext;
-use move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions};
+use move_deps::{
+    move_binary_format::errors::VMResult,
+    move_table_extension::NativeTableContext,
+    move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions},
+};
 use std::ops::Deref;
 
 pub struct MoveVmExt {

@@ -97,6 +97,7 @@ function Login () {
                     variant="filled"
                     required
                     placeholder='Private key...'
+                    autoComplete="off"
                   />
                   <InputRightAddon>
                     <Button type='submit' variant="unstyled">

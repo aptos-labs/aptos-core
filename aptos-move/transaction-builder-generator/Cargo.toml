@@ -20,7 +20,7 @@ textwrap = "0.13.4"
 
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["address32"] }
+move-deps = { path = "../move-deps", features=["address32"] }
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection" }
 serde-generate = { git = "https://github.com/aptos-labs/serde-reflection" }
 

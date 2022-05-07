@@ -5,8 +5,10 @@ pub mod account;
 pub mod signature;
 pub mod type_info;
 
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
-use move_vm_runtime::native_functions::{NativeFunction, NativeFunctionTable};
+use move_deps::{
+    move_core_types::{account_address::AccountAddress, identifier::Identifier},
+    move_vm_runtime::native_functions::{NativeFunction, NativeFunctionTable},
+};
 
 pub mod cost {
     pub const APTOS_LIB_TYPE_OF: u64 = 10;

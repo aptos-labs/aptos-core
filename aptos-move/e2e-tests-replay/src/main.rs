@@ -6,10 +6,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use structopt::StructOpt;
 
 use aptos_types::on_chain_config::{Version, APTOS_MAX_KNOWN_VERSION};
-use move_compiler::shared::PackagePaths;
-use move_model::run_model_builder;
-use move_stackless_bytecode_interpreter::{
-    concrete::settings::InterpreterSettings, StacklessBytecodeInterpreter,
+use move_deps::{
+    move_compiler::shared::PackagePaths,
+    move_model::run_model_builder,
+    move_stackless_bytecode_interpreter::{
+        concrete::settings::InterpreterSettings, StacklessBytecodeInterpreter,
+    },
 };
 
 use aptos_e2e_tests_replay::{self, ReplayFlags};

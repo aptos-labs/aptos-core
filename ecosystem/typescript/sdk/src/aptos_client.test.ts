@@ -30,6 +30,13 @@ test("gets the Account resource", async () => {
   expect((accountResource.data as AnyObject)["self_address"]).toBe("0x1");
 });
 
+test("gets ledger info", async () => {
+  const client = new AptosClient(NODE_URL);
+  const ledgerInfo = await client.getLedgerInfo();
+  expect(ledgerInfo.chain_id).toBeGreaterThan(1);
+  expect(parseInt(ledgerInfo.ledger_version, 10)).toBeGreaterThan(0);
+});
+
 test("gets account modules", async () => {
   const client = new AptosClient(NODE_URL);
   const modules = await client.getAccountModules("0x1");
