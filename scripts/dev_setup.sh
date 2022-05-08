@@ -372,22 +372,6 @@ function install_tidy {
   fi
 }
 
-function install_gcc_powerpc_linux_gnu {
-  PACKAGE_MANAGER=$1
-  #Differently named packages for gcc-powerpc-linux-gnu
-  if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-    install_pkg gcc-powerpc-linux-gnu "$PACKAGE_MANAGER"
-  elif [[ "$PACKAGE_MANAGER" == "yum" ]] || [[ "$PACKAGE_MANAGER" == "dnf" ]]; then
-    install_pkg gcc-powerpc64-linux-gnu "$PACKAGE_MANAGER"
-  fi
-  #if [[ "$PACKAGE_MANAGER" == "pacman" ]]; then
-  #  install_pkg powerpc-linux-gnu-gcc "$PACKAGE_MANAGER"
-  #fi
-  #if [[ "$PACKAGE_MANAGER" == "apk" ]] || [[ "$PACKAGE_MANAGER" == "brew" ]]; then
-  #  TODO
-  #fi
-}
-
 function install_toolchain {
   version=$1
   FOUND=$(rustup show | grep -c "$version" || true )
@@ -664,7 +648,6 @@ Build tools (since -t or no option was provided):
   * pkg-config
   * libssl-dev
   * sccache
-  * if linux, gcc-powerpc-linux-gnu
   * NodeJS / NPM
 EOF
   fi
@@ -872,7 +855,6 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_pkg clang "$PACKAGE_MANAGER"
   install_pkg llvm "$PACKAGE_MANAGER"
 
-  install_gcc_powerpc_linux_gnu "$PACKAGE_MANAGER"
   install_openssl_dev "$PACKAGE_MANAGER"
   install_pkg_config "$PACKAGE_MANAGER"
 
