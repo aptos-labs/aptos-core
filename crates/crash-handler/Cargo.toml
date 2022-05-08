@@ -10,9 +10,9 @@ publish = false
 edition = "2018"
 
 [dependencies]
-backtrace = "0.3.56"
-toml = "0.5.8"
+backtrace = "0.3.58"
+toml = "0.5.9"
 
 aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
-serde = { version = "1.0.124", features = ["derive"] }
+aptos-workspace-hack = { path = "../aptos-workspace-hack" }
+serde = { version = "1.0.137", features = ["derive"] }

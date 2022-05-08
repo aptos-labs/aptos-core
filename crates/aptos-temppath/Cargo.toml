@@ -11,5 +11,5 @@ edition = "2018"
 
 [dependencies]
 hex = "0.4.3"
-aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
+aptos-workspace-hack = { path = "../aptos-workspace-hack" }
 rand = "0.8.3"

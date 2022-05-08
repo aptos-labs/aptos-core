@@ -10,10 +10,10 @@ publish = false
 edition = "2018"
 
 [dependencies]
-criterion = "0.3.4"
+criterion = "0.3.5"
 proptest = "1.0.0"
 criterion-cpu-time = "0.1.0"
-num_cpus = "1.13.0"
+num_cpus = "1.13.1"
 
 aptos-types = { path = "../../types", features = ["fuzzing"] }
 language-e2e-tests = { path = "../e2e-tests" }

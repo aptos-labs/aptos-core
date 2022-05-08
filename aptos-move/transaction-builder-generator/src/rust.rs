@@ -944,9 +944,9 @@ version = "{}"
 edition = "2018"
 
 [dependencies]
-once_cell = "1.4.0"
+once_cell = "1.10.0"
 serde = {{ version = "1.0", features = ["derive"] }}
-serde_bytes = "0.11"
+serde_bytes = "0.11.6"
 aptos-types = {{ path = "../aptos-types", version = "{}" }}
 "#,
             name, version, self.aptos_types_version,

@@ -15,4 +15,4 @@ aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 aptos-types = { path = "../../types"  }
 move-deps = { path = "../move-deps", features=["address32"] }
 
-anyhow = "1.0.52"
+anyhow = "1.0.57"

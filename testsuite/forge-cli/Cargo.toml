@@ -10,7 +10,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
-async-trait = "0.1.42"
+async-trait = "0.1.53"
 aptos-sdk = { path = "../../sdk" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client"}
 forge = { path = "../forge" }
@@ -18,7 +18,7 @@ structopt = "0.3.21"
 tokio = { version = "1.8.1", features = ["full"] }
 testcases = { path = "../testcases" }
 url = "2.2.2"
-aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
+aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 cached-framework-packages = { path = "../../aptos-move/framework/cached-packages" }
 
 [[bin]]

@@ -18,7 +18,7 @@ data-streaming-service = { path = "../data-streaming-service" }
 aptos-config = { path = "../../../config" }
 aptos-data-client = { path = "../../aptos-data-client" }
 aptos-types = { path = "../../../types" }
-aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
+aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
 event-notifications = { path = "../../../state-sync/inter-component/event-notifications" }
 executor-types = { path = "../../../execution/executor-types" }
 mempool-notifications = { path = "../../../state-sync/inter-component/mempool-notifications" }

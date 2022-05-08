@@ -42,29 +42,30 @@ checksum = "f26201604c87b1e01bd3d98f8d5d9a8fcbb815e8cedb41ffccbeb4bf593a35fe"
 
 [[package]]
 name = "aead"
-version = "0.3.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fc95d1bdb8e6666b2b217308eeeb09f2d6728d104be3e31916cc74d15420331"
+checksum = "0b613b8e1e3cf911a086f53f03bf286f52fd7a7258e4fa606f0ef220d39d8877"
 dependencies = [
  "generic-array 0.14.5",
 ]
 
 [[package]]
 name = "aes"
-version = "0.6.0"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "884391ef1066acaa41e766ba8f596341b96e93ce34f9a43e7d24bf0a0eaf0561"
+checksum = "9e8b47f52ea9bae42228d07ec09eb676433d7c4ed1ebdf0f1d1c29ed446f1ab8"
 dependencies = [
- "aes-soft",
- "aesni",
+ "cfg-if 1.0.0",
  "cipher",
+ "cpufeatures",
+ "opaque-debug 0.3.0",
 ]
 
 [[package]]
 name = "aes-gcm"
-version = "0.8.0"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5278b5fabbb9bd46e24aa69b2fdea62c99088e0a950a9be40e3e0101298f88da"
+checksum = "df5f85a83a7d8b0442b6aa7b504b8212c1733da07b98aae43d4bc21b2cb3cdf6"
 dependencies = [
  "aead",
  "aes",
@@ -72,26 +73,6 @@ dependencies = [
  "ctr",
  "ghash",
  "subtle",
-]
-
-[[package]]
-name = "aes-soft"
-version = "0.6.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be14c7498ea50828a38d0e24a765ed2effe92a705885b57d029cd67d45744072"
-dependencies = [
- "cipher",
- "opaque-debug 0.3.0",
-]
-
-[[package]]
-name = "aesni"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea2e11f5e94c2f7d386164cc2aa1f97823fed6f259e486940a71c174dd01b0ce"
-dependencies = [
- "cipher",
- "opaque-debug 0.3.0",
 ]
 
 [[package]]
@@ -227,7 +208,7 @@ dependencies = [
  "cached-framework-packages",
  "executor",
  "executor-types",
- "fail",
+ "fail 0.5.0",
  "futures",
  "goldenfile",
  "hex",
@@ -455,7 +436,7 @@ dependencies = [
  "rusty-fork",
  "safety-rules",
  "scratchpad",
- "sha-1 0.9.8",
+ "sha-1 0.10.0",
  "state-sync-v1",
  "stats_alloc",
  "storage-interface",
@@ -651,7 +632,7 @@ dependencies = [
  "channel",
  "enum_dispatch",
  "event-notifications",
- "fail",
+ "fail 0.5.0",
  "futures",
  "itertools",
  "mempool-notifications",
@@ -732,7 +713,7 @@ dependencies = [
  "event-notifications",
  "executor",
  "executor-types",
- "fail",
+ "fail 0.5.0",
  "framework",
  "futures",
  "hex",
@@ -1122,7 +1103,7 @@ dependencies = [
  "aptos-types",
  "aptos-workspace-hack",
  "bcs",
- "fail",
+ "fail 0.5.0",
  "framework",
  "mirai-annotations",
  "move-deps",
@@ -1157,7 +1138,9 @@ dependencies = [
  "crossbeam-deque",
  "crossbeam-queue",
  "crossbeam-utils",
+ "crypto-common",
  "diesel",
+ "digest 0.10.3",
  "either",
  "futures-channel",
  "futures-core",
@@ -1186,10 +1169,11 @@ dependencies = [
  "rusty-fork",
  "serde 1.0.137",
  "serde_json",
- "sha-1 0.9.8",
+ "sha-1 0.10.0",
  "standback",
  "subtle",
  "syn 1.0.92",
+ "textwrap 0.15.0",
  "tokio",
  "tokio-util 0.6.9",
  "toml",
@@ -1846,9 +1830,9 @@ checksum = "fff857943da45f546682664a79488be82e69e43c1a7a2307679ab9afb3a66d2e"
 
 [[package]]
 name = "cipher"
-version = "0.2.5"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12f8e7987cbd042a63249497f41aed09f8e65add917ea6566effbc56578d6801"
+checksum = "7ee52072ec15386f770805afd189a01c8841be8696bed250fa2f13c4c0d6dfb7"
 dependencies = [
  "generic-array 0.14.5",
 ]
@@ -2033,7 +2017,7 @@ dependencies = [
  "executor",
  "executor-test-helpers",
  "executor-types",
- "fail",
+ "fail 0.5.0",
  "fallible",
  "futures",
  "itertools",
@@ -2185,12 +2169,6 @@ checksum = "59a6001667ab124aebae2a495118e11d30984c3a653e99d86d58971708cf5e4b"
 dependencies = [
  "libc",
 ]
-
-[[package]]
-name = "cpuid-bool"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcb25d077389e53838a8158c8e99174c5a9d902dee4904320db714f3c653ffba"
 
 [[package]]
 name = "crash-handler"
@@ -2427,9 +2405,9 @@ dependencies = [
 
 [[package]]
 name = "ctr"
-version = "0.6.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb4a30d54f7443bf3d6191dcd486aca19e67cb3c49fa7a06a319966346707e7f"
+checksum = "049bb91fb4aaf0e3c7efa6cd5ef877dbbbd15b39dad06d9948de4ec8a75761ea"
 dependencies = [
  "cipher",
 ]
@@ -2469,16 +2447,6 @@ dependencies = [
  "rand_core 0.6.3",
  "subtle",
  "zeroize",
-]
-
-[[package]]
-name = "dashmap"
-version = "4.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e77a43b28d0668df09411cb0bc9a8c2adc40f9a048afe863e05fd43251e8e39c"
-dependencies = [
- "cfg-if 1.0.0",
- "num_cpus",
 ]
 
 [[package]]
@@ -2609,7 +2577,7 @@ dependencies = [
  "diesel_derives",
  "num-bigint 0.2.6",
  "num-integer",
- "num-traits 0.2.15",
+ "num-traits 0.1.43",
  "pq-sys",
  "r2d2",
  "serde_json",
@@ -2942,7 +2910,7 @@ dependencies = [
  "consensus-types",
  "executor-test-helpers",
  "executor-types",
- "fail",
+ "fail 0.5.0",
  "itertools",
  "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=f2e7585b1ed5bd2810163d6bdebafe5a388881d3)",
  "move-ir-compiler",
@@ -3041,6 +3009,17 @@ dependencies = [
  "lazy_static 1.4.0",
  "log",
  "rand 0.7.3",
+]
+
+[[package]]
+name = "fail"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec3245a0ca564e7f3c797d20d833a6870f57a728ac967d5225b3ffdef4465011"
+dependencies = [
+ "lazy_static 1.4.0",
+ "log",
+ "rand 0.8.4",
 ]
 
 [[package]]
@@ -3426,9 +3405,9 @@ dependencies = [
 
 [[package]]
 name = "ghash"
-version = "0.3.1"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97304e4cd182c3846f7575ced3890c53012ce534ad9114046b0a9e00bb30a375"
+checksum = "1583cc1656d7839fd3732b80cf4f38850336cdb9b8ded1cd399ca62958de3c99"
 dependencies = [
  "opaque-debug 0.3.0",
  "polyval",
@@ -3596,9 +3575,9 @@ checksum = "eabb4a44450da02c90444cf74558da904edde8fb4e9035a9a6a4e15445af0bd7"
 
 [[package]]
 name = "handlebars"
-version = "3.5.5"
+version = "4.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4498fc115fa7d34de968184e473529abb40eeb6be8bc5f7faba3d08c316cb3e3"
+checksum = "99d6a30320f094710245150395bc763ad23128d6a1ebbad7594dc4164b62c56b"
 dependencies = [
  "log",
  "pest",
@@ -3996,7 +3975,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ab388864246d58a276e60e7569a833d9cc4cd75c66e5ca77c177dad38e59996"
 dependencies = [
  "ahash",
- "dashmap 5.2.0",
+ "dashmap",
  "hashbrown 0.12.1",
  "once_cell",
  "parking_lot 0.12.0",
@@ -5196,7 +5175,7 @@ version = "0.1.0"
 source = "git+https://github.com/move-language/move?rev=f2e7585b1ed5bd2810163d6bdebafe5a388881d3#f2e7585b1ed5bd2810163d6bdebafe5a388881d3"
 dependencies = [
  "better_any",
- "fail",
+ "fail 0.4.0",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=f2e7585b1ed5bd2810163d6bdebafe5a388881d3)",
@@ -5256,7 +5235,7 @@ dependencies = [
  "aptos-workspace-hack",
  "arc-swap",
  "crossbeam",
- "dashmap 4.0.2",
+ "dashmap",
  "proptest",
  "proptest-derive",
  "rayon",
@@ -6069,11 +6048,12 @@ dependencies = [
 
 [[package]]
 name = "polyval"
-version = "0.4.5"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eebcc4aa140b9abd2bc40d9c3f7ccec842679cd79045ac3a7ac698c1a064b7cd"
+checksum = "8419d2b623c7c0896ff2d5d96e2cb4ede590fed28fcc34934f4c33c036e620a1"
 dependencies = [
- "cpuid-bool",
+ "cfg-if 1.0.0",
+ "cpufeatures",
  "opaque-debug 0.3.0",
  "universal-hash",
 ]
@@ -6189,9 +6169,9 @@ dependencies = [
 
 [[package]]
 name = "prometheus"
-version = "0.12.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5986aa8d62380092d2f50f8b1cdba9cb9b6731ffd4b25b51fd126b6c3e05b99c"
+checksum = "b7f64969ffd5dd8f39bd57a68ac53c163a095ed9d0fb707146da1b27025a3504"
 dependencies = [
  "cfg-if 1.0.0",
  "fnv",
@@ -6811,6 +6791,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustversion"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2cc38e8fa666e2de3c4aba7edeb5ffc5246c1c2ed0e3d17e560aeeba736b23f"
+
+[[package]]
 name = "rusty-fork"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7185,23 +7171,25 @@ dependencies = [
 
 [[package]]
 name = "serial_test"
-version = "0.5.1"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0bccbcf40c8938196944a3da0e133e031a33f4d6b72db3bda3cc556e361905d"
+checksum = "e5bcc41d18f7a1d50525d080fd3e953be87c4f9f1a974f3c21798ca00d54ec15"
 dependencies = [
  "lazy_static 1.4.0",
- "parking_lot 0.11.2",
+ "parking_lot 0.10.2",
  "serial_test_derive",
 ]
 
 [[package]]
 name = "serial_test_derive"
-version = "0.5.1"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2acd6defeddb41eb60bb468f8825d0cfd0c2a76bc03bfd235b6a1dc4f6a1ad5"
+checksum = "2881bccd7d60fb32dfa3d7b3136385312f8ad75e2674aab2852867a09790cae8"
 dependencies = [
+ "proc-macro-error",
  "proc-macro2 1.0.38",
  "quote 1.0.18",
+ "rustversion",
  "syn 1.0.92",
 ]
 
@@ -7610,7 +7598,7 @@ dependencies = [
  "executor",
  "executor-test-helpers",
  "executor-types",
- "fail",
+ "fail 0.5.0",
  "futures",
  "itertools",
  "mempool-notifications",
@@ -7721,7 +7709,7 @@ dependencies = [
  "aptos-workspace-hack",
  "bcs",
  "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=f2e7585b1ed5bd2810163d6bdebafe5a388881d3)",
- "parking_lot 0.11.2",
+ "parking_lot 0.12.0",
  "scratchpad",
  "serde 1.0.137",
  "thiserror",
@@ -8065,6 +8053,11 @@ name = "textwrap"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1141d4d61095b28419e22cb0bbf02755f5e54e0526f97f1e3d1d160e60885fb"
+dependencies = [
+ "smawk",
+ "unicode-linebreak",
+ "unicode-width",
+]
 
 [[package]]
 name = "thiserror"
@@ -8453,7 +8446,7 @@ dependencies = [
  "serde_yaml",
  "structopt",
  "tempfile",
- "textwrap 0.13.4",
+ "textwrap 0.15.0",
  "which",
 ]
 
@@ -8548,7 +8541,7 @@ version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "static_assertions",
 ]
 
@@ -8645,6 +8638,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "099b7128301d285f79ddd55b9a83d5e6b9e97c92e0ea0daebee7263e932de992"
 
 [[package]]
+name = "unicode-linebreak"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a52dcaab0c48d931f7cc8ef826fa51690a08e1ea55117ef26f89864f532383f"
+dependencies = [
+ "regex",
+]
+
+[[package]]
 name = "unicode-normalization"
 version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8736,9 +8738,9 @@ checksum = "936e4b492acfd135421d8dca4b1aa80a7bfc26e702ef3af710e0752684df5372"
 
 [[package]]
 name = "uuid"
-version = "0.8.2"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
+checksum = "8cfcd319456c4d6ea10087ed423473267e1a071f3bc0aa89f80d60997843c6f0"
 dependencies = [
  "getrandom 0.2.6",
  "serde 1.0.137",
@@ -8822,7 +8824,7 @@ dependencies = [
  "aptosdb",
  "executor",
  "executor-test-helpers",
- "fail",
+ "fail 0.5.0",
  "move-core-types 0.0.4 (git+https://github.com/move-language/move?rev=f2e7585b1ed5bd2810163d6bdebafe5a388881d3)",
  "rand 0.8.4",
  "storage-interface",

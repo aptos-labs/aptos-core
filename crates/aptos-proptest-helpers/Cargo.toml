@@ -10,7 +10,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
-crossbeam = "0.8.0"
-aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
+crossbeam = "0.8.1"
+aptos-workspace-hack = { path = "../aptos-workspace-hack" }
 proptest = "1.0.0"
 proptest-derive = "0.3.0"

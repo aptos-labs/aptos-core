@@ -11,20 +11,20 @@ edition = "2018"
 
 # common dependencies
 [dependencies]
-anyhow = "1.0.52"
+anyhow = "1.0.57"
 byteorder = { version = "1.4.3", default-features = false }
 hex = "0.4.3"
-once_cell = "1.7.2"
+once_cell = "1.10.0"
 proptest = { version = "1.0.0", default-features = false }
 proptest-derive = { version = "0.3.0", default-features = false }
 rusty-fork = { version = "0.3.0", default-features = false }
-sha-1 = { version = "0.9.4", default-features = false }
+sha-1 = { version = "0.10.0", default-features = false }
 structopt = "0.3.21"
 rand = "0.8.3"
 
-bcs = "0.1.2"
+bcs = "0.1.3"
 aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers" }
-aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
+aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 
 # List out modules with data structures being fuzzed here.
 accumulator = { path = "../../storage/accumulator", features = ["fuzzing"] }

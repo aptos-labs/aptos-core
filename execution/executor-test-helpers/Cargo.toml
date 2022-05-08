@@ -10,7 +10,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.52"
+anyhow = "1.0.57"
 rand = "0.8.3"
 
 executor = { path = "../executor" }
@@ -24,7 +24,7 @@ aptos-genesis-tool = {path = "../../config/management/genesis", features = ["tes
 aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptos-types = { path = "../../types", features = ["fuzzing"] }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
-aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
+aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 storage-interface = { path = "../../storage/storage-interface" }
 storage-service = { path = "../../storage/storage-service" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }

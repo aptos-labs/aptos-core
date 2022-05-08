@@ -10,23 +10,23 @@ publish = false
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.52"
+anyhow = "1.0.57"
 hex = "0.4.3"
 rand = "0.8.3"
-serde_yaml = "0.8.17"
+serde_yaml = "0.8.24"
 structopt = "0.3.21"
-thiserror = "1.0.24"
+thiserror = "1.0.31"
 tokio = { version = "1.8.1", features = ["full"] }
 url = "2.2.2"
 
-bcs = "0.1.2"
+bcs = "0.1.3"
 aptos-config = { path = ".." }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
+aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 
 [dev-dependencies]
 aptos-types = {path = "../../types", features = ["fuzzing"]}

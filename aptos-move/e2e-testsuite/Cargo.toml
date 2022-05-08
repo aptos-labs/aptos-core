@@ -29,7 +29,7 @@ aptos-types = { path = "../../types", features = ["fuzzing"] }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder"}
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-state-view = { path = "../../storage/state-view" }
-aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
+aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 
 [features]
 default = ["aptos-transaction-builder/fuzzing"]

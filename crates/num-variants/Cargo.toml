@@ -14,7 +14,7 @@ edition = "2018"
 proc-macro = true
 
 [dependencies]
-syn = "1.0.64"
-quote = "1.0.9"
-proc-macro2 = "1.0.24"
-aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
+syn = "1.0.92"
+quote = "1.0.18"
+proc-macro2 = "1.0.38"
+aptos-workspace-hack = { path = "../aptos-workspace-hack" }

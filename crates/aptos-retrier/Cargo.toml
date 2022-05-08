@@ -10,6 +10,6 @@ publish = false
 edition = "2018"
 
 [dependencies]
-aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
+aptos-workspace-hack = { path = "../aptos-workspace-hack" }
 tokio = { version = "1.8.1", features = ["time"] }
 aptos-logger = { path = "../../crates/aptos-logger"}

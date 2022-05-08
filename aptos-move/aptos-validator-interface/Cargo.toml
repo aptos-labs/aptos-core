@@ -10,7 +10,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.52"
+anyhow = "1.0.57"
 aptos-config = { path = "../../config" }
 aptos-types = { path = "../../types" }
 aptosdb = { path = "../../storage/aptosdb" }

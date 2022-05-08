@@ -10,21 +10,21 @@ publish = false
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.52"
+anyhow = "1.0.57"
 hex = "0.4.3"
-serde = { version = "1.0.124", features = ["rc"], default-features = false }
-serde_yaml = "0.8.17"
+serde = { version = "1.0.137", features = ["rc"], default-features = false }
+serde_yaml = "0.8.24"
 structopt = "0.3.21"
-thiserror = "1.0.24"
+thiserror = "1.0.31"
 
-bcs = "0.1.2"
+bcs = "0.1.3"
 aptos-config = { path = ".."}
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-global-constants = { path = "../global-constants"}
 aptos-secure-storage = { path = "../../secure/storage" }
 aptos-time-service = { path = "../../crates/aptos-time-service" }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
+aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 

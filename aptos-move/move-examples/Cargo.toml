@@ -20,4 +20,4 @@ move-unit-test = { git = "https://github.com/move-language/move", rev = "f2e7585
 
 [dev-dependencies]
 move-cli = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
-tempfile = "3.2.0"
+tempfile = "3.3.0"

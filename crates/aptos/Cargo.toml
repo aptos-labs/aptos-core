@@ -11,24 +11,24 @@ edition = "2018"
 build = "build.rs"
 
 [dependencies]
-anyhow = "1.0.52"
-async-trait = "0.1.42"
+anyhow = "1.0.57"
+async-trait = "0.1.53"
 base64 = "0.13.0"
 clap = "3.1.8"
 hex = "0.4.3"
 itertools = "0.10.3"
 rand = "0.8.3"
-reqwest = { version = "0.11.2", features = ["blocking", "json"] }
-serde = "1.0.124"
-serde_json = "1.0.64"
-serde_yaml = "0.8.17"
+reqwest = { version = "0.11.10", features = ["blocking", "json"] }
+serde = "1.0.137"
+serde_json = "1.0.81"
+serde_yaml = "0.8.24"
 shadow-rs = "0.11.0"
-thiserror = "1.0.24"
-tempfile = "3.2.0"
+thiserror = "1.0.31"
+tempfile = "3.3.0"
 tokio = { version = "1.8.1", features = ["full"] }
 tokio-util = { version = "0.6.4", features = ["compat"] }
 toml = "0.5.9"
-uuid = { version = "0.8.2", features = ["v4", "serde"] }
+uuid = { version = "1.0.0", features = ["v4", "serde"] }
 
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../aptos-crypto" }
@@ -43,9 +43,9 @@ aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
 aptos-sdk = { path = "../../sdk" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client"}
-aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
+aptos-workspace-hack = { path = "../aptos-workspace-hack" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
-bcs = "0.1.2"
+bcs = "0.1.3"
 executor = { path = "../../execution/executor" }
 short-hex-str = { path = "../short-hex-str" }
 cached-framework-packages =  { path = "../../aptos-move/framework/cached-packages" }

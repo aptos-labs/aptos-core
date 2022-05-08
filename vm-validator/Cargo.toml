@@ -10,12 +10,12 @@ publish = false
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.52"
-fail = "0.4.0"
+anyhow = "1.0.57"
+fail = "0.5.0"
 aptos-state-view = { path = "../storage/state-view" }
 aptos-types = { path = "../types" }
 aptos-vm = { path = "../aptos-move/aptos-vm" }
-aptos-workspace-hack = { version = "0.1", path = "../crates/aptos-workspace-hack" }
+aptos-workspace-hack = { path = "../crates/aptos-workspace-hack" }
 executor = { path = "../execution/executor" }
 storage-interface = { path = "../storage/storage-interface" }
 

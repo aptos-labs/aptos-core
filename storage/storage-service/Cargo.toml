@@ -10,9 +10,9 @@ publish = false
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.52"
+anyhow = "1.0.57"
 
-bcs = "0.1.2"
+bcs = "0.1.3"
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptosdb = { path = "../aptosdb" }
@@ -21,7 +21,7 @@ aptos-metrics = { path = "../../crates/aptos-metrics" }
 aptos-secure-net = { path = "../../secure/net" }
 storage-interface = { path = "../storage-interface" }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
+aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 rand = { version = "0.8.3", optional = true }
 storage-client = { path = "../storage-client", optional = true }
 

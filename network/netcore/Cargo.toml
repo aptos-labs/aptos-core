@@ -10,14 +10,14 @@ publish = false
 edition = "2018"
 
 [dependencies]
-bytes = "1.0.1"
+bytes = "1.1.0"
 futures = "0.3.12"
-pin-project = "1.0.5"
-serde = { version = "1.0.124", default-features = false }
+pin-project = "1.0.10"
+serde = { version = "1.0.137", default-features = false }
 tokio = { version = "1.8.1", features = ["full"] }
 tokio-util = { version = "0.6.4", features = ["compat"] }
-url = { version = "2.2.1" }
-aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
+url = { version = "2.2.2" }
+aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 aptos-types = { path = "../../types" }
 memsocket = { path = "../memsocket", optional = true }
 proxy = { path = "../../crates/proxy" }
