@@ -15,10 +15,12 @@ use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use move_core_types::{
     account_address::AccountAddress,
-    gas_schedule::{GasAlgebra, GasConstants, MAX_TRANSACTION_SIZE_IN_BYTES},
+    gas_schedule::{GasAlgebra, GasConstants},
 };
 use rand::SeedableRng;
 use storage_interface::DbReaderWriter;
+
+const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 262144;
 
 struct TestValidator {
     vm_validator: VMValidator,

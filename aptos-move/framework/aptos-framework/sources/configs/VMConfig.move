@@ -96,7 +96,7 @@ module AptosFramework::VMConfig {
             maximum_number_of_gas_units: 4000000,
             min_price_per_gas_unit,
             max_price_per_gas_unit: 10000,
-            max_transaction_size_in_bytes: 4096,
+            max_transaction_size_in_bytes: 262144,
             gas_unit_scaling_factor: 1000,
             default_account_size: 800,
         };

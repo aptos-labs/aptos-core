@@ -37,7 +37,7 @@ use move_deps::{
         value::{serialize_values, MoveValue},
     },
     move_vm_runtime::{logging::expect_no_verification_errors, session::Session},
-    move_vm_types::gas_schedule::{calculate_intrinsic_gas, GasStatus},
+    move_vm_types::gas_schedule::GasStatus,
 };
 use std::sync::Arc;
 
@@ -190,8 +190,18 @@ impl AptosVMImpl {
         // The submitted transactions max gas units needs to be at least enough to cover the
         // intrinsic cost of the transaction as calculated against the size of the
         // underlying `RawTransaction`
-        let min_txn_fee =
-            gas_constants.to_external_units(calculate_intrinsic_gas(raw_bytes_len, gas_constants));
+        let min_txn_fee = {
+            let min_transaction_fee = gas_constants.min_transaction_gas_units;
+
+            if raw_bytes_len.get() > gas_constants.large_transaction_cutoff.get() {
+                let excess = raw_bytes_len.sub(gas_constants.large_transaction_cutoff);
+                min_transaction_fee.add(gas_constants.intrinsic_gas_per_byte.mul(excess))
+            } else {
+                min_transaction_fee.unitary_cast()
+            }
+        };
+        let min_txn_fee = gas_constants.to_external_units(min_txn_fee);
+
         if txn_data.max_gas_amount().get() < min_txn_fee.get() {
             warn!(
                 *log_context,

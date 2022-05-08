@@ -20,13 +20,15 @@ use language_e2e_tests::{
 use move_deps::{
     move_binary_format::file_format::CompiledModule,
     move_core_types::{
-        gas_schedule::{GasAlgebra, GasConstants, MAX_TRANSACTION_SIZE_IN_BYTES},
+        gas_schedule::{GasAlgebra, GasConstants},
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
         vm_status::StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER,
     },
     move_ir_compiler::Compiler,
 };
+
+pub const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 262144;
 
 #[test]
 fn verify_signature() {
