@@ -24,8 +24,6 @@ mod error;
 pub use error::*;
 mod execution_config;
 pub use execution_config::*;
-mod key_manager_config;
-pub use key_manager_config::*;
 mod logger_config;
 pub use logger_config::*;
 mod mempool_config;
