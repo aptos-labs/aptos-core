@@ -64,17 +64,6 @@ async fn test_account_resources_response() {
 // Unstable due to framework changes
 #[ignore]
 #[tokio::test]
-async fn test_account_state_blob_response() {
-    let mut context = new_test_context(current_function_name!());
-    let address = "0xA550C18";
-
-    let resp = context.get(&account_blob(address)).await;
-    context.check_golden_output(resp);
-}
-
-// Unstable due to framework changes
-#[ignore]
-#[tokio::test]
 async fn test_account_modules() {
     let mut context = new_test_context(current_function_name!());
     let address = "0x1";
@@ -217,10 +206,6 @@ async fn test_get_core_account_data_not_found() {
 
 fn account_resources(address: &str) -> String {
     format!("/accounts/{}/resources", address)
-}
-
-fn account_blob(address: &str) -> String {
-    format!("/accounts/{}/blob", address)
 }
 
 fn account_resources_with_ledger_version(address: &str, ledger_version: i128) -> String {

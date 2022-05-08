@@ -15,6 +15,7 @@ use serde_json::{json, Value};
 use state::State;
 use std::time::Duration;
 use url::Url;
+
 pub mod error;
 pub mod faucet;
 pub use faucet::FaucetClient;
@@ -240,18 +241,6 @@ impl Client {
         let response = request.send().await?;
 
         self.json(response).await
-    }
-
-    pub async fn get_account_state_blob(
-        &self,
-        address: AccountAddress,
-    ) -> Result<Response<Vec<u8>>> {
-        let url = self.base_url.join(&format!("accounts/{}/blob", address))?;
-
-        let response = self.inner.get(url).send().await?;
-        let (response, state) = self.check_response(response).await?;
-        let blob = response.json().await?;
-        Ok(Response::new(blob, state))
     }
 
     pub async fn get_account_resources(

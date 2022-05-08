@@ -141,17 +141,12 @@ pub trait Value: Clone + CryptoHash + Serialize + DeserializeOwned + Send + Sync
 #[cfg(any(test, feature = "fuzzing"))]
 pub trait TestValue: Value + Arbitrary + std::fmt::Debug + Eq + PartialEq + 'static {}
 
-// This crate still depends on types for a few things, therefore we implement `Value` and
-// `TestValue` for `AccountStateBlob` here. Ideally the module that defines the specific value like
-// `AccountStateBlob` should import the `Value` trait and implement it there.
-impl Value for aptos_types::account_state_blob::AccountStateBlob {}
-
 impl Value for StateValue {}
 
 impl Value for StateKeyAndValue {}
 
 #[cfg(any(test, feature = "fuzzing"))]
-impl TestValue for aptos_types::account_state_blob::AccountStateBlob {}
+impl TestValue for StateValue {}
 
 /// Node batch that will be written into db atomically with other batches.
 pub type NodeBatch<V> = BTreeMap<NodeKey, Node<V>>;

@@ -5,12 +5,16 @@ use crate::{TransactionContext, TransactionStatus};
 use aptos_management::error::Error;
 use aptos_rest_client::Client;
 use aptos_types::{
-    account_address::AccountAddress, account_config, account_config::AccountResource,
-    account_state::AccountState, account_state_blob::AccountStateBlob, account_view::AccountView,
-    transaction::SignedTransaction, validator_config::ValidatorConfig,
+    account_address::AccountAddress,
+    account_config,
+    account_config::AccountResource,
+    on_chain_config::{access_path_for_config, OnChainConfig},
+    transaction::SignedTransaction,
+    validator_config::ValidatorConfig,
     validator_info::ValidatorInfo,
 };
-use std::convert::TryFrom;
+use move_deps::move_core_types::move_resource::MoveStructType;
+use serde::de::DeserializeOwned;
 
 /// A wrapper around JSON RPC for error handling
 pub struct RestClient {
@@ -36,28 +40,29 @@ impl RestClient {
         ))
     }
 
-    pub async fn account_state(&self, account: AccountAddress) -> Result<AccountState, Error> {
-        let result = self.client.get_account_state_blob(account).await;
-        let account_state_blob: AccountStateBlob = result
-            .map_err(|e| Error::RestReadError("account-state", e.to_string()))?
-            .inner()
-            .clone()
-            .into();
-
-        AccountState::try_from(&account_state_blob)
-            .map_err(|e| Error::RestReadError("account-state", e.to_string()))
+    pub async fn get_resource<T: DeserializeOwned>(
+        &self,
+        address: AccountAddress,
+        resource_type: &str,
+    ) -> Result<T, Error> {
+        Ok(self
+            .client
+            .get_resource(address, resource_type)
+            .await
+            .map_err(|e| Error::RestReadError("get_resource", e.to_string()))?
+            .into_inner())
     }
 
     pub async fn validator_config(
         &self,
         account: AccountAddress,
     ) -> Result<ValidatorConfig, Error> {
-        resource(
-            "validator-config-resource",
-            self.account_state(account)
-                .await?
-                .get_validator_config_resource(),
-        )
+        let access_path = ValidatorConfig::struct_tag().access_vector();
+        let resource_type = std::str::from_utf8(&access_path)
+            .map_err(|e| Error::UnableToParse("Unable to form resource type", e.to_string()))?;
+
+        let validator_config: ValidatorConfig = self.get_resource(account, resource_type).await?;
+        resource("validator-config-resource", Ok(Some(validator_config)))
     }
 
     /// This method returns all validator infos currently registered in the validator set of the
@@ -68,45 +73,44 @@ impl RestClient {
         account: Option<AccountAddress>,
     ) -> Result<Vec<ValidatorInfo>, Error> {
         let validator_set_account = account_config::validator_set_address();
-        let validator_set = self
-            .account_state(validator_set_account)
-            .await?
-            .get_validator_set();
+        let access_path =
+            access_path_for_config(aptos_types::on_chain_config::ValidatorSet::CONFIG_ID).path;
+        let resource_type = std::str::from_utf8(&access_path)
+            .map_err(|e| Error::RestReadError("Unable to form resource type", e.to_string()))?;
 
-        match validator_set {
-            Ok(Some(validator_set)) => {
-                let mut validator_infos = vec![];
-                for validator_info in validator_set.payload() {
-                    if let Some(account) = account {
-                        if validator_info.account_address() == &account {
-                            validator_infos.push(validator_info.clone());
-                        }
-                    } else {
-                        validator_infos.push(validator_info.clone());
-                    }
-                }
+        let validator_set: aptos_types::on_chain_config::ValidatorSet = self
+            .get_resource(validator_set_account, resource_type)
+            .await?;
 
-                if validator_infos.is_empty() {
-                    return Err(Error::UnexpectedError(
-                        "No validator sets were found!".to_string(),
-                    ));
+        let mut validator_infos = vec![];
+        for validator_info in validator_set.payload() {
+            if let Some(account) = account {
+                if validator_info.account_address() == &account {
+                    validator_infos.push(validator_info.clone());
                 }
-                Ok(validator_infos)
+            } else {
+                validator_infos.push(validator_info.clone());
             }
-            Ok(None) => Err(Error::RestReadError(
-                "validator-set",
-                "not present".to_string(),
-            )),
-            Err(e) => Err(Error::RestReadError("validator-set", e.to_string())),
         }
+
+        if validator_infos.is_empty() {
+            return Err(Error::UnexpectedError(
+                "No validator sets were found!".to_string(),
+            ));
+        }
+        Ok(validator_infos)
     }
 
     pub async fn account_resource(
         &self,
         account: AccountAddress,
     ) -> Result<AccountResource, Error> {
-        let account_state = self.account_state(account).await?;
-        resource("account-resource", account_state.get_account_resource())
+        let access_path = AccountResource::struct_tag().access_vector();
+        let resource_type = std::str::from_utf8(&access_path)
+            .map_err(|e| Error::UnableToParse("Unable to form resource type", e.to_string()))?;
+
+        let account_resource: AccountResource = self.get_resource(account, resource_type).await?;
+        resource("account-resource", Ok(Some(account_resource)))
     }
 
     pub async fn sequence_number(&self, account: AccountAddress) -> Result<u64, Error> {

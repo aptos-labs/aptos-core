@@ -2,30 +2,30 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
-use aptos_types::account_state_blob::AccountStateBlob;
+use aptos_types::state_store::state_value::StateValue;
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
 use itertools::zip_eq;
 use rand::{distributions::Standard, prelude::StdRng, seq::IteratorRandom, Rng, SeedableRng};
 use scratchpad::{test_utils::naive_smt::NaiveSmt, SparseMerkleTree};
 use std::collections::HashSet;
 
-type ProofReader = scratchpad::test_utils::proof_reader::ProofReader<AccountStateBlob>;
+type ProofReader = scratchpad::test_utils::proof_reader::ProofReader<StateValue>;
 
 struct Block {
-    smt: SparseMerkleTree<AccountStateBlob>,
-    updates: Vec<Vec<(HashValue, AccountStateBlob)>>,
+    smt: SparseMerkleTree<StateValue>,
+    updates: Vec<Vec<(HashValue, StateValue)>>,
     proof_reader: ProofReader,
 }
 
 impl Block {
-    fn updates(&self) -> Vec<Vec<(HashValue, &AccountStateBlob)>> {
+    fn updates(&self) -> Vec<Vec<(HashValue, &StateValue)>> {
         self.updates
             .iter()
             .map(|small_batch| small_batch.iter().map(|(k, v)| (*k, v)).collect())
             .collect()
     }
 
-    fn updates_flat_batch(&self) -> Vec<(HashValue, &AccountStateBlob)> {
+    fn updates_flat_batch(&self) -> Vec<(HashValue, &StateValue)> {
         self.updates().iter().flatten().cloned().collect()
     }
 }
@@ -50,7 +50,7 @@ impl Group {
                 b.iter_batched(
                     || small_batches.clone(),
                     // return the resulting smt so the cost of Dropping it is not counted
-                    |small_batches| -> SparseMerkleTree<AccountStateBlob> {
+                    |small_batches| -> SparseMerkleTree<StateValue> {
                         block
                             .smt
                             .serial_update(small_batches, &block.proof_reader)
@@ -64,7 +64,7 @@ impl Group {
                 b.iter_batched(
                     || one_large_batch.clone(),
                     // return the resulting smt so the cost of Dropping it is not counted
-                    |one_large_batch| -> SparseMerkleTree<AccountStateBlob> {
+                    |one_large_batch| -> SparseMerkleTree<StateValue> {
                         block
                             .smt
                             .batch_update(one_large_batch, &block.proof_reader)
@@ -174,17 +174,17 @@ impl Benches {
         rng: &mut StdRng,
         keys: &[HashValue],
         block_size: usize,
-    ) -> Vec<Vec<(HashValue, AccountStateBlob)>> {
+    ) -> Vec<Vec<(HashValue, StateValue)>> {
         std::iter::repeat_with(|| vec![Self::gen_update(rng, keys), Self::gen_update(rng, keys)])
             .take(block_size)
             .collect()
     }
 
-    fn gen_update(rng: &mut StdRng, keys: &[HashValue]) -> (HashValue, AccountStateBlob) {
+    fn gen_update(rng: &mut StdRng, keys: &[HashValue]) -> (HashValue, StateValue) {
         (*keys.iter().choose(rng).unwrap(), Self::gen_value(rng))
     }
 
-    fn gen_value(rng: &mut StdRng) -> AccountStateBlob {
+    fn gen_value(rng: &mut StdRng) -> StateValue {
         rng.sample_iter(&Standard)
             .take(100)
             .collect::<Vec<u8>>()
@@ -193,7 +193,7 @@ impl Benches {
 
     fn gen_proof_reader(
         naive_smt: &mut NaiveSmt,
-        updates: &[Vec<(HashValue, AccountStateBlob)>],
+        updates: &[Vec<(HashValue, StateValue)>],
     ) -> ProofReader {
         let proofs = updates
             .iter()

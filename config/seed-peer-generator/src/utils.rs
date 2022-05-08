@@ -3,16 +3,15 @@
 
 #![forbid(unsafe_code)]
 
-use std::convert::TryFrom;
-
 use anyhow::Error;
 use aptos_config::config::{Peer, PeerRole, PeerSet};
 use aptos_logger::prelude::*;
 use aptos_rest_client::Client;
 use aptos_types::{
-    account_config::aptos_root_address, account_state::AccountState,
-    account_state_blob::AccountStateBlob, account_view::AccountView,
-    network_address::NetworkAddress, on_chain_config::ValidatorSet, validator_info::ValidatorInfo,
+    account_config::aptos_root_address,
+    network_address::NetworkAddress,
+    on_chain_config::{access_path_for_config, OnChainConfig, ValidatorSet},
+    validator_info::ValidatorInfo,
     PeerId,
 };
 
@@ -39,14 +38,11 @@ pub(crate) fn to_fullnode_addresses(
 fn get_validator_set(client_endpoint: String) -> anyhow::Result<ValidatorSet> {
     let client = Client::new(url::Url::parse(&client_endpoint)?);
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let blob = rt.block_on(client.get_account_state_blob(aptos_root_address()))?;
-    let account_state_blob: AccountStateBlob = blob.inner().clone().into();
-    let account_state = AccountState::try_from(&account_state_blob)?;
-    if let Some(val) = account_state.get_validator_set()? {
-        Ok(val)
-    } else {
-        Err(Error::msg("No validator set"))
-    }
+    let validator_set_response = rt.block_on(client.get_resource::<ValidatorSet>(
+        aptos_root_address(),
+        std::str::from_utf8(&access_path_for_config(ValidatorSet::CONFIG_ID).path)?,
+    ))?;
+    Ok(validator_set_response.inner().clone())
 }
 
 // TODO: Merge with OnchainDiscovery

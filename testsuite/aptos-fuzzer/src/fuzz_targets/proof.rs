@@ -5,7 +5,6 @@ use crate::{corpus_from_strategy, fuzz_data_to_value, FuzzTargetImpl};
 use aptos_crypto::HashValue;
 use aptos_proptest_helpers::ValueGenerator;
 use aptos_types::{
-    account_state_blob::AccountStateBlob,
     ledger_info::LedgerInfo,
     proof::{
         EventProof, SparseMerkleProof, StateStoreValueProof, TestAccumulatorProof,
@@ -54,10 +53,10 @@ pub struct SparseMerkleProofFuzzer;
 
 #[derive(Debug, Arbitrary)]
 struct SparseMerkleProofFuzzerInput {
-    proof: SparseMerkleProof<AccountStateBlob>,
+    proof: SparseMerkleProof<StateValue>,
     expected_root_hash: HashValue,
     element_key: HashValue,
-    element_blob: Option<AccountStateBlob>,
+    element_blob: Option<StateValue>,
 }
 
 impl FuzzTargetImpl for SparseMerkleProofFuzzer {
@@ -148,8 +147,8 @@ struct AccountStateProofFuzzerInput {
     proof: StateStoreValueProof,
     ledger_info: LedgerInfo,
     state_version: Version,
-    account_address_hash: HashValue,
-    account_state_blob: Option<AccountStateBlob>,
+    state_key_hash: HashValue,
+    state_value: Option<StateValue>,
 }
 
 impl FuzzTargetImpl for AccountStateProofFuzzer {
@@ -166,8 +165,8 @@ impl FuzzTargetImpl for AccountStateProofFuzzer {
         let _res = input.proof.verify(
             &input.ledger_info,
             input.state_version,
-            input.account_address_hash,
-            input.account_state_blob.map(StateValue::from).as_ref(),
+            input.state_key_hash,
+            input.state_value.as_ref(),
         );
     }
 }

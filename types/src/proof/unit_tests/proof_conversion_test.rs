@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_state_blob::AccountStateBlob,
     proof::{
         definition::{
             EventProof, StateStoreValueProof, TransactionInfoListWithProof,
@@ -11,11 +10,12 @@ use crate::{
         AccumulatorConsistencyProof, SparseMerkleRangeProof, TestAccumulatorProof,
         TestAccumulatorRangeProof,
     },
+    state_store::state_value::StateValue,
 };
 use bcs::test_helpers::assert_canonical_encode_decode;
 use proptest::prelude::*;
 
-type SparseMerkleProof = crate::proof::SparseMerkleProof<AccountStateBlob>;
+type SparseMerkleProof = crate::proof::SparseMerkleProof<StateValue>;
 
 proptest! {
 

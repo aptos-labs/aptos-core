@@ -20,12 +20,12 @@ use aptos_types::{
 };
 
 use anyhow::Result;
-use aptos_types::{account_state_blob::AccountStateBlob, account_view::AccountView};
+use aptos_types::account_view::AccountView;
 use move_core_types::{
     identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
     value::MoveValue,
 };
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use warp::{filters::BoxedFilter, Filter, Rejection, Reply};
 
 // GET /accounts/<address>
@@ -35,16 +35,6 @@ pub fn get_account(context: Context) -> BoxedFilter<(impl Reply,)> {
         .and(context.filter())
         .and_then(handle_get_account)
         .with(metrics("get_account"))
-        .boxed()
-}
-
-// GET /accounts/<address>/blob
-pub fn get_account_state_blob(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("accounts" / AddressParam / "blob")
-        .and(warp::get())
-        .and(context.filter())
-        .and_then(handle_get_account_state_blob)
-        .with(metrics("get_account_state_blob"))
         .boxed()
 }
 
@@ -80,14 +70,6 @@ async fn handle_get_account(
 ) -> Result<impl Reply, Rejection> {
     fail_point("endpoint_get_account")?;
     Ok(Account::new(None, address, context)?.account()?)
-}
-
-async fn handle_get_account_state_blob(
-    address: AddressParam,
-    context: Context,
-) -> Result<impl Reply, Rejection> {
-    fail_point("endpoint_get_account_state_blob")?;
-    Ok(Account::new(None, address, context)?.account_state_blob()?)
 }
 
 async fn handle_get_account_resources(
@@ -150,15 +132,6 @@ impl Account {
             .into();
 
         Response::new(self.latest_ledger_info, &account)
-    }
-
-    pub fn account_state_blob(self) -> Result<impl Reply, Error> {
-        let state = self
-            .context
-            .get_account_state(self.address.into(), self.ledger_version)?
-            .ok_or_else(|| self.account_not_found())?;
-        let blob: Vec<u8> = AccountStateBlob::try_from(&state)?.into();
-        Response::new(self.latest_ledger_info, &blob)
     }
 
     pub fn resources(self) -> Result<impl Reply, Error> {

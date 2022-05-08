@@ -749,7 +749,7 @@ impl StateStoreValueProof {
     }
 
     /// Verifies that the state of an account at version `state_version` is correct using the
-    /// provided proof. If `account_state_blob` is present, we expect the account to exist,
+    /// provided proof. If `state_value` is present, we expect the account to exist,
     /// otherwise we expect the account to not exist.
     pub fn verify(
         &self,

@@ -7,7 +7,7 @@ use crate::{
     SparseMerkleTree,
 };
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
-use aptos_types::account_state_blob::AccountStateBlob;
+use aptos_types::state_store::state_value::StateValue;
 use proptest::{
     collection::{hash_set, vec},
     prelude::*,
@@ -15,7 +15,7 @@ use proptest::{
 };
 use std::{collections::VecDeque, sync::Arc};
 
-type TxnOutput = Vec<(HashValue, AccountStateBlob)>;
+type TxnOutput = Vec<(HashValue, StateValue)>;
 type BlockOutput = Vec<TxnOutput>;
 
 #[derive(Debug)]
@@ -69,7 +69,7 @@ pub fn arb_smt_correctness_case() -> impl Strategy<Value = Vec<Action>> {
 
 pub fn test_smt_correctness_impl(input: Vec<Action>) {
     let mut naive_q = VecDeque::new();
-    naive_q.push_back(NaiveSmt::new::<AccountStateBlob>(&[]));
+    naive_q.push_back(NaiveSmt::new::<StateValue>(&[]));
     let mut serial_q = VecDeque::new();
     serial_q.push_back(SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH));
     let mut updater_q = VecDeque::new();

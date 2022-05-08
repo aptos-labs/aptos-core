@@ -5,7 +5,6 @@ use crate::{
     access_path::Path,
     account_address::AccountAddress,
     account_config::{AccountResource, BalanceResource},
-    account_state_blob::AccountStateBlob,
     account_view::AccountView,
     state_store::{state_key::StateKey, state_value::StateValue},
 };
@@ -129,14 +128,6 @@ impl TryFrom<&StateValue> for AccountState {
             .ok_or_else(|| anyhow!("Empty state value passed"))?;
 
         AccountState::try_from(bytes).map_err(Into::into)
-    }
-}
-
-impl TryFrom<&AccountStateBlob> for AccountState {
-    type Error = Error;
-
-    fn try_from(account_state_blob: &AccountStateBlob) -> Result<Self> {
-        bcs::from_bytes(&account_state_blob.blob).map_err(Into::into)
     }
 }
 

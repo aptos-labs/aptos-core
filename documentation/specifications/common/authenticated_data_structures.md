@@ -286,9 +286,9 @@ The previous section described Merkle accumulator and sparse Merkle tree that fo
 
 ### Ledger State
 
-The ledger state represents the ground truth about the Aptos ecosystem, including the quantity of coins held by each user at a given version. Each validator must know the ledger state at the latest version in order to execute new transactions. Specifically, the ledger state is a map from `AccountAddress` to a binary blob `AccountStateBlob` that represents the state of an account.
+The ledger state represents the ground truth about the Aptos ecosystem, including the quantity of coins held by each user at a given version. Each validator must know the ledger state at the latest version in order to execute new transactions. Specifically, the ledger state is a map from `StateKey` to a `StateValue` that represents a resource associated with an account.
 
-Each `AccountAddress` is hashed to a 256-bit `HashValue`. Then each `(hash(address), account_state_blob)` tuple is inserted into a sparse Merkle tree as a key-value pair. Based on the properties of cryptographic hash functions, we can assume that the resulting sparse Merkle tree is balanced no matter how the addresses are generated. This sparse Merkle tree represents the entire ledger state and the root hash of this tree is the state root hash, which means the state root hash is the authenticator for any account state at the same version.
+Each `StateKey` is hashed to a 256-bit `HashValue`. Then each `(hash(state_key), state_value)` tuple is inserted into a sparse Merkle tree as a key-value pair. Based on the properties of cryptographic hash functions, we can assume that the resulting sparse Merkle tree is balanced no matter how the addresses are generated. This sparse Merkle tree represents the entire ledger state and the root hash of this tree is the state root hash, which means the state root hash is the authenticator for any resource at the same version.
 
 ```rust
 type LedgerState = SparseMerkleTree<AccountStateBlob>;
@@ -300,7 +300,7 @@ When the state tree is updated after the execution of a transaction and a new tr
 
 #### Accounts
 
-At the logical level, an account is a collection of Move resources and modules. At the physical level, an account is an ordered map of access paths to byte array values. TODO: link to definition of access path. When an account is stored in the ledger state, the ordered map is serialized using Binary Canonical Serialization (BCS) to create a binary blob `AccountStateBlob` that gets inserted into a sparse Merkle tree.
+At the logical level, an account is a collection of Move resources and modules. At the physical level, an account is an ordered map of state key to state values. TODO: link to definition of access path. When an account is stored in the ledger state, individual resource in the account is serialized using Binary Canonical Serialization (BCS) to create a `StateValue` that gets inserted into a sparse Merkle tree.
 
 ```rust
 type Path = Vec<u8>;
@@ -312,17 +312,22 @@ struct AccessPath {
 
 type AccountState = BTreeMap<Path, Vec<u8>>;
 
-struct AccountStateBlob {
-    blob: Vec<u8>,
+pub enum StateKey {
+  AccessPath(AccessPath),
+  TableItem {
+    handle: u128,
+    key: Vec<u8>,
+  },
+  // Only used for testing
+  Raw(Vec<u8>),
 }
 
-impl From<AccountState> for AccountStateBlob {
-    fn from(account_state: AccountState) -> Self {
-        Self {
-            blob: bcs::to_bytes(&account_state),
-        }
-    }
+pub struct StateValue {
+  pub maybe_bytes: Option<Vec<u8>>,
+  hash: HashValue,
 }
+
+
 ```
 
 ### Transaction and Transaction Output

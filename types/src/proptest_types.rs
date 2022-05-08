@@ -6,7 +6,6 @@ use crate::{
     account_address::{self, AccountAddress},
     account_config::{AccountResource, BalanceResource},
     account_state::AccountState,
-    account_state_blob::AccountStateBlob,
     block_info::{BlockInfo, Round},
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -670,22 +669,18 @@ impl BalanceResourceGen {
 }
 
 #[derive(Arbitrary, Debug)]
-pub struct AccountStateBlobGen {
+pub struct AccountStateGen {
     balance_resource_gen: BalanceResourceGen,
     account_resource_gen: AccountResourceGen,
 }
 
-impl AccountStateBlobGen {
-    pub fn materialize(
-        self,
-        account_index: Index,
-        universe: &AccountInfoUniverse,
-    ) -> AccountStateBlob {
+impl AccountStateGen {
+    pub fn materialize(self, account_index: Index, universe: &AccountInfoUniverse) -> AccountState {
         let account_resource = self
             .account_resource_gen
             .materialize(account_index, universe);
         let balance_resource = self.balance_resource_gen.materialize();
-        AccountStateBlob::try_from((&account_resource, &balance_resource)).unwrap()
+        AccountState::try_from((&account_resource, &balance_resource)).unwrap()
     }
 }
 
@@ -762,7 +757,7 @@ pub struct TransactionToCommitGen {
     /// State updates: account and the blob.
     /// N.B. the transaction sender and event owners must be updated to reflect information such as
     /// sequence numbers so that test data generated through this is more realistic and logical.
-    account_state_gens: Vec<(Index, AccountStateBlobGen)>,
+    account_state_gens: Vec<(Index, AccountStateGen)>,
     /// Write set
     write_set: WriteSet,
     /// Gas used.
@@ -784,7 +779,7 @@ impl TransactionToCommitGen {
             .collect();
         // Account states must be materialized last, to reflect the latest account and event
         // sequence numbers.
-        let account_states: HashMap<AccountAddress, AccountStateBlob> = self
+        let account_states: HashMap<AccountAddress, AccountState> = self
             .account_state_gens
             .into_iter()
             .map(|(index, blob_gen)| {
@@ -796,16 +791,13 @@ impl TransactionToCommitGen {
             .collect();
 
         let mut state_updates = HashMap::new();
-        for (account_address, blob) in account_states {
-            AccountState::try_from(&blob)
-                .unwrap()
-                .iter()
-                .for_each(|(key, value)| {
-                    state_updates.insert(
-                        StateKey::AccessPath(AccessPath::new(account_address, key.clone())),
-                        StateValue::from(value.clone()),
-                    );
-                });
+        for (account_address, account_state) in account_states {
+            account_state.iter().for_each(|(key, value)| {
+                state_updates.insert(
+                    StateKey::AccessPath(AccessPath::new(account_address, key.clone())),
+                    StateValue::from(value.clone()),
+                );
+            });
         }
 
         TransactionToCommit::new(
@@ -826,18 +818,18 @@ impl Arbitrary for TransactionToCommitGen {
         (
             (
                 any::<Index>(),
-                any::<AccountStateBlobGen>(),
+                any::<AccountStateGen>(),
                 any::<SignatureCheckedTransactionGen>(),
             ),
             vec(
                 (
                     any::<Index>(),
-                    any::<AccountStateBlobGen>(),
+                    any::<AccountStateGen>(),
                     any::<ContractEventGen>(),
                 ),
                 0..=2,
             ),
-            vec((any::<Index>(), any::<AccountStateBlobGen>()), 0..=1),
+            vec((any::<Index>(), any::<AccountStateGen>()), 0..=1),
             any::<WriteSet>(),
             any::<u64>(),
             any::<ExecutionStatus>(),

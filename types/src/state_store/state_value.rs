@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_state_blob::AccountStateBlob,
     ledger_info::LedgerInfo,
     proof::{SparseMerkleRangeProof, StateStoreValueProof},
     state_store::state_key::StateKey,
@@ -49,12 +48,6 @@ impl StateValue {
 
     pub fn empty() -> Self {
         StateValue::new(None)
-    }
-}
-
-impl From<AccountStateBlob> for StateValue {
-    fn from(account_state_blob: AccountStateBlob) -> Self {
-        StateValue::new(Some(account_state_blob.blob))
     }
 }
 

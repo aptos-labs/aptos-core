@@ -31,17 +31,16 @@ use aptos_operational_tool::{
     test_helper::OperationalTool,
 };
 use aptos_rest_client::Client as RestClient;
+use aptos_sdk::move_types::move_resource::MoveResource;
 use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::{from_identity_public_key, AccountAddress},
-    account_state::AccountState,
-    account_state_blob::AccountStateBlob,
-    account_view::AccountView,
     block_info::BlockInfo,
     ledger_info::LedgerInfo,
     network_address::NetworkAddress,
     transaction::authenticator::AuthenticationKey,
+    validator_config::ValidatorOperatorConfigResource,
     waypoint::Waypoint,
 };
 use forge::{LocalNode, LocalSwarm, Node, NodeExt, SwarmExt};
@@ -341,19 +340,7 @@ async fn test_set_operator_and_add_new_validator() {
         .import_private_key(OWNER_KEY, validator_key)
         .unwrap();
 
-    // Verify no validator operator
-    let account_state_data = client
-        .get_account_state_blob(validator_account)
-        .await
-        .unwrap();
-    let account_state_blob: AccountStateBlob = account_state_data.inner().clone().into();
-    let account_state = AccountState::try_from(&account_state_blob).unwrap();
-    let _val_config_resource = account_state
-        .get_validator_config_resource()
-        .unwrap()
-        .unwrap();
-    // assert!(val_config_resource.delegated_account.is_none());
-    // assert!(val_config_resource.validator_config.is_none());
+    // TODO: Add check to Verify no validator operator when this test is enabled
 
     // Set the validator operator
     let txn_ctx = op_tool
@@ -366,23 +353,6 @@ async fn test_set_operator_and_add_new_validator() {
     wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number)
         .await
         .unwrap();
-
-    // Verify the operator has been set correctly
-    let account_state_data = client
-        .get_account_state_blob(validator_account)
-        .await
-        .unwrap();
-    let account_state_blob: AccountStateBlob = account_state_data.inner().clone().into();
-    let account_state = AccountState::try_from(&account_state_blob).unwrap();
-    let _val_config_resource = account_state
-        .get_validator_config_resource()
-        .unwrap()
-        .unwrap();
-    // assert_eq!(
-    //     operator_account,
-    //     val_config_resource.delegated_account.unwrap()
-    // );
-    // assert!(val_config_resource.validator_config.is_none());
 
     // Overwrite the keys in storage to execute the command from the new operator's perspective
     storage.set(OPERATOR_ACCOUNT, operator_account).unwrap();
@@ -408,6 +378,8 @@ async fn test_set_operator_and_add_new_validator() {
     wait_for_account_sequence_number(&client, txn_ctx.address, txn_ctx.sequence_number)
         .await
         .unwrap();
+
+    // TODO: Add check to verify the operator has been set correctly when this test is enabled
 
     // Check the validator set size
     let validator_set_infos = op_tool.validator_set(None, Some(&backend)).await.unwrap();
@@ -1167,7 +1139,7 @@ async fn create_operator_with_file_writer(
     let client = validator.rest_client();
     // Verify the corresponding account doesn't exist on-chain
     client
-        .get_account_state_blob(operator_account)
+        .get_account_resources(operator_account)
         .await
         .unwrap_err();
 
@@ -1190,16 +1162,14 @@ async fn create_operator_with_file_writer(
     assert!(txn_ctx.execution_result.unwrap().success);
 
     // Verify the operator account now exists on-chain
-    let account_state_data = client
-        .get_account_state_blob(operator_account)
+    let val_config_resource_response = client
+        .get_resource::<ValidatorOperatorConfigResource>(
+            operator_account,
+            std::str::from_utf8(&ValidatorOperatorConfigResource::resource_path()).unwrap(),
+        )
         .await
         .unwrap();
-    let account_state_blob: AccountStateBlob = account_state_data.inner().clone().into();
-    let account_state = AccountState::try_from(&account_state_blob).unwrap();
-    let op_config_resource = account_state
-        .get_validator_operator_config_resource()
-        .unwrap()
-        .unwrap();
+    let op_config_resource = val_config_resource_response.inner().clone();
     assert_eq!(op_human_name.as_bytes(), op_config_resource.human_name);
 }
 
@@ -1219,7 +1189,7 @@ async fn create_validator_with_file_writer(
     let client = validator.rest_client();
     // Verify the corresponding account doesn't exist on-chain
     client
-        .get_account_state_blob(validator_account)
+        .get_account_resources(validator_account)
         .await
         .unwrap_err();
 
@@ -1254,19 +1224,15 @@ async fn create_validator_with_file_writer(
     assert!(txn_ctx.execution_result.unwrap().success);
 
     // Verify the validator account now exists on-chain
-    let account_state_data = client
-        .get_account_state_blob(validator_account)
+    let val_config_resource_response = client
+        .get_resource::<aptos_types::validator_config::ValidatorConfig>(
+            validator_account,
+            std::str::from_utf8(&aptos_types::validator_config::ValidatorConfig::resource_path())
+                .unwrap(),
+        )
         .await
         .unwrap();
-    let account_state_blob: AccountStateBlob = account_state_data.inner().clone().into();
-    let account_state = AccountState::try_from(&account_state_blob).unwrap();
-    let _val_config_resource = account_state
-        .get_validator_config_resource()
-        .unwrap()
-        .unwrap();
-    // assert_eq!(val_human_name.as_bytes(), val_config_resource.human_name);
-    // assert!(val_config_resource.delegated_account.is_none());
-    // assert!(val_config_resource.validator_config.is_none());
+    let _val_config_resource = val_config_resource_response.inner().clone();
 }
 
 /// Launches a validator swarm of a specified size, connects an operational

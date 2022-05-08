@@ -19,7 +19,7 @@ pub struct StateSnapshotChunk {
     /// key of the last account in this chunk.
     pub last_key: HashValue,
     /// Repeated `len(record) + record` where `record` is BCS serialized tuple
-    /// `(key, account_state_blob)`
+    /// `(key, state_value)`
     pub blobs: FileHandle,
     /// BCS serialized `SparseMerkleRangeProof` that proves this chunk adds up to the root hash
     /// indicated in the backup (`StateSnapshotBackup::root_hash`).
