@@ -404,6 +404,12 @@ function install_cargo_guppy {
   fi
 }
 
+function install_cargo_sort {
+  if ! command -v cargo-sort &> /dev/null; then
+    cargo install cargo-sort
+  fi
+}
+
 function install_grcov {
   if ! command -v grcov &> /dev/null; then
     cargo install grcov --version="${GRCOV_VERSION}" --locked
@@ -865,6 +871,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   rustup component add clippy
 
   install_cargo_guppy
+  install_cargo_sort
   install_sccache
   install_grcov
   install_postgres

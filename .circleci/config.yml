@@ -39,6 +39,8 @@ jobs:
       - run: cargo x lint
       - run: cargo xclippy --workspace --all-targets
       - run: cargo xfmt --check
+      # TODO(joshlind): turn this on for all workspace dependencies! We only do one now as a proof of concept.
+      - run: cargo sort --grouped --check state-sync/aptos-data-client/
   e2e-test:
     executor: ubuntu-2xl
     steps:
@@ -344,6 +346,7 @@ commands:
       - run: sudo apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config --no-install-recommends --assume-yes
       - run: curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
       - run: cat $HOME/.cargo/env >> $BASH_ENV
+      - run: cargo install cargo-sort
   deploy-setup:
     steps:
       - kubernetes/install-kubectl:

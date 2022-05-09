@@ -28,15 +28,15 @@ aptos-types = { path = "../../types" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 network = { path = "../../network" }
 storage-service-client = { path = "../storage-service/client" }
-storage-service-types = { path = "../storage-service/types" }
 storage-service-server = { path = "../storage-service/server" }
+storage-service-types = { path = "../storage-service/types" }
 
 [dev-dependencies]
+bcs = "0.1.3"
 claim = "0.5.0"
 maplit = "1.0.2"
 tokio = { version = "1.8.1", features = ["rt", "macros"], default-features = false }
 
-bcs = "0.1.3"
-channel = { path = "../../crates/channel" }
 aptos-time-service = { path = "../../crates/aptos-time-service", features = ["async", "testing"] }
+channel = { path = "../../crates/channel" }
 network = { path = "../../network", features = ["fuzzing"] }
