@@ -1,0 +1,13 @@
+a,
+input,
+textarea {
+  display: block;
+}
+
+textarea {
+  border: 0;
+  min-height: 50vh;
+  outline: 0;
+  padding: 0;
+  width: 100%;
+}
