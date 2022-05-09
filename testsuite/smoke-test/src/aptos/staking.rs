@@ -31,18 +31,18 @@ impl AptosTest for Staking {
         )
         .unwrap();
         let txn_factory = ctx.aptos_transaction_factory();
-        let locked_period = 86400 * 2;
-        let current_time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-            + locked_period;
-        for account in &mut accounts {
-            let txn = account.sign_with_transaction_builder(txn_factory.payload(
-                aptos_stdlib::encode_stake_delegate_stake(validator_addr, 100, current_time),
-            ));
-            ctx.client().submit_and_wait(&txn).await?;
-        }
+        // let locked_period = 86400 * 2;
+        // let current_time = std::time::SystemTime::now()
+        //     .duration_since(std::time::UNIX_EPOCH)
+        //     .unwrap()
+        //     .as_secs()
+        //     + locked_period;
+        // for account in &mut accounts {
+        //     let txn = account.sign_with_transaction_builder(txn_factory.payload(
+        //         aptos_stdlib::encode_stake_delegate_stake(validator_addr, 100, current_time),
+        //     ));
+        //     ctx.client().submit_and_wait(&txn).await?;
+        // }
         let stake_pool = stake_pool_from_addr(ctx, validator_addr).await;
         assert_eq!(
             stake_pool["pending_active"].as_array().unwrap().len(),

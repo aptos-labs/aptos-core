@@ -98,7 +98,7 @@ module AptosFramework::Stake {
     }
 
     /// Any user can delegate a stake.
-    public(script) fun delegate_stake(account: &signer, to: address, amount: u64, locked_until_secs: u64) acquires StakePool, ValidatorSet {
+    public(friend) fun delegate_stake(account: &signer, to: address, amount: u64, locked_until_secs: u64) acquires StakePool, ValidatorSet {
         let coins = TestCoin::withdraw(account, amount);
         let current_time = Timestamp::now_seconds();
         assert!(current_time + MINIMUM_LOCK_PERIOD < locked_until_secs, Errors::invalid_argument(ELOCK_TIME_TOO_SHORT));
