@@ -1,0 +1,8 @@
+---
+consensus_key: "0xace014803ed1ddeff24bd0401be92cd96fdbecdf96b9321e730f2c895f87ccea"
+account_key: "0xd1156b92c11c9c164c11d335298a15db1bb271a841828f3ff4be575b852eeaa1"
+network_key: "0xb1f0c31d1c0da9bdbcf892de9b8ce8140a20a5437a9c2d7c5f88850f52d62a63"
+validator_host:
+  host: 127.0.0.1
+  port: 6180
+full_node_host: ~
