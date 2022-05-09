@@ -474,7 +474,7 @@ where
         Self::new_node_hashes_since_impl(
             self.smt.root_weak(),
             since_smt.smt.generation() + 1,
-            &mut NodePosition::with_capacity(256),
+            &mut NodePosition::with_capacity(HashValue::LENGTH_IN_BITS),
             &mut node_hashes,
         );
         node_hashes
