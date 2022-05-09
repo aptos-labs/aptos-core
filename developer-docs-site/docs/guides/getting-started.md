@@ -32,7 +32,7 @@ source ~/.cargo/env
 
 * Read the [Move book](https://diem.github.io/move/)
 * Learn more about [interacting with the Aptos Blockchain](/guides/interacting-with-the-aptos-blockchain)
-* Learn more about [Aptos Move](/guides/move)
+* Learn more about [Aptos Move](/tutorials/your-first-move-module)
 * Explore the [Framework documentation](https://github.com/aptos-labs/aptos-core/tree/framework-docs)
 * Start building and publishing your own modules on our public Devnet or on your own Testnet
 
