@@ -301,6 +301,22 @@ workflows:
           addl_tag: devnet
           requires:
             - docker-build-push
+  ### on testnet branch update ###
+  # Ensure the latest is built on the "testnet" branch, and mirror from ECR to Dockerhub
+  testnet-branch-cut:
+    when:
+      equal: [testnet, << pipeline.git.branch >>]
+    jobs:
+      - docker-build-push:
+          context: aws-dev
+          addl_tag: testnet
+      - ecr-dockerhub-mirror:
+          context:
+            - aws-dev
+            - docker-aptoslabsbots
+          addl_tag: testnet
+          requires:
+            - docker-build-push
   ### on continuous_push scheduled pipeline ###
   # Build the latest on "main" branch
   continuous-push:
