@@ -29,7 +29,6 @@ The rest of this document describes:
 
     ```
     git clone https://github.com/<YOUR-GITHUB-USERID>/aptos-core
-
     ```
 
 
