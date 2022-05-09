@@ -8,7 +8,7 @@ import { sleep } from "./util";
 import { AptosAccount } from "./aptos_account";
 import { Types } from "./types";
 import { Tables } from "./api/Tables";
-import { Address, AptosError, LedgerVersion, MoveModule } from "./api/data-contracts";
+import { AptosError } from "./api/data-contracts";
 
 export class RequestError extends Error {
   response?: AxiosResponse<any, Types.AptosError>;
