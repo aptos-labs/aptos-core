@@ -24,7 +24,7 @@ use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use async_trait::async_trait;
 use clap::Parser;
-use std::path::PathBuf;
+use std::{convert::TryInto, path::PathBuf};
 use storage_interface::DbReaderWriter;
 use vm_genesis::Validator;
 
@@ -106,7 +106,7 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
 
     let mut validators = Vec::new();
     for user in &layout.users {
-        validators.push(client.get::<ValidatorConfiguration>(user)?.into());
+        validators.push(client.get::<ValidatorConfiguration>(user)?.try_into()?);
     }
 
     let modules = client.get_modules("framework")?;

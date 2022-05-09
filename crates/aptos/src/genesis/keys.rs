@@ -11,6 +11,7 @@ use crate::{
     CliCommand,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, x25519, PrivateKey};
+use aptos_types::transaction::authenticator::AuthenticationKey;
 use async_trait::async_trait;
 use clap::Parser;
 use std::path::PathBuf;
@@ -83,10 +84,17 @@ impl CliCommand<()> for SetValidatorConfiguration {
         let network_key: x25519::PrivateKey =
             EncodingType::Hex.load_key(NETWORK_KEY_FILE, &network_key_path)?;
 
+        let account_key = account_key.public_key();
+        let consensus_key = consensus_key.public_key();
+        let network_key = network_key.public_key();
+        let auth_key = AuthenticationKey::ed25519(&account_key);
+        let account_address = auth_key.derived_address();
+
         let credentials = ValidatorConfiguration {
-            consensus_key: consensus_key.public_key(),
-            account_key: account_key.public_key(),
-            network_key: network_key.public_key(),
+            account_address,
+            consensus_key,
+            account_key,
+            network_key,
             validator_host: self.validator_host,
             full_node_host: self.full_node_host,
             stake_amount: self.stake_amount,

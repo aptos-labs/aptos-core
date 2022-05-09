@@ -12,6 +12,7 @@ use aptos_types::{
     network_address::{DnsName, NetworkAddress, Protocol},
     transaction::authenticator::AuthenticationKey,
 };
+use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::{
     convert::TryFrom,
@@ -52,6 +53,8 @@ impl Layout {
 ///
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ValidatorConfiguration {
+    /// Account address
+    pub account_address: AccountAddress,
     /// Key used for signing in consensus
     pub consensus_key: Ed25519PublicKey,
     /// Key used for signing transactions with the account
@@ -66,8 +69,10 @@ pub struct ValidatorConfiguration {
     pub stake_amount: u64,
 }
 
-impl From<ValidatorConfiguration> for Validator {
-    fn from(config: ValidatorConfiguration) -> Self {
+impl TryFrom<ValidatorConfiguration> for Validator {
+    type Error = CliError;
+
+    fn try_from(config: ValidatorConfiguration) -> Result<Self, CliError> {
         let auth_key = AuthenticationKey::ed25519(&config.account_key);
         let validator_addresses = vec![config
             .validator_host
@@ -81,8 +86,15 @@ impl From<ValidatorConfiguration> for Validator {
             vec![]
         };
 
-        Validator {
-            address: auth_key.derived_address(),
+        let derived_address = auth_key.derived_address();
+        if config.account_address != derived_address {
+            return Err(CliError::CommandArgumentError(format!(
+                "AccountAddress {} does not match account key derived one {}",
+                config.account_address, derived_address
+            )));
+        }
+        Ok(Validator {
+            address: derived_address,
             consensus_pubkey: config.consensus_key.to_bytes().to_vec(),
             operator_address: auth_key.derived_address(),
             network_address: bcs::to_bytes(&validator_addresses).unwrap(),
@@ -90,7 +102,7 @@ impl From<ValidatorConfiguration> for Validator {
             operator_auth_key: auth_key,
             auth_key,
             stake_amount: config.stake_amount,
-        }
+        })
     }
 }
 
