@@ -64,6 +64,8 @@ where
         }
         Ok(())
     }
+
+    fn finish_version(&self, _version: Version) {}
 }
 
 impl<V> MockTreeStore<V>

@@ -107,6 +107,8 @@ impl TreeWriter<StateKeyAndValue> for MockTreeWriter {
     fn write_node_batch(&self, _node_batch: &NodeBatch<StateKeyAndValue>) -> Result<()> {
         Ok(())
     }
+
+    fn finish_version(&self, _version: Version) {}
 }
 
 impl RestoreRunMode {
