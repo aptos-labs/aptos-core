@@ -65,3 +65,9 @@ variable "fullnode_region" {
   description = "Geographical region for the node location. All 25 regions can be obtained at https://api.vultr.com/v2/regions"
   default     = "fra"
 }
+
+
+variable "block_storage_class" {
+  description = "Either vultr-block-storage for high_perf/ssd, vultr-block-storage-hdd for storage_opt/hdd. high_perf is not available in all regions!"
+  default = "vultr-block-storage"
+}

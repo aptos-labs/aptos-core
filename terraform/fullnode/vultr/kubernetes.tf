@@ -1,5 +1,8 @@
 provider "kubernetes" {
-  config_path = local_file.kube_config.filename
+  host = yamldecode(base64decode(vultr_kubernetes.k8.kube_config)).clusters[0].cluster["server"]
+  cluster_ca_certificate = base64decode(yamldecode(base64decode(vultr_kubernetes.k8.kube_config)).clusters[0].cluster["certificate-authority-data"])
+  client_certificate = base64decode(yamldecode(base64decode(vultr_kubernetes.k8.kube_config)).users[0].user["client-certificate-data"])
+  client_key = base64decode(yamldecode(base64decode(vultr_kubernetes.k8.kube_config)).users[0].user["client-key-data"])
 }
 
 resource "kubernetes_namespace" "aptos" {
@@ -8,20 +11,12 @@ resource "kubernetes_namespace" "aptos" {
   }
 }
 
-resource "kubernetes_storage_class" "ssd" {
-  metadata {
-    name = "ssd"
-  }
-  storage_provisioner = "block.csi.vultr.com"
-  volume_binding_mode = "WaitForFirstConsumer"
-  parameters = {
-    block_type = "high_perf"
-  }
-}
-
 provider "helm" {
   kubernetes {
-    config_path = local_file.kube_config.filename
+    host = yamldecode(base64decode(vultr_kubernetes.k8.kube_config)).clusters[0].cluster["server"]
+    cluster_ca_certificate = base64decode(yamldecode(base64decode(vultr_kubernetes.k8.kube_config)).clusters[0].cluster["certificate-authority-data"])
+    client_certificate = base64decode(yamldecode(base64decode(vultr_kubernetes.k8.kube_config)).users[0].user["client-certificate-data"])
+    client_key = base64decode(yamldecode(base64decode(vultr_kubernetes.k8.kube_config)).users[0].user["client-key-data"])
   }
 }
 
@@ -46,7 +41,7 @@ resource "helm_release" "fullnode" {
         "vke.vultr.com/node-pool" = "aptos-fullnode"
       }
       storage = {
-        class = kubernetes_storage_class.ssd.metadata[0].name
+        class = var.block_storage_class
       }
       service = {
         type = "LoadBalancer"

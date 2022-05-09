@@ -9,8 +9,3 @@ resource "vultr_kubernetes" "k8" {
     label         = "aptos-fullnode"
   }
 }
-
-resource "local_file" "kube_config" {
-  content  = base64decode(vultr_kubernetes.k8.kube_config)
-  filename = "${path.module}/vultr_kube_config.yml"
-}
