@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Center, IconButton, SimpleGrid, useColorMode } from '@chakra-ui/react'
-import { IoIosPerson } from 'react-icons/io'
+import { IoIosPerson, IoMdImage } from 'react-icons/io'
 import { RiCopperCoinFill } from 'react-icons/ri'
 import React from 'react'
 import ChakraLink from './ChakraLink'
@@ -30,7 +30,7 @@ export default function WalletFooter () {
       py={2}
       bgColor={secondaryHeaderBgColor[colorMode]}
     >
-      <SimpleGrid width="100%" gap={4} columns={2}>
+      <SimpleGrid width="100%" gap={4} columns={3}>
         <Center width="100%">
           <ChakraLink to="/wallet">
             <IconButton
@@ -44,8 +44,7 @@ export default function WalletFooter () {
             />
           </ChakraLink>
         </Center>
-        {/* TODO: Will update after hackathon */}
-        {/* <Center width="100%">
+        <Center width="100%">
           <ChakraLink to="/gallery">
             <IconButton
               color={(pathname === '/gallery') ? 'blue.400' : secondaryIconColor[colorMode] }
@@ -57,7 +56,7 @@ export default function WalletFooter () {
               display="flex"
             />
           </ChakraLink>
-        </Center> */}
+        </Center>
         <Center width="100%">
           <ChakraLink to="/account">
             <IconButton

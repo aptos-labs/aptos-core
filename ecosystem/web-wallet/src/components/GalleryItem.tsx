@@ -6,12 +6,11 @@ import SquareBox from './SquareBox'
 import SquareImage from './SquareImage'
 
 interface GalleryItemProps {
-  title: string;
+  title?: string;
   imageSrc: string;
 }
 
 const GalleryItem = ({
-  title,
   imageSrc
 }: GalleryItemProps) => {
   return (

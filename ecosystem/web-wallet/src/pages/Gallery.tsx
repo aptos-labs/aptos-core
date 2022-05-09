@@ -1,188 +1,154 @@
-/* eslint-disable no-unused-vars */
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AddIcon } from '@chakra-ui/icons'
-import { Button, Flex, Grid, Heading, SimpleGrid, VStack } from '@chakra-ui/react'
-import { AptosClient, AptosAccount, type Types } from 'aptos'
-import { Item } from 'framer-motion/types/components/Reorder/Item'
+import {
+  Center,
+  Flex,
+  Grid,
+  Heading,
+  SimpleGrid,
+  Text,
+  useColorMode,
+  VStack
+} from '@chakra-ui/react'
+import { AptosClient, HexString } from 'aptos'
 import React from 'react'
+import CreateNFTModal from '../components/CreateNFTModal'
 import GalleryItem from '../components/GalleryItem'
 import withSimulatedExtensionContainer from '../components/WithSimulatedExtensionContainer'
-import { NODE_URL } from '../constants'
+import { NODE_URL, validStorageUris } from '../constants'
 import useWalletState from '../hooks/useWalletState'
 import WalletLayout from '../Layouts/WalletLayout'
+import axios from 'axios'
+import { MetadataJson } from '../types/TokenMetadata'
+import { useQuery } from 'react-query'
+import { AptosAccountState } from '../types'
+import SquareBox from '../components/SquareBox'
 
-window.Buffer = window.Buffer || require('buffer').Buffer
-
-// eslint-disable-next-line no-unused-vars
-const createToken = async (
-  account: AptosAccount,
-  collectionName: string,
-  name: string,
-  description: string,
-  supply: number,
-  uri: string): Promise<Types.HexEncodedBytes> => {
-  const payload: { function: string; arguments: any[]; type: string; type_arguments: any[] } = {
-    type: 'script_function_payload',
-    function: '0x1::Token::create_unlimited_token_script',
-    type_arguments: [],
-    arguments: [
-      Buffer.from(collectionName).toString('hex'),
-      Buffer.from(name).toString('hex'),
-      Buffer.from(description).toString('hex'),
-      true,
-      supply.toString(),
-      Buffer.from(uri).toString('hex')
-    ]
-  }
-  const aptosClient = new AptosClient(NODE_URL)
-  const txnRequest = await aptosClient.generateTransaction(account.address(), payload)
-  const signedTxn = await aptosClient.signTransaction(account, txnRequest)
-  const res = await aptosClient.submitTransaction(signedTxn)
-  await aptosClient.waitForTransaction(res.hash)
-  return Promise.resolve(res.hash)
+interface TokenAttributes {
+  name: string;
+  description?: string;
+  uri: string;
+  imageUri?: string;
+  supply?: number;
+  metadata?: MetadataJson
 }
 
-const createCollection = async (
-  account: AptosAccount,
-  name: string,
-  description: string,
-  uri: string
-): Promise<Types.HexEncodedBytes> => {
-  const payload: Types.TransactionPayload = {
-    type: 'script_function_payload',
-    function: '0x1::Token::create_unlimited_collection_script',
-    type_arguments: [],
-    arguments: [
-      Buffer.from(name).toString('hex'),
-      Buffer.from(description).toString('hex'),
-      Buffer.from(uri).toString('hex')
-    ]
-  }
-  const aptosClient = new AptosClient(NODE_URL)
-  const txnRequest = await aptosClient.generateTransaction(account.address(), payload)
-  const signedTxn = await aptosClient.signTransaction(account, txnRequest)
-  const res = await aptosClient.submitTransaction(signedTxn)
-  await aptosClient.waitForTransaction(res.hash)
-  return Promise.resolve(res.hash)
+type CollectionDict = Record<string, TokenAttributes[]>
+type StorageDict = Record<string, MetadataJson>
+
+interface GetGalleryItemsProps {
+  aptosAccount: AptosAccountState
 }
 
-const tableItem = async (handle: string, keyType: string, valueType: string, key: any): Promise<any> => {
-  const response = await fetch(`${NODE_URL}/tables/${handle}/item`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      key_type: keyType,
-      value_type: valueType,
-      key
+const secondaryBorderColor = {
+  light: 'gray.200',
+  dark: 'gray.600'
+}
+
+// this is a temporary workaround until we get the indexer working
+const getGalleryItems = async ({
+  aptosAccount
+}: GetGalleryItemsProps) => {
+  if (!aptosAccount) {
+    return undefined
+  }
+  const aptosClient = new AptosClient(NODE_URL)
+  const hexAddress = aptosAccount?.address().hex()
+  if (hexAddress) {
+    const collectionDict: CollectionDict = {}
+    const storageDict: StorageDict = {}
+    const accountTransactions = (await aptosClient.getAccountTransactions(hexAddress)).filter((txn) => (
+      !txn?.vm_status?.includes('Move abort')
+    ))
+    accountTransactions.forEach((transaction) => {
+      if ('payload' in transaction && 'function' in transaction.payload) {
+        if (transaction?.payload?.function === '0x1::Token::create_unlimited_collection_script') {
+          const collectionName = new HexString(transaction.payload.arguments[0]).toBuffer().toString()
+          collectionDict[collectionName] = []
+        }
+      }
     })
-  })
 
-  if (response.status === 404) {
-    return null
-  } else if (response.status !== 200) {
-    // assert(response.status === 200, await response.text())
-  } else {
-    return await response.json()
-  }
-}
+    const storageUris = await Promise.all(accountTransactions.map(async (accountTransaction) => {
+      if (
+        'payload' in accountTransaction &&
+        'function' in accountTransaction.payload &&
+        accountTransaction.payload.function === '0x1::Token::create_unlimited_token_script'
+      ) {
+        const uri = new HexString(accountTransaction.payload.arguments[5]).toBuffer().toString()
+        // check if uri is hosted on ipfs, arweave, or s3
+        if (validStorageUris.some(v => uri.includes(v))) {
+          // Will need to re-examine this type in the future
+          const fetchedUrl = axios.get<MetadataJson>(uri)
+          return fetchedUrl
+        }
+      }
+      return undefined
+    }))
 
-const getToken = async (
-  aptosAccount: AptosAccount,
-  aptosClient: AptosClient,
-  tokenKey: string,
-  collectionKey: string
-) => {
-  const accountResource = await aptosClient.getAccountResources(aptosAccount.address().hex())
-  let collections: Types.AccountResource | undefined
-  let tokens: Types.AccountResource | undefined
-  for (const item of accountResource) {
-    if (item.type === '0x1::Token::Collections') {
-      collections = item
-    } else if (item.type === '0x1::Token::TokenStore') {
-      tokens = item
+    storageUris.forEach((value) => {
+      if (value !== undefined && value.config.url?.toString()) {
+        storageDict[value.config.url.toString()] = value.data
+      }
+    })
+
+    for (const accountTransaction of accountTransactions) {
+      if (
+        'payload' in accountTransaction &&
+        'function' in accountTransaction.payload &&
+        accountTransaction.payload.function === '0x1::Token::create_unlimited_token_script'
+      ) {
+        const collectionName = new HexString(accountTransaction.payload.arguments[0]).toBuffer().toString()
+        const name = new HexString(accountTransaction.payload.arguments[1]).toBuffer().toString()
+        const uri = new HexString(accountTransaction.payload.arguments[5]).toBuffer().toString()
+        collectionDict[collectionName].push({
+          name,
+          uri,
+          metadata: storageDict[uri]
+        })
+      }
     }
+    const flatMap = Array.from(Object.values(collectionDict)).flat(1)
+    return flatMap
   }
-  if (tokens && collections) {
-    const tokensHandle = (tokens.data as Record<string, any>).tokens.handle
-    console.log(tokensHandle)
-    const collectionsHandle = (collections.data as Record<string, any>).collections.handle
-    console.log(collectionsHandle)
-
-    const tokenResult = await tableItem(
-      tokensHandle,
-      '0x1::ASCII::String',
-      '0x1::Token::Collection',
-      tokenKey
-    )
-  }
-  console.log(accountResource)
 }
 
 const Gallery = () => {
   const { aptosAccount } = useWalletState()
-  const newOnClick = async () => {
-    const aptosClient = new AptosClient(NODE_URL)
-    // const tokenClient = new TokenClient(aptosClient)
-    try {
-      if (aptosAccount) {
-        const collectionName = `${new Date().toDateString()}`
-        // const result = getToken(
-        //   aptosAccount,
-        //   aptosClient,
-        //   'USDC',
-        //   ''
-        // )
-        const collectionTxnHash = await createCollection(
-          aptosAccount,
-          collectionName,
-          'blank collection',
-          'https://hariri.dev/'
-        )
-        console.log(collectionTxnHash)
+  const { colorMode } = useColorMode()
+  const {
+    data: galleryItems
+  } = useQuery('gallery-items', () => getGalleryItems({ aptosAccount }))
 
-        const tokenTxnHash = await createToken(
-          aptosAccount,
-          collectionName,
-          'USDC',
-          'A USD equivalent',
-          100000,
-          'https://hariri.dev'
-        )
-
-        console.log(tokenTxnHash)
-        // TODO: temp fix: https://github.com/aptos-labs/aptos-core/pull/748/files#diff-a35123cdf0e1d8aa96b496b42612f8e0ed8f436b5a3cfc21244f5a3dc146f2f5R41
-        // await createToken(
-        //   aptosAccount,
-        //   'New collection',
-        //   'Token 1'
-        // )
-      }
-    } catch (err) {
-      console.log(err)
-    }
-  }
   return (
     <WalletLayout>
       <VStack width="100%" paddingTop={8} px={4}>
         <Grid pb={4} templateColumns="1fr 72px" width="100%">
           <Heading fontSize="xl" >Collectibles</Heading>
           <Flex justifyContent="right">
-            <Button size="xs" onClick={newOnClick} leftIcon={<AddIcon fontSize="xs"/>}>
-              New
-            </Button>
+            <CreateNFTModal />
           </Flex>
         </Grid>
         <SimpleGrid w="100%" columns={2} spacing={2}>
           {
-            [1, 2, 3, 4, 5, 6].map((item) => (
-              <GalleryItem
-                key={`${item}`}
-                title={`${item}`}
-                imageSrc="https://d15shllkswkct0.cloudfront.net/wp-content/blogs.dir/1/files/2021/07/phantom.jpg"
-              />
-            ))
+            (galleryItems && galleryItems.length > 0)
+              ? (
+                  galleryItems?.map((item, index) => (
+                    <GalleryItem
+                      key={`${item.name}-${index}`}
+                      title={item.name}
+                      imageSrc={item.metadata?.image || 'https://www.publicdomainpictures.net/pictures/280000/nahled/not-found-image-15383864787lu.jpg'}
+                    />
+                  ))
+                )
+              : (
+              <SquareBox borderWidth="1px" borderRadius=".5rem" borderColor={secondaryBorderColor[colorMode]}>
+                <Center height="100%" p={4}>
+                  <Text textAlign="center">No collectibles yet!</Text>
+                </Center>
+              </SquareBox>
+                )
           }
         </SimpleGrid>
       </VStack>

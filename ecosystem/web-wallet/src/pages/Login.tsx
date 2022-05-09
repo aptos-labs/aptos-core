@@ -49,7 +49,7 @@ function Login () {
       const encodedKey = Uint8Array.from(Buffer.from(nonHexKey, 'hex'))
       const account = new AptosAccount(encodedKey, undefined)
       const response = await getAccountResources({ address: account.address().hex() })
-      if (response?.status !== 200) {
+      if (!response) {
         setError('privateKey', { type: 'custom', message: 'Account not found' })
         return
       }
