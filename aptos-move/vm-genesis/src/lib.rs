@@ -241,7 +241,7 @@ fn create_and_initialize_validators(
         consensus_pubkeys.push(MoveValue::vector_u8(v.consensus_pubkey.clone()));
         validator_network_addresses.push(MoveValue::vector_u8(v.network_address.clone()));
         full_node_network_addresses.push(MoveValue::vector_u8(v.full_node_network_address.clone()));
-        staking_distribution.push(MoveValue::U64(1));
+        staking_distribution.push(MoveValue::U64(v.stake_amount));
     }
     exec_function(
         session,
@@ -365,6 +365,8 @@ pub struct Validator {
     pub network_address: Vec<u8>,
     /// `NetworkAddress` for the validator's full node
     pub full_node_network_address: Vec<u8>,
+    /// Amount to stake for consensus
+    pub stake_amount: u64,
 }
 
 pub struct TestValidator {
@@ -399,6 +401,7 @@ impl TestValidator {
             operator_auth_key,
             network_address,
             full_node_network_address,
+            stake_amount: 1,
         };
         Self { key, data }
     }

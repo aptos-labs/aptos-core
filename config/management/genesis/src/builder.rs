@@ -135,6 +135,7 @@ impl<S: KVStorage> GenesisBuilder<S> {
                 operator_auth_key,
                 network_address,
                 full_node_network_address,
+                stake_amount: 1,
             })
         }
         Ok(validators)

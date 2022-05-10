@@ -62,6 +62,8 @@ pub struct ValidatorConfiguration {
     pub validator_host: HostAndPort,
     /// Host for full node which can be an IP or a DNS name and is optional
     pub full_node_host: Option<HostAndPort>,
+    /// Stake amount for consensus
+    pub stake_amount: u64,
 }
 
 impl From<ValidatorConfiguration> for Validator {
@@ -87,6 +89,7 @@ impl From<ValidatorConfiguration> for Validator {
             full_node_network_address: bcs::to_bytes(&full_node_addresses).unwrap(),
             operator_auth_key: auth_key,
             auth_key,
+            stake_amount: config.stake_amount,
         }
     }
 }

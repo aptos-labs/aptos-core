@@ -61,6 +61,9 @@ pub struct SetValidatorConfiguration {
     /// Host and port pair for the fullnode e.g. 127.0.0.1:6180
     #[clap(long)]
     full_node_host: Option<HostAndPort>,
+    /// Stake amount for stake distribution
+    #[clap(long, default_value = "1")]
+    stake_amount: u64,
 }
 
 #[async_trait]
@@ -86,6 +89,7 @@ impl CliCommand<()> for SetValidatorConfiguration {
             network_key: network_key.public_key(),
             validator_host: self.validator_host,
             full_node_host: self.full_node_host,
+            stake_amount: self.stake_amount,
         };
 
         self.git_options
