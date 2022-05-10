@@ -172,6 +172,13 @@ spec:
       port: 6180
     - protocol: TCP
       port: 9101
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9101
   {{- if .Values.validator.exposeRestApi }}
   # REST API from HAproxy
     - protocol: TCP

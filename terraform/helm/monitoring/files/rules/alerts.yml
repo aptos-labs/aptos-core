@@ -95,53 +95,6 @@ groups:
       summary: "RocksDB read latency raised."
     annotations:
 
-  {{- if .Values.backup.enable }}
-  # DB Backup and Backup Verify
-  - alert: Backup Coordinator Liveness
-    # It's okay if one of these metrics stops changing but the pushgateway still reports the old value, since the alerts following this will detect the staleness. In fact this one is just to detect the absence of these metrics.
-    expr: absent(irate(aptos_backup_metadata_num_file_downloads[1m]) > 0) and on() (absent(aptos_db_backup_coordinator_heartbeat_timestamp_s) or absent(aptos_db_backup_coordinator_epoch_ending_epoch) or absent(aptos_db_backup_coordinator_transaction_version) or absent(aptos_db_backup_coordinator_state_snapshot_version))
-    for: 10m
-    labels:
-      severity: warning
-      summary: "Backup coordinator or one of its work streams is not heartbeating."
-    annotations:
-  - alert: Epoch Ending Backup Timeliness
-    expr: max(aptos_storage_next_block_epoch) by(owner) - on (owner) aptos_db_backup_coordinator_epoch_ending_epoch > 1 # "==1" when caught up.
-    for: 10m
-    labels:
-      severity: warning
-      summary: "Epoch ending backup is not keeping up."
-    annotations:
-  - alert: Transaction Backup Timeliness
-    expr: max(aptos_storage_latest_transaction_version) by(owner) - on (owner) aptos_db_backup_coordinator_transaction_version > {{ .Values.backup.config.transaction_batch_size }}  #  more than txn_backup_batch_size
-    for: 10m
-    labels:
-      severity: warning
-      summary: "Transaction backup is not keeping up."
-    annotations:
-  - alert: State Snapshot Backup Timeliness
-    expr: max(aptos_storage_latest_transaction_version) by(owner) - on (owner) aptos_db_backup_coordinator_state_snapshot_version > {{ .Values.backup.config.state_snapshot_interval }}  # more than state_snapshot_interval
-    for: 10m
-    labels:
-      severity: warning
-      summary: "State snapshot backup is not keeping up."
-    annotations:
-  - alert: Backup Verify Scheduling
-    expr: absent(time() - max_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s[1w]) < 86400)  # assuming the verifier schedule is per day
-    for: 10m
-    labels:
-      severity: warning
-      summary: "Backup Verify not started as scheduled."
-    annotations:
-  - alert: Backup Verify Success Timeliness
-    expr: absent(max_over_time(aptos_db_backup_verify_coordinator_succeed_timestamp_s[1w]) - max_over_time(aptos_db_backup_verify_coordinator_start_timestamp_s[1w]) > 0)
-    for: 20h  # assuming backup verify succeeds in 20 hours
-    labels:
-      severity: warning
-      summary: "Backup Verify didn't finish succeeded in time."
-    annotations:
-  {{- end }}
-
   # Logging alerts
   - alert: Logs Being Dropped
     expr: 1 < (rate(aptos_struct_log_queue_error[1m]) + rate(aptos_struct_log_send_error[1m]))
