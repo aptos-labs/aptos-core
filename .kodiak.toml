@@ -1,0 +1,9 @@
+# config file for kodiak merge queue: https://kodiakhq.com/ . This intended to replace https://github.com/bors-rs/bors mid-term, but for a limited period we can support both.
+
+# to enqueue a PR into the kodiakhq, simply label with with `automerge`.
+
+version = 1
+
+[merge]
+
+method = "squash"
