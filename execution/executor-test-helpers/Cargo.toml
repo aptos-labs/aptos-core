@@ -11,21 +11,21 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.57"
+move-core-types = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e", version = "0.0.4", features = ["address32"] }
 rand = "0.8.3"
 
-executor = { path = "../executor" }
-executor-types = { path = "../executor-types" }
-aptosdb = { path = "../../storage/aptosdb", features = ["fuzzing"] }
-aptos-state-view = { path = "../../storage/state-view" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e", version = "0.0.4", features=["address32"] }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
-aptos-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
+aptos-genesis-tool = { path = "../../config/management/genesis", features = ["testing"] }
+aptos-state-view = { path = "../../storage/state-view" }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
+aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types", features = ["fuzzing"] }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+aptosdb = { path = "../../storage/aptosdb", features = ["fuzzing"] }
+executor = { path = "../executor" }
+executor-types = { path = "../executor-types" }
 storage-interface = { path = "../../storage/storage-interface" }
 storage-service = { path = "../../storage/storage-service" }
-aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 vm-genesis = { path = "../../aptos-move/vm-genesis" }

@@ -11,39 +11,39 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.57"
+bcs = "0.1.3"
 fail = "0.5.0"
 itertools = { version = "0.10.0", default-features = false }
+move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["address32"] }
 once_cell = "1.10.0"
 serde = { version = "1.0.137", features = ["derive"] }
 
-consensus-types = { path = "../../consensus/consensus-types"}
-executor-types = { path = "../executor-types" }
-bcs = "0.1.3"
 aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-metrics = { path = "../../crates/aptos-metrics" }
-aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-secure-net = { path = "../../secure/net" }
 aptos-state-view = { path = "../../storage/state-view" }
 aptos-types = { path = "../../types" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["address32"] }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+consensus-types = { path = "../../consensus/consensus-types" }
+executor-types = { path = "../executor-types" }
 scratchpad = { path = "../../storage/scratchpad" }
 storage-interface = { path = "../../storage/storage-interface" }
 
 [dev-dependencies]
+move-ir-compiler = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
 proptest = "1.0.0"
 rand = "0.8.3"
 
-executor-test-helpers = { path = "../executor-test-helpers" }
 aptos-config = { path = "../../config" }
-aptos-genesis-tool = {path = "../../config/management/genesis", features = ["testing"] }
+aptos-genesis-tool = { path = "../../config/management/genesis", features = ["testing"] }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
-aptosdb = { path = "../../storage/aptosdb" }
-move-ir-compiler = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
-storage-interface = { path = "../../storage/storage-interface", features=["fuzzing"] }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
+aptosdb = { path = "../../storage/aptosdb" }
+executor-test-helpers = { path = "../executor-test-helpers" }
+storage-interface = { path = "../../storage/storage-interface", features = ["fuzzing"] }
 vm-genesis = { path = "../../aptos-move/vm-genesis" }
 
 [features]

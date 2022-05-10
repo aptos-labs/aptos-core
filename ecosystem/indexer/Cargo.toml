@@ -23,11 +23,10 @@ serde_json = "1.0.81"
 tokio = { version = "1.8.1", features = ["full", "time"] }
 url = "2.2.2"
 
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-metrics = { path = "../../crates/aptos-metrics" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
-
+aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 
 [[bin]]
 name = "aptos-indexer"

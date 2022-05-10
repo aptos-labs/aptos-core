@@ -17,8 +17,9 @@ serde = { version = "1.0.137", default-features = false }
 tokio = { version = "1.8.1", features = ["full"] }
 tokio-util = { version = "0.6.4", features = ["compat"] }
 url = { version = "2.2.2" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+
 aptos-types = { path = "../../types" }
+aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 memsocket = { path = "../memsocket", optional = true }
 proxy = { path = "../../crates/proxy" }
 

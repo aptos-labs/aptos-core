@@ -11,8 +11,9 @@ edition = "2018"
 
 [dependencies]
 futures = "0.3.12"
-aptos-workspace-hack = { path = "../aptos-workspace-hack" }
 tokio = { version = "1.8.1", features = ["sync"] }
+
+aptos-workspace-hack = { path = "../aptos-workspace-hack" }
 
 [dev-dependencies]
 tokio = { version = "1.8.1", features = ["full"] }

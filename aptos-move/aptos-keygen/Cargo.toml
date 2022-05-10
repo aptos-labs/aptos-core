@@ -10,8 +10,8 @@ publish = false
 edition = "2018"
 
 [dependencies]
-rand = "0.8.3"
 hex = "0.4.3"
+rand = "0.8.3"
 
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-types = { path = "../../types" }

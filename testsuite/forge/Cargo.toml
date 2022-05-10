@@ -34,15 +34,15 @@ termcolor = "1.1.2"
 tokio = { version = "1.8.1", features = ["full"] }
 url = "2.2.2"
 
-debug-interface = { path = "../../crates/debug-interface" }
 aptos-config = { path = "../../config" }
 aptos-genesis-tool = { path = "../../config/management/genesis" }
 aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-retrier = { path = "../../crates/aptos-retrier" }
 aptos-sdk = { path = "../../sdk" }
-aptos-rest-client = { path = "../../crates/aptos-rest-client"}
 aptos-secure-storage = { path = "../../secure/storage" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 cached-framework-packages = { path = "../../aptos-move/framework/cached-packages" }
+debug-interface = { path = "../../crates/debug-interface" }
 transaction-emitter = { path = "../../crates/transaction-emitter" }

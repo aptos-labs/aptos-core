@@ -10,6 +10,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
+bcs = "0.1.3"
 get_if_addrs = { version = "0.5.3", default-features = false }
 mirai-annotations = "1.12.0"
 rand = "0.8.3"
@@ -17,10 +18,9 @@ serde = { version = "1.0.137", features = ["rc"], default-features = false }
 serde_yaml = "0.8.24"
 thiserror = "1.0.31"
 
-bcs = "0.1.3"
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-crypto-derive = { path = "../crates/aptos-crypto-derive" }
-aptos-global-constants = { path = "./global-constants"}
+aptos-global-constants = { path = "./global-constants" }
 aptos-logger = { path = "../crates/aptos-logger" }
 aptos-secure-storage = { path = "../secure/storage" }
 aptos-temppath = { path = "../crates/aptos-temppath" }

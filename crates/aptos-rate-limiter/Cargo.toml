@@ -10,11 +10,12 @@ publish = false
 edition = "2018"
 
 [dependencies]
-aptos-infallible = { path= "../../crates/aptos-infallible" }
-aptos-workspace-hack = { path = "../aptos-workspace-hack" }
-aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-metrics = { path = "../../crates/aptos-metrics" }
 futures = "0.3.12"
 pin-project = "1.0.10"
 tokio = { version = "1.8.1", features = ["full"] }
 tokio-util = { version = "0.6.4", features = ["compat"] }
+
+aptos-infallible = { path = "../../crates/aptos-infallible" }
+aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-metrics = { path = "../../crates/aptos-metrics" }
+aptos-workspace-hack = { path = "../aptos-workspace-hack" }

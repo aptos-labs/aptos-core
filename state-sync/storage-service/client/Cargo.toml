@@ -13,9 +13,9 @@ edition = "2018"
 async-trait = "0.1.53"
 thiserror = "1.0.31"
 
-channel = { path = "../../../crates/channel" }
 aptos-config = { path = "../../../config" }
 aptos-types = { path = "../../../types" }
 aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
+channel = { path = "../../../crates/channel" }
 network = { path = "../../../network" }
 storage-service-types = { path = "../types" }

@@ -11,28 +11,29 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.57"
+bcs = "0.1.3"
 futures = "0.3.12"
+move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["address32"] }
 once_cell = "1.10.0"
 serde_yaml = "0.8.24"
 tokio = { version = "1.8.1", features = ["full"] }
 
-channel = {path = "../../crates/channel"}
-bcs = "0.1.3"
-event-notifications = { path = "../../state-sync/inter-component/event-notifications" }
-aptos-config = { path = "../../config"}
-aptos-crypto = {path = "../../crates/aptos-crypto"}
-aptos-logger = {path = "../../crates/aptos-logger"}
-aptos-metrics = {path = "../../crates/aptos-metrics"}
-aptos-time-service = {path = "../../crates/aptos-time-service"}
+aptos-config = { path = "../../config" }
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-logger = { path = "../../crates/aptos-logger" }
+aptos-metrics = { path = "../../crates/aptos-metrics" }
 aptos-secure-storage = { path = "../../secure/storage" }
-aptos-types = {path = "../../types"}
+aptos-time-service = { path = "../../crates/aptos-time-service" }
+aptos-types = { path = "../../types" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["address32"] }
-network = {path = "../../network"}
+channel = { path = "../../crates/channel" }
+event-notifications = { path = "../../state-sync/inter-component/event-notifications" }
+network = { path = "../../network" }
 short-hex-str = { path = "../../crates/short-hex-str" }
 
 [dev-dependencies]
-aptos-config = { path = "../../config", features = ["testing"]}
+rand = "0.8.3"
+
+aptos-config = { path = "../../config", features = ["testing"] }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
 netcore = { path = "../netcore", features = ["fuzzing"] }
-rand = "0.8.3"

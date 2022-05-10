@@ -23,4 +23,4 @@ aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
 [dev-dependencies]
 claim = "0.5.0"
 
-move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["address32"] }
+move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["address32"] }

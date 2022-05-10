@@ -14,15 +14,15 @@ anyhow = "1.0.57"
 bcs = "0.1.3"
 heck = "0.3.2"
 regex = "1.5.5"
+serde-generate = { git = "https://github.com/aptos-labs/serde-reflection" }
+serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection" }
 serde_yaml = "0.8.24"
 structopt = "0.3.21"
 textwrap = "0.15.0"
 
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
-move-deps = { path = "../move-deps", features=["address32"] }
-serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection" }
-serde-generate = { git = "https://github.com/aptos-labs/serde-reflection" }
+move-deps = { path = "../move-deps", features = ["address32"] }
 
 [dev-dependencies]
 tempfile = "3.3.0"

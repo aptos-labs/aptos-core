@@ -14,11 +14,10 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "=0.3.2"
-aptos-fuzzer = { path = ".." }
-aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
 once_cell = "1.10.0"
 
-# Prevent this from interfering with workspaces
+aptos-fuzzer = { path = ".." }
+aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
 
 [[bin]]
 name = "fuzz_runner"

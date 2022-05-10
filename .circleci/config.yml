@@ -39,8 +39,9 @@ jobs:
       - run: cargo x lint
       - run: cargo xclippy --workspace --all-targets
       - run: cargo xfmt --check
-      # TODO(joshlind): turn this on for all workspace dependencies! We only do one now as a proof of concept.
-      - run: cargo sort --grouped --check state-sync/aptos-data-client/
+      # Temporary workaround for unsorted hakari generated Cargo files (https://github.com/DevinR528/cargo-sort/issues/38).
+      - run: cargo sort --grouped crates/aptos-workspace-hack
+      - run: cargo sort --grouped --check --workspace
   e2e-test:
     executor: ubuntu-2xl
     steps:

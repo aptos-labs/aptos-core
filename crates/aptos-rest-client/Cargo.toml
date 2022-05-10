@@ -17,6 +17,7 @@ dpn = []
 anyhow = "1.0.57"
 bcs = "0.1.3"
 hex = "0.4.3"
+move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["address32"] }
 reqwest = { version = "0.11.10", features = ["json", "cookies"] }
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
@@ -28,4 +29,3 @@ aptos-crypto = { path = "../aptos-crypto" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { path = "../aptos-workspace-hack" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["address32"] }

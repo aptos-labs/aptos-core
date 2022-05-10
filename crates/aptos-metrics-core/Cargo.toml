@@ -10,5 +10,6 @@ publish = false
 edition = "2018"
 
 [dependencies]
-aptos-workspace-hack = { path = "../aptos-workspace-hack" }
 prometheus = { version = "0.13.0", default-features = false }
+
+aptos-workspace-hack = { path = "../aptos-workspace-hack" }

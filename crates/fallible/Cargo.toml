@@ -11,4 +11,5 @@ edition = "2018"
 
 [dependencies]
 thiserror = "1.0.31"
+
 aptos-workspace-hack = { path = "../aptos-workspace-hack" }

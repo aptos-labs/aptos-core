@@ -15,6 +15,7 @@ arc-swap = "1.5.0"
 bcs = "0.1.3"
 byteorder = "1.4.3"
 itertools = "0.10.0"
+move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["address32"] }
 num-derive = "0.3.3"
 num-traits = "0.2.15"
 once_cell = "1.10.0"
@@ -35,7 +36,6 @@ aptos-temppath = { path = "../../crates/aptos-temppath", optional = true }
 aptos-types = { path = "../../types" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 executor-types = { path = "../../execution/executor-types", optional = true }
-move-core-types = {git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["address32"]}
 num-variants = { path = "../../crates/num-variants" }
 schemadb = { path = "../schemadb" }
 scratchpad = { path = "../scratchpad", optional = true }

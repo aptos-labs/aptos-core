@@ -11,8 +11,8 @@ edition = "2018"
 
 [dependencies]
 backtrace = "0.3.58"
+serde = { version = "1.0.137", features = ["derive"] }
 toml = "0.5.9"
 
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-workspace-hack = { path = "../aptos-workspace-hack" }
-serde = { version = "1.0.137", features = ["derive"] }

@@ -8,25 +8,26 @@ publish = false
 license = "Apache-2.0"
 
 [dependencies]
+anyhow = "1.0.57"
 camino = "1.0.3"
+chrono = "0.4.19"
+colored-diff = "0.2.2"
 determinator = "0.8.0"
+env_logger = "0.8.3"
+globset = "0.4.6"
+guppy = { version = "0.13.0", features = ["summaries"] }
+hakari = "0.9.0"
+indexmap = "1.6.2"
+indoc = "1.0.3"
+log = "0.4.17"
+nextest-runner = "0.4.0"
+rayon = "1.5.2"
+regex = "1.5.5"
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
 structopt = "0.3.21"
-anyhow = "1.0.57"
-colored-diff = "0.2.2"
-guppy = { version = "0.13.0", features = ["summaries"] }
-hakari = "0.9.0"
-indoc = "1.0.3"
-toml = "0.5.9"
-env_logger = "0.8.3"
-log = "0.4.17"
-chrono = "0.4.19"
-globset = "0.4.6"
-regex = "1.5.5"
-rayon = "1.5.2"
-nextest-runner = "0.4.0"
-indexmap = "1.6.2"
 supports-color = "1.3.0"
+toml = "0.5.9"
+
 x-core = { path = "../x-core" }
 x-lint = { path = "../x-lint" }

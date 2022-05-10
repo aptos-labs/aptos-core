@@ -11,4 +11,5 @@ license = "Apache-2.0"
 camino = "1.0.3"
 guppy = "0.13.0"
 hakari = "0.9.0"
+
 x-core = { path = "../x-core" }

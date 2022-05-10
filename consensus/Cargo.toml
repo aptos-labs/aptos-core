@@ -12,6 +12,7 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.57"
 async-trait = "0.1.53"
+bcs = "0.1.3"
 byteorder = { version = "1.4.3", default-features = false }
 bytes = "1.1.0"
 fail = "0.5.0"
@@ -28,6 +29,17 @@ termion = { version = "1.5.6", default-features = false }
 thiserror = "1.0.31"
 tokio = { version = "1.8.1", features = ["full"] }
 
+aptos-config = { path = "../config" }
+aptos-crypto = { path = "../crates/aptos-crypto" }
+aptos-infallible = { path = "../crates/aptos-infallible" }
+aptos-logger = { path = "../crates/aptos-logger" }
+aptos-mempool = { path = "../mempool" }
+aptos-metrics = { path = "../crates/aptos-metrics" }
+aptos-secure-storage = { path = "../secure/storage" }
+aptos-temppath = { path = "../crates/aptos-temppath" }
+aptos-types = { path = "../types" }
+aptos-vm = { path = "../aptos-move/aptos-vm" }
+aptos-workspace-hack = { path = "../crates/aptos-workspace-hack" }
 channel = { path = "../crates/channel" }
 consensus-notifications = { path = "../state-sync/inter-component/consensus-notifications" }
 consensus-types = { path = "consensus-types", default-features = false }
@@ -35,22 +47,10 @@ event-notifications = { path = "../state-sync/inter-component/event-notification
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
 fallible = { path = "../crates/fallible" }
-bcs = "0.1.3"
-aptos-config = { path = "../config" }
-aptos-crypto = { path = "../crates/aptos-crypto" }
-aptos-logger = { path = "../crates/aptos-logger" }
-aptos-mempool = { path = "../mempool" }
-aptos-metrics = { path = "../crates/aptos-metrics" }
-aptos-infallible = { path = "../crates/aptos-infallible" }
-aptos-secure-storage = { path = "../secure/storage" }
-aptos-temppath = { path = "../crates/aptos-temppath" }
-aptos-types = { path = "../types" }
-aptos-vm = { path = "../aptos-move/aptos-vm" }
-aptos-workspace-hack = { path = "../crates/aptos-workspace-hack" }
 network = { path = "../network" }
 safety-rules = { path = "safety-rules" }
-short-hex-str = { path = "../crates/short-hex-str" }
 schemadb = { path = "../storage/schemadb" }
+short-hex-str = { path = "../crates/short-hex-str" }
 storage-interface = { path = "../storage/storage-interface" }
 
 [dev-dependencies]
@@ -58,15 +58,15 @@ claim = "0.5.0"
 proptest = "1.0.0"
 tempfile = "3.3.0"
 
-consensus-types = { path = "consensus-types", default-features = false, features = ["fuzzing"] }
-executor-test-helpers = { path = "../execution/executor-test-helpers" }
 aptos-config = { path = "../config", features = ["fuzzing"] }
 aptos-mempool = { path = "../mempool", features = ["fuzzing"] }
+consensus-types = { path = "consensus-types", default-features = false, features = ["fuzzing"] }
+executor-test-helpers = { path = "../execution/executor-test-helpers" }
 network = { path = "../network", features = ["fuzzing"] }
 safety-rules = { path = "safety-rules", features = ["testing"] }
 vm-validator = { path = "../vm-validator" }
 
 [features]
 default = []
-fuzzing = [ "consensus-types/fuzzing", "aptos-config/fuzzing", "aptos-crypto/fuzzing", "aptos-mempool/fuzzing", "aptos-types/fuzzing", "safety-rules/testing"]
+fuzzing = ["consensus-types/fuzzing", "aptos-config/fuzzing", "aptos-crypto/fuzzing", "aptos-mempool/fuzzing", "aptos-types/fuzzing", "safety-rules/testing"]
 failpoints = ["fail/failpoints"]

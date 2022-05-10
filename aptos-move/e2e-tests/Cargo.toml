@@ -14,28 +14,23 @@ anyhow = "1.0.57"
 bcs = "0.1.3"
 goldenfile = "1.1.0"
 hex = "0.4.3"
+num_cpus = "1.13.1"
 once_cell = "1.10.0"
 proptest = "1.0.0"
 proptest-derive = "0.3.0"
 rand = "0.8.3"
 serde = { version = "1.0.137", default-features = false }
-num_cpus = "1.13.1"
 
-## Move dependencies
-move-deps= { path = "../move-deps", features=["address32"] }
-
-## Aptos-Move dependencies
-aptos-keygen = { path = "../aptos-keygen" }
-aptos-vm = { path = "../aptos-vm" }
-aptos-writeset-generator = { path = "../writeset-transaction-generator" }
-cached-framework-packages = { path = "../framework/cached-packages" }
-vm-genesis = { path = "../vm-genesis" }
-
-## Other Aptos Dependencies
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
+aptos-keygen = { path = "../aptos-keygen" }
 aptos-proptest-helpers = { path = "../../crates/aptos-proptest-helpers" }
 aptos-state-view = { path = "../../storage/state-view" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types", features = ["fuzzing"] }
+aptos-vm = { path = "../aptos-vm" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+aptos-writeset-generator = { path = "../writeset-transaction-generator" }
+cached-framework-packages = { path = "../framework/cached-packages" }
+move-deps = { path = "../move-deps", features = ["address32"] }
+vm-genesis = { path = "../vm-genesis" }

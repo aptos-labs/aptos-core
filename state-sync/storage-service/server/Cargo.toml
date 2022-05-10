@@ -19,15 +19,15 @@ serde = { version = "1.0.137", default-features = false }
 thiserror = "1.0.31"
 tokio = { version = "1.8.1", features = ["rt", "macros"], default-features = false }
 
-bounded-executor = { path = "../../../crates/bounded-executor" }
-channel = { path = "../../../crates/channel" }
 aptos-config = { path = "../../../config" }
-aptos-logger = { path = "../../../crates/aptos-logger" }
 aptos-infallible = { path = "../../../crates/aptos-infallible" }
+aptos-logger = { path = "../../../crates/aptos-logger" }
 aptos-metrics = { path = "../../../crates/aptos-metrics" }
 aptos-time-service = { path = "../../../crates/aptos-time-service", features = ["async"] }
 aptos-types = { path = "../../../types" }
 aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
+bounded-executor = { path = "../../../crates/bounded-executor" }
+channel = { path = "../../../crates/channel" }
 network = { path = "../../../network" }
 storage-interface = { path = "../../../storage/storage-interface" }
 storage-service-types = { path = "../types" }
@@ -36,9 +36,9 @@ storage-service-types = { path = "../types" }
 anyhow = "1.0.57"
 claim = "0.5.0"
 mockall = "0.11.0"
+move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["address32"] }
 
 aptos-crypto = { path = "../../../crates/aptos-crypto" }
 aptos-time-service = { path = "../../../crates/aptos-time-service", features = ["async", "testing"] }
 aptos-types = { path = "../../../types" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["address32"] }
 storage-interface = { path = "../../../storage/storage-interface" }

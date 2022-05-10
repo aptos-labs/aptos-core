@@ -24,12 +24,13 @@ aptos-api = { path = "../api" }
 aptos-config = { path = "../config" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-data-client = { path = "../state-sync/aptos-data-client" }
-aptos-genesis-tool = {path = "../config/management/genesis", features = ["testing"] }
+aptos-genesis-tool = { path = "../config/management/genesis", features = ["testing"] }
 aptos-infallible = { path = "../crates/aptos-infallible" }
 aptos-logger = { path = "../crates/aptos-logger" }
 aptos-mempool = { path = "../mempool" }
 aptos-metrics = { path = "../crates/aptos-metrics" }
 aptos-secure-storage = { path = "../secure/storage" }
+aptos-state-view = { path = "../storage/state-view" }
 aptos-telemetry = { path = "../crates/aptos-telemetry" }
 aptos-temppath = { path = "../crates/aptos-temppath" }
 aptos-time-service = { path = "../crates/aptos-time-service" }
@@ -37,7 +38,6 @@ aptos-types = { path = "../types" }
 aptos-vm = { path = "../aptos-move/aptos-vm" }
 aptos-workspace-hack = { path = "../crates/aptos-workspace-hack" }
 aptosdb = { path = "../storage/aptosdb" }
-aptos-state-view = { path = "../storage/state-view" }
 backup-service = { path = "../storage/backup/backup-service" }
 cached-framework-packages = { path = "../aptos-move/framework/cached-packages" }
 consensus = { path = "../consensus" }
@@ -55,7 +55,7 @@ network-builder = { path = "../network/builder" }
 state-sync-multiplexer = { path = "../state-sync/state-sync-v2/state-sync-multiplexer" }
 state-sync-v1 = { path = "../state-sync/state-sync-v1" }
 storage-client = { path = "../storage/storage-client" }
-storage-interface= { path = "../storage/storage-interface" }
+storage-interface = { path = "../storage/storage-interface" }
 storage-service = { path = "../storage/storage-service" }
 storage-service-client = { path = "../state-sync/storage-service/client" }
 storage-service-server = { path = "../state-sync/storage-service/server" }

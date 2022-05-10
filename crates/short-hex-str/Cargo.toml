@@ -14,6 +14,7 @@ mirai-annotations = "1.12.0"
 serde = { version = "1.0.137", default-features = false }
 static_assertions = "1.1.0"
 thiserror = "1.0.31"
+
 aptos-workspace-hack = { path = "../aptos-workspace-hack" }
 
 [dev-dependencies]
