@@ -177,6 +177,45 @@ impl TransactionStore {
         })
     }
 
+    /// Get write sets in `[begin_version, end_version)` half-open range.
+    ///
+    /// N.b. an empty `Vec` is returned when `begin_version == end_version`
+    pub fn get_write_sets(
+        &self,
+        begin_version: Version,
+        end_version: Version,
+    ) -> Result<Vec<WriteSet>> {
+        if begin_version == end_version {
+            return Ok(Vec::new());
+        }
+        ensure!(
+            begin_version < end_version,
+            "begin_version {} >= end_version {}",
+            begin_version,
+            end_version
+        );
+
+        let mut iter = self.db.iter::<WriteSetSchema>(Default::default())?;
+        iter.seek(&begin_version)?;
+
+        let mut ret = Vec::with_capacity((end_version - begin_version) as usize);
+        for current_version in begin_version..end_version {
+            let (version, write_set) = iter
+                .next()
+                .transpose()?
+                .ok_or_else(|| format_err!("Write set missing for version {}", current_version))?;
+            ensure!(
+                version == current_version,
+                "Write set missing for version {}, got version {}",
+                current_version,
+                version,
+            );
+            ret.push(write_set);
+        }
+
+        Ok(ret)
+    }
+
     /// Get the first version that write set starts existent.
     pub fn get_first_write_set_version(&self) -> Result<Option<Version>> {
         let mut iter = self.db.iter::<WriteSetSchema>(Default::default())?;

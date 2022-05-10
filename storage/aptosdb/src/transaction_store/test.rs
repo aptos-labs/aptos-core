@@ -36,6 +36,7 @@ proptest! {
             store.put_write_set(ver as Version, ws, &mut cs).unwrap();
         }
         store.db.write_schemas(cs.batch).unwrap();
+        assert_eq!(store.get_write_sets(0, write_sets.len() as Version).unwrap(), write_sets);
 
         assert_eq!(store.get_first_txn_version().unwrap(), Some(0));
         assert_eq!(store.get_first_write_set_version().unwrap(), Some(0));
