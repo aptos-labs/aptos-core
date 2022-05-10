@@ -10,8 +10,9 @@
   "license": "Apache-2.0",
   "scripts": {
     "first": "node --loader ts-node/esm first_transaction.ts",
+    "first_nft": "node --loader ts-node/esm first_nft.ts",
     "hello_blockchain": "node --loader ts-node/esm hello_blockchain.ts",
-    "first_nft": "node --loader ts-node/esm first_nft.ts"
+    "coin": "node --loader ts-node/esm coin.ts"
   },
   "keywords": [],
   "dependencies": {

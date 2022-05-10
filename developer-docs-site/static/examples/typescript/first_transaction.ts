@@ -122,7 +122,7 @@ export class RestClient {
   }
 
   /** Submits a signed transaction to the blockchain. */
-  async submitTransaction(accountFrom: Account, txnRequest: TxnRequest): Promise<Record<string, any>> {
+  async submitTransaction(txnRequest: TxnRequest): Promise<Record<string, any>> {
     const response = await fetch(`${this.url}/transactions`, {
       method: "POST",
       headers: {"Content-Type": "application/json"},
@@ -132,6 +132,13 @@ export class RestClient {
       assert(response.status == 202, (await response.text()) + " - " + JSON.stringify(txnRequest));
     }
     return await response.json();
+  }
+
+  async executeTransactionWithPayload(accountFrom: Account, payload: Record<string, any>): Promise<string> {
+    const txnRequest = await this.generateTransaction(accountFrom.address(), payload);
+    const signedTxn = await this.signTransaction(accountFrom, txnRequest);
+    const res = await this.submitTransaction(signedTxn);
+    return res["hash"];
   }
 
   async transactionPending(txnHash: string): Promise<boolean> {
