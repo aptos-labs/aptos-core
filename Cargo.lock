@@ -3145,6 +3145,7 @@ dependencies = [
  "once_cell",
  "rayon",
  "sha2",
+ "siphasher",
  "smallvec",
  "structopt",
  "tempfile",

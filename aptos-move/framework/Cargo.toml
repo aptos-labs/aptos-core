@@ -20,6 +20,7 @@ rayon = "1.5.2"
 sha2 = "0.9.3"
 smallvec = "1.8.0"
 structopt = "0.3.21"
+siphasher = "0.3.10"
 tempfile = "3.3.0"
 
 aptos-crypto = { path = "../../crates/aptos-crypto" }

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod account;
+pub mod hash;
 pub mod signature;
 pub mod type_info;
 
@@ -12,6 +13,7 @@ use move_deps::{
 
 pub mod cost {
     pub const APTOS_LIB_TYPE_OF: u64 = 10;
+    pub const APTOS_SIP_HASH: u64 = 10;
 }
 
 pub mod status {
@@ -33,6 +35,7 @@ pub fn all_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
             signature::native_ed25519_signature_verification,
         ),
         ("TypeInfo", "type_of", type_info::type_of),
+        ("Hash", "sip_hash", hash::native_sip_hash),
     ];
     NATIVES
         .iter()
