@@ -13,11 +13,14 @@ use aptos_config::{
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, Logger};
-use aptos_metrics::{get_public_json_metrics, get_public_metrics, metric_server};
+use aptos_metrics::{get_public_json_metrics, metric_server};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_telemetry::{
-    constants::{APTOS_NODE_PUSH_METRICS, CHAIN_ID_METRIC, PEER_ID_METRIC},
-    send_data,
+    constants::{
+        APTOS_NODE_PUSH_METRICS, CHAIN_ID_METRIC, NODE_PUSH_TIME_SECS, PEER_ID_METRIC,
+        SYNCED_VERSION_METRIC,
+    },
+    send_env_data,
 };
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -40,7 +43,6 @@ use futures::channel::mpsc::channel;
 use mempool_notifications::MempoolNotificationSender;
 use network::application::storage::PeerMetadataStorage;
 use network_builder::builder::NetworkBuilder;
-use regex::Regex;
 use state_sync_multiplexer::{
     state_sync_v1_network_config, StateSyncMultiplexer, StateSyncRuntimes,
 };
@@ -391,8 +393,10 @@ fn setup_state_sync_storage_service(
 
 async fn periodic_telemetry_dump(node_config: NodeConfig, db: DbReaderWriter) {
     use futures::stream::StreamExt;
-    let mut dump_interval =
-        IntervalStream::new(tokio::time::interval(std::time::Duration::from_secs(30))).fuse();
+    let mut dump_interval = IntervalStream::new(tokio::time::interval(
+        std::time::Duration::from_secs(NODE_PUSH_TIME_SECS),
+    ))
+    .fuse();
 
     info!("periodic_telemetry_dump task started");
 
@@ -403,13 +407,6 @@ async fn periodic_telemetry_dump(node_config: NodeConfig, db: DbReaderWriter) {
                 // Build the params from internal prometheus metrics
                 let mut metrics_params: HashMap<String, String> = HashMap::new();
 
-                // Measurement Protocol params must be underscore or alphanumeric
-                // Prometheus metrics use {} to represent dimensions, so rename it
-                let met = get_public_metrics();
-                let re = Regex::new(r"[\{\}=]").unwrap();
-                for (k, v) in &met {
-                    metrics_params.insert(re.replace_all(k, "_").to_string(), v.to_string());
-                }
                 let met = get_public_json_metrics();
                 for (k, v) in &met {
                     metrics_params.insert(k.to_string(), v.to_string());
@@ -421,9 +418,12 @@ async fn periodic_telemetry_dump(node_config: NodeConfig, db: DbReaderWriter) {
                     Some(p) => p.to_string(),
                     None => String::new()
                 };
+                let synced_version = (&*db.reader).fetch_synced_version().unwrap_or(0);
+
+                metrics_params.insert(SYNCED_VERSION_METRIC.to_string(), synced_version.to_string());
                 metrics_params.insert(CHAIN_ID_METRIC.to_string(), chain_id.to_string());
                 metrics_params.insert(PEER_ID_METRIC.to_string(), peer_id.to_string());
-                send_data(APTOS_NODE_PUSH_METRICS.to_string(), peer_id.to_string(), metrics_params).await;
+                send_env_data(APTOS_NODE_PUSH_METRICS.to_string(), peer_id.to_string(), metrics_params).await;
             }
         }
     }

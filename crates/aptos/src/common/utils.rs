@@ -73,7 +73,7 @@ pub async fn to_common_result<T: Serialize>(
         "None"
     };
     let metrics = collect_metrics(command, !is_err, latency, error);
-    aptos_telemetry::send_data(
+    aptos_telemetry::send_env_data(
         APTOS_CLI_PUSH_METRICS.to_string(),
         uuid::Uuid::new_v4().to_string(),
         metrics,

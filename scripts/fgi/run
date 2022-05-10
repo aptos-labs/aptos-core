@@ -287,9 +287,9 @@ with open(f"{FORGE_OUTPUT_TEE}", 'r') as file:
         if 'test result: ok' in line:
             test_res = 'passed'
 
-        # attempt to get the error
-        if read_error_caused_by:
-            error_caused_by = line
+        # attempt to get the error as the first non-null line
+        if read_error_caused_by and line:
+            error_caused_by = line.strip()
             read_error_caused_by = False
         if 'Caused by:' in line:
             read_error_caused_by = True

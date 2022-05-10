@@ -261,7 +261,7 @@ pub fn run_forge<F: Factory>(
         }
         Err(e) => {
             eprintln!("Failed to run tests:\n{}", e);
-            process::exit(101); // Exit with a non-zero exit code if tests failed
+            Err(e)
         }
     }
 }

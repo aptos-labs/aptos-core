@@ -722,7 +722,6 @@ dependencies = [
  "network",
  "network-builder",
  "rand 0.8.4",
- "regex",
  "state-sync-multiplexer",
  "state-sync-v1",
  "storage-client",
@@ -941,6 +940,7 @@ dependencies = [
  "serde 1.0.137",
  "serde_json",
  "sysinfo",
+ "tokio",
  "uuid",
 ]
 
@@ -5312,6 +5312,7 @@ dependencies = [
  "aptos-metrics",
  "aptos-proptest-helpers",
  "aptos-rate-limiter",
+ "aptos-telemetry",
  "aptos-time-service",
  "aptos-types",
  "aptos-workspace-hack",
