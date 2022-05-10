@@ -18,33 +18,42 @@ module AptosFramework::Coin {
     const ENO_MINT_CAPABILITY: u64 = 7;
     const EDESTRUCTION_OF_NONZERO_TOKEN: u64 = 8;
 
-    // Core data structures
+    /// Core data structures
 
-    // Represents a set amount of coin
+    /// Main structure representing a coin/token in an account's custody.
     struct Coin<phantom CoinType> has store {
+        /// Amount of coin this address has.
         value: u64,
     }
 
-    // Represents ownership of coin
+    /// A holder of a specific coin types and associated event handles.
+    /// These are kept in a single resource to ensure locality of data.
     struct CoinStore<phantom CoinType> has key {
         coin: Coin<CoinType>,
         deposit_events: EventHandle<DepositEvent>,
         withdraw_events: EventHandle<WithdrawEvent>,
     }
 
-    // Represents resources associated with a coin
+    /// Information about a specific coin type. Stored on the creator of the coin's account.
     struct CoinInfo<phantom CoinType> has key {
         name: ASCII::String,
-        scaling_factor: u64,
+        /// Symbol of the coin, usually a shorter version of the name.
+        /// For example, Singapore Dollar is SGD.
+        symbol: ASCII::String,
+        /// Number of decimals used to get its user representation.
+        /// For example, if `decimals` equals `2`, a balance of `505` coins should
+        /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
+        decimals: u64,
+        // Amount of this coin type in existence.
         supply: Option<u64>,
     }
 
-    // Set of data sent to the event stream during a receive
+    /// Event emitted when some amount of a coin is deposited into an account.
     struct DepositEvent has drop, store {
         amount: u64,
     }
 
-    // Set of data sent to the event stream during a withdrawal
+    /// Event emitted when some amount of a coin is withdrawn from an account.
     struct WithdrawEvent has drop, store {
         amount: u64,
     }
@@ -69,25 +78,36 @@ module AptosFramework::Coin {
     }
 
     /// Returns `true` if the type `CoinType` is a registered coin.
-    /// Returns `false` otherwise.
     public fun is_registered<CoinType>(): bool {
         let type_info = TypeInfo::type_of<CoinType>();
         let coin_address = TypeInfo::account_address(&type_info);
         exists<CoinInfo<CoinType>>(coin_address)
     }
 
+    /// Returns the name of the coin.
     public fun name<CoinType>(): ASCII::String acquires CoinInfo {
         let type_info = TypeInfo::type_of<CoinType>();
         let coin_address = TypeInfo::account_address(&type_info);
         borrow_global<CoinInfo<CoinType>>(coin_address).name
     }
 
-    public fun scaling_factor<CoinType>(): u64 acquires CoinInfo {
+    /// Returns the symbol of the coin, usually a shorter version of the name.
+    public fun symbol<CoinType>(): ASCII::String acquires CoinInfo {
         let type_info = TypeInfo::type_of<CoinType>();
         let coin_address = TypeInfo::account_address(&type_info);
-        borrow_global<CoinInfo<CoinType>>(coin_address).scaling_factor
+        borrow_global<CoinInfo<CoinType>>(coin_address).symbol
     }
 
+    /// Returns the number of decimals used to get its user representation.
+    /// For example, if `decimals` equals `2`, a balance of `505` coins should
+    /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
+    public fun decimals<CoinType>(): u64 acquires CoinInfo {
+        let type_info = TypeInfo::type_of<CoinType>();
+        let coin_address = TypeInfo::account_address(&type_info);
+        borrow_global<CoinInfo<CoinType>>(coin_address).decimals
+    }
+
+    /// Returns the amount of coin in existence.
     public fun supply<CoinType>(): Option<u64> acquires CoinInfo {
         let type_info = TypeInfo::type_of<CoinType>();
         let coin_address = TypeInfo::account_address(&type_info);
@@ -134,7 +154,7 @@ module AptosFramework::Coin {
         merge(&mut coin_store.coin, coin);
     }
 
-    /// Destroy a zero-value coin. Calls will fail if the `value` in the passed-in `token` is non-zero
+    /// Destroys a zero-value coin. Calls will fail if the `value` in the passed-in `token` is non-zero
     /// so it is impossible to "burn" any non-zero amount of `Coin` without having
     /// a `BurnCapability` for the specific `CoinType`.
     public fun destroy_zero<CoinType>(zero_coin: Coin<CoinType>) {
@@ -142,17 +162,21 @@ module AptosFramework::Coin {
         assert!(value == 0, Errors::invalid_argument(EDESTRUCTION_OF_NONZERO_TOKEN))
     }
 
-    /// Extract `amount` from the passed-in `coin`, where the original token is modified in place.
+    /// Extracts `amount` from the passed-in `coin`, where the original token is modified in place.
     public fun extract<CoinType>(coin: &mut Coin<CoinType>, amount: u64): Coin<CoinType> {
         assert!(coin.value >= amount, Errors::invalid_argument(EINSUFFICIENT_BALANCE));
         coin.value = coin.value - amount;
         Coin { value: amount }
     }
 
+    /// Creates a new Coin with given CoinType and gives minting/burning capabilities to the
+    /// calling signer. The given signer also becomes the account hosting the information
+    /// about the coin (name, supply, etc.).
     public(script) fun initialize<CoinType>(
         account: &signer,
         name: vector<u8>,
-        scaling_factor: u64,
+        symbol: vector<u8>,
+        decimals: u64,
         monitor_supply: bool,
     ) {
         let account_addr = Signer::address_of(account);
@@ -170,7 +194,8 @@ module AptosFramework::Coin {
 
         let coin_info = CoinInfo<CoinType> {
             name: ASCII::string(name),
-            scaling_factor,
+            symbol: ASCII::string(symbol),
+            decimals,
             supply: if (monitor_supply) { Option::some(0) } else { Option::none() },
         };
         move_to(account, coin_info);
@@ -179,7 +204,7 @@ module AptosFramework::Coin {
         move_to(account, MintCapability<CoinType> { });
     }
 
-    /// "Merges" the two coins.
+    /// "Merges" the two given coins.
     /// The coin passed in as `dst_coin` will have a value equal to the sum of the two tokens (`dst_coin` and `source_coin`).
     public fun merge<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: Coin<CoinType>) {
         dst_coin.value = dst_coin.value + source_coin.value;
@@ -208,6 +233,9 @@ module AptosFramework::Coin {
         }
     }
 
+    /// Registers to receive a specific CoinType. An account that wants to hold a coin type
+    /// has to explicitly registers to do so. The register creates a special CoinStore
+    /// to hold the specified CoinType.
     public(script) fun register<CoinType>(account: &signer) {
         assert!(
             !exists<CoinStore<CoinType>>(Signer::address_of(account)),
@@ -237,6 +265,7 @@ module AptosFramework::Coin {
         coin.value
     }
 
+    /// Withdraw specifed `amount` of coin from the signing account.
     public fun withdraw<CoinType>(
         account: &signer,
         amount: u64,
@@ -277,22 +306,26 @@ module AptosFramework::Coin {
         let source_addr = Signer::address_of(&source);
         let destination_addr = Signer::address_of(&destination);
 
-        initialize<FakeMoney>(&source, b"Fake money", 1, true);
+        initialize<FakeMoney>(&source, b"Fake money", b"FMD", 18, true);
         register<FakeMoney>(&source);
         register<FakeMoney>(&destination);
         assert!(*Option::borrow(&supply<FakeMoney>()) == 0, 0);
 
+        assert!(name<FakeMoney>() == ASCII::string(b"Fake money"), 1);
+        assert!(symbol<FakeMoney>() == ASCII::string(b"FMD"), 2);
+        assert!(decimals<FakeMoney>() == 18, 3);
+
         mint<FakeMoney>(&source, source_addr, 100);
         transfer<FakeMoney>(&source, destination_addr, 50);
 
-        assert!(balance<FakeMoney>(source_addr) == 50, 1);
-        assert!(balance<FakeMoney>(destination_addr) == 50, 2);
-        assert!(*Option::borrow(&supply<FakeMoney>()) == 100, 3);
+        assert!(balance<FakeMoney>(source_addr) == 50, 4);
+        assert!(balance<FakeMoney>(destination_addr) == 50, 5);
+        assert!(*Option::borrow(&supply<FakeMoney>()) == 100, 6);
 
         let coin = withdraw<FakeMoney>(&source, 10);
         assert!(value(&coin) == 10, 4);
         burn(&source, coin);
-        assert!(*Option::borrow(&supply<FakeMoney>()) == 90, 5);
+        assert!(*Option::borrow(&supply<FakeMoney>()) == 90, 7);
     }
 
     #[test(source = @0x1, destination = @0x2)]
@@ -303,7 +336,7 @@ module AptosFramework::Coin {
         let source_addr = Signer::address_of(&source);
         let destination_addr = Signer::address_of(&destination);
 
-        initialize<FakeMoney>(&source, b"Fake money", 1, false);
+        initialize<FakeMoney>(&source, b"Fake money", b"FMD", 1, false);
         register<FakeMoney>(&source);
         register<FakeMoney>(&destination);
         assert!(Option::is_none(&supply<FakeMoney>()), 0);
@@ -323,7 +356,7 @@ module AptosFramework::Coin {
     #[test(source = @0x2)]
     #[expected_failure(abort_code = 7)]
     public(script) fun fail_initialize(source: signer) {
-        initialize<FakeMoney>(&source, b"Fake money", 1, true);
+        initialize<FakeMoney>(&source, b"Fake money", b"FMD", 1, true);
     }
 
     #[test(source = @0x1, destination = @0x2)]
@@ -335,7 +368,7 @@ module AptosFramework::Coin {
         let source_addr = Signer::address_of(&source);
         let destination_addr = Signer::address_of(&destination);
 
-        initialize<FakeMoney>(&source, b"Fake money", 1, true);
+        initialize<FakeMoney>(&source, b"Fake money", b"FMD", 1, true);
         register<FakeMoney>(&source);
         assert!(*Option::borrow(&supply<FakeMoney>()) == 0, 0);
 
@@ -351,7 +384,7 @@ module AptosFramework::Coin {
     ) acquires CoinStore, CoinInfo, MintCapability {
         let source_addr = Signer::address_of(&source);
 
-        initialize<FakeMoney>(&source, b"Fake money", 1, true);
+        initialize<FakeMoney>(&source, b"Fake money", b"FMD", 1, true);
         register<FakeMoney>(&source);
         register<FakeMoney>(&destination);
         assert!(*Option::borrow(&supply<FakeMoney>()) == 0, 0);
@@ -367,7 +400,7 @@ module AptosFramework::Coin {
     ) acquires BurnCapability, CoinStore, CoinInfo, MintCapability {
         let source_addr = Signer::address_of(&source);
 
-        initialize<FakeMoney>(&source, b"Fake money", 1, true);
+        initialize<FakeMoney>(&source, b"Fake money", b"FMD", 1, true);
         register<FakeMoney>(&source);
         register<FakeMoney>(&destination);
 
@@ -381,7 +414,7 @@ module AptosFramework::Coin {
     public(script) fun test_destroy_non_zero(source: signer) acquires CoinInfo, CoinStore, MintCapability {
         let source_addr = Signer::address_of(&source);
 
-        initialize<FakeMoney>(&source, b"Fake money", 1, true);
+        initialize<FakeMoney>(&source, b"Fake money", b"FMD", 1, true);
         register<FakeMoney>(&source);
 
         mint<FakeMoney>(&source, source_addr, 100);
@@ -394,7 +427,7 @@ module AptosFramework::Coin {
     public(script) fun test_extract(source: signer) acquires CoinInfo, CoinStore, MintCapability {
         let source_addr = Signer::address_of(&source);
 
-        initialize<FakeMoney>(&source, b"Fake money", 1, true);
+        initialize<FakeMoney>(&source, b"Fake money", b"FMD", 1, true);
         register<FakeMoney>(&source);
 
         mint<FakeMoney>(&source, source_addr, 100);
@@ -413,7 +446,7 @@ module AptosFramework::Coin {
     #[test(source = @0x1)]
     public(script) fun test_is_registered(source: signer) {
         assert!(!is_registered<FakeMoney>(), 0);
-        initialize<FakeMoney>(&source, b"Fake money", 1, true);
+        initialize<FakeMoney>(&source, b"Fake money", b"FMD", 1, true);
         assert!(is_registered<FakeMoney>(), 1);
     }
 
