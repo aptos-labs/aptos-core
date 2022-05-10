@@ -1,16 +1,17 @@
 ---
-title: "Your first dapp"
+title: "Your First Dapp"
+slug: "your-first-dapp"
 ---
 
 # Your First Dapp
 
 In this tutorial, you will learn how to build a [dapp](https://en.wikipedia.org/wiki/Decentralized_application) on the Aptos Blockchain. A dapp usually consists of a user interface written in JavaScript, which  interacts with one or more Move Modules.
 
-For this tutorial, we will use the Move Module `HelloBlockchain` described in [Your first Move Module](your-first-move-module) and focus on building the user interface.
+For this tutorial, we will use the Move Module `HelloBlockchain` described in [Your first Move Module](first-move-module.md) and focus on building the user interface.
 
 We will use:
 
-- The [Aptos SDK](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk)
+- The [Aptos SDK](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk).
 - The [Aptos Wallet](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/web-wallet), and
 - The [Aptos CLI](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos) to interact with blockchain.
 
@@ -22,7 +23,7 @@ The full source code for this tutorial is available [here](https://github.com/ap
 
 ### Aptos Wallet
 
-Before starting this tutorial, you should install the [Aptos Wallet extension](building-wallet-extension).
+Before starting this tutorial, you should install the [Aptos Wallet extension](building-wallet-extension.md).
 
 After you install it:
 
@@ -197,7 +198,7 @@ Now, in addition to displaying the account address, the app will also display th
 
 Our dapp is now set up to read from the blockchain. The next step is to write to the blockchain. To do so, we will publish a Move Module to our account.
 
-The Move Module provides a location for this data to be stored. Specifically, we will use the `HelloBlockchain` module from [Your first Move Module](your-first-move-module), which provides a resource called `MessageHolder` that holds a string (called `message`).
+The Move Module provides a location for this data to be stored. Specifically, we will use the `HelloBlockchain` module from [Your first Move Module](first-move-module.md), which provides a resource called `MessageHolder` that holds a string (called `message`).
 
 ### Publish the `HelloBlockchain` module with the Aptos CLI
 
