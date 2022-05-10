@@ -96,6 +96,21 @@ jobs:
               done
               exit $ret
             fi
+  build-push-community-platform:
+    executor: ubuntu-medium
+    steps:
+      - checkout
+      - aws-setup
+      - aws-ecr-setup
+      - run: echo $GITHUB_CONTAINER_REGISTRY_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+      - run:
+          name: Build or skip
+          shell: /bin/bash
+          command: |
+            set -e
+            cd ecosystem/platform/server
+            docker buildx create --use
+            GIT_SHA1=${CIRCLE_SHA1} docker buildx bake --progress=plain --push -f ./docker-bake.hcl
   ecr-dockerhub-mirror:
     executor: ubuntu-medium
     parameters:
@@ -267,6 +282,8 @@ workflows:
       - lint
       - ecosystem-lint
       - unit-test
+      - build-push-community-platform:
+          context: aws-dev
       - docker-build-push:
           context: aws-dev
       - ecosystem-test:
