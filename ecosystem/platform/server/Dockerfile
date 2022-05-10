@@ -28,7 +28,9 @@ COPY . /usr/src/app
 # this is a fake secret key just to get it to compile the assets
 ENV SECRET_KEY_BASE=18ff7d41b9da02d394434e2eb140611516707334b7d7a7e15cf8b567061f30e9400a82e61aa772b9e6ccb72853932769d03bbbb9d78f62333c8f7adb95cc727d
 
-RUN bundle exec rake assets:precompile
+# Yes, this should run twice
+# https://github.com/rails/tailwindcss-rails/issues/158
+RUN bundle exec rake assets:precompile && bundle exec rake assets:precompile
 
 EXPOSE 3000
 CMD ["bundle", "exec", "rails", "s", "-b", "0.0.0.0"]
