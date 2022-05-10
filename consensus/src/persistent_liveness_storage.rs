@@ -16,7 +16,7 @@ use consensus_types::{
     timeout_2chain::TwoChainTimeoutCertificate, timeout_certificate::TimeoutCertificate,
     vote::Vote, vote_data::VoteData,
 };
-use executor::components::apply_chunk_output::IntoLedgerView;
+use executor::components::in_memory_state_calculator::IntoLedgerView;
 use serde::Deserialize;
 use std::{cmp::max, collections::HashSet, sync::Arc};
 use storage_interface::DbReader;

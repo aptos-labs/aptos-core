@@ -5,17 +5,13 @@
 
 use crate::components::apply_chunk_output::ApplyChunkOutput;
 use anyhow::Result;
-use aptos_crypto::hash::TransactionAccumulatorHasher;
 use aptos_logger::trace;
 use aptos_state_view::StateView;
-use aptos_types::{
-    proof::accumulator::InMemoryAccumulator,
-    transaction::{Transaction, TransactionOutput},
-};
+use aptos_types::transaction::{Transaction, TransactionOutput};
 use aptos_vm::VMExecutor;
-use executor_types::ExecutedChunk;
+use executor_types::{ExecutedChunk, ExecutedTrees};
 use fail::fail_point;
-use std::{collections::HashSet, sync::Arc};
+use std::collections::HashSet;
 use storage_interface::verified_state_view::{StateCache, VerifiedStateView};
 
 pub struct ChunkOutput {
@@ -51,14 +47,14 @@ impl ChunkOutput {
             transactions_and_outputs.into_iter().unzip();
 
         // collect all accounts touched and dedup
-        let access_paths = transaction_outputs
+        let state_updates = transaction_outputs
             .iter()
             .flat_map(|o| o.write_set())
             .collect::<HashSet<_>>();
 
         // prime the state cache by fetching all touched accounts
         // TODO: add concurrency
-        access_paths
+        state_updates
             .iter()
             .map(|(key, _)| state_view.get_state_value(key))
             .collect::<Result<Vec<_>>>()?;
@@ -72,12 +68,12 @@ impl ChunkOutput {
 
     pub fn apply_to_ledger(
         self,
-        base_accumulator: &Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
+        base_view: &ExecutedTrees,
     ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
         fail_point!("executor::vm_execute_chunk", |_| {
             Err(anyhow::anyhow!("Injected error in apply_to_ledger."))
         });
-        ApplyChunkOutput::apply(self, base_accumulator)
+        ApplyChunkOutput::apply(self, base_view)
     }
 
     pub fn trace_log_transaction_status(&self) {

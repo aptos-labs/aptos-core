@@ -13,7 +13,7 @@ use aptos_types::{
     move_resource::MoveStorage, transaction::TransactionListWithProof,
 };
 use event_notifications::{EventNotificationSender, EventSubscriptionService};
-use executor::components::apply_chunk_output::IntoLedgerView;
+use executor::components::in_memory_state_calculator::IntoLedgerView;
 use executor_types::ChunkExecutorTrait;
 use std::sync::Arc;
 use storage_interface::DbReader;

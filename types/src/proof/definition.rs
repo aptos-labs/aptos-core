@@ -761,7 +761,7 @@ impl StateStoreValueProof {
         self.transaction_info_to_value_proof.verify(
             self.transaction_info_with_proof
                 .transaction_info
-                .state_change_hash(),
+                .ensure_state_checkpoint_hash()?,
             value_hash,
             state_value,
         )?;

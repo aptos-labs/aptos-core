@@ -35,6 +35,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
+pub mod in_memory_state;
 #[cfg(any(feature = "testing", feature = "fuzzing"))]
 pub mod mock;
 pub mod state_view;
@@ -76,7 +77,7 @@ impl StartupInfo {
         let committed_tree_state = TreeState {
             num_transactions: 0,
             ledger_frozen_subtree_hashes: Vec::new(),
-            account_state_root_hash: *SPARSE_MERKLE_PLACEHOLDER_HASH,
+            state_root_hash: *SPARSE_MERKLE_PLACEHOLDER_HASH,
         };
         let synced_tree_state = None;
 
@@ -108,7 +109,7 @@ impl StartupInfo {
 pub struct TreeState {
     pub num_transactions: LeafCount,
     pub ledger_frozen_subtree_hashes: Vec<HashValue>,
-    pub account_state_root_hash: HashValue,
+    pub state_root_hash: HashValue,
 }
 
 impl TreeState {
@@ -120,14 +121,14 @@ impl TreeState {
         Self {
             num_transactions,
             ledger_frozen_subtree_hashes,
-            account_state_root_hash,
+            state_root_hash: account_state_root_hash,
         }
     }
 
     pub fn describe(&self) -> &'static str {
         if self.num_transactions != 0 {
             "DB has been bootstrapped."
-        } else if self.account_state_root_hash != *SPARSE_MERKLE_PLACEHOLDER_HASH {
+        } else if self.state_root_hash != *SPARSE_MERKLE_PLACEHOLDER_HASH {
             "DB has no transaction, but a non-empty pre-genesis state."
         } else {
             "DB is empty, has no transaction or state."

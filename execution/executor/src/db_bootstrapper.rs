@@ -3,7 +3,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::components::{apply_chunk_output::IntoLedgerView, chunk_output::ChunkOutput};
+use crate::components::{chunk_output::ChunkOutput, in_memory_state_calculator::IntoLedgerView};
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -124,7 +124,7 @@ pub fn calculate_genesis<V: VMExecutor>(
 
     let (mut output, _, _) =
         ChunkOutput::by_transaction_execution::<V>(vec![genesis_txn.clone()], base_state_view)?
-            .apply_to_ledger(base_view.txn_accumulator())?;
+            .apply_to_ledger(&base_view)?;
     ensure!(
         !output.to_commit.is_empty(),
         "Genesis txn execution failed."

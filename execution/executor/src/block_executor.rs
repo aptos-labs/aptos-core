@@ -109,7 +109,7 @@ where
             };
             chunk_output.trace_log_transaction_status();
 
-            let (output, _, _) = chunk_output.apply_to_ledger(parent_accumulator)?;
+            let (output, _, _) = chunk_output.apply_to_ledger(parent_view)?;
             output
         };
 

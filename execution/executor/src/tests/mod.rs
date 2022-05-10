@@ -4,7 +4,7 @@
 use crate::{
     block_executor::BlockExecutor,
     chunk_executor::ChunkExecutor,
-    components::{apply_chunk_output::IntoLedgerView, chunk_output::ChunkOutput},
+    components::chunk_output::ChunkOutput,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
     mock_vm::{
         encode_mint_transaction, encode_reconfiguration_transaction, encode_transfer_transaction,
@@ -12,6 +12,7 @@ use crate::{
     },
 };
 
+use crate::components::in_memory_state_calculator::IntoLedgerView;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_state_view::StateViewId;
 use aptos_types::{
@@ -386,9 +387,7 @@ fn apply_transaction_by_writeset(
     let chunk_output =
         ChunkOutput::by_transaction_output(transactions_and_outputs, state_view).unwrap();
 
-    let (executed, _, _) = chunk_output
-        .apply_to_ledger(ledger_view.txn_accumulator())
-        .unwrap();
+    let (executed, _, _) = chunk_output.apply_to_ledger(&ledger_view).unwrap();
 
     db.writer
         .save_transactions(
@@ -522,7 +521,7 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
             ledger_view.state_view(&ledger_view, StateViewId::Miscellaneous, db.reader.clone()),
         )
         .unwrap();
-        let (executed, _, _) = out.apply_to_ledger(ledger_view.txn_accumulator()).unwrap();
+        let (executed, _, _) = out.apply_to_ledger(&ledger_view).unwrap();
         db.writer
             .save_transactions(
                 &executed.transactions_to_commit().unwrap(),

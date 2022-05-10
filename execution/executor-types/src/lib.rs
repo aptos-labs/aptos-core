@@ -11,10 +11,7 @@ pub use error::Error;
 use anyhow::Result;
 use aptos_crypto::{
     ed25519::Ed25519Signature,
-    hash::{
-        EventAccumulatorHasher, TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH,
-        SPARSE_MERKLE_PLACEHOLDER_HASH,
-    },
+    hash::{EventAccumulatorHasher, TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
 };
 use aptos_state_view::StateViewId;
@@ -37,10 +34,9 @@ use std::{cmp::max, collections::HashMap, sync::Arc};
 use storage_interface::DbReader;
 
 pub use executed_chunk::ExecutedChunk;
-use storage_interface::verified_state_view::VerifiedStateView;
+use storage_interface::{in_memory_state::InMemoryState, verified_state_view::VerifiedStateView};
 
 type SparseMerkleProof = aptos_types::proof::SparseMerkleProof<StateValue>;
-type SparseMerkleTree = scratchpad::SparseMerkleTree<StateValue>;
 
 pub trait ChunkExecutorTrait: Send + Sync {
     /// Verifies the transactions based on the provided proofs and ledger info. If the transactions
@@ -288,11 +284,8 @@ impl StateComputeResult {
 /// represent a specific state collectively. Usually it is a state after executing a block.
 #[derive(Clone, Debug)]
 pub struct ExecutedTrees {
-    /// The in-memory Sparse Merkle Tree representing a specific state after execution. If this
-    /// tree is presenting the latest commited state, it will have a single Subtree node (or
-    /// Empty node) whose hash equals the root hash of the newest Sparse Merkle Tree in
-    /// storage.
-    state_tree: SparseMerkleTree,
+    /// The in-memory representation of state after execution.
+    state: InMemoryState,
 
     /// The in-memory Merkle Accumulator representing a blockchain state consistent with the
     /// `state_tree`.
@@ -300,18 +293,8 @@ pub struct ExecutedTrees {
 }
 
 impl ExecutedTrees {
-    pub fn new_copy(
-        state_tree: SparseMerkleTree,
-        transaction_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
-    ) -> Self {
-        Self {
-            state_tree,
-            transaction_accumulator,
-        }
-    }
-
-    pub fn state_tree(&self) -> &SparseMerkleTree {
-        &self.state_tree
+    pub fn state(&self) -> &InMemoryState {
+        &self.state
     }
 
     pub fn txn_accumulator(&self) -> &Arc<InMemoryAccumulator<TransactionAccumulatorHasher>> {
@@ -327,26 +310,35 @@ impl ExecutedTrees {
         self.txn_accumulator().root_hash()
     }
 
-    pub fn state_root(&self) -> HashValue {
-        self.state_tree().root_hash()
-    }
-
     pub fn new(
-        state_root_hash: HashValue,
-        frozen_subtrees_in_accumulator: Vec<HashValue>,
-        num_leaves_in_accumulator: u64,
-    ) -> ExecutedTrees {
-        ExecutedTrees {
-            state_tree: SparseMerkleTree::new(state_root_hash),
-            transaction_accumulator: Arc::new(
-                InMemoryAccumulator::new(frozen_subtrees_in_accumulator, num_leaves_in_accumulator)
-                    .expect("The startup info read from storage should be valid."),
-            ),
+        state: InMemoryState,
+        transaction_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
+    ) -> Self {
+        Self {
+            state,
+            transaction_accumulator,
         }
     }
 
-    pub fn new_empty() -> ExecutedTrees {
-        Self::new(*SPARSE_MERKLE_PLACEHOLDER_HASH, vec![], 0)
+    pub fn new_at_state_checkpoint(
+        state_root_hash: HashValue,
+        frozen_subtrees_in_accumulator: Vec<HashValue>,
+        num_leaves_in_accumulator: u64,
+    ) -> Self {
+        let state = InMemoryState::new_at_checkpoint(state_root_hash, num_leaves_in_accumulator);
+        let transaction_accumulator = Arc::new(
+            InMemoryAccumulator::new(frozen_subtrees_in_accumulator, num_leaves_in_accumulator)
+                .expect("The startup info read from storage should be valid."),
+        );
+
+        Self::new(state, transaction_accumulator)
+    }
+
+    pub fn new_empty() -> Self {
+        Self::new(
+            InMemoryState::new_empty(),
+            Arc::new(InMemoryAccumulator::new_empty()),
+        )
     }
 
     pub fn is_same_view(&self, rhs: &Self) -> bool {
@@ -362,9 +354,9 @@ impl ExecutedTrees {
         VerifiedStateView::new(
             id,
             reader.clone(),
-            persisted_view.version(),
-            persisted_view.state_tree.root_hash(),
-            self.state_tree.clone(),
+            persisted_view.state.checkpoint_version(),
+            persisted_view.state.checkpoint_root_hash(),
+            self.state.current.clone(),
         )
     }
 }

@@ -968,6 +968,7 @@ impl TransactionInfo {
         transaction_hash: HashValue,
         state_change_hash: HashValue,
         event_root_hash: HashValue,
+        state_checkpoint_hash: Option<HashValue>,
         gas_used: u64,
         status: ExecutionStatus,
     ) -> Self {
@@ -975,6 +976,7 @@ impl TransactionInfo {
             transaction_hash,
             state_change_hash,
             event_root_hash,
+            state_checkpoint_hash,
             gas_used,
             status,
         ))
@@ -986,6 +988,7 @@ impl TransactionInfo {
             HashValue::default(),
             HashValue::default(),
             HashValue::default(),
+            Some(HashValue::default()),
             gas_used,
             status,
         )
@@ -1035,16 +1038,20 @@ impl TransactionInfoV0 {
         transaction_hash: HashValue,
         state_change_hash: HashValue,
         event_root_hash: HashValue,
+        state_checkpoint_hash: Option<HashValue>,
         gas_used: u64,
         status: ExecutionStatus,
     ) -> Self {
+        // TODO(aldenhu): stop expecting `state_checkpoint_hash.is_some()`
+        assert!(state_checkpoint_hash.is_some());
+
         Self {
             gas_used,
             status,
             transaction_hash,
             event_root_hash,
             state_change_hash,
-            state_checkpoint_hash: None,
+            state_checkpoint_hash,
         }
     }
 
@@ -1054,6 +1061,15 @@ impl TransactionInfoV0 {
 
     pub fn state_change_hash(&self) -> HashValue {
         self.state_change_hash
+    }
+
+    pub fn state_checkpoint_hash(&self) -> Option<HashValue> {
+        self.state_checkpoint_hash
+    }
+
+    pub fn ensure_state_checkpoint_hash(&self) -> Result<HashValue> {
+        self.state_checkpoint_hash
+            .ok_or_else(|| format_err!("State checkpoint hash not present in TransactionInfo"))
     }
 
     pub fn event_root_hash(&self) -> HashValue {
@@ -1073,8 +1089,8 @@ impl Display for TransactionInfo {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(
             f,
-            "TransactionInfo: [txn_hash: {}, state_root_hash: {}, event_root_hash: {}, gas_used: {}, recorded_status: {:?}]",
-            self.transaction_hash(), self.state_change_hash(), self.event_root_hash(), self.gas_used(), self.status(),
+            "TransactionInfo: [txn_hash: {}, state_change_hash: {}, event_root_hash: {}, state_checkpoint_hash: {:?}, gas_used: {}, recorded_status: {:?}]",
+            self.transaction_hash(), self.state_change_hash(), self.event_root_hash(), self.state_checkpoint_hash(), self.gas_used(), self.status(),
         )
     }
 }

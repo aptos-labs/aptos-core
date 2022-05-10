@@ -2919,6 +2919,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "rand 0.8.4",
+ "rayon",
  "scratchpad",
  "serde 1.0.137",
  "storage-interface",
@@ -6927,6 +6928,7 @@ dependencies = [
  "rand 0.8.4",
  "rayon",
  "storage-interface",
+ "thiserror",
 ]
 
 [[package]]

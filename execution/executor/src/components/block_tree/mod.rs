@@ -7,7 +7,7 @@
 mod test;
 
 use crate::{
-    components::apply_chunk_output::IntoLedgerView,
+    components::in_memory_state_calculator::IntoLedgerView,
     logging::{LogEntry, LogSchema},
 };
 use anyhow::{anyhow, ensure, Result};

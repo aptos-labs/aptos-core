@@ -61,6 +61,7 @@ prop_compose! {
                     txn.transaction().hash(),
                     state_checkpoint_hash.unwrap(),
                     event_root_hash,
+                    state_checkpoint_hash,
                     placeholder_txn_info.gas_used(),
                     placeholder_txn_info.status().clone(),
                 );

@@ -499,7 +499,8 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
             .transaction_infos
             .first()
             .expect("Target transaction info should exist!")
-            .state_change_hash();
+            .ensure_state_checkpoint_hash()
+            .expect("Must be at state checkpoint.");
 
         // Create the snapshot receiver
         let mut state_snapshot_receiver = storage

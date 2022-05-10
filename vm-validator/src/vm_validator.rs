@@ -11,7 +11,7 @@ use aptos_types::{
     transaction::{SignedTransaction, VMValidatorResult},
 };
 use aptos_vm::AptosVM;
-use executor::components::apply_chunk_output::IntoLedgerView;
+use executor::components::in_memory_state_calculator::IntoLedgerView;
 use fail::fail_point;
 use std::sync::Arc;
 use storage_interface::{

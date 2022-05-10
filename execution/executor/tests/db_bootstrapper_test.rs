@@ -33,7 +33,7 @@ use aptos_vm::AptosVM;
 use aptosdb::{AptosDB, GetRestoreHandler};
 use executor::{
     block_executor::BlockExecutor,
-    components::apply_chunk_output::IntoLedgerView,
+    components::in_memory_state_calculator::IntoLedgerView,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
 };
 use executor_test_helpers::{
@@ -219,7 +219,8 @@ fn get_state_backup(
         .unwrap()
         .into_ledger_view(&db_reader)
         .unwrap()
-        .state_root();
+        .state()
+        .root_hash();
 
     (accounts, proof, root_hash)
 }

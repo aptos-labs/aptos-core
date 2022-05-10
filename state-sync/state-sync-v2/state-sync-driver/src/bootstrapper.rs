@@ -840,7 +840,8 @@ impl<
             .transaction_infos
             .first()
             .expect("Target transaction info should exist!")
-            .state_change_hash();
+            .ensure_state_checkpoint_hash()
+            .expect("Must be at state checkpoint.");
         if account_state_chunk_with_proof.root_hash != expected_root_hash {
             self.terminate_active_stream(notification_id, NotificationFeedback::InvalidPayloadData)
                 .await?;

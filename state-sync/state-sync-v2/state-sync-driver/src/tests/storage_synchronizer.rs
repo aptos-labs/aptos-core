@@ -266,7 +266,9 @@ async fn test_initialize_account_synchronizer() {
         .expect_get_state_snapshot_receiver()
         .with(
             eq(target_ledger_info.ledger_info().version()),
-            eq(output_list_with_proof.proof.transaction_infos[0].state_change_hash()),
+            eq(output_list_with_proof.proof.transaction_infos[0]
+                .ensure_state_checkpoint_hash()
+                .unwrap()),
         )
         .return_once(move |_, _| Ok(Box::new(snapshot_receiver)));
 
