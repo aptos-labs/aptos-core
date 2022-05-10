@@ -13,11 +13,13 @@
   </div>
 <% end %>
 
-<%= form_with(model: current_user, url: onboarding_email_path, method: :post) do |f| %>
+<%= form_with(model: current_user, url: onboarding_email_path, method: :post, data: {turbo: false}) do |f| %>
   <div class="field">
     <%= f.label :email %><br />
     <%= f.email_field :email, autofocus: true, autocomplete: "email", value: current_user.email || @oauth_email %>
   </div>
+
+  <%= recaptcha_tags %>
 
   <div class="actions">
     <%= f.submit "Send email" %>

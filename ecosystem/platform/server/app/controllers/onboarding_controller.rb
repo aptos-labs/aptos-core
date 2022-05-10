@@ -9,7 +9,7 @@ class OnboardingController < ApplicationController
 
   def email_update
     email_params = params.require(:user).permit(:email)
-    if current_user.update(email_params)
+    if verify_recaptcha(model: current_user) && current_user.update(email_params)
       current_user.send_confirmation_instructions
       redirect_to overview_index_path
     else

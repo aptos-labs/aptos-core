@@ -21,23 +21,19 @@ class It1ProfilesController < ApplicationController
     params[:user] = current_user
     @it1_profile = It1Profile.new(params)
 
-    respond_to do |format|
-      if @it1_profile.save
-        format.html { redirect_to overview_index_path, notice: 'IT1 application was successfully created.' }
-      else
-        format.html { render :new, status: :unprocessable_entity }
-      end
+    if verify_recaptcha(model: @it1_profile) && @it1_profile.save
+      redirect_to overview_index_path, notice: 'IT1 application was successfully created.'
+    else
+      render :new, status: :unprocessable_entity
     end
   end
 
   # PATCH/PUT /it1_profiles/1 or /it1_profiles/1.json
   def update
-    respond_to do |format|
-      if @it1_profile.update(it1_profile_params)
-        format.html { redirect_to overview_index_path, notice: 'IT1 application was successfully updated.' }
-      else
-        format.html { render :edit, status: :unprocessable_entity }
-      end
+    if verify_recaptcha(model: @it1_profile) && @it1_profile.update(it1_profile_params)
+      redirect_to overview_index_path, notice: 'IT1 application was successfully updated.'
+    else
+      render :edit, status: :unprocessable_entity
     end
   end
 
