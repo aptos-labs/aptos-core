@@ -42,6 +42,8 @@ mod test_config;
 pub use test_config::*;
 mod api_config;
 pub use api_config::*;
+use aptos_crypto::{ed25519::Ed25519PrivateKey, x25519};
+use aptos_types::account_address::AccountAddress;
 
 /// Represents a deprecated config that provides no field verification.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
@@ -155,6 +157,26 @@ impl WaypointConfig {
             }
             _ => self.waypoint(),
         }
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct IdentityBlob {
+    account_address: AccountAddress,
+    account_key: Ed25519PrivateKey,
+    /// Optional consensus key.  Only used for validators
+    consensus_key: Option<Ed25519PrivateKey>,
+    network_key: x25519::PrivateKey,
+}
+
+impl IdentityBlob {
+    pub fn from_file(path: &Path) -> anyhow::Result<IdentityBlob> {
+        Ok(serde_yaml::from_str(&fs::read_to_string(path)?)?)
+    }
+
+    pub fn to_file(&self, path: &Path) -> anyhow::Result<()> {
+        let mut file = File::open(path)?;
+        Ok(file.write_all(serde_yaml::to_string(self)?.as_bytes())?)
     }
 }
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::{Error, SecureBackend},
+    config::{Error, IdentityBlob, SecureBackend},
     keys::ConfigKey,
     network_id::NetworkId,
     utils,
@@ -148,6 +148,10 @@ impl NetworkConfig {
                     .expect("Unable to convert key");
                 Some(key)
             }
+            Identity::FromFile(config) => {
+                let identity_blob: IdentityBlob = IdentityBlob::from_file(&config.path).unwrap();
+                Some(identity_blob.network_key)
+            }
             Identity::None => None,
         };
         key.expect("identity key should be present")
@@ -212,6 +216,10 @@ impl NetworkConfig {
                     .value;
                 Some(peer_id)
             }
+            Identity::FromFile(config) => {
+                let identity_blob: IdentityBlob = IdentityBlob::from_file(&config.path).unwrap();
+                Some(identity_blob.account_address)
+            }
             Identity::None => None,
         }
         .expect("peer id should be present")
@@ -234,6 +242,7 @@ impl NetworkConfig {
                     config.peer_id = peer_id;
                 }
             }
+            Identity::FromFile(_) => (),
         };
     }
 
@@ -300,6 +309,7 @@ pub enum DiscoveryMethod {
 pub enum Identity {
     FromConfig(IdentityFromConfig),
     FromStorage(IdentityFromStorage),
+    FromFile(IdentityFromFile),
     None,
 }
 
@@ -315,6 +325,10 @@ impl Identity {
             key_name,
             peer_id_name,
         })
+    }
+
+    pub fn from_file(path: PathBuf) -> Self {
+        Identity::FromFile(IdentityFromFile { path })
     }
 }
 
@@ -334,6 +348,12 @@ pub struct IdentityFromStorage {
     pub backend: SecureBackend,
     pub key_name: String,
     pub peer_id_name: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct IdentityFromFile {
+    pub path: PathBuf,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

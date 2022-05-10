@@ -10,6 +10,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0.57"
 bcs = "0.1.3"
 get_if_addrs = { version = "0.5.3", default-features = false }
 mirai-annotations = "1.12.0"

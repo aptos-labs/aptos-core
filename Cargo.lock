@@ -267,6 +267,7 @@ dependencies = [
 name = "aptos-config"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-global-constants",
