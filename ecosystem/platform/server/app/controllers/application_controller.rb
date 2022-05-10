@@ -3,8 +3,13 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
+require 'logging/logs'
+
 class ApplicationController < ActionController::Base
+  include Logging::Logs
+
   before_action :set_csrf_cookie
+  before_action :set_logging_metadata
 
   protect_from_forgery with: :exception
 
@@ -34,5 +39,18 @@ class ApplicationController < ActionController::Base
 
   def ensure_confirmed!
     redirect_to onboarding_email_path unless current_user.confirmed?
+  end
+
+  def append_info_to_payload(payload)
+    super
+    # Add metadata to lograge request logs.
+    payload[:request_id] = request.request_id
+    payload[:user_id] = current_user&.id
+  end
+
+  def set_logging_metadata
+    # Add metadata to thread local for Logging::Logs.log().
+    Thread.current.thread_variable_set(REQUEST_ID_KEY, request.request_id)
+    Thread.current.thread_variable_set(USER_ID_KEY, current_user&.id)
   end
 end

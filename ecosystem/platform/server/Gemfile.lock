@@ -204,6 +204,11 @@ GEM
     llhttp-ffi (0.4.0)
       ffi-compiler (~> 1.0)
       rake (~> 13.0)
+    lograge (0.12.0)
+      actionpack (>= 4)
+      activesupport (>= 4)
+      railties (>= 4)
+      request_store (~> 1.0)
     loofah (2.17.0)
       crass (~> 1.0.2)
       nokogiri (>= 1.5.9)
@@ -323,6 +328,8 @@ GEM
     regexp_parser (2.3.1)
     reline (0.3.1)
       io-console (~> 0.5)
+    request_store (1.5.1)
+      rack (>= 1.4)
     responders (3.0.1)
       actionpack (>= 5.0)
       railties (>= 5.0)
@@ -452,6 +459,7 @@ DEPENDENCIES
   jbuilder
   kaminari
   maxmind-geoip2
+  lograge (~> 0.12.0)
   omniauth
   omniauth-discord
   omniauth-github

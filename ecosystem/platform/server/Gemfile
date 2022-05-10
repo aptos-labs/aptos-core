@@ -88,6 +88,7 @@ gem 'tailwindcss-rails', '~> 2.0'
 # Monitoring
 gem 'sentry-rails'
 gem 'sentry-ruby'
+gem 'lograge', '~> 0.12.0'
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem

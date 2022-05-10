@@ -39,6 +39,7 @@ class It1ProfilesController < ApplicationController
     end
 
     if @it1_profile.save
+      log @it1_profile, 'created'
       validate_node(v, do_location: true)
       if @it1_profile.validator_verified?
         redirect_to it1_path, notice: 'AIT1 application completed successfully: your node is verified!'
@@ -64,6 +65,7 @@ class It1ProfilesController < ApplicationController
 
     ip_changed = @it1_profile.validator_ip_changed?
     if @it1_profile.update(it1_profile_params)
+      log @it1_profile, 'updated'
       if @it1_profile.validator_verified? && !@it1_profile.needs_revalidation?
         redirect_to it1_path,
                     notice: 'AIT1 node information updated' and return
