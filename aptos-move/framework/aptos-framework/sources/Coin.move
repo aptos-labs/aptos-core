@@ -20,6 +20,11 @@ module AptosFramework::Coin {
 
     /// Core data structures
 
+    /// Central coin events that are emitted for all coin stores.
+    struct CoinEvents has key {
+        register_events: EventHandle<RegisterEvent>,
+    }
+
     /// Main structure representing a coin/token in an account's custody.
     struct Coin<phantom CoinType> has store {
         /// Amount of coin this address has.
@@ -56,6 +61,11 @@ module AptosFramework::Coin {
     /// Event emitted when some amount of a coin is withdrawn from an account.
     struct WithdrawEvent has drop, store {
         amount: u64,
+    }
+
+    // Set of data sent to the event stream when a new coin store is registered.
+    struct RegisterEvent has drop, store {
+        type_info: TypeInfo::TypeInfo,
     }
 
     /// Capability required to mint coins.
@@ -236,10 +246,26 @@ module AptosFramework::Coin {
     /// Registers to receive a specific CoinType. An account that wants to hold a coin type
     /// has to explicitly registers to do so. The register creates a special CoinStore
     /// to hold the specified CoinType.
-    public(script) fun register<CoinType>(account: &signer) {
+    public(script) fun register<CoinType>(account: &signer) acquires CoinEvents {
+        let account_addr = Signer::address_of(account);
         assert!(
-            !exists<CoinStore<CoinType>>(Signer::address_of(account)),
+            !exists<CoinStore<CoinType>>(account_addr),
             Errors::already_published(ECOIN_STORE_ALREADY_PUBLISHED),
+        );
+
+        // Also add the central coin events resource if the account doesn't have one yet.
+        if (!exists<CoinEvents>(account_addr)) {
+            move_to(account, CoinEvents {
+                register_events: Event::new_event_handle<RegisterEvent>(account),
+            });
+        };
+
+        let coin_events = borrow_global_mut<CoinEvents>(account_addr);
+        Event::emit_event<RegisterEvent>(
+            &mut coin_events.register_events,
+            RegisterEvent {
+                type_info: TypeInfo::type_of<CoinType>(),
+            },
         );
 
         let coin_store = CoinStore<CoinType> {
@@ -302,7 +328,7 @@ module AptosFramework::Coin {
     public(script) fun end_to_end(
         source: signer,
         destination: signer,
-    ) acquires BurnCapability, CoinStore, CoinInfo, MintCapability {
+    ) acquires BurnCapability, CoinEvents, CoinInfo, CoinStore, MintCapability {
         let source_addr = Signer::address_of(&source);
         let destination_addr = Signer::address_of(&destination);
 
@@ -332,7 +358,7 @@ module AptosFramework::Coin {
     public(script) fun end_to_end_no_supply(
         source: signer,
         destination: signer,
-    ) acquires BurnCapability, CoinStore, CoinInfo, MintCapability {
+    ) acquires BurnCapability, CoinEvents, CoinInfo, CoinStore, MintCapability {
         let source_addr = Signer::address_of(&source);
         let destination_addr = Signer::address_of(&destination);
 
@@ -364,7 +390,7 @@ module AptosFramework::Coin {
     public(script) fun fail_transfer(
         source: signer,
         destination: signer,
-    ) acquires CoinStore, CoinInfo, MintCapability {
+    ) acquires CoinEvents, CoinInfo, CoinStore, MintCapability {
         let source_addr = Signer::address_of(&source);
         let destination_addr = Signer::address_of(&destination);
 
@@ -381,7 +407,7 @@ module AptosFramework::Coin {
     public(script) fun fail_mint(
         source: signer,
         destination: signer,
-    ) acquires CoinStore, CoinInfo, MintCapability {
+    ) acquires CoinEvents, CoinInfo, CoinStore, MintCapability {
         let source_addr = Signer::address_of(&source);
 
         initialize<FakeMoney>(&source, b"Fake money", b"FMD", 1, true);
@@ -397,7 +423,7 @@ module AptosFramework::Coin {
     public(script) fun fail_burn(
         source: signer,
         destination: signer,
-    ) acquires BurnCapability, CoinStore, CoinInfo, MintCapability {
+    ) acquires BurnCapability, CoinEvents, CoinInfo, CoinStore, MintCapability {
         let source_addr = Signer::address_of(&source);
 
         initialize<FakeMoney>(&source, b"Fake money", b"FMD", 1, true);
@@ -411,7 +437,9 @@ module AptosFramework::Coin {
 
     #[test(source = @0x1)]
     #[expected_failure(abort_code = 2055)]
-    public(script) fun test_destroy_non_zero(source: signer) acquires CoinInfo, CoinStore, MintCapability {
+    public(script) fun test_destroy_non_zero(
+        source: signer,
+    ) acquires CoinEvents, CoinInfo, CoinStore, MintCapability {
         let source_addr = Signer::address_of(&source);
 
         initialize<FakeMoney>(&source, b"Fake money", b"FMD", 1, true);
@@ -424,7 +452,9 @@ module AptosFramework::Coin {
     }
 
     #[test(source = @0x1)]
-    public(script) fun test_extract(source: signer) acquires CoinInfo, CoinStore, MintCapability {
+    public(script) fun test_extract(
+        source: signer,
+    ) acquires CoinEvents, CoinInfo, CoinStore, MintCapability {
         let source_addr = Signer::address_of(&source);
 
         initialize<FakeMoney>(&source, b"Fake money", b"FMD", 1, true);

@@ -1,5 +1,5 @@
 module AptosFramework::TypeInfo {
-    struct TypeInfo has copy, drop {
+    struct TypeInfo has copy, drop, store {
         account_address: address,
         module_name: vector<u8>,
         struct_name: vector<u8>,
