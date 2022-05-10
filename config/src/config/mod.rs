@@ -162,11 +162,11 @@ impl WaypointConfig {
 
 #[derive(Deserialize, Serialize)]
 pub struct IdentityBlob {
-    account_address: AccountAddress,
-    account_key: Ed25519PrivateKey,
+    pub account_address: AccountAddress,
+    pub account_key: Ed25519PrivateKey,
     /// Optional consensus key.  Only used for validators
-    consensus_key: Option<Ed25519PrivateKey>,
-    network_key: x25519::PrivateKey,
+    pub consensus_key: Option<Ed25519PrivateKey>,
+    pub network_key: x25519::PrivateKey,
 }
 
 impl IdentityBlob {
