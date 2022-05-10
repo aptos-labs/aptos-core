@@ -188,6 +188,11 @@ pub fn prompt_yes_with_override(prompt: &str, prompt_options: PromptOptions) -> 
     }
 }
 
+pub fn read_from_file(path: &Path) -> CliTypedResult<Vec<u8>> {
+    std::fs::read(path)
+        .map_err(|e| CliError::UnableToReadFile(format!("{}", path.display()), e.to_string()))
+}
+
 /// Write a `&[u8]` to a file
 pub fn write_to_file(path: &Path, name: &str, bytes: &[u8]) -> CliTypedResult<()> {
     let mut file = File::create(path).map_err(|e| CliError::IO(name.to_string(), e))?;

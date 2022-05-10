@@ -2,10 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::types::{CliTypedResult, EncodingType},
+    common::{
+        types::{CliError, CliTypedResult},
+        utils::{read_from_file, write_to_file},
+    },
     genesis::{
         config::{HostAndPort, ValidatorConfiguration},
-        git::GitOptions,
+        git::{from_yaml, to_yaml, GitOptions},
     },
     op::key,
     CliCommand,
@@ -14,11 +17,11 @@ use aptos_crypto::{ed25519::Ed25519PrivateKey, x25519, PrivateKey};
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use async_trait::async_trait;
 use clap::Parser;
+use move_core_types::account_address::AccountAddress;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-const ACCOUNT_KEY_FILE: &str = "account.key";
-const CONSENSUS_KEY_FILE: &str = "consensus.key";
-const NETWORK_KEY_FILE: &str = "network.key";
+const PRIVATE_KEYS_FILE: &str = "private-keys.yml";
 
 /// Generate account key, consensus key, and network key for a validator
 #[derive(Parser)]
@@ -29,20 +32,41 @@ pub struct GenerateKeys {
 }
 
 #[async_trait]
-impl CliCommand<Vec<PathBuf>> for GenerateKeys {
+impl CliCommand<PathBuf> for GenerateKeys {
     fn command_name(&self) -> &'static str {
         "GenerateKeys"
     }
 
-    async fn execute(self) -> CliTypedResult<Vec<PathBuf>> {
-        let account_key_path = self.output_dir.join(ACCOUNT_KEY_FILE);
-        let consensus_key_path = self.output_dir.join(CONSENSUS_KEY_FILE);
-        let network_key_path = self.output_dir.join(NETWORK_KEY_FILE);
-        let _ = key::GenerateKey::generate_ed25519(EncodingType::Hex, &account_key_path).await?;
-        let _ = key::GenerateKey::generate_ed25519(EncodingType::Hex, &consensus_key_path).await?;
-        let _ = key::GenerateKey::generate_x25519(EncodingType::Hex, &network_key_path).await?;
-        Ok(vec![account_key_path, consensus_key_path, network_key_path])
+    async fn execute(self) -> CliTypedResult<PathBuf> {
+        let account_key = key::GenerateKey::generate_ed25519_in_memory();
+        let consensus_key = key::GenerateKey::generate_ed25519_in_memory();
+        let network_key = key::GenerateKey::generate_x25519_in_memory()?;
+        let keys_file = self.output_dir.join(PRIVATE_KEYS_FILE);
+
+        let account_address =
+            AuthenticationKey::ed25519(&account_key.public_key()).derived_address();
+        let config = KeysAndAccount {
+            account_address,
+            account_key,
+            consensus_key,
+            network_key,
+        };
+
+        write_to_file(
+            keys_file.as_path(),
+            "private_keys.yaml",
+            to_yaml(&config)?.as_bytes(),
+        )?;
+        Ok(keys_file)
     }
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct KeysAndAccount {
+    account_address: AccountAddress,
+    account_key: Ed25519PrivateKey,
+    consensus_key: Ed25519PrivateKey,
+    network_key: x25519::PrivateKey,
 }
 
 /// Set ValidatorConfiguration for a single validator in the git repository
@@ -74,21 +98,14 @@ impl CliCommand<()> for SetValidatorConfiguration {
     }
 
     async fn execute(self) -> CliTypedResult<()> {
-        let account_key_path = self.keys_dir.join(ACCOUNT_KEY_FILE);
-        let consensus_key_path = self.keys_dir.join(CONSENSUS_KEY_FILE);
-        let network_key_path = self.keys_dir.join(NETWORK_KEY_FILE);
-        let account_key: Ed25519PrivateKey =
-            EncodingType::Hex.load_key(ACCOUNT_KEY_FILE, &account_key_path)?;
-        let consensus_key: Ed25519PrivateKey =
-            EncodingType::Hex.load_key(CONSENSUS_KEY_FILE, &consensus_key_path)?;
-        let network_key: x25519::PrivateKey =
-            EncodingType::Hex.load_key(NETWORK_KEY_FILE, &network_key_path)?;
-
-        let account_key = account_key.public_key();
-        let consensus_key = consensus_key.public_key();
-        let network_key = network_key.public_key();
-        let auth_key = AuthenticationKey::ed25519(&account_key);
-        let account_address = auth_key.derived_address();
+        let private_keys_path = self.keys_dir.join(PRIVATE_KEYS_FILE);
+        let bytes = read_from_file(private_keys_path.as_path())?;
+        let key_files: KeysAndAccount =
+            from_yaml(&String::from_utf8(bytes).map_err(CliError::from)?)?;
+        let account_address = key_files.account_address;
+        let account_key = key_files.account_key.public_key();
+        let consensus_key = key_files.consensus_key.public_key();
+        let network_key = key_files.network_key.public_key();
 
         let credentials = ValidatorConfiguration {
             account_address,

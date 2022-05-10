@@ -1,9 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::{
-    init::DEFAULT_REST_URL,
-    utils::{check_if_file_exists, to_common_result, to_common_success_result, write_to_file},
+use crate::{
+    common::{
+        init::DEFAULT_REST_URL,
+        utils::{
+            check_if_file_exists, read_from_file, to_common_result, to_common_success_result,
+            write_to_file,
+        },
+    },
+    genesis::git::from_yaml,
 };
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -152,11 +158,9 @@ impl CliConfig {
             return Err(CliError::ConfigNotFoundError(format!("{:?}", config_file)));
         }
 
-        let bytes = std::fs::read(&config_file).map_err(|err| {
-            CliError::ConfigLoadError(format!("{:?}", config_file), err.to_string())
-        })?;
-        serde_yaml::from_slice(&bytes)
-            .map_err(|err| CliError::ConfigLoadError(format!("{:?}", config_file), err.to_string()))
+        from_yaml(
+            &String::from_utf8(read_from_file(config_file.as_path())?).map_err(CliError::from)?,
+        )
     }
 
     pub fn load_profile(profile: &str) -> CliTypedResult<Option<ProfileConfig>> {
@@ -267,11 +271,7 @@ impl EncodingType {
         name: &'static str,
         path: &Path,
     ) -> CliTypedResult<Key> {
-        let data = std::fs::read(&path).map_err(|err| {
-            CliError::UnableToReadFile(path.to_str().unwrap().to_string(), err.to_string())
-        })?;
-
-        self.decode_key(name, data)
+        self.decode_key(name, read_from_file(path)?)
     }
 
     /// Decodes an encoded key given the known encoding
