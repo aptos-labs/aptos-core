@@ -18,10 +18,13 @@ class ApplicationController < ActionController::Base
   end
 
   def after_sign_in_path_for(user)
+    stored_location = stored_location_for(user)
+    return stored_location if stored_location.present?
+
     if user.email.nil?
       onboarding_email_path
     else
-      stored_location_for(user) || overview_index_path
+      overview_index_path
     end
   end
 

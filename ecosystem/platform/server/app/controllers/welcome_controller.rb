@@ -3,11 +3,12 @@
 # frozen_string_literal: true
 
 class WelcomeController < ApplicationController
-  before_action :authenticate_user!, only: %i[it1]
-
   def index
+    @hide_header = true
     redirect_to overview_index_path if user_signed_in?
   end
 
-  def it1; end
+  def it1
+    store_location_for(:user, it1_path) unless user_signed_in?
+  end
 end

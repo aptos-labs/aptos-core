@@ -16,7 +16,7 @@
 
   <body class="flex flex-col h-screen justify-between">
     <div class="flex flex-col flex-1">
-      <%= render "layouts/header" %>
+      <%= render "layouts/header" unless @hide_header %>
 
       <main class="flex-1">
         <%= yield %>

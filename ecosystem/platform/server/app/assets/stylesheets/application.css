@@ -20,3 +20,7 @@
  *= stub "application.tailwind"
  *= stub "active_admin"
  */
+
+dialog::backdrop {
+  background: rgba(0,0,0,0.75);
+}
