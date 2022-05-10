@@ -178,7 +178,7 @@ Aptos is now set up for account 18B61497FD290B02BB0751F44381CADA1657C2B3AA6194A0
 
 You can list the resources in an account from the command line. For example, see below for how to list the resources in the account you just created above:
 ```bash
-$ aptos account list --account 18B61497FD290B02BB0751F44381CADA1657C2B3AA6194A00D9BC9A85FAD3B04
+$ aptos account list --query resources --account 18B61497FD290B02BB0751F44381CADA1657C2B3AA6194A00D9BC9A85FAD3B04
 
 ```
 
@@ -281,7 +281,7 @@ $ aptos account list
 
 Additionally, any place that takes an account can use the name of a profile:
 ```bash
-$ ./aptos account list --account superuser
+$ ./aptos account list --query resources --account superuser
 {
   "Result": [
     {
@@ -321,6 +321,89 @@ $ ./aptos account list --account superuser
           },
           "len_bytes": 40
         }
+      }
+    }
+  ]
+}
+```
+
+### Listing modules in an account
+
+You can pass different types of queries to view different items under an account. Currently, 'resources' and
+'modules' are supported but more query types are coming. For example, to fetch modules:
+```bash
+$ ./aptos account list --query modules --account superuser
+
+{
+  "Result": [
+    {
+      "bytecode": "0xa11ceb0b050000000b01000a020a12031c2504410405452d0772e00108d202400692030a0a9c03150cb103650d96040400000101010201030104000506000006080001070700030e0401060100080001000009020300020f0404000110060100041107000003120709010603130a030106050806080105010802020c0a02000103040508020802070801010a0201060c010800010b0301090002070b030109000900074d657373616765054153434949064572726f7273054576656e74065369676e6572124d6573736167654368616e67654576656e740d4d657373616765486f6c64657206537472696e670b6765745f6d6573736167650b7365745f6d6573736167650c66726f6d5f6d6573736167650a746f5f6d657373616765076d657373616765156d6573736167655f6368616e67655f6576656e74730b4576656e7448616e646c650d6e6f745f7075626c697368656406737472696e670a616464726573735f6f66106e65775f6576656e745f68616e646c650a656d69745f6576656e747bd2d264eec4088a11c41a7acbcd8ab2d2c887fa4ea1a3ab0d0b4a405ddfb1560000000000000000000000000000000000000000000000000000000000000001030800000000000000000002020a08020b08020102020c08020d0b030108000001000101030b0a002901030607001102270b002b0110001402010200010105240b0111030c040e0011040c020a02290120030b05120e000b040e00380012012d0105230b022a010c050a051000140c030a050f010b030a04120038010b040b050f0015020100010100",
+      "abi": {
+        "address": "0x7bd2d264eec4088a11c41a7acbcd8ab2d2c887fa4ea1a3ab0d0b4a405ddfb156",
+        "name": "Message",
+        "friends": [],
+        "exposed_functions": [
+          {
+            "name": "get_message",
+            "visibility": "public",
+            "generic_type_params": [],
+            "params": [
+              "address"
+            ],
+            "return": [
+              "0x1::ASCII::String"
+            ]
+          },
+          {
+            "name": "set_message",
+            "visibility": "script",
+            "generic_type_params": [],
+            "params": [
+              "signer",
+              "vector"
+            ],
+            "return": []
+          }
+        ],
+        "structs": [
+          {
+            "name": "MessageChangeEvent",
+            "is_native": false,
+            "abilities": [
+              "drop",
+              "store"
+            ],
+            "generic_type_params": [],
+            "fields": [
+              {
+                "name": "from_message",
+                "type": "0x1::ASCII::String"
+              },
+              {
+                "name": "to_message",
+                "type": "0x1::ASCII::String"
+              }
+            ]
+          },
+          {
+            "name": "MessageHolder",
+            "is_native": false,
+            "abilities": [
+              "key"
+            ],
+            "generic_type_params": [],
+            "fields": [
+              {
+                "name": "message",
+                "type": "0x1::ASCII::String"
+              },
+              {
+                "name": "message_change_events",
+                "type": "0x1::Event::EventHandle<0x7bd2d264eec4088a11c41a7acbcd8ab2d2c887fa4ea1a3ab0d0b4a405ddfb156::Message::MessageChangeEvent>"
+              }
+            ]
+          }
+        ]
       }
     }
   ]
