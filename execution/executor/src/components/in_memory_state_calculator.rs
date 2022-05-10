@@ -4,7 +4,7 @@
 use crate::components::apply_chunk_output::ParsedTransactionOutput;
 use anyhow::{anyhow, bail, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_state_view::account_with_state_cache::AsAccountWithStateCache;
+use aptos_state_view::{account_with_state_cache::AsAccountWithStateCache, StateViewId};
 use aptos_types::{
     account_view::AccountView,
     epoch_state::EpochState,
@@ -25,7 +25,9 @@ use std::{
     sync::Arc,
 };
 use storage_interface::{
-    in_memory_state::InMemoryState, verified_state_view::StateCache, DbReader, TreeState,
+    in_memory_state::InMemoryState,
+    verified_state_view::{StateCache, VerifiedStateView},
+    DbReader, TreeState,
 };
 
 pub trait IntoLedgerView {
@@ -33,17 +35,33 @@ pub trait IntoLedgerView {
 }
 
 impl IntoLedgerView for TreeState {
-    fn into_ledger_view(self, _db: &Arc<dyn DbReader>) -> Result<ExecutedTrees> {
-        let checkpoint_num_txns = self.num_transactions;
-        let checkpoint =
-            InMemoryState::new_at_checkpoint(self.state_root_hash, checkpoint_num_txns);
+    fn into_ledger_view(self, db: &Arc<dyn DbReader>) -> Result<ExecutedTrees> {
+        let checkpoint_num_txns = self
+            .num_transactions
+            .checked_sub(self.write_sets_after_checkpoint.len() as LeafCount)
+            .ok_or_else(|| anyhow!("State checkpoint pre-dates genesis."))?;
+        let checkpoint_state =
+            InMemoryState::new_at_checkpoint(self.state_checkpoint_hash, checkpoint_num_txns);
 
+        let checkpoint_state_view = VerifiedStateView::new(
+            StateViewId::Miscellaneous,
+            db.clone(),
+            checkpoint_num_txns.checked_sub(1),
+            self.state_checkpoint_hash,
+            checkpoint_state.checkpoint.clone(),
+        );
+        let write_sets: Vec<_> = self.write_sets_after_checkpoint.iter().collect();
+        checkpoint_state_view.prime_cache_by_write_set(&write_sets)?;
+        let state_cache = checkpoint_state_view.into_state_cache();
+        let calculator =
+            InMemoryStateCalculator::new(&checkpoint_state, state_cache, checkpoint_num_txns);
+        let state = calculator.calculate_for_write_sets_after_checkpoint(&write_sets)?;
         let transaction_accumulator = Arc::new(InMemoryAccumulator::new(
             self.ledger_frozen_subtree_hashes,
             self.num_transactions,
         )?);
 
-        Ok(ExecutedTrees::new(checkpoint, transaction_accumulator))
+        Ok(ExecutedTrees::new(state, transaction_accumulator))
     }
 }
 
@@ -280,7 +298,6 @@ impl InMemoryStateCalculator {
         Ok((result_state, self.state_cache))
     }
 
-    #[allow(dead_code)]
     pub fn calculate_for_write_sets_after_checkpoint(
         mut self,
         write_sets: &[&WriteSet],

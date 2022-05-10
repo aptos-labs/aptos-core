@@ -22,6 +22,11 @@ use std::{
     time::{Duration, Instant},
 };
 
+// TODO(aldenhu):
+// A DB restored from a backup can have no checkpoint before the "committed version", which is
+// deemed to exist only because there's the last epoch ending ledger info.
+// Needs to address separately.
+#[ignore]
 #[tokio::test]
 async fn test_db_restore() {
     // pre-build tools

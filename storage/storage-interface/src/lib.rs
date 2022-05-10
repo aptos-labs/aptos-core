@@ -30,6 +30,7 @@ use aptos_types::{
         AccountTransactionsWithProof, TransactionInfo, TransactionListWithProof,
         TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
     },
+    write_set::WriteSet,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
@@ -77,7 +78,8 @@ impl StartupInfo {
         let committed_tree_state = TreeState {
             num_transactions: 0,
             ledger_frozen_subtree_hashes: Vec::new(),
-            state_root_hash: *SPARSE_MERKLE_PLACEHOLDER_HASH,
+            state_checkpoint_hash: *SPARSE_MERKLE_PLACEHOLDER_HASH,
+            write_sets_after_checkpoint: Vec::new(),
         };
         let synced_tree_state = None;
 
@@ -109,26 +111,52 @@ impl StartupInfo {
 pub struct TreeState {
     pub num_transactions: LeafCount,
     pub ledger_frozen_subtree_hashes: Vec<HashValue>,
-    pub state_root_hash: HashValue,
+    /// Root hash of the state checkpoint (global sparse merkle tree).
+    pub state_checkpoint_hash: HashValue,
+    /// The state checkpoint can be at or before the latest version, if the latter case, this is
+    /// the write sets between the state checkpoint and the latest version. Applying this to the
+    /// state checkpoint results in a in-mem latest world state.
+    /// N.b the latest version minus `write_sets_after_checkpoint.len()` is the state checkpoint
+    /// version.
+    pub write_sets_after_checkpoint: Vec<WriteSet>,
 }
 
 impl TreeState {
     pub fn new(
         num_transactions: LeafCount,
         ledger_frozen_subtree_hashes: Vec<HashValue>,
-        account_state_root_hash: HashValue,
+        state_checkpoint_hash: HashValue,
+        write_sets_after_checkpoint: Vec<WriteSet>,
     ) -> Self {
         Self {
             num_transactions,
             ledger_frozen_subtree_hashes,
-            state_root_hash: account_state_root_hash,
+            state_checkpoint_hash,
+            write_sets_after_checkpoint,
         }
+    }
+
+    pub fn new_at_state_checkpoint(
+        num_transactions: LeafCount,
+        ledger_frozen_subtree_hashes: Vec<HashValue>,
+        state_root_hash: HashValue,
+    ) -> Self {
+        Self {
+            num_transactions,
+            ledger_frozen_subtree_hashes,
+            state_checkpoint_hash: state_root_hash,
+            write_sets_after_checkpoint: Vec::new(),
+        }
+    }
+
+    pub fn new_empty() -> Self {
+        Self::new_at_state_checkpoint(0, Vec::new(), *SPARSE_MERKLE_PLACEHOLDER_HASH)
     }
 
     pub fn describe(&self) -> &'static str {
         if self.num_transactions != 0 {
             "DB has been bootstrapped."
-        } else if self.state_root_hash != *SPARSE_MERKLE_PLACEHOLDER_HASH {
+        } else if self.state_checkpoint_hash != *SPARSE_MERKLE_PLACEHOLDER_HASH {
             "DB has no transaction, but a non-empty pre-genesis state."
         } else {
             "DB is empty, has no transaction or state."

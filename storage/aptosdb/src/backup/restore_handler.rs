@@ -92,19 +92,19 @@ impl RestoreHandler {
         )
     }
 
-    pub fn get_tree_state(&self, num_transactions: LeafCount) -> Result<TreeState> {
+    pub fn get_tree_state(&self, version: Option<Version>) -> Result<TreeState> {
+        let num_transactions: LeafCount = version.map_or(0, |v| v + 1);
         let frozen_subtrees = self
             .ledger_store
             .get_frozen_subtree_hashes(num_transactions)?;
-        let state_root_hash = if num_transactions == 0 {
-            self.state_store
+        let state_root_hash = match version {
+            None => self
+                .state_store
                 .get_root_hash_option(PRE_GENESIS_VERSION)?
-                .unwrap_or(*SPARSE_MERKLE_PLACEHOLDER_HASH)
-        } else {
-            self.state_store.get_root_hash(num_transactions - 1)?
+                .unwrap_or(*SPARSE_MERKLE_PLACEHOLDER_HASH),
+            Some(ver) => self.state_store.get_root_hash(ver)?,
         };
-
-        Ok(TreeState::new(
+        Ok(TreeState::new_at_state_checkpoint(
             num_transactions,
             frozen_subtrees,
             state_root_hash,

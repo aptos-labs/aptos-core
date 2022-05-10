@@ -3,7 +3,9 @@
 
 ///! This module provides reusable helpers in tests.
 use super::*;
+use crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema;
 use aptos_crypto::hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher};
+use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 use aptos_temppath::TempPath;
 use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -603,6 +605,16 @@ pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &Transacti
         .put_transaction_infos(version, &[txn_info.clone()], &mut cs)
         .unwrap();
     db.db.write_schemas(cs.batch).unwrap();
+}
+
+pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {
+    db.db
+        .put::<JellyfishMerkleNodeSchema>(
+            &NodeKey::new_empty_path(version),
+            &Node::new_leaf(key.hash(), StateKeyAndValue::new(key, value)),
+        )
+        .unwrap();
+    db.state_store.set_latest_version(version);
 }
 
 pub fn test_sync_transactions_impl(

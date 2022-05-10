@@ -443,6 +443,47 @@ impl AptosDB {
         })
     }
 
+    fn get_tree_state(&self, version: Option<Version>) -> Result<TreeState> {
+        let num_transactions = version.map_or(0, |v| v + 1);
+
+        let frozen_subtrees = self
+            .ledger_store
+            .get_frozen_subtree_hashes(num_transactions)?;
+
+        let checkpoint_version = self
+            .state_store
+            .find_latest_persisted_version_less_than(num_transactions)?;
+        let checkpoint_root_hash = checkpoint_version
+            .map_or(Ok(*SPARSE_MERKLE_PLACEHOLDER_HASH), |ver| {
+                self.state_store.get_root_hash(ver)
+            })?;
+
+        let write_sets_after_checkpoint = self.transaction_store.get_write_sets(
+            Self::state_checkpoint_next_version(checkpoint_version),
+            num_transactions,
+        )?;
+
+        Ok(TreeState::new(
+            num_transactions,
+            frozen_subtrees,
+            checkpoint_root_hash,
+            write_sets_after_checkpoint,
+        ))
+    }
+
+    fn state_checkpoint_next_version(checkpoint_version: Option<Version>) -> Version {
+        match checkpoint_version {
+            None => 0,
+            Some(v) => {
+                if v == PRE_GENESIS_VERSION {
+                    0
+                } else {
+                    v + 1
+                }
+            }
+        }
+    }
+
     // ================================== Backup APIs ===================================
 
     /// Gets an instance of `BackupHandler` for data backup purpose.
@@ -1004,7 +1045,27 @@ impl DbReader for AptosDB {
     }
 
     fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
-        gauged_api("get_startup_info", || self.ledger_store.get_startup_info())
+        gauged_api("get_startup_info", || {
+            self.ledger_store
+                .get_startup_info()?
+                .map(
+                    |(latest_ledger_info, latest_epoch_state_if_not_in_li, synced_version_opt)| {
+                        let committed_tree_state =
+                            self.get_tree_state(Some(latest_ledger_info.ledger_info().version()))?;
+                        let synced_tree_state = synced_version_opt
+                            .map(|v| self.get_tree_state(Some(v)))
+                            .transpose()?;
+
+                        Ok(StartupInfo::new(
+                            latest_ledger_info,
+                            latest_epoch_state_if_not_in_li,
+                            committed_tree_state,
+                            synced_tree_state,
+                        ))
+                    },
+                )
+                .transpose()
+        })
     }
 
     fn get_state_value_with_proof_by_version(
@@ -1020,25 +1081,13 @@ impl DbReader for AptosDB {
 
     fn get_latest_tree_state(&self) -> Result<TreeState> {
         gauged_api("get_latest_tree_state", || {
-            let tree_state = match self.ledger_store.get_latest_transaction_info_option()? {
-                Some((version, txn_info)) => {
-                    self.ledger_store.get_tree_state(version + 1, txn_info)?
-                }
-                None => TreeState::new(
-                    0,
-                    vec![],
-                    self.state_store
-                        .get_root_hash_option(PRE_GENESIS_VERSION)?
-                        .unwrap_or(*SPARSE_MERKLE_PLACEHOLDER_HASH),
-                ),
-            };
+            let latest_version = self
+                .ledger_store
+                .get_latest_transaction_info_option()?
+                .map(|(version, _)| version);
+            let tree_state = self.get_tree_state(latest_version)?;
 
-            info!(
-                num_transactions = tree_state.num_transactions,
-                state_root_hash = %tree_state.state_root_hash,
-                description = tree_state.describe(),
-                "Got latest TreeState."
-            );
+            info!(tree_state = tree_state, "Got latest TreeState.");
 
             Ok(tree_state)
         })

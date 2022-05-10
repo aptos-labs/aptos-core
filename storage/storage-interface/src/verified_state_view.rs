@@ -12,10 +12,14 @@ use aptos_types::{
     proof::SparseMerkleProof,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Version, PRE_GENESIS_VERSION},
+    write_set::WriteSet,
 };
 use parking_lot::RwLock;
 use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 /// `VerifiedStateView` is like a snapshot of the global state comprised of state view at two
 /// levels, persistent storage and memory.
@@ -110,6 +114,16 @@ impl VerifiedStateView {
             state_cache: RwLock::new(HashMap::new()),
             state_proof_cache: RwLock::new(HashMap::new()),
         }
+    }
+
+    pub fn prime_cache_by_write_set(&self, write_sets: &[&WriteSet]) -> Result<()> {
+        write_sets
+            .iter()
+            .flat_map(|write_set| write_set.iter())
+            .map(|(key, _)| key)
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .try_for_each(|key| self.get_state_value(key).map(|_| ()))
     }
 
     pub fn into_state_cache(self) -> StateCache {
