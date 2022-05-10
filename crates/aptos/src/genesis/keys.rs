@@ -40,18 +40,20 @@ impl CliCommand<PathBuf> for GenerateKeys {
     async fn execute(self) -> CliTypedResult<PathBuf> {
         let account_key = key::GenerateKey::generate_ed25519_in_memory();
         let consensus_key = key::GenerateKey::generate_ed25519_in_memory();
-        let network_key = key::GenerateKey::generate_x25519_in_memory()?;
+        // Start network key based off of the account key, we can update it later
+        let network_key =
+            x25519::PrivateKey::from_ed25519_private_bytes(&account_key.to_bytes()).unwrap();
         let keys_file = self.output_dir.join(PRIVATE_KEYS_FILE);
 
         let account_address =
             AuthenticationKey::ed25519(&account_key.public_key()).derived_address();
+
         let config = KeysAndAccount {
             account_address,
             account_key,
             consensus_key,
             network_key,
         };
-
         write_to_file(
             keys_file.as_path(),
             "private_keys.yaml",
