@@ -4,7 +4,9 @@
 use crate::{
     aptosnet::{
         logging::{LogEntry, LogEvent, LogSchema},
-        metrics::{increment_counter, start_timer, DataType},
+        metrics::{
+            increment_counter, set_gauge, start_timer, DataType, PRIORITIZED_PEER, REGULAR_PEER,
+        },
         state::{ErrorType, PeerStates},
     },
     AptosDataClient, Error, GlobalDataSummary, Response, ResponseCallback, ResponseContext,
@@ -38,6 +40,7 @@ use storage_service_types::{
     StorageServiceRequest, StorageServiceResponse, TransactionOutputsWithProofRequest,
     TransactionsWithProofRequest,
 };
+use tokio::runtime::Handle;
 
 mod logging;
 mod metrics;
@@ -45,10 +48,15 @@ mod state;
 #[cfg(test)]
 mod tests;
 
+// TODO(joshlind): this code needs to be restructured. There are no clear APIs
+// and little separation between components.
+
 // Useful constants for the Aptos Data Client
 const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 5;
 const GLOBAL_DATA_METRIC_FREQ_SECS: u64 = 1;
-const POLLER_ERROR_LOG_FREQ_SECS: u64 = 1;
+const IN_FLIGHT_METRICS_SAMPLE_FREQ: u64 = 5;
+const POLLER_LOG_FREQ_SECS: u64 = 1;
+const REGULAR_PEER_SAMPLE_FREQ: u64 = 3;
 
 /// An [`AptosDataClient`] that fulfills requests from remote peers' Storage Service
 /// over AptosNet.
@@ -88,6 +96,7 @@ impl AptosNetDataClient {
         storage_service_config: StorageServiceConfig,
         time_service: TimeService,
         network_client: StorageServiceClient,
+        runtime: Option<Handle>,
     ) -> (Self, DataSummaryPoller) {
         let client = Self {
             data_client_config,
@@ -97,9 +106,10 @@ impl AptosNetDataClient {
             response_id_generator: Arc::new(U64IdGenerator::new()),
         };
         let poller = DataSummaryPoller::new(
-            time_service,
             client.clone(),
             Duration::from_millis(client.data_client_config.summary_poll_interval_ms),
+            runtime,
+            time_service,
         );
         (client, poller)
     }
@@ -146,46 +156,65 @@ impl AptosNetDataClient {
             })
     }
 
-    /// Fetches the next group of peers to poll. The group will contain: (i) any (new) peers that
-    /// have connected since the last time this method was called (i.e., the peers that have not
-    /// been polled yet); (ii) at most one prioritized peer (e.g., those that are upstream); and
-    /// (iii) at most one non-prioritized peer (i.e., those that are downstream).
-    fn fetch_peers_to_poll(&self) -> Result<Vec<PeerNetworkId>, Error> {
-        let mut peers_to_poll = vec![];
+    /// Fetches the next prioritized peer to poll
+    fn fetch_prioritized_peer_to_poll(&self) -> Result<Option<PeerNetworkId>, Error> {
+        // Fetch the number of in-flight polls and update the metrics
+        let num_in_flight_polls = self.peer_states.read().num_in_flight_priority_polls();
+        update_in_flight_metrics(PRIORITIZED_PEER, num_in_flight_polls);
 
-        // Fetch the last polled high-priority peer
-        if let Some(peer) = self.peer_states.write().oldest_polled_priority_peer() {
-            peers_to_poll.push(peer);
+        // Ensure we don't go over the maximum number of in-flight polls
+        if num_in_flight_polls >= self.data_client_config.max_num_in_flight_priority_polls {
+            return Ok(None);
         }
 
-        // Fetch all new peers (i.e., those not yet polled)
-        for peer in self.get_all_connected_peers()? {
-            if !self.peer_states.read().already_polled_peer(&peer) {
-                peers_to_poll.push(peer);
-            }
+        // Get all connected peers and identify the priority peers
+        let mut peers = self.get_all_connected_peers()?;
+        peers.retain(|peer| self.peer_states.read().is_priority_peer(peer));
+
+        self.select_peer_to_poll(peers)
+    }
+
+    /// Fetches the next regular peer to poll
+    fn fetch_regular_peer_to_poll(&self) -> Result<Option<PeerNetworkId>, Error> {
+        // Fetch the number of in-flight polls and update the metrics
+        let num_in_flight_polls = self.peer_states.read().num_in_flight_regular_polls();
+        update_in_flight_metrics(REGULAR_PEER, num_in_flight_polls);
+
+        // Ensure we don't go over the maximum number of in-flight polls
+        if num_in_flight_polls >= self.data_client_config.max_num_in_flight_regular_polls {
+            return Ok(None);
         }
 
-        // Handle regular peer polling
-        if peers_to_poll.is_empty() {
-            // Always try and poll at least one peer
-            if let Some(peer) = self.peer_states.write().oldest_polled_regular_peer() {
-                peers_to_poll.push(peer);
-            }
-        } else {
-            // Poll regular peers at a 1/3 reduced frequency
-            sample!(SampleRate::Frequency(3), {
-                if let Some(peer) = self.peer_states.write().oldest_polled_regular_peer() {
-                    peers_to_poll.push(peer);
-                }
-            });
-        }
+        // Get all connected peers and identify the regular peers
+        let mut peers = self.get_all_connected_peers()?;
+        peers.retain(|peer| !self.peer_states.read().is_priority_peer(peer));
 
-        // Mark all peers as polled
-        for peer in &peers_to_poll {
-            self.peer_states.write().mark_peer_as_polled(peer);
-        }
+        self.select_peer_to_poll(peers)
+    }
 
-        Ok(peers_to_poll)
+    /// Randomly selects a peer to poll that does not have an in-flight request
+    fn select_peer_to_poll(
+        &self,
+        mut peers: Vec<PeerNetworkId>,
+    ) -> Result<Option<PeerNetworkId>, Error> {
+        // Identify the peers who do not already have in-flight requests.
+        peers.retain(|peer| !self.peer_states.read().existing_in_flight_request(peer));
+
+        // Select a peer at random for polling
+        let peer_to_poll = peers.choose(&mut rand::thread_rng());
+        Ok(peer_to_poll.cloned())
+    }
+
+    /// Marks the given peers as having an in-flight poll request
+    fn in_flight_request_started(&self, peer: &PeerNetworkId) {
+        self.peer_states.write().new_in_flight_request(peer);
+    }
+
+    /// Marks the given peers as polled
+    fn in_flight_request_complete(&self, peer: &PeerNetworkId) {
+        self.peer_states
+            .write()
+            .mark_in_flight_request_complete(peer);
     }
 
     /// Returns all peers connected to us
@@ -471,22 +500,27 @@ impl fmt::Debug for AptosNetResponseCallback {
     }
 }
 
+/// A poller for storage summaries that is responsible for periodically refreshing
+/// the view of advertised data in the network.
 pub struct DataSummaryPoller {
-    time_service: TimeService,
-    data_client: AptosNetDataClient,
-    poll_interval: Duration,
+    data_client: AptosNetDataClient, // The data client through which to poll peers
+    poll_interval: Duration,         // The interval between polling rounds
+    runtime: Option<Handle>,         // An optional runtime on which to spawn the poller threads
+    time_service: TimeService,       // The service to monitor elapsed time
 }
 
 impl DataSummaryPoller {
     fn new(
-        time_service: TimeService,
         data_client: AptosNetDataClient,
         poll_interval: Duration,
+        runtime: Option<Handle>,
+        time_service: TimeService,
     ) -> Self {
         Self {
-            time_service,
             data_client,
             poll_interval,
+            runtime,
+            time_service,
         }
     }
 
@@ -503,95 +537,158 @@ impl DataSummaryPoller {
             // Wait for next round before polling
             ticker.next().await;
 
-            // Fetch the peers to poll
-            let peers_to_poll = match self.data_client.fetch_peers_to_poll() {
-                Ok(peers_to_poll) => peers_to_poll,
-                Err(error) => {
-                    sample!(
-                        SampleRate::Duration(Duration::from_secs(POLLER_ERROR_LOG_FREQ_SECS)),
-                        error!(
-                            (LogSchema::new(LogEntry::StorageSummaryRequest)
-                                .event(LogEvent::NoPeersToPoll)
-                                .message("Unable to fetch any peers to poll!")
-                                .error(&error))
-                        );
-                    );
-                    continue;
-                }
-            };
+            // Fetch the prioritized and regular peers to poll (if any)
+            let prioritized_peer = self.try_fetch_peer(true);
+            let regular_peer = self.fetch_regular_peer(prioritized_peer.is_none());
 
-            // Ensure peers to poll is not empty
-            if peers_to_poll.is_empty() {
+            // Ensure the peers to poll exist
+            if prioritized_peer.is_none() && regular_peer.is_none() {
                 sample!(
-                    SampleRate::Duration(Duration::from_secs(POLLER_ERROR_LOG_FREQ_SECS)),
-                    error!(
+                    SampleRate::Duration(Duration::from_secs(POLLER_LOG_FREQ_SECS)),
+                    debug!(
                         (LogSchema::new(LogEntry::StorageSummaryRequest)
                             .event(LogEvent::NoPeersToPoll)
-                            .message("Peers to poll is empty!"))
+                            .message("No prioritized or regular peers to poll this round!"))
                     );
                 );
+                continue;
             }
 
-            // Go through each peer and poll individually
-            for peer in peers_to_poll {
-                // Start the peer polling timer
-                let timer = start_timer(
-                    &metrics::REQUEST_LATENCIES,
-                    StorageServiceRequest::GetStorageServerSummary
-                        .get_label()
-                        .into(),
+            // Go through each peer and poll them individually
+            if let Some(prioritized_peer) = prioritized_peer {
+                poll_peer(
+                    self.data_client.clone(),
+                    prioritized_peer,
+                    self.runtime.clone(),
                 );
-
-                // Fetch the storage summary for the peer
-                let result: Result<StorageServerSummary> = self
-                    .data_client
-                    .send_request_to_peer_and_decode(
-                        peer,
-                        StorageServiceRequest::GetStorageServerSummary,
-                    )
-                    .await
-                    .map(Response::into_payload);
-                drop(timer);
-
-                // Check the storage summary response
-                let storage_summary = match result {
-                    Ok(storage_summary) => storage_summary,
-                    Err(error) => {
-                        error!(
-                            (LogSchema::new(LogEntry::StorageSummaryResponse)
-                                .event(LogEvent::PeerPollingError)
-                                .message("Error encountered when polling peer!")
-                                .error(&error)
-                                .peer(&peer))
-                        );
-                        continue;
-                    }
-                };
-
-                // Update the global storage summary and the summary for the peer
-                self.data_client.update_summary(peer, storage_summary);
-                self.data_client.update_global_summary_cache();
-
-                // Log the new global data summary and update the metrics
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_LOG_FREQ_SECS)),
-                    info!(
-                        (LogSchema::new(LogEntry::PeerStates)
-                            .event(LogEvent::AggregateSummary)
-                            .message(&format!(
-                                "Global data summary: {:?}",
-                                self.data_client.get_global_data_summary()
-                            )))
-                    );
-                );
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_METRIC_FREQ_SECS)),
-                    let global_data_summary = self.data_client.get_global_data_summary();
-                    update_advertised_data_metrics(global_data_summary);
-                );
+            }
+            if let Some(regular_peer) = regular_peer {
+                poll_peer(self.data_client.clone(), regular_peer, self.runtime.clone());
             }
         }
     }
+
+    /// Fetches the next regular peer to poll based on the sample frequency
+    fn fetch_regular_peer(&self, always_poll: bool) -> Option<PeerNetworkId> {
+        if always_poll {
+            self.try_fetch_peer(false)
+        } else {
+            sample!(SampleRate::Frequency(REGULAR_PEER_SAMPLE_FREQ), {
+                return self.try_fetch_peer(false);
+            });
+            None
+        }
+    }
+
+    /// Attempts to fetch the next peer to poll from the data client.
+    /// If an error is encountered, the error is logged and None is returned.
+    fn try_fetch_peer(&self, is_priority_peer: bool) -> Option<PeerNetworkId> {
+        let result = if is_priority_peer {
+            self.data_client.fetch_prioritized_peer_to_poll()
+        } else {
+            self.data_client.fetch_regular_peer_to_poll()
+        };
+        result.unwrap_or_else(|error| {
+            log_poller_error(error);
+            None
+        })
+    }
+}
+
+/// Logs the given poller error based on the logging frequency
+fn log_poller_error(error: Error) {
+    sample!(
+        SampleRate::Duration(Duration::from_secs(POLLER_LOG_FREQ_SECS)),
+        error!(
+            (LogSchema::new(LogEntry::StorageSummaryRequest)
+                .event(LogEvent::PeerPollingError)
+                .message("Unable to fetch peers to poll!")
+                .error(&error))
+        );
+    );
+}
+
+/// Updates the metrics for the number of in-flight polls
+fn update_in_flight_metrics(label: &str, num_in_flight_polls: u64) {
+    sample!(
+        SampleRate::Frequency(IN_FLIGHT_METRICS_SAMPLE_FREQ),
+        set_gauge(
+            &metrics::IN_FLIGHT_POLLS,
+            label.into(),
+            num_in_flight_polls,
+        );
+    );
+}
+
+/// Spawns a dedicated poller for the given peer.
+fn poll_peer(data_client: AptosNetDataClient, peer: PeerNetworkId, runtime: Option<Handle>) {
+    // Create the poller for the peer
+    let poller = async move {
+        // Mark the in-flight poll as started
+        data_client.in_flight_request_started(&peer);
+
+        // Start the peer polling timer
+        let timer = start_timer(
+            &metrics::REQUEST_LATENCIES,
+            StorageServiceRequest::GetStorageServerSummary
+                .get_label()
+                .into(),
+        );
+
+        // Fetch the storage summary for the peer and stop the timer
+        let result: Result<StorageServerSummary> = data_client
+            .send_request_to_peer_and_decode(peer, StorageServiceRequest::GetStorageServerSummary)
+            .await
+            .map(Response::into_payload);
+        drop(timer);
+
+        // Check the storage summary response
+        let storage_summary = match result {
+            Ok(storage_summary) => storage_summary,
+            Err(error) => {
+                error!(
+                    (LogSchema::new(LogEntry::StorageSummaryResponse)
+                        .event(LogEvent::PeerPollingError)
+                        .message("Error encountered when polling peer!")
+                        .error(&error)
+                        .peer(&peer))
+                );
+                return;
+            }
+        };
+
+        // Update the global storage summary and the summary for the peer
+        data_client.update_summary(peer, storage_summary);
+        data_client.update_global_summary_cache();
+
+        // Mark the in-flight poll as now complete
+        data_client.in_flight_request_complete(&peer);
+
+        // Log the new global data summary and update the metrics
+        sample!(
+            SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_LOG_FREQ_SECS)),
+            info!(
+                (LogSchema::new(LogEntry::PeerStates)
+                    .event(LogEvent::AggregateSummary)
+                    .message(&format!(
+                        "Global data summary: {:?}",
+                        data_client.get_global_data_summary()
+                    )))
+            );
+        );
+        sample!(
+            SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_METRIC_FREQ_SECS)),
+            let global_data_summary = data_client.get_global_data_summary();
+            update_advertised_data_metrics(global_data_summary);
+        );
+    };
+
+    // Spawn the poller
+    if let Some(runtime) = runtime {
+        runtime.spawn(poller)
+    } else {
+        tokio::spawn(poller)
+    };
 }
 
 /// Updates the advertised data metrics using the given global

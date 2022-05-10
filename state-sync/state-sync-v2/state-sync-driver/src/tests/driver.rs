@@ -157,6 +157,7 @@ fn create_driver_for_tests(
         node_config.state_sync.storage_service,
         TimeService::mock(),
         network_client,
+        None,
     );
 
     // Create and spawn the driver

@@ -98,7 +98,7 @@ impl Default for StateSyncDriverConfig {
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 10,
             max_pending_data_chunks: 100,
-            max_stream_wait_time_ms: 10_000,
+            max_stream_wait_time_ms: 5000,
         }
     }
 }
@@ -173,6 +173,8 @@ impl Default for DataStreamingServiceConfig {
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct AptosDataClientConfig {
+    pub max_num_in_flight_priority_polls: u64, // Max num of in-flight polls for priority peers
+    pub max_num_in_flight_regular_polls: u64,  // Max num of in-flight polls for regular peers
     pub response_timeout_ms: u64, // Timeout (in milliseconds) when waiting for a response
     pub summary_poll_interval_ms: u64, // Interval (in milliseconds) between data summary polls
 }
@@ -180,7 +182,9 @@ pub struct AptosDataClientConfig {
 impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
-            response_timeout_ms: 10000,
+            max_num_in_flight_priority_polls: 10,
+            max_num_in_flight_regular_polls: 10,
+            response_timeout_ms: 5000,
             summary_poll_interval_ms: 100,
         }
     }

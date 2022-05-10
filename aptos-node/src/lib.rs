@@ -344,20 +344,21 @@ fn setup_aptos_data_client(
         peer_metadata_storage,
     );
 
-    // Create the data client
-    let (aptos_data_client, data_summary_poller) = AptosNetDataClient::new(
-        aptos_data_client_config,
-        storage_service_config,
-        TimeService::real(),
-        network_client,
-    );
-
-    // Create a new runtime for the data client and spawn the data poller
+    // Create a new runtime for the data client
     let aptos_data_client_runtime = Builder::new_multi_thread()
         .thread_name("aptos-data-client")
         .enable_all()
         .build()
         .expect("Failed to create aptos data client!");
+
+    // Create the data client and spawn the data poller
+    let (aptos_data_client, data_summary_poller) = AptosNetDataClient::new(
+        aptos_data_client_config,
+        storage_service_config,
+        TimeService::real(),
+        network_client,
+        Some(aptos_data_client_runtime.handle().clone()),
+    );
     aptos_data_client_runtime.spawn(data_summary_poller.start_poller());
 
     (aptos_data_client, aptos_data_client_runtime)
