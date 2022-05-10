@@ -214,6 +214,17 @@ jobs:
               exit $FGI_EXIT_CODE
             fi
             exit 0
+  ecosystem-lint:
+    executor: ubuntu-medium
+    steps:
+      - ecosystem-setup
+      # install packages for examples
+      - run: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install
+      - run: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install
+      # Run package build+lint + tests
+      - run: cd ./ecosystem/typescript/sdk && yarn install
+      - run: cd ./ecosystem/typescript/sdk && yarn lint
+      - run: cd ./ecosystem/typescript/sdk && yarn fmt:check
   ecosystem-test:
     executor: ubuntu-xl
     steps:
@@ -234,31 +245,9 @@ jobs:
               exit $DOCKER_COMPOSE_EXIT_CODE
             fi
             circleci-agent step halt
-      - dev-setup
-      - run:
-          name: Install Node + Yarn
-          command: |
-            # Set up Node
-            export NODE_VERSION=16.14.2
-            curl -L -o node.tar.xz "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz"
-            sudo tar -xJf node.tar.xz -C /usr/local --strip-components=1
-            rm node.tar.xz
-            sudo ln -s /usr/local/bin/node /usr/local/bin/nodejs
-            # Set up Yarn
-            export PATH=~/.yarn/bin:$PATH
-            export YARN_VERSION=1.22.17
-            curl -L -o yarn.tar.gz "https://yarnpkg.com/downloads/${YARN_VERSION}/yarn-v${YARN_VERSION}.tar.gz"
-            sudo tar -xzf yarn.tar.gz -C /opt/
-            rm yarn.tar.gz
-            sudo ln -s /opt/yarn-v${YARN_VERSION}/bin/yarn /usr/local/bin/yarn
-            sudo ln -s /opt/yarn-v${YARN_VERSION}/bin/yarnpkg /usr/local/bin/yarnpkg
-      # install packages for examples
-      - run: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install
-      - run: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install
-      # Run package build+lint + tests
+      - ecosystem-setup
+      # Run package install, test, build
       - run: cd ./ecosystem/typescript/sdk && yarn install
-      - run: cd ./ecosystem/typescript/sdk && yarn lint
-      - run: cd ./ecosystem/typescript/sdk && yarn fmt:check
       - run: cd ./ecosystem/typescript/sdk && yarn test
       - run: cd ./ecosystem/typescript/sdk && yarn build
 
@@ -274,6 +263,7 @@ workflows:
       #      - build-benchmarks
       - e2e-test
       - lint
+      - ecosystem-lint
       - unit-test
       - docker-build-push:
           context: aws-dev
@@ -403,6 +393,26 @@ commands:
             # the images that exist in dockerhub org
             echo "export DOCKERHUB_ORG=aptoslab" >> $BASH_ENV
             echo "export DOCKERHUB_IMAGES=( validator forge init validator_tcb tools faucet )" >> $BASH_ENV
+  ecosystem-setup:
+    steps:
+      - checkout
+      - run:
+          name: Install Node + Yarn
+          command: |
+            # Set up Node
+            export NODE_VERSION=16.14.2
+            curl -L -o node.tar.xz "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz"
+            sudo tar -xJf node.tar.xz -C /usr/local --strip-components=1
+            rm node.tar.xz
+            sudo ln -s /usr/local/bin/node /usr/local/bin/nodejs
+            # Set up Yarn
+            export PATH=~/.yarn/bin:$PATH
+            export YARN_VERSION=1.22.17
+            curl -L -o yarn.tar.gz "https://yarnpkg.com/downloads/${YARN_VERSION}/yarn-v${YARN_VERSION}.tar.gz"
+            sudo tar -xzf yarn.tar.gz -C /opt/
+            rm yarn.tar.gz
+            sudo ln -s /opt/yarn-v${YARN_VERSION}/bin/yarn /usr/local/bin/yarn
+            sudo ln -s /opt/yarn-v${YARN_VERSION}/bin/yarnpkg /usr/local/bin/yarnpkg
   docker-compose-setup:
     steps:
       - checkout
