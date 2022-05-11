@@ -76,7 +76,7 @@ Example `private-key.txt` and the associated `private-key.txt.pub` files are sho
   $ cat ~/private-key.txt.pub
   B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813%
   ```
-Note, that the private-key.txt.pub is not the public key which is reffered to later in this tutorial and is not used for running a full node. We mention this key for the sake of completeness as it is used, alongside the private key, to generate the signing key utilizied for signing. 
+Note, that the private-key.txt.pub is not the public key which is referred to later in this tutorial and is not used for running a full node. We mention this key for the sake of completeness as it is used, alongside the private key, to generate the signing key utilized for signing. 
 
 ## Retrieve the public network identity
 
