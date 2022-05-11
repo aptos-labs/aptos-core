@@ -159,6 +159,8 @@ impl Client {
     pub fn put<T: Serialize + ?Sized>(&self, name: &str, input: &T) -> CliTypedResult<()> {
         match self {
             Client::Local(local_repository_path) => {
+                self.create_dir(local_repository_path.to_str().unwrap())?;
+
                 let path = local_repository_path.join(format!("{}.yaml", name));
                 write_to_file(
                     path.as_path(),
@@ -178,9 +180,7 @@ impl Client {
         match self {
             Client::Local(local_repository_path) => {
                 let path = local_repository_path.join(name);
-                if path.exists() && path.is_dir() {
-                    // Do nothing
-                } else {
+                if !path.exists() || !path.is_dir() {
                     std::fs::create_dir(path.as_path())
                         .map_err(|e| CliError::IO(path.display().to_string(), e))?
                 };

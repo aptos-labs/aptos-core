@@ -673,14 +673,12 @@ To generate this using the `aptos` CLI:
 1. Generate your validator's keys:
 
 ```
-mkdir bobs
 cargo run --package aptos -- genesis generate-keys --output-dir bobs
 ```
 
 2. Generate your `ValidatorConfiguration`:
 
 ```
-mkdir my_config
 cargo run --package aptos -- \\
     genesis set-validator-configuration \\
     --keys-dir bobs \\

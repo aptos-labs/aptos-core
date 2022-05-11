@@ -54,6 +54,12 @@ impl CliCommand<PathBuf> for GenerateKeys {
             consensus_key,
             network_key,
         };
+
+        if !self.output_dir.exists() || !self.output_dir.is_dir() {
+            std::fs::create_dir(&self.output_dir)
+                .map_err(|e| CliError::IO(self.output_dir.to_str().unwrap().to_string(), e))?
+        };
+
         write_to_file(
             keys_file.as_path(),
             "private_keys.yaml",
