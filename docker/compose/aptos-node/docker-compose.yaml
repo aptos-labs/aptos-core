@@ -1,24 +1,6 @@
 # This compose file defines an Aptos node deployment.
 # It includes a validator node and a fullnode.
-# To use this docker compose:
-# - Generate keys: <TODO add commands here>
-# - Download genesis.blob and waypoint.txt
-# - Initialize secure-data.json <TODO add commands here>
-
-# Additional information:
-# * If you use this compose for different Aptos Networks, you will need to remove the db volume first.
-# * If you would like to use the current Aptos version within this repository, execute the
-#     `build.sh` in `docker/validator` and change the image tag below to aptos_e2e:latest
-# * Validator images can be found at https://hub.docker.com/repository/docker/aptoslab/validator/tags
-
-# Monitoring:
-# If you want to install the monitoring components for your node deployment,
-# you can symlink the ../monitoring folder into this directory.
-# Note that you will need to rename the monitoring docker-compose.yaml file to avoid duplication.
-# e.g. rename it to docker-compose.mon.yaml
-# You will also need to configure the network in the monitoring compose file,
-# so that the container can join the same network and talk to each other.
-# To start both validator and monitoring, run `docker-compose -f docker-compose.yaml -f docker-compose.mon.yaml up -d`
+# Read the README.md files for instruction on how to install aptos-node
 
 version: "3.8"
 services:
