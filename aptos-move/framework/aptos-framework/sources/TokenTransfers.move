@@ -161,7 +161,7 @@ module AptosFramework::TokenTransfers {
         offer(&owner1, creator_addr, &token_id, 1);
         claim(&creator, owner1_addr, &token_id);
     }
-
+    #[test_only]
     fun create_token(creator: &signer, amount: u64): TokenId {
         use Std::ASCII;
         use Std::Option;

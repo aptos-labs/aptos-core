@@ -23,6 +23,10 @@ module AptosFramework::Token {
     const ETOKEN_ALREADY_EXISTS: u64 = 12;
     const ETOKEN_NOT_PUBLISHED: u64 = 13;
     const ETOKEN_STORE_NOT_PUBLISHED: u64 = 14;
+    const ENO_TOKEN_IN_TOKENSTORE: u64 = 15;
+    const ENO_TRANSFER_CAPABILITY: u64 = 16;
+
+    const NONFUNGIBLE_TOKEN_MAX: u64 = 1;
 
     //
     // Core data structures for holding tokens
@@ -44,9 +48,11 @@ module AptosFramework::Token {
         name: ASCII::String,
     }
 
-    /// Represents resources associated with a token
+    /// Represents token resources owned by token owner
     struct TokenStore has key {
         tokens: Table<TokenId, Token>,
+        transfer_capability: Table<TokenId, TransferCapability>,
+        transfer_all_capability: Table<address, TransferAllCapability>,
         deposit_events: EventHandle<DepositEvent>,
         withdraw_events: EventHandle<WithdrawEvent>,
     }
@@ -63,19 +69,40 @@ module AptosFramework::Token {
         amount: u64,
     }
 
+    /// create collection event with creator address and collection name
+    struct CreateCollectionEvent has drop, store {
+        creator: address,
+        collection_name: ASCII::String,
+    }
+
+    /// token creation event id of token created
+    struct CreateTokenEvent has drop, store {
+        id: TokenId,
+    }
+
+    /// token creation event id of token created
+    struct CreateNonFungibleTokenEvent has drop, store {
+        id: TokenId,
+    }
+
     //
     // Core data structures for creating and maintaining tokens
     //
 
-    /// A token creator may have many tokens and many collections of tokens
+    /// Represent token collection meta-data owned by creator
+    /// A creator can have multiple collections
     struct Collections has key {
         collections: Table<ASCII::String, Collection>,
         token_data: Table<TokenId, TokenData>,
         burn_capabilities: Table<TokenId, BurnCapability>,
         mint_capabilities: Table<TokenId, MintCapability>,
+        create_collection_events: EventHandle<CreateCollectionEvent>,
+        create_token_events: EventHandle<CreateTokenEvent>,
+        create_non_fungible_token_events: EventHandle<CreateNonFungibleTokenEvent>,
+
     }
 
-    /// The source of Tokens, their collection!
+    /// Represent collection metadata
     struct Collection has store {
         // Describes the collection
         description: ASCII::String,
@@ -97,7 +124,7 @@ module AptosFramework::Token {
         description: ASCII::String,
         // The name of this Token
         name: ASCII::String,
-        // Optional maximum number of this type of Token
+        // Optional maximum number of this type of Token. NFT should set maximum to 1.
         maximum: Option<u64>,
         // Total number of this type of Token
         supply: Option<u64>,
@@ -115,19 +142,31 @@ module AptosFramework::Token {
         token_id: TokenId,
     }
 
+    /// Capability for transferring a token,
+    /// only allow transfer from owner address
+    struct TransferCapability has key, store, drop {
+        owner: address,
+    }
+
+    /// Capability for transferring all tokens
+    /// only allow transfer from owner address
+    struct TransferAllCapability has key, store, drop  {
+        owner: address,
+    }
+
     //
-    // Script functions
+    // Creator Script functions
     //
 
     public(script) fun create_limited_collection_script(
-        account: &signer,
+        creator: &signer,
         name: vector<u8>,
         description: vector<u8>,
         uri: vector<u8>,
         maximum: u64,
     ) acquires Collections {
         create_collection(
-            account,
+            creator,
             ASCII::string(name),
             ASCII::string(description),
             ASCII::string(uri),
@@ -136,13 +175,13 @@ module AptosFramework::Token {
     }
 
     public(script) fun create_unlimited_collection_script(
-        account: &signer,
+        creator: &signer,
         name: vector<u8>,
         description: vector<u8>,
         uri: vector<u8>,
     ) acquires Collections {
         create_collection(
-            account,
+            creator,
             ASCII::string(name),
             ASCII::string(description),
             ASCII::string(uri),
@@ -151,7 +190,7 @@ module AptosFramework::Token {
     }
 
     public(script) fun create_limited_token_script(
-        account: &signer,
+        creator: &signer,
         collection: vector<u8>,
         name: vector<u8>,
         description: vector<u8>,
@@ -161,7 +200,7 @@ module AptosFramework::Token {
         uri: vector<u8>,
     ) acquires Collections, TokenStore {
         create_token(
-            account,
+            creator,
             ASCII::string(collection),
             ASCII::string(name),
             ASCII::string(description),
@@ -173,7 +212,7 @@ module AptosFramework::Token {
     }
 
     public(script) fun create_unlimited_token_script(
-        account: &signer,
+        creator: &signer,
         collection: vector<u8>,
         name: vector<u8>,
         description: vector<u8>,
@@ -182,7 +221,7 @@ module AptosFramework::Token {
         uri: vector<u8>,
     ) acquires Collections, TokenStore {
         create_token(
-            account,
+            creator,
             ASCII::string(collection),
             ASCII::string(name),
             ASCII::string(description),
@@ -192,6 +231,10 @@ module AptosFramework::Token {
             ASCII::string(uri),
         );
     }
+
+    //
+    // Transaction Script functions
+    //
 
     public(script) fun direct_transfer_script(
         sender: &signer,
@@ -294,14 +337,18 @@ module AptosFramework::Token {
     }
 
     public fun initialize_token_store(account: &signer) {
-        move_to(
-            account,
-            TokenStore {
-                tokens: Table::new(),
-                deposit_events: Event::new_event_handle<DepositEvent>(account),
-                withdraw_events: Event::new_event_handle<WithdrawEvent>(account),
-            },
-        );
+        if (!exists<TokenStore>(Signer::address_of(account))) {
+            move_to(
+                account,
+                TokenStore{
+                    tokens: Table::new(),
+                    transfer_capability: Table::new(),
+                    transfer_all_capability: Table::new(),
+                    deposit_events: Event::new_event_handle<DepositEvent>(account),
+                    withdraw_events: Event::new_event_handle<WithdrawEvent>(account),
+                },
+            );
+        }
     }
 
     public fun merge(dst_token: &mut Token, source_token: Token) {
@@ -314,15 +361,88 @@ module AptosFramework::Token {
         &token.id
     }
 
-    /// Transfers `amount` of tokens from `from` to `to`.
-    public fun transfer(
+    /// Transfer one token
+    public(script) fun transferFrom(
         from: &signer,
-        id: &TokenId,
         to: address,
+        id: &TokenId
+    ) acquires TokenStore {
+        let token = withdraw_token(from, id ,1);
+        direct_deposit(to, token);
+    }
+
+    /// Transfers `amount` of tokens
+    public(script) fun transferFromMultiple(
+        from: &signer,
+        to: address,
+        id: &TokenId,
         amount: u64,
     ) acquires TokenStore {
         let token = withdraw_token(from, id ,amount);
         direct_deposit(to, token);
+    }
+
+    /// Tranfer amount of token with tranfer capability
+    public fun transfer(
+        operator: address,
+        from: address,
+        to: address,
+        id: &TokenId,
+        amount: u64
+    ) acquires TokenStore {
+        assert!(exists<TokenStore>(operator), ETOKEN_STORE_NOT_PUBLISHED);
+        let token_store = borrow_global<TokenStore>(operator);
+        let is_approve_all = Table::contains( &token_store.transfer_all_capability, &from);
+        let is_approve_token = Table::contains(&token_store.transfer_capability, id);
+        assert!(is_approve_token, ENO_TRANSFER_CAPABILITY);
+        let address_match = Table::borrow(&token_store.transfer_capability, id).owner == from;
+
+        assert!(is_approve_all ||  address_match, ENO_TRANSFER_CAPABILITY);
+
+
+        let token = withdraw_without_event_internal(from, id, amount);
+        direct_deposit(to, token);
+    }
+
+    /// provide the transfer capability to another account
+    public(script) fun approve(owner: &signer, to: address, id: &TokenId, approved: bool) acquires TokenStore{
+        if (approved) {
+            let owner_addr = Signer::address_of(owner);
+            // validate ownership of token before providing transfer capability
+            assert!(exists<TokenStore>(owner_addr), ETOKEN_STORE_NOT_PUBLISHED);
+            assert!(Table::contains(
+                &borrow_global<TokenStore>(owner_addr).tokens, id),
+                ENO_TOKEN_IN_TOKENSTORE
+            );
+            let tranfer_cap = TransferCapability{
+                owner: Signer::address_of(owner),
+            };
+            assert!(exists<TokenStore>(to), ETOKEN_STORE_NOT_PUBLISHED);
+            let token_store = borrow_global_mut<TokenStore>(to);
+            Table::add(&mut token_store.transfer_capability, id, tranfer_cap);
+        }
+        else {
+            assert!(exists<TokenStore>(to), ETOKEN_STORE_NOT_PUBLISHED);
+            let token_store = borrow_global_mut<TokenStore>(to);
+            let _ = Table::remove(&mut token_store.transfer_capability, id);
+        }
+    }
+
+    /// provide the transfer all token capability to another account
+    public(script) fun setApprovalForAll(owner: &signer, to: address, approved: bool) acquires TokenStore{
+        if (approved) {
+            assert!(exists<TokenStore>(to), ETOKEN_STORE_NOT_PUBLISHED);
+            let owner_addr =  Signer::address_of(owner);
+            let tranfer_all_cap = TransferAllCapability { owner: owner_addr};
+            let token_store = borrow_global_mut<TokenStore>(to);
+            Table::add(&mut token_store.transfer_all_capability, &owner_addr, tranfer_all_cap);
+        }
+        else {
+            assert!(exists<TokenStore>(to), ETOKEN_STORE_NOT_PUBLISHED);
+            let owner_addr =  Signer::address_of(owner);
+            let token_store = borrow_global_mut<TokenStore>(to);
+            let _ = Table::remove(&mut token_store.transfer_all_capability, &owner_addr);
+        }
     }
 
     public fun withdraw_token(
@@ -337,15 +457,14 @@ module AptosFramework::Token {
             WithdrawEvent { id: *id, amount },
         );
 
-        withdraw_without_event(account, id, amount)
+        withdraw_without_event_internal(account_addr, id, amount)
     }
 
-    public fun withdraw_without_event(
-        account: &signer,
+    fun withdraw_without_event_internal(
+        account_addr: address,
         id: &TokenId,
-        amount: u64,
+        amount: u64
     ): Token acquires TokenStore {
-        let account_addr = Signer::address_of(account);
         assert!(
             exists<TokenStore>(account_addr),
             Errors::not_published(ETOKEN_STORE_NOT_PUBLISHED),
@@ -401,21 +520,24 @@ module AptosFramework::Token {
 
     /// Create a new collection to hold tokens
     public fun create_collection(
-        account: &signer,
+        creator: &signer,
         name: ASCII::String,
         description: ASCII::String,
         uri: ASCII::String,
         maximum: Option<u64>,
     ) acquires Collections {
-        let account_addr = Signer::address_of(account);
+        let account_addr = Signer::address_of(creator);
         if (!exists<Collections>(account_addr)) {
             move_to(
-                account,
+                creator,
                 Collections {
                     collections: Table::new(),
                     token_data: Table::new(),
                     burn_capabilities: Table::new(),
                     mint_capabilities: Table::new(),
+                    create_collection_events:  Event::new_event_handle<CreateCollectionEvent>(creator),
+                    create_token_events: Event::new_event_handle<CreateTokenEvent>(creator),
+                    create_non_fungible_token_events: Event::new_event_handle<CreateNonFungibleTokenEvent>(creator),
                 },
             )
         };
@@ -436,6 +558,15 @@ module AptosFramework::Token {
         };
 
         Table::add(collections, &name, collection);
+
+        let collection_handle =  borrow_global_mut<Collections>(account_addr);
+        Event::emit_event<CreateCollectionEvent>(
+            &mut collection_handle.create_collection_events,
+            CreateCollectionEvent {
+                creator: account_addr,
+                collection_name: *&name,
+            }
+        );
     }
 
     public fun create_token(
@@ -475,7 +606,7 @@ module AptosFramework::Token {
             );
         };
 
-        let supply = if (monitor_supply) { Option::some(initial_balance) } else { Option::none() };
+        let supply = if (monitor_supply) { Option::some(0) } else { Option::none() };
 
         let token_data = TokenData {
             collection: *&token_id.collection,
@@ -485,8 +616,8 @@ module AptosFramework::Token {
             supply,
             uri: uri,
         };
-
         Table::add(&mut collections.token_data, &token_id, token_data);
+
         Table::add(
             &mut collections.burn_capabilities,
             &token_id,
@@ -504,6 +635,25 @@ module AptosFramework::Token {
             };
             initialize_token(account, &token_id);
             mint(account, Signer::address_of(account), &token_id, initial_balance);
+        };
+
+        let token_handle =  borrow_global_mut<Collections>(account_addr);
+        Event::emit_event<CreateTokenEvent>(
+            &mut token_handle.create_token_events,
+            CreateTokenEvent {
+                id: token_id,
+            }
+        );
+
+        if (Option::is_some(&maximum)) {
+            if (*Option::borrow(&maximum) == NONFUNGIBLE_TOKEN_MAX ) {
+                Event::emit_event<CreateNonFungibleTokenEvent>(
+                    &mut token_handle.create_non_fungible_token_events,
+                    CreateNonFungibleTokenEvent {
+                        id: token_id,
+                    }
+                );
+            }
         };
 
         token_id
@@ -572,16 +722,23 @@ module AptosFramework::Token {
         direct_deposit(dst_addr, Token { id: *token_id, value: amount });
     }
 
-    //
-    // Tests
-    //
+    public fun balanceOf(owner: address, id: &TokenId): u64 acquires  TokenStore{
+        let token_store = borrow_global<TokenStore>(owner);
+        if (Table::contains(&token_store.tokens, id)) {
+            Table::borrow(&token_store.tokens, id).value
+        } else {
+            0
+        }
+    }
+
+    // ****************** TEST-ONLY FUNCTIONS **************
 
     #[test(creator = @0x1, owner = @0x2)]
-    public fun create_withdraw_deposit_nft(
+    public fun create_withdraw_deposit_token(
         creator: signer,
         owner: signer,
     ) acquires Collections, TokenStore {
-        let token_id = create_collection_and_token(&creator, 1);
+        let token_id = create_collection_and_token(&creator, 1, 1, 1);
 
         let token = withdraw_token(&creator, &token_id, 1);
         deposit_token(&owner, token);
@@ -592,7 +749,7 @@ module AptosFramework::Token {
         creator: signer,
         owner: signer,
     ) acquires Collections, TokenStore {
-        let token_id = create_collection_and_token(&creator, 2);
+        let token_id = create_collection_and_token(&creator, 2, 5, 5);
 
         let token_0 = withdraw_token(&creator, &token_id, 1);
         let token_1 = withdraw_token(&creator, &token_id, 1);
@@ -603,19 +760,27 @@ module AptosFramework::Token {
     }
 
     #[test(creator = @0x1)]
-    #[expected_failure] // (abort_code = 3)]
-    public fun test_maximum(creator: signer) acquires Collections, TokenStore {
-        let token_id = create_collection_and_token(&creator, 2);
+    #[expected_failure] // (abort_code = 9)]
+    public fun test_token_maximum(creator: signer) acquires Collections, TokenStore {
+        let token_id = create_collection_and_token(&creator, 2, 2, 1);
+        mint(&creator, Signer::address_of(&creator), &token_id, 1);
+    }
+
+    #[test(creator = @0x1)]
+    #[expected_failure] // (abort_code = 5)]
+    public fun test_collection_maximum(creator: signer) acquires Collections, TokenStore {
+        let token_id = create_collection_and_token(&creator, 2, 2, 1);
         create_token(
             &creator,
-            *&token_id.collection,
-            ASCII::string(b"Token: Hello, Token 2"),
-            ASCII::string(b"Hello, Token 2"),
-            false,
-            1,
-            Option::none(),
+            token_id.collection,
+            ASCII::string(b"Token"),
+            ASCII::string(b"Hello, Token"),
+            true,
+            2,
+            Option::some(100),
             ASCII::string(b"https://aptos.dev"),
         );
+
     }
 
     #[test(creator = @0x1, owner = @0x2)]
@@ -623,15 +788,18 @@ module AptosFramework::Token {
         creator: signer,
         owner: signer,
     ) acquires Collections, TokenStore {
-        let token_id = create_collection_and_token(&creator, 2);
+        let token_id = create_collection_and_token(&creator, 2, 2, 2);
         direct_transfer(&creator, &owner, &token_id, 1);
         let token = withdraw_token(&owner, &token_id, 1);
         deposit_token(&creator, token);
     }
 
-    fun create_collection_and_token(
+    #[test_only]
+    public fun create_collection_and_token(
         creator: &signer,
         amount: u64,
+        collection_max: u64,
+        token_max: u64,
     ): TokenId acquires Collections, TokenStore {
         let collection_name = ASCII::string(b"Hello, World");
 
@@ -640,7 +808,7 @@ module AptosFramework::Token {
             *&collection_name,
             ASCII::string(b"Collection: Hello, World"),
             ASCII::string(b"https://aptos.dev"),
-            Option::some(1),
+            Option::some(collection_max),
         );
 
         create_token(
@@ -650,8 +818,18 @@ module AptosFramework::Token {
             ASCII::string(b"Hello, Token"),
             true,
             amount,
-            Option::none(),
+            Option::some(token_max),
             ASCII::string(b"https://aptos.dev"),
         )
+    }
+
+    #[test(creator = @0xFF)]
+    fun test_create_events_generation(creator: signer) acquires Collections, TokenStore {
+        create_collection_and_token(&creator, 1, 2, 1);
+        let collections = borrow_global<Collections>(Signer::address_of(&creator));
+        assert!(Event::get_event_handle_counter(&collections.create_collection_events) == 1, 1);
+        assert!(Event::get_event_handle_counter(&collections.create_token_events) == 1, 1);
+        assert!(Event::get_event_handle_counter(&collections.create_non_fungible_token_events) == 1, 1);
+
     }
 }

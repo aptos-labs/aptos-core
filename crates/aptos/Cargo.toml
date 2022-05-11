@@ -49,7 +49,7 @@ aptosdb = { path = "../../storage/aptosdb" }
 cached-framework-packages =  { path = "../../aptos-move/framework/cached-packages" }
 executor = { path = "../../execution/executor" }
 framework = { path = '../../aptos-move/framework' }
-move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "testing"] }
+move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "testing", "table-extension"] }
 short-hex-str = { path = "../short-hex-str" }
 storage-interface = { path = "../../storage/storage-interface" }
 vm-genesis = { path = "../../aptos-move/vm-genesis" }

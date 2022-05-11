@@ -70,6 +70,12 @@ module Std::Event {
         guid
     }
 
+    #[test_only]
+    public fun get_event_handle_counter<T: drop + store>(handle : &EventHandle<T>): u64 {
+        let counter = handle.counter;
+        counter
+    }
+
     // ****************** SPECIFICATIONS *******************
     spec module {} // switch documentation context to module
 
