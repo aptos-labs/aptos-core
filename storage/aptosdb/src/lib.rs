@@ -664,10 +664,7 @@ impl DbReader for AptosDB {
         gauged_api("get_latest_state_value", || {
             let ledger_info_with_sigs = self.ledger_store.get_latest_ledger_info()?;
             let version = ledger_info_with_sigs.ledger_info().version();
-            let (blob, _proof) = self
-                .state_store
-                .get_value_with_proof_by_version(&state_key, version)?;
-            Ok(blob)
+            self.state_store.get_value_by_version(&state_key, version)
         })
     }
 

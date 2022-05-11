@@ -196,7 +196,6 @@ impl StateStore {
     /// Get the state value given the state key and root hash of state Merkle tree by using the
     /// state value index. Only used for testing for now but should replace the
     /// `get_value_with_proof_by_version` call for VM execution to fetch the value without proof.
-    #[cfg(test)]
     pub fn get_value_by_version(
         &self,
         state_key: &StateKey,
@@ -221,7 +220,6 @@ impl StateStore {
 
     /// Returns the value index in the form of number of nibbles for given pair of state key and version
     /// which can be used to index into the JMT leaf.
-    #[cfg(test)]
     fn get_jmt_leaf_node_key(
         &self,
         state_key: &StateKey,
