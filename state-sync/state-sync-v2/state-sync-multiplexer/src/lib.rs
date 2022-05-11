@@ -235,6 +235,7 @@ mod tests {
             node_config.state_sync.storage_service,
             TimeService::mock(),
             network_client,
+            None,
         );
 
         // Create the multiplexer

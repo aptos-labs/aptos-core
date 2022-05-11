@@ -123,7 +123,7 @@ pub mod script_to_script_function;
 pub mod system_module_names;
 pub mod transaction_metadata;
 
-pub use crate::{aptos_vm::AptosVM, aptos_vm_impl::convert_changeset_and_events};
+pub use crate::aptos_vm::AptosVM;
 
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -131,14 +131,14 @@ use aptos_types::{
     transaction::{SignedTransaction, Transaction, TransactionOutput, VMValidatorResult},
     vm_status::VMStatus,
 };
-use move_core_types::{
+use move_deps::move_core_types::{
     account_address::AccountAddress,
     language_storage::{ResourceKey, StructTag},
 };
 
 /// This trait describes the VM's validation interfaces.
 pub trait VMValidator {
-    /// Executes the prologue of the Diem Account and verifies that the transaction is valid.
+    /// Executes the prologue of the Aptos Account and verifies that the transaction is valid.
     fn validate_transaction(
         &self,
         transaction: SignedTransaction,

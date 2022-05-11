@@ -2,7 +2,7 @@
 name = "af-cli"
 version = "0.1.0"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
-description = "CLI frontend for the Move compiler and VM (with Diem Framework)"
+description = "CLI frontend for the Move compiler and VM (with Aptos Framework)"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
@@ -10,16 +10,14 @@ publish = false
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.52"
-bcs = "0.1.2"
+anyhow = "1.0.57"
+bcs = "0.1.3"
 clap = "3.1.8"
 
 aptos-vm = { path = "../aptos-vm" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 cached-framework-packages =  { path = "../framework/cached-packages" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["address32"] }
-move-vm-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
-move-cli = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
+move-deps = { path = "../move-deps", features = ["address32"] }
 
 [dev-dependencies]
 datatest-stable = "0.1.1"

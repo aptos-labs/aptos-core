@@ -12,7 +12,7 @@ module Std::Event {
     // the BCS layout of the old value.
     // Note: the reason why this works is somewhat subtle. The BCS encoding for a vector V of
     // length N is `uleb128_encoded_bytes(N) | contents(V)`
-    // (see https://github.com/diem/bcs#fixed-and-variable-length-sequences).
+    // (see https://github.com/aptos/bcs#fixed-and-variable-length-sequences).
     // uleb128_encoded_bytes(24) fits into 1 byte, so using len_bytes: u8 is what we want here
     struct GUIDWrapper has store, drop { len_bytes: u8, guid: GUID }
 
@@ -26,7 +26,7 @@ module Std::Event {
         guid: GUIDWrapper,
     }
 
-    /// Deprecated. Only kept around so Diem clients know how to deserialize existing EventHandleGenerator's
+    /// Deprecated. Only kept around so Aptos clients know how to deserialize existing EventHandleGenerator's
     struct EventHandleGenerator has key {
         // A monotonically increasing counter
         counter: u64,

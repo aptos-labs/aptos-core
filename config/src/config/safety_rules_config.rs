@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::{LoggerConfig, SecureBackend},
+    config::{IdentityBlob, LoggerConfig, SecureBackend, WaypointConfig},
     keys::ConfigKey,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, Uniform};
@@ -26,6 +26,7 @@ pub struct SafetyRulesConfig {
     // Read/Write/Connect networking operation timeout in milliseconds.
     pub network_timeout_ms: u64,
     pub enable_cached_safety_data: bool,
+    pub initial_safety_rules_config: InitialSafetyRulesConfig,
 }
 
 impl Default for SafetyRulesConfig {
@@ -40,6 +41,7 @@ impl Default for SafetyRulesConfig {
             // Default value of 30 seconds for a timeout
             network_timeout_ms: 30_000,
             enable_cached_safety_data: true,
+            initial_safety_rules_config: InitialSafetyRulesConfig::None,
         }
     }
 }
@@ -48,6 +50,35 @@ impl SafetyRulesConfig {
     pub fn set_data_dir(&mut self, data_dir: PathBuf) {
         if let SecureBackend::OnDiskStorage(backend) = &mut self.backend {
             backend.set_data_dir(data_dir);
+        }
+    }
+}
+
+// TODO: Find a cleaner way so WaypointConfig isn't duplicated
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InitialSafetyRulesConfig {
+    FromFile {
+        identity_blob_path: PathBuf,
+        waypoint: WaypointConfig,
+    },
+    None,
+}
+
+impl InitialSafetyRulesConfig {
+    pub fn waypoint(&self) -> Waypoint {
+        match self {
+            InitialSafetyRulesConfig::FromFile { waypoint, .. } => waypoint.waypoint(),
+            InitialSafetyRulesConfig::None => panic!("Must have a waypoint"),
+        }
+    }
+
+    pub fn identity_blob(&self) -> IdentityBlob {
+        match self {
+            InitialSafetyRulesConfig::FromFile {
+                identity_blob_path, ..
+            } => IdentityBlob::from_file(identity_blob_path).unwrap(),
+            InitialSafetyRulesConfig::None => panic!("Must have an identity blob"),
         }
     }
 }

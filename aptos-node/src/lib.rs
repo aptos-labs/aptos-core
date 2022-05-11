@@ -13,20 +13,19 @@ use aptos_config::{
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, Logger};
-use aptos_metrics::{get_public_json_metrics, get_public_metrics, metric_server};
+use aptos_metrics::{get_public_json_metrics, metric_server};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_telemetry::{
-    constants::{APTOS_NODE_PUSH_METRICS, CHAIN_ID_METRIC, PEER_ID_METRIC},
-    send_data,
+    constants::{
+        APTOS_NODE_PUSH_METRICS, CHAIN_ID_METRIC, NODE_PUSH_TIME_SECS, PEER_ID_METRIC,
+        SYNCED_VERSION_METRIC,
+    },
+    send_env_data,
 };
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_config::aptos_root_address,
-    account_view::AccountView,
-    chain_id::ChainId,
-    move_resource::MoveStorage,
-    on_chain_config::{VMPublishingOption, ON_CHAIN_CONFIG_REGISTRY},
-    waypoint::Waypoint,
+    account_config::aptos_root_address, account_view::AccountView, chain_id::ChainId,
+    move_resource::MoveStorage, on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
@@ -44,7 +43,6 @@ use futures::channel::mpsc::channel;
 use mempool_notifications::MempoolNotificationSender;
 use network::application::storage::PeerMetadataStorage;
 use network_builder::builder::NetworkBuilder;
-use regex::Regex;
 use state_sync_multiplexer::{
     state_sync_v1_network_config, StateSyncMultiplexer, StateSyncRuntimes,
 };
@@ -129,7 +127,6 @@ pub fn load_test_environment<R>(
     config_path: Option<PathBuf>,
     random_ports: bool,
     lazy: bool,
-    publishing_option: Option<VMPublishingOption>,
     genesis_modules: Vec<Vec<u8>>,
     rng: R,
 ) where
@@ -173,15 +170,13 @@ pub fn load_test_environment<R>(
             template.consensus.mempool_poll_count = u64::MAX;
         }
 
-        let mut builder = aptos_genesis_tool::validator_builder::ValidatorBuilder::new(
+        let builder = aptos_genesis_tool::validator_builder::ValidatorBuilder::new(
             &config_path,
             genesis_modules,
         )
         .template(template)
         .randomize_first_validator_ports(random_ports);
-        if let Some(publishing_option) = publishing_option {
-            builder = builder.publishing_option(publishing_option);
-        }
+
         let (root_keys, _genesis, genesis_waypoint, validators) = builder.build(rng).unwrap();
 
         let serialized_keys = bcs::to_bytes(&root_keys.root_key).unwrap();
@@ -349,20 +344,21 @@ fn setup_aptos_data_client(
         peer_metadata_storage,
     );
 
-    // Create the data client
-    let (aptos_data_client, data_summary_poller) = AptosNetDataClient::new(
-        aptos_data_client_config,
-        storage_service_config,
-        TimeService::real(),
-        network_client,
-    );
-
-    // Create a new runtime for the data client and spawn the data poller
+    // Create a new runtime for the data client
     let aptos_data_client_runtime = Builder::new_multi_thread()
         .thread_name("aptos-data-client")
         .enable_all()
         .build()
         .expect("Failed to create aptos data client!");
+
+    // Create the data client and spawn the data poller
+    let (aptos_data_client, data_summary_poller) = AptosNetDataClient::new(
+        aptos_data_client_config,
+        storage_service_config,
+        TimeService::real(),
+        network_client,
+        Some(aptos_data_client_runtime.handle().clone()),
+    );
     aptos_data_client_runtime.spawn(data_summary_poller.start_poller());
 
     (aptos_data_client, aptos_data_client_runtime)
@@ -398,8 +394,10 @@ fn setup_state_sync_storage_service(
 
 async fn periodic_telemetry_dump(node_config: NodeConfig, db: DbReaderWriter) {
     use futures::stream::StreamExt;
-    let mut dump_interval =
-        IntervalStream::new(tokio::time::interval(std::time::Duration::from_secs(30))).fuse();
+    let mut dump_interval = IntervalStream::new(tokio::time::interval(
+        std::time::Duration::from_secs(NODE_PUSH_TIME_SECS),
+    ))
+    .fuse();
 
     info!("periodic_telemetry_dump task started");
 
@@ -410,13 +408,6 @@ async fn periodic_telemetry_dump(node_config: NodeConfig, db: DbReaderWriter) {
                 // Build the params from internal prometheus metrics
                 let mut metrics_params: HashMap<String, String> = HashMap::new();
 
-                // Measurement Protocol params must be underscore or alphanumeric
-                // Prometheus metrics use {} to represent dimensions, so rename it
-                let met = get_public_metrics();
-                let re = Regex::new(r"[\{\}=]").unwrap();
-                for (k, v) in &met {
-                    metrics_params.insert(re.replace_all(k, "_").to_string(), v.to_string());
-                }
                 let met = get_public_json_metrics();
                 for (k, v) in &met {
                     metrics_params.insert(k.to_string(), v.to_string());
@@ -428,9 +419,12 @@ async fn periodic_telemetry_dump(node_config: NodeConfig, db: DbReaderWriter) {
                     Some(p) => p.to_string(),
                     None => String::new()
                 };
+                let synced_version = (&*db.reader).fetch_synced_version().unwrap_or(0);
+
+                metrics_params.insert(SYNCED_VERSION_METRIC.to_string(), synced_version.to_string());
                 metrics_params.insert(CHAIN_ID_METRIC.to_string(), chain_id.to_string());
                 metrics_params.insert(PEER_ID_METRIC.to_string(), peer_id.to_string());
-                send_data(APTOS_NODE_PUSH_METRICS.to_string(), peer_id.to_string(), metrics_params).await;
+                send_env_data(APTOS_NODE_PUSH_METRICS.to_string(), peer_id.to_string(), metrics_params).await;
             }
         }
     }

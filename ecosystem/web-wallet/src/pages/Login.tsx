@@ -45,7 +45,8 @@ function Login () {
   const onSubmit: SubmitHandler<Inputs> = async (data, event) => {
     event?.preventDefault()
     try {
-      const encodedKey = Uint8Array.from(Buffer.from(key, 'hex'))
+      const nonHexKey = (key.startsWith('0x')) ? key.substring(2) : key
+      const encodedKey = Uint8Array.from(Buffer.from(nonHexKey, 'hex'))
       const account = new AptosAccount(encodedKey, undefined)
       const response = await getAccountResources({ address: account.address().hex() })
       if (response?.status !== 200) {
@@ -84,7 +85,7 @@ function Login () {
           </Box>
         </Center>
         <Heading textAlign="center">Wallet</Heading>
-        <Text textAlign="center" pb={8} color={secondaryTextColor[colorMode]}>The official Aptos crypto wallet</Text>
+        <Text textAlign="center" pb={8} color={secondaryTextColor[colorMode]}>An Aptos crypto wallet</Text>
         <form onSubmit={handleSubmit(onSubmit)}>
           <VStack spacing={4}>
             <Center minW="100%" px={4}>
@@ -96,6 +97,7 @@ function Login () {
                     variant="filled"
                     required
                     placeholder='Private key...'
+                    autoComplete="off"
                   />
                   <InputRightAddon>
                     <Button type='submit' variant="unstyled">

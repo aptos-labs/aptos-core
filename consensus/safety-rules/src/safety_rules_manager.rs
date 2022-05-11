@@ -10,7 +10,7 @@ use crate::{
     thread::ThreadService,
     SafetyRules, TSafetyRules,
 };
-use aptos_config::config::{SafetyRulesConfig, SafetyRulesService};
+use aptos_config::config::{InitialSafetyRulesConfig, SafetyRulesConfig, SafetyRulesService};
 use aptos_infallible::RwLock;
 use aptos_secure_storage::{KVStorage, Storage};
 use std::{convert::TryInto, net::SocketAddr, sync::Arc};
@@ -45,7 +45,36 @@ pub fn storage(config: &SafetyRulesConfig) -> PersistentSafetyStorage {
             config.enable_cached_safety_data,
         )
     } else {
-        PersistentSafetyStorage::new(internal_storage, config.enable_cached_safety_data)
+        let storage =
+            PersistentSafetyStorage::new(internal_storage, config.enable_cached_safety_data);
+        // If it's initialized, then we can continue
+        if storage.author().is_ok() {
+            storage
+        } else if !matches!(
+            config.initial_safety_rules_config,
+            InitialSafetyRulesConfig::None
+        ) {
+            let identity_blob = config.initial_safety_rules_config.identity_blob();
+            let waypoint = config.initial_safety_rules_config.waypoint();
+
+            let backend = &config.backend;
+            let internal_storage: Storage =
+                backend.try_into().expect("Unable to initialize storage");
+            PersistentSafetyStorage::initialize(
+                internal_storage,
+                identity_blob.account_address,
+                identity_blob
+                    .consensus_key
+                    .expect("Consensus key needed for safety rules"),
+                identity_blob.account_key,
+                waypoint,
+                config.enable_cached_safety_data,
+            )
+        } else {
+            panic!(
+                "Safety rules storage is not initialized, provide an initial safety rules config"
+            )
+        }
     }
 }
 

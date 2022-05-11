@@ -18,7 +18,7 @@ Rails.application.configure do
   config.eager_load = true
 
   # Full error reports are disabled and caching is turned on.
-  config.consider_all_requests_local       = false
+  config.consider_all_requests_local = false
   config.action_controller.perform_caching = true
 
   # Ensures that a master key has been made available in either ENV["RAILS_MASTER_KEY"]
@@ -30,7 +30,8 @@ Rails.application.configure do
   config.public_file_server.enabled = ENV['RAILS_SERVE_STATIC_FILES'].present?
 
   # Compress CSS using a preprocessor.
-  # config.assets.css_compressor = :sass
+  # Must set up dart-sass before re-enabling
+  config.assets.css_compressor = nil
 
   # Do not fallback to assets pipeline if a precompiled asset is missed.
   config.assets.compile = false
@@ -68,6 +69,20 @@ Rails.application.configure do
   # config.active_job.queue_name_prefix = "cp_production"
 
   config.action_mailer.perform_caching = false
+  config.action_mailer.default_url_options = { host: 'community.aptoslabs.com', protocol: 'https' }
+  config.action_mailer.delivery_method = :smtp
+  config.action_mailer.perform_deliveries = true
+  config.action_mailer.raise_delivery_errors = true
+  config.action_mailer.smtp_settings = {
+    address: ENV.fetch('SMTP_HOST', nil),
+    port: ENV.fetch('SMTP_PORT', nil),
+    enable_starttls_auto: true, # detects and uses STARTTLS
+    user_name: 'community@aptoslabs.com',
+    password: ENV.fetch('MAILCHIMP_API_KEY', nil), # SMTP password is any valid API key
+    authentication: 'login', # Mandrill supports 'plain' or 'login'
+    domain: 'aptoslabs.com'
+  }
+  config.action_mailer.preview_path = "#{Rails.root}/tmp/mailers/previews"
 
   # Ignore bad email addresses and do not raise email delivery errors.
   # Set this to true and configure the email server for immediate delivery to raise delivery errors.
@@ -88,9 +103,9 @@ Rails.application.configure do
   # config.logger = ActiveSupport::TaggedLogging.new(Syslog::Logger.new "app-name")
 
   if ENV['RAILS_LOG_TO_STDOUT'].present?
-    logger           = ActiveSupport::Logger.new($stdout)
+    logger = ActiveSupport::Logger.new($stdout)
     logger.formatter = config.log_formatter
-    config.logger    = ActiveSupport::TaggedLogging.new(logger)
+    config.logger = ActiveSupport::TaggedLogging.new(logger)
   end
 
   # Do not dump schema after migrations.

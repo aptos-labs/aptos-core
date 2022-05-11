@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use move_cli::sandbox::commands::test;
+use move_deps::move_cli::sandbox::commands::test;
 
 use std::path::{Path, PathBuf};
 

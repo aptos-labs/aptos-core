@@ -26,11 +26,7 @@
   fields.revision = "{{ .Values.imageTag }}"
   fields.chain_name = "{{ required "chain.name must be set" .Values.chain.name }}"
 
-{{- if .Values.loggingToNull }}
-[sinks.null]
-  type = "blackhole"
-  inputs = ["add_fields"] # required
-{{- else }}
+{{- if .Values.loggingCentralHost }}
 [sinks.http_output]
   # General
   type = "http" # required

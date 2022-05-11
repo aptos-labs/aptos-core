@@ -1,15 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! The official Rust SDK for Diem.
+//! The official Rust SDK for Aptos.
 //!
 //! ## Modules
 //!
-//! This SDK provides all the necessary components for building on top of the Diem Blockchain. Some of the important modules are:
+//! This SDK provides all the necessary components for building on top of the Aptos Blockchain. Some of the important modules are:
 //!
 //! * `crypto` - Types used for signing and verifying
 //! * `transaction_builder` - Includes helpers for constructing transactions
-//! * `types` - Includes types for Diem on-chain data structures
+//! * `types` - Includes types for Aptos on-chain data structures
 //!
 //! ## Example
 //!

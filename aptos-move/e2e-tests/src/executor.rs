@@ -38,13 +38,15 @@ use aptos_vm::{
     parallel_executor::ParallelAptosVM,
     AptosVM, VMExecutor, VMValidator,
 };
-use move_core_types::{
-    account_address::AccountAddress,
-    identifier::Identifier,
-    language_storage::{ModuleId, ResourceKey, TypeTag},
-    move_resource::MoveResource,
+use move_deps::{
+    move_core_types::{
+        account_address::AccountAddress,
+        identifier::Identifier,
+        language_storage::{ModuleId, ResourceKey, TypeTag},
+        move_resource::MoveResource,
+    },
+    move_vm_types::gas_schedule::GasStatus,
 };
-use move_vm_types::gas_schedule::GasStatus;
 use num_cpus;
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
@@ -64,7 +66,7 @@ pub type TraceSeqMapping = (usize, Vec<usize>, Vec<usize>);
 
 /// Provides an environment to run a VM instance.
 ///
-/// This struct is a mock in-memory implementation of the Diem executor.
+/// This struct is a mock in-memory implementation of the Aptos executor.
 #[derive(Debug)]
 pub struct FakeExecutor {
     data_store: FakeDataStore,
@@ -200,20 +202,8 @@ impl FakeExecutor {
             genesis_modules,
             publishing_options,
             validator_accounts,
-            false,
         );
         Self::from_genesis(genesis.0.write_set())
-    }
-
-    pub fn parallel_genesis() -> Self {
-        let genesis = vm_genesis::generate_test_genesis(
-            cached_framework_packages::module_blobs(),
-            VMPublishingOption::open(),
-            None,
-            true,
-        )
-        .0;
-        FakeExecutor::from_genesis(genesis.write_set())
     }
 
     /// Create one instance of [`AccountData`] without saving it to data store.
@@ -459,9 +449,10 @@ impl FakeExecutor {
         let new_block = BlockMetadata::new(
             HashValue::zero(),
             0,
-            self.block_time,
-            vec![],
+            0,
+            vec![false; validator_set.payload().count()],
             *validator_set.payload().next().unwrap().account_address(),
+            self.block_time,
         );
         let output = self
             .execute_transaction_block(vec![Transaction::BlockMetadata(new_block)])

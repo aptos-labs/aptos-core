@@ -187,10 +187,7 @@ impl RocksdbPropertyReporter {
                 );
             }
             // report rocksdb properties each 10 seconds
-            #[cfg(not(test))]
-            const TIMEOUT_MS: u64 = 10000;
-            #[cfg(test)]
-            const TIMEOUT_MS: u64 = 10;
+            const TIMEOUT_MS: u64 = if cfg!(test) { 10 } else { 10000 };
 
             match recv.recv_timeout(Duration::from_millis(TIMEOUT_MS)) {
                 Ok(_) => break,
@@ -1290,18 +1287,11 @@ impl DbWriter for AptosDB {
                 self.commit(sealed_cs)?;
             }
 
-            // Once everything is successfully persisted, update the latest in-memory ledger info.
-            if let Some(x) = ledger_info_with_sigs {
-                self.ledger_store.set_latest_ledger_info(x.clone());
-
-                APTOS_STORAGE_LEDGER_VERSION.set(x.ledger_info().version() as i64);
-                APTOS_STORAGE_NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);
-            }
-
             // Only increment counter if commit succeeds and there are at least one transaction written
             // to the storage. That's also when we'd inform the pruner thread to work.
             if num_txns > 0 {
                 let last_version = first_version + num_txns - 1;
+                self.state_store.set_latest_version(last_version);
                 APTOS_STORAGE_COMMITTED_TXNS.inc_by(num_txns);
                 APTOS_STORAGE_LATEST_TXN_VERSION.set(last_version as i64);
                 counters
@@ -1315,6 +1305,14 @@ impl DbWriter for AptosDB {
                 );
 
                 self.wake_pruner(last_version);
+            }
+
+            // Once everything is successfully persisted, update the latest in-memory ledger info.
+            if let Some(x) = ledger_info_with_sigs {
+                self.ledger_store.set_latest_ledger_info(x.clone());
+
+                APTOS_STORAGE_LEDGER_VERSION.set(x.ledger_info().version() as i64);
+                APTOS_STORAGE_NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);
             }
 
             Ok(())

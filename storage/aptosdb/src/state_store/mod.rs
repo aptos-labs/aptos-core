@@ -17,6 +17,7 @@ use crate::{
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::{
     iterator::JellyfishMerkleIterator, node_type::NodeKey, restore::JellyfishMerkleRestore,
     JellyfishMerkleTree, TreeReader, TreeWriter,
@@ -29,7 +30,7 @@ use aptos_types::{
         state_key_prefix::StateKeyPrefix,
         state_value::{StateKeyAndValue, StateValue, StateValueChunkWithProof},
     },
-    transaction::Version,
+    transaction::{Version, PRE_GENESIS_VERSION},
 };
 use itertools::process_results;
 use schemadb::{SchemaBatch, DB};
@@ -45,11 +46,57 @@ pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 #[derive(Debug)]
 pub(crate) struct StateStore {
     db: Arc<DB>,
+    latest_version: Mutex<Option<Version>>,
 }
 
 impl StateStore {
     pub fn new(db: Arc<DB>) -> Self {
-        Self { db }
+        let latest_version = Self::find_latest_persisted_version_from_db(&db, Version::MAX)
+            .expect("Failed to query latest node on initialization.");
+
+        Self {
+            db,
+            latest_version: Mutex::new(latest_version),
+        }
+    }
+
+    pub fn latest_version(&self) -> Option<Version> {
+        *self.latest_version.lock()
+    }
+
+    pub fn set_latest_version(&self, version: Version) {
+        *self.latest_version.lock() = Some(version)
+    }
+
+    pub fn find_latest_persisted_version_less_than(
+        &self,
+        next_version: Version,
+    ) -> Result<Option<Version>> {
+        let latest_version = self.latest_version();
+        if let Some(version) = &latest_version {
+            if *version != PRE_GENESIS_VERSION && *version >= next_version {
+                if next_version == 0 {
+                    return Ok(None);
+                } else {
+                    return Self::find_latest_persisted_version_from_db(&self.db, next_version - 1);
+                }
+            }
+        }
+        Ok(latest_version)
+    }
+
+    pub fn find_latest_persisted_version_from_db(
+        db: &Arc<DB>,
+        max_version: Version,
+    ) -> Result<Option<Version>> {
+        let mut iter = db
+            .iter::<JellyfishMerkleNodeSchema>(Default::default())
+            .expect("Failed to create DB iterator.");
+        // TODO: If we break up a single update batch to multiple commits, we would need to
+        // deal with a partial version, which hasn't got the root committed.
+        iter.seek_for_prev(&NodeKey::new_empty_path(max_version))?;
+        let latest_node = iter.next().transpose()?;
+        Ok(latest_node.map(|(key, _node)| key.version()))
     }
 
     /// Get the state value with proof given the state key and root hash of state Merkle tree
@@ -238,7 +285,12 @@ impl StateStore {
             .collect::<Vec<_>>();
 
         let (new_root_hash_vec, tree_update_batch) = JellyfishMerkleTree::new(self)
-            .batch_put_value_sets(value_sets_ref, node_hashes, first_version)?;
+            .batch_put_value_sets(
+                value_sets_ref,
+                node_hashes,
+                self.find_latest_persisted_version_less_than(first_version)?,
+                first_version,
+            )?;
 
         let num_versions = new_root_hash_vec.len();
         assert_eq!(num_versions, tree_update_batch.node_stats.len());
@@ -420,6 +472,10 @@ impl TreeWriter<StateKeyAndValue> for StateStore {
         let mut batch = SchemaBatch::new();
         add_node_batch_and_index(&mut batch, node_batch)?;
         self.db.write_schemas(batch)
+    }
+
+    fn finish_version(&self, version: Version) {
+        self.set_latest_version(version)
     }
 }
 

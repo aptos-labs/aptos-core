@@ -31,6 +31,10 @@ consensus:
   round_initial_timeout_ms: {{ .Values.validator.config.round_initial_timeout_ms }}
   {{- end }}
 
+state_sync:
+  state_sync_driver:
+    enable_state_sync_v2: {{ .Values.validator.config.enable_state_sync_v2 }}
+
 storage:
   storage_pruner_config:
     ledger_prune_window: {{ int .Values.validator.config.ledger_prune_window }}
@@ -64,15 +68,6 @@ validator_network:
       namespace: "{{ .Values.vault.namespace }}"
       token:
         from_disk: "/opt/vault/token"
-  network_address_key_backend:
-    type: "vault"
-    server: "{{ .Values.vault.server.address }}"
-    {{- if .Values.vault.server.ca_cert }}
-    ca_certificate: "{{ .Values.vault.server.ca_cert }}"
-    {{- end }}
-    namespace: "{{ .Values.vault.namespace }}"
-    token:
-      from_disk: "/opt/vault/token"
 
 full_node_networks:
 - network_id:

@@ -5,7 +5,7 @@ use crate::common;
 use aptos_types::transaction::{
     ArgumentABI, ScriptABI, ScriptFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
-use move_core_types::{
+use move_deps::move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, TypeTag},
 };
@@ -227,8 +227,11 @@ impl ScriptFunctionCall {
     fn get_external_definitions(local_types: bool) -> serde_generate::ExternalDefinitions {
         let definitions = if local_types {
             vec![
-                ("move_core_types::language_storage", vec!["ModuleId"]),
-                ("move_core_types", vec!["ident_str"]),
+                (
+                    "move_deps::move_core_types::language_storage",
+                    vec!["ModuleId"],
+                ),
+                ("move_deps::move_core_types", vec!["ident_str"]),
                 (
                     "aptos_types::transaction",
                     vec![
@@ -941,9 +944,9 @@ version = "{}"
 edition = "2018"
 
 [dependencies]
-once_cell = "1.4.0"
+once_cell = "1.10.0"
 serde = {{ version = "1.0", features = ["derive"] }}
-serde_bytes = "0.11"
+serde_bytes = "0.11.6"
 aptos-types = {{ path = "../aptos-types", version = "{}" }}
 "#,
             name, version, self.aptos_types_version,

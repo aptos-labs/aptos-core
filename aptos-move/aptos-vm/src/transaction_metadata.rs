@@ -9,7 +9,7 @@ use aptos_types::{
         authenticator::AuthenticationKeyPreimage, SignedTransaction, TransactionPayload,
     },
 };
-use move_core_types::gas_schedule::{
+use move_deps::move_core_types::gas_schedule::{
     AbstractMemorySize, GasAlgebra, GasCarrier, GasPrice, GasUnits,
 };
 use std::convert::TryFrom;

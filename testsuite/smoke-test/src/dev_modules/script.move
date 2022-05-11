@@ -7,16 +7,16 @@
 // the compiled stdlib.
 
 script {
-use DiemFramework::Diem;
-use DiemFramework::DiemAccount;
-use DiemFramework::XUS::XUS;
+use AptosFramework::Aptos;
+use AptosFramework::AptosAccount;
+use AptosFramework::XUS::XUS;
 use {{sender}}::MyModule;
 
 fun main(account: signer, recipient: address, amount: u64) {
-    let with_cap = DiemAccount::extract_withdraw_capability(&account);
-    DiemAccount::pay_from<XUS>(&with_cap, recipient, amount, x"", x"");
-    DiemAccount::restore_withdraw_capability(with_cap);
-    let coin = MyModule::id<XUS>(Diem::zero<XUS>());
-    Diem::destroy_zero(coin)
+    let with_cap = AptosAccount::extract_withdraw_capability(&account);
+    AptosAccount::pay_from<XUS>(&with_cap, recipient, amount, x"", x"");
+    AptosAccount::restore_withdraw_capability(with_cap);
+    let coin = MyModule::id<XUS>(Aptos::zero<XUS>());
+    Aptos::destroy_zero(coin)
 }
 }

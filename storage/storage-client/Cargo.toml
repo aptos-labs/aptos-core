@@ -10,16 +10,16 @@ publish = false
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.52"
-serde = "1.0.124"
+anyhow = "1.0.57"
+bcs = "0.1.3"
+serde = "1.0.137"
 
-bcs = "0.1.2"
 aptos-crypto = { path = "../../crates/aptos-crypto" }
-aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
+aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-secure-net = { path = "../../secure/net" }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
+aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 storage-interface = { path = "../storage-interface" }
 
 [features]

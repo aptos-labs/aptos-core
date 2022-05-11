@@ -10,14 +10,14 @@ publish = false
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.52"
-bytes = "1.0.1"
-reqwest = { version = "0.11.2", features = ["blocking", "json"], default_features = false }
-serde = { version = "1.0.124", features = ["derive"], default-features = false }
+anyhow = "1.0.57"
+bytes = "1.1.0"
+reqwest = { version = "0.11.10", features = ["blocking", "json"], default_features = false }
+serde = { version = "1.0.137", features = ["derive"], default-features = false }
 tokio = { version = "1.8.1", features = ["full"] }
 warp = "0.3.2"
 
 aptos-config = { path = "../../config" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-metrics = { path = "../../crates/aptos-metrics" }
-aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
+aptos-workspace-hack = { path = "../aptos-workspace-hack" }

@@ -25,14 +25,17 @@ Try running the indexer with `--help` to get more details
 # Local Development
 
 > *Notes*:
-> - Diesel uses the `DATABASE_URL` env var to connect to the database
+> - Diesel uses the `DATABASE_URL` env var to connect to the database.
+> - Diesel CLI can be installed via cargo, e.g., `cargo install diesel_cli --no-default-features --features postgres`.
 > - `diesel migration run` sets up the database and runs all available migrations.
+> - Aptos tests use the `INDEXER_DATABASE_URL` env var. It needs to be set for the relevant tests to run.
+> - Postgres can be [installed and run via brew](https://wiki.postgresql.org/wiki/Homebrew).
 
 ## Adding new tables / Updating tables with Diesel
 
 * `diesel migration generate <your_migration_name>` generates a new folder containing `up.sql + down.sql` for your
   migration
-* `diesel migration run` to apply the missing migrations,
+* `diesel migration run` to apply the missing migrations. This will re-generate `schema.rs` as required.
 * `diesel migration redo` to rollback and apply the last migration
 * `diesel database reset` drops the existing database and reruns all the migrations
 * You can find more information in the [Diesel](https://diesel.rs/) documentation

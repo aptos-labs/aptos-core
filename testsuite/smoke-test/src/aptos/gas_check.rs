@@ -19,7 +19,7 @@ impl AptosTest for GasCheck {
     async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
         let mut account1 = ctx.random_account();
         ctx.create_user_account(account1.public_key()).await?;
-        let account2 = ctx.random_account();
+        let mut account2 = ctx.random_account();
         ctx.create_user_account(account2.public_key()).await?;
 
         let transfer_txn =
@@ -35,6 +35,19 @@ impl AptosTest for GasCheck {
         assert!(format!("{:?}", err).contains("INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE"));
 
         ctx.mint(account1.address(), 1000).await?;
+        ctx.mint(account2.address(), 1000).await?;
+
+        let transfer_too_much =
+            account2.sign_with_transaction_builder(ctx.aptos_transaction_factory().payload(
+                aptos_stdlib::encode_test_coin_transfer(account1.address(), 1000),
+            ));
+
+        let err = ctx
+            .client()
+            .submit_and_wait(&transfer_too_much)
+            .await
+            .unwrap_err();
+        assert!(format!("{:?}", err).contains("execution failed"));
 
         // succeed with enough gas
         ctx.client().submit_and_wait(&transfer_txn).await?;

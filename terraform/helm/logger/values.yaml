@@ -36,4 +36,3 @@ loggingClientCert: ""
 loggingClientKey: ""
 loggingCA: ""
 loggingCentralHost: ""
-loggingToNull: true

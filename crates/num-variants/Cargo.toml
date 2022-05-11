@@ -9,12 +9,12 @@ license = "Apache-2.0"
 publish = false
 edition = "2018"
 
-
 [lib]
 proc-macro = true
 
 [dependencies]
-syn = "1.0.64"
-quote = "1.0.9"
-proc-macro2 = "1.0.24"
-aptos-workspace-hack = { version = "0.1", path = "../aptos-workspace-hack" }
+proc-macro2 = "1.0.38"
+quote = "1.0.18"
+syn = "1.0.92"
+
+aptos-workspace-hack = { path = "../aptos-workspace-hack" }

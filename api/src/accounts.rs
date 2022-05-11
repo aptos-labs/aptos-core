@@ -20,7 +20,7 @@ use aptos_types::{
 };
 
 use anyhow::Result;
-use aptos_types::account_state_blob::AccountStateBlob;
+use aptos_types::{account_state_blob::AccountStateBlob, account_view::AccountView};
 use move_core_types::{
     identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
     value::MoveValue,

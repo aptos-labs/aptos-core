@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+mod aptos_debug_natives;
+
 use crate::{
     common::{
         types::{
@@ -14,7 +16,6 @@ use crate::{
 };
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
-use aptos_vm::natives::aptos_natives;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use move_cli::package::cli::UnitTestResult;
@@ -88,7 +89,7 @@ impl CliCommand<()> for InitPackage {
 
     async fn execute(self) -> CliTypedResult<()> {
         let move_toml = self.package_dir.join(SourcePackageLayout::Manifest.path());
-        check_if_file_exists(move_toml.as_path(), self.prompt_options.assume_yes)?;
+        check_if_file_exists(move_toml.as_path(), self.prompt_options)?;
         create_dir_all(self.package_dir.join(SourcePackageLayout::Sources.path())).map_err(
             |err| {
                 CliError::IO(
@@ -177,6 +178,10 @@ impl CliCommand<Vec<String>> for CompilePackage {
 pub struct TestPackage {
     #[clap(flatten)]
     move_options: MovePackageDir,
+
+    /// A filter string to determine which unit tests to run
+    #[clap(long)]
+    pub filter: Option<String>,
 }
 
 #[async_trait]
@@ -195,8 +200,11 @@ impl CliCommand<&'static str> for TestPackage {
         let result = move_cli::package::cli::run_move_unit_tests(
             self.move_options.package_dir.as_path(),
             config,
-            UnitTestingConfig::default_with_bound(Some(100_000)),
-            aptos_natives(),
+            UnitTestingConfig {
+                filter: self.filter,
+                ..UnitTestingConfig::default_with_bound(Some(100_000))
+            },
+            aptos_debug_natives::aptos_debug_natives(),
             false,
         )
         .map_err(|err| CliError::MoveTestError(err.to_string()))?;

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! Support for mocking the Diem data store.
+//! Support for mocking the Aptos data store.
 
 use crate::account::AccountData;
 use anyhow::Result;
@@ -12,7 +12,7 @@ use aptos_types::{
     transaction::ChangeSet,
     write_set::{WriteOp, WriteSet},
 };
-use move_core_types::language_storage::ModuleId;
+use move_deps::move_core_types::language_storage::ModuleId;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

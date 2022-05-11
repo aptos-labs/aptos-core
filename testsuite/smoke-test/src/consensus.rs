@@ -75,7 +75,7 @@ async fn test_consensus_observer_mode_storage_error() {
 //         .chain_info()
 //         .root_account
 //         .sign_with_transaction_builder(
-//             transaction_factory.update_diem_consensus_config(0, bcs::to_bytes(&new_onfig).unwrap()),
+//             transaction_factory.update_aptos_consensus_config(0, bcs::to_bytes(&new_onfig).unwrap()),
 //         );
 //
 //     let client = swarm.validators().next().unwrap().rest_client();

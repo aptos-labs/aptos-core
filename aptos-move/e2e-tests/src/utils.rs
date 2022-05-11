@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 use crate::{account::Account, compile, executor::FakeExecutor};
 use aptos_transaction_builder::aptos_stdlib;
-use move_binary_format::file_format::CompiledModule;
+use move_deps::move_binary_format::file_format::CompiledModule;
 
 pub fn close_module_publishing(
     executor: &mut FakeExecutor,

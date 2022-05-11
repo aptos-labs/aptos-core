@@ -26,7 +26,6 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::VMPublishingOption,
     transaction::{Transaction, TransactionStatus},
 };
 use aptos_vm::AptosVM;
@@ -54,7 +53,6 @@ pub fn new_test_context(test_name: &'static str) -> TestContext {
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
     let builder =
         ValidatorBuilder::new(&tmp_dir, cached_framework_packages::module_blobs().to_vec())
-            .publishing_option(VMPublishingOption::open())
             .min_price_per_gas_unit(0)
             .randomize_first_validator_ports(false);
 
@@ -130,7 +128,12 @@ impl TestContext {
         if self.golden_output.is_none() {
             self.golden_output = Some(GoldenOutputs::new(self.test_name.replace(':', "_")));
         }
-        self.golden_output.as_ref().unwrap().log(&pretty(&msg));
+
+        let msg = pretty(&msg);
+        let re = regex::Regex::new("hash\": \".*\"").unwrap();
+        let msg = re.replace_all(&msg, "hash\": \"\"");
+
+        self.golden_output.as_ref().unwrap().log(&msg);
     }
 
     pub fn rng(&mut self) -> &mut rand::rngs::StdRng {
@@ -213,7 +216,7 @@ impl TestContext {
 
     pub async fn commit_block(&mut self, signed_txns: &[SignedTransaction]) {
         let metadata = self.new_block_metadata();
-        let timestamp = metadata.timestamp_usec();
+        let timestamp = metadata.timestamp_usecs();
         let txns: Vec<Transaction> = std::iter::once(Transaction::BlockMetadata(metadata.clone()))
             .chain(
                 signed_txns
@@ -391,7 +394,7 @@ impl TestContext {
         let id = HashValue::random_with_rng(&mut self.rng);
         self.fake_time += 1;
         let timestamp = self.fake_time;
-        BlockMetadata::new(id, round, timestamp, vec![], self.validator_owner)
+        BlockMetadata::new(id, 0, round, vec![false], self.validator_owner, timestamp)
     }
 
     fn new_ledger_info(
@@ -413,7 +416,7 @@ impl TestContext {
                 metadata.id(),
                 root_hash,
                 version,
-                metadata.timestamp_usec(),
+                metadata.timestamp_usecs(),
                 None,
             ),
             HashValue::zero(),

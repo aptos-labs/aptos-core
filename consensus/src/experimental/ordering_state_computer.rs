@@ -12,7 +12,7 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
 use consensus_types::{block::Block, executed_block::ExecutedBlock};
 use executor_types::{Error as ExecutionError, StateComputeResult};
 use fail::fail_point;
@@ -116,4 +116,6 @@ impl StateComputer for OrderingStateComputer {
         self.state_computer_for_sync.sync_to(target).await?;
         Ok(())
     }
+
+    fn new_epoch(&self, _: &EpochState) {}
 }

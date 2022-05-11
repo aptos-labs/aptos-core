@@ -182,7 +182,7 @@ impl DualAttestationMessage {
         let mut message = metadata.into();
         bcs::serialize_into(&mut message, &reciever).unwrap();
         bcs::serialize_into(&mut message, &amount).unwrap();
-        message.extend(b"@@$$DIEM_ATTEST$$@@");
+        message.extend(b"@@$$APTOS_ATTEST$$@@");
 
         Self {
             message: message.into(),

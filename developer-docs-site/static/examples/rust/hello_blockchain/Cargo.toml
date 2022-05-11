@@ -11,5 +11,5 @@ edition = "2018"
 
 [dependencies]
 first-transaction = { path = "../first_transaction" }
-serde_json = "1.0.64"
+serde_json = "1.0.81"
 hex = "0.4.3"

@@ -39,6 +39,10 @@ use aptos_config::{
 use aptos_crypto::x25519;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
+use aptos_telemetry::constants::{
+    APTOS_NETWORK_PUSH_METRICS, NETWORK_ID_METRIC, NETWORK_PUSH_TIME_SECS, ORIGIN_METRIC,
+    PEERS_CONNECTED_METRIC, ROLE_METRIC,
+};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use futures::{
@@ -363,6 +367,11 @@ where
         let ticker = self.time_service.interval(self.connectivity_check_interval);
         tokio::pin!(ticker);
 
+        let tele_ticker = self
+            .time_service
+            .interval(Duration::from_secs(NETWORK_PUSH_TIME_SECS));
+        tokio::pin!(tele_ticker);
+
         info!(
             NetworkSchema::new(&self.network_context),
             "{} Starting ConnectivityManager actor", self.network_context
@@ -374,6 +383,9 @@ where
                 _ = ticker.select_next_some() => {
                     self.check_connectivity(&mut pending_dials).await;
                 },
+                _ = tele_ticker.select_next_some() => {
+                    self.report_network_metrics().await;
+                },
                 req = self.requests_rx.select_next_some() => {
                     self.handle_request(req);
                 },
@@ -381,7 +393,9 @@ where
                     // Shutdown the connectivity manager when the PeerManager
                     // shuts down.
                     match maybe_notif {
-                        Some(notif) => self.handle_control_notification(notif),
+                        Some(notif) => {
+                            self.handle_control_notification(notif.clone());
+                        },
                         None => break,
                     }
                 },
@@ -822,6 +836,84 @@ where
                 }
             }
         }
+    }
+
+    async fn report_network_metrics(&self) {
+        if aptos_telemetry::is_disabled() {
+            return;
+        }
+        let peer_id_str = self.network_context.peer_id().to_string();
+        let network_id_str = self.network_context.network_id().to_string();
+        let role_str = self.network_context.role().to_string();
+
+        // collect common metadata metrics for the node, regardless of the connection direction
+        let mut inbound_metadata_metrics: HashMap<String, String> = HashMap::new();
+        inbound_metadata_metrics.insert(NETWORK_ID_METRIC.to_string(), network_id_str.to_string());
+        inbound_metadata_metrics.insert(ROLE_METRIC.to_string(), role_str.to_string());
+        let mut outbound_metadata_metrics = inbound_metadata_metrics.clone();
+        inbound_metadata_metrics.insert(
+            ORIGIN_METRIC.to_string(),
+            ConnectionOrigin::Inbound.to_string(),
+        );
+        outbound_metadata_metrics.insert(
+            ORIGIN_METRIC.to_string(),
+            ConnectionOrigin::Outbound.to_string(),
+        );
+
+        // group connected peers based on their direction
+        let mut inbound_peers = vec![];
+        let mut outbound_peers = vec![];
+        for connection_metadata in self.connected.values() {
+            match connection_metadata.origin {
+                ConnectionOrigin::Inbound => inbound_peers.push(connection_metadata),
+                ConnectionOrigin::Outbound => outbound_peers.push(connection_metadata),
+            };
+        }
+
+        // direction-specific metadata metrics, such as peers connected in each direction
+        inbound_metadata_metrics.insert(
+            PEERS_CONNECTED_METRIC.to_string(),
+            inbound_peers.len().to_string(),
+        );
+        outbound_metadata_metrics.insert(
+            PEERS_CONNECTED_METRIC.to_string(),
+            outbound_peers.len().to_string(),
+        );
+
+        // telemetry data has a max size, so prepare to chunk up all peers and metadata
+        // into separate payloads of optimal size
+        let metrics_metadata_size = inbound_metadata_metrics.len();
+        let payload_max_size = 25;
+        let metrics_size = payload_max_size - metrics_metadata_size;
+        let mut payloads = vec![];
+
+        // group all peers with the metadata metrics that need to be included in each payload
+        let f = vec![
+            (inbound_peers, inbound_metadata_metrics),
+            (outbound_peers, outbound_metadata_metrics),
+        ];
+        for (peers, metadata_metrics) in f {
+            for peers_chunk in peers.chunks(metrics_size) {
+                let mut metrics_chunk = metadata_metrics.clone();
+                for connection_metadata in peers_chunk.iter() {
+                    metrics_chunk.insert(
+                        connection_metadata.remote_peer_id.short_str().to_string(),
+                        connection_metadata.addr.to_string(),
+                    );
+                }
+                payloads.push(metrics_chunk);
+            }
+        }
+
+        let futs = payloads.iter().map(|payload| {
+            aptos_telemetry::send_data(
+                APTOS_NETWORK_PUSH_METRICS.to_string(),
+                peer_id_str.clone(),
+                payload.clone(),
+            )
+        });
+
+        futures::future::join_all(futs).await;
     }
 }
 

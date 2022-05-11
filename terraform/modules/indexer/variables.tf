@@ -31,6 +31,11 @@ variable "vpc_id" {
   description = "VPC ID to create resources in"
 }
 
+variable "db_sources_ipv4" {
+  description = "List of CIDR subnets which can access the DB"
+  default     = ["0.0.0.0/0"]
+}
+
 variable "indexer_helm_values" {
   default = {}
 }
@@ -75,4 +80,9 @@ variable "db_max_allocated_storage" {
 variable "db_parameter_group_family" {
   description = "Parameter group family name for the RDS DB. Must be compatible with the db_engine and db_engine_version. https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_WorkingWithDBInstanceParamGroups.html"
   default     = "postgres14"
+}
+
+variable "db_publicly_accessible" {
+  default     = false
+  description = "Determines if RDS instance is publicly accessible"
 }

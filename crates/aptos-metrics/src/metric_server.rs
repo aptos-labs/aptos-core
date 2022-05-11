@@ -2,8 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    gather_metrics, json_encoder::JsonEncoder, json_metrics::get_json_metrics,
-    public_metrics::PUBLIC_METRICS, system_metrics::refresh_system_metrics, NUM_METRICS,
+    gather_metrics,
+    json_encoder::JsonEncoder,
+    json_metrics::get_json_metrics,
+    public_metrics::{PUBLIC_JSON_METRICS, PUBLIC_METRICS},
+    system_metrics::refresh_system_metrics,
+    NUM_METRICS,
 };
 use futures::future;
 use hyper::{
@@ -90,7 +94,7 @@ pub fn get_public_metrics() -> HashMap<String, String> {
 
 pub fn get_public_json_metrics() -> HashMap<&'static str, String> {
     let jmet = get_json_metrics();
-    whitelist_json_metrics(jmet, PUBLIC_METRICS)
+    whitelist_json_metrics(jmet, PUBLIC_JSON_METRICS)
 }
 
 // filtering metrics from the prometheus collections
@@ -167,7 +171,7 @@ async fn serve_public_metrics(req: Request<Body>) -> Result<Response<Body>, hype
         }
         (&Method::GET, "/json_metrics") => {
             let json_metrics = get_json_metrics();
-            let whitelist_json_metrics = whitelist_json_metrics(json_metrics, PUBLIC_METRICS);
+            let whitelist_json_metrics = whitelist_json_metrics(json_metrics, PUBLIC_JSON_METRICS);
             let encoded_metrics = serde_json::to_string(&whitelist_json_metrics).unwrap();
             *resp.body_mut() = Body::from(encoded_metrics);
         }

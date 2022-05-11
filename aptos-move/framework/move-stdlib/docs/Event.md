@@ -100,7 +100,7 @@ A handle for an event such that:
 
 ## Resource `EventHandleGenerator`
 
-Deprecated. Only kept around so Diem clients know how to deserialize existing EventHandleGenerator's
+Deprecated. Only kept around so Aptos clients know how to deserialize existing EventHandleGenerator's
 
 
 <pre><code><b>struct</b> <a href="Event.md#0x1_Event_EventHandleGenerator">EventHandleGenerator</a> <b>has</b> key

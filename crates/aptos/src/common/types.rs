@@ -1,9 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::{
-    init::DEFAULT_REST_URL,
-    utils::{check_if_file_exists, to_common_result, to_common_success_result, write_to_file},
+use crate::{
+    common::{
+        init::DEFAULT_REST_URL,
+        utils::{
+            check_if_file_exists, read_from_file, to_common_result, to_common_success_result,
+            write_to_file,
+        },
+    },
+    genesis::git::from_yaml,
 };
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -21,6 +27,7 @@ use std::{
     fmt::Debug,
     path::{Path, PathBuf},
     str::FromStr,
+    time::Instant,
 };
 use thiserror::Error;
 
@@ -78,6 +85,36 @@ impl CliError {
     }
 }
 
+impl From<aptos_config::config::Error> for CliError {
+    fn from(e: aptos_config::config::Error) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
+impl From<aptos_github_client::Error> for CliError {
+    fn from(e: aptos_github_client::Error) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
+impl From<serde_yaml::Error> for CliError {
+    fn from(e: serde_yaml::Error) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
+impl From<base64::DecodeError> for CliError {
+    fn from(e: base64::DecodeError) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
+impl From<std::string::FromUtf8Error> for CliError {
+    fn from(e: std::string::FromUtf8Error) -> Self {
+        CliError::UnexpectedError(e.to_string())
+    }
+}
+
 /// Config saved to `.aptos/config.yaml`
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CliConfig {
@@ -121,11 +158,9 @@ impl CliConfig {
             return Err(CliError::ConfigNotFoundError(format!("{:?}", config_file)));
         }
 
-        let bytes = std::fs::read(&config_file).map_err(|err| {
-            CliError::ConfigLoadError(format!("{:?}", config_file), err.to_string())
-        })?;
-        serde_yaml::from_slice(&bytes)
-            .map_err(|err| CliError::ConfigLoadError(format!("{:?}", config_file), err.to_string()))
+        from_yaml(
+            &String::from_utf8(read_from_file(config_file.as_path())?).map_err(CliError::from)?,
+        )
     }
 
     pub fn load_profile(profile: &str) -> CliTypedResult<Option<ProfileConfig>> {
@@ -236,11 +271,7 @@ impl EncodingType {
         name: &'static str,
         path: &Path,
     ) -> CliTypedResult<Key> {
-        let data = std::fs::read(&path).map_err(|err| {
-            CliError::UnableToReadFile(path.to_str().unwrap().to_string(), err.to_string())
-        })?;
-
-        self.decode_key(name, data)
+        self.decode_key(name, read_from_file(path)?)
     }
 
     /// Decodes an encoded key given the known encoding
@@ -282,11 +313,14 @@ impl FromStr for EncodingType {
 }
 
 /// An insertable option for use with prompts.
-#[derive(Debug, Parser)]
+#[derive(Clone, Copy, Debug, Parser)]
 pub struct PromptOptions {
     /// Assume yes for all yes/no prompts
-    #[clap(long)]
+    #[clap(long, group = "prompt_options")]
     pub assume_yes: bool,
+    /// Assume no for all yes/no prompts
+    #[clap(long, group = "prompt_options")]
+    pub assume_no: bool,
 }
 
 /// An insertable option for use with encodings.
@@ -337,16 +371,14 @@ pub struct PrivateKeyInputOptions {
 }
 
 impl PrivateKeyInputOptions {
+    /// Extract private key from CLI args with fallback to config
     pub fn extract_private_key(
         &self,
         encoding: EncodingType,
         profile: &str,
     ) -> CliTypedResult<Ed25519PrivateKey> {
-        if let Some(ref file) = self.private_key_file {
-            encoding.load_key("--private-key-file", file.as_path())
-        } else if let Some(ref key) = self.private_key {
-            let key = key.as_bytes().to_vec();
-            encoding.decode_key("--private-key", key)
+        if let Some(key) = self.extract_private_key_cli(encoding)? {
+            Ok(key)
         } else if let Some(Some(private_key)) =
             CliConfig::load_profile(profile)?.map(|p| p.private_key)
         {
@@ -355,6 +387,23 @@ impl PrivateKeyInputOptions {
             Err(CliError::CommandArgumentError(
                 "One of ['--private-key', '--private-key-file'] must be used".to_string(),
             ))
+        }
+    }
+
+    /// Extract private key from CLI args
+    pub fn extract_private_key_cli(
+        &self,
+        encoding: EncodingType,
+    ) -> CliTypedResult<Option<Ed25519PrivateKey>> {
+        if let Some(ref file) = self.private_key_file {
+            Ok(Some(
+                encoding.load_key("--private-key-file", file.as_path())?,
+            ))
+        } else if let Some(ref key) = self.private_key {
+            let key = key.as_bytes().to_vec();
+            Ok(Some(encoding.decode_key("--private-key", key)?))
+        } else {
+            Ok(None)
         }
     }
 }
@@ -407,7 +456,7 @@ pub struct SaveFile {
 impl SaveFile {
     /// Check if the key file exists already
     pub fn check_file(&self) -> CliTypedResult<()> {
-        check_if_file_exists(self.output_file.as_path(), self.prompt_options.assume_yes)
+        check_if_file_exists(self.output_file.as_path(), self.prompt_options)
     }
 
     /// Save to the `output_file`
@@ -473,7 +522,7 @@ impl WriteTransactionOptions {
 #[derive(Debug, Parser)]
 pub struct MovePackageDir {
     /// Path to a move package (the folder with a Move.toml file)
-    #[clap(long, parse(from_os_str))]
+    #[clap(long, parse(from_os_str), default_value = ".")]
     pub package_dir: PathBuf,
     /// Path to save the compiled move package
     ///
@@ -547,13 +596,15 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
     /// Executes the command, and serializes it to the common JSON output type
     async fn execute_serialized(self) -> CliResult {
         let command_name = self.command_name();
-        to_common_result(command_name, self.execute().await).await
+        let start_time = Instant::now();
+        to_common_result(command_name, start_time, self.execute().await).await
     }
 
     /// Executes the command, and throws away Ok(result) for the string Success
     async fn execute_serialized_success(self) -> CliResult {
         let command_name = self.command_name();
-        to_common_success_result(command_name, self.execute().await).await
+        let start_time = Instant::now();
+        to_common_success_result(command_name, start_time, self.execute().await).await
     }
 }
 

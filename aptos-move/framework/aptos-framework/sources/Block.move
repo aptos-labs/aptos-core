@@ -17,10 +17,10 @@ module AptosFramework::Block {
     }
 
     struct NewBlockEvent has drop, store {
+        epoch: u64,
         round: u64,
+        previous_block_votes: vector<bool>,
         proposer: address,
-        previous_block_votes: vector<address>,
-
         /// On-chain time during  he block at the given height
         time_microseconds: u64,
     }
@@ -57,10 +57,11 @@ module AptosFramework::Block {
     /// The runtime always runs this before executing the transactions in a block.
     fun block_prologue(
         vm: signer,
+        epoch: u64,
         round: u64,
-        timestamp: u64,
-        previous_block_votes: vector<address>,
-        proposer: address
+        previous_block_votes: vector<bool>,
+        proposer: address,
+        timestamp: u64
     ) acquires BlockMetadata {
         Timestamp::assert_operating();
         // Operational constraint: can only be invoked by the VM.
@@ -78,9 +79,10 @@ module AptosFramework::Block {
         Event::emit_event<NewBlockEvent>(
             &mut block_metadata_ref.new_block_events,
             NewBlockEvent {
+                epoch,
                 round,
-                proposer,
                 previous_block_votes,
+                proposer,
                 time_microseconds: timestamp,
             }
         );

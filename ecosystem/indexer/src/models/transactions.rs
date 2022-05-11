@@ -10,8 +10,8 @@ use crate::{
     schema::{block_metadata_transactions, transactions, user_transactions},
 };
 use aptos_rest_client::aptos_api_types::{
-    BlockMetadataTransaction as APIBlockMetadataTransaction, Transaction as APITransaction,
-    TransactionInfo, UserTransaction as APIUserTransaction, U64,
+    Address, BlockMetadataTransaction as APIBlockMetadataTransaction,
+    Transaction as APITransaction, TransactionInfo, UserTransaction as APIUserTransaction, U64,
 };
 use diesel::{
     BelongingToDsl, ExpressionMethods, GroupedBy, OptionalExtension, QueryDsl, RunQueryDsl,
@@ -317,6 +317,8 @@ pub struct BlockMetadataTransaction {
 
     // Default time columns
     pub inserted_at: chrono::NaiveDateTime,
+    pub epoch: i64,
+    pub previous_block_votes_bitmap: serde_json::Value,
 }
 
 impl BlockMetadataTransaction {
@@ -325,11 +327,14 @@ impl BlockMetadataTransaction {
             hash: tx.info.hash.to_string(),
             id: tx.id.to_string(),
             round: *tx.round.inner() as i64,
-            previous_block_votes: serde_json::to_value(&tx.previous_block_votes).unwrap(),
+            // TODO: Deprecated, use previous_block_votes_bitmap instead. Column kept to not break indexer users (e.g., explorer), writing an empty vector.
+            previous_block_votes: serde_json::to_value(vec![] as Vec<Address>).unwrap(),
             proposer: tx.proposer.inner().to_hex_literal(),
             // time is in milliseconds, but chronos wants seconds
             timestamp: parse_timestamp(tx.timestamp, tx.info.version),
             inserted_at: chrono::Utc::now().naive_utc(),
+            epoch: *tx.epoch.inner() as i64,
+            previous_block_votes_bitmap: serde_json::to_value(&tx.previous_block_votes).unwrap(),
         }
     }
 }

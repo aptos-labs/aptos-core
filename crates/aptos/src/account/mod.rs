@@ -13,7 +13,7 @@ pub mod transfer;
 #[derive(Debug, Subcommand)]
 pub enum AccountTool {
     Create(create::CreateAccount),
-    List(list::ListResources),
+    List(list::ListAccount),
     Transfer(transfer::TransferCoins),
 }
 

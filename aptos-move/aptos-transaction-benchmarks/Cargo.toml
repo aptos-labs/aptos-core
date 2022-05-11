@@ -10,19 +10,18 @@ publish = false
 edition = "2018"
 
 [dependencies]
-criterion = "0.3.4"
-proptest = "1.0.0"
+criterion = "0.3.5"
 criterion-cpu-time = "0.1.0"
-num_cpus = "1.13.0"
-
-aptos-types = { path = "../../types", features = ["fuzzing"] }
-language-e2e-tests = { path = "../e2e-tests" }
-aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
-aptos-crypto = { path = "../../crates/aptos-crypto" }
-
+num_cpus = "1.13.1"
+proptest = "1.0.0"
 read-write-set = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
 read-write-set-dynamic = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
+
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-types = { path = "../../types", features = ["fuzzing"] }
 aptos-vm = { path = "../aptos-vm" }
+aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+language-e2e-tests = { path = "../e2e-tests" }
 
 [[bench]]
 name = "transaction_benches"

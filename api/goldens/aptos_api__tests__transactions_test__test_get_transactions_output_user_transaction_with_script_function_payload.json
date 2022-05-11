@@ -2,18 +2,18 @@
   {
     "type": "block_metadata_transaction",
     "version": "1",
-    "hash": "0xa8fc186c28fc0f95b8233651438093e8e215a51dcd16475f5e68c0a421f6305c",
-    "state_root_hash": "0x675c725b44b9336874f4b97cdfdc1f3e45f919cb3dfb7db6465182a78cd4f31d",
-    "event_root_hash": "0xd62c85b93234824cf825e9c028c3bcc59b06926039721bd7edd76b56ae9fcecf",
+    "hash": "",
+    "state_root_hash": "",
+    "event_root_hash": "",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x2c6b6a213bccd302278e142502fbc7d7075d3c8cc4b64fa37350c0b6f3fa5ede",
+    "accumulator_root_hash": "",
     "changes": [
       {
         "type": "write_resource",
         "address": "0xa550c18",
-        "state_key_hash": "0x7e8bea72fc5af8587e37495c9bcbf1a1ed13674251622b4ed373884bf9749972",
+        "state_key_hash": "",
         "data": {
           "type": "0x1::Block::BlockMetadata",
           "data": {
@@ -37,7 +37,7 @@
       {
         "type": "write_resource",
         "address": "0xa550c18",
-        "state_key_hash": "0x3ca60dda914f0541ea08b55c9d4b0952e032e54065e1876b5d41cdcff924ae6b",
+        "state_key_hash": "",
         "data": {
           "type": "0x1::Timestamp::CurrentTimeMicroseconds",
           "data": {
@@ -47,26 +47,29 @@
       }
     ],
     "id": "0xf44b581f23222c10916b17a369b4da039d075952b58036f2a7b561446592403c",
+    "epoch": "0",
     "round": "1",
-    "previous_block_votes": [],
+    "previous_block_votes": [
+      false
+    ],
     "proposer": "0xf85fd00e30cd388d2609db24d6cc44f2652f27413456938eaa059f65231647cc",
     "timestamp": "1"
   },
   {
     "type": "user_transaction",
     "version": "2",
-    "hash": "0x18073cb2536317833aa630d30062383a1f00221dd3604bbce19cd262813e6c36",
-    "state_root_hash": "0x2cc7da3cac9b799f25124c5b213e3093f6ddb7847551cde41efb31891ffed6e6",
-    "event_root_hash": "0x414343554d554c41544f525f504c414345484f4c4445525f4841534800000000",
+    "hash": "",
+    "state_root_hash": "",
+    "event_root_hash": "",
     "gas_used": "92",
     "success": true,
     "vm_status": "Executed successfully",
-    "accumulator_root_hash": "0x24851c8db074ca2b0634878e3627d2090dfe1c1dfa54ac77a1474c226ba0bd0c",
+    "accumulator_root_hash": "",
     "changes": [
       {
         "type": "write_resource",
         "address": "0xa550c18",
-        "state_key_hash": "0xa85a3f04345fb96b11d0e4f8b85a04475452f309d6305d8a4de891bd22392995",
+        "state_key_hash": "",
         "data": {
           "type": "0x1::Account::Account",
           "data": {
@@ -79,7 +82,7 @@
       {
         "type": "write_resource",
         "address": "0xa550c18",
-        "state_key_hash": "0x6b3ef01fe5ffd2a5a4bc8921a900ff6281fce77cda659e1b89c93a08e7a6507f",
+        "state_key_hash": "",
         "data": {
           "type": "0x1::TestCoin::Balance",
           "data": {
@@ -92,7 +95,7 @@
       {
         "type": "write_resource",
         "address": "0xe60912ecb0a8c365d163d258f3b9f1b62f8f9148c207643864d7ed4a2b23159",
-        "state_key_hash": "0xef168b1e7ff11082ccb95c00354bce60695449d7fc4b0c83b481a95133bbc9ce",
+        "state_key_hash": "",
         "data": {
           "type": "0x1::Account::Account",
           "data": {
@@ -105,7 +108,7 @@
       {
         "type": "write_resource",
         "address": "0xe60912ecb0a8c365d163d258f3b9f1b62f8f9148c207643864d7ed4a2b23159",
-        "state_key_hash": "0xb578f1f36209c64335508215430e2f9dea45efaf53b8941995ae8f2324109fe9",
+        "state_key_hash": "",
         "data": {
           "type": "0x1::GUID::Generator",
           "data": {
@@ -116,7 +119,7 @@
       {
         "type": "write_resource",
         "address": "0xe60912ecb0a8c365d163d258f3b9f1b62f8f9148c207643864d7ed4a2b23159",
-        "state_key_hash": "0x78b4fe92df14f1bbb0363a2fe287f1d97c7f42bb48cbf38ce43f726da5ce9194",
+        "state_key_hash": "",
         "data": {
           "type": "0x1::TestCoin::Balance",
           "data": {
@@ -129,7 +132,7 @@
       {
         "type": "write_resource",
         "address": "0xe60912ecb0a8c365d163d258f3b9f1b62f8f9148c207643864d7ed4a2b23159",
-        "state_key_hash": "0x9598bca9766221a341f76a5fc7e818b2748060569637fcd2f59c6a7ccc01b313",
+        "state_key_hash": "",
         "data": {
           "type": "0x1::TestCoin::TransferEvents",
           "data": {
@@ -177,7 +180,7 @@
     "signature": {
       "type": "ed25519_signature",
       "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-      "signature": "0xb66feafc1e1b95ce33a8e25101a212cdfd4e94a7dfd85409ad538ce7fcc150b610326a97e688b1d02bb4703880631498588784c8128824671b219d6aca6edb04"
+      "signature": "0x368cd71ddb9e8710823f1fb4feeaa2fe3cf814e56c1b151161157ce8090822809344962b8f10ae141387484aca5c5ffd32a6ddb18973b37c7c847ebdf7493504"
     },
     "events": [],
     "timestamp": "1"

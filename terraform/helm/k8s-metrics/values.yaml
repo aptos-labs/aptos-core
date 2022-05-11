@@ -1,3 +1,21 @@
 coredns:
   maxReplicas: 2
   minReplicas: 2
+
+autoscaler:
+  enabled:
+  clusterName:
+  scaleDownUnneededTime: 15m
+  scaleDownDelayAfterAdd: 5m
+  image:
+    repo: k8s.gcr.io/autoscaling/cluster-autoscaler
+    tag: v1.21.0
+  resources:
+    limits:
+      cpu: 100m
+      memory: 600Mi
+    requests:
+      cpu: 100m
+      memory: 600Mi
+  serviceAccount:
+    annotations:

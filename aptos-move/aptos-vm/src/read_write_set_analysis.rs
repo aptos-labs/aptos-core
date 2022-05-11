@@ -12,16 +12,18 @@ use aptos_types::{
     account_config,
     transaction::{SignedTransaction, TransactionPayload},
 };
-use move_bytecode_utils::module_cache::SyncModuleCache;
-use move_core_types::{
-    ident_str,
-    identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, ResourceKey, StructTag, TypeTag},
-    resolver::ModuleResolver,
-    transaction_argument::convert_txn_args,
-    value::{serialize_values, MoveValue},
+use move_deps::{
+    move_bytecode_utils::module_cache::SyncModuleCache,
+    move_core_types::{
+        ident_str,
+        identifier::{IdentStr, Identifier},
+        language_storage::{ModuleId, ResourceKey, StructTag, TypeTag},
+        resolver::ModuleResolver,
+        transaction_argument::convert_txn_args,
+        value::{serialize_values, MoveValue},
+    },
+    read_write_set_dynamic::{ConcretizedFormals, NormalizedReadWriteSetAnalysis},
 };
-use read_write_set_dynamic::{ConcretizedFormals, NormalizedReadWriteSetAnalysis};
 use std::ops::Deref;
 
 pub struct ReadWriteSetAnalysis<'a, R: ModuleResolver> {
@@ -47,7 +49,7 @@ pub fn add_on_functions_list() -> Vec<(ModuleId, Identifier)> {
 }
 
 impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
-    /// Create a Diem transaction read/write set analysis from a generic Move module read/write set
+    /// Create a Aptos transaction read/write set analysis from a generic Move module read/write set
     /// analysis and a view of the current blockchain for module fetching and access concretization.
     pub fn new(rw: &'a NormalizedReadWriteSetAnalysis, blockchain_view: &'a R) -> Self {
         ReadWriteSetAnalysis {
@@ -175,14 +177,15 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
                 self.get_keys_user_transaction_impl(tx, concretize)
             }
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
-                let (round, timestamp, previous_vote, proposer) =
+                let (epoch, round, timestamp, previous_vote, proposer) =
                     block_metadata.clone().into_inner();
                 let args = serialize_values(&vec![
                     MoveValue::Signer(account_config::reserved_vm_address()),
+                    MoveValue::U64(epoch),
                     MoveValue::U64(round),
-                    MoveValue::U64(timestamp),
-                    MoveValue::Vector(previous_vote.into_iter().map(MoveValue::Address).collect()),
+                    MoveValue::Vector(previous_vote.into_iter().map(MoveValue::Bool).collect()),
                     MoveValue::Address(proposer),
+                    MoveValue::U64(timestamp),
                 ]);
                 let metadata_access = self.get_partially_concretized_summary(
                     &BLOCK_MODULE,
@@ -271,7 +274,7 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
         keys_written.sort();
         keys_written.dedup();
         // Hack: remove GasFees accesses from epilogue if gas_price is zero. This is sound
-        // to do as of Diem 1.4, but should be re-evaluated if the epilogue changes
+        // to do as of Aptos 1.4, but should be re-evaluated if the epilogue changes
         if tx.gas_unit_price() == 0 {
             let tx_fees_tag = StructTag {
                 address: account_config::CORE_CODE_ADDRESS,

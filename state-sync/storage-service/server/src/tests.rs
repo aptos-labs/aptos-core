@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{network::StorageServiceNetworkEvents, StorageReader, StorageServiceServer};
-use anyhow::Result;
+use anyhow::{format_err, Result};
 use aptos_config::config::StorageServiceConfig;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_logger::Level;
@@ -13,27 +13,34 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     chain_id::ChainId,
-    contract_event::ContractEvent,
+    contract_event::{ContractEvent, EventByVersionWithProof, EventWithProof},
     epoch_change::EpochChangeProof,
     event::EventKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    proof::{SparseMerkleRangeProof, TransactionInfoListWithProof},
+    proof::{
+        AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleRangeProof,
+        TransactionAccumulatorSummary, TransactionInfoListWithProof,
+    },
+    state_proof::StateProof,
     state_store::{
         state_key::StateKey,
-        state_value::{StateKeyAndValue, StateValueChunkWithProof},
+        state_value::{StateValue, StateValueChunkWithProof, StateValueWithProof},
     },
     transaction::{
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionListWithProof,
-        TransactionOutput, TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
-        Version,
+        AccountTransactionsWithProof, RawTransaction, Script, SignedTransaction, Transaction,
+        TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
+        TransactionPayload, TransactionWithProof, Version,
     },
-    write_set::WriteSet,
     PeerId,
 };
 use channel::aptos_channel;
-use claim::{assert_matches, assert_none, assert_some};
+use claim::assert_matches;
 use futures::channel::oneshot;
-use move_core_types::language_storage::TypeTag;
+use mockall::{
+    mock,
+    predicate::{always, eq},
+    Sequence,
+};
 use network::{
     peer_manager::PeerManagerNotification,
     protocols::{
@@ -41,29 +48,157 @@ use network::{
     },
 };
 use std::{collections::BTreeMap, sync::Arc};
-use storage_interface::DbReader;
+use storage_interface::{DbReader, Order, StartupInfo, TreeState};
 use storage_service_types::{
-    AccountStatesChunkWithProofRequest, CompleteDataRange, DataSummary,
+    AccountStatesChunkWithProofRequest, CompleteDataRange, DataSummary, Epoch,
     EpochEndingLedgerInfoRequest, ProtocolMetadata, ServerProtocolVersion, StorageServerSummary,
     StorageServiceError, StorageServiceMessage, StorageServiceRequest, StorageServiceResponse,
     TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
 
-// TODO(joshlind): Expand these test cases to better test storage interaction
-// and functionality. This will likely require a better mock db abstraction.
-
 /// Various test constants for storage
-const FIRST_TXN_OUTPUT_VERSION: u64 = 20;
-const FIRST_TXN_VERSION: u64 = 10;
-const LAST_EPOCH: u64 = 10;
-const LAST_TXN_VERSION: u64 = 100;
-const NUM_ACCOUNTS_AT_VERSION: u64 = 1000;
 const PROTOCOL_VERSION: u64 = 1;
-const STATE_PRUNE_WINDOW: u64 = 50;
+
+#[tokio::test]
+async fn test_cachable_requests_eviction() {
+    // Create test data
+    let max_lru_cache_size = StorageServiceConfig::default().max_lru_cache_size;
+    let version = 101;
+    let start_account_index = 100;
+    let end_account_index = 199;
+    let state_value_chunk_with_proof = StateValueChunkWithProof {
+        first_index: start_account_index,
+        last_index: end_account_index,
+        first_key: HashValue::random(),
+        last_key: HashValue::random(),
+        raw_values: vec![],
+        proof: SparseMerkleRangeProof::new(vec![]),
+        root_hash: HashValue::random(),
+    };
+
+    // Create the mock db reader
+    let mut db_reader = create_mock_db_reader();
+    let mut expectation_sequence = Sequence::new();
+    db_reader
+        .expect_get_state_leaf_count()
+        .times(max_lru_cache_size as usize)
+        .with(always())
+        .returning(move |_| Ok(165));
+    for _ in 0..2 {
+        let state_value_chunk_with_proof_clone = state_value_chunk_with_proof.clone();
+        db_reader
+            .expect_get_state_value_chunk_with_proof()
+            .times(1)
+            .with(
+                eq(version),
+                eq(start_account_index as usize),
+                eq((end_account_index - start_account_index + 1) as usize),
+            )
+            .return_once(move |_, _, _| Ok(state_value_chunk_with_proof_clone))
+            .in_sequence(&mut expectation_sequence);
+    }
+
+    // Create the storage client and server
+    let (mut mock_client, service, _) = MockClient::new(Some(db_reader));
+    tokio::spawn(service.start());
+
+    // Process a request to fetch an account states chunk. This should cache and serve the response.
+    for _ in 0..2 {
+        let request = StorageServiceRequest::GetAccountStatesChunkWithProof(
+            AccountStatesChunkWithProofRequest {
+                version,
+                start_account_index,
+                end_account_index,
+            },
+        );
+        let _ = mock_client.send_request(request).await.unwrap();
+    }
+
+    // Process enough requests to evict the previously cached response
+    for version in 0..max_lru_cache_size {
+        let request = StorageServiceRequest::GetNumberOfAccountsAtVersion(version);
+        let _ = mock_client.send_request(request).await.unwrap();
+    }
+
+    // Process a request to fetch the account states chunk again. This requires refetching the data.
+    let request =
+        StorageServiceRequest::GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest {
+            version,
+            start_account_index,
+            end_account_index,
+        });
+    let _ = mock_client.send_request(request).await.unwrap();
+}
+
+#[tokio::test]
+async fn test_cachable_requests_data_versions() {
+    // Create test data
+    let start_versions = [0, 76, 101, 230, 300, 454];
+    let end_version = 454;
+    let proof_version = end_version;
+    let include_events = false;
+
+    // Create the mock db reader
+    let mut db_reader = create_mock_db_reader();
+    let mut expectation_sequence = Sequence::new();
+    let mut transaction_lists_with_proof = vec![];
+    for start_version in start_versions {
+        // Create and save test transaction lists
+        let transaction_list_with_proof = create_transaction_list_with_proof(
+            start_version,
+            end_version,
+            proof_version,
+            include_events,
+        );
+        transaction_lists_with_proof.push(transaction_list_with_proof.clone());
+
+        // Expect the data to be fetched from storage once
+        db_reader
+            .expect_get_transactions()
+            .times(1)
+            .with(
+                eq(start_version),
+                eq(end_version - start_version + 1),
+                eq(proof_version),
+                eq(include_events),
+            )
+            .return_once(move |_, _, _, _| Ok(transaction_list_with_proof))
+            .in_sequence(&mut expectation_sequence);
+    }
+
+    // Create the storage client and server
+    let (mut mock_client, service, _) = MockClient::new(Some(db_reader));
+    tokio::spawn(service.start());
+
+    // Repeatedly fetch the data and verify the responses
+    for (i, start_version) in start_versions.iter().enumerate() {
+        for _ in 0..10 {
+            let request =
+                StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+                    proof_version,
+                    start_version: *start_version,
+                    end_version,
+                    include_events,
+                });
+
+            // Process the request
+            let response = mock_client.send_request(request).await.unwrap();
+
+            // Verify the response is correct
+            match response {
+                StorageServiceResponse::TransactionsWithProof(transactions_with_proof) => {
+                    assert_eq!(transactions_with_proof, transaction_lists_with_proof[i])
+                }
+                _ => panic!("Expected transactions with proof but got: {:?}", response),
+            };
+        }
+    }
+}
 
 #[tokio::test]
 async fn test_get_server_protocol_version() {
-    let (mut mock_client, service, _) = MockClient::new();
+    // Create the storage client and server
+    let (mut mock_client, service, _) = MockClient::new(None);
     tokio::spawn(service.start());
 
     // Process a request to fetch the protocol version
@@ -79,113 +214,170 @@ async fn test_get_server_protocol_version() {
 
 #[tokio::test]
 async fn test_get_account_states_with_proof() {
-    let (mut mock_client, service, _) = MockClient::new();
-    tokio::spawn(service.start());
-
-    // Create a request to fetch an account states chunk with a proof
-    let start_account_index = 100;
-    let end_account_index = 200;
-    let request =
-        StorageServiceRequest::GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest {
-            version: 0,
-            start_account_index,
-            end_account_index,
-        });
-
-    // Process the request
-    let response = mock_client.send_request(request).await.unwrap();
-
-    // Verify the response is correct
-    let chunk_size = end_account_index - start_account_index + 1;
-    let mut account_blobs = vec![];
-    for _ in 0..chunk_size {
-        account_blobs.push((
-            HashValue::zero(),
-            StateKeyAndValue::new(StateKey::Raw(vec![]), vec![].into()),
-        ));
-    }
-    let expected_response =
-        StorageServiceResponse::AccountStatesChunkWithProof(StateValueChunkWithProof {
+    // Test small and large chunk requests
+    for chunk_size in [
+        1,
+        100,
+        StorageServiceConfig::default().max_account_states_chunk_sizes,
+    ] {
+        // Create test data
+        let version = 101;
+        let start_account_index = 100;
+        let end_account_index = start_account_index + chunk_size - 1;
+        let state_value_chunk_with_proof = StateValueChunkWithProof {
             first_index: start_account_index,
             last_index: end_account_index,
-            first_key: HashValue::zero(),
-            last_key: HashValue::zero(),
-            raw_values: account_blobs,
+            first_key: HashValue::random(),
+            last_key: HashValue::random(),
+            raw_values: vec![],
             proof: SparseMerkleRangeProof::new(vec![]),
-            root_hash: HashValue::zero(),
-        });
-    assert_eq!(response, expected_response);
+            root_hash: HashValue::random(),
+        };
 
-    // Create a request to fetch the maximum amount of data
-    let max_account_chunk_size = StorageServiceConfig::default().max_account_states_chunk_sizes;
-    let start_account_index = 312;
-    let end_account_index = start_account_index + max_account_chunk_size - 1;
-    let request =
-        StorageServiceRequest::GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest {
-            version: 0,
-            start_account_index,
-            end_account_index,
-        });
+        // Create the mock db reader
+        let mut db_reader = create_mock_db_reader();
+        let state_value_chunk_with_proof_clone = state_value_chunk_with_proof.clone();
+        db_reader
+            .expect_get_state_value_chunk_with_proof()
+            .times(1)
+            .with(
+                eq(version),
+                eq(start_account_index as usize),
+                eq((end_account_index - start_account_index + 1) as usize),
+            )
+            .return_once(move |_, _, _| Ok(state_value_chunk_with_proof_clone));
 
-    // Process and verify the response is not an error
-    let _ = mock_client.send_request(request).await.unwrap();
+        // Create the storage client and server
+        let (mut mock_client, service, _) = MockClient::new(Some(db_reader));
+        tokio::spawn(service.start());
+
+        // Process a request to fetch an account states chunk with a proof
+        let request = StorageServiceRequest::GetAccountStatesChunkWithProof(
+            AccountStatesChunkWithProofRequest {
+                version,
+                start_account_index,
+                end_account_index,
+            },
+        );
+        let response = mock_client.send_request(request).await.unwrap();
+
+        // Verify the response is correct
+        assert_eq!(
+            response,
+            StorageServiceResponse::AccountStatesChunkWithProof(state_value_chunk_with_proof)
+        );
+    }
 }
 
 #[tokio::test]
-async fn test_get_invalid_account_states_request() {
-    let (mut mock_client, service, _) = MockClient::new();
+async fn test_get_account_states_with_proof_invalid() {
+    // Create the storage client and server
+    let (mut mock_client, service, _) = MockClient::new(None);
     tokio::spawn(service.start());
 
-    // Create a request to fetch an invalid account states range
-    let start_account_index = 100;
-    let end_account_index = 99;
-    let request =
-        StorageServiceRequest::GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest {
-            version: 0,
-            start_account_index,
-            end_account_index,
-        });
-
-    // Process and verify the response
-    let response = mock_client.send_request(request).await.unwrap_err();
-    assert_matches!(response, StorageServiceError::InvalidRequest(_));
-
-    // Create a request to fetch too much data
+    // Test invalid ranges and chunks that are too large
     let max_account_chunk_size = StorageServiceConfig::default().max_account_states_chunk_sizes;
     let start_account_index = 100;
-    let end_account_index = start_account_index + max_account_chunk_size;
-    let request =
-        StorageServiceRequest::GetAccountStatesChunkWithProof(AccountStatesChunkWithProofRequest {
-            version: 0,
-            start_account_index,
-            end_account_index,
-        });
+    for end_account_index in [99, start_account_index + max_account_chunk_size] {
+        let request = StorageServiceRequest::GetAccountStatesChunkWithProof(
+            AccountStatesChunkWithProofRequest {
+                version: 0,
+                start_account_index,
+                end_account_index,
+            },
+        );
 
-    // Process and verify the response
-    let response = mock_client.send_request(request).await.unwrap_err();
-    assert_matches!(response, StorageServiceError::InvalidRequest(_));
+        // Process and verify the response
+        let response = mock_client.send_request(request).await.unwrap_err();
+        assert_matches!(response, StorageServiceError::InvalidRequest(_));
+    }
 }
 
 #[tokio::test]
 async fn test_get_number_of_accounts_at_version() {
-    let (mut mock_client, service, _) = MockClient::new();
+    // Create test data
+    let version = 101;
+    let number_of_accounts: u64 = 560;
+
+    // Create the mock db reader
+    let mut db_reader = create_mock_db_reader();
+    db_reader
+        .expect_get_state_leaf_count()
+        .times(1)
+        .with(eq(version))
+        .returning(move |_| Ok(number_of_accounts as usize));
+
+    // Create the storage client and server
+    let (mut mock_client, service, _) = MockClient::new(Some(db_reader));
     tokio::spawn(service.start());
 
-    // Create a request to fetch the number of accounts at the specified version
-    let request = StorageServiceRequest::GetNumberOfAccountsAtVersion(0);
-
-    // Process the request
+    // Process a request to fetch the number of accounts at a version
+    let request = StorageServiceRequest::GetNumberOfAccountsAtVersion(version);
     let response = mock_client.send_request(request).await.unwrap();
 
     // Verify the response is correct
-    let expected_response =
-        StorageServiceResponse::NumberOfAccountsAtVersion(NUM_ACCOUNTS_AT_VERSION);
-    assert_eq!(response, expected_response);
+    assert_eq!(
+        response,
+        StorageServiceResponse::NumberOfAccountsAtVersion(number_of_accounts)
+    );
+}
+
+#[tokio::test]
+async fn test_get_number_of_accounts_at_version_invalid() {
+    // Create test data
+    let version = 1;
+
+    // Create the mock db reader
+    let mut db_reader = create_mock_db_reader();
+    db_reader
+        .expect_get_state_leaf_count()
+        .times(1)
+        .with(eq(version))
+        .returning(move |_| Err(format_err!("Version does not exist!")));
+
+    // Create the storage client and server
+    let (mut mock_client, service, _) = MockClient::new(Some(db_reader));
+    tokio::spawn(service.start());
+
+    // Process a request to fetch the number of accounts at a version
+    let request = StorageServiceRequest::GetNumberOfAccountsAtVersion(version);
+    let response = mock_client.send_request(request).await.unwrap_err();
+
+    // Verify the response is correct
+    assert_matches!(response, StorageServiceError::InternalError(_));
 }
 
 #[tokio::test]
 async fn test_get_storage_server_summary() {
-    let (mut mock_client, service, mock_time) = MockClient::new();
+    // Create test data
+    let highest_version = 506;
+    let highest_epoch = 30;
+    let lowest_version = 101;
+    let state_prune_window = 50;
+    let highest_ledger_info = create_test_ledger_info_with_sigs(highest_epoch, highest_version);
+
+    // Create the mock db reader
+    let mut db_reader = create_mock_db_reader();
+    let highest_ledger_info_clone = highest_ledger_info.clone();
+    db_reader
+        .expect_get_latest_ledger_info()
+        .times(1)
+        .return_once(move || Ok(highest_ledger_info_clone));
+    db_reader
+        .expect_get_first_txn_version()
+        .times(1)
+        .return_once(move || Ok(Some(lowest_version)));
+    db_reader
+        .expect_get_first_write_set_version()
+        .times(1)
+        .return_once(move || Ok(Some(lowest_version)));
+    db_reader
+        .expect_get_state_prune_window()
+        .times(1)
+        .return_once(move || Ok(Some(state_prune_window)));
+
+    // Create the storage client and server
+    let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader));
     tokio::spawn(service.start());
 
     // Fetch the storage summary and verify we get a default summary response
@@ -205,8 +397,6 @@ async fn test_get_storage_server_summary() {
     let response = mock_client.send_request(request).await.unwrap();
 
     // Verify the response is correct (after the cache update)
-    let highest_version = LAST_TXN_VERSION;
-    let highest_epoch = LAST_EPOCH;
     let expected_server_summary = StorageServerSummary {
         protocol_metadata: ProtocolMetadata {
             max_epoch_chunk_size: default_storage_config.max_epoch_chunk_size,
@@ -216,18 +406,18 @@ async fn test_get_storage_server_summary() {
             max_account_states_chunk_size: default_storage_config.max_account_states_chunk_sizes,
         },
         data_summary: DataSummary {
-            synced_ledger_info: Some(create_test_ledger_info_with_sigs(
-                highest_epoch,
-                highest_version,
-            )),
+            synced_ledger_info: Some(highest_ledger_info),
             epoch_ending_ledger_infos: Some(CompleteDataRange::from_genesis(highest_epoch - 1)),
-            transactions: Some(CompleteDataRange::new(FIRST_TXN_VERSION, highest_version).unwrap()),
+            transactions: Some(CompleteDataRange::new(lowest_version, highest_version).unwrap()),
             transaction_outputs: Some(
-                CompleteDataRange::new(FIRST_TXN_OUTPUT_VERSION, highest_version).unwrap(),
+                CompleteDataRange::new(lowest_version, highest_version).unwrap(),
             ),
             account_states: Some(
-                CompleteDataRange::new(LAST_TXN_VERSION - STATE_PRUNE_WINDOW + 1, highest_version)
-                    .unwrap(),
+                CompleteDataRange::new(
+                    highest_version - state_prune_window as u64 + 1,
+                    highest_version,
+                )
+                .unwrap(),
             ),
         },
     };
@@ -238,287 +428,240 @@ async fn test_get_storage_server_summary() {
 }
 
 #[tokio::test]
-async fn test_get_transactions_with_proof_events() {
-    let (mut mock_client, service, _) = MockClient::new();
-    tokio::spawn(service.start());
-
-    // Create a request to fetch transactions with a proof
-    let start_version = 0;
-    let end_version = 10;
-    let request = StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
-        proof_version: LAST_TXN_VERSION,
-        start_version,
-        end_version,
-        include_events: true,
-    });
-
-    // Process the request
-    let response = mock_client.send_request(request).await.unwrap();
-
-    // Verify the response is correct
-    match response {
-        StorageServiceResponse::TransactionsWithProof(transactions_with_proof) => {
-            assert_eq!(
-                transactions_with_proof.transactions.len() as u64,
-                end_version - start_version + 1,
+async fn test_get_transactions_with_proof() {
+    // Test small and large chunk requests
+    for chunk_size in [
+        1,
+        100,
+        StorageServiceConfig::default().max_transaction_chunk_size,
+    ] {
+        // Test event inclusion
+        for include_events in [true, false] {
+            // Create test data
+            let start_version = 0;
+            let end_version = start_version + chunk_size - 1;
+            let proof_version = end_version;
+            let transaction_list_with_proof = create_transaction_list_with_proof(
+                start_version,
+                end_version,
+                proof_version,
+                include_events,
             );
-            assert_eq!(
-                transactions_with_proof.first_transaction_version,
-                Some(start_version)
-            );
-            assert_some!(transactions_with_proof.events);
+
+            // Create the mock db reader
+            let mut db_reader = create_mock_db_reader();
+            let transaction_list_with_proof_clone = transaction_list_with_proof.clone();
+            db_reader
+                .expect_get_transactions()
+                .times(1)
+                .with(
+                    eq(start_version),
+                    eq(end_version - start_version + 1),
+                    eq(proof_version),
+                    eq(include_events),
+                )
+                .return_once(move |_, _, _, _| Ok(transaction_list_with_proof_clone));
+
+            // Create the storage client and server
+            let (mut mock_client, service, _) = MockClient::new(Some(db_reader));
+            tokio::spawn(service.start());
+
+            // Create a request to fetch transactions with a proof
+            let request =
+                StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+                    proof_version,
+                    start_version,
+                    end_version,
+                    include_events,
+                });
+
+            // Process the request
+            let response = mock_client.send_request(request).await.unwrap();
+
+            // Verify the response is correct
+            match response {
+                StorageServiceResponse::TransactionsWithProof(transactions_with_proof) => {
+                    assert_eq!(transactions_with_proof, transaction_list_with_proof)
+                }
+                _ => panic!("Expected transactions with proof but got: {:?}", response),
+            };
         }
-        _ => panic!("Expected transactions with proof but got: {:?}", response),
-    };
-
-    // Create a request to fetch the maximum amount of data
-    let max_transaction_chunk_size = StorageServiceConfig::default().max_transaction_chunk_size;
-    let start_version = 0;
-    let end_version = start_version + max_transaction_chunk_size - 1;
-    let request = StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
-        proof_version: LAST_TXN_VERSION,
-        start_version,
-        end_version,
-        include_events: true,
-    });
-
-    // Process and verify the response is not an error
-    let _ = mock_client.send_request(request).await.unwrap();
+    }
 }
 
 #[tokio::test]
-async fn test_get_transactions_with_proof_no_events() {
-    let (mut mock_client, service, _) = MockClient::new();
+async fn test_get_transactions_with_proof_invalid() {
+    // Create the storage client and server
+    let (mut mock_client, service, _) = MockClient::new(None);
     tokio::spawn(service.start());
 
-    // Create a request to fetch transactions with a proof (excluding events)
-    let start_version = 10;
-    let end_version = 30;
-    let request = StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
-        proof_version: LAST_TXN_VERSION,
-        start_version,
-        end_version,
-        include_events: false,
-    });
-
-    // Process the request
-    let response = mock_client.send_request(request).await.unwrap();
-
-    // Verify the response is correct
-    match response {
-        StorageServiceResponse::TransactionsWithProof(transactions_with_proof) => {
-            assert_eq!(
-                transactions_with_proof.transactions.len() as u64,
-                end_version - start_version + 1,
-            );
-            assert_eq!(
-                transactions_with_proof.first_transaction_version,
-                Some(start_version)
-            );
-            assert_none!(transactions_with_proof.events);
-        }
-        _ => panic!("Expected transactions with proof but got: {:?}", response),
-    };
-}
-
-#[tokio::test]
-async fn test_get_invalid_transactions_request() {
-    let (mut mock_client, service, _) = MockClient::new();
-    tokio::spawn(service.start());
-
-    // Create a request to fetch an invalid transaction range
-    let start_version = 992;
-    let end_version = 101;
-    let request = StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
-        proof_version: LAST_TXN_VERSION,
-        start_version,
-        end_version,
-        include_events: true,
-    });
-
-    // Process and verify the response
-    let response = mock_client.send_request(request).await.unwrap_err();
-    assert_matches!(response, StorageServiceError::InvalidRequest(_));
-
-    // Create a request to fetch too much data
+    // Test invalid ranges and chunks that are too large
     let max_transaction_chunk_size = StorageServiceConfig::default().max_transaction_chunk_size;
-    let start_version = 35;
-    let end_version = start_version + max_transaction_chunk_size;
-    let request = StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
-        proof_version: LAST_TXN_VERSION,
-        start_version,
-        end_version,
-        include_events: true,
-    });
+    let start_version = 1000;
+    for end_version in [1, start_version + max_transaction_chunk_size] {
+        let request =
+            StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+                proof_version: start_version,
+                start_version,
+                end_version,
+                include_events: true,
+            });
 
-    // Process and verify the response
-    let response = mock_client.send_request(request).await.unwrap_err();
-    assert_matches!(response, StorageServiceError::InvalidRequest(_));
+        // Process and verify the response
+        let response = mock_client.send_request(request).await.unwrap_err();
+        assert_matches!(response, StorageServiceError::InvalidRequest(_));
+    }
 }
 
 #[tokio::test]
 async fn test_get_transaction_outputs_with_proof() {
-    let (mut mock_client, service, _) = MockClient::new();
-    tokio::spawn(service.start());
+    // Test small and large chunk requests
+    for chunk_size in [
+        1,
+        100,
+        StorageServiceConfig::default().max_transaction_output_chunk_size,
+    ] {
+        // Create test data
+        let start_version = 0;
+        let end_version = start_version + chunk_size - 1;
+        let proof_version = end_version;
+        let output_list_with_proof =
+            create_output_list_with_proof(start_version, end_version, proof_version);
 
-    // Create a request to fetch transaction outputs with a proof
-    let start_version = 5;
-    let end_version = 47;
-    let request =
-        StorageServiceRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
-            proof_version: LAST_TXN_VERSION,
-            start_version,
-            end_version,
-        });
+        // Create the mock db reader
+        let mut db_reader = create_mock_db_reader();
+        let output_list_with_proof_clone = output_list_with_proof.clone();
+        db_reader
+            .expect_get_transaction_outputs()
+            .times(1)
+            .with(
+                eq(start_version),
+                eq(end_version - start_version + 1),
+                eq(proof_version),
+            )
+            .return_once(move |_, _, _| Ok(output_list_with_proof_clone));
 
-    // Process the request
-    let response = mock_client.send_request(request).await.unwrap();
+        // Create the storage client and server
+        let (mut mock_client, service, _) = MockClient::new(Some(db_reader));
+        tokio::spawn(service.start());
 
-    // Verify the response is correct
-    match response {
-        StorageServiceResponse::TransactionOutputsWithProof(outputs_with_proof) => {
-            assert_eq!(
-                outputs_with_proof.transactions_and_outputs.len() as u64,
-                end_version - start_version + 1,
-            );
-            assert_eq!(
-                outputs_with_proof.first_transaction_output_version,
-                Some(start_version)
-            );
-        }
-        _ => panic!("Expected outputs with proof but got: {:?}", response),
-    };
+        // Create a request to fetch transactions outputs with a proof
+        let request = StorageServiceRequest::GetTransactionOutputsWithProof(
+            TransactionOutputsWithProofRequest {
+                proof_version,
+                start_version,
+                end_version,
+            },
+        );
 
-    // Create a request to fetch the maximum amount of data
-    let max_transaction_output_chunk_size =
-        StorageServiceConfig::default().max_transaction_output_chunk_size;
-    let start_version = 104;
-    let end_version = start_version + max_transaction_output_chunk_size - 1;
-    let request =
-        StorageServiceRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
-            proof_version: LAST_TXN_VERSION,
-            start_version,
-            end_version,
-        });
+        // Process the request
+        let response = mock_client.send_request(request).await.unwrap();
 
-    // Process and verify the response is not an error
-    let _ = mock_client.send_request(request).await.unwrap();
+        // Verify the response is correct
+        match response {
+            StorageServiceResponse::TransactionOutputsWithProof(outputs_with_proof) => {
+                assert_eq!(outputs_with_proof, output_list_with_proof)
+            }
+            _ => panic!(
+                "Expected transaction outputs with proof but got: {:?}",
+                response
+            ),
+        };
+    }
 }
 
 #[tokio::test]
-async fn test_get_invalid_transactions_outputs_request() {
-    let (mut mock_client, service, _) = MockClient::new();
+async fn test_get_transaction_outputs_with_proof_invalid() {
+    // Create the storage client and server
+    let (mut mock_client, service, _) = MockClient::new(None);
     tokio::spawn(service.start());
 
-    // Create a request to fetch an invalid output range
-    let start_version = 992;
-    let end_version = 101;
-    let request =
-        StorageServiceRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
-            proof_version: LAST_TXN_VERSION,
-            start_version,
-            end_version,
-        });
+    // Test invalid ranges and chunks that are too large
+    let max_output_chunk_size = StorageServiceConfig::default().max_transaction_output_chunk_size;
+    let start_version = 1000;
+    for end_version in [1, start_version + max_output_chunk_size] {
+        let request = StorageServiceRequest::GetTransactionOutputsWithProof(
+            TransactionOutputsWithProofRequest {
+                proof_version: end_version,
+                start_version,
+                end_version,
+            },
+        );
 
-    // Process and verify the response
-    let response = mock_client.send_request(request).await.unwrap_err();
-    assert_matches!(response, StorageServiceError::InvalidRequest(_));
-
-    // Create a request to fetch too much data
-    let max_transaction_output_chunk_size =
-        StorageServiceConfig::default().max_transaction_output_chunk_size;
-    let start_version = 35;
-    let end_version = start_version + max_transaction_output_chunk_size;
-    let request =
-        StorageServiceRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
-            proof_version: LAST_TXN_VERSION,
-            start_version,
-            end_version,
-        });
-
-    // Process and verify the response
-    let response = mock_client.send_request(request).await.unwrap_err();
-    assert_matches!(response, StorageServiceError::InvalidRequest(_));
+        // Process and verify the response
+        let response = mock_client.send_request(request).await.unwrap_err();
+        assert_matches!(response, StorageServiceError::InvalidRequest(_));
+    }
 }
 
 #[tokio::test]
 async fn test_get_epoch_ending_ledger_infos() {
-    let (mut mock_client, service, _) = MockClient::new();
-    tokio::spawn(service.start());
+    // Test small and large chunk requests
+    for chunk_size in [1, 100, StorageServiceConfig::default().max_epoch_chunk_size] {
+        // Create test data
+        let start_epoch = 11;
+        let expected_end_epoch = start_epoch + chunk_size - 1;
+        let epoch_change_proof = EpochChangeProof {
+            ledger_info_with_sigs: create_epoch_ending_ledger_infos(
+                start_epoch,
+                expected_end_epoch,
+            ),
+            more: false,
+        };
 
-    // Create a request to fetch epoch ending ledger infos
-    let start_epoch = 11;
-    let expected_end_epoch = 21;
-    let request = StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
-        start_epoch,
-        expected_end_epoch,
-    });
+        // Create the mock db reader
+        let mut db_reader = create_mock_db_reader();
+        let epoch_change_proof_clone = epoch_change_proof.clone();
+        db_reader
+            .expect_get_epoch_ending_ledger_infos()
+            .times(1)
+            .with(eq(start_epoch), eq(expected_end_epoch + 1))
+            .return_once(move |_, _| Ok(epoch_change_proof_clone));
 
-    // Process the request
-    let response = mock_client.send_request(request).await.unwrap();
+        // Create the storage client and server
+        let (mut mock_client, service, _) = MockClient::new(Some(db_reader));
+        tokio::spawn(service.start());
 
-    // Verify the response is correct
-    match response {
-        StorageServiceResponse::EpochEndingLedgerInfos(epoch_change_proof) => {
-            assert_eq!(
-                epoch_change_proof.ledger_info_with_sigs.len(),
-                (expected_end_epoch - start_epoch + 1) as usize
-            );
-            assert_eq!(epoch_change_proof.more, false);
+        // Create a request to fetch epoch ending ledger infos
+        let request =
+            StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
+                start_epoch,
+                expected_end_epoch,
+            });
 
-            for (i, epoch_ending_li) in epoch_change_proof.ledger_info_with_sigs.iter().enumerate()
-            {
-                assert_eq!(
-                    epoch_ending_li.ledger_info().epoch(),
-                    (i as u64) + start_epoch
-                );
+        // Process the request
+        let response = mock_client.send_request(request).await.unwrap();
+
+        // Verify the response is correct
+        match response {
+            StorageServiceResponse::EpochEndingLedgerInfos(response_epoch_change_proof) => {
+                assert_eq!(response_epoch_change_proof, epoch_change_proof)
             }
-        }
-        _ => panic!("Expected epoch ending ledger infos but got: {:?}", response),
-    };
-
-    // Create a request to fetch the maximum amount of data
-    let max_epoch_chunk_size = StorageServiceConfig::default().max_epoch_chunk_size;
-    let start_epoch = 43;
-    let expected_end_epoch = start_epoch + max_epoch_chunk_size - 1;
-    let request = StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
-        start_epoch,
-        expected_end_epoch,
-    });
-
-    // Process and verify the response is not an error
-    let _ = mock_client.send_request(request).await.unwrap();
+            _ => panic!("Expected epoch ending ledger infos but got: {:?}", response),
+        };
+    }
 }
 
 #[tokio::test]
-async fn test_get_invalid_epoch_ledger_infos() {
-    let (mut mock_client, service, _) = MockClient::new();
+async fn test_get_epoch_ending_ledger_infos_invalid() {
+    // Create the storage client and server
+    let (mut mock_client, service, _) = MockClient::new(None);
     tokio::spawn(service.start());
 
-    // Create a request to fetch an invalid epoch range
-    let start_epoch = 11;
-    let expected_end_epoch = 10;
-    let request = StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
-        start_epoch,
-        expected_end_epoch,
-    });
-
-    // Process and verify the response
-    let response = mock_client.send_request(request).await.unwrap_err();
-    assert_matches!(response, StorageServiceError::InvalidRequest(_));
-
-    // Create a request to fetch too much data
+    // Test invalid ranges and chunks that are too large
     let max_epoch_chunk_size = StorageServiceConfig::default().max_epoch_chunk_size;
     let start_epoch = 11;
-    let expected_end_epoch = start_epoch + max_epoch_chunk_size;
-    let request = StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
-        start_epoch,
-        expected_end_epoch,
-    });
+    for expected_end_epoch in [10, start_epoch + max_epoch_chunk_size] {
+        let request =
+            StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
+                start_epoch,
+                expected_end_epoch,
+            });
 
-    // Process and verify the response
-    let response = mock_client.send_request(request).await.unwrap_err();
-    assert_matches!(response, StorageServiceError::InvalidRequest(_));
+        // Process and verify the response
+        let response = mock_client.send_request(request).await.unwrap_err();
+        assert_matches!(response, StorageServiceError::InvalidRequest(_));
+    }
 }
 
 /// A wrapper around the inbound network interface/channel for easily sending
@@ -528,10 +671,15 @@ struct MockClient {
 }
 
 impl MockClient {
-    fn new() -> (Self, StorageServiceServer<StorageReader>, MockTimeService) {
+    fn new(
+        db_reader: Option<MockDatabaseReader>,
+    ) -> (Self, StorageServiceServer<StorageReader>, MockTimeService) {
         initialize_logger();
         let storage_config = StorageServiceConfig::default();
-        let storage = StorageReader::new(storage_config, Arc::new(MockDbReader));
+        let storage = StorageReader::new(
+            storage_config,
+            Arc::new(db_reader.unwrap_or_else(create_mock_db_reader)),
+        );
 
         let queue_cfg = crate::network::network_endpoint_config(storage_config)
             .inbound_queue
@@ -590,15 +738,50 @@ impl MockClient {
     }
 }
 
-fn create_test_event(sequence_number: u64) -> ContractEvent {
-    ContractEvent::new(
-        EventKey::new_from_address(&AccountAddress::random(), 0),
-        sequence_number,
-        TypeTag::Bool,
-        bcs::to_bytes(&0).unwrap(),
+/// Creates a test epoch change proof
+fn create_epoch_ending_ledger_infos(
+    start_epoch: Epoch,
+    end_epoch: Epoch,
+) -> Vec<LedgerInfoWithSignatures> {
+    let mut ledger_info_with_sigs = vec![];
+    for epoch in start_epoch..end_epoch {
+        ledger_info_with_sigs.push(create_test_ledger_info_with_sigs(epoch, 0));
+    }
+    ledger_info_with_sigs
+}
+
+/// Creates a test transaction output list with proof
+fn create_output_list_with_proof(
+    start_version: u64,
+    _end_version: u64,
+    _proof_version: u64,
+) -> TransactionOutputListWithProof {
+    TransactionOutputListWithProof::new(
+        vec![],
+        Some(start_version),
+        TransactionInfoListWithProof::new_empty(),
     )
 }
 
+/// Creates a test ledger info with signatures
+fn create_test_ledger_info_with_sigs(epoch: u64, version: u64) -> LedgerInfoWithSignatures {
+    // Create a mock ledger info with signatures
+    let ledger_info = LedgerInfo::new(
+        BlockInfo::new(
+            epoch,
+            0,
+            HashValue::zero(),
+            HashValue::zero(),
+            version,
+            0,
+            None,
+        ),
+        HashValue::zero(),
+    );
+    LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
+}
+
+/// Creates a test user transaction
 fn create_test_transaction(sequence_number: u64) -> Transaction {
     let private_key = Ed25519PrivateKey::generate_for_testing();
     let public_key = private_key.public_key();
@@ -622,153 +805,29 @@ fn create_test_transaction(sequence_number: u64) -> Transaction {
     Transaction::UserTransaction(signed_transaction)
 }
 
-fn create_test_output() -> TransactionOutput {
-    TransactionOutput::new(WriteSet::default(), vec![], 0, TransactionStatus::Retry)
-}
+/// Creates a test transaction output list with proof
+fn create_transaction_list_with_proof(
+    start_version: u64,
+    end_version: u64,
+    _proof_version: u64,
+    include_events: bool,
+) -> TransactionListWithProof {
+    // Include events if required
+    let events = if include_events { Some(vec![]) } else { None };
 
-fn create_test_ledger_info_with_sigs(epoch: u64, version: u64) -> LedgerInfoWithSignatures {
-    // Create a mock ledger info with signatures
-    let ledger_info = LedgerInfo::new(
-        BlockInfo::new(
-            epoch,
-            0,
-            HashValue::zero(),
-            HashValue::zero(),
-            version,
-            0,
-            None,
-        ),
-        HashValue::zero(),
-    );
-    LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
-}
-
-/// This is a mock implementation of the `DbReader` trait.
-#[derive(Clone)]
-struct MockDbReader;
-
-impl DbReader for MockDbReader {
-    fn get_epoch_ending_ledger_infos(
-        &self,
-        start_epoch: u64,
-        end_epoch: u64,
-    ) -> Result<EpochChangeProof> {
-        let mut ledger_info_with_sigs = vec![];
-        // `get_epoch_ending_ledger_infos` only returns the epoch changes from
-        // `start_epoch` up to `end_epoch - 1`.
-        for epoch in start_epoch..end_epoch {
-            ledger_info_with_sigs.push(create_test_ledger_info_with_sigs(epoch, 0));
-        }
-
-        Ok(EpochChangeProof {
-            ledger_info_with_sigs,
-            more: false,
-        })
+    // Create the requested transactions
+    let mut transactions = vec![];
+    for sequence_number in start_version..=end_version {
+        transactions.push(create_test_transaction(sequence_number));
     }
 
-    fn get_transactions(
-        &self,
-        start_version: Version,
-        batch_size: u64,
-        _ledger_version: Version,
-        fetch_events: bool,
-    ) -> Result<TransactionListWithProof> {
-        // Create mock events
-        let events = if fetch_events {
-            let mut events = vec![];
-            for i in 0..batch_size {
-                events.push(vec![create_test_event(i)]);
-            }
-            Some(events)
-        } else {
-            None
-        };
+    // Create a transaction list with an empty proof
+    let mut transaction_list_with_proof = TransactionListWithProof::new_empty();
+    transaction_list_with_proof.first_transaction_version = Some(start_version);
+    transaction_list_with_proof.events = events;
+    transaction_list_with_proof.transactions = transactions;
 
-        // Create mock transactions
-        let mut transactions = vec![];
-        for i in 0..batch_size {
-            transactions.push(create_test_transaction(i))
-        }
-
-        Ok(TransactionListWithProof {
-            transactions,
-            events,
-            first_transaction_version: Some(start_version),
-            proof: TransactionInfoListWithProof::new_empty(),
-        })
-    }
-
-    fn get_first_txn_version(&self) -> Result<Option<Version>> {
-        Ok(Some(FIRST_TXN_VERSION))
-    }
-
-    fn get_first_write_set_version(&self) -> Result<Option<Version>> {
-        Ok(Some(FIRST_TXN_OUTPUT_VERSION))
-    }
-
-    fn get_transaction_outputs(
-        &self,
-        start_version: Version,
-        limit: u64,
-        _ledger_version: Version,
-    ) -> Result<TransactionOutputListWithProof> {
-        // Create mock transactions and outputs
-        let mut transactions_and_outputs = vec![];
-        for i in 0..limit {
-            let transaction = create_test_transaction(i);
-            let output = create_test_output();
-            transactions_and_outputs.push((transaction, output))
-        }
-
-        Ok(TransactionOutputListWithProof {
-            transactions_and_outputs,
-            first_transaction_output_version: Some(start_version),
-            proof: TransactionInfoListWithProof::new_empty(),
-        })
-    }
-
-    fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>> {
-        Ok(Some(create_test_ledger_info_with_sigs(
-            LAST_EPOCH,
-            LAST_TXN_VERSION,
-        )))
-    }
-
-    fn get_state_leaf_count(&self, _version: Version) -> Result<usize> {
-        Ok(NUM_ACCOUNTS_AT_VERSION as usize)
-    }
-
-    fn get_state_value_chunk_with_proof(
-        &self,
-        _version: Version,
-        start_idx: usize,
-        chunk_size: usize,
-    ) -> Result<StateValueChunkWithProof> {
-        // Create empty account blobs
-        let mut account_blobs = vec![];
-        for _ in 0..chunk_size {
-            account_blobs.push((
-                HashValue::zero(),
-                StateKeyAndValue::new(StateKey::Raw(vec![]), vec![].into()),
-            ));
-        }
-
-        // Create an account states chunk with proof
-        let account_states_chunk_with_proof = StateValueChunkWithProof {
-            first_index: start_idx as u64,
-            last_index: (start_idx + chunk_size - 1) as u64,
-            first_key: HashValue::zero(),
-            last_key: HashValue::zero(),
-            raw_values: account_blobs,
-            proof: SparseMerkleRangeProof::new(vec![]),
-            root_hash: HashValue::zero(),
-        };
-        Ok(account_states_chunk_with_proof)
-    }
-
-    fn get_state_prune_window(&self) -> Result<Option<usize>> {
-        Ok(Some(STATE_PRUNE_WINDOW as usize))
-    }
+    transaction_list_with_proof
 }
 
 /// Initializes the Aptos logger for tests
@@ -777,4 +836,170 @@ pub fn initialize_logger() {
         .is_async(false)
         .level(Level::Debug)
         .build();
+}
+
+/// Creates a mock database reader
+pub fn create_mock_db_reader() -> MockDatabaseReader {
+    MockDatabaseReader::new()
+}
+
+// This automatically creates a MockDatabaseReader.
+// TODO(joshlind): if we frequently use these mocks, we should define a single
+// mock test crate to be shared across the codebase.
+mock! {
+    pub DatabaseReader {}
+    impl DbReader for DatabaseReader {
+        fn get_epoch_ending_ledger_infos(
+            &self,
+            start_epoch: u64,
+            end_epoch: u64,
+        ) -> Result<EpochChangeProof>;
+
+        fn get_transactions(
+            &self,
+            start_version: Version,
+            batch_size: u64,
+            ledger_version: Version,
+            fetch_events: bool,
+        ) -> Result<TransactionListWithProof>;
+
+        fn get_transaction_by_hash(
+            &self,
+            hash: HashValue,
+            ledger_version: Version,
+            fetch_events: bool,
+        ) -> Result<Option<TransactionWithProof>>;
+
+        fn get_transaction_by_version(
+            &self,
+            version: Version,
+            ledger_version: Version,
+            fetch_events: bool,
+        ) -> Result<TransactionWithProof>;
+
+        fn get_first_txn_version(&self) -> Result<Option<Version>>;
+
+        fn get_first_write_set_version(&self) -> Result<Option<Version>>;
+
+        fn get_transaction_outputs(
+            &self,
+            start_version: Version,
+            limit: u64,
+            ledger_version: Version,
+        ) -> Result<TransactionOutputListWithProof>;
+
+        fn get_events(
+            &self,
+            event_key: &EventKey,
+            start: u64,
+            order: Order,
+            limit: u64,
+        ) -> Result<Vec<(u64, ContractEvent)>>;
+
+        fn get_events_with_proofs(
+            &self,
+            event_key: &EventKey,
+            start: u64,
+            order: Order,
+            limit: u64,
+            known_version: Option<u64>,
+        ) -> Result<Vec<EventWithProof>>;
+
+        fn get_block_timestamp(&self, version: u64) -> Result<u64>;
+
+        fn get_event_by_version_with_proof(
+            &self,
+            event_key: &EventKey,
+            event_version: u64,
+            proof_version: u64,
+        ) -> Result<EventByVersionWithProof>;
+
+        fn get_last_version_before_timestamp(
+            &self,
+            _timestamp: u64,
+            _ledger_version: Version,
+        ) -> Result<Version>;
+
+        fn get_latest_state_value(&self, state_key: StateKey) -> Result<Option<StateValue>>;
+
+        fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>>;
+
+        fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures>;
+
+        fn get_latest_version_option(&self) -> Result<Option<Version>>;
+
+        fn get_latest_version(&self) -> Result<Version>;
+
+        fn get_latest_commit_metadata(&self) -> Result<(Version, u64)>;
+
+        fn get_startup_info(&self) -> Result<Option<StartupInfo>>;
+
+        fn get_account_transaction(
+            &self,
+            address: AccountAddress,
+            seq_num: u64,
+            include_events: bool,
+            ledger_version: Version,
+        ) -> Result<Option<TransactionWithProof>>;
+
+        fn get_account_transactions(
+            &self,
+            address: AccountAddress,
+            seq_num: u64,
+            limit: u64,
+            include_events: bool,
+            ledger_version: Version,
+        ) -> Result<AccountTransactionsWithProof>;
+
+        fn get_state_proof_with_ledger_info(
+            &self,
+            known_version: u64,
+            ledger_info: LedgerInfoWithSignatures,
+        ) -> Result<StateProof>;
+
+        fn get_state_proof(&self, known_version: u64) -> Result<StateProof>;
+
+        fn get_state_value_with_proof(
+            &self,
+            state_key: StateKey,
+            version: Version,
+            ledger_version: Version,
+        ) -> Result<StateValueWithProof>;
+
+        fn get_state_value_with_proof_by_version(
+            &self,
+            state_key: &StateKey,
+            version: Version,
+        ) -> Result<(Option<StateValue>, SparseMerkleProof<StateValue>)>;
+
+        fn get_latest_tree_state(&self) -> Result<TreeState>;
+
+        fn get_epoch_ending_ledger_info(&self, known_version: u64) -> Result<LedgerInfoWithSignatures>;
+
+        fn get_latest_transaction_info_option(&self) -> Result<Option<(Version, TransactionInfo)>>;
+
+        fn get_accumulator_root_hash(&self, _version: Version) -> Result<HashValue>;
+
+        fn get_accumulator_consistency_proof(
+            &self,
+            _client_known_version: Option<Version>,
+            _ledger_version: Version,
+        ) -> Result<AccumulatorConsistencyProof>;
+
+        fn get_accumulator_summary(
+            &self,
+            ledger_version: Version,
+        ) -> Result<TransactionAccumulatorSummary>;
+
+        fn get_state_leaf_count(&self, version: Version) -> Result<usize>;
+
+        fn get_state_value_chunk_with_proof(
+            &self,
+            version: Version,
+            start_idx: usize,
+            chunk_size: usize,
+        ) -> Result<StateValueChunkWithProof>;
+
+        fn get_state_prune_window(&self) -> Result<Option<usize>>;
+    }
 }

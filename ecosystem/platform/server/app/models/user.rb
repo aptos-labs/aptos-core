@@ -16,9 +16,10 @@ class User < ApplicationRecord
   validates :username, uniqueness: { case_sensitive: false }, allow_nil: true
   validates :email, uniqueness: { case_sensitive: false }, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_nil: true
 
-  validate_hex :mainnet_address
+  validate_aptos_address :mainnet_address
 
   has_many :authorizations, dependent: :destroy
+  has_one :it1_profile
 
   # https://github.com/makandra/rails_state_machine
   # TODO: this state machine

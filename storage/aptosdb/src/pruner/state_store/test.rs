@@ -25,6 +25,7 @@ fn put_value_set(
         .put_value_sets(vec![&value_set], None, version, &mut cs)
         .unwrap()[0];
     db.write_schemas(cs.batch).unwrap();
+    state_store.set_latest_version(version);
 
     root
 }

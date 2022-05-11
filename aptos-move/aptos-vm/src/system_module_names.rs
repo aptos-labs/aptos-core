@@ -1,13 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-//! Names of modules, functions, and types used by Diem System.
+//! Names of modules, functions, and types used by Aptos System.
 
 use aptos_types::account_config;
-use move_core_types::{ident_str, identifier::IdentStr, language_storage::ModuleId};
+use move_deps::move_core_types::{ident_str, identifier::IdentStr, language_storage::ModuleId};
 use once_cell::sync::Lazy;
 
 // Data to resolve basic account and transaction flow functions and structs
-/// The ModuleId for the diem block module
+/// The ModuleId for the aptos block module
 pub static BLOCK_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(
         account_config::CORE_CODE_ADDRESS,

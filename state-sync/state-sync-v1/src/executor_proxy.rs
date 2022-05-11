@@ -706,10 +706,11 @@ mod tests {
     fn create_dummy_transaction(index: u8, validator_account: AccountAddress) -> Transaction {
         Transaction::BlockMetadata(BlockMetadata::new(
             gen_block_id(index),
+            0,
             index as u64,
-            (index as u64 + 1) * 100000010,
             vec![],
             validator_account,
+            (index as u64 + 1) * 100000010,
         ))
     }
 
@@ -736,7 +737,7 @@ mod tests {
         //     sequence_number,
         //     genesis_key.clone(),
         //     genesis_key.public_key(),
-        //     Some(aptos_stdlib::encode_update_diem_consensus_config_script_function(
+        //     Some(aptos_stdlib::encode_update_aptos_consensus_config_script_function(
         //         0,
         //         bcs::to_bytes(&OnChainConsensusConfig::V1(ConsensusConfigV1 {
         //             two_chain: false,

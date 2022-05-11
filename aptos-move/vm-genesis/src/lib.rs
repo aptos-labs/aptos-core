@@ -15,13 +15,12 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::{
-        ConsensusConfigV1, OnChainConsensusConfig, ReadWriteSetAnalysis, VMPublishingOption,
+        ConsensusConfigV1, ConsensusConfigV2, OnChainConsensusConfig, VMPublishingOption,
         APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
 use aptos_vm::{
-    convert_changeset_and_events,
     data_cache::{IntoMoveResolver, StateViewCache},
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
@@ -54,20 +53,23 @@ pub fn encode_genesis_transaction(
     aptos_root_key: Ed25519PublicKey,
     validators: &[Validator],
     stdlib_module_bytes: &[Vec<u8>],
-    vm_publishing_option: Option<VMPublishingOption>,
-    consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
-    enable_parallel_execution: bool,
     min_price_per_gas_unit: u64,
 ) -> Transaction {
+    let consensus_config = OnChainConsensusConfig::V2(ConsensusConfigV2 {
+        two_chain: true,
+        decoupled_execution: true,
+        back_pressure_limit: 10,
+        exclude_round: 20,
+    });
+
     Transaction::GenesisTransaction(WriteSetPayload::Direct(encode_genesis_change_set(
         &aptos_root_key,
         validators,
         stdlib_module_bytes,
-        vm_publishing_option.unwrap_or_else(VMPublishingOption::open),
+        VMPublishingOption::open(),
         consensus_config,
         chain_id,
-        enable_parallel_execution,
         min_price_per_gas_unit,
     )))
 }
@@ -79,7 +81,6 @@ pub fn encode_genesis_change_set(
     vm_publishing_option: VMPublishingOption,
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
-    enable_parallel_execution: bool,
     min_price_per_gas_unit: u64,
 ) -> ChangeSet {
     let mut stdlib_modules = Vec::new();
@@ -108,29 +109,7 @@ pub fn encode_genesis_change_set(
     create_and_initialize_validators(&mut session, validators);
     reconfigure(&mut session);
 
-    if enable_parallel_execution {
-        let payload = bcs::to_bytes(&ReadWriteSetAnalysis::V1(
-            read_write_set::analyze(&stdlib_modules)
-                .expect("Failed to get ReadWriteSet for current Diem Framework")
-                .normalize_all_scripts(aptos_vm::read_write_set_analysis::add_on_functions_list())
-                .trim()
-                .into_inner(),
-        ))
-        .expect("Failed to serialize analyze result");
-
-        exec_function(
-            &mut session,
-            "ParallelExecutionConfig",
-            "enable_parallel_execution_with_config",
-            vec![],
-            serialize_values(&vec![
-                MoveValue::Signer(account_config::aptos_root_address()),
-                MoveValue::vector_u8(payload),
-            ]),
-        )
-    }
-
-    let (mut changeset1, mut events1, _) = session.finish().unwrap().unpack();
+    let mut session1_out = session.finish().unwrap();
 
     let state_view = GenesisStateView::new();
     let data_cache = StateViewCache::new(&state_view).into_move_resolver();
@@ -142,16 +121,17 @@ pub fn encode_genesis_change_set(
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id2));
 
     publish_stdlib(&mut session, Modules::new(stdlib_modules.iter()));
-    let (changeset2, events2, _) = session.finish().unwrap().unpack();
+    let session2_out = session.finish().unwrap();
 
-    changeset1.squash(changeset2).unwrap();
-    events1.extend(events2);
+    session1_out.squash(session2_out).unwrap();
+    let change_set = session1_out.into_change_set(&mut ()).unwrap();
 
-    let (write_set, events) = convert_changeset_and_events(changeset1, events1).unwrap();
-
-    assert!(!write_set.iter().any(|(_, op)| op.is_deletion()));
-    verify_genesis_write_set(&events);
-    ChangeSet::new(write_set, events)
+    assert!(!change_set
+        .write_set()
+        .iter()
+        .any(|(_, op)| op.is_deletion()));
+    verify_genesis_write_set(change_set.events());
+    change_set
 }
 
 fn exec_function(
@@ -261,7 +241,7 @@ fn create_and_initialize_validators(
         consensus_pubkeys.push(MoveValue::vector_u8(v.consensus_pubkey.clone()));
         validator_network_addresses.push(MoveValue::vector_u8(v.network_address.clone()));
         full_node_network_addresses.push(MoveValue::vector_u8(v.full_node_network_address.clone()));
-        staking_distribution.push(MoveValue::U64(1));
+        staking_distribution.push(MoveValue::U64(v.stake_amount));
     }
     exec_function(
         session,
@@ -350,7 +330,7 @@ pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) 
         GenesisOptions::Fresh => framework::aptos::module_blobs(),
     };
 
-    generate_test_genesis(&modules, VMPublishingOption::open(), None, false).0
+    generate_test_genesis(&modules, VMPublishingOption::open(), None).0
 }
 
 pub fn test_genesis_transaction() -> Transaction {
@@ -365,31 +345,28 @@ pub fn test_genesis_change_set_and_validators(
         cached_framework_packages::module_blobs(),
         VMPublishingOption::open(),
         count,
-        false,
     )
 }
 
 #[derive(Debug, Clone)]
 pub struct Validator {
-    /// The Diem account address of the validator
+    /// The Aptos account address of the validator
     pub address: AccountAddress,
-    /// UTF8-encoded name for the validator
-    pub name: Vec<u8>,
     /// Authentication key for the validator
     pub auth_key: AuthenticationKey,
     /// Ed25519 public key used to sign consensus messages
     pub consensus_pubkey: Vec<u8>,
-    /// The Diem account address of the validator's operator (same as `address` if the validator is
+    /// The Aptos account address of the validator's operator (same as `address` if the validator is
     /// its own operator)
     pub operator_address: AccountAddress,
-    /// UTF8-encoded name of the operator
-    pub operator_name: Vec<u8>,
     /// Authentication key for the operator
     pub operator_auth_key: AuthenticationKey,
     /// `NetworkAddress` for the validator
     pub network_address: Vec<u8>,
     /// `NetworkAddress` for the validator's full node
     pub full_node_network_address: Vec<u8>,
+    /// Amount to stake for consensus
+    pub stake_amount: u64,
 }
 
 pub struct TestValidator {
@@ -413,20 +390,18 @@ impl TestValidator {
         let consensus_pubkey = key.public_key().to_bytes().to_vec();
         let operator_auth_key = auth_key;
         let operator_address = operator_auth_key.derived_address();
-        let operator_name = name.clone();
         let network_address = [0u8; 0].to_vec();
         let full_node_network_address = [0u8; 0].to_vec();
 
         let data = Validator {
             address,
-            name,
             auth_key,
             consensus_pubkey,
             operator_address,
-            operator_name,
             operator_auth_key,
             network_address,
             full_node_network_address,
+            stake_amount: 1,
         };
         Self { key, data }
     }
@@ -436,7 +411,6 @@ pub fn generate_test_genesis(
     stdlib_modules: &[Vec<u8>],
     vm_publishing_option: VMPublishingOption,
     count: Option<usize>,
-    enable_parallel_execution: bool,
 ) -> (ChangeSet, Vec<TestValidator>) {
     let test_validators = TestValidator::new_test_set(count);
     let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
@@ -449,7 +423,6 @@ pub fn generate_test_genesis(
         vm_publishing_option,
         OnChainConsensusConfig::V1(ConsensusConfigV1 { two_chain: true }),
         ChainId::test(),
-        enable_parallel_execution,
         0,
     );
     (genesis, test_validators)

@@ -10,7 +10,7 @@ use anyhow::{format_err, Result};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
 use consensus_types::{block::Block, common::Payload, executed_block::ExecutedBlock};
 use executor_types::{Error, StateComputeResult};
 use futures::channel::mpsc;
@@ -96,6 +96,8 @@ impl StateComputer for MockStateComputer {
             .expect("Fail to notify about sync");
         Ok(())
     }
+
+    fn new_epoch(&self, _: &EpochState) {}
 }
 
 pub struct EmptyStateComputer;
@@ -122,6 +124,8 @@ impl StateComputer for EmptyStateComputer {
     async fn sync_to(&self, _commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
         Ok(())
     }
+
+    fn new_epoch(&self, _: &EpochState) {}
 }
 
 /// Random Compute Result State Computer
@@ -171,4 +175,6 @@ impl StateComputer for RandomComputeResultStateComputer {
     async fn sync_to(&self, _commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
         Ok(())
     }
+
+    fn new_epoch(&self, _: &EpochState) {}
 }

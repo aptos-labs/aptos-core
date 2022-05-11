@@ -37,20 +37,34 @@ export default function WalletFooter () {
               color={(pathname === '/wallet') ? 'blue.400' : secondaryIconColor[colorMode] }
               variant="unstyled"
               size="md"
-              aria-label=""
+              aria-label="Wallet"
               fontSize="xl"
               icon={<RiCopperCoinFill />}
               display="flex"
             />
           </ChakraLink>
         </Center>
+        {/* TODO: Will update after hackathon */}
+        {/* <Center width="100%">
+          <ChakraLink to="/gallery">
+            <IconButton
+              color={(pathname === '/gallery') ? 'blue.400' : secondaryIconColor[colorMode] }
+              variant="unstyled"
+              size="md"
+              aria-label="Gallery"
+              icon={<IoMdImage />}
+              fontSize="xl"
+              display="flex"
+            />
+          </ChakraLink>
+        </Center> */}
         <Center width="100%">
           <ChakraLink to="/account">
             <IconButton
               color={(pathname === '/account') ? 'blue.400' : secondaryIconColor[colorMode] }
               variant="unstyled"
               size="md"
-              aria-label="go back"
+              aria-label="Account"
               icon={<IoIosPerson />}
               fontSize="xl"
               display="flex"

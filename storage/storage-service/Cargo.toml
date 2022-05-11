@@ -10,28 +10,29 @@ publish = false
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.52"
+anyhow = "1.0.57"
+bcs = "0.1.3"
+rand = { version = "0.8.3", optional = true }
 
-bcs = "0.1.2"
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
-aptosdb = { path = "../aptosdb" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-metrics = { path = "../../crates/aptos-metrics" }
 aptos-secure-net = { path = "../../secure/net" }
-storage-interface = { path = "../storage-interface" }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
-rand = { version = "0.8.3", optional = true }
+aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
+aptosdb = { path = "../aptosdb" }
 storage-client = { path = "../storage-client", optional = true }
+storage-interface = { path = "../storage-interface" }
 
 [dev-dependencies]
 itertools = "0.10.0"
-aptosdb = { path = "../aptosdb", features = ["fuzzing"] }
-aptos-temppath = { path = "../../crates/aptos-temppath" }
 proptest = "1.0.0"
+
+aptos-temppath = { path = "../../crates/aptos-temppath" }
+aptosdb = { path = "../aptosdb", features = ["fuzzing"] }
 storage-client = { path = "../storage-client" }
 
 [features]
 default = []
-fuzzing = [ "aptosdb/fuzzing", "rand"]
+fuzzing = ["aptosdb/fuzzing", "rand"]

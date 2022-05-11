@@ -44,10 +44,7 @@ use storage_interface::DbReaderWriter;
 use structopt::StructOpt;
 use tokio::io::BufReader;
 
-#[cfg(not(test))]
-const BATCH_SIZE: usize = 10000;
-#[cfg(test)]
-const BATCH_SIZE: usize = 2;
+const BATCH_SIZE: usize = if cfg!(test) { 2 } else { 10000 };
 
 #[derive(StructOpt)]
 pub struct TransactionRestoreOpt {

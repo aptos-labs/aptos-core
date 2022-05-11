@@ -9,7 +9,7 @@ use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
 use aptos_logger::debug;
 use std::{
     cmp::min,
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, HashSet},
 };
 use storage_service_types::{StorageServerSummary, StorageServiceRequest};
 
@@ -101,9 +101,8 @@ impl PeerState {
 pub(crate) struct PeerStates {
     config: StorageServiceConfig,
     peer_to_state: HashMap<PeerNetworkId, PeerState>,
-    polled_peers: HashSet<PeerNetworkId>, // The peers already marked as polled
-    prioritized_peer_queue: VecDeque<PeerNetworkId>, // The order in which high-priority peers were polled
-    regular_peer_queue: VecDeque<PeerNetworkId>,     // The order in which regular peers were polled
+    in_flight_priority_polls: HashSet<PeerNetworkId>, // The priority peers with in-flight polls
+    in_flight_regular_polls: HashSet<PeerNetworkId>,  // The regular peers with in-flight polls
 }
 
 impl PeerStates {
@@ -111,9 +110,8 @@ impl PeerStates {
         Self {
             config,
             peer_to_state: HashMap::new(),
-            polled_peers: HashSet::new(),
-            prioritized_peer_queue: VecDeque::new(),
-            regular_peer_queue: VecDeque::new(),
+            in_flight_priority_polls: HashSet::new(),
+            in_flight_regular_polls: HashSet::new(),
         }
     }
 
@@ -174,30 +172,48 @@ impl PeerStates {
         }
     }
 
-    /// Marks the given peer as polled
-    pub fn mark_peer_as_polled(&mut self, peer: &PeerNetworkId) {
-        let _ = self.polled_peers.insert(*peer);
+    /// Returns the number of in-flight priority polls
+    pub fn num_in_flight_priority_polls(&self) -> u64 {
+        self.in_flight_priority_polls.len() as u64
+    }
 
-        if is_priority_peer(peer) {
-            self.prioritized_peer_queue.push_front(*peer);
+    /// Returns the number of in-flight regular polls
+    pub fn num_in_flight_regular_polls(&self) -> u64 {
+        self.in_flight_regular_polls.len() as u64
+    }
+
+    /// Returns true iff there is an existing in-flight request
+    pub fn existing_in_flight_request(&self, peer: &PeerNetworkId) -> bool {
+        if self.is_priority_peer(peer) {
+            self.in_flight_priority_polls.contains(peer)
         } else {
-            self.regular_peer_queue.push_front(*peer);
+            self.in_flight_regular_polls.contains(peer)
         }
     }
 
-    /// Returns true iff the given peer has already been polled
-    pub fn already_polled_peer(&self, peer: &PeerNetworkId) -> bool {
-        self.polled_peers.contains(peer)
+    /// Creates a new pending in-flight request for the specified peer
+    pub fn new_in_flight_request(&mut self, peer: &PeerNetworkId) {
+        if self.is_priority_peer(peer) {
+            let _ = self.in_flight_priority_polls.insert(*peer);
+        } else {
+            let _ = self.in_flight_regular_polls.insert(*peer);
+        };
     }
 
-    /// Returns the high-priority peer that was last polled and contains the oldest data
-    pub fn oldest_polled_priority_peer(&mut self) -> Option<PeerNetworkId> {
-        self.prioritized_peer_queue.pop_back()
+    /// Marks the pending in-flight request as complete for the specified peer
+    pub fn mark_in_flight_request_complete(&mut self, peer: &PeerNetworkId) {
+        if self.is_priority_peer(peer) {
+            let _ = self.in_flight_priority_polls.remove(peer);
+        } else {
+            let _ = self.in_flight_regular_polls.remove(peer);
+        };
     }
 
-    /// Returns the regular peer that was last polled and contains the oldest data
-    pub fn oldest_polled_regular_peer(&mut self) -> Option<PeerNetworkId> {
-        self.regular_peer_queue.pop_back()
+    /// Returns true iff the given peer is high-priority.
+    ///
+    /// TODO(joshlind): make this less hacky using network topological awareness.
+    pub fn is_priority_peer(&self, peer: &PeerNetworkId) -> bool {
+        peer.network_id().is_validator_network()
     }
 
     /// Updates the storage summary for the given peer
@@ -302,13 +318,6 @@ pub(crate) fn calculate_optimal_chunk_sizes(
         transaction_chunk_size,
         transaction_output_chunk_size,
     }
-}
-
-/// Returns true iff the given peer is high-priority.
-///
-/// TODO(joshlind): make this less hacky using network topological awareness.
-fn is_priority_peer(peer: &PeerNetworkId) -> bool {
-    peer.network_id().is_validator_network()
 }
 
 /// Calculates the median of the given set of values (if it exists)

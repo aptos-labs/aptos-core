@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@types/node": "^17.0.23",
-    "aptos": "0.0.17",
+    "aptos": "0.0.19",
     "ts-node": "^10.7.0",
     "typescript": "^4.6.3"
   }

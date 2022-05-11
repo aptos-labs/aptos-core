@@ -37,20 +37,22 @@ use aptos_types::{
     write_set::{WriteSet, WriteSetMut},
 };
 use fail::fail_point;
-use move_binary_format::{
-    access::ModuleAccess,
-    errors::{verification_error, Location, VMResult},
-    CompiledModule, IndexKind,
+use move_deps::{
+    move_binary_format::{
+        access::ModuleAccess,
+        errors::{verification_error, Location, VMResult},
+        CompiledModule, IndexKind,
+    },
+    move_core_types::{
+        account_address::AccountAddress,
+        gas_schedule::{GasAlgebra, GasUnits},
+        language_storage::ModuleId,
+        transaction_argument::convert_txn_args,
+        value::{serialize_values, MoveValue},
+    },
+    move_vm_runtime::session::LoadedFunctionInstantiation,
+    move_vm_types::{gas_schedule::GasStatus, loaded_data::runtime_types::Type},
 };
-use move_core_types::{
-    account_address::AccountAddress,
-    gas_schedule::{GasAlgebra, GasUnits},
-    language_storage::ModuleId,
-    transaction_argument::convert_txn_args,
-    value::{serialize_values, MoveValue},
-};
-use move_vm_runtime::session::LoadedFunctionInstantiation;
-use move_vm_types::{gas_schedule::GasStatus, loaded_data::runtime_types::Type};
 use num_cpus;
 use once_cell::sync::OnceCell;
 use std::{
@@ -112,7 +114,7 @@ impl AptosVM {
     }
 
     fn is_valid_for_constant_type(typ: &Type) -> bool {
-        use move_vm_types::loaded_data::runtime_types::Type::*;
+        use move_deps::move_vm_types::loaded_data::runtime_types::Type::*;
         match typ {
             Bool | U8 | U64 | U128 | Address => true,
             Vector(inner) => AptosVM::is_valid_for_constant_type(&(*inner)),
@@ -617,13 +619,14 @@ impl AptosVM {
             .0
             .new_session(storage, SessionId::block_meta(&block_metadata));
 
-        let (round, timestamp, previous_vote, proposer) = block_metadata.into_inner();
+        let (epoch, round, timestamp, previous_vote, proposer) = block_metadata.into_inner();
         let args = serialize_values(&vec![
             MoveValue::Signer(txn_data.sender),
+            MoveValue::U64(epoch),
             MoveValue::U64(round),
-            MoveValue::U64(timestamp),
-            MoveValue::Vector(previous_vote.into_iter().map(MoveValue::Address).collect()),
+            MoveValue::Vector(previous_vote.into_iter().map(MoveValue::Bool).collect()),
             MoveValue::Address(proposer),
+            MoveValue::U64(timestamp),
         ]);
         session
             .execute_function_bypass_visibility(

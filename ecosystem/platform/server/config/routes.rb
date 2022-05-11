@@ -4,10 +4,13 @@
 # SPDX-License-Identifier: Apache-2.0
 
 Rails.application.routes.draw do
-  devise_for :users, **ActiveAdmin::Devise.config.deep_merge(controllers: {
-                                                               omniauth_callbacks: 'users/omniauth_callbacks'
-                                                             }), path: :users
+  devise_for :users, {
+    controllers: {
+      omniauth_callbacks: 'users/omniauth_callbacks'
+    }
+  }
   ActiveAdmin.routes(self)
+
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   namespace :api do
@@ -17,7 +20,12 @@ Rails.application.routes.draw do
     resources :users, only: %i[show update]
   end
 
-  # Defines the root path route ("/")
-  # TODO: make this the static rails renderer
-  # root "articles#index"
+  get 'onboarding/email', to: 'onboarding#email'
+  post 'onboarding/email', to: 'onboarding#email_update'
+
+  resources :overview, only: %i[index]
+  resources :it1_profiles, except: %i[show index destroy]
+
+  get 'it1', to: 'welcome#it1'
+  root 'welcome#index'
 end

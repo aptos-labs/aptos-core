@@ -141,30 +141,28 @@ where
     V: crate::Value,
 {
     /// Constructs a new `TreeCache` instance.
-    pub fn new(reader: &'a R, next_version: Version) -> Result<Self> {
+    pub fn new(
+        reader: &'a R,
+        next_version: Version,
+        persisted_version: Option<Version>,
+    ) -> Result<Self> {
         let mut node_cache = HashMap::new();
-        let root_node_key = if next_version == 0 {
-            let pre_genesis_root_key = NodeKey::new_empty_path(PRE_GENESIS_VERSION);
-            let pre_genesis_root = reader.get_node_option(&pre_genesis_root_key)?;
 
-            match pre_genesis_root {
-                Some(_) => {
-                    // This is to support the extreme case where things really went wild,
-                    // and we need to ditch the transaction history and apply a new
-                    // genesis on top of an existing state db.
-                    pre_genesis_root_key
-                }
-                None => {
-                    // Hack: We need to start from an empty tree, so we insert
-                    // a null node beforehand deliberately to deal with this corner case.
-                    let genesis_root_key = NodeKey::new_empty_path(0);
-                    node_cache.insert(genesis_root_key.clone(), Node::new_null());
-                    genesis_root_key
-                }
+        let root_node_key = if let Some(version) = persisted_version {
+            if version == PRE_GENESIS_VERSION {
+                assert_eq!(next_version, 0);
+            } else {
+                assert!(next_version > version);
             }
+            NodeKey::new_empty_path(version)
         } else {
-            NodeKey::new_empty_path(next_version - 1)
+            // Hack: We need to start from an empty tree, so we insert
+            // a null node beforehand deliberately to deal with this corner case.
+            let genesis_root_key = NodeKey::new_empty_path(0);
+            node_cache.insert(genesis_root_key.clone(), Node::new_null());
+            genesis_root_key
         };
+
         Ok(Self {
             node_cache,
             stale_node_index_cache: HashSet::new(),
@@ -175,6 +173,11 @@ where
             num_stale_leaves: 0,
             num_new_leaves: 0,
         })
+    }
+
+    #[cfg(test)]
+    pub fn new_test(reader: &'a R, next_version: Version) -> Result<Self> {
+        Self::new(reader, next_version, next_version.checked_sub(1))
     }
 
     /// Gets a node with given node key. If it doesn't exist in node cache, read from `reader`.

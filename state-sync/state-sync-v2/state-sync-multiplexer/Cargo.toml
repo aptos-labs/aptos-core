@@ -13,12 +13,12 @@ edition = "2018"
 futures = "0.3.12"
 tokio = { version = "1.8.1", features = ["full"] }
 
-consensus-notifications = { path = "../../../state-sync/inter-component/consensus-notifications" }
-data-streaming-service = { path = "../data-streaming-service" }
 aptos-config = { path = "../../../config" }
 aptos-data-client = { path = "../../aptos-data-client" }
 aptos-types = { path = "../../../types" }
-aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
+aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
+consensus-notifications = { path = "../../../state-sync/inter-component/consensus-notifications" }
+data-streaming-service = { path = "../data-streaming-service" }
 event-notifications = { path = "../../../state-sync/inter-component/event-notifications" }
 executor-types = { path = "../../../execution/executor-types" }
 mempool-notifications = { path = "../../../state-sync/inter-component/mempool-notifications" }
@@ -29,7 +29,7 @@ storage-interface = { path = "../../../storage/storage-interface" }
 
 [dev-dependencies]
 aptos-crypto = { path = "../../../crates/aptos-crypto" }
-aptos-genesis-tool = {path = "../../../config/management/genesis", features = ["testing"] }
+aptos-genesis-tool = { path = "../../../config/management/genesis", features = ["testing"] }
 aptos-infallible = { path = "../../../crates/aptos-infallible" }
 aptos-temppath = { path = "../../../crates/aptos-temppath" }
 aptos-time-service = { path = "../../../crates/aptos-time-service", features = ["async", "testing"] }

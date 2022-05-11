@@ -190,10 +190,10 @@ edition = "2018"
 
 [dependencies]
 aptos-types = {{ path = "../aptos-types", version = "0.1.0" }}
-serde_bytes = "0.11"
+serde_bytes = "0.11.6"
 serde = {{ version = "1.0.114", features = ["derive"] }}
-bcs = "0.1.1"
-once_cell = "1.4.0"
+bcs = "0.1.3"
+once_cell = "1.10.0"
 
 [[bin]]
 name = "stdlib_demo"

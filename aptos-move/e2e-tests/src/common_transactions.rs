@@ -6,7 +6,7 @@
 use crate::account::Account;
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::transaction::{RawTransaction, Script, SignedTransaction};
-use move_ir_compiler::Compiler;
+use move_deps::move_ir_compiler::Compiler;
 use once_cell::sync::Lazy;
 
 pub static EMPTY_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {

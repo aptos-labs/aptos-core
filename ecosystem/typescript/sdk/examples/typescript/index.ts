@@ -29,7 +29,7 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
   };
   const txnRequest = await client.generateTransaction(account1.address(), payload);
   const signedTxn = await client.signTransaction(account1, txnRequest);
-  const transactionRes = await client.submitTransaction(account1, signedTxn);
+  const transactionRes = await client.submitTransaction(signedTxn);
   await client.waitForTransaction(transactionRes.hash);
 
   resources = await client.getAccountResources(account2.address());

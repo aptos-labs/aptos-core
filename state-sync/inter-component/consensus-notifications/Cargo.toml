@@ -10,17 +10,17 @@ publish = false
 edition = "2018"
 
 [dependencies]
-async-trait = "0.1.42"
+async-trait = "0.1.53"
 futures = "0.3.12"
-serde = { version = "1.0.124", default-features = false }
-thiserror = "1.0.24"
+serde = { version = "1.0.137", default-features = false }
+thiserror = "1.0.31"
 tokio = { version = "1.8.1" }
 
 aptos-crypto = { path = "../../../crates/aptos-crypto" }
 aptos-types = { path = "../../../types" }
-aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
+aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
 
 [dev-dependencies]
 claim = "0.5.0"
 
-move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["address32"] }
+move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["address32"] }

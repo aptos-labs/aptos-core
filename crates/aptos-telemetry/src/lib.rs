@@ -39,7 +39,7 @@ struct Ip {
     origin: String,
 }
 
-pub fn is_disable() -> bool {
+pub fn is_disabled() -> bool {
     env::var(APTOS_TELEMETRY_DISABLE).is_ok()
 }
 
@@ -54,8 +54,27 @@ async fn get_ip_origin() -> String {
     }
 }
 
+pub async fn send_env_data(
+    event_name: String,
+    user_id: String,
+    event_params: HashMap<String, String>,
+) {
+    if is_disabled() {
+        debug!("Error sending data: disabled Aptos telemetry");
+        return;
+    }
+
+    // dump event params in a new hashmap with some default params to include
+    let mut new_event_params: HashMap<String, String> = event_params.clone();
+    // attempt to get IP address
+    let ip_origin = get_ip_origin().await;
+    new_event_params.insert(constants::IP_ADDR_METRIC.to_string(), ip_origin);
+    new_event_params.insert(constants::GIT_REV_METRIC.to_string(), get_git_rev());
+    send_data(event_name, user_id, new_event_params).await;
+}
+
 pub async fn send_data(event_name: String, user_id: String, event_params: HashMap<String, String>) {
-    if is_disable() {
+    if is_disabled() {
         debug!("Error sending data: disabled Aptos telemetry");
         return;
     }
@@ -66,16 +85,9 @@ pub async fn send_data(event_name: String, user_id: String, event_params: HashMa
     let measurement_id = env::var(GA_MEASUREMENT_ID)
         .unwrap_or_else(|_| constants::APTOS_GA_MEASUREMENT_ID.to_string());
 
-    // dump event params in a new hashmap with some default params to include
-    let mut new_event_params: HashMap<String, String> = event_params.clone();
-    // attempt to get IP address
-    let ip_origin = get_ip_origin().await;
-    new_event_params.insert(constants::IP_ADDR_METRIC.to_string(), ip_origin);
-    new_event_params.insert(constants::GIT_REV_METRIC.to_string(), get_git_rev());
-
     let metrics_event = MetricsEvent {
         name: event_name,
-        params: new_event_params,
+        params: event_params,
     };
 
     let metrics_dump = MetricsDump {
@@ -89,18 +101,21 @@ pub async fn send_data(event_name: String, user_id: String, event_params: HashMa
     };
 
     let client = reqwest::Client::new();
-    let res = client
-        .post(format!(
-            "{}?&measurement_id={}&api_secret={}",
-            constants::GA4_URL,
-            measurement_id,
-            api_secret
-        ))
-        .json::<MetricsDump>(&metrics_dump)
-        .send()
-        .await;
-    match res {
-        Ok(_) => debug!("Sent telemetry data {:?}", &metrics_dump),
-        Err(e) => debug!("{:?}", e),
-    }
+    // do not block on these requests
+    tokio::spawn(async move {
+        let res = client
+            .post(format!(
+                "{}?&measurement_id={}&api_secret={}",
+                constants::GA4_URL,
+                measurement_id,
+                api_secret
+            ))
+            .json::<MetricsDump>(&metrics_dump)
+            .send()
+            .await;
+        match res {
+            Ok(_) => debug!("Sent telemetry data {:?}", &metrics_dump),
+            Err(e) => debug!("{:?}", e),
+        }
+    });
 }

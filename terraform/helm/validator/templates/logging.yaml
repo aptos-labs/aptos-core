@@ -9,7 +9,7 @@ data:
 {{ (tpl (.Files.Get "files/vector.toml") .) | indent 4 }}
 
 ---
-{{- if not .Values.loggingToNull }}
+{{- if .Values.loggingCentralHost }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -76,7 +76,7 @@ spec:
       - name: vector-config
         configMap:
           name: {{ include "aptos-validator.fullname" . }}-vector
-      {{- if not .Values.loggingToNull }}
+      {{- if .Values.loggingCentralHost }}
       - name: vector-secret
         secret:
           secretName: {{ include "aptos-validator.fullname" . }}-vector
@@ -112,7 +112,7 @@ spec:
         - name: vector-config
           mountPath: /etc/vector
           readOnly: true
-        {{- if not $.Values.loggingToNull }}
+        {{- if $.Values.loggingCentralHost }}
         - name: vector-secret
           mountPath: /etc/vector/cert
         {{- end }}

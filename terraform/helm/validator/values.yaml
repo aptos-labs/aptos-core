@@ -27,6 +27,7 @@ validator:
   tolerations: []
   affinity: {}
   config:
+    enable_state_sync_v2: false
     provide_genesis: true
     sync_only: false
     concurrency_level: 4
@@ -349,7 +350,6 @@ loggingClientCert:
 loggingClientKey:
 loggingCA:
 loggingCentralHost:
-loggingToNull: true
 
 # Used for testing purposes only!
 # Exposes the validator's REST API in addition to that of its VFN

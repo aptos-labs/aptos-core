@@ -10,33 +10,32 @@ publish = false
 edition = "2018"
 
 [dependencies]
-arc-swap = "1.2.0"
-bitvec = {version = "0.19.4", optional = true}
+arc-swap = "1.5.0"
+bitvec = { version = "0.19.4" }
 itertools = "0.10.0"
-once_cell = "1.7.2"
+once_cell = "1.10.0"
 proptest = { version = "1.0.0", optional = true }
-rayon = "1.5.0"
+rayon = "1.5.2"
 
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-metrics = { path = "../../crates/aptos-metrics" }
 aptos-types = { path = "../../types" }
-aptos-workspace-hack = { version = "0.1", path = "../../crates/aptos-workspace-hack" }
-
+aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 
 [dev-dependencies]
 bitvec = "0.19.4"
-criterion = "0.3.4"
-rand = "0.8.3"
-once_cell = "1.7.2"
+criterion = "0.3.5"
+once_cell = "1.10.0"
 proptest = "1.0.0"
+rand = "0.8.3"
 
 aptos-types = { path = "../../types", features = ["fuzzing"] }
 storage-interface = { path = "../storage-interface" }
 
 [features]
-fuzzing = ["bitvec", "aptos-types/fuzzing", "proptest"]
-bench = ["bitvec", "proptest"]
+fuzzing = ["aptos-types/fuzzing", "proptest"]
+bench = ["proptest"]
 
 [[bench]]
 name = "sparse_merkle"

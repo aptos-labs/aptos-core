@@ -17,12 +17,6 @@
  *
  *= require_tree .
  *= require_self
+ *= stub "application.tailwind"
+ *= stub "active_admin"
  */
-
-.yield-wrapper-outer {
-    display:flex;
-}
-
-.yield-wrapper-inner {
-    margin: auto;
-}

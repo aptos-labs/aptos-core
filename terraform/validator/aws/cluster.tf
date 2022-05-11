@@ -48,7 +48,7 @@ resource "aws_launch_template" "nodes" {
   for_each      = local.pools
   name          = "aptos-${local.workspace_name}/${each.key}"
   instance_type = each.value.instance_type
-  user_data     = base64encode(
+  user_data = base64encode(
     templatefile("${path.module}/templates/eks_user_data.sh", {
       taints = each.value.taint ? "aptos.org/nodepool=${each.key}:NoExecute" : ""
     })
@@ -71,6 +71,12 @@ resource "aws_eks_node_group" "nodes" {
   subnet_ids      = [aws_subnet.private[0].id]
   tags            = local.default_tags
 
+  lifecycle {
+    ignore_changes = [
+      scaling_config[0].desired_size
+    ]
+  }
+
   launch_template {
     id      = aws_launch_template.nodes[each.key].id
     version = aws_launch_template.nodes[each.key].latest_version
@@ -78,7 +84,7 @@ resource "aws_eks_node_group" "nodes" {
 
   scaling_config {
     desired_size = lookup(var.node_pool_sizes, each.key, each.value.size)
-    min_size     = lookup(var.node_pool_sizes, each.key, each.value.size)
+    min_size     = 1
     max_size     = lookup(var.node_pool_sizes, each.key, each.value.size) * var.max_node_pool_surge
   }
 

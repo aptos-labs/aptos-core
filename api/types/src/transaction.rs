@@ -256,15 +256,11 @@ impl From<(&BlockMetadata, TransactionInfo)> for Transaction {
         Transaction::BlockMetadataTransaction(BlockMetadataTransaction {
             info,
             id: txn.id().into(),
+            epoch: txn.epoch().into(),
             round: txn.round().into(),
-            previous_block_votes: txn
-                .previous_block_votes()
-                .clone()
-                .iter()
-                .map(|a| (*a).into())
-                .collect(),
+            previous_block_votes: txn.previous_block_votes().clone(),
             proposer: txn.proposer().into(),
-            timestamp: txn.timestamp_usec().into(),
+            timestamp: txn.timestamp_usecs().into(),
         })
     }
 }
@@ -345,8 +341,9 @@ pub struct BlockMetadataTransaction {
     #[serde(flatten)]
     pub info: TransactionInfo,
     pub id: HashValue,
+    pub epoch: U64,
     pub round: U64,
-    pub previous_block_votes: Vec<Address>,
+    pub previous_block_votes: Vec<bool>,
     pub proposer: Address,
     pub timestamp: U64,
 }

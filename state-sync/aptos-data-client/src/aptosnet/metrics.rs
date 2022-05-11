@@ -9,6 +9,8 @@ use aptos_metrics::{
 
 /// The special label TOTAL_COUNT stores the sum of all values in the counter.
 pub const TOTAL_COUNT_LABEL: &str = "TOTAL_COUNT";
+pub const PRIORITIZED_PEER: &str = "prioritized_peer";
+pub const REGULAR_PEER: &str = "regular_peer";
 
 /// Counter for tracking sent requests
 pub static SENT_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -46,6 +48,16 @@ pub static REQUEST_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_data_client_request_latencies",
         "Counters related to request latencies",
         &["request_type"]
+    )
+    .unwrap()
+});
+
+/// Gauge for tracking the number of in-flight polls
+pub static IN_FLIGHT_POLLS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_data_client_in_flight_polls",
+        "Gauge related to the number of in-flight polls",
+        &["peer_type"]
     )
     .unwrap()
 });

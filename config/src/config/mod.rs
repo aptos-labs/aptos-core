@@ -24,16 +24,12 @@ mod error;
 pub use error::*;
 mod execution_config;
 pub use execution_config::*;
-mod key_manager_config;
-pub use key_manager_config::*;
 mod logger_config;
 pub use logger_config::*;
 mod mempool_config;
 pub use mempool_config::*;
 mod network_config;
 pub use network_config::*;
-mod json_rpc_config;
-pub use json_rpc_config::*;
 mod secure_backend_config;
 pub use secure_backend_config::*;
 mod state_sync_config;
@@ -46,6 +42,8 @@ mod test_config;
 pub use test_config::*;
 mod api_config;
 pub use api_config::*;
+use aptos_crypto::{ed25519::Ed25519PrivateKey, x25519};
+use aptos_types::account_address::AccountAddress;
 
 /// Represents a deprecated config that provides no field verification.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
@@ -74,8 +72,6 @@ pub struct NodeConfig {
     pub mempool: MempoolConfig,
     #[serde(default)]
     pub metrics: DeprecatedConfig,
-    #[serde(default)]
-    pub json_rpc: JsonRpcConfig,
     #[serde(default)]
     pub api: ApiConfig,
     #[serde(default)]
@@ -161,6 +157,26 @@ impl WaypointConfig {
             }
             _ => self.waypoint(),
         }
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct IdentityBlob {
+    pub account_address: AccountAddress,
+    pub account_key: Ed25519PrivateKey,
+    /// Optional consensus key.  Only used for validators
+    pub consensus_key: Option<Ed25519PrivateKey>,
+    pub network_key: x25519::PrivateKey,
+}
+
+impl IdentityBlob {
+    pub fn from_file(path: &Path) -> anyhow::Result<IdentityBlob> {
+        Ok(serde_yaml::from_str(&fs::read_to_string(path)?)?)
+    }
+
+    pub fn to_file(&self, path: &Path) -> anyhow::Result<()> {
+        let mut file = File::open(path)?;
+        Ok(file.write_all(serde_yaml::to_string(self)?.as_bytes())?)
     }
 }
 
@@ -292,7 +308,6 @@ impl NodeConfig {
 
     pub fn randomize_ports(&mut self) {
         self.debug_interface.randomize_ports();
-        self.json_rpc.randomize_ports();
         self.api.randomize_ports();
         self.storage.randomize_ports();
 

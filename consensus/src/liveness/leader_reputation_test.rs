@@ -12,6 +12,7 @@ use consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::{Author, Round},
 };
+use itertools::Itertools;
 
 struct MockHistory {
     window_size: usize,
@@ -35,8 +36,8 @@ impl MetadataBackend for MockHistory {
     }
 }
 
-fn create_block(proposer: Author, voters: Vec<&ValidatorSigner>) -> NewBlockEvent {
-    NewBlockEvent::new(0, proposer, voters.iter().map(|v| v.author()).collect(), 0)
+fn create_block(epoch: u64, proposer: Author, voters: Vec<bool>) -> NewBlockEvent {
+    NewBlockEvent::new(epoch, 0, voters, proposer, 0)
 }
 
 #[test]
@@ -52,17 +53,76 @@ fn test_simple_heuristic() {
     }
     let heuristic = ActiveInactiveHeuristic::new(proposers[0], active_weight, inactive_weight);
     // 1. Window size not enough
-    let weights = heuristic.get_weights(&proposers, &[]);
+    let weights = heuristic.get_weights(0, &proposers, &[]);
     assert_eq!(weights.len(), proposers.len());
     for w in weights {
         assert_eq!(w, inactive_weight);
     }
     // 2. Sliding window with [proposer 0, voters 1, 2], [proposer 0, voters 3]
     let weights = heuristic.get_weights(
+        0,
         &proposers,
         &[
-            create_block(proposers[0], vec![&signers[1], &signers[2]]),
-            create_block(proposers[0], vec![&signers[3]]),
+            create_block(
+                0,
+                proposers[0],
+                vec![false, true, true, false, false, false, false, false],
+            ),
+            create_block(
+                0,
+                proposers[0],
+                vec![false, false, false, true, false, false, false, false],
+            ),
+        ],
+    );
+    assert_eq!(weights.len(), proposers.len());
+    for (i, w) in weights.iter().enumerate() {
+        let expected = if i < 4 {
+            active_weight
+        } else {
+            inactive_weight
+        };
+        assert_eq!(*w, expected);
+    }
+}
+
+#[test]
+fn test_epoch_change() {
+    let active_weight = 9;
+    let inactive_weight = 1;
+    let mut proposers = vec![];
+    let mut signers = vec![];
+    for i in 0..8 {
+        let signer = ValidatorSigner::random([i; 32]);
+        proposers.push(signer.author());
+        signers.push(signer);
+    }
+    let heuristic = ActiveInactiveHeuristic::new(proposers[0], active_weight, inactive_weight);
+    // History with [proposer 0, voters 1, 2], [proposer 0, voters 3] in current epoch
+    let weights = heuristic.get_weights(
+        2,
+        &proposers,
+        &[
+            create_block(
+                2,
+                proposers[0],
+                vec![false, true, true, false, false, false, false, false],
+            ),
+            create_block(
+                2,
+                proposers[0],
+                vec![false, false, false, true, false, false, false, false],
+            ),
+            create_block(
+                1,
+                proposers[0],
+                vec![false, true, true, true, true, true, true, true],
+            ),
+            create_block(
+                0,
+                proposers[0],
+                vec![false, true, true, true, true, true, true, true],
+            ),
         ],
     );
     assert_eq!(weights.len(), proposers.len());
@@ -80,18 +140,17 @@ fn test_simple_heuristic() {
 fn test_api() {
     let active_weight = 9;
     let inactive_weight = 1;
-    let mut proposers = vec![];
-    let mut signers = vec![];
-    for i in 0..5 {
-        let signer = ValidatorSigner::random([i; 32]);
-        proposers.push(signer.author());
-        signers.push(signer);
-    }
+    let (proposers, signers): (Vec<_>, Vec<_>) = (0..5)
+        .map(|i| ValidatorSigner::random([i; 32]))
+        .sorted_by(|a, b| Ord::cmp(&a.author(), &b.author()))
+        .map(|signer| (signer.author(), signer))
+        .unzip();
     let history = vec![
-        create_block(proposers[0], vec![&signers[1], &signers[2]]),
-        create_block(proposers[0], vec![&signers[3]]),
+        create_block(0, proposers[0], vec![false, true, true, false, false]),
+        create_block(0, proposers[0], vec![false, false, false, true, false]),
     ];
     let leader_reputation = LeaderReputation::new(
+        0,
         proposers.clone(),
         Box::new(MockHistory::new(1, history)),
         Box::new(ActiveInactiveHeuristic::new(

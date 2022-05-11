@@ -34,6 +34,7 @@ fn put_value_set(
         .put_value_sets(vec![&value_set], None, version, &mut cs)
         .unwrap()[0];
     state_store.db.write_schemas(cs.batch).unwrap();
+    state_store.set_latest_version(version);
     root
 }
 
@@ -517,14 +518,11 @@ fn update_store(
     for (i, (key, value)) in input.enumerate() {
         let mut cs = ChangeSet::new();
         let value_state_set: HashMap<_, _> = std::iter::once((key, value)).collect();
+        let version = first_version + i as Version;
         store
-            .put_value_sets(
-                vec![&value_state_set],
-                None,
-                first_version + i as Version,
-                &mut cs,
-            )
+            .put_value_sets(vec![&value_state_set], None, version, &mut cs)
             .unwrap();
         store.db.write_schemas(cs.batch).unwrap();
+        store.set_latest_version(version);
     }
 }

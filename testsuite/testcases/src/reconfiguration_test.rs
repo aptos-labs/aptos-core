@@ -91,7 +91,7 @@ impl NetworkTest for ReconfigurationTest {
     //             let downgrade_config = OnChainConsensusConfig::default();
     //             for i in 1..count / 2 {
     //                 let upgrade_txn = aptos_root_account.sign_with_transaction_builder(
-    //                     tx_factory.update_diem_consensus_config(
+    //                     tx_factory.update_aptos_consensus_config(
     //                         allowed_nonce,
     //                         bcs::to_bytes(&upgrade_config).unwrap(),
     //                     ),
@@ -105,7 +105,7 @@ impl NetworkTest for ReconfigurationTest {
     //                 .unwrap();
     //                 expect_epoch(full_node_client, (i + 1) * 2).await.unwrap();
     //                 let downgrade_txn = aptos_root_account.sign_with_transaction_builder(
-    //                     tx_factory.update_diem_consensus_config(
+    //                     tx_factory.update_aptos_consensus_config(
     //                         allowed_nonce,
     //                         bcs::to_bytes(&downgrade_config).unwrap(),
     //                     ),
@@ -127,7 +127,7 @@ impl NetworkTest for ReconfigurationTest {
     //             let magic_number = 42;
     //             println!("Bump Version to {}", magic_number);
     //             let update_txn = aptos_root_account.sign_with_transaction_builder(
-    //                 tx_factory.update_diem_version(allowed_nonce, magic_number),
+    //                 tx_factory.update_aptos_version(allowed_nonce, magic_number),
     //             );
     //             execute_and_wait_transactions(
     //                 full_node_client,

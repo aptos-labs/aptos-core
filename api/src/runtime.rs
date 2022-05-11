@@ -3,7 +3,7 @@
 
 use crate::{context::Context, index};
 
-use aptos_config::config::{ApiConfig, JsonRpcConfig, NodeConfig};
+use aptos_config::config::{ApiConfig, NodeConfig};
 use aptos_mempool::MempoolClientSender;
 use aptos_types::chain_id::ChainId;
 use storage_interface::DbReader;
@@ -49,12 +49,6 @@ struct WebServer {
 
 impl From<ApiConfig> for WebServer {
     fn from(cfg: ApiConfig) -> Self {
-        Self::new(cfg.address, cfg.tls_cert_path, cfg.tls_key_path)
-    }
-}
-
-impl From<JsonRpcConfig> for WebServer {
-    fn from(cfg: JsonRpcConfig) -> Self {
         Self::new(cfg.address, cfg.tls_cert_path, cfg.tls_key_path)
     }
 }

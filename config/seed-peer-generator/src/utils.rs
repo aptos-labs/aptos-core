@@ -11,8 +11,9 @@ use aptos_logger::prelude::*;
 use aptos_rest_client::Client;
 use aptos_types::{
     account_config::aptos_root_address, account_state::AccountState,
-    account_state_blob::AccountStateBlob, network_address::NetworkAddress,
-    on_chain_config::ValidatorSet, validator_info::ValidatorInfo, PeerId,
+    account_state_blob::AccountStateBlob, account_view::AccountView,
+    network_address::NetworkAddress, on_chain_config::ValidatorSet, validator_info::ValidatorInfo,
+    PeerId,
 };
 
 /// Retrieve the Fullnode seed peers from JSON-RPC

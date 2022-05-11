@@ -35,6 +35,8 @@ root.render(
           <Routes>
             <Route path='/' element={<Login/>} />
             <Route path='/wallet' element={<Wallet/>} />
+            {/* TODO: Will update post hackathon */}
+            {/* <Route path='/gallery' element={<Gallery/>} /> */}
             <Route path="/help" element={<Help />} />
             <Route path="/create-wallet" element={<CreateWallet />} />
             <Route path="/account" element={<Account />} />

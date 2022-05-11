@@ -1,7 +1,8 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
-#!/usr/bin/env ruby
-
-require_relative "../config/application"
-require "importmap/commands"
+require_relative '../config/application'
+require 'importmap/commands'

@@ -27,7 +27,6 @@ use aptos_management::{
 use aptos_secure_storage::{CryptoStorage, KVStorage, OnDiskStorage, Storage};
 use aptos_types::{
     chain_id::ChainId,
-    on_chain_config::{ConsensusConfigV2, OnChainConsensusConfig, VMPublishingOption},
     transaction::{authenticator::AuthenticationKey, Transaction},
     waypoint::Waypoint,
 };
@@ -147,7 +146,6 @@ pub struct ValidatorBuilder {
     move_modules: Vec<Vec<u8>>,
     num_validators: NonZeroUsize,
     randomize_first_validator_ports: bool,
-    publishing_option: Option<VMPublishingOption>,
     template: NodeConfig,
     min_price_per_gas_unit: u64,
 }
@@ -159,7 +157,6 @@ impl ValidatorBuilder {
             move_modules,
             num_validators: NonZeroUsize::new(1).unwrap(),
             randomize_first_validator_ports: true,
-            publishing_option: Some(VMPublishingOption::open()),
             template: NodeConfig::default_for_validator(),
             min_price_per_gas_unit: 1,
         }
@@ -172,11 +169,6 @@ impl ValidatorBuilder {
 
     pub fn num_validators(mut self, num_validators: NonZeroUsize) -> Self {
         self.num_validators = num_validators;
-        self
-    }
-
-    pub fn publishing_option(mut self, publishing_option: VMPublishingOption) -> Self {
-        self.publishing_option = Some(publishing_option);
         self
     }
 
@@ -215,7 +207,6 @@ impl ValidatorBuilder {
             &mut genesis_storage,
             &root_keys,
             &validators,
-            self.publishing_option,
             self.move_modules,
             self.min_price_per_gas_unit,
         )?;
@@ -275,9 +266,6 @@ impl ValidatorBuilder {
             validator_identity.peer_id_name,
             SecureBackend::OnDiskStorage(validator.storage_config.clone()),
         );
-        validator_network.network_address_key_backend = Some(SecureBackend::OnDiskStorage(
-            validator.storage_config.clone(),
-        ));
 
         // By default we don't start a swarm with VFNs, so make sure the public fullnode endpoint
         // really is publicly accessable
@@ -371,7 +359,6 @@ impl ValidatorBuilder {
         genesis_storage: &mut OnDiskStorage,
         root_keys: &RootKeys,
         validators: &[ValidatorConfig],
-        publishing_option: Option<VMPublishingOption>,
         move_modules: Vec<Vec<u8>>,
         min_price_per_gas_unit: u64,
     ) -> Result<(Transaction, Waypoint)> {
@@ -420,16 +407,7 @@ impl ValidatorBuilder {
         genesis_builder.set_min_price_per_gas_unit(min_price_per_gas_unit)?;
 
         // Create Genesis and Genesis Waypoint
-        let genesis = genesis_builder.build(
-            ChainId::test(),
-            publishing_option,
-            OnChainConsensusConfig::V2(ConsensusConfigV2 {
-                two_chain: true,
-                decoupled_execution: true,
-                back_pressure_limit: 10,
-                exclude_round: 20,
-            }),
-        )?;
+        let genesis = genesis_builder.build(ChainId::test())?;
         let waypoint = create_genesis_waypoint(&genesis)?;
 
         Ok((genesis, waypoint))

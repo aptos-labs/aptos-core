@@ -144,7 +144,7 @@ proptest! {
         let mut seen_any_block = false;
         for (ver, txn) in txns.into_iter().enumerate() {
             if let Transaction::BlockMetadata(b) = txn {
-                timestamp = b.into_inner().1;
+                timestamp = b.timestamp_usecs();
                 block_meta_ver = ver as Version;
                 seen_any_block = true;
             }
@@ -156,7 +156,7 @@ proptest! {
                     block_meta_ver
                 );
                 prop_assert_eq!(
-                    block_meta.into_inner().1,
+                    block_meta.timestamp_usecs(),
                     timestamp
                 );
             } else {

@@ -56,7 +56,7 @@ variable "ssh_pub_key" {
 
 variable "validator_lite_mode" {
   description = "Run validator lite deployment"
-  default = false
+  default     = false
 }
 
 variable "num_validators" {
@@ -178,8 +178,18 @@ variable "indexer_db_password" {
   default     = ""
 }
 
+variable "indexer_db_publicly_accessible" {
+  default     = false
+  description = "Determines if indexer RDS instance is publicly accessible"
+}
+
 variable "enable_k8s_metrics_server" {
   description = "Installs kubernetes metrics server: https://github.com/kubernetes-sigs/metrics-server"
+  default     = false
+}
+
+variable "enable_cluster_autoscaler" {
+  description = "Enable cluster autoscaler: https://docs.aws.amazon.com/eks/latest/userguide/autoscaling.html"
   default     = false
 }
 

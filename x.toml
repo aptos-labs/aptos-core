@@ -71,6 +71,9 @@ workspace-members = [
     "x",
     "x-core",
     "x-lint",
+
+    # Don't consider since it includes excluded move crates
+    "move-deps",
 ]
 
 [hakari.final-excludes]
@@ -164,7 +167,6 @@ members = [
     # Please keep this list in alphabetical order!
 
     "testcases",
-    "aptos-e2e-tests-replay",
     "aptos-fuzz",
     "aptos-fuzzer",
     "aptos-keygen",
@@ -228,6 +230,7 @@ root-members = [
 root-members = [
     "backup-cli",
     "db-bootstrapper",
+    "aptos",
     "aptos-genesis-tool",
     "aptos-node",
     "aptos-operational-tool",
@@ -250,7 +253,7 @@ mark-changed = "all"
 
 [[determinator.path-rule]]
 # Ignore website and other ancillary files, and scripts not listed above.
-globs = ["developer-docs-site/**/*", "documentation/**/*", "docker/**/*", "language/documentation/**/*", "specifications/**/*", "scripts/**/*", "terraform/**/*"]
+globs = ["dashboards/**", "developer-docs-site/**/*", "documentation/**/*", "docker/**/*", "language/documentation/**/*", "specifications/**/*", "scripts/**/*", "terraform/**/*"]
 mark-changed = []
 
 [[determinator.path-rule]]
@@ -260,7 +263,7 @@ mark-changed = []
 
 [[determinator.path-rule]]
 # A bunch of images that should be ignored, I guess.
-globs = ["diem.png", ".assets/aptos_banner.png", ".assets/aptos.png", "storage/data.png"]
+globs = [".assets/aptos_banner.png", ".assets/aptos.png", "storage/data.png"]
 mark-changed = []
 
 [[determinator.path-rule]]

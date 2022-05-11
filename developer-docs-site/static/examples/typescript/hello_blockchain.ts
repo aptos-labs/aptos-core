@@ -23,7 +23,7 @@ class HelloBlockchainClient extends RestClient {
     };
     const txnRequest = await this.generateTransaction(accountFrom.address(), payload);
     const signedTxn = await this.signTransaction(accountFrom, txnRequest);
-    const res = await this.submitTransaction(accountFrom, signedTxn);
+    const res = await this.submitTransaction(signedTxn);
     return res["hash"];
   }
   //<:!:section_1
@@ -53,7 +53,7 @@ class HelloBlockchainClient extends RestClient {
 
     const txnRequest = await this.generateTransaction(accountFrom.address(), payload);
     const signedTxn = await this.signTransaction(accountFrom, txnRequest);
-    const res = await this.submitTransaction(accountFrom, signedTxn);
+    const res = await this.submitTransaction(signedTxn);
     return res["hash"];
   }
 

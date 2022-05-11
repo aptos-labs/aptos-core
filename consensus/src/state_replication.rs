@@ -4,7 +4,7 @@
 use crate::error::{MempoolError, StateSyncError};
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures};
 use consensus_types::{block::Block, common::Payload, executed_block::ExecutedBlock};
 use executor_types::{Error as ExecutionError, StateComputeResult};
 use futures::future::BoxFuture;
@@ -71,4 +71,7 @@ pub trait StateComputer: Send + Sync {
     /// In case of failure (`Result::Error`) the LI of storage remains unchanged, and the validator
     /// can assume there were no modifications to the storage made.
     async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError>;
+
+    // Reconfigure to execute transactions for a new epoch.
+    fn new_epoch(&self, epoch_state: &EpochState);
 }

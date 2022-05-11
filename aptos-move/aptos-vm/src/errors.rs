@@ -4,8 +4,10 @@
 use crate::logging::AdapterLogSchema;
 use aptos_logger::prelude::*;
 use aptos_types::account_config::ChainSpecificAccountInfo;
-use move_binary_format::errors::VMError;
-use move_core_types::vm_status::{StatusCode, VMStatus};
+use move_deps::{
+    move_binary_format::errors::VMError,
+    move_core_types::vm_status::{StatusCode, VMStatus},
+};
 
 /// Error codes that can be emitted by the prologue. These have special significance to the VM when
 /// they are raised during the prologue.
@@ -22,7 +24,7 @@ pub const ETRANSACTION_EXPIRED: u64 = 1006; // transaction expiration time excee
 pub const EBAD_CHAIN_ID: u64 = 1007; // chain_id in transaction doesn't match the one on-chain
 pub const ESCRIPT_NOT_ALLOWED: u64 = 1008;
 pub const EMODULE_NOT_ALLOWED: u64 = 1009;
-pub const EINVALID_WRITESET_SENDER: u64 = 1010; // invalid sender (not diem root) for write set
+pub const EINVALID_WRITESET_SENDER: u64 = 1010; // invalid sender (not aptos root) for write set
 pub const ESEQUENCE_NUMBER_TOO_BIG: u64 = 1011;
 pub const EBAD_TRANSACTION_FEE_CURRENCY: u64 = 1012;
 pub const ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1013;

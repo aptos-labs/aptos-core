@@ -15,10 +15,12 @@ use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use move_core_types::{
     account_address::AccountAddress,
-    gas_schedule::{GasAlgebra, GasConstants, MAX_TRANSACTION_SIZE_IN_BYTES},
+    gas_schedule::{GasAlgebra, GasConstants},
 };
 use rand::SeedableRng;
 use storage_interface::DbReaderWriter;
+
+const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 262144;
 
 struct TestValidator {
     vm_validator: VMValidator,
@@ -65,14 +67,14 @@ impl std::ops::Deref for TestValidator {
 // * SEQUENCE_NUMBER_TOO_NEW -- This error is filtered out when running validation; it is only
 //   testable when running the executor.
 // * INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE -- This is tested in verify_txn.rs.
-// * SENDING_ACCOUNT_FROZEN: Tested in functional-tests/tests/diem_account/freezing.move.
+// * SENDING_ACCOUNT_FROZEN: Tested in functional-tests/tests/aptos_account/freezing.move.
 // * Errors arising from deserializing the code -- these are tested in
-//   - diem/language/move-binary-format/src/unit_tests/deserializer_tests.rs
-//   - diem/language/move-binary-format/tests/serializer_tests.rs
+//   - move-language/move/language/move-binary-format/src/unit_tests/deserializer_tests.rs
+//   - move-language/move/language/move-binary-format/tests/serializer_tests.rs
 // * Errors arising from calls to `static_verify_program` -- this is tested separately in tests for
 //   the bytecode verifier.
 // * Testing for invalid genesis write sets -- this is tested in
-//   diem/language/e2e-testsuite/src/tests/genesis.rs
+//   move-language/move/language/e2e-testsuite/src/tests/genesis.rs
 
 #[test]
 fn test_validate_transaction() {

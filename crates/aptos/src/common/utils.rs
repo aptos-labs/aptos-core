@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::types::{CliError, CliTypedResult},
+    common::types::{CliError, CliTypedResult, PromptOptions},
     CliResult,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
@@ -25,6 +25,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     str::FromStr,
+    time::{Duration, Instant},
 };
 
 shadow!(build);
@@ -50,20 +51,29 @@ pub fn prompt_yes(prompt: &str) -> bool {
 }
 
 /// Convert any successful response to Success
-pub async fn to_common_success_result<T>(command: &str, result: CliTypedResult<T>) -> CliResult {
-    to_common_result(command, result.map(|_| "Success")).await
+pub async fn to_common_success_result<T>(
+    command: &str,
+    start_time: Instant,
+    result: CliTypedResult<T>,
+) -> CliResult {
+    to_common_result(command, start_time, result.map(|_| "Success")).await
 }
 
 /// For pretty printing outputs in JSON
-pub async fn to_common_result<T: Serialize>(command: &str, result: CliTypedResult<T>) -> CliResult {
+pub async fn to_common_result<T: Serialize>(
+    command: &str,
+    start_time: Instant,
+    result: CliTypedResult<T>,
+) -> CliResult {
+    let latency = start_time.elapsed();
     let is_err = result.is_err();
     let error = if let Err(ref e) = result {
         e.to_str()
     } else {
         "None"
     };
-    let metrics = collect_metrics(command, !is_err, error);
-    aptos_telemetry::send_data(
+    let metrics = collect_metrics(command, !is_err, latency, error);
+    aptos_telemetry::send_env_data(
         APTOS_CLI_PUSH_METRICS.to_string(),
         uuid::Uuid::new_v4().to_string(),
         metrics,
@@ -79,8 +89,14 @@ pub async fn to_common_result<T: Serialize>(command: &str, result: CliTypedResul
 }
 
 /// Collect build and command metrics for better debugging of CLI
-fn collect_metrics(command: &str, successful: bool, error: &str) -> HashMap<String, String> {
+fn collect_metrics(
+    command: &str,
+    successful: bool,
+    latency: Duration,
+    error: &str,
+) -> HashMap<String, String> {
     let mut metrics = HashMap::new();
+    metrics.insert("Latency".to_string(), latency.as_millis().to_string());
     metrics.insert("Command".to_string(), command.to_string());
     metrics.insert("Successful".to_string(), successful.to_string());
     metrics.insert("Error".to_string(), error.to_string());
@@ -149,22 +165,32 @@ impl<T> From<CliTypedResult<T>> for ResultWrapper<T> {
     }
 }
 
-/// Checks if a file exists, being overridden by `--assume-yes`
-pub fn check_if_file_exists(file: &Path, assume_yes: bool) -> CliTypedResult<()> {
-    if file.exists()
-        && !assume_yes
-        && !prompt_yes(
-            format!(
+/// Checks if a file exists, being overridden by `PromptOptions`
+pub fn check_if_file_exists(file: &Path, prompt_options: PromptOptions) -> CliTypedResult<()> {
+    if file.exists() {
+        prompt_yes_with_override(
+            &format!(
                 "{:?} already exists, are you sure you want to overwrite it?",
-                file.as_os_str()
-            )
-            .as_str(),
-        )
-    {
+                file.as_os_str(),
+            ),
+            prompt_options,
+        )?
+    }
+
+    Ok(())
+}
+
+pub fn prompt_yes_with_override(prompt: &str, prompt_options: PromptOptions) -> CliTypedResult<()> {
+    if prompt_options.assume_no || (!prompt_options.assume_yes && !prompt_yes(prompt)) {
         Err(CliError::AbortedError)
     } else {
         Ok(())
     }
+}
+
+pub fn read_from_file(path: &Path) -> CliTypedResult<Vec<u8>> {
+    std::fs::read(path)
+        .map_err(|e| CliError::UnableToReadFile(format!("{}", path.display()), e.to_string()))
 }
 
 /// Write a `&[u8]` to a file
@@ -270,4 +296,14 @@ pub async fn submit_transaction(
 
 pub fn current_dir() -> PathBuf {
     env::current_dir().unwrap()
+}
+
+/// Reads a line from input
+pub fn read_line(input_name: &'static str) -> CliTypedResult<String> {
+    let mut input_buf = String::new();
+    let _ = std::io::stdin()
+        .read_line(&mut input_buf)
+        .map_err(|err| CliError::IO(input_name.to_string(), err))?;
+
+    Ok(input_buf)
 }

@@ -10,41 +10,43 @@ publish = false
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.52"
-bcs = "0.1.2"
-bytes = "1.0.1"
-fail = "0.4.0"
+anyhow = "1.0.57"
+bcs = "0.1.3"
+bytes = "1.1.0"
+fail = "0.5.0"
 futures = "0.3.12"
 hex = "0.4.3"
-hyper = "0.14.4"
-once_cell = "1.7.2"
+hyper = "0.14.18"
+move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["address32"] }
+move-resource-viewer = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
+once_cell = "1.10.0"
 percent-encoding = "2.1.0"
-serde = { version = "1.0.124", features = ["derive"], default-features = false }
-serde_json = "1.0.64"
+serde = { version = "1.0.137", features = ["derive"], default-features = false }
+serde_json = "1.0.81"
 tokio = { version = "1.8.1", features = ["full"] }
 warp = { version = "0.3.2", features = ["default", "tls"] }
 
+aptos-api-types = { path = "./types", package = "aptos-api-types" }
 aptos-config = { path = "../config" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-logger = { path = "../crates/aptos-logger" }
-aptos-mempool = { path = "../mempool"}
+aptos-mempool = { path = "../mempool" }
 aptos-metrics = { path = "../crates/aptos-metrics" }
 aptos-state-view = { path = "../storage/state-view" }
 aptos-types = { path = "../types" }
 aptos-vm = { path = "../aptos-move/aptos-vm" }
-aptos-workspace-hack = { version = "0.1", path = "../crates/aptos-workspace-hack" }
-aptos-api-types = { path = "./types", package = "aptos-api-types" }
+aptos-workspace-hack = { path = "../crates/aptos-workspace-hack" }
 storage-interface = { path = "../storage/storage-interface" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features=["address32"] }
-move-resource-viewer = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
 
 [dev-dependencies]
 goldenfile = "1.1.0"
+move-package = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
 rand = "0.8.3"
-reqwest = { version = "0.11.2", features = ["blocking", "json"], default_features = false }
+regex = "1.5.5"
+reqwest = { version = "0.11.10", features = ["blocking", "json"], default_features = false }
 
 aptos-crypto = { path = "../crates/aptos-crypto" }
-aptos-genesis-tool = {path = "../config/management/genesis", features = ["testing"] }
+aptos-genesis-tool = { path = "../config/management/genesis", features = ["testing"] }
 aptos-global-constants = { path = "../config/global-constants" }
 aptos-mempool = { path = "../mempool", features = ["fuzzing"] }
 aptos-sdk = { path = "../sdk" }
@@ -56,7 +58,6 @@ cached-framework-packages = { path = "../aptos-move/framework/cached-packages" }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
 mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
-move-package = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
 vm-validator = { path = "../vm-validator" }
 
 [features]

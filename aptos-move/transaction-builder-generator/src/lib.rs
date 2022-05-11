@@ -89,7 +89,7 @@ pub trait SourceInstaller {
     ) -> std::result::Result<(), Self::Error>;
 }
 
-/// How to read custom code to inject in Diem containers.
+/// How to read custom code to inject in Aptos containers.
 pub fn read_custom_code_from_paths<'a, I>(package: &'a [&'a str], paths: I) -> CustomCode
 where
     I: Iterator<Item = std::path::PathBuf>,

@@ -8,10 +8,12 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics::monitor;
 use aptos_types::{
-    contract_event::ContractEvent, ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
+    account_address::AccountAddress, contract_event::ContractEvent, epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
 };
 use consensus_notifications::ConsensusNotificationSender;
 use consensus_types::{block::Block, executed_block::ExecutedBlock};
@@ -33,6 +35,7 @@ pub struct ExecutionProxy {
     mempool_notifier: Arc<dyn TxnManager>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     async_state_sync_notifier: channel::Sender<NotificationType>,
+    validators: Mutex<Vec<AccountAddress>>,
 }
 
 impl ExecutionProxy {
@@ -62,6 +65,7 @@ impl ExecutionProxy {
             mempool_notifier,
             state_sync_notifier,
             async_state_sync_notifier: tx,
+            validators: Mutex::new(vec![]),
         }
     }
 }
@@ -90,7 +94,10 @@ impl StateComputer for ExecutionProxy {
         let compute_result = monitor!(
             "execute_block",
             self.executor.execute_block(
-                (block.id(), block.transactions_to_execute()),
+                (
+                    block.id(),
+                    block.transactions_to_execute(&self.validators.lock())
+                ),
                 parent_block_id
             )
         )?;
@@ -121,7 +128,7 @@ impl StateComputer for ExecutionProxy {
 
         for block in blocks {
             block_ids.push(block.id());
-            txns.extend(block.transactions_to_commit());
+            txns.extend(block.transactions_to_commit(&self.validators.lock()));
             reconfig_events.extend(block.reconfig_event());
         }
 
@@ -166,5 +173,12 @@ impl StateComputer for ExecutionProxy {
             let anyhow_error: anyhow::Error = error.into();
             anyhow_error.into()
         })
+    }
+
+    fn new_epoch(&self, epoch_state: &EpochState) {
+        *self.validators.lock() = epoch_state
+            .verifier
+            .get_ordered_account_addresses_iter()
+            .collect();
     }
 }

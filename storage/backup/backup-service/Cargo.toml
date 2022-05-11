@@ -9,29 +9,29 @@ publish = false
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.52"
-bytes = "1.0.1"
-hyper = "0.14.4"
-once_cell = "1.7.2"
-serde = { version = "1.0.124", default-features = false }
+anyhow = "1.0.57"
+bcs = "0.1.3"
+bytes = "1.1.0"
+hyper = "0.14.18"
+once_cell = "1.10.0"
+serde = { version = "1.0.137", default-features = false }
 tokio = { version = "1.8.1", features = ["full"] }
 warp = "0.3.2"
 
-bcs = "0.1.2"
 aptos-crypto = { path = "../../../crates/aptos-crypto" }
 aptos-logger = { path = "../../../crates/aptos-logger" }
 aptos-metrics = { path = "../../../crates/aptos-metrics" }
 aptos-types = { path = "../../../types" }
-aptos-workspace-hack = { version = "0.1", path = "../../../crates/aptos-workspace-hack" }
+aptos-workspace-hack = { path = "../../../crates/aptos-workspace-hack" }
 aptosdb = { path = "../../aptosdb" }
 storage-interface = { path = "../../storage-interface" }
 
 [dev-dependencies]
-aptosdb = { path = "../../aptosdb", features = ["fuzzing"] }
+reqwest = { version = "0.11.10", features = ["blocking", "json"], default_features = false }
+
 aptos-config = { path = "../../../config" }
 aptos-temppath = { path = "../../../crates/aptos-temppath" }
-
-reqwest = { version = "0.11.2", features = ["blocking", "json"], default_features = false }
+aptosdb = { path = "../../aptosdb", features = ["fuzzing"] }
 
 [features]
 fuzzing = ["aptosdb/fuzzing"]
