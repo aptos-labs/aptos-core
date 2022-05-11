@@ -21,7 +21,7 @@ use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-const PRIVATE_KEYS_FILE: &str = "private-keys.yml";
+const PRIVATE_KEYS_FILE: &str = "private-keys.yaml";
 
 /// Generate account key, consensus key, and network key for a validator
 #[derive(Parser)]

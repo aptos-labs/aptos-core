@@ -153,7 +153,7 @@ impl CliConfig {
 
     /// Loads the config from the current working directory
     pub fn load() -> CliTypedResult<Self> {
-        let config_file = Self::aptos_folder()?.join("config.yml");
+        let config_file = Self::aptos_folder()?.join("config.yaml");
         if !config_file.exists() {
             return Err(CliError::ConfigNotFoundError(format!("{:?}", config_file)));
         }
@@ -176,7 +176,7 @@ impl CliConfig {
         }
     }
 
-    /// Saves the config to ./.aptos/config.yml
+    /// Saves the config to ./.aptos/config.yaml
     pub fn save(&self) -> CliTypedResult<()> {
         let aptos_folder = Self::aptos_folder()?;
 
@@ -194,11 +194,11 @@ impl CliConfig {
         }
 
         // Save over previous config file
-        let config_file = aptos_folder.join("config.yml");
+        let config_file = aptos_folder.join("config.yaml");
         let config_bytes = serde_yaml::to_string(&self).map_err(|err| {
             CliError::UnexpectedError(format!("Failed to serialize config {}", err))
         })?;
-        write_to_file(&config_file, "config.yml", config_bytes.as_bytes())?;
+        write_to_file(&config_file, "config.yaml", config_bytes.as_bytes())?;
         Ok(())
     }
 

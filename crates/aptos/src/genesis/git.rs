@@ -140,7 +140,7 @@ impl Client {
     pub fn get<T: DeserializeOwned>(&self, name: &str) -> CliTypedResult<T> {
         match self {
             Client::Local(local_repository_path) => {
-                let path = local_repository_path.join(format!("{}.yml", name));
+                let path = local_repository_path.join(format!("{}.yaml", name));
                 let mut file = std::fs::File::open(path.as_path())
                     .map_err(|e| CliError::IO(path.display().to_string(), e))?;
 
@@ -150,7 +150,7 @@ impl Client {
                 from_yaml(&contents)
             }
             Client::Github(client) => {
-                from_base64_encoded_yaml(&client.get_file(&format!("{}.yml", name))?)
+                from_base64_encoded_yaml(&client.get_file(&format!("{}.yaml", name))?)
             }
         }
     }
@@ -159,7 +159,7 @@ impl Client {
     pub fn put<T: Serialize + ?Sized>(&self, name: &str, input: &T) -> CliTypedResult<()> {
         match self {
             Client::Local(local_repository_path) => {
-                let path = local_repository_path.join(format!("{}.yml", name));
+                let path = local_repository_path.join(format!("{}.yaml", name));
                 write_to_file(
                     path.as_path(),
                     &path.display().to_string(),
@@ -167,7 +167,7 @@ impl Client {
                 )?;
             }
             Client::Github(client) => {
-                client.put(&format!("{}.yml", name), &to_base64_encoded_yaml(input)?)?;
+                client.put(&format!("{}.yaml", name), &to_base64_encoded_yaml(input)?)?;
             }
         }
 

@@ -690,6 +690,8 @@ cargo run --package aptos -- \\
     --local-repository-dir .
 ```
 
+3. The last command will produce a `bob.yaml` file that should be distributed to other participants for `genesis.blob` generation.
+
 ### Generating a Genesis and Waypoint
 
 `genesis.blob` and the waypoint can be generated after obtaining the `Layout` file, each of the individual `ValidatorConfiguration` files, and the framework release. It is important to validate that the `ValidatorConfiguration` provided in the earlier stage is the same as in the distribution for generating the `genesis.blob`. If there is a mismatch, inform all participants.
