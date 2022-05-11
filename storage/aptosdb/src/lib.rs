@@ -27,12 +27,8 @@ mod state_store;
 mod system_store;
 mod transaction_store;
 
-#[cfg(any(test, feature = "fuzzing"))]
-#[allow(dead_code)]
+#[cfg(test)]
 mod aptosdb_test;
-
-#[cfg(feature = "fuzzing")]
-pub use aptosdb_test::test_save_blocks_impl;
 
 use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},

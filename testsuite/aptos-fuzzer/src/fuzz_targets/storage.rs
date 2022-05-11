@@ -16,7 +16,8 @@ use aptos_jellyfish_merkle::test_helper::{
 use aptos_proptest_helpers::ValueGenerator;
 use aptos_types::account_state_blob::AccountStateBlob;
 use aptosdb::{
-    schema::fuzzing::fuzz_decode, test_helper::arb_blocks_to_commit, test_save_blocks_impl,
+    schema::fuzzing::fuzz_decode,
+    test_helper::{arb_blocks_to_commit, test_save_blocks_impl},
 };
 use proptest::{
     collection::{hash_set, vec},
