@@ -399,7 +399,7 @@ commands:
           name: Compose AWS Env Variables
           command: |
             echo 'export AWS_ECR_ACCOUNT_URL="${AWS_ECR_ACCOUNT_NUM}.dkr.ecr.${AWS_REGION}.amazonaws.com"' >> $BASH_ENV
-            echo "export AWS_ECR_IMAGES=( validator forge init validator_tcb tools faucet txn-emitter )" >> $BASH_ENV
+            echo "export AWS_ECR_IMAGES=( validator forge init validator_tcb tools faucet txn-emitter indexer )" >> $BASH_ENV
       - aws-ecr/ecr-login
   ### Sets up the permissions for using Dockerhub
   dockerhub-setup:
@@ -413,7 +413,7 @@ commands:
           command: |
             # the images that exist in dockerhub org
             echo "export DOCKERHUB_ORG=aptoslab" >> $BASH_ENV
-            echo "export DOCKERHUB_IMAGES=( validator forge init validator_tcb tools faucet )" >> $BASH_ENV
+            echo "export DOCKERHUB_IMAGES=( validator forge init validator_tcb tools faucet indexer )" >> $BASH_ENV
   ecosystem-setup:
     steps:
       - checkout
