@@ -6,6 +6,7 @@
 class OnboardingController < ApplicationController
   before_action :authenticate_user!
   before_action :set_oauth_data
+  layout 'it1'
 
   def email; end
 

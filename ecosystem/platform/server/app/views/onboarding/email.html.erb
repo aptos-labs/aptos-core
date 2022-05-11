@@ -1,42 +1,44 @@
-<h2>Welcome, <%= @oauth_username %></h2>
-<% if current_user.username %>
-  <p>Please set and verify your email to continue the signup process</p>
-<% else %>
-  <p>Please set a username and verify your email to continue the signup process</p>
-<% end %>
+<div>
+  <h2 class="text-4xl text-[#1dd7a5] font-mono mb-8">Welcome, <%= @oauth_username %>!</h2>
+  <% if current_user.username %>
+    <p>Please set and verify your email to continue the signup process</p>
+  <% else %>
+    <p>Please set a username and verify your email to continue the signup process</p>
+  <% end %>
 
-<%= render "layouts/flash" %>
+  <%= render "layouts/flash" %>
 
-<% if current_user.errors.any? %>
-  <div id="error_explanation" class="bg-red-50 text-red-500 px-3 py-2 font-medium rounded-lg mt-3">
-    <h2><%= pluralize(current_user.errors.count, "error") %> prohibited this user from being saved:</h2>
+  <% if current_user.errors.any? %>
+    <div id="error_explanation" class="bg-red-50 text-red-500 px-3 py-2 font-medium rounded-lg mt-3">
+      <h2><%= pluralize(current_user.errors.count, "error") %> prohibited this user from being saved:</h2>
 
-    <ul>
-      <% current_user.errors.each do |error| %>
-        <li><%= error.full_message %></li>
-      <% end %>
-    </ul>
-  </div>
-<% end %>
-
-<%= render "shared/captcha_helper" %>
-
-<%= form_with(model: current_user, url: onboarding_email_path, method: :post, data: {turbo: false}) do |f| %>
-  <% unless current_user.username %>
-    <div class="field">
-      <%= f.label :username %><br/>
-      <%= f.text_field :username, autofocus: false, autocomplete: "username", value: current_user.username %>
+      <ul>
+        <% current_user.errors.each do |error| %>
+          <li><%= error.full_message %></li>
+        <% end %>
+      </ul>
     </div>
   <% end %>
 
-  <div class="field">
-    <%= f.label :email %><br />
-    <%= f.email_field :email, autofocus: true, autocomplete: "email", value: current_user.email || @oauth_email %>
-  </div>
+  <%= render "shared/captcha_helper" %>
 
-  <%= recaptcha_tags %>
+  <%= form_with(model: current_user, url: onboarding_email_path, method: :post, data: {turbo: false}) do |f| %>
+    <% unless current_user.username %>
+      <div class="field">
+        <%= f.label :username %><br/>
+        <%= f.text_field :username, autofocus: false, autocomplete: "username", value: current_user.username %>
+      </div>
+    <% end %>
 
-  <div class="actions">
-    <%= f.submit "Send email" %>
-  </div>
-<% end %>
+    <div class="field">
+      <%= f.label :email %><br />
+      <%= f.email_field :email, autofocus: true, autocomplete: "email", value: current_user.email || @oauth_email %>
+    </div>
+
+    <%= recaptcha_tags %>
+
+    <div class="actions">
+      <%= f.submit "Send email" %>
+    </div>
+  <% end %>
+</div>

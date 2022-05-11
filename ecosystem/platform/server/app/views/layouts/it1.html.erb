@@ -1,0 +1,13 @@
+<%= render 'layouts/application' do %>
+  <div class="bg-neutral-900 text-white h-full p-6 sm:p-24 2xl:px-48">
+    <h2 class="text-6xl mb-4">Incentivized Testnet</h2>
+    <div class="mb-8">
+      <%= render 'shared/bump_hero' %>
+    </div>
+
+    <div class="flex flex-col lg:flex-row gap-8 sm:gap-24 xl:gap-48 justify-between">
+      <%= yield %>
+      <%= render 'shared/it1_schedule' %>
+    </div>
+  </div>
+<% end %>

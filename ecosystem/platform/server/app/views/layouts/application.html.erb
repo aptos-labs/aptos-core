@@ -1,28 +1,3 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Community Platform</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <%= csrf_meta_tags %>
-    <%= csp_meta_tag %>
-
-    <%= favicon_link_tag asset_path('favicon.ico') %>
-
-    <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
-    <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
-    <%= render 'layouts/google_analytics' %>
-    <%= javascript_importmap_tags %>
-  </head>
-
-  <body class="flex flex-col h-screen justify-between">
-    <div class="flex flex-col flex-1">
-      <%= render "layouts/header" unless @hide_header %>
-
-      <main class="flex-1">
-        <%= yield %>
-      </div>
-    </main>
-
-    <%= render "layouts/footer" %>
-  </body>
-</html>
+<%= render 'layouts/application' do %>
+  <%= yield %>
+<% end %>
