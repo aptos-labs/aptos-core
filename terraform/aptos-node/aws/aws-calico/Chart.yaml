@@ -1,0 +1,5 @@
+apiVersion: v2
+name: aws-calico
+version: 1.6.0
+description: Calico network plugin for AWS
+home: https://github.com/aws/amazon-vpc-cni-k8s
