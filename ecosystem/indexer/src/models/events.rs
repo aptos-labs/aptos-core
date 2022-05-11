@@ -27,8 +27,16 @@ impl Event {
         let from_message = serde_json::to_string(&_data["from_message"]).unwrap();
         let to_message = serde_json::to_string(&_data["from_message"]).unwrap();
 
-        _data["from_message"] = serde_json::Value::from(from_message.trim_matches(char::from(0)).replace("\\u0000", ""));
-        _data["to_message"] = serde_json::Value::from(to_message.trim_matches(char::from(0)).replace("\\u0000", ""));
+        _data["from_message"] = serde_json::Value::from(
+            from_message
+                .trim_matches(char::from(0))
+                .replace("\\u0000", ""),
+        );
+        _data["to_message"] = serde_json::Value::from(
+            to_message
+                .trim_matches(char::from(0))
+                .replace("\\u0000", ""),
+        );
 
         Event {
             transaction_hash,

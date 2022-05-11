@@ -97,7 +97,8 @@ impl WriteSetChange {
                 let _data = &data;
                 let mut _json = serde_json::to_value(_data).unwrap();
                 let str = serde_json::to_string(&_json["data"]["message"]).unwrap();
-                _json["data"]["message"] = serde_json::Value::from(str.trim_matches(char::from(0)).replace("\\u0000", ""));
+                _json["data"]["message"] =
+                    serde_json::Value::from(str.trim_matches(char::from(0)).replace("\\u0000", ""));
 
                 WriteSetChange {
                     transaction_hash,
@@ -109,7 +110,7 @@ impl WriteSetChange {
                     data: _json,
                     inserted_at: chrono::Utc::now().naive_utc(),
                 }
-            },
+            }
             APIWriteSetChange::WriteTableItem {
                 state_key_hash,
                 handle,
