@@ -17,7 +17,11 @@ use aptos_types::{
 use storage_interface::{DbReader, Order};
 
 use anyhow::{ensure, format_err, Result};
-use aptos_types::{state_store::state_key_prefix::StateKeyPrefix, transaction::Version};
+use aptos_state_view::StateView;
+use aptos_types::{
+    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix},
+    transaction::Version,
+};
 use aptos_vm::data_cache::{IntoMoveResolver, RemoteStorageOwned};
 use futures::{channel::oneshot, SinkExt};
 use std::{convert::Infallible, sync::Arc};
@@ -89,6 +93,12 @@ impl Context {
 
     pub fn get_latest_ledger_info_with_signatures(&self) -> Result<LedgerInfoWithSignatures> {
         self.db.get_latest_ledger_info()
+    }
+
+    pub fn get_state_value(&self, state_key: &StateKey, version: u64) -> Result<Option<Vec<u8>>> {
+        self.db
+            .state_view_at_version(Some(version))?
+            .get_state_value(state_key)
     }
 
     pub fn get_account_state(

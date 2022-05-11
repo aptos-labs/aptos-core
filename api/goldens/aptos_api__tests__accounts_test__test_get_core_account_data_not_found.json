@@ -1,5 +1,5 @@
 {
   "code": 404,
-  "message": "account not found by address(0xf) and ledger version(0)",
+  "message": "resource not found by address(0xf), struct tag(0x1::Account::Account) and ledger version(0)",
   "aptos_ledger_version": "0"
 }

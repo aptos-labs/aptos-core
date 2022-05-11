@@ -20,9 +20,11 @@ use aptos_types::{
 };
 
 use anyhow::Result;
-use aptos_types::account_view::AccountView;
+use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
 use move_core_types::{
-    identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
+    identifier::Identifier,
+    language_storage::{ResourceKey, StructTag},
+    move_resource::MoveStructType,
     value::MoveValue,
 };
 use std::convert::TryInto;
@@ -125,11 +127,22 @@ impl Account {
     }
 
     pub fn account(self) -> Result<impl Reply, Error> {
-        let account_state = self.account_state()?;
-        let account: AccountData = account_state
-            .get_account_resource()?
-            .ok_or_else(|| self.resource_not_found(&AccountResource::struct_tag()))?
-            .into();
+        let state_key = StateKey::AccessPath(AccessPath::resource_access_path(ResourceKey::new(
+            self.address.into(),
+            AccountResource::struct_tag(),
+        )));
+
+        let state_value = self
+            .context
+            .get_state_value(&state_key, self.ledger_version)?;
+
+        let account_resource: AccountResource = state_value
+            .map(|bytes| bcs::from_bytes(&bytes))
+            .transpose()
+            .map_err(anyhow::Error::from)?
+            .ok_or_else(|| self.resource_not_found(&AccountResource::struct_tag()))?;
+
+        let account: AccountData = account_resource.into();
 
         Response::new(self.latest_ledger_info, &account)
     }
