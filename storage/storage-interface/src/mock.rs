@@ -48,6 +48,14 @@ impl DbReader for MockDbReaderWriter {
             SparseMerkleProof::new(None, vec![]),
         ))
     }
+
+    fn get_state_value_by_version(
+        &self,
+        state_key: &StateKey,
+        _: Version,
+    ) -> Result<Option<StateValue>> {
+        Ok(self.get_latest_state_value(state_key.clone()).unwrap())
+    }
 }
 
 fn get_mock_account_state() -> AccountState {
