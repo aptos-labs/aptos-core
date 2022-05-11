@@ -29,7 +29,7 @@ impl Event {
 
         _data["from_message"] = serde_json::Value::from(from_message.trim_matches(char::from(0)).replace("\\u0000", ""));
         _data["to_message"] = serde_json::Value::from(to_message.trim_matches(char::from(0)).replace("\\u0000", ""));
-        
+
         Event {
             transaction_hash,
             key: event.key.to_string(),
