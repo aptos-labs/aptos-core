@@ -93,15 +93,22 @@ impl WriteSetChange {
                 address,
                 state_key_hash,
                 data,
-            } => WriteSetChange {
-                transaction_hash,
-                hash: state_key_hash.clone(),
-                type_: write_set_change.type_str().to_string(),
-                address: address.to_string(),
-                module: Default::default(),
-                resource: Default::default(),
-                data: serde_json::to_value(data).unwrap(),
-                inserted_at: chrono::Utc::now().naive_utc(),
+            } => {
+                let _data = &data;
+                let mut _json = serde_json::to_value(_data).unwrap();
+                let str = serde_json::to_string(&_json["data"]["message"]).unwrap();
+                _json["data"]["message"] = serde_json::Value::from(str.trim_matches(char::from(0)).replace("\\u0000", ""));
+
+                WriteSetChange {
+                    transaction_hash,
+                    hash: state_key_hash.clone(),
+                    type_: write_set_change.type_str().to_string(),
+                    address: address.to_string(),
+                    module: Default::default(),
+                    resource: Default::default(),
+                    data: _json,
+                    inserted_at: chrono::Utc::now().naive_utc(),
+                }
             },
             APIWriteSetChange::WriteTableItem {
                 state_key_hash,
