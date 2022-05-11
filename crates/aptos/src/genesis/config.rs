@@ -59,10 +59,12 @@ pub struct ValidatorConfiguration {
     pub consensus_key: Ed25519PublicKey,
     /// Key used for signing transactions with the account
     pub account_key: Ed25519PublicKey,
-    /// Public key used for network identity (same as account address)
-    pub network_key: x25519::PublicKey,
+    /// Public key used for validator network identity (same as account address)
+    pub validator_network_key: x25519::PublicKey,
     /// Host for validator which can be an IP or a DNS name
     pub validator_host: HostAndPort,
+    /// Public key used for full node network identity (same as account address)
+    pub full_node_network_key: x25519::PublicKey,
     /// Host for full node which can be an IP or a DNS name and is optional
     pub full_node_host: Option<HostAndPort>,
     /// Stake amount for consensus
@@ -76,11 +78,11 @@ impl TryFrom<ValidatorConfiguration> for Validator {
         let auth_key = AuthenticationKey::ed25519(&config.account_key);
         let validator_addresses = vec![config
             .validator_host
-            .as_network_address(config.network_key)
+            .as_network_address(config.validator_network_key)
             .unwrap()];
         let full_node_addresses = if let Some(full_node_host) = config.full_node_host {
             vec![full_node_host
-                .as_network_address(config.network_key)
+                .as_network_address(config.full_node_network_key)
                 .unwrap()]
         } else {
             vec![]

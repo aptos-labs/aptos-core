@@ -10,7 +10,8 @@ use crate::{
 use aptos_crypto::{x25519, Uniform};
 use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
 use aptos_types::{
-    network_address::NetworkAddress, transaction::authenticator::AuthenticationKey, PeerId,
+    account_address::from_identity_public_key, network_address::NetworkAddress,
+    transaction::authenticator::AuthenticationKey, PeerId,
 };
 use rand::{
     rngs::{OsRng, StdRng},
@@ -138,7 +139,7 @@ impl NetworkConfig {
 impl NetworkConfig {
     pub fn identity_key(&self) -> x25519::PrivateKey {
         let key = match &self.identity {
-            Identity::FromConfig(config) => Some(config.key.clone().key),
+            Identity::FromConfig(config) => Some(config.key.private_key()),
             Identity::FromStorage(config) => {
                 let storage: Storage = (&config.backend).into();
                 let key = storage
@@ -218,7 +219,15 @@ impl NetworkConfig {
             }
             Identity::FromFile(config) => {
                 let identity_blob: IdentityBlob = IdentityBlob::from_file(&config.path).unwrap();
-                Some(identity_blob.account_address)
+
+                // If account is not specified, generate peer id from public key
+                if let Some(address) = identity_blob.account_address {
+                    Some(address)
+                } else {
+                    Some(from_identity_public_key(
+                        identity_blob.network_key.public_key(),
+                    ))
+                }
             }
             Identity::None => None,
         }
