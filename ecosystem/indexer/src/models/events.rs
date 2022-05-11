@@ -35,7 +35,7 @@ impl Event {
             key: event.key.to_string(),
             sequence_number: event.sequence_number.0 as i64,
             type_: event.typ.to_string(),
-            data: event.data.clone(),
+            data: _data,
             inserted_at: chrono::Utc::now().naive_utc(),
         }
     }
