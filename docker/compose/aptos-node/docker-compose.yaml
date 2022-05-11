@@ -1,0 +1,77 @@
+# This compose file defines an Aptos node deployment.
+# It includes a validator node and a fullnode.
+# Read the README.md files for instruction on how to install aptos-node
+
+version: "3.8"
+services:
+  validator:
+    image: "${VALIDATOR_IMAGE_REPO:-aptoslab/validator}:${IMAGE_TAG:-testnet}"
+    networks:
+      shared:
+        ipv4_address:  172.16.1.10
+    volumes:
+      - type: volume
+        source: aptos-validator
+        target: /opt/aptos/data
+      - type: bind
+        source: ./validator.yaml
+        target: /opt/aptos/etc/validator.yaml
+      - type: bind
+        source: ./genesis.blob
+        target: /opt/aptos/genesis/genesis.blob
+      - type: bind
+        source: ./waypoint.txt
+        target: /opt/aptos/genesis/waypoint.txt
+      - type: bind
+        source: ./private-keys.yml
+        target: /opt/aptos/genesis/private-keys.yml
+    command: ["/opt/aptos/bin/aptos-node", "-f", "/opt/aptos/etc/validator.yaml"]
+    ports:
+      - "6180:6180"
+      - "6181:6181"
+      - "8080:8080"
+      - "9101:9101"
+    expose:
+      - 6180
+      - 9101
+
+  fullnode:
+    image: "${VALIDATOR_IMAGE_REPO:-aptoslab/validator}:${IMAGE_TAG:-testnet}"
+    networks:
+      shared:
+        ipv4_address:  172.16.1.11
+    volumes:
+      - type: volume
+        source: aptos-fullnode
+        target: /opt/aptos/data
+      - type: bind
+        source: ./fullnode.yaml
+        target: /opt/aptos/etc/fullnode.yaml
+      - type: bind
+        source: ./genesis.blob
+        target: /opt/aptos/genesis/genesis.blob
+      - type: bind
+        source: ./waypoint.txt
+        target: /opt/aptos/genesis/waypoint.txt
+    command: ["/opt/aptos/bin/aptos-node", "-f", "/opt/aptos/etc/fullnode.yaml"]
+    ports:
+      - "6182:6182"
+      - "80:8080"
+      - "9103:9101"
+    expose:
+      - 6182
+      - 80
+      - 9103
+
+networks:
+  shared:
+    name: "aptos-docker-compose-shared"
+    ipam:
+      config:
+        - subnet: 172.16.1.0/24
+
+volumes:
+  aptos-validator:
+    name: aptos-validator
+  aptos-fullnode:
+    name: aptos-fullnode
