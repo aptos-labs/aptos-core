@@ -1,6 +1,6 @@
-<div class="flex flex-col lg:flex-row gap-8 sm:gap-24 xl:gap-48 justify-between">
+<div class="flex flex-col lg:flex-row gap-8 sm:gap-24 xl:gap-48 justify-between flex-[2]">
   <div>
-    <div class="sm:w-[30rem] mb-8 sm:mb-12">
+    <div class="sm:w-[36rem] mb-8 sm:mb-12 font-light sm:text-lg">
       <p class="mb-4">
       Ensuring a production-grade Aptos mainnet.
       <br>
@@ -14,24 +14,24 @@
 
     <%= render "layouts/flash" %>
 
-    <div class="flex flex-col lg:flex-row gap-8 lg:gap-24">
-      <div class="bg-neutral-800 rounded-md flex flex-col">
+    <div class="flex flex-col lg:flex-row gap-8 sm:gap-16 2xl:gap-24">
+      <div class="bg-neutral-800 rounded-md flex flex-col flex-1">
         <h3 class="font-mono uppercase mb-2 bg-neutral-700 text-[#1dd7a5] px-4 py-2 rounded-t-md">Step 1</h3>
         <div class="px-8 py-4 flex flex-col flex-1">
           <h4 class="text-[#1dd7a5] font-mono uppercase text-2xl mb-4">Node Verification</h4>
-          <hr class="border-[#1dd7a5] mb-4">
-          <p class="mb-8">
+          <div class="mb-4"><%= render 'shared/bump' %></div>
+          <p class="mb-8 font-light">
           Register your node, and automatically verify that it is set up correctly.
           </p>
           <%= link_to "Register", new_it1_profile_path, class: "w-full bg-[#1dd7a5] text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mt-auto" %>
         </div>
       </div>
-      <div class="bg-neutral-800 rounded-md flex flex-col">
+      <div class="bg-neutral-800 rounded-md flex flex-col flex-1">
         <h3 class="font-mono uppercase mb-2 bg-neutral-700 text-[#1dd7a5] px-4 py-2 rounded-t-md">Step 2</h3>
         <div class="px-8 py-4 flex flex-col flex-1">
           <h4 class="text-[#1dd7a5] font-mono uppercase text-2xl mb-4">Identity Verification</h4>
-          <hr class="border-[#1dd7a5] mb-4">
-          <p class="mb-8">
+          <div class="mb-4"><%= render 'shared/bump' %></div>
+          <p class="mb-8 font-light">
           Identity must be verified by noon (PST) May 23 to get into the selection process.
           </p>
           <% if current_user&.it1_profile&.validator_verified? %>
@@ -43,3 +43,4 @@
       </div>
     </div>
   </div>
+</div>

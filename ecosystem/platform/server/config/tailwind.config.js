@@ -8,6 +8,19 @@ module.exports = {
   ],
   theme: {
     extend: {
+      colors: {
+        'neutral': {
+          ...defaultTheme.colors.neutral,
+          '700': '#393939',
+          '800': '#212121',
+          '900': '#171717',
+        },
+      },
+      fontFamily: {
+        'sans': ['apparat', ...defaultTheme.fontFamily.sans],
+        'mono': ['lft-etica-mono', ...defaultTheme.fontFamily.mono],
+        'display': ['apparat-semicond', ...defaultTheme.fontFamily.sans],
+      },
     },
   },
   plugins: [

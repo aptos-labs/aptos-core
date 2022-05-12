@@ -20,7 +20,7 @@
       <div>
         <div class="mb-16">
           <h3 class="text-[#1dd7a5] font-mono uppercase text-2xl mb-2">Public Keys</h3>
-          <hr class="border-[#1dd7a5] mb-8">
+          <div class="mb-8"><%= render 'shared/bump' %></div>
 
           <p class="mb-4">
           <%= f.label :consensus_key, class: "font-mono uppercase block mb-2 text-lg" %>
@@ -38,7 +38,7 @@
 
         <div class="mb-16">
           <h3 class="text-[#1dd7a5] font-mono uppercase text-2xl mb-2">Validator Node</h3>
-          <hr class="border-[#1dd7a5] mb-8">
+          <div class="mb-8"><%= render 'shared/bump' %></div>
 
           <p class="mb-4">
           <%= f.label :validator_address, "Address (IP or hostname)", class: "font-mono uppercase block mb-2 text-lg" %>
@@ -68,7 +68,7 @@
 
         <div class="mb-16">
           <h3 class="text-[#1dd7a5] font-mono uppercase text-2xl mb-2">Full Node</h3>
-          <hr class="border-[#1dd7a5] mb-8">
+          <div class="mb-8"><%= render 'shared/bump' %></div>
 
           <p class="mb-4">
           <%= f.label :fullnode_address, "Address (IP or hostname)", class: "font-mono uppercase block mb-2 text-lg" %>
