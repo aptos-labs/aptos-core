@@ -34,10 +34,10 @@
           <p class="mb-8 font-light">
           Identity must be verified by noon (PST) May 23 to get into the selection process.
           </p>
-          <% if current_user&.it1_profile&.validator_verified? %>
+          <% if current_user&.kyc_complete? %>
+            <div class="w-full bg-teal-400 text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mt-auto cursor-not-allowed select-none">Verification Complete</div>
+          <% elsif current_user&.it1_profile&.validator_verified? %>
             <%= link_to "Verify", onboarding_kyc_redirect_path, class: "w-full bg-teal-400 text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mt-auto" %>
-          <% else %>
-            <%= link_to "Verify", "#", class: "w-full bg-teal-400 text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mt-auto" %>
           <% end %>
         </div>
       </div>

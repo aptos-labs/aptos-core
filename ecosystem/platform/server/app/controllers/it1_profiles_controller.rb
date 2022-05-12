@@ -5,6 +5,7 @@
 class It1ProfilesController < ApplicationController
   before_action :authenticate_user!
   before_action :set_it1_profile, only: %i[show edit update destroy]
+  before_action :ensure_confirmed!
   respond_to :html
 
   def show
@@ -42,7 +43,7 @@ class It1ProfilesController < ApplicationController
       log @it1_profile, 'created'
       validate_node(v, do_location: true)
       if @it1_profile.validator_verified?
-        redirect_to it1_path, notice: 'AIT1 application completed successfully: your node is verified!'
+        redirect_to it1_path, notice: 'AIT1 application completed successfully: your node is verified!' and return
       end
     end
     respond_with(@it1_profile)

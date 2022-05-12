@@ -7,6 +7,19 @@ class ApplicationJob < ActiveJob::Base
   # Automatically retry jobs that encountered a deadlock
   retry_on ActiveRecord::Deadlocked
 
+  # Add context to sentry for jobs
+  around_perform do |job, block|
+    Sentry.configure_scope do |scope|
+      scope.set_context(:job_args, job.arguments.first)
+      scope.set_tags(job_name: job.class.name)
+      job.sentry_scope = scope
+      block.call
+    end
+  end
+
+  # @return [Sentry::Scope]
+  attr_accessor :sentry_scope
+
   # Most jobs are safe to ignore if the underlying records are no longer available
   # discard_on ActiveJob::DeserializationError
 end

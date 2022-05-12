@@ -61,11 +61,7 @@ class User < ApplicationRecord
   # end
 
   def kyc_complete?
-    kyc_status == 'completed'
-  end
-
-  def providers
-    authorizations.map(&:provider)
+    kyc_exempt? || kyc_status == 'completed'
   end
 
   def add_oauth_authorization(data)

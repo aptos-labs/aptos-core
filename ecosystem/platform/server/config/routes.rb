@@ -15,9 +15,12 @@ Rails.application.routes.draw do
 
   namespace :api do
     # get ':provider/callback', to: 'sessions#create'
-
     get 'users/me', to: 'users#me'
     resources :users, only: %i[show update]
+  end
+
+  namespace :user do
+    root to: redirect('/it1') # creates user_root_path, where users go after confirming email
   end
 
   # KYC routes

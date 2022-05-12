@@ -5,6 +5,7 @@
 
 class OnboardingController < ApplicationController
   before_action :authenticate_user!
+  before_action :ensure_confirmed!, only: %i[kyc_redirect kyc_callback]
   before_action :set_oauth_data, except: :kyc_callback
   protect_from_forgery except: :kyc_callback
 
@@ -48,6 +49,7 @@ class OnboardingController < ApplicationController
       KYCCompleteJob.perform_now({ user_id: current_user.id, inquiry_id: })
       redirect_to it1_path, notice: 'Identity Verification completed successfully!'
     rescue KYCCompleteJobError => e
+      Sentry.capture_exception(e)
       redirect_to it1_path, error: 'Error; If you completed Identity Verification,'\
                                    " it may take some time to reflect. Error: #{e}"
     end

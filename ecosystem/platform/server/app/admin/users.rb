@@ -14,11 +14,11 @@ ActiveAdmin.register User do
     selectable_column
     id_column
     column :it1_profile
+    column :authorizations
     column 'External ID', :external_id
     column :email
     column :is_root
     column :kyc_exempt
-    column :providers
     column :current_sign_in_ip
     column 'Last Sign In', :current_sign_in_at
     column :sign_in_count
@@ -38,7 +38,7 @@ ActiveAdmin.register User do
 
   show do
     default_main_content do
-      row :providers
+      row :authorizations
       row :it1_profile
     end
   end

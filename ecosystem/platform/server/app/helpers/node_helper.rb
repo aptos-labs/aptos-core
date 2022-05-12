@@ -73,6 +73,7 @@ module NodeHelper
       )
       LocationResult.new(true, nil, client.insights(@ip))
     rescue StandardError => e
+      Sentry.capture_exception(e)
       LocationResult.new(false, "Error: #{e}", nil)
     end
 
@@ -86,6 +87,7 @@ module NodeHelper
     rescue Net::OpenTimeout => e
       MetricsResult.new(false, nil, "Open timeout: #{e}")
     rescue StandardError => e
+      Sentry.capture_exception(e)
       MetricsResult.new(false, nil, "Error: #{e}")
     end
 
