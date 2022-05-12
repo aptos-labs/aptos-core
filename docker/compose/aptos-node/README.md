@@ -82,7 +82,7 @@
 
 7. Download AptosFramework Move bytecodes.
 
-    Download the Aptos Framework from the release page: https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v0.1.0
+    Download the Aptos Framework from the release page: https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v0.1.0 (Download the binary release, not the source.)
 
     ```
     $ unzip framework.zip
