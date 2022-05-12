@@ -311,6 +311,166 @@ fn test_retired_records() {
     }
 }
 
+#[test]
+pub fn test_find_latest_persisted_version_less_than() {
+    let tmp_dir = TempPath::new();
+    let db = AptosDB::new_for_test(&tmp_dir);
+    let store = &db.state_store;
+
+    // Empty store
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(0).unwrap(),
+        None,
+    );
+
+    // put in genesis
+    let kv = vec![(
+        StateKey::Raw(b"key".to_vec()),
+        StateValue::from(b"value".to_vec()),
+    )];
+    put_value_set(store, kv.clone(), 0);
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(0).unwrap(),
+        None
+    );
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(1).unwrap(),
+        Some(0)
+    );
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(2).unwrap(),
+        Some(0)
+    );
+
+    // put in another version
+    put_value_set(store, kv, 2);
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(4).unwrap(),
+        Some(2)
+    );
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(3).unwrap(),
+        Some(2)
+    );
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(2).unwrap(),
+        Some(0)
+    );
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(1).unwrap(),
+        Some(0)
+    );
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(0).unwrap(),
+        None,
+    );
+}
+
+#[test]
+pub fn test_find_latest_persisted_version_less_than_with_pre_genesis() {
+    let kv = vec![(
+        StateKey::Raw(b"key".to_vec()),
+        StateValue::from(b"value".to_vec()),
+    )];
+    // make a DB with PRE_GENESIS
+    let tmp_dir = {
+        let tmp_dir1 = TempPath::new();
+        let db1 = AptosDB::new_for_test(&tmp_dir1);
+        let store1 = &db1.state_store;
+        put_value_set(store1, kv.clone(), 0);
+        let root_hash = store1.get_root_hash(0).unwrap();
+        let tmp_dir2 = TempPath::new();
+        let db2 = AptosDB::new_for_test(&tmp_dir2);
+        let store2 = &db2.state_store;
+        let mut restore = store2
+            .get_snapshot_receiver(PRE_GENESIS_VERSION, root_hash)
+            .unwrap();
+        let chunk = store1.get_value_chunk_with_proof(0, 0, 1).unwrap();
+        restore.add_chunk(chunk.raw_values, chunk.proof).unwrap();
+        restore.finish_box().unwrap();
+        tmp_dir2
+    };
+    // re-open the DB, to mimic the real use case (pre-genesis DB is pre-generated with db-restore)
+    let db = AptosDB::new_for_test(&tmp_dir);
+    let store = &db.state_store;
+
+    // Assert we see the pre-genesis
+    assert!(store
+        .find_latest_persisted_version_less_than(PRE_GENESIS_VERSION)
+        .is_err());
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(0).unwrap(),
+        Some(PRE_GENESIS_VERSION)
+    );
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(1).unwrap(),
+        Some(PRE_GENESIS_VERSION)
+    );
+
+    // put in genesis
+    put_value_set(store, kv.clone(), 0);
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(0).unwrap(),
+        Some(PRE_GENESIS_VERSION),
+    );
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(1).unwrap(),
+        Some(0)
+    );
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(2).unwrap(),
+        Some(0)
+    );
+
+    // put in another version
+    put_value_set(store, kv, 2);
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(4).unwrap(),
+        Some(2)
+    );
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(3).unwrap(),
+        Some(2)
+    );
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(2).unwrap(),
+        Some(0)
+    );
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(1).unwrap(),
+        Some(0)
+    );
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(0).unwrap(),
+        Some(PRE_GENESIS_VERSION),
+    );
+
+    // re-open DB
+    drop(db);
+    let db = AptosDB::new_for_test(&tmp_dir);
+    let store = &db.state_store;
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(4).unwrap(),
+        Some(2)
+    );
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(3).unwrap(),
+        Some(2)
+    );
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(2).unwrap(),
+        Some(0)
+    );
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(1).unwrap(),
+        Some(0)
+    );
+    assert_eq!(
+        store.find_latest_persisted_version_less_than(0).unwrap(),
+        Some(PRE_GENESIS_VERSION),
+    );
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 

@@ -72,31 +72,38 @@ impl StateStore {
         &self,
         next_version: Version,
     ) -> Result<Option<Version>> {
-        let latest_version = self.latest_version();
-        if let Some(version) = &latest_version {
-            if *version != PRE_GENESIS_VERSION && *version >= next_version {
-                if next_version == 0 {
-                    return Ok(None);
-                } else {
-                    return Self::find_latest_persisted_version_from_db(&self.db, next_version - 1);
-                }
+        ensure!(
+            next_version != PRE_GENESIS_VERSION,
+            "Nothing before pre-genesis"
+        );
+
+        let latest_version_opt = self.latest_version();
+        if let Some(latest_version) = &latest_version_opt {
+            if *latest_version < next_version {
+                return Ok(latest_version_opt);
             }
         }
-        Ok(latest_version)
+        Self::find_latest_persisted_version_from_db(&self.db, next_version)
     }
 
-    pub fn find_latest_persisted_version_from_db(
+    fn find_latest_persisted_version_from_db(
         db: &Arc<DB>,
-        max_version: Version,
+        next_version: Version,
     ) -> Result<Option<Version>> {
-        let mut iter = db
-            .iter::<JellyfishMerkleNodeSchema>(Default::default())
-            .expect("Failed to create DB iterator.");
-        // TODO: If we break up a single update batch to multiple commits, we would need to
-        // deal with a partial version, which hasn't got the root committed.
-        iter.seek_for_prev(&NodeKey::new_empty_path(max_version))?;
-        let latest_node = iter.next().transpose()?;
-        Ok(latest_node.map(|(key, _node)| key.version()))
+        if next_version > 0 {
+            let max_possible_version = next_version - 1;
+            let mut iter = db.rev_iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+            iter.seek_for_prev(&NodeKey::new_empty_path(max_possible_version))?;
+            if let Some((key, _node)) = iter.next().transpose()? {
+                // TODO: If we break up a single update batch to multiple commits, we would need to
+                // deal with a partial version, which hasn't got the root committed.
+                return Ok(Some(key.version()));
+            }
+        }
+        // try PRE_GENESIS
+        Ok(db
+            .get::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(PRE_GENESIS_VERSION))?
+            .map(|_pre_genesis_root| PRE_GENESIS_VERSION))
     }
 
     /// Get the state value with proof given the state key and root hash of state Merkle tree
