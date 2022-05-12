@@ -414,7 +414,7 @@ async fn periodic_telemetry_dump(node_config: NodeConfig, db: DbReaderWriter) {
                 }
 
                 // get some data we do not currently have metrics for
-                let chain_id = fetch_chain_id(&db);
+                let chain_id = fetch_chain_id(&db).id(); // get the chain_id as its u8 id for consistency of schema
                 let peer_id = match node_config.peer_id() {
                     Some(p) => p.to_string(),
                     None => String::new()
