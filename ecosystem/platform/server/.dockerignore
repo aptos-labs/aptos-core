@@ -40,3 +40,5 @@
 
 # Never commit this dangerous file :-)
 .env
+
+/Dockerfile
