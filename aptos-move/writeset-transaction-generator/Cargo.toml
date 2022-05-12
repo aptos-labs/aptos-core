@@ -13,14 +13,6 @@ edition = "2018"
 anyhow = "1.0.57"
 bcs = "0.1.3"
 handlebars = "4.2.2"
-move-binary-format = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
-move-bytecode-verifier = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
-move-compiler = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["address32"] }
-move-vm-runtime = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
-move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["table-extension"] }
-move-vm-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
-read-write-set = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
 serde = { version = "1.0.137", default-features = false }
 tempfile = "3.3.0"
 
@@ -34,3 +26,4 @@ aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 aptosdb = { path = "../../storage/aptosdb" }
 cached-framework-packages =  { path = "../framework/cached-packages" }
 framework =  { path = "../framework" }
+move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "table-extension"] }

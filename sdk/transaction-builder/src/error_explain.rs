@@ -6,7 +6,7 @@
 //!
 //! Note that the ~13 KiB error descriptions will be inlined into the final binary.
 
-use move_core_types::{
+use move_deps::move_core_types::{
     errmap::{ErrorContext, ErrorMapping},
     language_storage::ModuleId,
 };
@@ -27,7 +27,7 @@ pub fn get_explanation(module_id: &ModuleId, abort_code: u64) -> Option<ErrorCon
 #[cfg(test)]
 mod tests {
     use super::*;
-    use move_core_types::{account_address::AccountAddress, ident_str};
+    use move_deps::move_core_types::{account_address::AccountAddress, ident_str};
 
     #[test]
     fn test_get_explanation() {

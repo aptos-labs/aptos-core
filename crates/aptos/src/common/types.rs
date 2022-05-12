@@ -20,7 +20,7 @@ use aptos_rest_client::{aptos_api_types::WriteSetChange, Client, Transaction};
 use aptos_types::{chain_id::ChainId, transaction::authenticator::AuthenticationKey};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
-use move_core_types::account_address::AccountAddress;
+use move_deps::move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},

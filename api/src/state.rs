@@ -17,7 +17,7 @@ use aptos_api_types::{
 use aptos_state_view::StateView;
 use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
 use aptos_vm::data_cache::AsMoveResolver;
-use move_core_types::{
+use move_deps::move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, ResourceKey, StructTag},

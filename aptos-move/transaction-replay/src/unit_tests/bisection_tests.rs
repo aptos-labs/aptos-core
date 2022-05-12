@@ -4,7 +4,7 @@
 use crate::{unit_tests::TestInterface, AptosDebugger};
 use anyhow::bail;
 use aptos_types::{account_address::AccountAddress, account_config::AccountResource};
-use move_core_types::{effects::ChangeSet, move_resource::MoveStructType};
+use move_deps::move_core_types::{effects::ChangeSet, move_resource::MoveStructType};
 use std::path::PathBuf;
 
 #[test]

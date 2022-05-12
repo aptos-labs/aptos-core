@@ -3,8 +3,7 @@
 
 use aptos_types::account_address::AccountAddress;
 use aptos_vm::natives::aptos_natives;
-use move_cli::package::cli;
-use move_unit_test::UnitTestingConfig;
+use move_deps::{move_cli::package::cli, move_unit_test::UnitTestingConfig};
 use std::{collections::BTreeMap, path::PathBuf};
 use tempfile::tempdir;
 
@@ -24,7 +23,7 @@ pub fn run_tests_for_pkg(
     let pkg_path = path_in_crate(path_to_pkg);
     cli::run_move_unit_tests(
         &pkg_path,
-        move_package::BuildConfig {
+        move_deps::move_package::BuildConfig {
             test_mode: true,
             install_dir: Some(tempdir().unwrap().path().to_path_buf()),
             additional_named_addresses: named_addr,

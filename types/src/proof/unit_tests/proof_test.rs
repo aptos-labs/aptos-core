@@ -32,7 +32,7 @@ use aptos_crypto::{
     },
     HashValue, PrivateKey, Uniform,
 };
-use move_core_types::language_storage::TypeTag;
+use move_deps::move_core_types::language_storage::TypeTag;
 
 type SparseMerkleProof = crate::proof::SparseMerkleProof<StateValue>;
 

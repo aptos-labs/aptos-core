@@ -7,7 +7,7 @@ use aptos_crypto::{
     x25519,
 };
 
-pub use move_core_types::account_address::AccountAddress;
+pub use move_deps::move_core_types::account_address::AccountAddress;
 
 pub fn from_public_key(public_key: &Ed25519PublicKey) -> AccountAddress {
     AuthenticationKey::ed25519(public_key).derived_address()

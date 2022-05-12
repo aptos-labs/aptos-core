@@ -11,7 +11,6 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.57"
-move-core-types = { git = "https://github.com/move-language/move", rev = "1b6b7513dcc1a5c866f178ca5c1e74beb2ce181e", version = "0.0.4", features = ["address32"] }
 rand = "0.8.3"
 
 aptos-config = { path = "../../config" }
@@ -26,6 +25,7 @@ aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 aptosdb = { path = "../../storage/aptosdb", features = ["fuzzing"] }
 executor = { path = "../executor" }
 executor-types = { path = "../executor-types" }
+move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
 storage-interface = { path = "../../storage/storage-interface" }
 storage-service = { path = "../../storage/storage-service" }
 vm-genesis = { path = "../../aptos-move/vm-genesis" }

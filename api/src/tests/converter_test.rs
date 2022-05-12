@@ -4,7 +4,7 @@
 use crate::{current_function_name, tests::new_test_context};
 use aptos_api_types::{new_vm_ascii_string, AsConverter, MoveConverter, MoveType};
 use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::MoveResolverExt};
-use move_core_types::{
+use move_deps::move_core_types::{
     account_address::AccountAddress,
     value::{MoveStruct, MoveValue as VmMoveValue},
 };

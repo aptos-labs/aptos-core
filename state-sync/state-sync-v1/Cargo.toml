@@ -52,7 +52,6 @@ vm-genesis = { path = "../../aptos-move/vm-genesis", optional = true }
 [dev-dependencies]
 bytes = "1.1.0"
 claim = "0.5.0"
-move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["address32"] }
 proptest = "1.0.0"
 
 aptos-crypto = { path = "../../crates/aptos-crypto" }
@@ -65,6 +64,7 @@ aptosdb = { path = "../../storage/aptosdb" }
 channel = { path = "../../crates/channel" }
 executor-test-helpers = { path = "../../execution/executor-test-helpers" }
 memsocket = { path = "../../network/memsocket" }
+move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
 network = { path = "../../network", features = ["fuzzing", "testing"] }
 network-builder = { path = "../../network/builder" }
 storage-service = { path = "../../storage/storage-service" }

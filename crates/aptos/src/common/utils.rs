@@ -14,7 +14,7 @@ use aptos_types::{
     transaction::{authenticator::AuthenticationKey, TransactionPayload},
 };
 use itertools::Itertools;
-use move_core_types::account_address::AccountAddress;
+use move_deps::move_core_types::account_address::AccountAddress;
 use reqwest::Url;
 use serde::Serialize;
 use shadow_rs::shadow;

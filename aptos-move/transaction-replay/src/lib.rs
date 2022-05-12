@@ -23,13 +23,17 @@ use aptos_vm::{
     move_vm_ext::{MoveVmExt, SessionId},
     AptosVM, VMExecutor,
 };
-use move_binary_format::{errors::VMResult, file_format::CompiledModule};
-use move_cli::sandbox::utils::on_disk_state_view::OnDiskStateView;
-use move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags};
-use move_core_types::{effects::ChangeSet as MoveChanges, language_storage::TypeTag};
-use move_vm_runtime::session::{SerializedReturnValues, Session};
-use move_vm_test_utils::DeltaStorage;
-use move_vm_types::gas_schedule::GasStatus;
+use move_deps::{
+    move_binary_format::{errors::VMResult, file_format::CompiledModule},
+    move_cli,
+    move_cli::sandbox::utils::on_disk_state_view::OnDiskStateView,
+    move_compiler,
+    move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags},
+    move_core_types::{effects::ChangeSet as MoveChanges, language_storage::TypeTag},
+    move_vm_runtime::session::{SerializedReturnValues, Session},
+    move_vm_test_utils::DeltaStorage,
+    move_vm_types::gas_schedule::GasStatus,
+};
 use std::{
     convert::TryFrom,
     path::{Path, PathBuf},

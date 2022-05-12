@@ -24,16 +24,18 @@ use aptos_vm::{
     data_cache::{IntoMoveResolver, StateViewCache},
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
-use move_binary_format::CompiledModule;
-use move_bytecode_utils::Modules;
-use move_core_types::{
-    account_address::AccountAddress,
-    identifier::Identifier,
-    language_storage::{ModuleId, TypeTag},
-    resolver::MoveResolver,
-    value::{serialize_values, MoveValue},
+use move_deps::{
+    move_binary_format::CompiledModule,
+    move_bytecode_utils::Modules,
+    move_core_types::{
+        account_address::AccountAddress,
+        identifier::Identifier,
+        language_storage::{ModuleId, TypeTag},
+        resolver::MoveResolver,
+        value::{serialize_values, MoveValue},
+    },
+    move_vm_types::gas_schedule::{GasStatus, INITIAL_COST_SCHEDULE},
 };
-use move_vm_types::gas_schedule::{GasStatus, INITIAL_COST_SCHEDULE};
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 

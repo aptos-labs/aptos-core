@@ -9,7 +9,7 @@ use crate::{
     state_store::{state_key::StateKey, state_value::StateValue},
 };
 use anyhow::{anyhow, Error, Result};
-use move_core_types::{language_storage::StructTag, move_resource::MoveResource};
+use move_deps::move_core_types::{language_storage::StructTag, move_resource::MoveResource};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     collections::{btree_map::BTreeMap, HashMap},

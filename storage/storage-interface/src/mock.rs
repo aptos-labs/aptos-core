@@ -13,7 +13,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
-use move_core_types::move_resource::MoveResource;
+use move_deps::move_core_types::move_resource::MoveResource;
 
 /// This is a mock of the DbReaderWriter in tests.
 pub struct MockDbReaderWriter;

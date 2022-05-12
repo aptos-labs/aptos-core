@@ -32,7 +32,7 @@ use channel::{aptos_channel, aptos_channel::Sender, message_queues::QueueStyle};
 use data_streaming_service::{
     data_notification::DataNotification, data_stream::DataStreamListener, streaming_client::Epoch,
 };
-use move_core_types::language_storage::TypeTag;
+use move_deps::move_core_types::language_storage::TypeTag;
 use std::collections::BTreeMap;
 use storage_interface::{StartupInfo, TreeState};
 use storage_service_types::CompleteDataRange;

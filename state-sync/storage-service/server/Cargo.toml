@@ -36,9 +36,9 @@ storage-service-types = { path = "../types" }
 anyhow = "1.0.57"
 claim = "0.5.0"
 mockall = "0.11.0"
-move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["address32"] }
 
 aptos-crypto = { path = "../../../crates/aptos-crypto" }
 aptos-time-service = { path = "../../../crates/aptos-time-service", features = ["async", "testing"] }
 aptos-types = { path = "../../../types" }
+move-deps = { path = "../../../aptos-move/move-deps", features = ["address32"] }
 storage-interface = { path = "../../../storage/storage-interface" }

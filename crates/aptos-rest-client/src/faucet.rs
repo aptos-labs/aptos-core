@@ -3,7 +3,7 @@
 
 use crate::{error::Error, Client, Result};
 use aptos_types::transaction::SignedTransaction;
-use move_core_types::account_address::AccountAddress;
+use move_deps::move_core_types::account_address::AccountAddress;
 use reqwest::Url;
 
 pub struct FaucetClient {

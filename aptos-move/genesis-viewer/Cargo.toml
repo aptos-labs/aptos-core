@@ -10,9 +10,6 @@ publish = false
 edition = "2018"
 
 [dependencies]
-move-binary-format = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["address32"] }
-move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["table-extension"] }
 structopt = "0.3.21"
 
 aptos-resource-viewer = { path = "../aptos-resource-viewer" }
@@ -20,4 +17,5 @@ aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 aptos-workspace-hack = { path = "../../crates/aptos-workspace-hack" }
 cached-framework-packages =  { path = "../framework/cached-packages" }
+move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "table-extension"] }
 vm-genesis = { path = "../vm-genesis" }

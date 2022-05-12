@@ -3,7 +3,7 @@
 
 use crate::on_chain_config::OnChainConfig;
 use anyhow::{format_err, Result};
-use move_core_types::gas_schedule::{CostTable, GasConstants};
+use move_deps::move_core_types::gas_schedule::{CostTable, GasConstants};
 use serde::{Deserialize, Serialize};
 
 /// Defines all the on chain configuration data needed by VM.

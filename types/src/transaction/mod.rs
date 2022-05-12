@@ -24,7 +24,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use move_core_types::transaction_argument::convert_txn_args;
+use move_deps::move_core_types::transaction_argument::convert_txn_args;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -49,7 +49,7 @@ pub use script::{
 };
 
 use crate::state_store::{state_key::StateKey, state_value::StateValue};
-use move_core_types::vm_status::AbortLocation;
+use move_deps::move_core_types::vm_status::AbortLocation;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
 pub use transaction_argument::{parse_transaction_argument, TransactionArgument, VecBytes};
 

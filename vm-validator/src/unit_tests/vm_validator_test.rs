@@ -13,7 +13,7 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
-use move_core_types::{
+use move_deps::move_core_types::{
     account_address::AccountAddress,
     gas_schedule::{GasAlgebra, GasConstants},
 };

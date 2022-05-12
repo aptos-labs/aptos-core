@@ -5,8 +5,10 @@ use crate::FuzzTargetImpl;
 use anyhow::{bail, Result};
 use aptos_proptest_helpers::ValueGenerator;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use move_core_types::value::{MoveStructLayout, MoveTypeLayout};
-use move_vm_types::values::{prop::layout_and_value_strategy, Value};
+use move_deps::{
+    move_core_types::value::{MoveStructLayout, MoveTypeLayout},
+    move_vm_types::values::{prop::layout_and_value_strategy, Value},
+};
 use std::io::Cursor;
 
 #[derive(Clone, Debug, Default)]

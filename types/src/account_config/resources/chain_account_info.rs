@@ -4,7 +4,7 @@
 use crate::account_config::constants::{
     APTOS_ACCOUNT_MODULE_IDENTIFIER, CORE_ACCOUNT_MODULE_IDENTIFIER, CORE_CODE_ADDRESS,
 };
-use move_core_types::{
+use move_deps::move_core_types::{
     account_address::AccountAddress,
     ident_str,
     identifier::{IdentStr, Identifier},

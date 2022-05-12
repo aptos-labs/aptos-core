@@ -23,13 +23,16 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use aptos_vm::move_vm_ext::MoveResolverExt;
-use move_binary_format::file_format::FunctionHandleIndex;
-use move_core_types::{
-    identifier::Identifier,
-    language_storage::{ModuleId, StructTag, TypeTag},
-    value::{MoveStructLayout, MoveTypeLayout},
+use move_deps::{
+    move_binary_format::file_format::FunctionHandleIndex,
+    move_core_types,
+    move_core_types::{
+        identifier::Identifier,
+        language_storage::{ModuleId, StructTag, TypeTag},
+        value::{MoveStructLayout, MoveTypeLayout},
+    },
+    move_resource_viewer::MoveValueAnnotator,
 };
-use move_resource_viewer::MoveValueAnnotator;
 use serde_json::Value;
 use std::{
     convert::{TryFrom, TryInto},
@@ -477,7 +480,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         layout: &MoveTypeLayout,
         val: Value,
     ) -> Result<move_core_types::value::MoveValue> {
-        use move_core_types::value::MoveValue::*;
+        use move_deps::move_core_types::value::MoveValue::*;
 
         Ok(match layout {
             MoveTypeLayout::Bool => Bool(serde_json::from_value::<bool>(val)?),
@@ -634,7 +637,7 @@ impl<R: MoveResolverExt> AsConverter<R> for R {
 }
 
 pub fn new_vm_ascii_string(string: &str) -> move_core_types::value::MoveValue {
-    use move_core_types::value::{MoveStruct, MoveValue};
+    use move_deps::move_core_types::value::{MoveStruct, MoveValue};
 
     let byte_vector = MoveValue::Vector(
         string

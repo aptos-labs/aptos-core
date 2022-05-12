@@ -10,8 +10,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet},
 };
 use aptos_vm::move_vm_ext::MoveResolverExt;
-use move_binary_format::CompiledModule;
-use move_vm_test_utils::InMemoryStorage;
+use move_deps::{move_binary_format::CompiledModule, move_vm_test_utils::InMemoryStorage};
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryFrom,

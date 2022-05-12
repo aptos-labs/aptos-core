@@ -283,7 +283,7 @@ mod tests {
     };
     use claim::{assert_err, assert_matches, assert_ok};
     use futures::{executor::block_on, FutureExt, StreamExt};
-    use move_core_types::language_storage::TypeTag;
+    use move_deps::move_core_types::language_storage::TypeTag;
     use std::{collections::BTreeMap, time::Duration};
     use tokio::runtime::{Builder, Runtime};
 

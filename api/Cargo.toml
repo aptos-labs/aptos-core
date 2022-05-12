@@ -17,8 +17,6 @@ fail = "0.5.0"
 futures = "0.3.12"
 hex = "0.4.3"
 hyper = "0.14.18"
-move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["address32"] }
-move-resource-viewer = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
 once_cell = "1.10.0"
 percent-encoding = "2.1.0"
 serde = { version = "1.0.137", features = ["derive"], default-features = false }
@@ -36,11 +34,11 @@ aptos-state-view = { path = "../storage/state-view" }
 aptos-types = { path = "../types" }
 aptos-vm = { path = "../aptos-move/aptos-vm" }
 aptos-workspace-hack = { path = "../crates/aptos-workspace-hack" }
+move-deps = { path = "../aptos-move/move-deps", features = ["address32"] }
 storage-interface = { path = "../storage/storage-interface" }
 
 [dev-dependencies]
 goldenfile = "1.1.0"
-move-package = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
 rand = "0.8.3"
 regex = "1.5.5"
 reqwest = { version = "0.11.10", features = ["blocking", "json"], default_features = false }
@@ -58,6 +56,7 @@ cached-framework-packages = { path = "../aptos-move/framework/cached-packages" }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
 mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
+move-deps = { path = "../aptos-move/move-deps" }
 vm-validator = { path = "../vm-validator" }
 
 [features]

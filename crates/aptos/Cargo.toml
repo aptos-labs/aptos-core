@@ -18,15 +18,6 @@ bcs = "0.1.3"
 clap = "3.1.8"
 hex = "0.4.3"
 itertools = "0.10.3"
-move-binary-format = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
-move-cli = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["address32"] }
-move-package = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
-move-stdlib = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["testing"] }
-move-table-extension = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
-move-unit-test = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
-move-vm-runtime = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3", features = ["testing"] }
-move-vm-types = { git = "https://github.com/move-language/move", rev = "f2e7585b1ed5bd2810163d6bdebafe5a388881d3" }
 rand = "0.8.3"
 reqwest = { version = "0.11.10", features = ["blocking", "json"] }
 serde = "1.0.137"
@@ -58,6 +49,7 @@ aptosdb = { path = "../../storage/aptosdb" }
 cached-framework-packages =  { path = "../../aptos-move/framework/cached-packages" }
 executor = { path = "../../execution/executor" }
 framework = { path = '../../aptos-move/framework' }
+move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "testing"] }
 short-hex-str = { path = "../short-hex-str" }
 storage-interface = { path = "../../storage/storage-interface" }
 vm-genesis = { path = "../../aptos-move/vm-genesis" }

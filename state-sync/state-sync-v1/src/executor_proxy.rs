@@ -240,7 +240,7 @@ mod tests {
     };
     use executor_types::BlockExecutorTrait;
     use futures::{future::FutureExt, stream::StreamExt};
-    use move_core_types::language_storage::TypeTag;
+    use move_deps::move_core_types::language_storage::TypeTag;
     use serde::{Deserialize, Serialize};
     use storage_interface::DbReaderWriter;
     use vm_genesis::TestValidator;

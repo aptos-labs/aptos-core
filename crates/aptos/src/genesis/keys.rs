@@ -18,7 +18,7 @@ use aptos_crypto::{ed25519::Ed25519PrivateKey, x25519, PrivateKey};
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use async_trait::async_trait;
 use clap::Parser;
-use move_core_types::account_address::AccountAddress;
+use move_deps::move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 

@@ -3,6 +3,7 @@
 
 use aptos_types::transaction::{ModuleBundle, TransactionPayload};
 use forge::{AptosContext, AptosTest, Result, Test};
+use move_deps::move_package;
 
 pub struct ModulePublish;
 

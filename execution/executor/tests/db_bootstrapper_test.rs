@@ -40,7 +40,7 @@ use executor_test_helpers::{
     bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
 };
 use executor_types::BlockExecutorTrait;
-use move_core_types::{
+use move_deps::move_core_types::{
     language_storage::TypeTag,
     move_resource::{MoveResource, MoveStructType},
 };

@@ -11,7 +11,7 @@ use crate::{
 use anyhow::{ensure, Context, Error, Result};
 use aptos_crypto::hash::CryptoHash;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
+use move_deps::move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
 
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;

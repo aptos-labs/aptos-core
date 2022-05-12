@@ -3,7 +3,7 @@
 
 use crate::on_chain_config::OnChainConfig;
 use anyhow::Result;
-use move_core_types::identifier::Identifier;
+use move_deps::move_core_types::identifier::Identifier;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 

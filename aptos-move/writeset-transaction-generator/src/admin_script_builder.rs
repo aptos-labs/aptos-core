@@ -8,7 +8,7 @@ use aptos_types::{
     transaction::{Script, WriteSetPayload},
 };
 use handlebars::Handlebars;
-use move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags};
+use move_deps::move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags};
 use serde::Serialize;
 use std::{collections::HashMap, io::Write, path::PathBuf};
 use tempfile::NamedTempFile;

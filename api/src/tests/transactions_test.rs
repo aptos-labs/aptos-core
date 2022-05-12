@@ -24,7 +24,7 @@ use aptos_types::{
 
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_types::state_store::state_key::StateKey;
-use move_core_types::{
+use move_deps::move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
 };

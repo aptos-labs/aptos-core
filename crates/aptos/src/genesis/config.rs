@@ -12,7 +12,7 @@ use aptos_types::{
     network_address::{DnsName, NetworkAddress, Protocol},
     transaction::authenticator::AuthenticationKey,
 };
-use move_core_types::account_address::AccountAddress;
+use move_deps::move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::{
     convert::TryFrom,

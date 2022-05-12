@@ -6,8 +6,7 @@ use crate::{
     tests::{new_test_context, TestContext},
 };
 use aptos_sdk::types::LocalAccount;
-use move_core_types::account_address::AccountAddress;
-use move_package::BuildConfig;
+use move_deps::{move_core_types::account_address::AccountAddress, move_package::BuildConfig};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::{convert::TryInto, path::PathBuf};

@@ -26,5 +26,5 @@ pub mod transaction_builder;
 pub mod types;
 
 pub mod move_types {
-    pub use move_core_types::*;
+    pub use move_deps::move_core_types::*;
 }

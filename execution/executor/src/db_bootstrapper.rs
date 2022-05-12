@@ -21,7 +21,7 @@ use aptos_types::{
 };
 use aptos_vm::VMExecutor;
 use executor_types::ExecutedChunk;
-use move_core_types::move_resource::MoveResource;
+use move_deps::move_core_types::move_resource::MoveResource;
 use std::{collections::btree_map::BTreeMap, sync::Arc};
 use storage_interface::{
     verified_state_view::VerifiedStateView, DbReaderWriter, DbWriter, TreeState,

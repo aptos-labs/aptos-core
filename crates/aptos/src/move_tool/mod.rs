@@ -18,17 +18,20 @@ use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
-use move_cli::package::cli::UnitTestResult;
-use move_core_types::{
-    account_address::AccountAddress,
-    identifier::Identifier,
-    language_storage::{ModuleId, TypeTag},
+use move_deps::{
+    move_cli,
+    move_cli::package::cli::UnitTestResult,
+    move_core_types::{
+        account_address::AccountAddress,
+        identifier::Identifier,
+        language_storage::{ModuleId, TypeTag},
+    },
+    move_package::{
+        compilation::compiled_package::CompiledPackage,
+        source_package::layout::SourcePackageLayout, BuildConfig,
+    },
+    move_unit_test::UnitTestingConfig,
 };
-use move_package::{
-    compilation::compiled_package::CompiledPackage, source_package::layout::SourcePackageLayout,
-    BuildConfig,
-};
-use move_unit_test::UnitTestingConfig;
 use std::{
     collections::BTreeMap,
     convert::TryFrom,
