@@ -3,16 +3,15 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
-class KYCCompleteJobError < StandardError
-end
+class KYCCompleteJobError < StandardError; end
 
 class KYCCompleteJob < ApplicationJob
   # Ex args: { user_id: 32, inquiry_id=inq_syMMVRdEz7fswAa2hi }
   def perform(args)
     user = User.find(args[:user_id])
     sentry_scope.set_user(id: user.id)
+
     inquiry_id = args[:inquiry_id]
-    sentry_scope.set_context(:inquiry_id, inquiry_id)
 
     client = PersonaHelper::PersonaClient.new
 
@@ -29,5 +28,6 @@ class KYCCompleteJob < ApplicationJob
     raise KYCCompleteJobError, "Inquiry was not complete! Status: '#{status}'" unless status == 'completed'
 
     user.update(completed_persona_inquiry_id: inquiry_id, kyc_status: 'completed')
+    user.maybe_send_ait1_registration_complete_email
   end
 end

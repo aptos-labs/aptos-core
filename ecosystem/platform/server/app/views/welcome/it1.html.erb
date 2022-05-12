@@ -23,8 +23,14 @@
           <p class="mb-8 font-light">
           Register your node, and automatically verify that it is set up correctly.
           </p>
-          <%= render(ButtonComponent.new(href: new_it1_profile_path, class: 'w-full mt-auto')) do %>
-            Register
+          <% if current_user&.it1_profile&.validator_verified? %>
+            <%= render(ButtonComponent.new(href: edit_it1_profile_path(current_user.it1_profile), class: 'w-full mt-auto')) do %>
+              Edit Registration
+            <% end %>
+          <% else %>
+            <%= render(ButtonComponent.new(href: new_it1_profile_path, class: 'w-full mt-auto')) do %>
+              Register
+            <% end %>
           <% end %>
         </div>
       </div>

@@ -11,7 +11,9 @@ class OnboardingController < ApplicationController
 
   layout 'it1'
 
-  def email; end
+  def email
+    redirect_to it1_path if current_user.confirmed?
+  end
 
   def kyc_redirect
     if current_user.kyc_exempt?
@@ -41,7 +43,7 @@ class OnboardingController < ApplicationController
     reference_id = kyc_params.require(:'reference-id')
     if current_user.external_id != reference_id
       redirect_to onboarding_kyc_redirect_path,
-                  status: :unprocessable_entity and return
+                  status: :unprocessable_entity, error: 'Persona was started with a different user' and return
     end
 
     inquiry_id = kyc_params.require(:'inquiry-id')
@@ -56,12 +58,14 @@ class OnboardingController < ApplicationController
   end
 
   def email_update
-    return redirect_to overview_index_path if current_user.confirmed?
+    redirect_to it1_path and return if current_user.confirmed?
+    render :email, status: :unprocessable_entity and return unless verify_recaptcha(model: current_user)
 
     email_params = params.require(:user).permit(:email, :username)
-    if verify_recaptcha(model: current_user) && current_user.update(email_params)
+    if current_user.update(email_params.merge(confirmation_token: Devise.friendly_token))
       log current_user, 'email updated'
-      current_user.send_confirmation_instructions
+      url = confirmation_url(current_user, confirmation_token: current_user.confirmation_token)
+      SendConfirmEmailJob.perform_now({ user_id: current_user.id, template_vars: { CONFIRM_LINK: url } })
       redirect_to onboarding_email_path, notice: "Verification email sent to #{email_params[:email]}"
     else
       render :email, status: :unprocessable_entity

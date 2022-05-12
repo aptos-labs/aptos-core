@@ -3,16 +3,14 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
-class LocationFetchError < StandardError
-end
+class LocationFetchError < StandardError; end
 
 class LocationJob < ApplicationJob
   # Ex args: { it1_profile_id: 32 }
   def perform(args)
     it1_profile = It1Profile.find(args[:it1_profile_id])
     sentry_scope.set_user(id: it1_profile.user_id)
-    sentry_scope.set_context(:it1_profile_id, it1_profile.id)
-    sentry_scope.set_context(:validator_address, it1_profile.validator_address)
+    sentry_scope.set_context(:job_info, { validator_address: it1_profile.validator_address })
 
     # pass zeroes as a hack here: we only need the validator address
     node_verifier = NodeHelper::NodeVerifier.new(it1_profile.validator_address, 0, 0)

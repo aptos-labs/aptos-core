@@ -12,6 +12,7 @@ class ApplicationJob < ActiveJob::Base
     Sentry.configure_scope do |scope|
       scope.set_context(:job_args, job.arguments.first)
       scope.set_tags(job_name: job.class.name)
+      scope.set_user(id: job.arguments.first[:user_id]) if job.arguments.first.try(:include?, :user_id)
       job.sentry_scope = scope
       block.call
     end
