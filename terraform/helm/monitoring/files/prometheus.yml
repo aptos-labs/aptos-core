@@ -86,7 +86,7 @@ scrape_configs:
   - target_label: owner
     replacement: {{ .Values.validator.name }}
 
-  {{ if not .Values.monitoring.fullKubernetesScrape }}
+ {{ if not .Values.monitoring.fullKubernetesScrape }}
   metric_relabel_configs:
   - source_labels: [namespace, pod]
     action: keep
@@ -107,12 +107,6 @@ scrape_configs:
   - role: pod
 
   relabel_configs:
-  - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_part_of]
-    action: keep
-    regex: "{{ .Chart.Name }}"
-  - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_instance]
-    action: keep
-    regex: "{{ .Release.Name }}"
   - source_labels: [__meta_kubernetes_pod_container_port_number]
     action: keep
     regex: "9101"
@@ -127,26 +121,6 @@ scrape_configs:
     target_label: kubernetes_pod_name
   - target_label: owner
     replacement: {{ .Values.validator.name }}
-
-- job_name: "pushgateway"
-  static_configs:
-  - targets: ['localhost:9091']
-    labels:
-      owner: {{ .Values.validator.name }}
-
-{{ if .Values.vault.prometheusTarget }}
-- job_name: "vault"
-  static_configs:
-  - targets: ['{{ .Values.vault.prometheusTarget }}']
-    labels:
-      owner: {{ .Values.validator.name }}
-  scheme: "https"
-  metrics_path: "/v1/sys/metrics"
-  params:
-    format: ["prometheus"]
-  tls_config:
-    insecure_skip_verify: true
-{{ end }}
 
 {{ if .Values.monitoring.prometheus.remote_write.enabled }}
 {{ with .Values.monitoring.prometheus.remote_write }}

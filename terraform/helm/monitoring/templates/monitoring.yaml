@@ -46,7 +46,7 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "aptos-monitoring.fullname" . }}-monitoring
+  name: {{ include "aptos-monitoring.fullname" . }}
   labels:
     {{- include "aptos-monitoring.labels" . | nindent 4 }}
 data:
@@ -59,31 +59,14 @@ data:
 {{ (tpl (.Files.Get "files/haproxy-mon.cfg") .) | indent 4 }}
 
 ---
-
 apiVersion: v1
-kind: Service
+kind: ConfigMap
 metadata:
-  name: {{ include "aptos-monitoring.fullname" . }}-monitoring
+  name: {{ include "aptos-monitoring.fullname" . }}-dashboards
   labels:
     {{- include "aptos-monitoring.labels" . | nindent 4 }}
-  annotations:
-    service.beta.kubernetes.io/aws-load-balancer-type: nlb
-    {{- if .Values.service.domain }}
-    external-dns.alpha.kubernetes.io/hostname: mon.{{ .Values.service.domain }}
-    {{- end }}
-spec:
-  selector:
-    {{- include "aptos-monitoring.selectorLabels" . | nindent 4 }}
-    app.kubernetes.io/name: monitoring
-  ports:
-  - name: grafana-http
-    port: 80
-    targetPort: 3000
-  type: LoadBalancer
-  {{- with .Values.service.monitoring.loadBalancerSourceRanges }}
-  loadBalancerSourceRanges:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+binaryData:
+{{ (.Files.Glob "files/dashboards/*.json.gz").AsSecrets | indent 2 }}
 
 ---
 
@@ -140,15 +123,42 @@ subjects:
 
 ---
 
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "aptos-monitoring.fullname" . }}
+  labels:
+    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    {{- if .Values.service.domain }}
+    external-dns.alpha.kubernetes.io/hostname: mon.{{ .Values.service.domain }}
+    {{- end }}
+spec:
+  selector:
+    {{- include "aptos-monitoring.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: monitoring
+  ports:
+  - name: grafana-http
+    port: 80
+    targetPort: 3000
+  type: LoadBalancer
+  {{- with .Values.service.monitoring.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+---
+
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "aptos-monitoring.fullname" . }}-monitoring
+  name: {{ include "aptos-monitoring.fullname" . }}
   labels:
     {{- include "aptos-monitoring.labels" . | nindent 4 }}
     app.kubernetes.io/name: monitoring
 spec:
-  serviceName: {{ include "aptos-monitoring.fullname" . }}-monitoring
+  serviceName: {{ include "aptos-monitoring.fullname" . }}
   replicas: 1
   podManagementPolicy: Parallel
   selector:
@@ -167,7 +177,6 @@ spec:
         checksum/rules.yml: {{ (tpl (.Files.Glob "files/rules/*.yml").AsConfig .) | sha256sum }}
         checksum/dashboards.json: {{ (.Files.Glob "files/dashboards/*.json.gz").AsSecrets | sha256sum }}
     spec:
-      priorityClassName: {{ include "aptos-monitoring.fullname" . }}-medium
       {{- with .Values.monitoring }}
       containers:
       - name: prometheus
@@ -306,7 +315,7 @@ spec:
         emptyDir: {}
       - name: monitoring-config
         configMap:
-          name: {{ include "aptos-monitoring.fullname" . }}-monitoring
+          name: {{ include "aptos-monitoring.fullname" . }}
       - name: prometheus-data
         persistentVolumeClaim:
           claimName: {{ include "aptos-monitoring.fullname" . }}-prometheus
