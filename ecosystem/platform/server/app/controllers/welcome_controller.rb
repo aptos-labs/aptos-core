@@ -6,9 +6,7 @@
 class WelcomeController < ApplicationController
   layout 'it1'
 
-  def index
-    redirect_to it1_path if user_signed_in?
-  end
+  def index; end
 
   def it1
     redirect_to root_path unless user_signed_in?

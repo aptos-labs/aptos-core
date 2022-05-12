@@ -20,8 +20,14 @@ Rails.application.routes.draw do
     resources :users, only: %i[show update]
   end
 
+  # KYC routes
+  get 'onboarding/kyc_redirect', to: 'onboarding#kyc_redirect'
+  get 'onboarding/kyc_callback', to: 'onboarding#kyc_callback'
+
   get 'onboarding/email', to: 'onboarding#email'
   post 'onboarding/email', to: 'onboarding#email_update'
+
+  get 'health', to: 'health#health'
 
   resources :overview, only: %i[index]
   resources :it1_profiles, except: %i[index destroy]
