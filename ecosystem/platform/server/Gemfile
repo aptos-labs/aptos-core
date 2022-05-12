@@ -84,6 +84,7 @@ gem 'recaptcha', '~> 5.10'
 # gem "image_processing", "~> 1.2"
 
 gem 'tailwindcss-rails', '~> 2.0'
+gem 'view_component', '~> 2.54'
 
 # Monitoring
 gem 'lograge', '~> 0.12.0'

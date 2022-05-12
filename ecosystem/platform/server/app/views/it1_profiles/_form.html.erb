@@ -87,7 +87,9 @@
     </div>
 
     <div class="bg-neutral-800 rounded-md p-4 md:px-8 md:py-16 2xl:px-16 2xl:py-24 self-start">
-      <%= f.submit "Validate node", class: "w-full bg-teal-400 text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mb-8" %>
+      <%= render(ButtonComponent.new(type: :submit, class: 'w-full mb-8')) do %>
+        Validate node
+      <% end %>
       <div class="mb-8">
       <%= recaptcha_tags theme: :dark %>
       </div>

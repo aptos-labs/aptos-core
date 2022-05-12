@@ -1,4 +1,4 @@
-<div>
+<div class="flex-[2]">
   <h2 class="text-4xl text-teal-400 font-mono mb-16 mt-8">Welcome, <%= @oauth_username %>!</h2>
 
   <%= render "layouts/flash" %>
@@ -29,7 +29,9 @@
     </div>
 
     <div class="mb-12">
-      <%= f.submit "Verify email", class: "w-72 bg-teal-400 hover:bg-teal-300 cursor-pointer text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded" %>
+      <%= render(ButtonComponent.new(type: :submit, class: 'w-72')) do %>
+        Verify email
+      <% end %>
     </div>
 
     <div class="text-sm">

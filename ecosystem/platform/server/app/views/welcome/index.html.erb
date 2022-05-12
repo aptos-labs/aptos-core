@@ -33,6 +33,8 @@
         </div>
       </div>
     </dialog>
-    <%= link_to "Sign up for Testnet", "javascript:document.getElementById('login-dialog').showModal()", class: "w-full bg-teal-400 text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mt-auto" %>
+    <%= render(ButtonComponent.new(size: :large, onclick: 'document.getElementById("login-dialog").showModal()', class: 'w-full mt-auto')) do %>
+      Sign up for Testnet
+    <% end %>
   </div>
 </div>

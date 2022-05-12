@@ -23,7 +23,9 @@
           <p class="mb-8 font-light">
           Register your node, and automatically verify that it is set up correctly.
           </p>
-          <%= link_to "Register", new_it1_profile_path, class: "w-full bg-teal-400 text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mt-auto" %>
+          <%= render(ButtonComponent.new(href: new_it1_profile_path, class: 'w-full mt-auto')) do %>
+            Register
+          <% end %>
         </div>
       </div>
       <div class="bg-neutral-800 rounded-md flex flex-col flex-1">
@@ -37,7 +39,9 @@
           <% if current_user&.kyc_complete? %>
             <div class="w-full bg-teal-400 text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mt-auto cursor-not-allowed select-none">Verification Complete</div>
           <% elsif current_user&.it1_profile&.validator_verified? %>
-            <%= link_to "Verify", onboarding_kyc_redirect_path, class: "w-full bg-teal-400 text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mt-auto" %>
+            <%= render(ButtonComponent.new(href: onboarding_kyc_redirect_path, class: 'w-full mt-auto')) do %>
+              Verify
+            <% end %>
           <% end %>
         </div>
       </div>
