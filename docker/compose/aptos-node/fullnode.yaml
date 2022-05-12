@@ -21,6 +21,9 @@ full_node_networks:
   discovery_method: "onchain"
   listen_address: "/ip4/0.0.0.0/tcp/6182"
   max_inbound_connections: 100
+  identity:
+    type: "from_file"
+    path: "/opt/aptos/genesis/validator-full-node-identity.yaml"
 
 api:
   enabled: true

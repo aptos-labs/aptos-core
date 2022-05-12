@@ -26,13 +26,14 @@ full_node_networks:
 - network_id: "public"
   discovery_method: "onchain"
   listen_address: "/ip4/0.0.0.0/tcp/6182"
+  identity:
+    type: "from_file"
+    path: "/opt/aptos/genesis/validator-full-node-identity.yaml"
   {{- if .Values.haproxy.config.send_proxy_protocol }}
   enable_proxy_protocol: true
   {{- end }}
   max_inbound_connections: 100
   {{- if .Values.fullnode.identity }}
-  identity:
-    {{- .Values.fullnode.identity | toYaml | nindent 6 }}
   {{- end }}
   seeds:
     {{- .Values.fullnode.config.seeds | default dict | toYaml | nindent 6 }}

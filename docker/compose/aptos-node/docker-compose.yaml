@@ -23,8 +23,8 @@ services:
         source: ./waypoint.txt
         target: /opt/aptos/genesis/waypoint.txt
       - type: bind
-        source: ./private-keys.yml
-        target: /opt/aptos/genesis/private-keys.yml
+        source: ./validator-identity.yaml
+        target: /opt/aptos/genesis/validator-identity.yaml
     command: ["/opt/aptos/bin/aptos-node", "-f", "/opt/aptos/etc/validator.yaml"]
     ports:
       - "6180:6180"
@@ -53,6 +53,9 @@ services:
       - type: bind
         source: ./waypoint.txt
         target: /opt/aptos/genesis/waypoint.txt
+      - type: bind
+        source: ./validator-full-node-identity.yaml
+        target: /opt/aptos/genesis/validator-full-node-identity.yaml
     command: ["/opt/aptos/bin/aptos-node", "-f", "/opt/aptos/etc/fullnode.yaml"]
     ports:
       - "6182:6182"
