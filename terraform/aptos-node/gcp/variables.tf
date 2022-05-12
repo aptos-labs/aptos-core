@@ -104,3 +104,25 @@ variable "validator_instance_num" {
   description = "Number of instances used for validator and fullnodes"
   default     = 2
 }
+
+variable "enable_logger" {
+  description = "Enable logger pod"
+  default     = false
+}
+
+variable "logger_helm_values" {
+  description = "Map of values to pass to logger Helm"
+  type        = any
+  default     = {}
+}
+
+variable "enable_monitoring" {
+  description = "Enable logger pod"
+  default     = false
+}
+
+variable "monitoring_helm_values" {
+  description = "Map of values to pass to monitoring Helm"
+  type        = any
+  default     = {}
+}
