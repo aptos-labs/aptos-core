@@ -23,11 +23,11 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ConfigKey<T: PrivateKey + Serialize> {
     #[serde(bound(deserialize = "T: Deserialize<'de>"))]
-    pub(crate) key: T,
+    key: T,
 }
 
 impl<T: DeserializeOwned + PrivateKey + Serialize> ConfigKey<T> {
-    pub(crate) fn new(key: T) -> Self {
+    pub fn new(key: T) -> Self {
         Self { key }
     }
 

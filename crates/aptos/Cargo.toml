@@ -41,7 +41,7 @@ toml = "0.5.9"
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
 
 aptos-config = { path = "../../config" }
-aptos-crypto = { path = "../aptos-crypto" }
+aptos-crypto = { path = "../aptos-crypto", features = [] }
 aptos-github-client = { path = "../../secure/storage/github" }
 aptos-logger = { path = "../aptos-logger" }
 aptos-management = { path = "../../config/management" }

@@ -62,11 +62,15 @@ pub fn storage(config: &SafetyRulesConfig) -> PersistentSafetyStorage {
                 backend.try_into().expect("Unable to initialize storage");
             PersistentSafetyStorage::initialize(
                 internal_storage,
-                identity_blob.account_address,
+                identity_blob
+                    .account_address
+                    .expect("AccountAddress needed for safety rules"),
                 identity_blob
                     .consensus_key
                     .expect("Consensus key needed for safety rules"),
-                identity_blob.account_key,
+                identity_blob
+                    .account_key
+                    .expect("Account key needed for safety rules"),
                 waypoint,
                 config.enable_cached_safety_data,
             )

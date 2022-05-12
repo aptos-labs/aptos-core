@@ -160,12 +160,19 @@ impl WaypointConfig {
     }
 }
 
+/// A single struct for reading / writing to a file for identity across config
 #[derive(Deserialize, Serialize)]
 pub struct IdentityBlob {
-    pub account_address: AccountAddress,
-    pub account_key: Ed25519PrivateKey,
+    /// Optional account address.  Used for validators and validator full nodes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account_address: Option<AccountAddress>,
+    /// Optional account key.  Only used for validators
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account_key: Option<Ed25519PrivateKey>,
     /// Optional consensus key.  Only used for validators
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub consensus_key: Option<Ed25519PrivateKey>,
+    /// Network private key.  Peer id is derived from this if account address is not present
     pub network_key: x25519::PrivateKey,
 }
 
