@@ -3,6 +3,7 @@ version: 2.1
 orbs:
   aws-cli: circleci/aws-cli@2.1.0
   aws-ecr: circleci/aws-ecr@7.3.0
+  gcp-gcr: circleci/gcp-gcr@0.15.0
   kubernetes: circleci/kubernetes@1.3.0
   slack: circleci/slack@4.9.3
 
@@ -103,6 +104,8 @@ jobs:
       - checkout
       - aws-setup
       - aws-ecr-setup
+      - gcp-gcr/gcr-auth:
+          registry-url: us-west1-docker.pkg.dev
       - run: echo $GITHUB_CONTAINER_REGISTRY_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
       - run:
           name: Build or skip
@@ -284,7 +287,9 @@ workflows:
       - ecosystem-lint
       - unit-test
       - build-push-community-platform:
-          context: aws-dev
+          context:
+          - aws-dev
+          - gcp-global
       - docker-build-push:
           context: aws-dev
       - ecosystem-test:

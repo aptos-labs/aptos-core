@@ -5,6 +5,7 @@
 
 variable "GIT_SHA1" {}
 variable "AWS_ECR_ACCOUNT_URL" {}
+variable "GCP_DOCKER_ARTIFACT_REPO" {}
 
 variable "gh_image_cache" {
   default = "ghcr.io/aptos-labs/aptos-core/community-platform"
@@ -21,5 +22,8 @@ target "community-platform" {
   context    = "."
   cache-from = ["type=registry,ref=${gh_image_cache}"]
   cache-to   = ["type=registry,ref=${gh_image_cache},mode=max"]
-  tags       = ["${AWS_ECR_ACCOUNT_URL}/aptos/community-platform:${GIT_SHA1}"]
+  tags = [
+    "${AWS_ECR_ACCOUNT_URL}/aptos/community-platform:${GIT_SHA1}",
+    "${GCP_DOCKER_ARTIFACT_REPO}/community-platform:${GIT_SHA1}",
+  ]
 }
