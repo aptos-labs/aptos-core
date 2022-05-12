@@ -20,7 +20,7 @@ const config = {
 
   presets: [
     [
-      "classic",
+      "@docusaurus/preset-classic",
       /** @type {import("@docusaurus/preset-classic").Options} */
       ({
         docs: {
@@ -125,6 +125,13 @@ const config = {
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme,
         additionalLanguages: ["rust"],
+      },
+      algolia: {
+        appId: 'HM7UY0NMLG',
+        apiKey: 'ab185b9077070c3e02dce2e381a3f81b',
+        indexName: 'aptos',
+        contextualSearch: true,
+        debug: false,
       },
     }),
   plugins: [
