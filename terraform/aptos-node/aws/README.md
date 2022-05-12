@@ -105,7 +105,7 @@ This will download all the terraform dependencies for you, in the `.terraform` f
     $ aptos genesis generate-keys --output-dir ~/$WORKSPACE
     ```
 
-    This will create a `private-keys.yaml` file for you. Backup your key files somewhere safe, this is important for you to establish ownership of your node, and it will be used to claim your rewards later if eligible. Very important!!
+    This will create three files: `private-keys.yaml`, `validator-identity.yaml`, `validator-full-node-identity.yaml` for you. Backup your key files somewhere safe, this is important for you to establish ownership of your node, and it will be used to claim your rewards later if eligible. Very important!!
 
 11. Configure validator information.
 
@@ -164,16 +164,22 @@ This will download all the terraform dependencies for you, in the `.terraform` f
 
 15. To re-cap, in your working directory, you should have a list of files:
     - `private-keys.yaml` Private keys for owner account, consensus, networking
+    - `validator-identity.yaml` Private keys for setting validator identity
+    - `validator-full-node-identity.yaml` Private keys for setting validator full node identity
     - `<username>.yaml` Node info for both validator / fullnode
     - `layout.yaml` layout file to define root key, validator user, and chain ID
     - `framework` folder which contains all the move bytecode for AptosFramework.
     - `waypoint.txt` waypoint for genesis transaction
     - `genesis.blob` genesis binary contains all the info about framework, validatorSet and more.
 
-16. Insert `genesis.blob`, `waypoint.txt` and `private-keys.yaml` as secret into k8s cluster.
+16. Insert `genesis.blob`, `waypoint.txt` and the identity files as secret into k8s cluster.
 
     ```
-    $ kubectl create secret generic ${WORKSPACE}-aptos-node-genesis-e1 --from-file=genesis.blob=genesis.blob --from-file=waypoint.txt=waypoint.txt --from-file=private-keys.yaml=private-keys.yaml
+    $ kubectl create secret generic ${WORKSPACE}-aptos-node-genesis-e1 \
+        --from-file=genesis.blob=genesis.blob \
+        --from-file=waypoint.txt=waypoint.txt \
+        --from-file=validator-identity.yaml=validator-identity.yaml \
+        --from-file=validator-full-node-identity.yaml=validator-full-node-identity.yaml
     ```
 
     If you changed the era number, make sure it matches when creating the secret.

@@ -19,20 +19,32 @@
     $ aptos genesis generate-keys --output-dir ~/$WORKSPACE
     ```
 
-    This will create a `private-keys.yaml` file for you, Backup your key files somewhere safe, this is important for you to establish ownership of your node, and it will be used to claim your rewards later if eligible. Very important!!
+    This will create three files: `private-keys.yaml`, `validator-identity.yaml`, `validator-full-node-identity.yaml` for you. Backup your key files somewhere safe, this is important for you to establish ownership of your node, and it will be used to claim your rewards later if eligible. Very important!!
 
 5. Configure validator information, you need to setup a static IP / DNS address which can be used by the node, and make sure the network / firewalls are properly configured to accept external connections.
 
     ```
-    $ aptos genesis set-validator-configuration --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE --username <pick a username for your node> --validator-host <Validator Node IP / DNS address>:<Port> --full-node-host <Full Node IP / DNS address>:<Port>
+    $ aptos genesis set-validator-configuration \
+        --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE \
+        --username <pick a username for your node> \
+        --validator-host <Validator Node IP / DNS address>:<Port> \
+        --full-node-host <Full Node IP / DNS address>:<Port>
 
     # for example, with IP:
 
-    $ aptos genesis set-validator-configuration --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE --username aptosbot --validator-host 35.232.235.205:6180 --full-node-host 34.135.169.144:6182
+    $ aptos genesis set-validator-configuration \
+        --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE \
+        --username aptosbot \
+        --validator-host 35.232.235.205:6180 \
+        --full-node-host 34.135.169.144:6182
 
     # for example, with DNS:
 
-    $ aptos genesis set-validator-configuration --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE --username aptosbot --validator-host bot.aptosdev.com:6180 --full-node-host fn.bot.aptosdev.com:6182
+    $ aptos genesis set-validator-configuration \
+        --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE \
+        --username aptosbot \
+        --validator-host bot.aptosdev.com:6180 \
+        --full-node-host fn.bot.aptosdev.com:6182
     ```
 
     This will create a YAML file in your working directory with your username, e.g. `aptosbot.yml`, it should looks like:
@@ -55,10 +67,10 @@
 6. Create layout YAML file, which defines the node in the validatorSet, for test mode, we can create a genesis blob containing only one node.
 
     ```
-    $ vi layout.yml
+    $ vi layout.yaml
     ```
 
-    Add root key, node username, and chain_id in the `layout.yml` file, for example:
+    Add root key, node username, and chain_id in the `layout.yaml` file, for example:
 
     ```
     ---
@@ -90,6 +102,8 @@
     - `fullnode.yaml` fullnode config file
     - `docker-compose.yaml` docker compose file to run validator and fullnode
     - `private-keys.yaml` Private keys for owner account, consensus, networking
+    - `validator-identity.yaml` Private keys for setting validator identity
+    - `validator-full-node-identity.yaml` Private keys for setting validator full node identity
     - `<username>.yaml` Node info for both validator / fullnode
     - `layout.yaml` layout file to define root key, validator user, and chain ID
     - `framework` folder which contains all the move bytecode for AptosFramework.
