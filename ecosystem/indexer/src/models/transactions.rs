@@ -195,7 +195,17 @@ impl Transaction {
         Option<Vec<EventModel>>,
         Option<Vec<WriteSetChangeModel>>,
     ) {
-        match transaction {
+        let mut _json = serde_json::to_value(&transaction).unwrap();
+        let mut _str = serde_json::to_string(&_json).unwrap();
+
+        if _str.contains("\\u0000") {
+            _str = _str.replace("\\u0000", "");
+            _json = serde_json::from_str(&_str).unwrap();
+        }
+
+        let mut _tx: APITransaction = serde_json::from_value(_json).unwrap();
+
+        match &_tx {
             APITransaction::UserTransaction(tx) => (
                 Self::from_transaction_info(
                     &tx.info,
