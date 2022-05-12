@@ -64,7 +64,47 @@ Ed25519PublicKey:
 Ed25519Signature:
   NEWTYPESTRUCT: BYTES
 EventKey:
-  NEWTYPESTRUCT: BYTES
+  TUPLESTRUCT:
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
 HashValue:
   NEWTYPESTRUCT: BYTES
 Identifier:

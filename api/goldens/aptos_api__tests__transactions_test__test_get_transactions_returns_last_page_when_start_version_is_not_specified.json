@@ -22,13 +22,10 @@
             "new_block_events": {
               "counter": "8",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "5"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xa550c18",
+                  "creation_num": "5"
+                }
               }
             }
           }
@@ -61,7 +58,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "92",
+    "gas_used": "91",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -139,25 +136,19 @@
             "received_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
+                  "creation_num": "1"
+                }
               }
             },
             "sent_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0x9e4c52c179a8a4cf9189a8ba861693be8547d921c8b210ec95e9a8c29ce83623",
+                  "creation_num": "0"
+                }
               }
             }
           }
@@ -208,13 +199,10 @@
             "new_block_events": {
               "counter": "9",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "5"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xa550c18",
+                  "creation_num": "5"
+                }
               }
             }
           }
@@ -247,7 +235,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "92",
+    "gas_used": "91",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -325,25 +313,19 @@
             "received_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x59c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0x59c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
+                  "creation_num": "1"
+                }
               }
             },
             "sent_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x59c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0x59c02dfad19271ecb71d6ef1095d174cfcd641696135b76cd1cbf28f79e134c",
+                  "creation_num": "0"
+                }
               }
             }
           }
@@ -394,13 +376,10 @@
             "new_block_events": {
               "counter": "10",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "5"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xa550c18",
+                  "creation_num": "5"
+                }
               }
             }
           }
@@ -433,7 +412,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "92",
+    "gas_used": "91",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -511,25 +490,19 @@
             "received_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
+                  "creation_num": "1"
+                }
               }
             },
             "sent_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xd1fdd7f5e3329151d0c0f2cf8d2e7041d5c6bedea6f4cafe97677ac6e39d7333",
+                  "creation_num": "0"
+                }
               }
             }
           }
@@ -580,13 +553,10 @@
             "new_block_events": {
               "counter": "11",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "5"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xa550c18",
+                  "creation_num": "5"
+                }
               }
             }
           }
@@ -619,7 +589,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "92",
+    "gas_used": "91",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -697,25 +667,19 @@
             "received_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
+                  "creation_num": "1"
+                }
               }
             },
             "sent_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0x629ec1c7de426633839c3f68e4ea92581232c8cbdd579ba57478b26e5876da5f",
+                  "creation_num": "0"
+                }
               }
             }
           }
@@ -766,13 +730,10 @@
             "new_block_events": {
               "counter": "12",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "5"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xa550c18",
+                  "creation_num": "5"
+                }
               }
             }
           }
@@ -805,7 +766,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "92",
+    "gas_used": "91",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -883,25 +844,19 @@
             "received_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
+                  "creation_num": "1"
+                }
               }
             },
             "sent_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0x71f9cc8709deb65a1d8019f02735da21bfd43be9f8c75bbdca45560958bc65a9",
+                  "creation_num": "0"
+                }
               }
             }
           }
@@ -952,13 +907,10 @@
             "new_block_events": {
               "counter": "13",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "5"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xa550c18",
+                  "creation_num": "5"
+                }
               }
             }
           }
@@ -991,7 +943,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "92",
+    "gas_used": "91",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1069,25 +1021,19 @@
             "received_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0x811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
+                  "creation_num": "1"
+                }
               }
             },
             "sent_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0x811a29fed994d121a6d1a8d422a73ddfaa9cef6cf313477409c6ca6462bdbec",
+                  "creation_num": "0"
+                }
               }
             }
           }
@@ -1138,13 +1084,10 @@
             "new_block_events": {
               "counter": "14",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "5"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xa550c18",
+                  "creation_num": "5"
+                }
               }
             }
           }
@@ -1177,7 +1120,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "92",
+    "gas_used": "91",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1255,25 +1198,19 @@
             "received_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
+                  "creation_num": "1"
+                }
               }
             },
             "sent_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0x2466e5bfe75e3531bf24c8aa25074f165b997e19c80a36a9eccea767b263f2a4",
+                  "creation_num": "0"
+                }
               }
             }
           }
@@ -1324,13 +1261,10 @@
             "new_block_events": {
               "counter": "15",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "5"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xa550c18",
+                  "creation_num": "5"
+                }
               }
             }
           }
@@ -1363,7 +1297,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "92",
+    "gas_used": "91",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1441,25 +1375,19 @@
             "received_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
+                  "creation_num": "1"
+                }
               }
             },
             "sent_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xe6729b2cdb9dd280cefaa1121c496e82e94a75bf429a1e83bc2f5f605780c345",
+                  "creation_num": "0"
+                }
               }
             }
           }
@@ -1510,13 +1438,10 @@
             "new_block_events": {
               "counter": "16",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "5"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xa550c18",
+                  "creation_num": "5"
+                }
               }
             }
           }
@@ -1549,7 +1474,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "92",
+    "gas_used": "91",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1627,25 +1552,19 @@
             "received_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
+                  "creation_num": "1"
+                }
               }
             },
             "sent_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xbc8b6a81cd04f4de0119ff7ab7ec5eb28797e5ab659071fc7f4ed8285963fbbc",
+                  "creation_num": "0"
+                }
               }
             }
           }
@@ -1696,13 +1615,10 @@
             "new_block_events": {
               "counter": "17",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "5"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xa550c18",
+                  "creation_num": "5"
+                }
               }
             }
           }
@@ -1735,7 +1651,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "92",
+    "gas_used": "91",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1813,25 +1729,19 @@
             "received_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
+                  "creation_num": "1"
+                }
               }
             },
             "sent_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0x3a005a7fa8e1c2fdab97247be839d548711d07e26b682d3f8b6bb9f6fa804332",
+                  "creation_num": "0"
+                }
               }
             }
           }
@@ -1882,13 +1792,10 @@
             "new_block_events": {
               "counter": "18",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "5"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xa550c18",
+                  "creation_num": "5"
+                }
               }
             }
           }
@@ -1921,7 +1828,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "92",
+    "gas_used": "91",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1999,25 +1906,19 @@
             "received_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
+                  "creation_num": "1"
+                }
               }
             },
             "sent_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0x73cb8245b462c25d2c0792576c83f26a66456c6c26ed271769be71ec85920331",
+                  "creation_num": "0"
+                }
               }
             }
           }
@@ -2068,13 +1969,10 @@
             "new_block_events": {
               "counter": "19",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "5"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xa550c18",
+                  "creation_num": "5"
+                }
               }
             }
           }
@@ -2107,7 +2005,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "92",
+    "gas_used": "91",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -2185,25 +2083,19 @@
             "received_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
-                    "creation_num": "1"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
+                  "creation_num": "1"
+                }
               }
             },
             "sent_events": {
               "counter": "0",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
-                    "creation_num": "0"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xb8e26002ab0e7a0849cb7c9618faa67dbd7c2167f944102d2dd80ab33f8491b2",
+                  "creation_num": "0"
+                }
               }
             }
           }
@@ -2254,13 +2146,10 @@
             "new_block_events": {
               "counter": "20",
               "guid": {
-                "guid": {
-                  "id": {
-                    "addr": "0xa550c18",
-                    "creation_num": "5"
-                  }
-                },
-                "len_bytes": 40
+                "id": {
+                  "addr": "0xa550c18",
+                  "creation_num": "5"
+                }
               }
             }
           }

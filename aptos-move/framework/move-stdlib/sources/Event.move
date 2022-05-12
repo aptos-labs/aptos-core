@@ -6,16 +6,6 @@ module Std::Event {
     use Std::BCS;
     use Std::GUID::{Self, GUID};
 
-    /// Wrapper for a GUID for layout compatibility with legacy EventHandle id's
-    // This is a hack for layout compatibility. The old EventHandle.guid was a 24 byte vector<u8>
-    // created from `append(u64 counter bytes, account address bytes)`. This dummy struct mimics
-    // the BCS layout of the old value.
-    // Note: the reason why this works is somewhat subtle. The BCS encoding for a vector V of
-    // length N is `uleb128_encoded_bytes(N) | contents(V)`
-    // (see https://github.com/aptos/bcs#fixed-and-variable-length-sequences).
-    // uleb128_encoded_bytes(24) fits into 1 byte, so using len_bytes: u8 is what we want here
-    struct GUIDWrapper has store, drop { len_bytes: u8, guid: GUID }
-
     /// A handle for an event such that:
     /// 1. Other modules can emit events to this handle.
     /// 2. Storage can use this handle to prove the total number of events that happened in the past.
@@ -23,7 +13,7 @@ module Std::Event {
         /// Total number of events emitted to this event stream.
         counter: u64,
         /// A globally unique ID for this event stream.
-        guid: GUIDWrapper,
+        guid: GUID,
     }
 
     /// Deprecated. Only kept around so Aptos clients know how to deserialize existing EventHandleGenerator's
@@ -35,23 +25,21 @@ module Std::Event {
 
     /// Use EventHandleGenerator to generate a unique event handle for `sig`
     public fun new_event_handle<T: drop + store>(account: &signer): EventHandle<T> {
-        // must be 40 for compatibility with legacy Event ID's--see comment on GUIDWrapper
-        let len_bytes = 40u8;
          EventHandle<T> {
             counter: 0,
-            guid: GUIDWrapper { len_bytes, guid: GUID::create(account) }
+            guid: GUID::create(account)
         }
     }
 
     /// Emit an event with payload `msg` by using `handle_ref`'s key and counter.
     public fun emit_event<T: drop + store>(handle_ref: &mut EventHandle<T>, msg: T) {
-        write_to_event_store<T>(BCS::to_bytes(&handle_ref.guid.guid), handle_ref.counter, msg);
+        write_to_event_store<T>(BCS::to_bytes(&handle_ref.guid), handle_ref.counter, msg);
         handle_ref.counter = handle_ref.counter + 1;
     }
 
     /// Return the GUIID associated with this EventHandle
     public fun guid<T: drop + store>(handle_ref: &EventHandle<T>): &GUID {
-        &handle_ref.guid.guid
+        &handle_ref.guid
     }
 
     /// Log `msg` as the `count`th event associated with the event stream identified by `guid`
@@ -65,7 +53,7 @@ module Std::Event {
     // ****************** TEST-ONLY FUNCTIONS **************
 
     #[test_only]
-    public fun create_guid_wrapper_for_test<T: drop + store>(s: &signer): GUIDWrapper {
+    public fun create_guid_wrapper_for_test<T: drop + store>(s: &signer): GUID {
         let EventHandle<T> { counter: _, guid } = new_event_handle<T>(s);
         guid
     }

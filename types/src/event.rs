@@ -5,7 +5,11 @@ use crate::account_address::AccountAddress;
 use hex::FromHex;
 #[cfg(any(test, feature = "fuzzing"))]
 use rand::{rngs::OsRng, RngCore};
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{
+    de,
+    ser::{self, SerializeTupleStruct},
+    Deserialize, Serialize,
+};
 use std::{
     convert::{TryFrom, TryInto},
     fmt,
@@ -108,7 +112,11 @@ impl ser::Serialize for EventKey {
             // In order to preserve the Serde data model and help analysis tools,
             // make sure to wrap our value in a container with the same name
             // as the original type.
-            serializer.serialize_newtype_struct("EventKey", serde_bytes::Bytes::new(&self.0))
+            let mut ts = serializer.serialize_tuple_struct("EventKey", EventKey::LENGTH)?;
+            for byte in &self.0 {
+                ts.serialize_field(byte)?;
+            }
+            ts.end()
         }
     }
 }
@@ -125,12 +133,8 @@ impl<'de> de::Deserialize<'de> for EventKey {
             EventKey::from_hex(s).map_err(D::Error::custom)
         } else {
             // See comment in serialize.
-            #[derive(::serde::Deserialize)]
-            #[serde(rename = "EventKey")]
-            struct Value<'a>(&'a [u8]);
-
-            let value = Value::deserialize(deserializer)?;
-            Self::try_from(value.0).map_err(D::Error::custom)
+            let value = EventKeyValue::deserialize(deserializer)?;
+            Self::try_from(&value.to_array()[..]).map_err(D::Error::custom)
         }
     }
 }
@@ -229,6 +233,64 @@ impl EventHandle {
         }
     }
 }
+
+#[derive(::serde::Deserialize)]
+#[serde(rename = "EventKey")]
+struct EventKeyValue(
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+);
+
+impl EventKeyValue {
+    fn to_array(&self) -> [u8; EventKey::LENGTH] {
+        [
+            self.0, self.1, self.2, self.3, self.4, self.5, self.6, self.7, self.8, self.9,
+            self.10, self.11, self.12, self.13, self.14, self.15, self.16, self.17, self.18,
+            self.19, self.20, self.21, self.22, self.23, self.24, self.25, self.26, self.27,
+            self.28, self.29, self.30, self.31, self.32, self.33, self.34, self.35, self.36,
+            self.37, self.38, self.39,
+        ]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::EventKey;

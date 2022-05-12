@@ -197,7 +197,47 @@ EpochState:
     - verifier:
         TYPENAME: ValidatorVerifier
 EventKey:
-  NEWTYPESTRUCT: BYTES
+  TUPLESTRUCT:
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
+    - U8
 HashValue:
   NEWTYPESTRUCT: BYTES
 Identifier:
