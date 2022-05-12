@@ -147,12 +147,15 @@ This will download all the terraform dependencies for you, in the `.terraform` f
     chain_id: 5
     ```
 
-13. Download AptosFramework Move bytecodes into a folder named `framework`
+13. Download AptosFramework Move bytecodes into a folder named `framework`.
+
+    Download the Aptos Framework from the release page: https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v0.1.0
 
     ```
-    $ wget https://github.com/aptos-labs/aptos-core/files/8665561/framework.zip
     $ unzip framework.zip
     ```
+
+    You should now have a folder called `framework`, which contains move bytecodes with format `.mv`.
 
 14. Compile genesis blob and waypoint
 
