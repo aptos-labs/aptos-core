@@ -74,6 +74,10 @@ workspace-members = [
 
     # Don't consider since it includes excluded move crates
     "move-deps",
+
+    # Don't include these since they contain test features that we don't want in production.
+    "forge",
+    "transaction-emitter",
 ]
 
 [hakari.final-excludes]
