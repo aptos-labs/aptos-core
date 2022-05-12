@@ -19,47 +19,47 @@
 
       <div>
         <div class="mb-16">
-          <h3 class="text-[#1dd7a5] font-mono uppercase text-2xl mb-2">Public Keys</h3>
+          <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">Public Keys</h3>
           <div class="mb-8"><%= render 'shared/bump' %></div>
 
           <p class="mb-4">
           <%= f.label :consensus_key, class: "font-mono uppercase block mb-2 text-lg" %>
-          <%= f.text_field :consensus_key, autofocus: true, required: true, pattern: '0x[a-f0-9]{64}', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+          <%= f.text_field :consensus_key, autofocus: true, required: true, pattern: '0x[a-f0-9]{64}', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
           </p>
           <p class="mb-4">
           <%= f.label :account_key, class: "font-mono uppercase block mb-2 text-lg" %>
-          <%= f.text_field :account_key, required: true, pattern: '0x[a-f0-9]{64}', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+          <%= f.text_field :account_key, required: true, pattern: '0x[a-f0-9]{64}', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
           </p>
           <p class="mb-4">
           <%= f.label :network_key, class: "font-mono uppercase block mb-2 text-lg" %>
-          <%= f.text_field :network_key, required: true, pattern: '0x[a-f0-9]{64}', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+          <%= f.text_field :network_key, required: true, pattern: '0x[a-f0-9]{64}', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
           </p>
         </div>
 
         <div class="mb-16">
-          <h3 class="text-[#1dd7a5] font-mono uppercase text-2xl mb-2">Validator Node</h3>
+          <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">Validator Node</h3>
           <div class="mb-8"><%= render 'shared/bump' %></div>
 
           <p class="mb-4">
           <%= f.label :validator_address, "Address (IP or hostname)", class: "font-mono uppercase block mb-2 text-lg" %>
-          <%= f.text_field :validator_address, required: true, class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+          <%= f.text_field :validator_address, required: true, class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
           </p>
 
           <div class="flex gap-8 md:gap-16 mb-4 items-end">
             <div class="flex-1">
               <%= f.label :validator_port, "Validator (noise) port", class: "font-mono uppercase block mb-2 text-lg" %>
-              <%= f.text_field :validator_port, required: true, pattern: '[0-9]+', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+              <%= f.text_field :validator_port, required: true, pattern: '[0-9]+', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
             </div>
             <div class="flex-1">
               <%= f.label :validator_metrics_port, "Metrics port", class: "font-mono uppercase block mb-2 text-lg" %>
-              <%= f.text_field :validator_metrics_port, required: true, pattern: '[0-9]+', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+              <%= f.text_field :validator_metrics_port, required: true, pattern: '[0-9]+', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
             </div>
           </div>
 
           <div class="flex gap-8 md:gap-16 mb-4 items-end">
             <div class="flex-1">
               <%= f.label :validator_api_port, "API port", class: "font-mono uppercase block mb-2 text-lg" %>
-              <%= f.text_field :validator_api_port, required: true, pattern: '[0-9]+', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+              <%= f.text_field :validator_api_port, required: true, pattern: '[0-9]+', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
             </div>
             <div class="flex-1"></div>
           </div>
@@ -67,18 +67,18 @@
         </div>
 
         <div class="mb-16">
-          <h3 class="text-[#1dd7a5] font-mono uppercase text-2xl mb-2">Full Node</h3>
+          <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">Full Node</h3>
           <div class="mb-8"><%= render 'shared/bump' %></div>
 
           <p class="mb-4">
           <%= f.label :fullnode_address, "Address (IP or hostname)", class: "font-mono uppercase block mb-2 text-lg" %>
-          <%= f.text_field :fullnode_address, class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+          <%= f.text_field :fullnode_address, class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
           </p>
 
           <div class="flex gap-8 md:gap-16 mb-4 items-end">
             <div class="flex-1">
               <%= f.label :fullnode_port, class: "font-mono uppercase block mb-2 text-lg" %>
-              <%= f.text_field :fullnode_port, pattern: '[0-9]+', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+              <%= f.text_field :fullnode_port, pattern: '[0-9]+', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
             </div>
             <div class="flex-1"></div>
           </div>
@@ -87,14 +87,14 @@
     </div>
 
     <div class="bg-neutral-800 rounded-md p-4 md:px-8 md:py-16 2xl:px-16 2xl:py-24 self-start">
-      <%= f.submit "Validate node", class: "w-full bg-[#1dd7a5] text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mb-8" %>
+      <%= f.submit "Validate node", class: "w-full bg-teal-400 text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mb-8" %>
       <div class="mb-8">
       <%= recaptcha_tags theme: :dark %>
       </div>
       <div class="text-sm">
         <label class="flex mb-4 gap-2 items-center cursor-pointer">
-          <%= f.check_box :terms_accepted, required: true, class: "bg-transparent border-[#1dd7a5] checked:bg-[#1dd7a5] hover:checked:bg-[#1dd7a5] focus:checked:bg-[#1dd7a5] focus:ring-0 outline-none" %>
-          <span>I agree to the Aptos <a href="#" class="font-bold text-[#1dd7a5]">Terms of Use</a> and <a href="#" class="font-bold text-[#1dd7a5]">Privacy Policy</a>.</span>
+          <%= f.check_box :terms_accepted, required: true, class: "bg-transparent border-teal-400 checked:bg-teal-400 hover:checked:bg-teal-400 focus:checked:bg-teal-400 focus:ring-0 outline-none" %>
+          <span>I agree to the Aptos <a href="#" class="font-bold text-teal-400">Terms of Use</a> and <a href="#" class="font-bold text-teal-400">Privacy Policy</a>.</span>
         </label>
       </div>
     </div>

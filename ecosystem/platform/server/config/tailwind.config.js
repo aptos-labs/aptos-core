@@ -15,6 +15,12 @@ module.exports = {
           '800': '#212121',
           '900': '#171717',
         },
+        'teal': {
+          ...defaultTheme.colors.teal,
+          '300': '#1de9b6',
+          '400': '#1bd7a4',
+          '500': '#187e65',
+        },
       },
       fontFamily: {
         'sans': ['apparat', ...defaultTheme.fontFamily.sans],

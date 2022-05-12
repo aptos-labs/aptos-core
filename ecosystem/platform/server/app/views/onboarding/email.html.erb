@@ -1,5 +1,5 @@
 <div>
-  <h2 class="text-4xl text-[#1dd7a5] font-mono mb-16 mt-8">Welcome, <%= @oauth_username %>!</h2>
+  <h2 class="text-4xl text-teal-400 font-mono mb-16 mt-8">Welcome, <%= @oauth_username %>!</h2>
 
   <%= render "layouts/flash" %>
 
@@ -21,7 +21,7 @@
 
   <%= form_with(model: current_user, url: onboarding_email_path, method: :post, data: {turbo: false}, html: {onsubmit: "return validateRecaptcha();"}) do |f| %>
     <div class="mb-8">
-      <%= f.email_field :email, autofocus: true, autocomplete: "email", required: true, placeholder: "ENTER YOUR EMAIL ADDRESS", class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+      <%= f.email_field :email, autofocus: true, autocomplete: "email", required: true, placeholder: "ENTER YOUR EMAIL ADDRESS", class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
     </div>
 
     <div class="mb-8">
@@ -29,13 +29,13 @@
     </div>
 
     <div class="mb-12">
-      <%= f.submit "Verify email", class: "w-72 bg-[#1dd7a5] hover:bg-[#1de9b6] cursor-pointer text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded" %>
+      <%= f.submit "Verify email", class: "w-72 bg-teal-400 hover:bg-teal-300 cursor-pointer text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded" %>
     </div>
 
     <div class="text-sm">
       <label class="flex mb-4 gap-2 items-center cursor-pointer">
-        <%= f.check_box :terms_accepted, required: true, class: "bg-transparent border-[#1dd7a5] checked:bg-[#1dd7a5] hover:checked:bg-[#1dd7a5] focus:checked:bg-[#1dd7a5] focus:ring-0 outline-none" %>
-        <span>I agree to the Aptos <a href="#" class="font-bold text-[#1dd7a5]">Terms of Use</a> and <a href="#" class="font-bold text-[#1dd7a5]">Privacy Policy</a>.</span>
+        <%= f.check_box :terms_accepted, required: true, class: "bg-transparent border-teal-400 checked:bg-teal-400 hover:checked:bg-teal-400 focus:checked:bg-teal-400 focus:ring-0 outline-none" %>
+        <span>I agree to the Aptos <a href="#" class="font-bold text-teal-400">Terms of Use</a> and <a href="#" class="font-bold text-teal-400">Privacy Policy</a>.</span>
       </label>
     </div>
   <% end %>
