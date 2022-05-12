@@ -1,7 +1,7 @@
 # Using Aptos Node docker
 ## Start Aptos Node as test mode
 1. Install Docker and Docker-Compose, Aptos CLI.
-2. Create a directory for your Aptos node composition. e.g.
+2. Create a directory for your Aptos node composition. For convenience, place the Aptos CLI (`aptos`) in that directory.
     ```
     export WORKSPACE=testnet
     mkdir ~/$WORKSPACE
@@ -16,7 +16,7 @@
 4. Generate key pairs (node owner key, consensus key and networking key) in your working directory.
 
     ```
-    $ aptos genesis generate-keys --output-dir ~/$WORKSPACE
+    $ ./aptos genesis generate-keys
     ```
 
     This will create three files: `private-keys.yaml`, `validator-identity.yaml`, `validator-full-node-identity.yaml` for you. Backup your key files somewhere safe, this is important for you to establish ownership of your node, and it will be used to claim your rewards later if eligible. Very important!!
@@ -24,24 +24,21 @@
 5. Configure validator information, you need to setup a static IP / DNS address which can be used by the node, and make sure the network / firewalls are properly configured to accept external connections.
 
     ```
-    $ aptos genesis set-validator-configuration \
-        --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE \
+    $ ./aptos genesis set-validator-configuration \
         --username <pick a username for your node> \
         --validator-host <Validator Node IP / DNS address>:<Port> \
         --full-node-host <Full Node IP / DNS address>:<Port>
 
     # for example, with IP:
 
-    $ aptos genesis set-validator-configuration \
-        --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE \
+    $ ./aptos genesis set-validator-configuration \
         --username aptosbot \
         --validator-host 35.232.235.205:6180 \
         --full-node-host 34.135.169.144:6182
 
     # for example, with DNS:
 
-    $ aptos genesis set-validator-configuration \
-        --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE \
+    $ ./aptos genesis set-validator-configuration \
         --username aptosbot \
         --validator-host bot.aptosdev.com:6180 \
         --full-node-host fn.bot.aptosdev.com:6182
@@ -93,7 +90,7 @@
 8. Compile genesis blob and waypoint
 
     ```
-    $ aptos genesis generate-genesis --local-repository-dir ~/$WORKSPACE --output-dir ~/$WORKSPACE
+    $ ./aptos genesis generate-genesis
     ```
 
     This should create two files in your working directory, `genesis.blob` and `waypoint.txt`
