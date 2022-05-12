@@ -10,6 +10,7 @@ class ApplicationController < ActionController::Base
 
   before_action :set_csrf_cookie
   before_action :set_logging_metadata
+  before_action :set_sentry_metadata
 
   protect_from_forgery with: :exception
 
@@ -52,5 +53,10 @@ class ApplicationController < ActionController::Base
     # Add metadata to thread local for Logging::Logs.log().
     Thread.current.thread_variable_set(REQUEST_ID_KEY, request.request_id)
     Thread.current.thread_variable_set(USER_ID_KEY, current_user&.id)
+  end
+
+  def set_sentry_metadata
+    Sentry.set_user(id: current_user.id) if current_user
+    Sentry.set_tags(request_id: request.request_id)
   end
 end
