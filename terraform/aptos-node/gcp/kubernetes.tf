@@ -74,3 +74,64 @@ resource "helm_release" "validator" {
     value = var.helm_force_update ? timestamp() : ""
   }
 }
+
+resource "helm_release" "logger" {
+  count       = var.enable_logger ? 1 : 0
+  name        = "${terraform.workspace}-log"
+  chart       = "${path.module}/../../helm/logger"
+  max_history = 10
+  wait        = false
+
+  values = [
+    jsonencode({
+      logger = {
+        name = "aptos-logger"
+      }
+      chain = {
+        name = var.chain_name
+      }
+      serviceAccount = {
+        create = false
+        name = "${terraform.workspace}-aptos-node-validator"
+      }
+    }),
+    jsonencode(var.logger_helm_values),
+  ]
+
+  set {
+    name  = "timestamp"
+    value = timestamp()
+  }
+}
+
+resource "helm_release" "monitoring" {
+  count       = var.enable_monitoring ? 1 : 0
+  name        = "${terraform.workspace}-mon"
+  chart       = "${path.module}/../../helm/monitoring"
+  max_history = 10
+  wait        = false
+
+  values = [
+    jsonencode({
+      chain = {
+        name = var.chain_name
+      }
+      validator = {
+        name = var.validator_name
+      }
+      monitoring = {
+        prometheus = {
+          storage = {
+            class = kubernetes_storage_class.ssd.metadata[0].name
+          }
+        }
+      }
+    }),
+    jsonencode(var.monitoring_helm_values),
+  ]
+
+  set {
+    name  = "timestamp"
+    value = timestamp()
+  }
+}
