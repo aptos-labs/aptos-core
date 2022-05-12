@@ -39,7 +39,7 @@ ENV SECRET_KEY_BASE=18ff7d41b9da02d394434e2eb140611516707334b7d7a7e15cf8b567061f
 
 # Yes, this should run twice
 # https://github.com/rails/tailwindcss-rails/issues/158
-RUN bundle exec rake assets:precompile && bundle exec rake assets:precompile
+RUN SKIP_DB_CHECK=1 bundle exec rake assets:precompile && SKIP_DB_CHECK=1 bundle exec rake assets:precompile
 
 COPY --link --from=aws-env /aws-env /aws-env
 

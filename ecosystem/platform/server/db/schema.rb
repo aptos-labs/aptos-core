@@ -14,7 +14,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 20_220_511_034_418) do
+ActiveRecord::Schema[7.0].define(version: 20_220_512_031_021) do
   # These are extensions that must be enabled in order to support this database
   enable_extension 'plpgsql'
 
@@ -161,6 +161,9 @@ ActiveRecord::Schema[7.0].define(version: 20_220_511_034_418) do
     t.boolean 'is_node_operator', default: false, null: false
     t.string 'mainnet_address'
     t.string 'kyc_status', default: 'not_started', null: false
+    t.uuid 'external_id', default: -> { 'gen_random_uuid()' }, null: false
+    t.boolean 'kyc_exempt', default: false
+    t.string 'completed_persona_inquiry_id'
     t.index ['confirmation_token'], name: 'index_users_on_confirmation_token', unique: true
     t.index ['email'], name: 'index_users_on_email', unique: true
     t.index ['reset_password_token'], name: 'index_users_on_reset_password_token', unique: true

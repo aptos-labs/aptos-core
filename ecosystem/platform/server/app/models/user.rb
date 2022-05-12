@@ -21,13 +21,6 @@ class User < ApplicationRecord
   has_many :authorizations, dependent: :destroy
   has_one :it1_profile
 
-  # https://github.com/makandra/rails_state_machine
-  # TODO: this state machine
-  state_machine :kyc_status do
-    state :not_started, initial: true
-    state :exempted
-  end
-
   def self.from_omniauth(auth, current_user = nil)
     # find an existing user or create a user and authorizations
     # schema of auth https://github.com/omniauth/omniauth/wiki/Auth-Hash-Schema
@@ -67,9 +60,8 @@ class User < ApplicationRecord
   #   end
   # end
 
-  def kyc_url
-    # TODO: fill this out
-    '#'
+  def kyc_complete?
+    kyc_status == 'completed'
   end
 
   def providers

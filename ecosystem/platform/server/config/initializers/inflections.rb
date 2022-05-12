@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
@@ -15,6 +16,6 @@
 # end
 
 # These inflection rules are supported but not enabled by default:
-# ActiveSupport::Inflector.inflections(:en) do |inflect|
-#   inflect.acronym "RESTful"
-# end
+ActiveSupport::Inflector.inflections(:en) do |inflect|
+  inflect.acronym 'KYC'
+end

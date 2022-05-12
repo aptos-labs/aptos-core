@@ -12,6 +12,8 @@
       </p>
     </div>
 
+    <%= render "layouts/flash" %>
+
     <div class="flex flex-col lg:flex-row gap-8 lg:gap-24">
       <div class="bg-neutral-800 rounded-md flex flex-col">
         <h3 class="font-mono uppercase mb-2 bg-neutral-700 text-[#1dd7a5] px-4 py-2 rounded-t-md">Step 1</h3>
@@ -30,9 +32,13 @@
           <h4 class="text-[#1dd7a5] font-mono uppercase text-2xl mb-4">Identity Verification</h4>
           <hr class="border-[#1dd7a5] mb-4">
           <p class="mb-8">
-          Identity must be verified by noon (PST) May 23 to get into the lottery.
+          Identity must be verified by noon (PST) May 23 to get into the selection process.
           </p>
-          <%= link_to "Verify", "#", class: "w-full bg-[#1dd7a5] text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mt-auto" %>
+          <% if current_user&.it1_profile&.validator_verified? %>
+            <%= link_to "Verify", onboarding_kyc_redirect_path, class: "w-full bg-[#1dd7a5] text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mt-auto" %>
+          <% else %>
+            <%= link_to "Verify", "#", class: "w-full bg-[#1dd7a5] text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mt-auto" %>
+          <% end %>
         </div>
       </div>
     </div>
