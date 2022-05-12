@@ -4,7 +4,7 @@ FROM golang:1.18.2-buster@sha256:72506be8130fd4c98a032a497db82234aaace7eb48a90ae
 
 # build aws-env which is used to inject load AWS Secrets as environment variables at init time.
 RUN git clone --depth=1 --branch v1.3.0 https://github.com/aptos-labs/aws-env src \
-    && cd src \
+    && cd src/cmd/aws-env \
     && CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build -ldflags '-w -s' -o /aws-env && chmod +x /aws-env
 
 FROM ruby:3.1.2-slim
@@ -45,4 +45,4 @@ COPY --link --from=aws-env /aws-env /aws-env
 
 EXPOSE 3000
 
-CMD ["aws-env", "exec", "--", "bundle", "exec", "rails", "s", "-b", "0.0.0.0"]
+CMD ["/aws-env", "exec", "--", "bundle", "exec", "rails", "s", "-b", "0.0.0.0"]
