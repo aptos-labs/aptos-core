@@ -53,6 +53,7 @@ Install pre-requisites if needed:
     zone          = "c"            # Specify the zone suffix
     project       = "<GCP Project Name>" # Specify your GCP project name
     era           = 1              # bump era number to wipe the chain
+    chain_id      = 5
     image_tag     = "testnet" # Specify the docker image tag to use
     validator_name = "<Name of Your Validator, no space>"
   }
