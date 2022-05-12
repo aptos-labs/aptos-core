@@ -1,7 +1,7 @@
 /// Native Move functions for transaction metadata and scheduling
 module AptosFramework::Transaction {
 
-    use Std::Option::Option;
+    use AptosFramework::TypeInfo
     use Std::ASCII::String;
 
     /// Return the version number of the distributed database,
@@ -10,23 +10,19 @@ module AptosFramework::Transaction {
     /// [Versioned database](https://aptos.dev/basics/basics-txns-states#versioned-database)
     public native fun version_number(): u64;
 
-    /// Initialize a recurring transaction for a public script function
-    /// that takes no arguments, to execute at the end of every `n`th
-    /// block
-    public(script) native fun init_schedule(
+    /// Schedule transaction for the epilogue of a block, delaying by
+    /// `delay` blocks. A `delay` of 0 schedules a transaction during
+    /// the epilogue of the current block, and can only be called from a
+    /// non-epilogue transaction. Calling during the epilogue requires
+    /// a `delay` of at least 1, corresponding to a transaction
+    /// scheduled during the epilogue of the next block.
+    public(script) native fun schedule(
         account: &signer,
         script_address: address,
         script_module_name: String,
         script_function_name: String,
-        n: u64,
-    );
-
-    /// Cancel the recurring schedule for a transaction previously
-    /// authorized by `account`
-    public(script) native fun cancel_schedule(
-        account: &signer,
-        script_address: address,
-        script_module_name: String,
-        script_function_name: String,
+        type_arguments: &vector<TypeInfo>,
+        arguments: &vector<String>,
+        delay: u64,
     );
 }
