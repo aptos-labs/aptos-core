@@ -24,3 +24,13 @@
 dialog::backdrop {
   background: rgba(0,0,0,0.75);
 }
+
+input:-webkit-autofill {
+  -webkit-box-shadow:0 0 0 50px #171717 inset;
+  -webkit-text-fill-color: #fff;
+}
+
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 50px #171717 inset;
+  -webkit-text-fill-color: #fff;
+}
