@@ -58,6 +58,7 @@ Install pre-requisites if needed:
     region        = var.aws_region  # Specify the region
     # zone_id     = "<Route53 zone id>"  # zone id for Route53 if you want to use DNS
     era           = 1              # bump era number to wipe the chain
+    chain_id      = 5
     image_tag     = "testnet" # Specify the docker image tag to use
     validator_name = "<Name of Your Validator>"
   }
