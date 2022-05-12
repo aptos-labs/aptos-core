@@ -26,6 +26,7 @@
     ```
     $ ./aptos genesis set-validator-configuration \
         --username <pick a username for your node> \
+        --local-repository-dir . \
         --validator-host <Validator Node IP / DNS address>:<Port> \
         --full-node-host <Full Node IP / DNS address>:<Port>
 
@@ -33,6 +34,7 @@
 
     $ ./aptos genesis set-validator-configuration \
         --username aptosbot \
+        --local-repository-dir . \
         --validator-host 35.232.235.205:6180 \
         --full-node-host 34.135.169.144:6182
 
@@ -40,6 +42,7 @@
 
     $ ./aptos genesis set-validator-configuration \
         --username aptosbot \
+        --local-repository-dir . \
         --validator-host bot.aptosdev.com:6180 \
         --full-node-host fn.bot.aptosdev.com:6182
     ```
@@ -90,7 +93,7 @@
 8. Compile genesis blob and waypoint
 
     ```
-    $ ./aptos genesis generate-genesis
+    $ ./aptos genesis generate-genesis --local-repository-dir .
     ```
 
     This should create two files in your working directory, `genesis.blob` and `waypoint.txt`
