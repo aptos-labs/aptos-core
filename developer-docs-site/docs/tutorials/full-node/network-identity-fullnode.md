@@ -76,6 +76,7 @@ Example `private-key.txt` and the associated `private-key.txt.pub` files are sho
   $ cat ~/private-key.txt.pub
   B881EA2C174D8211C123E5A91D86227DB116A44BB345A6E66874F83D8993F813%
   ```
+Note, that the private-key.txt.pub is not the public key which is referred to later in this tutorial and is not used for running a full node. We mention this key for the sake of completeness as it is used, alongside the private key, to generate the signing key utilized for signing. 
 
 ## Retrieve the public network identity
 
@@ -131,8 +132,8 @@ full_node_networks:
   discovery_method: "onchain"
   identity:
     type: "from_config"
-    key: "B8BD811A91D8E6E0C6DAC991009F189337378760B55F3AD05580235325615C74"
-    peer_id: "ca3579457555c80fc7bb39964eb298c414fd60f81a2f8eedb0244ec07a26e575"
+    key: "C83110913CBE4583F820FABEB7514293624E46862FAE1FD339B923F0CACC647D"
+    peer_id: "2a873fd3fb4e334b729966dc5aa68118fb5ba7c2c0c39d9860e709fd6589214b"
 ```
 
 ## Allowing other FullNodes to connect
@@ -159,13 +160,13 @@ Once you start your FullNode with a static identity you can allow others to conn
 - Make sure the port number you put in the `addressses` matches the one you have in the FullNode config (`6180` or `6182`). For example:
 
   ```
-  bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a:
+  2a873fd3fb4e334b729966dc5aa68118fb5ba7c2c0c39d9860e709fd6589214b:
     addresses:
-    - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/ln-handshake/0"
+    - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/ln-noise-ik/2a873fd3fb4e334b729966dc5aa68118fb5ba7c2c0c39d9860e709fd6589214b/ln-handshake/0"
     role: "Upstream"
-  bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a:
+  2a873fd3fb4e334b729966dc5aa68118fb5ba7c2c0c39d9860e709fd6589214b:
     addresses:
-    - "/ip4/100.20.221.187/tcp/6182/ln-noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/ln-handshake/0"
+    - "/ip4/100.20.221.187/tcp/6182/ln-noise-ik/2a873fd3fb4e334b729966dc5aa68118fb5ba7c2c0c39d9860e709fd6589214b/ln-handshake/0"
     role: "Upstream"
   ```
 
