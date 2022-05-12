@@ -1,63 +1,102 @@
+<div class="flex flex-col lg:flex-row justify-between">
+  <%= render "shared/captcha_helper" %>
 
-<%= render "shared/captcha_helper" %>
+  <%= form_with(model: it1_profile, class: "contents", data: {turbo: false}, html: {onsubmit:"return validateRecaptcha();"}) do |f| %>
+    <div>
+      <% if it1_profile.errors.any? %>
+        <div id="error_explanation" class="flex p-4 mb-4 bg-red-100 rounded-lg dark:bg-red-200 lg:w-96" role="alert">
+          <div class="ml-3 text-sm font-medium text-red-700 dark:text-red-800">
+            <h2><%= pluralize(it1_profile.errors.count, "error") %> prohibited this from being saved:</h2>
 
-<%= form_with(model: it1_profile, class: "contents", data: {turbo: false}, html: {onsubmit:"return validateRecaptcha();"}) do |form| %>
-  <% if it1_profile.errors.any? %>
-    <div id="error_explanation" class="bg-red-50 text-red-500 px-3 py-2 font-medium rounded-lg mt-3">
-      <h2><%= pluralize(it1_profile.errors.count, "error") %> prohibited this from being saved:</h2>
-      <ul>
-        <% it1_profile.errors.each do |error| %>
-          <li><%= error.full_message %></li>
-        <% end %>
-      </ul>
+            <ul>
+              <% it1_profile.errors.each do |error| %>
+                <li><%= error.full_message %></li>
+              <% end %>
+            </ul>
+          </div>
+        </div>
+      <% end %>
+
+      <div>
+        <div class="mb-16">
+          <h3 class="text-[#1dd7a5] font-mono uppercase text-2xl mb-2">Public Keys</h3>
+          <hr class="border-[#1dd7a5] mb-8">
+
+          <p class="mb-4">
+          <%= f.label :consensus_key, class: "font-mono uppercase block mb-2 text-lg" %>
+          <%= f.text_field :consensus_key, autofocus: true, required: true, pattern: '0x[a-f0-9]{64}', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+          </p>
+          <p class="mb-4">
+          <%= f.label :account_key, class: "font-mono uppercase block mb-2 text-lg" %>
+          <%= f.text_field :account_key, required: true, pattern: '0x[a-f0-9]{64}', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+          </p>
+          <p class="mb-4">
+          <%= f.label :network_key, class: "font-mono uppercase block mb-2 text-lg" %>
+          <%= f.text_field :network_key, required: true, pattern: '0x[a-f0-9]{64}', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+          </p>
+        </div>
+
+        <div class="mb-16">
+          <h3 class="text-[#1dd7a5] font-mono uppercase text-2xl mb-2">Validator Node</h3>
+          <hr class="border-[#1dd7a5] mb-8">
+
+          <p class="mb-4">
+          <%= f.label :validator_address, "Address (IP or hostname)", class: "font-mono uppercase block mb-2 text-lg" %>
+          <%= f.text_field :validator_address, required: true, class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+          </p>
+
+          <div class="flex gap-8 md:gap-16 mb-4 items-end">
+            <div class="flex-1">
+              <%= f.label :validator_port, "Validator (noise) port", class: "font-mono uppercase block mb-2 text-lg" %>
+              <%= f.text_field :validator_port, required: true, pattern: '[0-9]+', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+            </div>
+            <div class="flex-1">
+              <%= f.label :validator_metrics_port, "Metrics port", class: "font-mono uppercase block mb-2 text-lg" %>
+              <%= f.text_field :validator_metrics_port, required: true, pattern: '[0-9]+', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+            </div>
+          </div>
+
+          <div class="flex gap-8 md:gap-16 mb-4 items-end">
+            <div class="flex-1">
+              <%= f.label :validator_api_port, "API port", class: "font-mono uppercase block mb-2 text-lg" %>
+              <%= f.text_field :validator_api_port, required: true, pattern: '[0-9]+', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+            </div>
+            <div class="flex-1"></div>
+          </div>
+
+        </div>
+
+        <div class="mb-16">
+          <h3 class="text-[#1dd7a5] font-mono uppercase text-2xl mb-2">Full Node</h3>
+          <hr class="border-[#1dd7a5] mb-8">
+
+          <p class="mb-4">
+          <%= f.label :fullnode_address, "Address (IP or hostname)", class: "font-mono uppercase block mb-2 text-lg" %>
+          <%= f.text_field :fullnode_address, class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+          </p>
+
+          <div class="flex gap-8 md:gap-16 mb-4 items-end">
+            <div class="flex-1">
+              <%= f.label :fullnode_port, class: "font-mono uppercase block mb-2 text-lg" %>
+              <%= f.text_field :fullnode_port, pattern: '[0-9]+', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-[#1dd7a5]" %>
+            </div>
+            <div class="flex-1"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-neutral-800 rounded-md p-4 md:px-8 md:py-16 2xl:px-16 2xl:py-24 self-start">
+      <%= f.submit "Validate node", class: "w-full bg-[#1dd7a5] text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mb-8" %>
+      <div class="mb-8">
+      <%= recaptcha_tags theme: :dark %>
+      </div>
+      <div class="text-sm">
+        <label class="flex mb-4 gap-2 items-center cursor-pointer">
+          <%= f.check_box :terms_accepted, required: true, class: "bg-transparent border-[#1dd7a5] checked:bg-[#1dd7a5] hover:checked:bg-[#1dd7a5] focus:checked:bg-[#1dd7a5] focus:ring-0 outline-none" %>
+          <span>I agree to the Aptos <a href="#" class="font-bold text-[#1dd7a5]">Terms of Use</a> and <a href="#" class="font-bold text-[#1dd7a5]">Privacy Policy</a>.</span>
+        </label>
+      </div>
     </div>
   <% end %>
-
-  <div>
-    <p>
-    <%= form.label :consensus_key %>
-    <%= form.text_field :consensus_key, required: true, pattern: '0x[a-f0-9]{64}' %>
-    </p>
-    <p>
-    <%= form.label :account_key %>
-    <%= form.text_field :account_key, required: true, pattern: '0x[a-f0-9]{64}' %>
-    </p>
-    <p>
-    <%= form.label :network_key %>
-    <%= form.text_field :network_key, required: true, pattern: '0x[a-f0-9]{64}' %>
-    </p>
-    <p>
-    <%= form.label :validator_address %>
-    <%= form.text_field :validator_address, required: true %>
-    </p>
-    <p>
-    <%= form.label :validator_port %>
-    <%= form.number_field :validator_port, required: true %>
-    </p>
-    <p>
-    <%= form.label :validator_metrics_port %>
-    <%= form.number_field :validator_metrics_port, required: true, placeholder: 9101 %>
-    </p>
-    <p>
-    <%= form.label :validator_api_port %>
-    <%= form.number_field :validator_api_port, required: true, placeholder: 8080 %>
-    </p>
-    <p>
-    <%= form.label :fullnode_address %>
-    <%= form.text_field :fullnode_address %>
-    </p>
-    <p>
-    <%= form.label :fullnode_port %>
-    <%= form.number_field :fullnode_port %>
-    </p>
-    <p>
-    <%= form.label :terms_accepted %>
-    <%= form.check_box :terms_accepted, required: true %>
-    </p>
-    <%= recaptcha_tags %>
-  </div>
-
-  <div class="inline">
-    <%= form.submit class: "rounded-lg py-3 px-5 bg-blue-600 text-white inline-block font-medium cursor-pointer" %>
-  </div>
-<% end %>
+</div>
