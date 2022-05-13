@@ -22,28 +22,28 @@
           <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">Public Keys</h3>
           <div class="mb-8"><%= render 'shared/bump' %></div>
 
-          <p class="mb-4">
+          <div class="mb-4">
           <%= f.label :consensus_key, class: "font-mono uppercase block mb-2 text-lg" %>
           <%= f.text_field :consensus_key, autofocus: true, required: true, pattern: '0x[a-f0-9]{64}' %>
-          </p>
-          <p class="mb-4">
+          </div>
+          <div class="mb-4">
           <%= f.label :account_key, class: "font-mono uppercase block mb-2 text-lg" %>
           <%= f.text_field :account_key, required: true, pattern: '0x[a-f0-9]{64}' %>
-          </p>
-          <p class="mb-4">
+          </div>
+          <div class="mb-4">
           <%= f.label :network_key, class: "font-mono uppercase block mb-2 text-lg" %>
           <%= f.text_field :network_key, required: true, pattern: '0x[a-f0-9]{64}' %>
-          </p>
+          </div>
         </div>
 
         <div class="mb-16">
           <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">Validator Node</h3>
           <div class="mb-8"><%= render 'shared/bump' %></div>
 
-          <p class="mb-4">
+          <div class="mb-4">
           <%= f.label :validator_address, "Address (IP or hostname)", class: "font-mono uppercase block mb-2 text-lg" %>
           <%= f.text_field :validator_address, required: true %>
-          </p>
+          </div>
 
           <div class="flex gap-8 md:gap-16 mb-4 items-end">
             <div class="flex-1">
@@ -70,10 +70,10 @@
           <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">Full Node</h3>
           <div class="mb-8"><%= render 'shared/bump' %></div>
 
-          <p class="mb-4">
+          <div class="mb-4">
           <%= f.label :fullnode_address, "Address (IP or hostname)", class: "font-mono uppercase block mb-2 text-lg" %>
           <%= f.text_field :fullnode_address %>
-          </p>
+          </div>
 
           <div class="flex gap-8 md:gap-16 mb-4 items-end">
             <div class="flex-1">
