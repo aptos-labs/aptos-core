@@ -26,7 +26,7 @@ import { seconaryAddressFontColor } from '../components/WalletHeader'
 import withSimulatedExtensionContainer from '../components/WithSimulatedExtensionContainer'
 import useWalletState from '../hooks/useWalletState'
 import { AptosAccount, AptosClient, FaucetClient, Types } from 'aptos'
-import { AccountResource } from 'aptos/dist/api/data-contracts'
+import { AccountResource } from 'aptos/src/api/data-contracts'
 import { FaFaucet } from 'react-icons/fa'
 import { IoIosSend } from 'react-icons/io'
 import numeral from 'numeral'
@@ -56,7 +56,7 @@ export const getAccountResources = async ({
 }: GetAccountResourcesProps) => {
   const client = new AptosClient(nodeUrl)
   if (address) {
-    const accountResources = await client.accounts.getAccountResources(
+    const accountResources = await client.getAccountResources(
       address
     )
     return accountResources
@@ -64,7 +64,7 @@ export const getAccountResources = async ({
   return undefined
 }
 
-type Inputs = Record<string, any>
+export type Inputs = Record<string, any>
 
 interface FundWithFaucetProps {
   nodeUrl?: string;
@@ -116,7 +116,7 @@ const submitTransaction = async ({
 }
 
 const getAccountBalanceFromAccountResources = (
-  accountResources: AccountResource[] | undefined
+  accountResources: Types.AccountResource[] | undefined
 ): Number => {
   if (accountResources) {
     const accountResource = (accountResources) ? accountResources?.find((r) => r.type === '0x1::TestCoin::Balance') : undefined
@@ -163,7 +163,7 @@ const Wallet = () => {
           nodeUrl: NODE_URL,
           address: toAddress
         })
-        if (accountResponse?.status !== 200) {
+        if (accountResponse) {
           setLastTransactionStatus(TransferResult.UndefinedAccount)
           throw new Error(TransferResult.UndefinedAccount)
         }
@@ -197,7 +197,7 @@ const Wallet = () => {
   useEffect(() => {
     getAccountResources({ address })?.then((data) => {
       if (isTransferLoading && (lastTransactionStatus === TransferResult.Success || lastTransactionStatus === TransferResult.IncorrectPayload)) {
-        const newTokenBalance = getAccountBalanceFromAccountResources(data?.data)
+        const newTokenBalance = getAccountBalanceFromAccountResources(data)
         toast({
           title: (lastTransactionStatus === TransferResult.Success) ? 'Transaction succeeded' : 'Transaction failed',
           description: lastTransactionStatus + `. Amount transferred: ${lastTransferAmount}, gas consumed: ${lastBalance - lastTransferAmount - Number(newTokenBalance)}`,
@@ -207,7 +207,7 @@ const Wallet = () => {
         })
       }
       setIsTransferLoading(false)
-      const tempAccountResources = data?.data
+      const tempAccountResources = data
       setAccountResources(tempAccountResources)
     })
   }, [refreshState])

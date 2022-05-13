@@ -23,3 +23,9 @@ export const secondaryErrorMessageColor = {
   dark: 'red.200',
   light: 'red.500'
 }
+
+export const validStorageUris = [
+  'amazonaws.com',
+  'ipfs.io',
+  'arweave.net'
+]

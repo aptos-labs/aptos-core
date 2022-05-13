@@ -2,7 +2,6 @@ import { FaucetClient } from "./faucet_client";
 import { AptosAccount } from "./aptos_account";
 import { AptosClient } from "./aptos_client";
 import { TokenClient } from "./token_client";
-// import { Types } from "./types";
 
 import { NODE_URL, FAUCET_URL } from "./util.test";
 

@@ -3,6 +3,10 @@
 
 import React, { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import {
+  QueryClientProvider,
+  QueryClient
+} from 'react-query'
 import { Routes, Route, MemoryRouter } from 'react-router-dom'
 import { ChakraProvider, extendTheme, type ThemeConfig } from '@chakra-ui/react'
 import Wallet from './pages/Wallet'
@@ -11,6 +15,9 @@ import { WalletStateProvider } from './hooks/useWalletState'
 import Help from './pages/Help'
 import CreateWallet from './pages/CreateWallet'
 import Account from './pages/Account'
+import Gallery from './pages/Gallery'
+
+export const queryClient = new QueryClient()
 
 const theme: ThemeConfig = extendTheme({
   initialColorMode: 'dark',
@@ -29,20 +36,21 @@ const root = createRoot(document.getElementById('root') as Element)
 
 root.render(
   <StrictMode>
-    <ChakraProvider theme={theme}>
-      <WalletStateProvider>
-        <MemoryRouter initialEntries={['/']}>
-          <Routes>
-            <Route path='/' element={<Login/>} />
-            <Route path='/wallet' element={<Wallet/>} />
-            {/* TODO: Will update post hackathon */}
-            {/* <Route path='/gallery' element={<Gallery/>} /> */}
-            <Route path="/help" element={<Help />} />
-            <Route path="/create-wallet" element={<CreateWallet />} />
-            <Route path="/account" element={<Account />} />
-          </Routes>
-        </MemoryRouter>
-      </WalletStateProvider>
-    </ChakraProvider>
+    <QueryClientProvider client={queryClient}>
+      <ChakraProvider theme={theme}>
+        <WalletStateProvider>
+          <MemoryRouter initialEntries={['/']}>
+            <Routes>
+              <Route path='/' element={<Login/>} />
+              <Route path='/wallet' element={<Wallet/>} />
+              <Route path='/gallery' element={<Gallery/>} />
+              <Route path="/help" element={<Help />} />
+              <Route path="/create-wallet" element={<CreateWallet />} />
+              <Route path="/account" element={<Account />} />
+            </Routes>
+          </MemoryRouter>
+        </WalletStateProvider>
+      </ChakraProvider>
+    </QueryClientProvider>
   </StrictMode>
 )
