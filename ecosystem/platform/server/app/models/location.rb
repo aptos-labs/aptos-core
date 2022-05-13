@@ -7,7 +7,7 @@ class Location < ApplicationRecord
 
   # @param [MaxMind::GeoIP2::Model::Insights] data
   def self.upsert_from_maxmind!(item, data)
-    item.location = (item.location || Location.new(attr)).tap { |location| location.assign_from_maxmind(data) }
+    item.location = (item&.location || Location.new).tap { |location| location.assign_from_maxmind(data) }
     item.location.save!
   end
 

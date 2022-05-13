@@ -56,6 +56,8 @@ module NodeHelper
 
     # @return IPResult
     def resolve_ip
+      return IPResult.new(true, @hostname, nil) if @hostname =~ Resolv::IPv4::Regex
+
       resolved_ip = Resolv::DNS.open do |dns|
         dns.timeouts = 0.5
         dns.getaddress @hostname
@@ -67,11 +69,13 @@ module NodeHelper
 
     # @return [LocationResult]
     def location
+      return LocationResult(false, "Can not fetch location with no IP: #{@ip.message}", nil) unless @ip.ok
+
       client = MaxMind::GeoIP2::Client.new(
         account_id: ENV.fetch('MAXMIND_ACCOUNT_ID'),
         license_key: ENV.fetch('MAXMIND_LICENSE_KEY')
       )
-      LocationResult.new(true, nil, client.insights(@ip))
+      LocationResult.new(true, nil, client.insights(@ip.ip))
     rescue StandardError => e
       Sentry.capture_exception(e)
       LocationResult.new(false, "Error: #{e}", nil)
