@@ -82,7 +82,7 @@ module PersonaHelper
 
     def url
       PersonaURL.new(URI.parse(base_url))
-                .set_param('reference-id ', @user.external_id)
+                .set_param('reference-id', @user.external_id)
     end
 
     private
