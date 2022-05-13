@@ -15,7 +15,7 @@ SIZE_CLASSES = {
 }.freeze
 
 class ButtonComponent < ViewComponent::Base
-  def initialize(scheme: :primary,
+  def initialize(scheme: :primary, # rubocop:disable Lint/MissingSuper
                  size: :medium,
                  **rest)
     rest[:class] = [

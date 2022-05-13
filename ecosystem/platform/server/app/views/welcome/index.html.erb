@@ -33,8 +33,21 @@
         </div>
       </div>
     </dialog>
-    <%= render(ButtonComponent.new(size: :large, onclick: 'document.getElementById("login-dialog").showModal()', class: 'w-full mt-auto')) do %>
-      Sign up for Testnet
-    <% end %>
+    <script type="application/javascript">
+        function showLoginModal(title) {
+            document.getElementById("login-dialog").children[1].innerHTML = title;
+            document.getElementById("login-dialog").showModal();
+        }
+    </script>
+    <p class=" mb-4">
+      <%= render(ButtonComponent.new(size: :large, onclick: 'showLoginModal("Sign up with")', class: 'w-full mt-auto')) do %>
+        Sign up for Testnet
+      <% end %>
+    </p>
+    <p>
+      <%= render(ButtonComponent.new(size: :large, onclick: 'showLoginModal("Sign in with")', class: 'w-full mt-auto')) do %>
+        Log in
+      <% end %>
+    </p>
   </div>
 </div>

@@ -15,7 +15,7 @@
     <%= render "layouts/flash" %>
 
     <div class="flex flex-col lg:flex-row gap-8 sm:gap-16 2xl:gap-24">
-      <div class="bg-neutral-800 rounded-md flex flex-col flex-1">
+      <div id="first-step" class="bg-neutral-800 rounded-md flex flex-col flex-1">
         <h3 class="font-mono uppercase mb-2 bg-neutral-700 text-teal-400 px-4 py-2 rounded-t-md text-sm">Step 1</h3>
         <div class="px-8 py-4 flex flex-col flex-1">
           <h4 class="text-teal-400 font-mono uppercase text-2xl mb-4">Node Verification</h4>
@@ -34,7 +34,27 @@
           <% end %>
         </div>
       </div>
-      <div class="bg-neutral-800 rounded-md flex flex-col flex-1">
+      <% if current_user&.it1_profile&.validator_verified?
+           cls = ''
+           title = ''
+         else
+           cls = 'cursor-not-allowed select-none opacity-50'
+           title = 'title="You must complete Node Verification first" onclick="shakeFirst()"'.html_safe
+         end
+      %>
+
+      <script type="application/javascript">
+          function shakeFirst() {
+              const element = document.getElementById("first-step");
+              if (element) {
+                  element.classList.add("shake");
+                  setTimeout(() => {
+                      element.classList.remove("shake");
+                  }, 300);
+              }
+          }
+      </script>
+      <div class="bg-neutral-800 rounded-md flex flex-col flex-1 <%=cls%>" <%=title%>>
         <h3 class="font-mono uppercase mb-2 bg-neutral-700 text-teal-400 px-4 py-2 rounded-t-md text-sm">Step 2</h3>
         <div class="px-8 py-4 flex flex-col flex-1">
           <h4 class="text-teal-400 font-mono uppercase text-2xl mb-4">Identity Verification</h4>
@@ -43,11 +63,17 @@
           Identity must be verified by noon (PST) May 23 to get into the selection process.
           </p>
           <% if current_user&.kyc_complete? %>
-            <div class="w-full bg-teal-400 text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mt-auto cursor-not-allowed select-none">Verification Complete</div>
+            <div class="w-full bg-teal-400 text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mt-auto cursor-not-allowed select-none">
+              Verification Complete
+            </div>
           <% elsif current_user&.it1_profile&.validator_verified? %>
             <%= render(ButtonComponent.new(href: onboarding_kyc_redirect_path, class: 'w-full mt-auto')) do %>
               Verify
             <% end %>
+          <% else %>
+            <div class="w-full bg-teal-400 text-neutral-800 block p-2 text-center font-mono uppercase text-lg rounded font-bold mt-auto cursor-not-allowed select-none">
+              Verify
+            </div>
           <% end %>
         </div>
       </div>
