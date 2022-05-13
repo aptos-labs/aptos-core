@@ -13,8 +13,7 @@ Gas ensures that all Move programs running on the Aptos Blockchain eventually te
 When a client submits a transaction for execution to the Aptos Blockchain, it contains a specified:
 
 * `max_gas_amount`: The maximum amount of gas units that can be used to execute the transaction. This bounds the computational resources that can be consumed by the transaction.
-* `gas_price`: The gas price in the specified gas currency. Gas price is a way to translate from gas units (the abstract units of resources consumed by the virtual machine) to a transaction fee in the specified gas currency.
-* `gas_currency`: This is the currency of the transaction fee.
+* `gas_price`: The gas price in the blockchain's utility token. Gas price is a way to translate from gas units (the abstract units of resources consumed by the virtual machine) to a transaction fee in the blockchain's utility token.
 
 The transaction fee charged to the client will be at most `gas_price * max_gas_amount`.
 
@@ -34,7 +33,7 @@ Each of these resource dimensions can fluctuate independently. However, there is
 
 ## Using gas to compute transaction fees
 
-When you send a transaction, the transaction fee (in the specifed gas currency) for execution is the gas price multiplied by the VM's computed resource usage for that transaction.
+When you send a transaction, the transaction fee for execution is the gas price multiplied by the VM's computed resource usage for that transaction.
 
 At different times in the transaction flow, different aspects of resource usage are charged. The basics of the transaction flow and the gas-related logic are detailed in the following diagram:
 ![FIGURE 1.0 Gas and Transaction Flow](/img/docs/using-gas.svg)
@@ -56,18 +55,12 @@ In the former, the fee is collected and the result of the transaction is persist
 
 When you send a transaction, it is prioritized based on different criteria. One of these is the normalized gas price for the transaction.
 
-For transactions that are subject to ordering by gas price (i.e., non-governance transactions) these prices are first normalized to Aptos Coins. This is done by using the current gas currency to Aptos Coin conversion rate that is stored on-chain. Transactions are then ranked (in part) based upon this normalized gas price.
-
 For example:
 
-* Bob sends a transaction with `gas_price` 10 and `gas_currency` of “BobCoins”.
-* Alice sends a transaction at the same time with `gas_price` 20 and `gas_currency` of “AliceCoins”.
+* Bob sends a transaction with `gas_price` 10.
+* Alice sends a transaction at the same time with `gas_price` 20.
 
-If the on-chain “BobCoins” to Aptos Coins exchange rate is 2.1 and the on-chain “AliceCoins” to Aptos Coins exchange rate is 1,
-* Bob’s transaction has a normalized gas price of `10 * 2.1 = 21`.
-* Alice’s transaction has a normalized gas price of `20 * 1 = 20`.
-
-Then, Bob’s transaction would be ranked higher than Alice’s.
+Alice's transaction would be ranked higher than Bob's.
 
 ## Core design principles
 Three central principles have motivated the design of gas in Aptos and Move:
