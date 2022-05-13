@@ -84,7 +84,7 @@ For best availability and stability, we recommend that you deploy your node on t
 
 Follow the links below to begin your installation:
 
-* [Using GCP](run-validator-node-using-gcp)
-* [Using AWS](run-validator-node-using-aws)
-* [Using Docker](run-validator-node-using-docker)
-* [Using Aptos source code](run-validator-node-using-source)
+* [Using GCP](./using-gcp.md)
+* [Using AWS](./using-aws.md)
+* [Using Docker](./using-docker.md)
+* [Using Aptos source code](./using-source-code.md)
