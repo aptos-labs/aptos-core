@@ -4,43 +4,36 @@
 import assert from "assert";
 import fs from "fs";
 import { Account, RestClient, TESTNET_URL, FAUCET_URL, FaucetClient } from "./first_transaction";
+import { HelloBlockchainClient } from "./hello_blockchain";
 
 const readline = require("readline").createInterface({
   input: process.stdin,
   output: process.stdout
 });
 
-class CoinClient extends RestClient {
+class FirstCoinClient extends RestClient {
 
-  /** Publishes a new module to the blockchain within the specified account */
-  async publishModule(accountFrom: Account, moduleHex: string): Promise<string> {
-    const payload = {
-      "type": "module_bundle_payload",
-      "modules": [
-        {"bytecode": `0x${moduleHex}`},
-      ],
-    };
-    return await this.executeTransactionWithPayload(accountFrom, payload);
-  }
-  
+//:!:>section_1
   /** Initializes the new coin */
   async initializeCoin(accountFrom: Account, coinTypeAddress: string): Promise<string> {
     let payload: { function: string; arguments: any[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
-      function: `0x1::Coin::initialize`,
+      function: `0x1::ManagedCoin::initialize`,
       type_arguments: [
         `0x${coinTypeAddress}::MoonCoin::MoonCoin`,
       ],
       arguments: [
         Buffer.from("Moon Coin", "utf-8").toString("hex"),
         Buffer.from("MOON", "utf-8").toString("hex"),
-        "18",
+        "6",
         false,
       ]
     };
     return await this.executeTransactionWithPayload(accountFrom, payload);
   }
+//<:!:section_1
 
+//:!:>section_2
   /** Receiver needs to register the coin before they can receive it */
   async registerCoin(coinReceiver: Account, coinTypeAddress: string): Promise<string> {
     let payload: { function: string; arguments: string[]; type: string; type_arguments: any[] };
@@ -54,7 +47,9 @@ class CoinClient extends RestClient {
     };
     return await this.executeTransactionWithPayload(coinReceiver, payload);
   }
+//<:!:section_2
 
+//:!:>section_3
   /** Mints the newly created coin to a specified receiver address */
   async mintCoin(
     coinOwner: Account,
@@ -65,7 +60,7 @@ class CoinClient extends RestClient {
     let payload: { function: string; arguments: string[]; type: string; type_arguments: any[] };
     payload = {
       "type": "script_function_payload",
-      "function": `0x1::Coin::mint`,
+      "function": `0x1::ManagedCoin::mint`,
       "type_arguments": [
         `0x${coinTypeAddress}::MoonCoin::MoonCoin`,
       ],
@@ -76,7 +71,9 @@ class CoinClient extends RestClient {
     };
     return await this.executeTransactionWithPayload(coinOwner, payload);
   }
+//<:!:section_3
 
+//:!:>section_4
   /** Return the balance of the newly created coin */
   async getBalance(accountAddress: string, coinTypeAddress: string): Promise<string> {
     const resource = await this.accountResource(
@@ -89,13 +86,14 @@ class CoinClient extends RestClient {
       return resource["data"]["coin"]["value"]
     }
   }
+//<:!:section_4
 }
 
 /** run our demo! */
 async function main() {
   assert(process.argv.length == 3, "Expecting an argument that points to the helloblockchain module");
 
-  const restClient = new CoinClient(TESTNET_URL);
+  const restClient = new FirstCoinClient(TESTNET_URL);
   const faucetClient = new FaucetClient(FAUCET_URL, restClient);
 
   // Create two accounts, Alice and Bob, and fund Alice but not Bob
@@ -118,10 +116,10 @@ async function main() {
   const modulePath = process.argv[2];
   const moduleHex = fs.readFileSync(modulePath).toString("hex");
 
-  console.log("Publishing...");
-
-  let txHash = await restClient.publishModule(alice, moduleHex);
-  await restClient.waitForTransaction(txHash);
+  console.log("Publishing MoonCoinType module...");
+  const helloBlockchainClient = new HelloBlockchainClient(TESTNET_URL);
+  let txHash = await helloBlockchainClient.publishModule(alice, moduleHex);
+  await helloBlockchainClient.waitForTransaction(txHash);
 
   console.log("Alice will initialize the new coin");
   txHash = await restClient.initializeCoin(alice, alice.address());

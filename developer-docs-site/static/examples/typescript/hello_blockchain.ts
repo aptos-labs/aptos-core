@@ -11,7 +11,7 @@ const readline = require("readline").createInterface({
 });
 
 //:!:>section_1
-class HelloBlockchainClient extends RestClient {
+export class HelloBlockchainClient extends RestClient {
 
   /** Publish a new module to the blockchain within the specified account */
   async publishModule(accountFrom: Account, moduleHex: string): Promise<string> {

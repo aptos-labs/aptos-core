@@ -208,6 +208,18 @@ impl RestClient {
         res.json().unwrap()
     }
 
+    /// Submits a signed transaction to the blockchain.
+    pub fn execution_transaction_with_payload(
+        &self,
+        account_from: &mut Account,
+        payload: serde_json::Value,
+    ) -> String {
+        let txn_request = self.generate_transaction(&account_from.address(), payload);
+        let signed_txn = self.sign_transaction(account_from, txn_request);
+        let res = self.submit_transaction(&signed_txn);
+        res.get("hash").unwrap().as_str().unwrap().to_string()
+    }
+
     pub fn transaction_pending(&self, transaction_hash: &str) -> bool {
         let res = reqwest::blocking::get(format!("{}/transactions/{}", self.url, transaction_hash))
             .unwrap();
