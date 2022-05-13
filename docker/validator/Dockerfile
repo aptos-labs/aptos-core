@@ -24,7 +24,7 @@ RUN IMAGE_TARGETS="release" ./docker/build-common.sh
 ### Production Image ###
 FROM debian-base AS prod
 
-RUN apt-get update && apt-get install -y libssl1.1 && apt-get clean && rm -r /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libssl1.1 ca-certificates && apt-get clean && rm -r /var/lib/apt/lists/*
 
 ### Needed to run debugging tools like perf
 RUN apt-get update && apt-get install -y linux-tools-4.19 sudo procps

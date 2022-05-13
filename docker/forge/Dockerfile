@@ -23,7 +23,7 @@ RUN IMAGE_TARGETS="test" ./docker/build-common.sh
 
 FROM debian-base
 
-RUN apt-get update && apt-get install -y libssl1.1 openssh-client wget busybox git unzip awscli && apt-get clean && rm -r /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libssl1.1 ca-certificates openssh-client wget busybox git unzip awscli && apt-get clean && rm -r /var/lib/apt/lists/*
 
 RUN mkdir /aptos
 COPY rust-toolchain /aptos/rust-toolchain

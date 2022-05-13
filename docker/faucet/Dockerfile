@@ -24,7 +24,7 @@ RUN IMAGE_TARGETS="test" ./docker/build-common.sh
 ### Production Image ###
 FROM debian-base AS pre-test
 
-RUN apt-get update && apt-get install -y libssl1.1 nano net-tools tcpdump iproute2 netcat \
+RUN apt-get update && apt-get install -y libssl1.1 ca-certificates nano net-tools tcpdump iproute2 netcat \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
 RUN mkdir -p /opt/aptos/bin  /aptos/client/data/wallet/

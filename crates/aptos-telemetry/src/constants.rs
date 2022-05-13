@@ -9,8 +9,10 @@
 pub const APTOS_GA_MEASUREMENT_ID: &str = "G-ZX4L6WPCFZ";
 pub const APTOS_GA_API_SECRET: &str = "ArtslKPTTjeiMi1n-IR39g";
 
-pub const HTTPBIN_URL: &str = "http://httpbin.org/ip";
-pub const GA4_URL: &str = "http://www.google-analytics.com/mp/collect";
+pub const HTTPBIN_URL: &str = "https://httpbin.org/ip";
+// measurement protocol requires HTTPS
+// https://developers.google.com/analytics/devguides/collection/protocol/v1/reference#transport
+pub const GA4_URL: &str = "https://www.google-analytics.com/mp/collect";
 
 // Timeouts
 pub const NETWORK_PUSH_TIME_SECS: u64 = 30;

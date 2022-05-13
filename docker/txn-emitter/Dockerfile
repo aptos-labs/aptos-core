@@ -24,7 +24,7 @@ RUN IMAGE_TARGETS="release" ./docker/build-common.sh
 ### Production Image ###
 FROM debian-base AS pre-prod
 
-RUN apt-get update && apt-get -y install libssl1.1 wget busybox gettext-base && apt-get clean && rm -r /var/lib/apt/lists/*
+RUN apt-get update && apt-get -y install libssl1.1 ca-certificates wget busybox gettext-base && apt-get clean && rm -r /var/lib/apt/lists/*
 
 RUN mkdir -p /opt/aptos/bin
 COPY --from=builder /aptos/target/release/transaction-emitter /usr/local/bin

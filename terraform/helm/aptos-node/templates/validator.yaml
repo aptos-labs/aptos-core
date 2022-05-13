@@ -198,13 +198,14 @@ spec:
   - ports:
     - protocol: TCP
       port: 6180
-  # Aptos telemetry
-  - ports:
-    - protocol: TCP
-      port: 80
   # DNS
   - to:
     - namespaceSelector: {}
     ports:
     - protocol: UDP
       port: 53
+  # Enable HTTPS telemetry
+  - ports:
+    - protocol: TCP
+      port: 443
+

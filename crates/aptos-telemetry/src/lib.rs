@@ -7,7 +7,8 @@
 pub mod constants;
 
 use aptos_logger::prelude::*;
-use aptos_metrics::json_metrics::get_git_rev;
+use aptos_metrics::{json_metrics::get_git_rev, register_int_counter_vec, IntCounterVec};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -19,6 +20,24 @@ use uuid::Uuid;
 pub const GA_MEASUREMENT_ID: &str = "GA_MEASUREMENT_ID";
 pub const GA_API_SECRET: &str = "GA_API_SECRET";
 pub const APTOS_TELEMETRY_DISABLE: &str = "APTOS_TELEMETRY_DISABLE";
+
+pub static APTOS_TELEMETRY_SUCCESS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_telemetry_success",
+        "Number of telemetry events successfully sent",
+        &["event_name"]
+    )
+    .unwrap()
+});
+
+pub static APTOS_TELEMETRY_FAILURE: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_telemetry_failure",
+        "Number of telemetry events failed to send",
+        &["event_name"]
+    )
+    .unwrap()
+});
 
 #[derive(Debug, Serialize, Deserialize)]
 struct MetricsDump {
@@ -86,7 +105,7 @@ pub async fn send_data(event_name: String, user_id: String, event_params: HashMa
         .unwrap_or_else(|_| constants::APTOS_GA_MEASUREMENT_ID.to_string());
 
     let metrics_event = MetricsEvent {
-        name: event_name,
+        name: event_name.clone(),
         params: event_params,
     };
 
@@ -114,8 +133,33 @@ pub async fn send_data(event_name: String, user_id: String, event_params: HashMa
             .send()
             .await;
         match res {
-            Ok(_) => debug!("Sent telemetry data {:?}", &metrics_dump),
-            Err(e) => debug!("{:?}", e),
+            Ok(res) => {
+                let status_code = res.status().as_u16();
+                if status_code > 200 && status_code < 299 {
+                    info!("Sent telemetry event {}", event_name.as_str());
+                    debug!("Sent telemetry data {:?}", &metrics_dump);
+                    APTOS_TELEMETRY_SUCCESS
+                        .with_label_values(&[event_name.as_str()])
+                        .inc();
+                } else {
+                    info!(
+                        "Failed to send telemetry event {}: {}",
+                        res.status(),
+                        event_name.as_str()
+                    );
+                    debug!("{:?}", res.text().await);
+                    APTOS_TELEMETRY_FAILURE
+                        .with_label_values(&[event_name.as_str()])
+                        .inc();
+                }
+            }
+            Err(e) => {
+                info!("Failed to send telemetry event {}", event_name.as_str());
+                debug!("{:?}", e);
+                APTOS_TELEMETRY_FAILURE
+                    .with_label_values(&[event_name.as_str()])
+                    .inc();
+            }
         }
     });
 }

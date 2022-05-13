@@ -924,6 +924,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics",
  "aptos-workspace-hack",
+ "once_cell",
  "reqwest",
  "serde 1.0.137",
  "serde_json",
