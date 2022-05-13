@@ -97,7 +97,8 @@ spec:
             export VAULT_TOKEN="root"
             VAULT_BACKEND="backend=vault;server=$VAULT_ADDR;token=/tmp/vault.token"
             {{- end }}
-            vault write -f "/transit/keys/val${N}__validator_network/rotate"
+            # XXX: disables key rotation at re-genesis to keep from hitting managed backend key size limits
+            # vault write -f "/transit/keys/val${N}__validator_network/rotate"
             aptos-genesis-tool owner-key --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N"
             aptos-genesis-tool operator-key --validator-backend "$VAULT_BACKEND;namespace=val$N" --shared-backend "$FILE_BACKEND;namespace=val$N"
             {{- if .Values.service.fullnode.enableOnchainDiscovery }}
