@@ -6,11 +6,11 @@ sidebar_position: 10
 
 # Run a Validator Node
 
-Validator nodes runs a distributed consensus protocol, execute the transaction, and store the transaction and the execution results on the blockchain. Validator nodes decide which transactions will be added to the blockchain and in which order. Read more about [Validator node concepts](/basics/basics-validator-nodes).
+The Aptos blockchain consists of validator nodes that run a distributed consensus protocol. The consensus protocol agrees upon the ordering of transactions and their results and then store both the transactions and output on the blockchain. Read more about [Validator node concepts](/basics/basics-validator-nodes).
 
 For incentivized testnet, we're recommending every node operator to run a validator with a fullnode, so all the reference implementation used here will have both nodes installed by default.
 
-This tutorial explains how to configure a validator node to run on test mode, which will be used during the registration stage to validate your eligibility, and how to connect to incentivized testnet once you're selected to run a validator node. Users not selected to run a validator node can still run a public fullnode to connect to incentivized testnet.
+This tutorial explains how to configure a validator node to run in test mode, which will be used during the incentivized testnet registration stage to validate your eligibility, and how to connect to the incentivized testnet if you're selected to run a validator node.
 
 ## Before you proceed
 
@@ -35,7 +35,7 @@ The amount of data stored by Aptos depends on the ledger history (length) of the
 of on-chain states (e.g., accounts). These values depend on several factors, including: the age of the blockchain,
 the average transaction rate and the configuration of the ledger pruner.
 
-We recommend to bootstrap with 300GB of disk space to leave room for load testing, but if you want to save disk space you can start with smaller size and expand when reaching limit, and you will be responsible for monitoring the disk usage of your node, adjusting it as needed to ensure the node uptime. 
+We recommend nodes have at least 300GB of disk space to ensure adequate storage space for load testing. You have the option to start with a smaller size and adjust based upon demands. You will be responsible for monitoring your node's disk usage and adjusting appropriately to ensure node uptime.
 
 ## Networking configuration requirements
 
@@ -51,9 +51,9 @@ For Fullnode:
 - Open TCP port 80/8080, for REST API access.
 
 ## Getting started
-You can configure an Aptos node in many ways: using Aptos source code, using docker, and using Terraform. For best availability and stability, we recommend you to deploy your node on the Cloud. We provided Terraform support for deploying the node on three cloud providers: GCP, AWS and Azure.
+You can configure an Aptos node in many ways: using Aptos source code, Docker, and Terraform. For best availability and stability, we recommend you to deploy your node on the Cloud. We have provided Terraform support for deploying the node on three cloud providers: GCP, AWS and Azure.
 
-In order to participate in the incentivized testnet, participants must demonstrate the ability to configure and deploy a node as well as pass KYC (know your client) sanctions requirements.
+In order to participate in the incentivized testnet, participants must demonstrate the ability to configure and deploy a node as well as pass sanctions screening requirements.
 
 High level steps for joining Aptos Incentivized Testnet:
 - Follow the instruction to deploy a node (including a validator node and a fullnode) with test mode.
@@ -65,6 +65,6 @@ High level steps for joining Aptos Incentivized Testnet:
 Running a validator node in test mode is required to be eligible for incentivized testnet. This is a method we use to verify that a node operator can successfully start a validator node, and have it properly configured with Aptos network identity. In test mode, you will be running a local network with one single node, it should be functioning like a normal blockchain. You can follow those guide to install your node in test mode:
 
 * [Using Aptos source code](run-validator-node-using-source)
-* [Using docker](run-validator-node-using-docker)
+* [Using Docker](run-validator-node-using-docker)
 * [Using GCP](run-validator-node-using-gcp)
 * [Using AWS](run-validator-node-using-aws)
