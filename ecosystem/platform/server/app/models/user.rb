@@ -86,21 +86,21 @@ class User < ApplicationRecord
       secret: data['credentials']['secret'],
       refresh_token: data['credentials']['refresh_token'],
       expires_at:,
-      email: data['info']['email'].downcase,
-      profile_url: data['info']['image']
+      email: data.dig('info', 'email')&.downcase,
+      profile_url: data.dig('info', 'image')
     }
     case data['provider']
     when 'github'
       auth = auth.merge({
-                          username: data['info']['nickname'].downcase,
-                          full_name: data['info']['name']
+                          username: data.dig('info', 'nickname')&.downcase,
+                          full_name: data.dig('info', 'name')
                         })
     when 'discord'
       raw_info = data['extra']['raw_info']
       auth = auth.merge({
                           username: "#{raw_info['username'].downcase}##{raw_info['discriminator']}",
-                          full_name: data['info']['name'],
-                          profile_url: data['info']['image']
+                          full_name: data.dig('info', 'name'),
+                          profile_url: data.dig('info', 'image')
                         })
     else
       raise 'Unknown Provider!'
