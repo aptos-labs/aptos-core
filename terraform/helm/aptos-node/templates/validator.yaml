@@ -198,6 +198,10 @@ spec:
   - ports:
     - protocol: TCP
       port: 6180
+  # Aptos telemetry
+  - ports:
+    - protocol: TCP
+      port: 80
   # DNS
   - to:
     - namespaceSelector: {}
