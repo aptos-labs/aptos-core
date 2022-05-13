@@ -75,6 +75,11 @@
           <%= f.text_field :fullnode_address %>
           </p>
 
+          <p class="mb-4">
+          <%= f.label :fullnode_network_key, class: "font-mono uppercase block mb-2 text-lg" %>
+          <%= f.text_field :fullnode_network_key, pattern: '0x[a-f0-9]{64}' %>
+          </p>
+
           <div class="flex gap-8 md:gap-16 mb-4 items-end">
             <div class="flex-1">
               <%= f.label :fullnode_port, class: "font-mono uppercase block mb-2 text-lg" %>
