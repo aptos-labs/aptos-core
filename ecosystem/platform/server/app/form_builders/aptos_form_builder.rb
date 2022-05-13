@@ -10,7 +10,7 @@ class AptosFormBuilder < ActionView::Helpers::FormBuilder
       options[:class] = [
         'font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded '\
         'w-full py-2 px-4 focus:ring-0 focus:border-teal-400',
-        { 'border-red-500': @object.errors.any? },
+        { 'border-red-500': @object.errors[method].present? },
         options[:class]
       ]
       super(method, options)
