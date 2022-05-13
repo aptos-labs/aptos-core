@@ -79,7 +79,6 @@ module AptosFramework::Genesis {
         Account::rotate_authentication_key_internal(core_resource_account, copy core_resource_account_auth_key);
         // initialize the core framework account
         let core_framework_account = Account::create_core_framework_account();
-        Account::rotate_authentication_key_internal(&core_framework_account, core_resource_account_auth_key);
 
         // Consensus config setup
         ConsensusConfig::initialize(core_resource_account);
