@@ -174,6 +174,52 @@ Aptos is now set up for account 18B61497FD290B02BB0751F44381CADA1657C2B3AA6194A0
 }
 
 ```
+### View an account's balance and transfer events
+
+You can view the balance and transfer events (deposits and withdrawals) with:
+```bash
+$ aptos account list --query balance --account 18B61497FD290B02BB0751F44381CADA1657C2B3AA6194A00D9BC9A85FAD3B04
+
+```
+
+The above command will generate the following information on your terminal:
+
+```bash
+{
+  "Result": [
+    {
+      "coin": {
+        "value": "9999729"
+      },
+      "deposit_events": {
+        "counter": "1",
+        "guid": {
+          "guid": {
+            "id": {
+              "addr": "0x661a4ca2b5f7475e61d2209cd3818488b3725ddb5e483633317291f86d3a26d6",
+              "creation_num": "1"
+            }
+          },
+          "len_bytes": 40
+        }
+      },
+      "withdraw_events": {
+        "counter": "3",
+        "guid": {
+          "guid": {
+            "id": {
+              "addr": "0x661a4ca2b5f7475e61d2209cd3818488b3725ddb5e483633317291f86d3a26d6",
+              "creation_num": "2"
+            }
+          },
+          "len_bytes": 40
+        }
+      }
+    }
+  ]
+}
+```
+
 ### Listing resources in an account
 
 You can list the resources in an account from the command line. For example, see below for how to list the resources in the account you just created above:
