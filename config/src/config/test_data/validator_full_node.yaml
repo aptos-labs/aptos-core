@@ -12,13 +12,16 @@ base:
 execution:
     genesis_file_location: "relative/path/to/genesis"
 
+# For validator fullnode we setup two network ids, the private "vfn" identity will allow it to connect to the validator node,
+# and the public identity will allow it to connects to other fullnodes onchain.
+
 full_node_networks:
     - listen_address: "/ip4/0.0.0.0/tcp/6180"
       discovery_method: "onchain"
       identity:
           type: "from_storage"
           key_name: "fullnode_network"
-          peer_id_name: "operator_account"
+          peer_id_name: "owner_account"
           backend:
               type: "vault"
               server: "https://127.0.0.1:8200"
@@ -26,15 +29,14 @@ full_node_networks:
               token:
                   from_disk: "/full/path/to/token"
       network_id: "public"
-    - listen_address: "/ip4/0.0.0.0/tcp/7180"
+    - listen_address: "/ip4/0.0.0.0/tcp/6181"
       max_outbound_connections: 1
       network_id:
           private: "vfn"
       seeds:
-        "00000000000000000000000000000000c227da54069989f283712e4016704660":
+        00000000000000000000000000000000d58bc7bb154b38039bc9096ce04e1237:
           addresses:
-            - "/ip4/127.0.0.1/tcp/58259/ln-noise-ik/c998dcd54c3daf48e0ad516d94b7be0b0b7a27caa00541f2b2c14b13500df10b/ln-handshake/0"
-          keys: ["c998dcd54c3daf48e0ad516d94b7be0b0b7a27caa00541f2b2c14b13500df10b"]
+          - "/ip4/127.0.0.1/tcp/6181/ln-noise-ik/f0274c2774519281a8332d0bb9d8101bd58bc7bb154b38039bc9096ce04e1237/ln-handshake/0"
           role: "Validator"
 api:
     enabled: true
