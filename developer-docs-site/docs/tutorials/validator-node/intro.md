@@ -6,7 +6,7 @@ sidebar_position: 10
 
 # Run a Validator Node
 
-The Aptos blockchain consists of validator nodes that run a distributed consensus protocol. The consensus protocol agrees upon the ordering of transactions and their results and then store both the transactions and output on the blockchain. Read more about [Validator node concepts](/basics/basics-validator-nodes).
+The Aptos blockchain consists of validator nodes that run a distributed consensus protocol. The consensus protocol agrees upon the ordering of transactions and their results and then store both the transactions and output on the blockchain.
 
 For incentivized testnet, we're recommending every node operator to run a validator with a fullnode, so all the reference implementation used here will have both nodes installed by default.
 
