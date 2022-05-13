@@ -1,13 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React, { useEffect } from 'react'
-import { AptosAccount } from 'aptos'
-import { Buffer } from 'buffer'
+import React, { useEffect } from 'react';
+import { AptosAccount } from 'aptos';
+import { Buffer } from 'buffer';
 import {
-  useNavigate
-} from 'react-router-dom'
-import useWalletState from '../hooks/useWalletState'
+  useNavigate,
+} from 'react-router-dom';
 import {
   Box,
   Button,
@@ -19,52 +18,55 @@ import {
   InputRightAddon,
   Text,
   useColorMode,
-  VStack
-} from '@chakra-ui/react'
-import { SubmitHandler, useForm } from 'react-hook-form'
-import { AptosBlackLogo, AptosWhiteLogo } from '../components/AptosLogo'
-import withSimulatedExtensionContainer from '../components/WithSimulatedExtensionContainer'
-import { getAccountResources } from './Wallet'
-import ChakraLink from '../components/ChakraLink'
-import { secondaryBgColor, secondaryErrorMessageColor } from '../constants'
+  VStack,
+} from '@chakra-ui/react';
+import { SubmitHandler, useForm } from 'react-hook-form';
+import ChakraLink from 'core/components/ChakraLink';
+import useWalletState from 'core/hooks/useWalletState';
+import { AptosWhiteLogo, AptosBlackLogo } from 'core/components/AptosLogo';
+import withSimulatedExtensionContainer from 'core/components/WithSimulatedExtensionContainer';
+import { secondaryBgColor, secondaryErrorMessageColor } from 'core/constants';
+import { getAccountResources } from './Wallet';
 
-type Inputs = Record<string, any>
+type Inputs = Record<string, any>;
 
 export const secondaryTextColor = {
   dark: 'gray.400',
-  light: 'gray.500'
-}
+  light: 'gray.500',
+};
 
-function Login () {
-  const { colorMode } = useColorMode()
-  const { aptosAccount, updateWalletState } = useWalletState()
-  const { register, watch, handleSubmit, setError, formState: { errors } } = useForm()
-  const key: string = watch('privateKey')
-  const navigate = useNavigate()
+function Login() {
+  const { colorMode } = useColorMode();
+  const { aptosAccount, updateWalletState } = useWalletState();
+  const {
+    formState: { errors }, handleSubmit, register, setError, watch,
+  } = useForm();
+  const key: string = watch('privateKey');
+  const navigate = useNavigate();
 
   const onSubmit: SubmitHandler<Inputs> = async (data, event) => {
-    event?.preventDefault()
+    event?.preventDefault();
     try {
-      const nonHexKey = (key.startsWith('0x')) ? key.substring(2) : key
-      const encodedKey = Uint8Array.from(Buffer.from(nonHexKey, 'hex'))
-      const account = new AptosAccount(encodedKey, undefined)
-      const response = await getAccountResources({ address: account.address().hex() })
+      const nonHexKey = (key.startsWith('0x')) ? key.substring(2) : key;
+      const encodedKey = Uint8Array.from(Buffer.from(nonHexKey, 'hex'));
+      const account = new AptosAccount(encodedKey, undefined);
+      const response = await getAccountResources({ address: account.address().hex() });
       if (!response) {
-        setError('privateKey', { type: 'custom', message: 'Account not found' })
-        return
+        setError('privateKey', { message: 'Account not found', type: 'custom' });
+        return;
       }
-      updateWalletState({ aptosAccountState: account })
-      navigate('/wallet')
+      updateWalletState({ aptosAccountState: account });
+      navigate('/wallet');
     } catch (err) {
-      setError('privateKey', { type: 'custom', message: 'Invalid private key' })
+      setError('privateKey', { message: 'Invalid private key', type: 'custom' });
     }
-  }
+  };
 
   useEffect(() => {
     if (aptosAccount) {
-      navigate('/wallet')
+      navigate('/wallet');
     }
-  }, [])
+  }, []);
 
   return (
     <VStack
@@ -85,7 +87,14 @@ function Login () {
           </Box>
         </Center>
         <Heading textAlign="center">Wallet</Heading>
-        <Text textAlign="center" pb={8} color={secondaryTextColor[colorMode]}>An Aptos crypto wallet</Text>
+        <Text
+          textAlign="center"
+          pb={8}
+          color={secondaryTextColor[colorMode]}
+          fontSize="lg"
+        >
+          An Aptos crypto wallet
+        </Text>
         <form onSubmit={handleSubmit(onSubmit)}>
           <VStack spacing={4}>
             <Center minW="100%" px={4}>
@@ -93,14 +102,14 @@ function Login () {
                 <InputGroup>
                   <Input
                     maxW="350px"
-                    { ...register('privateKey')}
+                    {...register('privateKey')}
                     variant="filled"
                     required
-                    placeholder='Private key...'
+                    placeholder="Private key..."
                     autoComplete="off"
                   />
                   <InputRightAddon>
-                    <Button type='submit' variant="unstyled">
+                    <Button type="submit" variant="unstyled">
                       Submit
                     </Button>
                   </InputRightAddon>
@@ -128,7 +137,7 @@ function Login () {
         </ChakraLink>
       </HStack> */}
     </VStack>
-  )
+  );
 }
 
-export default withSimulatedExtensionContainer(Login)
+export default withSimulatedExtensionContainer(Login);

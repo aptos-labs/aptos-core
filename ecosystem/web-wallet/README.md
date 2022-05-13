@@ -12,3 +12,9 @@
 
 **B. Webpage**
 1. `yarn run`
+
+## Linting
+```bash
+# Autofix all linting issues
+npm run lint -- --fix
+```

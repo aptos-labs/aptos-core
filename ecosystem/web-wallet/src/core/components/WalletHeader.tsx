@@ -1,26 +1,28 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { Center, HStack, Text, Tooltip, useClipboard, useColorMode } from '@chakra-ui/react'
-import React from 'react'
-import useWalletState from '../hooks/useWalletState'
+import {
+  Center, HStack, Text, Tooltip, useClipboard, useColorMode,
+} from '@chakra-ui/react';
+import React from 'react';
+import useWalletState from 'core/hooks/useWalletState';
 
 const secondaryHeaderBgColor = {
+  dark: 'gray.700',
   light: 'gray.200',
-  dark: 'gray.700'
-}
+};
 
 export const seconaryAddressFontColor = {
+  dark: 'gray.400',
   light: 'gray.500',
-  dark: 'gray.400'
-}
+};
 
-export default function WalletHeader () {
-  const { aptosAccount } = useWalletState()
-  const { colorMode } = useColorMode()
-  const { onCopy, hasCopied } = useClipboard(
-    aptosAccount?.address().hex() || ''
-  )
+export default function WalletHeader() {
+  const { aptosAccount } = useWalletState();
+  const { colorMode } = useColorMode();
+  const { hasCopied, onCopy } = useClipboard(
+    aptosAccount?.address().hex() || '',
+  );
 
   return (
     <Center
@@ -55,5 +57,5 @@ export default function WalletHeader () {
         </Tooltip>
       </HStack>
     </Center>
-  )
+  );
 }

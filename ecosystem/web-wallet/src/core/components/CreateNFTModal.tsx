@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AddIcon } from '@chakra-ui/icons'
+import { AddIcon } from '@chakra-ui/icons';
 import {
   Button,
   FormControl,
@@ -17,50 +17,50 @@ import {
   Text,
   useColorMode,
   useDisclosure,
-  VStack
-} from '@chakra-ui/react'
-import { AptosClient, RequestError, TokenClient } from 'aptos'
-import { useMutation } from 'react-query'
-import React from 'react'
-import { SubmitHandler, useForm } from 'react-hook-form'
-import { queryClient } from '..'
-import { NODE_URL } from '../constants'
-import useWalletState from '../hooks/useWalletState'
-import { Inputs } from '../pages/Wallet'
-import { AptosAccountState } from '../types'
-import { secondaryTextColor } from '../pages/Login'
+  VStack,
+} from '@chakra-ui/react';
+import { AptosClient, RequestError, TokenClient } from 'aptos';
+import { useMutation, useQueryClient } from 'react-query';
+import React from 'react';
+import { SubmitHandler, useForm } from 'react-hook-form';
+import useWalletState from 'core/hooks/useWalletState';
+import { Inputs } from 'pages/Wallet';
+import { secondaryTextColor } from 'pages/Login';
+import { NODE_URL } from 'core/constants';
+import { AptosAccountState } from 'core/types';
 
-window.Buffer = window.Buffer || require('buffer').Buffer
+// eslint-disable-next-line global-require
+window.Buffer = window.Buffer || require('buffer').Buffer;
 
 const defaultRequestErrorAttributes = {
+  config: {},
+  headers: {},
   status: 400,
   statusText: 'Move abort',
-  headers: {},
-  config: {}
-}
+};
 
 interface RaiseForErrorProps {
   vmStatus: string
 }
 
 const raiseForError = ({
-  vmStatus
+  vmStatus,
 }: RaiseForErrorProps) => {
   if (vmStatus.includes('Move abort')) {
     throw new RequestError(vmStatus, {
       data: {
-        message: vmStatus
+        message: vmStatus,
       },
-      ...defaultRequestErrorAttributes
-    })
+      ...defaultRequestErrorAttributes,
+    });
   }
-}
+};
 
 interface CreateTokenAndCollectionProps {
   account: AptosAccountState,
   collectionName?: string,
-  name?: string,
   description?: string,
+  name?: string,
   supply: number,
   uri?: string
 }
@@ -68,28 +68,28 @@ interface CreateTokenAndCollectionProps {
 const createTokenAndCollection = async ({
   account,
   collectionName,
-  name,
   description,
+  name,
   supply,
-  uri
+  uri,
 }: CreateTokenAndCollectionProps): Promise<void> => {
   if (!account || !(collectionName && description && uri && name)) {
-    return
+    return;
   }
-  const aptosClient = new AptosClient(NODE_URL)
-  const tokenClient = new TokenClient(aptosClient)
+  const aptosClient = new AptosClient(NODE_URL);
+  const tokenClient = new TokenClient(aptosClient);
 
   const collectionTxnHash = await tokenClient.createCollection(
     account,
     collectionName,
     description,
-    uri
-  )
+    uri,
+  );
 
   // Move abort errors do not throw so we need to check them manually
-  const collectionTxn: any = await aptosClient.getTransaction(collectionTxnHash)
-  let vmStatus: string = collectionTxn.vm_status
-  raiseForError({ vmStatus })
+  const collectionTxn: any = await aptosClient.getTransaction(collectionTxnHash);
+  let vmStatus: string = collectionTxn.vm_status;
+  raiseForError({ vmStatus });
 
   const tokenTxnHash = await tokenClient.createToken(
     account,
@@ -97,53 +97,54 @@ const createTokenAndCollection = async ({
     name,
     description,
     supply,
-    uri
-  )
-  const tokenTxn: any = await aptosClient.getTransaction(tokenTxnHash)
-  vmStatus = tokenTxn.vm_status
-  raiseForError({ vmStatus })
-}
+    uri,
+  );
+  const tokenTxn: any = await aptosClient.getTransaction(tokenTxnHash);
+  vmStatus = tokenTxn.vm_status;
+  raiseForError({ vmStatus });
+};
 
-export default function CreateNFTModal () {
-  const { colorMode } = useColorMode()
-  const { isOpen, onOpen, onClose } = useDisclosure()
-  const { register, watch, handleSubmit } = useForm()
-  const { aptosAccount } = useWalletState()
+export default function CreateNFTModal() {
+  const { colorMode } = useColorMode();
+  const { isOpen, onClose, onOpen } = useDisclosure();
+  const { handleSubmit, register, watch } = useForm();
+  const { aptosAccount } = useWalletState();
+  const queryClient = useQueryClient();
 
-  const collectionName: string | undefined = watch('collectionName')
-  const tokenName: string | undefined = watch('tokenName')
-  const description: string | undefined = watch('description')
-  const supply = Number(watch('supply') || 1)
-  const uri: string | undefined = watch('uri')
+  const collectionName: string | undefined = watch('collectionName');
+  const tokenName: string | undefined = watch('tokenName');
+  const description: string | undefined = watch('description');
+  const supply = Number(watch('supply') || 1);
+  const uri: string | undefined = watch('uri');
 
   const {
-    isError,
     error,
+    isError,
     isLoading,
-    mutateAsync: createTokenAndCollectionOnClick
+    mutateAsync: createTokenAndCollectionOnClick,
   } = useMutation<void, RequestError>(() => (
     createTokenAndCollection({
       account: aptosAccount,
       collectionName,
-      name: tokenName,
       description,
+      name: tokenName,
       supply,
-      uri
+      uri,
     })
-  ))
+  ));
 
-  const errorMessage = error?.response?.data?.message
+  const errorMessage = error?.response?.data?.message;
 
   const onSubmit: SubmitHandler<Inputs> = async (_data, event) => {
-    event?.preventDefault()
-    await createTokenAndCollectionOnClick()
-    await queryClient.refetchQueries(['gallery-items'])
-    onClose()
-  }
+    event?.preventDefault();
+    await createTokenAndCollectionOnClick();
+    await queryClient.refetchQueries(['gallery-items']);
+    onClose();
+  };
 
   return (
     <>
-      <Button size="xs" onClick={onOpen} leftIcon={<AddIcon fontSize="xs"/>}>
+      <Button size="xs" onClick={onOpen} leftIcon={<AddIcon fontSize="xs" />}>
         New
       </Button>
       <Modal isOpen={isOpen} onClose={onClose}>
@@ -159,7 +160,7 @@ export default function CreateNFTModal () {
                     Collection name
                   </FormLabel>
                   <Input
-                    { ...register('collectionName')}
+                    {...register('collectionName')}
                     variant="filled"
                     required
                     maxLength={100}
@@ -170,7 +171,7 @@ export default function CreateNFTModal () {
                     Token name
                   </FormLabel>
                   <Input
-                    { ...register('tokenName')}
+                    {...register('tokenName')}
                     variant="filled"
                     required
                     maxLength={100}
@@ -181,7 +182,7 @@ export default function CreateNFTModal () {
                     Description
                   </FormLabel>
                   <Input
-                    { ...register('description')}
+                    {...register('description')}
                     variant="filled"
                     required
                     maxLength={3000}
@@ -193,7 +194,7 @@ export default function CreateNFTModal () {
                     Supply
                   </FormLabel>
                   <Input
-                    { ...register('supply')}
+                    {...register('supply')}
                     variant="filled"
                     type="number"
                     min={1}
@@ -207,7 +208,7 @@ export default function CreateNFTModal () {
                     Uri
                   </FormLabel>
                   <Input
-                    { ...register('uri')}
+                    {...register('uri')}
                     variant="filled"
                     required
                     maxLength={300}
@@ -217,23 +218,23 @@ export default function CreateNFTModal () {
                 {
                   (isError)
                     ? (
-                    <Text color="red.400">
-                      {errorMessage}
-                    </Text>
-                      )
+                      <Text color="red.400">
+                        {errorMessage}
+                      </Text>
+                    )
                     : undefined
                 }
               </VStack>
             </ModalBody>
             <ModalFooter>
-              <Button isLoading={isLoading} colorScheme='blue' mr={3} type="submit">
+              <Button isLoading={isLoading} colorScheme="blue" mr={3} type="submit">
                 Submit
               </Button>
-              <Button variant='ghost' onClick={onClose}>Close</Button>
+              <Button variant="ghost" onClick={onClose}>Close</Button>
             </ModalFooter>
           </form>
         </ModalContent>
       </Modal>
     </>
-  )
+  );
 }

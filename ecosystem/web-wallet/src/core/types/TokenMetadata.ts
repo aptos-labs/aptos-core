@@ -6,37 +6,37 @@ export type MetadataJsonAttribute = {
 };
 
 export type MetadataJsonCollection = {
-  name: string;
   family: string;
+  name: string;
 };
 
 export type MetadataJsonFile = {
-  uri: string;
-  type: string;
   cdn?: boolean;
+  type: string;
+  uri: string;
 };
 
 export type MetadataJsonCreator = {
   address: string;
-  verified: boolean;
   share: number;
+  verified: boolean;
 };
 
 export type MetadataJsonProperties = {
-  files: MetadataJsonFile[];
   category: MetaDataJsonCategory;
   creators: MetadataJsonCreator[];
+  files: MetadataJsonFile[];
 };
 
 export type MetadataJson = {
-  name: string;
-  symbol: string;
-  description: string;
-  seller_fee_basis_points: number;
-  image: string;
   animation_url?: string;
-  external_url?: string;
   attributes?: MetadataJsonAttribute[];
   collection?: MetadataJsonCollection;
+  description: string;
+  external_url?: string;
+  image: string;
+  name: string;
   properties: MetadataJsonProperties;
+  seller_fee_basis_points: number;
+  symbol: string;
 };
