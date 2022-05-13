@@ -8,7 +8,9 @@ sidebar_position: 12
 
 1. Install Docker and Docker-Compose, [Aptos CLI](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md).
 
-:::caution Docker has only been tested on Linux, Windows, and Intel MacOS. If you are on M1 MacOS, use the Aptos-core source approach.
+:::caution Note on Apple M1
+
+Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1 macOS, use the Aptos-core source approach.
 
 :::
 

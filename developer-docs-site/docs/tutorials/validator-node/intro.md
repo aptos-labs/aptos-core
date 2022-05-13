@@ -4,17 +4,32 @@ slug: "intro"
 sidebar_position: 10
 ---
 
-# Run a Validator Node
+# Introduction
 
-The Aptos blockchain consists of validator nodes that run a distributed consensus protocol. The consensus protocol agrees upon the ordering of transactions and their results and then store both the transactions and output on the blockchain.
+This tutorial describes how to run Aptos nodes for the Aptos Incentivized Testnet 1 (AIT1) program. It explains the following:
 
-For incentivized testnet, we're recommending every node operator to run a validator with a fullnode, so all the reference implementation used here will have both nodes installed by default.
+- How to configure a validator node to run in test mode. This will be used during the AIT1 registration stage to validate your eligibility, and 
+- How to connect to the incentivized testnet if you are selected to run a validator node.
 
-This tutorial explains how to configure a validator node to run in test mode, which will be used during the incentivized testnet registration stage to validate your eligibility, and how to connect to the incentivized testnet if you're selected to run a validator node.
+:::info
+
+For the AIT1, we  recommend that every node operator run both a validator node and a FullNode. Hence, the reference implementation described in these sections will install both the nodes by default. 
+
+:::
+
+## Deploying for Aptos Incentivized Testnet
+
+In order to participate in the incentivized testnet, participants must demonstrate the ability to configure and deploy a node, as well as pass the sanctions screening requirements.
+
+Follow the below steps to participate in the Aptos Incentivized Testnet:
+- Follow the instructions to deploy both a validator node and a fullnode in the test mode.
+- Navigate to the [Incentivized Testnet registration page](https://community.aptoslabs.com/) and enter information about your node (pub-keys, IP/DNS address).
+- If you are selected to run a node, follow instructions in [Connecting to Aptos Incentivized Testnet](connect-to-testnet) to join incentivized testnet.
+- Keep the node in healthy state for the entire testing period and follow operational requests as needed.
 
 ## Before you proceed
 
-Before you get started with this tutorial, read the following sections:
+If you are new to Aptos Blockchain, read the following sections before proceeding:
 
 * [Validator node concepts](/basics/basics-validator-nodes).
 * [FullNode concepts](/basics/basics-fullnodes).
@@ -51,20 +66,25 @@ For Fullnode:
 - Open TCP port 80/8080, for REST API access.
 
 ## Getting started
-You can configure an Aptos node in many ways: using Aptos source code, Docker, and Terraform. For best availability and stability, we recommend you to deploy your node on the Cloud. We have provided Terraform support for deploying the node on three cloud providers: GCP, AWS and Azure.
-
-In order to participate in the incentivized testnet, participants must demonstrate the ability to configure and deploy a node as well as pass sanctions screening requirements.
-
-High level steps for joining Aptos Incentivized Testnet:
-- Follow the instruction to deploy a node (including a validator node and a fullnode) with test mode.
-- Navigate to registration page, enter informations about your node (pub-keys, IP/DNS address).
-- If you're selected to run a node, follow instructions to join incentivized testnet.
-- Keep the node in healthy state for the entire testing period and follow operational requests as needed.
 
 ### Installation
-Running a validator node in test mode is required to be eligible for incentivized testnet. This is a method we use to verify that a node operator can successfully start a validator node, and have it properly configured with Aptos network identity. In test mode, you will be running a local network with one single node, it should be functioning like a normal blockchain. You can follow those guide to install your node in test mode:
+You must run a validator node in test mode to be eligible for incentivized testnet. This is a method we use to verify that a node operator can successfully start a validator node, and have it properly configured with Aptos network identity. 
 
-* [Using Aptos source code](run-validator-node-using-source)
-* [Using Docker](run-validator-node-using-docker)
+In test mode, you will be running a local network with one single node, and it should be functioning like a normal blockchain. You can configure an Aptos node in many ways: 
+
+- Using Aptos source code.
+- Using Docker, and 
+- Using Terraform (for deploying with GCP, AWS and Azure). 
+
+:::tip
+
+For best availability and stability, we recommend that you deploy your node on the cloud. We have provided Terraform support for deploying the node on three cloud providers: GCP, AWS and Azure.
+
+:::
+
+Follow the links below to begin your installation:
+
 * [Using GCP](run-validator-node-using-gcp)
 * [Using AWS](run-validator-node-using-aws)
+* [Using Docker](run-validator-node-using-docker)
+* [Using Aptos source code](run-validator-node-using-source)
