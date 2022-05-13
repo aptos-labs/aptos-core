@@ -25,6 +25,7 @@ ActiveAdmin.register It1Profile do
     column :validator_verified
     column :fullnode_address
     column :fullnode_port
+    column :fullnode_network_key
     column :created_at
     column :updated_at
     actions

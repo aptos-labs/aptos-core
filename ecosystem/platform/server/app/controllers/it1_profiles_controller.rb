@@ -110,6 +110,6 @@ class It1ProfilesController < ApplicationController
   def it1_profile_params
     params.fetch(:it1_profile, {}).permit(:consensus_key, :account_key, :network_key, :validator_address,
                                           :validator_port, :validator_api_port, :validator_metrics_port,
-                                          :fullnode_address, :fullnode_port, :terms_accepted)
+                                          :fullnode_address, :fullnode_port, :fullnode_network_key, :terms_accepted)
   end
 end
