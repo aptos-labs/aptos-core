@@ -70,6 +70,9 @@ class OnboardingController < ApplicationController
     else
       render :email, status: :unprocessable_entity
     end
+  rescue SendEmailJobError
+    current_user.errors.add :email
+    render :email, status: :unprocessable_entity
   end
 
   private
