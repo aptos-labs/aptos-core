@@ -1,18 +1,18 @@
 ---
-title: "Run Validator Node Using AWS"
-slug: "run-validator-node-using-aws"
+title: "Run Validator Node Using Azure"
+slug: "run-validator-node-using-azure"
 sidebar_position: 11
 ---
 
 ## Run on AWS
-This guide assumes you already have AWS account setup.
+This guide assumes you already have Azure account setup.
 
 Install pre-requisites if needed:
 
    * Aptos CLI: https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md
    * Terraform 1.1.7: https://www.terraform.io/downloads.html
    * Kubernetes CLI: https://kubernetes.io/docs/tasks/tools/
-   * AWS CLI: https://aws.amazon.com/cli/
+   * Azure CLI: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
 
 1. Create a working directory for your configuration.
 
@@ -26,10 +26,12 @@ Install pre-requisites if needed:
     mkdir -p ~/$WORKSPACE
     ```
 
-2. Create a S3 storage bucket for storing the Terraform state on AWS, you can do this on AWS UI or by the command: 
+2. Create a blob storage container for storing the Terraform state on Azure, you can do this on Azure UI or by the command: 
 
     ```
-    aws s3api create-bucket --bucket <bucket name> --region <region name>
+    az group create -l <azure region> -n aptos-$WORKSPACE
+    az storage account create -n <storage account name> -g aptos-$WORKSPACE -l <azure region> --sku Standard_LRS
+    az storage container create -n <container name> --account-name <storage account name> --resource-group aptos-$WORKSPACE
     ```
 
 3. Create Terraform file called `main.tf` in your working directory:
@@ -42,22 +44,19 @@ Install pre-requisites if needed:
   ```
   terraform {
     required_version = "~> 1.1.0"
-    backend "s3" {
-      bucket = "terraform.aptos-node"
-      key    = "state/aptos-node"
-      region = <aws region>
+    backend "azurerm" {
+      resource_group_name  = <resource group name>
+      storage_account_name = <storage account name>
+      container_name       = <container name>
+      key                  = "state/validator"
     }
   }
 
-  provider "aws" {
-    region = <aws region>
-  }
 
   module "aptos-node" {
     # download Terraform module from aptos-labs/aptos-core repo
-    source        = "github.com/aptos-labs/aptos-core.git//terraform/aptos-node/aws?ref=main"
-    region        = <aws region>  # Specify the region
-    # zone_id     = "<Route53 zone id>"  # zone id for Route53 if you want to use DNS
+    source        = "github.com/aptos-labs/aptos-core.git//terraform/aptos-node/azure?ref=main"
+    region        = <azure region>  # Specify the region
     era           = 1              # bump era number to wipe the chain
     chain_id      = 23
     image_tag     = "testnet" # Specify the docker image tag to use
@@ -65,7 +64,7 @@ Install pre-requisites if needed:
   }
   ```
 
-    For the full customization options, see the variables file [here](https://github.com/aptos-labs/aptos-core/blob/main/terraform/aptos-node/aws/variables.tf), and the [helm values](https://github.com/aptos-labs/aptos-core/blob/main/terraform/helm/aptos-node/values.yaml).
+    For the full customization options, see the variables file [here](https://github.com/aptos-labs/aptos-core/blob/main/terraform/aptos-node/azure/variables.tf), and the [helm values](https://github.com/aptos-labs/aptos-core/blob/main/terraform/helm/aptos-node/values.yaml).
 
 5. Initialize Terraform in the same directory of your `main.tf` file
   ```
@@ -88,7 +87,7 @@ This will download all the terraform dependencies for you, in the `.terraform` f
 
 8. Once terraform apply finishes, you can check if those resources are created:
 
-    - `aws eks update-kubeconfig --name aptos-$WORKSPACE` to configure access for your k8s cluster.
+    - `az aks get-credentials --resource-group aptos-$WORKSPACE --name aptos-$WORKSPACE` to configure access for your k8s cluster.
     - `kubectl get pods` this should have haproxy, validator and fullnode. with validator and fullnode pod `pending` (require further action in later steps)
     - `kubectl get svc` this should have `validator-lb` and `fullnode-lb`, with an external-IP you can share later for connectivity.
 
