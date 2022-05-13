@@ -276,6 +276,14 @@ workflows:
   ### on bors action ###
   # Build the PR binaries and run various tests
   # Build the Docker images and run Forge tests
+
+  build-push-community-platform:
+    jobs:
+      - build-push-community-platform:
+          context:
+          - aws-dev
+          - gcp-global
+
   build-test-deploy:
     when:
       not:
@@ -286,10 +294,6 @@ workflows:
       - lint
       - ecosystem-lint
       - unit-test
-      - build-push-community-platform:
-          context:
-          - aws-dev
-          - gcp-global
       - docker-build-push:
           context: aws-dev
       - ecosystem-test:
