@@ -44,7 +44,7 @@ With your development environment ready, now you can start to setup your Validat
 7. Generate key pairs (node owner key, consensus key and networking key) in your working directory.
 
     ```
-    cargo run -p aptos -- genesis generate-keys --output-dir ~/$WORKSPACE
+    cargo run --release -p aptos -- genesis generate-keys --output-dir ~/$WORKSPACE
     ```
 
     This will create three files: `private-keys.yaml`, `validator-identity.yaml`, `validator-full-node-identity.yaml` for you. **IMPORTANT**: Backup your key files somewhere safe. These key files are important for you to establish ownership of your node, and you will use this information to claim your rewards later if eligible. Never share those keys with anyone else.
@@ -52,7 +52,7 @@ With your development environment ready, now you can start to setup your Validat
 8. Configure validator information, you need to setup a static IP / DNS address which can be used by the node, and make sure the network / firewalls are properly configured to accept external connections. This is all the info you need to register on our community website later.
 
     ```
-    cargo run -p aptos -- genesis set-validator-configuration \
+    cargo run --release -p aptos -- genesis set-validator-configuration \
         --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE \
         --username <pick a username for your node> \
         --validator-host <Validator Node IP / DNS address>:<Port> \
@@ -60,7 +60,7 @@ With your development environment ready, now you can start to setup your Validat
 
     # for example, with IP:
 
-    cargo run -p aptos -- genesis set-validator-configuration \
+    cargo run --release -p aptos -- genesis set-validator-configuration \
         --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE \
         --username aptosbot \
         --validator-host 35.232.235.205:6180 \
@@ -68,7 +68,7 @@ With your development environment ready, now you can start to setup your Validat
 
     # for example, with DNS:
 
-    cargo run -p aptos -- genesis set-validator-configuration \
+    cargo run --release -p aptos -- genesis set-validator-configuration \
         --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE \
         --username aptosbot \
         --validator-host bot.aptosdev.com:6180 \
@@ -104,7 +104,7 @@ With your development environment ready, now you can start to setup your Validat
     ---
     root_key: "0x5243ca72b0766d9e9cbf2debf6153443b01a1e0e6d086c7ea206eaf6f8043956"
     users:
-      - <username you created in step 5>
+      - <username you created in step 8>
     chain_id: 23
     ```
 
@@ -113,7 +113,7 @@ With your development environment ready, now you can start to setup your Validat
 10. Build AptosFramework Move bytecodes, copy into the framework folder
 
     ```
-    cargo run --package framework -- --package aptos-framework --output current
+    cargo run --release --package framework -- --package aptos-framework --output current
 
     mkdir ~/WORKSPACE/framework
 
@@ -125,7 +125,7 @@ With your development environment ready, now you can start to setup your Validat
 11. Compile genesis blob and waypoint
 
     ```
-    aptos genesis generate-genesis --local-repository-dir ~/$WORKSPACE --output-dir ~/$WORKSPACE
+    cargo run --release -p aptos -- genesis generate-genesis --local-repository-dir ~/$WORKSPACE --output-dir ~/$WORKSPACE
     ```
 
     This should create two files in your working directory, `genesis.blob` and `waypoint.txt`
@@ -133,8 +133,8 @@ With your development environment ready, now you can start to setup your Validat
 12. Copy the `validator.yaml`, `fullnode.yaml` files into this directory.
     ```
     mkdir ~/$WORKSPACE/config
-    cp docker/compose/aptos-node/validator.yaml ~/$WORKSPACE/config/validator.yaml
-    cp docker/compose/aptos-node/fullnode.yaml ~/$WORKSPACE/config/fullnode.yaml
+    cp docker/compose/aptos-node/validator.yaml ~/$WORKSPACE/validator.yaml
+    cp docker/compose/aptos-node/fullnode.yaml ~/$WORKSPACE/fullnode.yaml
     ```
 
     Modify the config file to update the key path, genesis file path, waypoint path.
