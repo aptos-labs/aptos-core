@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { AddIcon } from '@chakra-ui/icons'
 import {
   Button,

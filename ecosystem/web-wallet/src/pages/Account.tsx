@@ -45,7 +45,7 @@ export const CredentialRow = ({
       </Flex>
       <Flex alignItems="flex-end">
         <Tooltip label={hasCopied ? 'Copied!' : 'Copy'} closeDelay={300}>
-          <Text fontSize="xs" cursor="pointer" isTruncated onClick={onCopy}>
+          <Text fontSize="xs" cursor="pointer" noOfLines={1} onClick={onCopy}>
             {body}
           </Text>
         </Tooltip>

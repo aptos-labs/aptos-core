@@ -66,9 +66,28 @@ export const getAccountResources = async ({
 
 export type Inputs = Record<string, any>
 
+interface SubmitTransactionProps {
+  toAddress: string;
+  fromAddress: AptosAccount;
+  amount: string;
+  nodeUrl?: string;
+}
+
 interface FundWithFaucetProps {
   nodeUrl?: string;
+  faucetUrl?: string;
   address?: string;
+}
+
+const fundWithFaucet = async ({
+  nodeUrl = NODE_URL,
+  faucetUrl = FAUCET_URL,
+  address
+}: FundWithFaucetProps): Promise<void> => {
+  const faucetClient = new FaucetClient(nodeUrl, faucetUrl)
+  if (address) {
+    await faucetClient.fundAccount(address, 5000)
+  }
 }
 
 const TransferResult = Object.freeze({
@@ -78,23 +97,6 @@ const TransferResult = Object.freeze({
   IncorrectPayload: 'Incorrect transaction payload',
   Success: 'Transaction executed successfully'
 } as const)
-
-const fundWithFaucet = async ({
-  nodeUrl = NODE_URL,
-  address
-}: FundWithFaucetProps): Promise<void> => {
-  const faucetClient = new FaucetClient(nodeUrl, FAUCET_URL)
-  if (address) {
-    await faucetClient.fundAccount(address, 5000)
-  }
-}
-
-interface SubmitTransactionProps {
-  toAddress: string;
-  fromAddress: AptosAccount;
-  amount: string;
-  nodeUrl?: string;
-}
 
 const submitTransaction = async ({
   toAddress,

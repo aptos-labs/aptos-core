@@ -44,7 +44,7 @@ export default function WalletHeader () {
               whiteSpace="nowrap"
               overflow="hidden"
               display="block"
-              isTruncated
+              noOfLines={1}
               maxW={['100px', '120px']}
               cursor="pointer"
               onClick={onCopy}

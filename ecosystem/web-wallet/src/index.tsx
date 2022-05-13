@@ -17,8 +17,6 @@ import CreateWallet from './pages/CreateWallet'
 import Account from './pages/Account'
 import Gallery from './pages/Gallery'
 
-export const queryClient = new QueryClient()
-
 const theme: ThemeConfig = extendTheme({
   initialColorMode: 'dark',
   useSystemColorMode: false,
@@ -31,6 +29,8 @@ const theme: ThemeConfig = extendTheme({
     }
   }
 })
+
+export const queryClient = new QueryClient()
 
 const root = createRoot(document.getElementById('root') as Element)
 
