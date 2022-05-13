@@ -106,7 +106,7 @@ variable "validator_instance_num" {
 }
 
 variable "enable_logger" {
-  description = "Enable logger pod"
+  description = "Enable logger helm chart"
   default     = false
 }
 
@@ -117,7 +117,7 @@ variable "logger_helm_values" {
 }
 
 variable "enable_monitoring" {
-  description = "Enable logger pod"
+  description = "Enable monitoring helm chart"
   default     = false
 }
 
