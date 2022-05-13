@@ -59,9 +59,9 @@ impl StateKey {
     }
 
     /// Recovers from serialized bytes in physical storage.
-    pub fn decode(val: &[u8]) -> anyhow::Result<StateKey> {
+    pub fn decode(val: &[u8]) -> Result<StateKey, StateKeyDecodeErr> {
         if val.is_empty() {
-            return Err(StateKeyDecodeErr::EmptyInput.into());
+            return Err(StateKeyDecodeErr::EmptyInput);
         }
         let tag = val[0];
         let state_key_tag =
@@ -70,6 +70,12 @@ impl StateKey {
             StateKeyTag::AccessPath => Ok(StateKey::AccessPath(bcs::from_bytes(&val[1..])?)),
             StateKeyTag::TableItem => {
                 const HANDLE_SIZE: usize = std::mem::size_of::<u128>();
+                if val.len() < 1 + HANDLE_SIZE {
+                    return Err(StateKeyDecodeErr::NotEnoughBytes {
+                        tag,
+                        num_bytes: val.len(),
+                    });
+                }
                 let handle = u128::from_be_bytes(
                     val[1..1 + HANDLE_SIZE]
                         .try_into()
@@ -103,7 +109,7 @@ impl CryptoHash for StateKey {
 
 /// Error thrown when a [`StateKey`] fails to be deserialized out of a byte sequence stored in physical
 /// storage, via [`StateKey::decode`].
-#[derive(Debug, Error, Eq, PartialEq)]
+#[derive(Debug, Error)]
 pub enum StateKeyDecodeErr {
     /// Input is empty.
     #[error("Missing tag due to empty input")]
@@ -112,4 +118,10 @@ pub enum StateKeyDecodeErr {
     /// The first byte of the input is not a known tag representing one of the variants.
     #[error("lead tag byte is unknown: {}", unknown_tag)]
     UnknownTag { unknown_tag: u8 },
+
+    #[error("Not enough bytes: tag: {}, num bytes: {}", tag, num_bytes)]
+    NotEnoughBytes { tag: u8, num_bytes: usize },
+
+    #[error(transparent)]
+    BcsError(#[from] bcs::Error),
 }
