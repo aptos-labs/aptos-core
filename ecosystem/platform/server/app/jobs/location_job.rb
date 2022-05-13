@@ -14,7 +14,11 @@ class LocationJob < ApplicationJob
 
     # pass zeroes as a hack here: we only need the validator address
     node_verifier = NodeHelper::NodeVerifier.new(it1_profile.validator_address, 0, 0)
-    location_res = node_verifier.location
+
+    unless node_verifier.ip.ok
+      raise LocationFetchError,
+            "Error fetching IP for #{it1_profile.validator_address}: #{node_verifier.ip.message}"
+    end
 
     new_ip = node_verifier.ip.ip
     if new_ip != it1_profile.validator_ip
@@ -22,11 +26,13 @@ class LocationJob < ApplicationJob
                         "#{it1_profile.validator_address}: was #{it1_profile.validator_ip}, got #{new_ip}"
     end
 
+    location_res = node_verifier.location
+
     unless location_res.ok
       # TODO: DO SOMETHING (SENTRY? THROW?) IF THIS IS NOT OK
-      raise LocationFetchError("Error fetching location for #{it1_profile.validator_ip}: #{location_res.message}")
+      raise LocationFetchError, "Error fetching location for '#{it1_profile.validator_ip}': #{location_res.message}"
     end
 
-    Location.upsert_from_maxmind!(@it1_profile, location_res.record)
+    Location.upsert_from_maxmind!(it1_profile, location_res.record)
   end
 end
