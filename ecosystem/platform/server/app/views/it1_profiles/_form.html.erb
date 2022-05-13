@@ -31,7 +31,7 @@
           <%= f.text_field :account_key, required: true, pattern: '0x[a-f0-9]{64}' %>
           </div>
           <div class="mb-4">
-          <%= f.label :network_key, class: "font-mono uppercase block mb-2 text-lg" %>
+          <%= f.label :network_key, "Validator Network Key", class: "font-mono uppercase block mb-2 text-lg" %>
           <%= f.text_field :network_key, required: true, pattern: '0x[a-f0-9]{64}' %>
           </div>
         </div>
@@ -74,6 +74,11 @@
           <%= f.label :fullnode_address, "Address (IP or hostname)", class: "font-mono uppercase block mb-2 text-lg" %>
           <%= f.text_field :fullnode_address %>
           </div>
+
+          <p class="mb-4">
+          <%= f.label :fullnode_network_key, class: "font-mono uppercase block mb-2 text-lg" %>
+          <%= f.text_field :fullnode_network_key, pattern: '0x[a-f0-9]{64}' %>
+          </p>
 
           <div class="flex gap-8 md:gap-16 mb-4 items-end">
             <div class="flex-1">

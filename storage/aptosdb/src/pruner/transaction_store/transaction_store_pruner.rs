@@ -18,6 +18,7 @@ impl DBSubPruner for TransactionStorePruner {
     ) -> anyhow::Result<()> {
         // Current target version  might be less than the target version to ensure we don't prune
         // more than max_version in one go.
+
         let candidate_transactions =
             self.get_pruning_candidate_transactions(least_readable_version, target_version)?;
         self.transaction_store

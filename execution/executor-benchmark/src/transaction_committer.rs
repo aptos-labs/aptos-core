@@ -9,7 +9,7 @@ use aptos_types::{
     transaction::Version,
 };
 use aptos_vm::AptosVM;
-use aptosdb::metrics::APTOS_STORAGE_API_LATENCY_SECONDS;
+use aptosdb::metrics::API_LATENCY_SECONDS;
 use executor::{
     block_executor::BlockExecutor,
     metrics::{
@@ -119,7 +119,7 @@ fn report_block(
             APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum(),
             APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum() - APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum(),
             APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum(),
-            APTOS_STORAGE_API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum(),
+            API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum(),
         );
     const NANOS_PER_SEC: f64 = 1_000_000_000.0;
     info!(
@@ -130,7 +130,7 @@ fn report_block(
                 / total_versions,
             APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.get_sample_sum() * NANOS_PER_SEC
                 / total_versions,
-            APTOS_STORAGE_API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum() * NANOS_PER_SEC
+            API_LATENCY_SECONDS.get_metric_with_label_values(&["save_transactions", "Ok"]).expect("must exist.").get_sample_sum() * NANOS_PER_SEC
                 / total_versions,
         );
 }

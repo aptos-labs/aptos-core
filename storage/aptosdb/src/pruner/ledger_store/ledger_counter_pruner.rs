@@ -16,8 +16,11 @@ impl DBSubPruner for LedgerCounterPruner {
         least_readable_version: u64,
         target_version: u64,
     ) -> anyhow::Result<()> {
-        self.ledger_store
-            .prune_ledger_couners(least_readable_version, target_version, db_batch)?;
+        self.ledger_store.prune_ledger_counters(
+            least_readable_version,
+            target_version,
+            db_batch,
+        )?;
         Ok(())
     }
 }

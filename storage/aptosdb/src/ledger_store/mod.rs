@@ -370,13 +370,15 @@ impl LedgerStore {
     }
 
     /// Prune the ledger counters stored in DB in the range [being, end)
-    pub fn prune_ledger_couners(
+    pub fn prune_ledger_counters(
         &self,
         begin: Version,
         end: Version,
         db_batch: &mut SchemaBatch,
     ) -> anyhow::Result<()> {
-        db_batch.delete_range::<LedgerCountersSchema>(&begin, &end)?;
+        for version in begin..end {
+            db_batch.delete::<LedgerCountersSchema>(&version)?;
+        }
         Ok(())
     }
 }

@@ -267,7 +267,9 @@ impl TransactionStore {
         end: Version,
         db_batch: &mut SchemaBatch,
     ) -> anyhow::Result<()> {
-        db_batch.delete_range::<TransactionSchema>(&begin, &end)?;
+        for version in begin..end {
+            db_batch.delete::<TransactionSchema>(&version)?;
+        }
         Ok(())
     }
 
@@ -278,7 +280,9 @@ impl TransactionStore {
         end: Version,
         db_batch: &mut SchemaBatch,
     ) -> anyhow::Result<()> {
-        db_batch.delete_range::<TransactionInfoSchema>(&begin, &end)?;
+        for version in begin..end {
+            db_batch.delete::<TransactionInfoSchema>(&version)?;
+        }
         Ok(())
     }
 
@@ -289,7 +293,9 @@ impl TransactionStore {
         end: Version,
         db_batch: &mut SchemaBatch,
     ) -> anyhow::Result<()> {
-        db_batch.delete_range::<WriteSetSchema>(&begin, &end)?;
+        for version in begin..end {
+            db_batch.delete::<WriteSetSchema>(&version)?;
+        }
         Ok(())
     }
 

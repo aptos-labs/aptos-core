@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::APTOS_STORAGE_LEDGER;
+use crate::metrics::LEDGER_COUNTER;
 use num_derive::ToPrimitive;
 use num_traits::ToPrimitive;
 use num_variants::NumVariants;
@@ -145,7 +145,7 @@ impl LedgerCounters {
     /// Bump Prometheus counters.
     pub fn bump_op_counters(&self) {
         for counter in &LedgerCounter::VARIANTS {
-            APTOS_STORAGE_LEDGER
+            LEDGER_COUNTER
                 .with_label_values(&[counter.name()])
                 .set(self.get(*counter) as i64);
         }

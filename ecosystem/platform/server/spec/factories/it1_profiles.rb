@@ -13,5 +13,6 @@ FactoryBot.define do
     validator_metrics_port { 1 }
     fullnode_address { 'MyString' }
     fullnode_port { 1 }
+    fullnode_network_key { 'MyString' }
   end
 end

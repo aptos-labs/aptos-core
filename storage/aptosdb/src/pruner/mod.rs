@@ -13,7 +13,7 @@ pub(crate) mod transaction_store;
 pub mod utils;
 pub(crate) mod worker;
 
-use crate::metrics::APTOS_STORAGE_PRUNE_WINDOW;
+use crate::metrics::{PRUNER_BATCH_SIZE, PRUNER_WINDOW};
 
 use aptos_config::config::StoragePrunerConfig;
 use aptos_infallible::Mutex;
@@ -82,11 +82,16 @@ impl Pruner {
         let least_readable_version = Arc::new(Mutex::new(vec![0, 0, 0, 0, 0]));
         let worker_progress_clone = Arc::clone(&least_readable_version);
 
-        APTOS_STORAGE_PRUNE_WINDOW.set(
-            storage_pruner_config
-                .state_store_prune_window
-                .expect("State store pruner window is required") as i64,
-        );
+        PRUNER_WINDOW
+            .with_label_values(&["state_pruner"])
+            .set((storage_pruner_config.state_store_prune_window.unwrap_or(0)) as i64);
+
+        PRUNER_WINDOW
+            .with_label_values(&["ledger_pruner"])
+            .set((storage_pruner_config.ledger_prune_window.unwrap_or(0)) as i64);
+
+        PRUNER_BATCH_SIZE.set(storage_pruner_config.pruning_batch_size as i64);
+
         let worker = Worker::new(
             db,
             transaction_store,
@@ -121,13 +126,18 @@ impl Pruner {
         self.state_store_prune_window
     }
 
+    pub fn get_ledger_pruner_window(&self) -> Version {
+        self.ledger_prune_window
+    }
+
     /// Sends pruning command to the worker thread when necessary.
     pub fn maybe_wake_pruner(&self, latest_version: Version) {
         *self.latest_version.lock() = latest_version;
         if latest_version
             >= *self.last_version_sent_to_pruners.lock() + self.pruning_batch_size as u64
         {
-            self.wake_pruner(latest_version)
+            self.wake_pruner(latest_version);
+            *self.last_version_sent_to_pruners.lock() = latest_version;
         }
     }
 
