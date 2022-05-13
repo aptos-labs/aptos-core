@@ -31,7 +31,7 @@ class SendEmailJob < ApplicationJob
     handle_results(results)
   rescue StandardError => e
     Sentry.capture_exception(e)
-    puts "Error: #{e}"
+    raise SendEmailJobError
   end
 
   def email_body
