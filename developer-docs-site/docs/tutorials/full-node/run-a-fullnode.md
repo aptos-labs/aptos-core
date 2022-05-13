@@ -193,7 +193,7 @@ This section describes how to configure and run your FullNode using Docker.
 5. Start Docker Compose by running the command:
 
     ```
-    docker-compose up
+    docker compose up
     ```
 
 ## Verify the correctness of your FullNode
