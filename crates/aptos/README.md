@@ -23,7 +23,7 @@ source $HOME/.cargo/env
 1. Install the `aptos` CLI tool by running the below command.  You can run this command from any directory.  The `aptos`
    CLI tool will be installed into your `CARGO_HOME`, usually `~/.cargo`:
 ```bash
-cargo install --git https://github.com/aptos-labs/aptos-core.git aptos
+cargo install --git https://github.com/aptos-labs/aptos-core.git aptos --tag aptos-cli-latest
 ```
 2. Confirm that the `aptos` CLI tool is installed successfully by running the below command.  The terminal will display
    the path to the `aptos` CLI's location.
