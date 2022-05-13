@@ -18,13 +18,12 @@ class ButtonComponent < ViewComponent::Base
   def initialize(scheme: :primary,
                  size: :medium,
                  **rest)
-    @rest = rest
-
-    @tag = rest[:href] ? :a : :button
     rest[:class] = [
       SCHEME_CLASSES[scheme],
       SIZE_CLASSES[size],
       rest[:class]
     ]
+    @rest = rest
+    @tag = rest[:href] ? :a : :button
   end
 end

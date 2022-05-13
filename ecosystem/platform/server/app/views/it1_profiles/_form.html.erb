@@ -1,7 +1,7 @@
 <div class="flex flex-col lg:flex-row justify-between">
   <%= render "shared/captcha_helper" %>
 
-  <%= form_with(model: it1_profile, class: "contents", data: {turbo: false}, html: {onsubmit:"return validateRecaptcha();"}) do |f| %>
+  <%= form_with(model: it1_profile, class: "contents", data: {turbo: false}, html: {onsubmit:"return validateRecaptcha();"}, builder: AptosFormBuilder) do |f| %>
     <div>
       <% if it1_profile.errors.any? %>
         <div id="error_explanation" class="flex p-4 mb-4 bg-red-100 rounded-lg dark:bg-red-200 lg:w-96" role="alert">
@@ -24,15 +24,15 @@
 
           <p class="mb-4">
           <%= f.label :consensus_key, class: "font-mono uppercase block mb-2 text-lg" %>
-          <%= f.text_field :consensus_key, autofocus: true, required: true, pattern: '0x[a-f0-9]{64}', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
+          <%= f.text_field :consensus_key, autofocus: true, required: true, pattern: '0x[a-f0-9]{64}' %>
           </p>
           <p class="mb-4">
           <%= f.label :account_key, class: "font-mono uppercase block mb-2 text-lg" %>
-          <%= f.text_field :account_key, required: true, pattern: '0x[a-f0-9]{64}', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
+          <%= f.text_field :account_key, required: true, pattern: '0x[a-f0-9]{64}' %>
           </p>
           <p class="mb-4">
           <%= f.label :network_key, class: "font-mono uppercase block mb-2 text-lg" %>
-          <%= f.text_field :network_key, required: true, pattern: '0x[a-f0-9]{64}', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
+          <%= f.text_field :network_key, required: true, pattern: '0x[a-f0-9]{64}' %>
           </p>
         </div>
 
@@ -42,24 +42,24 @@
 
           <p class="mb-4">
           <%= f.label :validator_address, "Address (IP or hostname)", class: "font-mono uppercase block mb-2 text-lg" %>
-          <%= f.text_field :validator_address, required: true, class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
+          <%= f.text_field :validator_address, required: true %>
           </p>
 
           <div class="flex gap-8 md:gap-16 mb-4 items-end">
             <div class="flex-1">
               <%= f.label :validator_port, "Validator (noise) port", class: "font-mono uppercase block mb-2 text-lg" %>
-              <%= f.text_field :validator_port, required: true, pattern: '[0-9]+', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
+              <%= f.text_field :validator_port, required: true, pattern: '[0-9]+' %>
             </div>
             <div class="flex-1">
               <%= f.label :validator_metrics_port, "Metrics port", class: "font-mono uppercase block mb-2 text-lg" %>
-              <%= f.text_field :validator_metrics_port, required: true, pattern: '[0-9]+', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
+              <%= f.text_field :validator_metrics_port, required: true, pattern: '[0-9]+' %>
             </div>
           </div>
 
           <div class="flex gap-8 md:gap-16 mb-4 items-end">
             <div class="flex-1">
               <%= f.label :validator_api_port, "API port", class: "font-mono uppercase block mb-2 text-lg" %>
-              <%= f.text_field :validator_api_port, required: true, pattern: '[0-9]+', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
+              <%= f.text_field :validator_api_port, required: true, pattern: '[0-9]+' %>
             </div>
             <div class="flex-1"></div>
           </div>
@@ -72,13 +72,13 @@
 
           <p class="mb-4">
           <%= f.label :fullnode_address, "Address (IP or hostname)", class: "font-mono uppercase block mb-2 text-lg" %>
-          <%= f.text_field :fullnode_address, class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
+          <%= f.text_field :fullnode_address %>
           </p>
 
           <div class="flex gap-8 md:gap-16 mb-4 items-end">
             <div class="flex-1">
               <%= f.label :fullnode_port, class: "font-mono uppercase block mb-2 text-lg" %>
-              <%= f.text_field :fullnode_port, pattern: '[0-9]+', class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
+              <%= f.text_field :fullnode_port, pattern: '[0-9]+' %>
             </div>
             <div class="flex-1"></div>
           </div>
@@ -95,7 +95,7 @@
       </div>
       <div class="text-sm">
         <label class="flex mb-4 gap-2 items-center cursor-pointer">
-          <%= f.check_box :terms_accepted, required: true, class: "bg-transparent border-teal-400 checked:bg-teal-400 hover:checked:bg-teal-400 focus:checked:bg-teal-400 focus:ring-0 outline-none" %>
+          <%= f.check_box :terms_accepted, required: true %>
           <span>I agree to the Aptos <a href="#" class="font-bold text-teal-400">Terms of Use</a> and <a href="#" class="font-bold text-teal-400">Privacy Policy</a>.</span>
         </label>
       </div>

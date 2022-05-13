@@ -19,9 +19,9 @@
 
   <%= render "shared/captcha_helper" %>
 
-  <%= form_with(model: current_user, url: onboarding_email_path, method: :post, data: {turbo: false}, html: {onsubmit: "return validateRecaptcha();"}) do |f| %>
+  <%= form_with(model: current_user, url: onboarding_email_path, method: :post, data: {turbo: false}, html: {onsubmit: "return validateRecaptcha();"}, builder: AptosFormBuilder) do |f| %>
     <div class="mb-8">
-      <%= f.email_field :email, autofocus: true, autocomplete: "email", required: true, placeholder: "ENTER YOUR EMAIL ADDRESS", class: "font-mono placeholder:text-white text-lg bg-transparent appearance-none border border-white rounded w-full py-2 px-4 focus:ring-0 focus:border-teal-400" %>
+      <%= f.email_field :email, autofocus: true, autocomplete: "email", required: true, placeholder: "ENTER YOUR EMAIL ADDRESS" %>
     </div>
 
     <div class="mb-8">
@@ -36,7 +36,7 @@
 
     <div class="text-sm">
       <label class="flex mb-4 gap-2 items-center cursor-pointer">
-        <%= f.check_box :terms_accepted, required: true, class: "bg-transparent border-teal-400 checked:bg-teal-400 hover:checked:bg-teal-400 focus:checked:bg-teal-400 focus:ring-0 outline-none" %>
+        <%= f.check_box :terms_accepted, required: true %>
         <span>I agree to the Aptos <a href="#" class="font-bold text-teal-400">Terms of Use</a> and <a href="#" class="font-bold text-teal-400">Privacy Policy</a>.</span>
       </label>
     </div>
