@@ -66,7 +66,7 @@ class OnboardingController < ApplicationController
       log current_user, 'email updated'
       url = confirmation_url(current_user, confirmation_token: current_user.confirmation_token)
       SendConfirmEmailJob.perform_now({ user_id: current_user.id, template_vars: { CONFIRM_LINK: url } })
-      redirect_to onboarding_email_path, notice: "Verification email sent to #{email_params[:email]}"
+      render :email_success
     else
       render :email, status: :unprocessable_entity
     end

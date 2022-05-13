@@ -1,0 +1,13 @@
+<div class="flex-[2]">
+  <h2 class="text-4xl text-teal-400 font-mono mb-16 mt-8">Welcome, <%= @oauth_username %>!</h2>
+
+  <p class="mb-4 font-light">
+  A verification email has been sent to <strong><%= current_user.email %></strong>.
+  </p>
+  <p class="mb-4 font-light">
+  Please verify your email by clicking the link sent to your inbox.
+  </p>
+  <p class="mb-4 font-light">
+  If you have not received this email, please check your spam folder, or <%= link_to "click here", onboarding_email_path, class: "underline" %> to send a new email.
+  </p>
+</div>
