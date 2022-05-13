@@ -157,13 +157,13 @@ With your development environment ready, now you can start to setup your Validat
 14. Start your local Validator by running the below command:
 
     ```
-    cargo run -p aptos-node --release -- -f ~/$WORKSPACE/validator.yaml
+    cargo run -p aptos-node --release -- -f ~/$WORKSPACE/config/validator.yaml
     ```
 
     Run fullnode in another terminal:
 
     ```
-    cargo run -p aptos-node --release -- -f ~/$WORKSPACE/fullnode.yaml
+    cargo run -p aptos-node --release -- -f ~/$WORKSPACE/config/fullnode.yaml
     ```
 
 Now you have completed setting up your node in test mode. You can continue to our [community](https://community.aptoslabs.com/) website for registration.
