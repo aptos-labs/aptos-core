@@ -8,9 +8,7 @@ sidebar_position: 12
 
 1. Install Docker and Docker-Compose, [Aptos CLI](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos/README.md).
 
-:::caution Docker support only on Linux
-
-Docker container is currently supported only on Linux x86-64 platform. If you are on macOS or Windows platform, use the Aptos-core source approach.
+:::caution Docker has only been tested on Linux, Windows, and Intel MacOS. If you are on M1 MacOS, use the Aptos-core source approach.
 
 :::
 
