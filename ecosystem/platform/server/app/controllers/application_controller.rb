@@ -39,7 +39,7 @@ class ApplicationController < ActionController::Base
   end
 
   def ensure_confirmed!
-    redirect_to onboarding_email_path unless current_user.confirmed?
+    redirect_to onboarding_email_path unless current_user&.confirmed?
   end
 
   def append_info_to_payload(payload)
