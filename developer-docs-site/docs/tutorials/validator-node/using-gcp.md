@@ -110,7 +110,7 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
 
     This will create three files: `private-keys.yaml`, `validator-identity.yaml`, `validator-full-node-identity.yaml` for you. **IMPORTANT**: Backup your key files somewhere safe. These key files are important for you to establish ownership of your node, and you will use this information to claim your rewards later if eligible. Never share those keys with anyone else.
 
-11. Configure validator information.
+11. Configure validator information. This is all the info you need to register on our community website later.
 
     ```
     aptos genesis set-validator-configuration --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE --username <pick a username for your node> --validator-host $VALIDATOR_ADDRESS:6180 --full-node-host $FULLNODE_ADDRESS:6182
