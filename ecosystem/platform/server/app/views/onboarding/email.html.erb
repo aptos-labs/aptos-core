@@ -21,7 +21,7 @@
 
   <%= form_with(model: current_user, url: onboarding_email_path, method: :post, data: {turbo: false}, html: {onsubmit: "return validateRecaptcha();"}, builder: AptosFormBuilder) do |f| %>
     <div class="mb-8">
-      <%= f.email_field :email, autofocus: true, autocomplete: "email", required: true, placeholder: "ENTER YOUR EMAIL ADDRESS" %>
+      <%= f.email_field :email, autofocus: true, autocomplete: "email", required: true, placeholder: "ENTER YOUR EMAIL ADDRESS", class: 'md:w-96' %>
     </div>
 
     <div class="mb-8">
@@ -29,9 +29,7 @@
     </div>
 
     <div class="mb-12">
-      <%= render(ButtonComponent.new(type: :submit, class: 'w-72')) do %>
-        Verify email
-      <% end %>
+      <%= f.submit "Verify email", class: "w-72" %>
     </div>
 
     <div class="text-sm">

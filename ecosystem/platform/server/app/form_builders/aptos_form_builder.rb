@@ -23,4 +23,9 @@ class AptosFormBuilder < ActionView::Helpers::FormBuilder
     ]
     super(method, options)
   end
+
+  def submit(value = nil, options = {})
+    options[:type] = :submit
+    @template.render(ButtonComponent.new(**options)) { value }
+  end
 end
