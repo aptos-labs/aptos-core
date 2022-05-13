@@ -50,7 +50,7 @@ impl CliCommand<()> for InitTool {
     }
 
     async fn execute(self) -> CliTypedResult<()> {
-        let mut config = if CliConfig::config_exists()? {
+        let mut config = if CliConfig::config_exists() {
             CliConfig::load()?
         } else {
             CliConfig::default()

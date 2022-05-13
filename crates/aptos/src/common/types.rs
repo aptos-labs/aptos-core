@@ -122,6 +122,10 @@ pub struct CliConfig {
     pub profiles: Option<HashMap<String, ProfileConfig>>,
 }
 
+const CONFIG_FILE: &str = "config.yaml";
+const LEGACY_CONFIG_FILE: &str = "config.yml";
+const CONFIG_FOLDER: &str = ".aptos";
+
 /// An individual profile
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ProfileConfig {
@@ -147,20 +151,38 @@ impl Default for CliConfig {
 
 impl CliConfig {
     /// Checks if the config exists in the current working directory
-    pub fn config_exists() -> CliTypedResult<bool> {
-        Self::aptos_folder().map(|folder| folder.exists())
+    pub fn config_exists() -> bool {
+        if let Ok(folder) = Self::aptos_folder() {
+            let config_file = folder.join(CONFIG_FILE);
+            let old_config_file = folder.join(LEGACY_CONFIG_FILE);
+            config_file.exists() || old_config_file.exists()
+        } else {
+            false
+        }
     }
 
     /// Loads the config from the current working directory
     pub fn load() -> CliTypedResult<Self> {
-        let config_file = Self::aptos_folder()?.join("config.yaml");
-        if !config_file.exists() {
-            return Err(CliError::ConfigNotFoundError(format!("{:?}", config_file)));
-        }
+        let folder = Self::aptos_folder()?;
 
-        from_yaml(
-            &String::from_utf8(read_from_file(config_file.as_path())?).map_err(CliError::from)?,
-        )
+        let config_file = folder.join(CONFIG_FILE);
+        let old_config_file = folder.join(LEGACY_CONFIG_FILE);
+        if config_file.exists() {
+            from_yaml(
+                &String::from_utf8(read_from_file(config_file.as_path())?)
+                    .map_err(CliError::from)?,
+            )
+        } else if old_config_file.exists() {
+            from_yaml(
+                &String::from_utf8(read_from_file(old_config_file.as_path())?)
+                    .map_err(CliError::from)?,
+            )
+        } else {
+            Err(CliError::ConfigNotFoundError(format!(
+                "{}",
+                config_file.display()
+            )))
+        }
     }
 
     pub fn load_profile(profile: &str) -> CliTypedResult<Option<ProfileConfig>> {
@@ -184,21 +206,29 @@ impl CliConfig {
         if !aptos_folder.exists() {
             std::fs::create_dir(&aptos_folder).map_err(|err| {
                 CliError::CommandArgumentError(format!(
-                    "Unable to create {:?} directory {}",
-                    aptos_folder, err
+                    "Unable to create {} directory {}",
+                    aptos_folder.display(),
+                    err
                 ))
             })?;
-            debug!("Created .aptos/ folder");
+            debug!("Created {} folder", aptos_folder.display());
         } else {
-            debug!(".aptos/ folder already initialized");
+            debug!("{} folder already initialized", aptos_folder.display());
         }
 
         // Save over previous config file
-        let config_file = aptos_folder.join("config.yaml");
+        let config_file = aptos_folder.join(CONFIG_FILE);
         let config_bytes = serde_yaml::to_string(&self).map_err(|err| {
             CliError::UnexpectedError(format!("Failed to serialize config {}", err))
         })?;
-        write_to_file(&config_file, "config.yaml", config_bytes.as_bytes())?;
+        write_to_file(&config_file, CONFIG_FILE, config_bytes.as_bytes())?;
+
+        // As a cleanup, delete the old if it exists
+        let legacy_config_file = aptos_folder.join(LEGACY_CONFIG_FILE);
+        if legacy_config_file.exists() {
+            eprintln!("Removing legacy config file {}", LEGACY_CONFIG_FILE);
+            let _ = std::fs::remove_file(legacy_config_file);
+        }
         Ok(())
     }
 
@@ -208,7 +238,7 @@ impl CliConfig {
             .map_err(|err| {
                 CliError::UnexpectedError(format!("Unable to get current directory {}", err))
             })
-            .map(|dir| dir.join(".aptos"))
+            .map(|dir| dir.join(CONFIG_FOLDER))
     }
 }
 
