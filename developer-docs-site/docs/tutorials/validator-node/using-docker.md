@@ -36,7 +36,9 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
 
     This will create three files: `private-keys.yaml`, `validator-identity.yaml`, `validator-full-node-identity.yaml` for you. **IMPORTANT**: Backup your key files somewhere safe. These key files are important for you to establish ownership of your node, and you will use this information to claim your rewards later if eligible. Never share those keys with anyone else.
 
-5. Configure validator information, you need to setup a static IP / DNS address which can be used by the node, and make sure the network / firewalls are properly configured to accept external connections. This is all the info you need to register on our community website later.
+5. Configure validator information, you need to setup a static IP / DNS address which can be used by the node, and make sure the network / firewalls are properly configured to accept external connections. See [Network Identity For FullNode](/tutorials/full-node/network-identity-fullnode.md) for how to do this. 
+
+This is all the info you need to register on our community website later.
 
     ```
     aptos genesis set-validator-configuration \

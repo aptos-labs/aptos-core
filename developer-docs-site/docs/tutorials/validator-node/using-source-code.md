@@ -6,10 +6,7 @@ sidebar_position: 13
 
 # Using Aptos-core source code
 
-1. Fork and clone the Aptos repo.
-
-    - Fork the Aptos Core repo by clicking on the **Fork** on the top right of this repo page: https://github.com/aptos-labs/aptos-core.
-    - Clone your fork.
+1. Clone the Aptos repo.
 
       ```
       git clone https://github.com/<YOUR-GITHUB-USERID>/aptos-core
