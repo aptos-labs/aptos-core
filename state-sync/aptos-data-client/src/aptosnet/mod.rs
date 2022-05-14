@@ -36,7 +36,8 @@ use rand::seq::SliceRandom;
 use std::{convert::TryFrom, fmt, sync::Arc, time::Duration};
 use storage_service_client::StorageServiceClient;
 use storage_service_types::{
-    AccountStatesChunkWithProofRequest, Epoch, EpochEndingLedgerInfoRequest, StorageServerSummary,
+    AccountStatesChunkWithProofRequest, Epoch, EpochEndingLedgerInfoRequest,
+    NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest, StorageServerSummary,
     StorageServiceRequest, StorageServiceResponse, TransactionOutputsWithProofRequest,
     TransactionsWithProofRequest,
 };
@@ -432,6 +433,35 @@ impl AptosDataClient for AptosNetDataClient {
             });
         let response: Response<EpochChangeProof> = self.send_request_and_decode(request).await?;
         Ok(response.map(|epoch_change| epoch_change.ledger_info_with_sigs))
+    }
+
+    async fn get_new_transaction_outputs_with_proof(
+        &self,
+        known_version: Version,
+        known_epoch: Epoch,
+    ) -> Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>> {
+        let request = StorageServiceRequest::GetNewTransactionOutputsWithProof(
+            NewTransactionOutputsWithProofRequest {
+                known_version,
+                known_epoch,
+            },
+        );
+        self.send_request_and_decode(request).await
+    }
+
+    async fn get_new_transactions_with_proof(
+        &self,
+        known_version: Version,
+        known_epoch: Epoch,
+        include_events: bool,
+    ) -> Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>> {
+        let request =
+            StorageServiceRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
+                known_version,
+                known_epoch,
+                include_events,
+            });
+        self.send_request_and_decode(request).await
     }
 
     async fn get_number_of_account_states(&self, version: Version) -> Result<Response<u64>> {

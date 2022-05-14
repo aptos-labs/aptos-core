@@ -41,7 +41,6 @@ use tokio::time::timeout;
 pub const TOTAL_NUM_ACCOUNTS: u64 = 2000;
 
 /// Test constants for advertised data
-pub const MAX_RESPONSE_ID: u64 = 100000;
 pub const MIN_ADVERTISED_ACCOUNTS: u64 = 9500;
 pub const MAX_ADVERTISED_ACCOUNTS: u64 = 10000;
 pub const MIN_ADVERTISED_EPOCH_END: u64 = 100;
@@ -50,6 +49,10 @@ pub const MIN_ADVERTISED_TRANSACTION: u64 = 1000;
 pub const MAX_ADVERTISED_TRANSACTION: u64 = 10000;
 pub const MIN_ADVERTISED_TRANSACTION_OUTPUT: u64 = 1000;
 pub const MAX_ADVERTISED_TRANSACTION_OUTPUT: u64 = 10000;
+pub const MAX_REAL_EPOCH_END: u64 = MAX_ADVERTISED_EPOCH_END + 5;
+pub const MAX_REAL_TRANSACTION: u64 = MAX_ADVERTISED_TRANSACTION + 5000;
+pub const MAX_REAL_TRANSACTION_OUTPUT: u64 = MAX_REAL_TRANSACTION;
+pub const MAX_RESPONSE_ID: u64 = 100000;
 
 /// Test timeout constant
 pub const MAX_NOTIFICATION_TIMEOUT_SECS: u64 = 10;
@@ -57,24 +60,53 @@ pub const MAX_NOTIFICATION_TIMEOUT_SECS: u64 = 10;
 /// A simple mock of the Aptos Data Client
 #[derive(Clone, Debug)]
 pub struct MockAptosDataClient {
-    pub epoch_ending_ledger_infos: HashMap<Epoch, LedgerInfoWithSignatures>,
-    pub synced_ledger_infos: Vec<LedgerInfoWithSignatures>,
+    pub advertised_epoch_ending_ledger_infos: HashMap<Epoch, LedgerInfoWithSignatures>,
+    pub advertised_synced_ledger_infos: Vec<LedgerInfoWithSignatures>,
+    pub data_beyond_highest_advertised: bool,
+    pub highest_epoch_ending_ledger_infos: HashMap<Epoch, LedgerInfoWithSignatures>,
 }
 
 impl MockAptosDataClient {
-    pub fn new() -> Self {
-        let epoch_ending_ledger_infos = create_epoch_ending_ledger_infos();
-        let synced_ledger_infos = create_synced_ledger_infos(&epoch_ending_ledger_infos);
+    pub fn new(data_beyond_highest_advertised: bool) -> Self {
+        // Create the advertised data
+        let advertised_epoch_ending_ledger_infos = create_epoch_ending_ledger_infos(
+            MIN_ADVERTISED_EPOCH_END,
+            MIN_ADVERTISED_TRANSACTION,
+            MAX_ADVERTISED_EPOCH_END,
+            MAX_ADVERTISED_TRANSACTION,
+        );
+        let advertised_synced_ledger_infos = create_synced_ledger_infos(
+            MIN_ADVERTISED_EPOCH_END,
+            MIN_ADVERTISED_TRANSACTION,
+            MAX_ADVERTISED_EPOCH_END,
+            MAX_ADVERTISED_TRANSACTION,
+            &advertised_epoch_ending_ledger_infos,
+        );
+
+        // Create the highest data
+        let highest_epoch_ending_ledger_infos = create_epoch_ending_ledger_infos(
+            MAX_ADVERTISED_EPOCH_END + 1,
+            MAX_ADVERTISED_TRANSACTION + 1,
+            MAX_REAL_EPOCH_END,
+            MAX_REAL_TRANSACTION,
+        );
 
         Self {
-            epoch_ending_ledger_infos,
-            synced_ledger_infos,
+            advertised_epoch_ending_ledger_infos,
+            advertised_synced_ledger_infos,
+            data_beyond_highest_advertised,
+            highest_epoch_ending_ledger_infos,
         }
     }
 
     fn emulate_network_latencies(&self) {
-        // Sleep for 100 - 500 ms to emulate variance
-        thread::sleep(Duration::from_millis(create_range_random_u64(100, 500)));
+        // Sleep for 10 - 50 ms to emulate variance
+        thread::sleep(Duration::from_millis(create_range_random_u64(10, 50)));
+    }
+
+    fn emulate_subscription_expiration(&self) -> aptos_data_client::Error {
+        thread::sleep(Duration::from_secs(MAX_NOTIFICATION_TIMEOUT_SECS));
+        aptos_data_client::Error::TimeoutWaitingForResponse("RPC timed out!".into())
     }
 }
 
@@ -85,8 +117,8 @@ impl AptosDataClient for MockAptosDataClient {
         let optimal_chunk_sizes = OptimalChunkSizes {
             account_states_chunk_size: create_non_zero_random_u64(100),
             epoch_chunk_size: create_non_zero_random_u64(10),
-            transaction_chunk_size: create_non_zero_random_u64(2000),
-            transaction_output_chunk_size: create_non_zero_random_u64(100),
+            transaction_chunk_size: create_non_zero_random_u64(1000),
+            transaction_output_chunk_size: create_non_zero_random_u64(1000),
         };
 
         // Create a global data summary with a fixed set of data
@@ -101,7 +133,7 @@ impl AptosDataClient for MockAptosDataClient {
                 MAX_ADVERTISED_EPOCH_END,
             )
             .unwrap()],
-            synced_ledger_infos: self.synced_ledger_infos.clone(),
+            synced_ledger_infos: self.advertised_synced_ledger_infos.clone(),
             transactions: vec![CompleteDataRange::new(
                 MIN_ADVERTISED_TRANSACTION,
                 MAX_ADVERTISED_TRANSACTION,
@@ -127,7 +159,7 @@ impl AptosDataClient for MockAptosDataClient {
     ) -> Result<Response<StateValueChunkWithProof>, aptos_data_client::Error> {
         self.emulate_network_latencies();
 
-        // Create epoch ending ledger infos according to the requested epochs
+        // Create account blobs according to the given indices
         let mut account_blobs = vec![];
         for _ in start_index..=end_index {
             account_blobs.push((
@@ -159,10 +191,111 @@ impl AptosDataClient for MockAptosDataClient {
         // Fetch the epoch ending ledger infos according to the requested epochs
         let mut epoch_ending_ledger_infos = vec![];
         for epoch in start_epoch..=end_epoch {
-            let ledger_info = self.epoch_ending_ledger_infos.get(&epoch).unwrap();
+            let ledger_info = if epoch <= MAX_ADVERTISED_EPOCH_END {
+                self.advertised_epoch_ending_ledger_infos
+                    .get(&epoch)
+                    .unwrap()
+            } else {
+                self.highest_epoch_ending_ledger_infos.get(&epoch).unwrap()
+            };
             epoch_ending_ledger_infos.push(ledger_info.clone());
         }
         Ok(create_data_client_response(epoch_ending_ledger_infos))
+    }
+
+    async fn get_new_transaction_outputs_with_proof(
+        &self,
+        known_version: Version,
+        known_epoch: Epoch,
+    ) -> Result<
+        Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>,
+        aptos_data_client::Error,
+    > {
+        self.emulate_network_latencies();
+
+        // Attempt to fetch the new data
+        if self.data_beyond_highest_advertised && known_version < MAX_REAL_TRANSACTION_OUTPUT {
+            let target_ledger_info = if known_epoch <= MAX_REAL_EPOCH_END {
+                // Fetch the epoch ending ledger info
+                self.get_epoch_ending_ledger_infos(known_epoch, known_epoch)
+                    .await
+                    .unwrap()
+                    .payload[0]
+                    .clone()
+            } else {
+                // Return a synced ledger info at the last version and highest epoch
+                create_ledger_info(MAX_REAL_TRANSACTION_OUTPUT, MAX_REAL_EPOCH_END + 1, false)
+            };
+
+            // Fetch the new transaction outputs
+            let target_ledger_version = target_ledger_info.ledger_info().version();
+            let outputs_with_proof = self
+                .get_transaction_outputs_with_proof(
+                    target_ledger_version,
+                    known_version + 1,
+                    target_ledger_version,
+                )
+                .await
+                .unwrap()
+                .payload;
+
+            // Return the new data
+            Ok(create_data_client_response((
+                outputs_with_proof,
+                target_ledger_info,
+            )))
+        } else {
+            Err(self.emulate_subscription_expiration())
+        }
+    }
+
+    async fn get_new_transactions_with_proof(
+        &self,
+        known_version: Version,
+        known_epoch: Epoch,
+        include_events: bool,
+    ) -> Result<
+        Response<(TransactionListWithProof, LedgerInfoWithSignatures)>,
+        aptos_data_client::Error,
+    > {
+        self.emulate_network_latencies();
+
+        // Attempt to fetch the new data
+        if self.data_beyond_highest_advertised && known_version < MAX_REAL_TRANSACTION {
+            self.emulate_network_latencies();
+            let target_ledger_info = if known_epoch <= MAX_REAL_EPOCH_END {
+                // Fetch the epoch ending ledger info
+                self.get_epoch_ending_ledger_infos(known_epoch, known_epoch)
+                    .await
+                    .unwrap()
+                    .payload[0]
+                    .clone()
+            } else {
+                // Return a synced ledger info at the last version and highest epoch
+                create_ledger_info(MAX_REAL_TRANSACTION, MAX_REAL_EPOCH_END + 1, false)
+            };
+
+            // Fetch the new transactions
+            let target_ledger_version = target_ledger_info.ledger_info().version();
+            let transactions_with_proof = self
+                .get_transactions_with_proof(
+                    target_ledger_version,
+                    known_version + 1,
+                    target_ledger_version,
+                    include_events,
+                )
+                .await
+                .unwrap()
+                .payload;
+
+            // Return the new data
+            Ok(create_data_client_response((
+                transactions_with_proof,
+                target_ledger_info,
+            )))
+        } else {
+            Err(self.emulate_subscription_expiration())
+        }
     }
 
     async fn get_number_of_account_states(
@@ -260,16 +393,20 @@ pub fn create_ledger_info(
     )
 }
 
-/// Creates a epoch ending ledger infos for all epochs
-fn create_epoch_ending_ledger_infos() -> HashMap<Epoch, LedgerInfoWithSignatures> {
-    let mut current_epoch = MIN_ADVERTISED_EPOCH_END;
-    let mut current_version = MIN_ADVERTISED_TRANSACTION;
+/// Creates epoch ending ledger infos for the given epoch and version range
+fn create_epoch_ending_ledger_infos(
+    start_epoch: Epoch,
+    start_version: Version,
+    end_epoch: Epoch,
+    end_version: Version,
+) -> HashMap<Epoch, LedgerInfoWithSignatures> {
+    let mut current_epoch = start_epoch;
+    let mut current_version = start_version;
 
     // Populate the epoch ending ledger infos using random intervals
-    let max_num_versions_in_epoch = (MAX_ADVERTISED_TRANSACTION - MIN_ADVERTISED_TRANSACTION)
-        / ((MAX_ADVERTISED_EPOCH_END + 1) - MIN_ADVERTISED_EPOCH_END);
+    let max_num_versions_in_epoch = (end_version - start_version) / ((end_epoch + 1) - start_epoch);
     let mut epoch_ending_ledger_infos = HashMap::new();
-    while current_epoch < MAX_ADVERTISED_EPOCH_END + 1 {
+    while current_epoch < end_epoch + 1 {
         let num_versions_in_epoch = create_non_zero_random_u64(max_num_versions_in_epoch);
         current_version += num_versions_in_epoch;
 
@@ -288,16 +425,20 @@ fn create_epoch_ending_ledger_infos() -> HashMap<Epoch, LedgerInfoWithSignatures
     epoch_ending_ledger_infos
 }
 
-/// Creates a set of synced ledger infos for advertising
+/// Creates a set of synced ledger infos given the versions and epochs range
 fn create_synced_ledger_infos(
+    start_epoch: Epoch,
+    start_version: Version,
+    end_epoch: Epoch,
+    end_version: Version,
     epoch_ending_ledger_infos: &HashMap<Epoch, LedgerInfoWithSignatures>,
 ) -> Vec<LedgerInfoWithSignatures> {
-    let mut current_epoch = MIN_ADVERTISED_EPOCH_END;
-    let mut current_version = MIN_ADVERTISED_TRANSACTION;
+    let mut current_epoch = start_epoch;
+    let mut current_version = start_version;
 
     // Populate the synced ledger infos
     let mut synced_ledger_infos = vec![];
-    while current_version < MAX_ADVERTISED_TRANSACTION && current_epoch < MAX_ADVERTISED_EPOCH_END {
+    while current_version < end_version && current_epoch < end_epoch {
         let random_num_versions = create_non_zero_random_u64(10);
         current_version += random_num_versions;
 
@@ -318,13 +459,9 @@ fn create_synced_ledger_infos(
         ));
     }
 
-    // Manually insert a synced ledger info at the last transaction and epoch
-    // to ensure we can sync right up to the end.
-    synced_ledger_infos.push(create_ledger_info(
-        MAX_ADVERTISED_TRANSACTION,
-        MAX_ADVERTISED_EPOCH_END,
-        false,
-    ));
+    // Manually insert a synced ledger info at the last transaction and highest
+    // epoch to ensure we can sync right up to the end.
+    synced_ledger_infos.push(create_ledger_info(end_version, end_epoch + 1, false));
 
     synced_ledger_infos
 }

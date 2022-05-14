@@ -89,6 +89,27 @@ pub trait AptosDataClient {
         expected_end_epoch: Epoch,
     ) -> Result<Response<Vec<LedgerInfoWithSignatures>>>;
 
+    /// Returns a new transaction output list with proof. Versions start at
+    /// `known_version + 1` and `known_epoch` (inclusive). The end version
+    /// and proof version are specified by the server. If the data cannot be
+    /// fetched, an error is returned.
+    async fn get_new_transaction_outputs_with_proof(
+        &self,
+        known_version: Version,
+        known_epoch: Epoch,
+    ) -> Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
+
+    /// Returns a new transaction list with proof. Versions start at
+    /// `known_version + 1` and `known_epoch` (inclusive). The end version
+    /// and proof version are specified by the server. If the data cannot be
+    /// fetched, an error is returned.
+    async fn get_new_transactions_with_proof(
+        &self,
+        known_version: Version,
+        known_epoch: Epoch,
+        include_events: bool,
+    ) -> Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
+
     /// Returns the number of account states at the specified version.
     async fn get_number_of_account_states(&self, version: Version) -> Result<Response<u64>>;
 
@@ -190,6 +211,8 @@ impl<T> Response<T> {
 pub enum ResponsePayload {
     AccountStatesWithProof(StateValueChunkWithProof),
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
+    NewTransactionOutputsWithProof((TransactionOutputListWithProof, LedgerInfoWithSignatures)),
+    NewTransactionsWithProof((TransactionListWithProof, LedgerInfoWithSignatures)),
     NumberOfAccountStates(u64),
     TransactionOutputsWithProof(TransactionOutputListWithProof),
     TransactionsWithProof(TransactionListWithProof),
@@ -200,6 +223,8 @@ impl ResponsePayload {
         match self {
             Self::AccountStatesWithProof(_) => "account_states_with_proof",
             Self::EpochEndingLedgerInfos(_) => "epoch_ending_ledger_infos",
+            Self::NewTransactionOutputsWithProof(_) => "new_transaction_outputs_with_proof",
+            Self::NewTransactionsWithProof(_) => "new_transactions_with_proof",
             Self::NumberOfAccountStates(_) => "number_of_account_states",
             Self::TransactionOutputsWithProof(_) => "transaction_outputs_with_proof",
             Self::TransactionsWithProof(_) => "transactions_with_proof",
@@ -214,11 +239,25 @@ impl From<StateValueChunkWithProof> for ResponsePayload {
         Self::AccountStatesWithProof(inner)
     }
 }
+
 impl From<Vec<LedgerInfoWithSignatures>> for ResponsePayload {
     fn from(inner: Vec<LedgerInfoWithSignatures>) -> Self {
         Self::EpochEndingLedgerInfos(inner)
     }
 }
+
+impl From<(TransactionOutputListWithProof, LedgerInfoWithSignatures)> for ResponsePayload {
+    fn from(inner: (TransactionOutputListWithProof, LedgerInfoWithSignatures)) -> Self {
+        Self::NewTransactionOutputsWithProof(inner)
+    }
+}
+
+impl From<(TransactionListWithProof, LedgerInfoWithSignatures)> for ResponsePayload {
+    fn from(inner: (TransactionListWithProof, LedgerInfoWithSignatures)) -> Self {
+        Self::NewTransactionsWithProof(inner)
+    }
+}
+
 impl From<u64> for ResponsePayload {
     fn from(inner: u64) -> Self {
         Self::NumberOfAccountStates(inner)
@@ -229,6 +268,7 @@ impl From<TransactionOutputListWithProof> for ResponsePayload {
         Self::TransactionOutputsWithProof(inner)
     }
 }
+
 impl From<TransactionListWithProof> for ResponsePayload {
     fn from(inner: TransactionListWithProof) -> Self {
         Self::TransactionsWithProof(inner)

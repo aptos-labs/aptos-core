@@ -205,7 +205,7 @@ pub fn fetch_latest_synced_version(storage: Arc<dyn DbReader>) -> Result<Version
 }
 
 /// Fetches the startup info from the specified storage
-fn fetch_startup_info(storage: Arc<dyn DbReader>) -> Result<StartupInfo, Error> {
+pub fn fetch_startup_info(storage: Arc<dyn DbReader>) -> Result<StartupInfo, Error> {
     let startup_info = storage.get_startup_info().map_err(|error| {
         Error::StorageError(format!(
             "Failed to get startup info from storage: {:?}",
