@@ -35,6 +35,11 @@ impl DBSubPruner for TransactionStorePruner {
             target_version,
             db_batch,
         )?;
+        self.transaction_store.prune_transaction_accumulator(
+            least_readable_version,
+            target_version,
+            db_batch,
+        )?;
         Ok(())
     }
 }
