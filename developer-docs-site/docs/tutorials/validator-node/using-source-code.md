@@ -144,6 +144,40 @@ With your development environment ready, now you can start to setup your Validat
     sed -i -e "s/\/opt\/aptos\/genesis/$QUOTED_WORKSPACE/g" ~/$WORKSPACE/fullnode.yaml
     ```
 
+    There are some changes to be done about network configuration.
+    The top level overview of what we need to achieve is the following: there are two
+    types of networks, full-node-network and validator-network. Each of network
+    can also have some subnetworks. We need to help our nodes to find each other
+    in some subset of networks.
+
+    So, let's remember the step 8, where we were specifying 
+    `--validator-host <Validator Node IP / DNS address>:<Port>`.
+    This should be an address validator listening to on a validator_network.
+    It is [here](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/aptos-node/validator.yaml#L26).
+    Port 6180 is a default port to listen, so it is not specified in a config. But again,
+    you have to make this line consistent with a port you specified on validator
+    in step 8. If in step 8 you left the value for port as 6180, no edits are required
+    for `validator.yaml`. Second thing is a port for full_node_network for our validator.
+    By default it [listens](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/aptos-node/validator.yaml#L35)
+    on port 6181. It is absolutely fine if you changed it, just keep this number in mind.
+    We will refer 6180 as VALIDATOR_LISTENING_VALIDATOR_NETWORK and 6181 as
+    VALIDATOR_LISTENING_FULL_NETWORK later.
+
+    Now, it is time to update `fullnode.yaml`. It has two full_node_networks.
+    First one is [private](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/aptos-node/fullnode.yaml#L11).
+    If you are running validator and full node on a same machine, it makes sense to change the
+    port for private network to anything. It does not matter. For example 16181.
+    The important thing here is to specify the address of our validator.
+    So in the [L17](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/aptos-node/fullnode.yaml#L17)
+    you need to specify a correct IP address where you validator is located (or 127.0.0.1 if it is on a same host),
+    and VALIDATOR_LISTENING_FULL_NETWORK port.
+
+    [Line 22](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/aptos-node/fullnode.yaml#L22)
+    defines FULL_NODE_LISTENING_PUBLIC_NETWORK port, in this case 6182.
+
+    In the submission form you need to specify VALIDATOR_LISTENING_VALIDATOR_NETWORK and
+    FULL_NODE_LISTENING_PUBLIC_NETWORK ports.
+
 :::note
 
 If you have an intention to run both validator and full nodes on a same server,
