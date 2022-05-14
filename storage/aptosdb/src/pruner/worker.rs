@@ -51,9 +51,6 @@ impl Worker {
     }
 
     pub(crate) fn work(mut self) {
-        for db_pruner in &self.db_pruners {
-            db_pruner.lock().initialize();
-        }
         while self.receive_commands() {
             // Process a reasonably small batch of work before trying to receive commands again,
             // in case `Command::Quit` is received (that's when we should quit.)

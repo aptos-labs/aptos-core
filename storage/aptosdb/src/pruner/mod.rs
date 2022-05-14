@@ -18,7 +18,7 @@ use crate::metrics::{PRUNER_BATCH_SIZE, PRUNER_WINDOW};
 use aptos_config::config::StoragePrunerConfig;
 use aptos_infallible::Mutex;
 
-use crate::{EventStore, LedgerStore, TransactionStore};
+use crate::{pruner::PrunerIndex::LedgerPrunerIndex, EventStore, LedgerStore, TransactionStore};
 use aptos_types::transaction::Version;
 use schemadb::DB;
 use std::{
@@ -48,7 +48,7 @@ pub(crate) struct Pruner {
     worker_thread: Option<JoinHandle<()>>,
     /// The sender side of the channel talking to the worker thread.
     command_sender: Mutex<Sender<Command>>,
-    /// (For tests) A way for the worker thread to inform the `Pruner` the pruning progress. If it
+    /// A way for the worker thread to inform the `Pruner` the pruning progress. If it
     /// sets value to `V`, all versions before `V` can no longer be accessed. This is protected by Mutex
     /// as this is accessed both by the Pruner thread and the worker thread.
     #[allow(dead_code)]
@@ -62,8 +62,8 @@ pub(crate) struct Pruner {
     latest_version: Arc<Mutex<Version>>,
 }
 
-#[cfg(test)]
 pub enum PrunerIndex {
+    #[cfg(test)]
     StateStorePrunerIndex,
     LedgerPrunerIndex,
 }
@@ -130,6 +130,9 @@ impl Pruner {
         self.ledger_prune_window
     }
 
+    pub fn get_least_readable_ledger_version(&self) -> Version {
+        self.least_readable_version.lock()[LedgerPrunerIndex as usize]
+    }
     /// Sends pruning command to the worker thread when necessary.
     pub fn maybe_wake_pruner(&self, latest_version: Version) {
         *self.latest_version.lock() = latest_version;

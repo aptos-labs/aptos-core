@@ -109,13 +109,15 @@ impl StateStorePruner {
         index_min_nonpurged_version: Version,
         index_purged_at: Instant,
     ) -> Self {
-        StateStorePruner {
+        let pruner = StateStorePruner {
             db,
             index_min_nonpurged_version: AtomicVersion::new(index_min_nonpurged_version),
             index_purged_at: Mutex::new(index_purged_at),
             target_version: AtomicVersion::new(0),
             least_readable_version: AtomicVersion::new(0),
-        }
+        };
+        pruner.initialize();
+        pruner
     }
 
     /// Purge the stale node index so that after restart not too much already pruned stuff is dealt

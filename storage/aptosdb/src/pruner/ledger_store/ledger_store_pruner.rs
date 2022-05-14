@@ -100,7 +100,7 @@ impl LedgerPruner {
         event_store: Arc<EventStore>,
         ledger_store: Arc<LedgerStore>,
     ) -> Self {
-        LedgerPruner {
+        let pruner = LedgerPruner {
             db,
             target_version: AtomicVersion::new(0),
             least_readable_version: AtomicVersion::new(0),
@@ -110,6 +110,8 @@ impl LedgerPruner {
             )),
             event_store_pruner: Arc::new(EventStorePruner::new(event_store)),
             write_set_pruner: Arc::new(WriteSetPruner::new(transaction_store)),
-        }
+        };
+        pruner.initialize();
+        pruner
     }
 }
