@@ -35,6 +35,12 @@ If you are new to Aptos Blockchain, read the following sections before proceedin
 * [FullNode concepts](/basics/basics-fullnodes).
 * [Node networks and synchronization](/basics/basics-node-networks-sync).
 
+:::note IMPORTANT
+
+We strongly recommend that you run the validator node and the FullNode on two separate and independent machines. Make sure that these machines are well-provisioned and isolated from each other. Guaranteeing the resource isolation between the validator node and the FullNode will help ensure smooth deployment of these nodes.
+
+:::
+
 ## Hardware requirements
 
 We recommend the following hardware resources:
@@ -88,3 +94,4 @@ Follow the links below to begin your installation:
 * [Using AWS](using-aws.md)
 * [Using Docker](using-docker.md)
 * [Using Aptos source code](using-source-code.md)
+

@@ -148,7 +148,7 @@ This will download all the terraform dependencies for you, in the `.terraform` f
     chain_id: 23
     ```
 
-13. Download AptosFramework Move bytecodes into a folder named `framework`.
+13. Download AptosFramework Move bytecode into a folder named `framework`.
 
     Download the Aptos Framework from the release page: https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v0.1.0
 
@@ -158,15 +158,15 @@ This will download all the terraform dependencies for you, in the `.terraform` f
     unzip framework.zip
     ```
 
-    You should now have a folder called `framework`, which contains move bytecodes with format `.mv`.
+    You will now have a folder called `framework`, which contains Move bytecode with the format `.mv`.
 
-14. Compile genesis blob and waypoint
+14. Compile genesis blob and waypoint.
 
     ```
     aptos genesis generate-genesis --local-repository-dir ~/$WORKSPACE --output-dir ~/$WORKSPACE
     ``` 
 
-    This should create two files in your working directory, `genesis.blob` and `waypoint.txt`
+    This will create two files in your working directory, `genesis.blob` and `waypoint.txt`.
 
 15. To recap, in your working directory, you should have a list of files:
     - `main.tf` the Terraform files to install aptos-node module.
@@ -189,7 +189,12 @@ This will download all the terraform dependencies for you, in the `.terraform` f
         --from-file=validator-full-node-identity.yaml=validator-full-node-identity.yaml
     ```
 
-    If you changed the era number, make sure it matches when creating the secret.
+    :::note
+    
+    The `-e1` suffix refers to the era number. If you changed the era number, make sure it matches when creating the secret.
+
+    :::
+
 
 17. Check all pods running.
 
@@ -202,4 +207,4 @@ This will download all the terraform dependencies for you, in the `.terraform` f
     node1-aptos-node-validator-0                1/1     Running   0          4h30m
     ```
 
-Now you have completed setting up your node in test mode. You can continue to our [community](https://community.aptoslabs.com/) website for registration.
+Now you have successfully completed setting up your node in test mode. You can now proceed to the [Aptos community](https://community.aptoslabs.com/) website for registration.
