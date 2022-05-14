@@ -73,18 +73,12 @@ fn test_empty_db() {
         waypoint
     );
 
-    let initial_accumulator = db_rw
-        .reader
-        .get_accumulator_summary(waypoint.version())
-        .unwrap();
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
     let state_proof = db_rw
         .reader
         .get_state_proof(trusted_state.version())
         .unwrap();
-    let trusted_state_change = trusted_state
-        .verify_and_ratchet(&state_proof, Some(&initial_accumulator))
-        .unwrap();
+    let trusted_state_change = trusted_state.verify_and_ratchet(&state_proof).unwrap();
     assert!(trusted_state_change.is_epoch_change());
 
     // `maybe_bootstrap()` does nothing on non-empty DB.
@@ -310,17 +304,11 @@ fn test_pre_genesis() {
     assert!(maybe_bootstrap::<AptosVM>(&db_rw, &genesis_txn, waypoint).unwrap());
 
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
-    let initial_accumulator = db_rw
-        .reader
-        .get_accumulator_summary(trusted_state.version())
-        .unwrap();
     let state_proof = db_rw
         .reader
         .get_state_proof(trusted_state.version())
         .unwrap();
-    let trusted_state_change = trusted_state
-        .verify_and_ratchet(&state_proof, Some(&initial_accumulator))
-        .unwrap();
+    let trusted_state_change = trusted_state.verify_and_ratchet(&state_proof).unwrap();
     assert!(trusted_state_change.is_epoch_change());
 
     // Effect of bootstrapping reflected.
@@ -351,14 +339,8 @@ fn test_new_genesis() {
     assert_eq!(get_balance(&account2, &db), 2_000_000);
 
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
-    let initial_accumulator = db
-        .reader
-        .get_accumulator_summary(trusted_state.version())
-        .unwrap();
     let state_proof = db.reader.get_state_proof(trusted_state.version()).unwrap();
-    let trusted_state_change = trusted_state
-        .verify_and_ratchet(&state_proof, Some(&initial_accumulator))
-        .unwrap();
+    let trusted_state_change = trusted_state.verify_and_ratchet(&state_proof).unwrap();
     assert!(trusted_state_change.is_epoch_change());
 
     // New genesis transaction: set validator set, bump epoch and overwrite account1 balance.
@@ -398,18 +380,11 @@ fn test_new_genesis() {
 
     // Client bootable from waypoint.
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
-    let initial_accumulator = db
-        .reader
-        .get_accumulator_summary(trusted_state.version())
-        .unwrap();
     let state_proof = db.reader.get_state_proof(trusted_state.version()).unwrap();
-    let trusted_state_change = trusted_state
-        .verify_and_ratchet(&state_proof, Some(&initial_accumulator))
-        .unwrap();
+    let trusted_state_change = trusted_state.verify_and_ratchet(&state_proof).unwrap();
     assert!(trusted_state_change.is_epoch_change());
     let trusted_state = trusted_state_change.new_state().unwrap();
     assert_eq!(trusted_state.version(), 5);
-    assert!(state_proof.consistency_proof().is_empty());
 
     // Effect of bootstrapping reflected.
     assert_eq!(get_balance(&account1, &db), 1_000_000);

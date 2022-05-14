@@ -483,7 +483,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
     }
 
     fn retrieve_epoch_change_proof(&self, version: u64) -> Result<EpochChangeProof> {
-        let (_, proofs, _) = self
+        let (_, proofs) = self
             .aptos_db
             .get_state_proof(version)
             .map_err(DbError::from)?
