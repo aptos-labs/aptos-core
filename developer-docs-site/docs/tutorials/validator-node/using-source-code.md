@@ -138,6 +138,39 @@ With your development environment ready, now you can start to setup your Validat
     ```
 
     Modify the config file to update the key path, genesis file path, waypoint path.
+    ```
+    QUOTED_WORKSPACE=$(echo $HOME/$WORKSPACE | sed -e 's/\//\\\//g')
+    sed -i -e "s/\/opt\/aptos\/genesis/$QUOTED_WORKSPACE/g" ~/$WORKSPACE/validator.yaml
+    sed -i -e "s/\/opt\/aptos\/genesis/$QUOTED_WORKSPACE/g" ~/$WORKSPACE/fullnode.yaml
+    ```
+
+:::note
+
+If you have an intention to run both validator and full nodes on a same server,
+some extra changes to config are required. The instruction for doing this is not
+a part of this documentation, as it requires some understanding of implications
+of that actions.
+
+Broadly speaking, these updates in either validator.yaml or fullnode.yaml are required:
+
+a) use different `base.data_dir` values
+b) use different `full_node_networks.listen_address` values
+c) use different `api.address` values
+d) append the following sections to one of the configs (you can change port values to some
+   other reasonable values)
+```
+debug\_interface:
+  admission\_control\_node\_debug\_port: 16192
+  public\_metrics\_server\_port: 19103
+  metrics\_server\_port: 19104
+
+storage:
+  address: 127.0.0.1:16666
+  backup\_service\_address: 127.0.0.1:16186
+```
+
+:::
+
 
 13. To recap, in your working directory (`~/$WORKSPACE`), you should have a list of files:
     - `validator.yaml` validator config file
