@@ -5,13 +5,12 @@ use crate::{
     epoch_change::{EpochChangeProof, Verifier},
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    proof::{AccumulatorConsistencyProof, TransactionAccumulatorSummary},
+    proof::TransactionAccumulatorSummary,
     state_proof::StateProof,
     transaction::Version,
     waypoint::Waypoint,
 };
 use anyhow::{bail, ensure, format_err, Result};
-use aptos_crypto::HashValue;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -35,12 +34,6 @@ pub enum TrustedState {
         waypoint: Waypoint,
         /// The current epoch and validator set inside that epoch.
         epoch_state: EpochState,
-        /// The current verified view of the transaction accumulator. Note that this
-        /// is not the complete accumulator; rather, it is a summary containing only
-        /// the frozen subtrees at the currently verified state version. We use the
-        /// accumulator summary to verify accumulator consistency proofs when
-        /// applying state proofs.
-        accumulator: TransactionAccumulatorSummary,
     },
 }
 
@@ -91,7 +84,6 @@ impl TrustedState {
         Ok(Self::EpochState {
             waypoint: Waypoint::new_epoch_boundary(epoch_change_li)?,
             epoch_state,
-            accumulator,
         })
     }
 
@@ -108,24 +100,6 @@ impl TrustedState {
             Self::EpochWaypoint(waypoint) => *waypoint,
             Self::EpochState { waypoint, .. } => *waypoint,
         }
-    }
-
-    pub fn accumulator_root_hash(&self) -> Option<HashValue> {
-        match self {
-            Self::EpochWaypoint(_) => None,
-            Self::EpochState { accumulator, .. } => Some(accumulator.root_hash()),
-        }
-    }
-
-    pub fn accumulator_summary(&self) -> Option<&TransactionAccumulatorSummary> {
-        match self {
-            Self::EpochWaypoint(_) => None,
-            Self::EpochState { accumulator, .. } => Some(accumulator),
-        }
-    }
-
-    pub fn need_accumulator(&self) -> bool {
-        self.accumulator_summary().is_none()
     }
 
     /// Verify and ratchet forward our trusted state using an [`EpochChangeProof`]
@@ -161,13 +135,10 @@ impl TrustedState {
     pub fn verify_and_ratchet<'a>(
         &self,
         state_proof: &'a StateProof,
-        initial_accumulator: Option<&'a TransactionAccumulatorSummary>,
     ) -> Result<TrustedStateChange<'a>> {
         self.verify_and_ratchet_inner(
             state_proof.latest_ledger_info_w_sigs(),
             state_proof.epoch_changes(),
-            state_proof.consistency_proof(),
-            initial_accumulator,
         )
     }
 
@@ -175,8 +146,6 @@ impl TrustedState {
         &self,
         latest_li: &'a LedgerInfoWithSignatures,
         epoch_change_proof: &'a EpochChangeProof,
-        consistency_proof: &'a AccumulatorConsistencyProof,
-        initial_accumulator: Option<&'a TransactionAccumulatorSummary>,
     ) -> Result<TrustedStateChange<'a>> {
         // Abort early if the response is stale.
         let curr_version = self.version();
@@ -186,28 +155,6 @@ impl TrustedState {
             "The target latest ledger info version is stale ({}) and behind our current trusted version ({})",
             target_version, curr_version,
         );
-
-        let curr_accumulator = match self {
-            // If we're verifying from an epoch waypoint, the user needs to provide
-            // an initial accumulator. Note that we assume this accumulator is
-            // untrusted.
-            Self::EpochWaypoint(_) => {
-                // When verifying from a waypoint, we need to check that the initial
-                // untrusted accumulator is consistent with the received waypoint
-                // ledger info.
-                let curr_accumulator = initial_accumulator
-                    .expect("Client must provide an initial untrusted accumulator when verifying from a waypoint");
-                let waypoint_li = epoch_change_proof
-                    .ledger_info_with_sigs
-                    .first()
-                    .ok_or_else(|| format_err!("Empty epoch change proof"))?
-                    .ledger_info();
-                curr_accumulator.verify_consistency(waypoint_li)?;
-                curr_accumulator
-            }
-            // Otherwise, we should already have a _trusted_ accumulator.
-            Self::EpochState { accumulator, .. } => accumulator,
-        };
 
         if self.epoch_change_verification_required(latest_li.ledger_info().next_block_epoch()) {
             // Verify the EpochChangeProof to move us into the latest epoch.
@@ -238,15 +185,9 @@ impl TrustedState {
             };
             let new_waypoint = Waypoint::new_any(verified_ledger_info.ledger_info());
 
-            // Try to extend our accumulator summary and check that it's consistent
-            // with the target ledger info.
-            let new_accumulator = curr_accumulator
-                .try_extend_with_proof(consistency_proof, verified_ledger_info.ledger_info())?;
-
             let new_state = TrustedState::EpochState {
                 waypoint: new_waypoint,
                 epoch_state: new_epoch_state,
-                accumulator: new_accumulator,
             };
 
             Ok(TrustedStateChange::Epoch {
@@ -279,15 +220,9 @@ impl TrustedState {
                 // Verify the target ledger info, which should be inside the current epoch.
                 curr_epoch_state.verify(latest_li)?;
 
-                // Try to extend our accumulator summary and check that it's consistent
-                // with the target ledger info.
-                let new_accumulator = curr_accumulator
-                    .try_extend_with_proof(consistency_proof, latest_li.ledger_info())?;
-
                 let new_state = Self::EpochState {
                     waypoint: new_waypoint,
                     epoch_state: curr_epoch_state.clone(),
-                    accumulator: new_accumulator,
                 };
 
                 Ok(TrustedStateChange::Version { new_state })

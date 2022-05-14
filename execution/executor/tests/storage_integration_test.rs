@@ -32,15 +32,9 @@ fn test_genesis() {
     let (_, db, _executor, waypoint) = create_db_and_executor(path.path(), &genesis);
 
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
-    let initial_accumulator = db
-        .reader
-        .get_accumulator_summary(trusted_state.version())
-        .unwrap();
     let state_proof = db.reader.get_state_proof(trusted_state.version()).unwrap();
 
-    trusted_state
-        .verify_and_ratchet(&state_proof, Some(&initial_accumulator))
-        .unwrap();
+    trusted_state.verify_and_ratchet(&state_proof).unwrap();
     let li = state_proof.latest_ledger_info();
     assert_eq!(li.version(), 0);
 

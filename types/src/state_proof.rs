@@ -4,7 +4,6 @@
 use crate::{
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    proof::AccumulatorConsistencyProof,
 };
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -24,48 +23,25 @@ use serde::{Deserialize, Serialize};
 pub struct StateProof {
     latest_li_w_sigs: LedgerInfoWithSignatures,
     epoch_changes: EpochChangeProof,
-    consistency_proof: AccumulatorConsistencyProof,
 }
 
 impl StateProof {
     pub fn new(
         latest_li_w_sigs: LedgerInfoWithSignatures,
         epoch_changes: EpochChangeProof,
-        consistency_proof: AccumulatorConsistencyProof,
     ) -> Self {
         Self {
             latest_li_w_sigs,
             epoch_changes,
-            consistency_proof,
         }
     }
 
-    pub fn into_inner(
-        self,
-    ) -> (
-        LedgerInfoWithSignatures,
-        EpochChangeProof,
-        AccumulatorConsistencyProof,
-    ) {
-        (
-            self.latest_li_w_sigs,
-            self.epoch_changes,
-            self.consistency_proof,
-        )
+    pub fn into_inner(self) -> (LedgerInfoWithSignatures, EpochChangeProof) {
+        (self.latest_li_w_sigs, self.epoch_changes)
     }
 
-    pub fn as_inner(
-        &self,
-    ) -> (
-        &LedgerInfoWithSignatures,
-        &EpochChangeProof,
-        &AccumulatorConsistencyProof,
-    ) {
-        (
-            &self.latest_li_w_sigs,
-            &self.epoch_changes,
-            &self.consistency_proof,
-        )
+    pub fn as_inner(&self) -> (&LedgerInfoWithSignatures, &EpochChangeProof) {
+        (&self.latest_li_w_sigs, &self.epoch_changes)
     }
 
     #[inline]
@@ -81,11 +57,6 @@ impl StateProof {
     #[inline]
     pub fn epoch_changes(&self) -> &EpochChangeProof {
         &self.epoch_changes
-    }
-
-    #[inline]
-    pub fn consistency_proof(&self) -> &AccumulatorConsistencyProof {
-        &self.consistency_proof
     }
 }
 

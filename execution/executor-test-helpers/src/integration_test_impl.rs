@@ -168,14 +168,12 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         .commit_blocks(vec![block1_id], ledger_info_with_sigs)
         .unwrap();
 
-    let initial_accumulator = db.reader.get_accumulator_summary(0).unwrap();
     let state_proof = db.reader.get_state_proof(0).unwrap();
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
-    let trusted_state =
-        match trusted_state.verify_and_ratchet(&state_proof, Some(&initial_accumulator)) {
-            Ok(TrustedStateChange::Epoch { new_state, .. }) => new_state,
-            _ => panic!("unexpected state change"),
-        };
+    let trusted_state = match trusted_state.verify_and_ratchet(&state_proof) {
+        Ok(TrustedStateChange::Epoch { new_state, .. }) => new_state,
+        _ => panic!("unexpected state change"),
+    };
     let current_version = state_proof.latest_ledger_info().version();
     assert_eq!(trusted_state.version(), 9);
 
@@ -354,9 +352,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         .unwrap();
 
     let state_proof = db.reader.get_state_proof(trusted_state.version()).unwrap();
-    let trusted_state_change = trusted_state
-        .verify_and_ratchet(&state_proof, None)
-        .unwrap();
+    let trusted_state_change = trusted_state.verify_and_ratchet(&state_proof).unwrap();
     assert!(matches!(
         trusted_state_change,
         TrustedStateChange::Version { .. }

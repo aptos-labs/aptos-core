@@ -47,7 +47,7 @@ use crate::{
     system_store::SystemStore,
     transaction_store::TransactionStore,
 };
-use anyhow::{ensure, format_err, Result};
+use anyhow::{ensure, Result};
 use aptos_config::config::{RocksdbConfig, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_crypto::hash::{HashValue, SPARSE_MERKLE_PLACEHOLDER_HASH};
 use aptos_infallible::Mutex;
@@ -955,32 +955,7 @@ impl DbReader for AptosDB {
                 EpochChangeProof::new(vec![], /* more = */ false)
             };
 
-            // Only return a consistency proof up to the verifiable end LI. If a
-            // client still needs to sync more epoch change LI's, then they cannot
-            // verify the latest LI nor verify a consistency proof up to the latest
-            // LI. If the client needs more epochs, we just return the consistency
-            // proof up to the last epoch change LI.
-            let verifiable_li = if epoch_change_proof.more {
-                epoch_change_proof
-                    .ledger_info_with_sigs
-                    .last()
-                    .ok_or_else(|| format_err!(
-                        "No epoch changes despite claiming the client needs to sync more epochs: known_epoch={}, end_epoch={}",
-                        known_epoch, end_epoch,
-                    ))?
-                    .ledger_info()
-            } else {
-                ledger_info
-            };
-
-            let consistency_proof = self
-                .ledger_store
-                .get_consistency_proof(Some(known_version), verifiable_li.version())?;
-            Ok(StateProof::new(
-                ledger_info_with_sigs,
-                epoch_change_proof,
-                consistency_proof,
-            ))
+            Ok(StateProof::new(ledger_info_with_sigs, epoch_change_proof))
         })
     }
 
