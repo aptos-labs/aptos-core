@@ -52,7 +52,6 @@ Install pre-requisites if needed:
     }
   }
 
-
   module "aptos-node" {
     # download Terraform module from aptos-labs/aptos-core repo
     source        = "github.com/aptos-labs/aptos-core.git//terraform/aptos-node/azure?ref=main"
