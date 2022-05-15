@@ -470,6 +470,44 @@ export type Transaction = PendingTransaction | GenesisTransaction | UserTransact
 
 export type SubmitTransactionRequest = UserTransactionRequest & UserTransactionSignature;
 
+/**
+ * Raw transaction format that the chain understands and signs.  The order of the properties is important.
+ */
+export interface RawTransaction {
+  /**
+   * Hex-encoded 16 bytes Aptos account address.
+   *
+   * Prefixed with `0x` and leading zeros are trimmed.
+   * See [doc](https://diem.github.io/move/address.html) for more details.
+   */
+  sender: Address;
+
+  /** Unsigned int64 type value */
+  sequence_number: Uint64;
+  payload: TransactionPayload;
+
+  /** Unsigned int64 type value */
+  max_gas_amount: Uint64;
+
+  /** Unsigned int64 type value */
+  gas_unit_price: Uint64;
+
+  /**
+   * Timestamp in seconds, e.g. transaction expiration timestamp.
+   *
+   */
+  expiration_timestamp_secs: TimestampSec;
+
+  /**
+   * The blockchain chain id.
+   *
+   * @min 0
+   * @max 255
+   * @example 4
+   */
+  chain_id: number;
+}
+
 export type PendingTransaction = { type: string; hash: HexEncodedBytes } & UserTransactionRequest &
   UserTransactionSignature;
 

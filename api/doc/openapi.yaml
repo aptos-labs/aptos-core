@@ -1099,6 +1099,39 @@ components:
       allOf:
         - $ref: '#/components/schemas/UserTransactionRequest'
         - $ref: '#/components/schemas/UserTransactionSignature'
+    RawTransaction:
+      title: Raw Transaction
+      type: object
+      description: |
+        Raw transaction format that the chain understands and signs.  The order of the properties is important.
+      required:
+        - sender
+        - sequence_number
+        - payload
+        - max_gas_amount
+        - gas_unit_price
+        - expiration_timestamp_secs
+        - chain_id
+      properties:
+        sender:
+          $ref: '#/components/schemas/Address'
+        sequence_number:
+          $ref: '#/components/schemas/Uint64'
+        payload:
+          $ref: '#/components/schemas/TransactionPayload'
+        max_gas_amount:
+          $ref: '#/components/schemas/Uint64'
+        gas_unit_price:
+          $ref: '#/components/schemas/Uint64'
+        expiration_timestamp_secs:
+          $ref: '#/components/schemas/TimestampSec'
+        chain_id:
+          type: integer
+          minimum: 0
+          maximum: 255
+          example: 4
+          description: |
+            The blockchain chain id.
     PendingTransaction:
       title: Pending Transaction
       type: object
