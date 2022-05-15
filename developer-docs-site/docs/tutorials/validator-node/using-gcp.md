@@ -146,7 +146,7 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
     ---
     root_key: "0x5243ca72b0766d9e9cbf2debf6153443b01a1e0e6d086c7ea206eaf6f8043956"
     users:
-      - <username you created in step 5>
+      - <username you created in step 11>
     chain_id: 23
     ```
 
