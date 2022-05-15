@@ -110,7 +110,7 @@ This will download all the terraform dependencies for you, in the `.terraform` f
 11. Configure validator information. This is all the info you need to register on our community website later.
 
     ```
-    aptos genesis set-validator-configuration --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE --username <pick a username for your node> --validator-host $VALIDATOR_ADDRESS:6180 --full-node-host $FULLNODE_ADDRESS:6182
+    aptos genesis set-validator-configuration --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE --username <select a username for your node> --validator-host $VALIDATOR_ADDRESS:6180 --full-node-host $FULLNODE_ADDRESS:6182
 
     ```
 
@@ -143,7 +143,7 @@ This will download all the terraform dependencies for you, in the `.terraform` f
     ---
     root_key: "0x5243ca72b0766d9e9cbf2debf6153443b01a1e0e6d086c7ea206eaf6f8043956"
     users:
-      - <username you created in step 5>
+      - <username you specified in step 11>
     chain_id: 23
     ```
 
