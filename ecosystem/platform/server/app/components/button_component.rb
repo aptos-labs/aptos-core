@@ -4,14 +4,14 @@
 # SPDX-License-Identifier: Apache-2.0
 
 SCHEME_CLASSES = {
-  primary: 'bg-teal-400 hover:bg-teal-300 text-neutral-800 text-center font-mono uppercase font-bold',
-  secondary: 'border border-teal-400 hover:border-teal-300 text-center text-white font-mono uppercase'
+  primary: 'bg-surf-400 hover:bg-surf-300 text-surf-900 text-center font-mono uppercase font-bold',
+  secondary: 'border border-surf-400 hover:border-surf-300 text-center text-white font-mono uppercase'
 }.freeze
 
 SIZE_CLASSES = {
-  large: 'px-8 py-4 text-lg rounded',
-  medium: 'p-2 text-lg rounded',
-  small: 'py-1 text-sm rounded'
+  large: 'px-8 py-4 text-xl rounded-lg',
+  medium: 'p-2 text-lg rounded-lg',
+  small: 'py-1 text-sm rounded-lg'
 }.freeze
 
 class ButtonComponent < ViewComponent::Base

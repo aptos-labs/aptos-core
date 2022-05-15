@@ -1,7 +1,7 @@
 <div class="flex flex-col lg:flex-row justify-between">
   <%= render "shared/captcha_helper" %>
 
-  <%= form_with(model: it1_profile, class: "contents", data: {turbo: false}, html: {onsubmit:"return validateRecaptcha();"}, builder: AptosFormBuilder) do |f| %>
+  <%= form_with(model: it1_profile, class: "contents flex flex-col md:flex-row md:gap-10", data: {turbo: false}, html: {onsubmit:"return validateRecaptcha();"}, builder: AptosFormBuilder) do |f| %>
     <div>
       <% if it1_profile.errors.any? %>
         <div id="error_explanation" class="flex p-4 mb-4 bg-red-100 rounded-lg dark:bg-red-200 lg:w-96" role="alert">
@@ -19,7 +19,7 @@
 
       <div>
         <div class="mb-16">
-          <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">Public Keys</h3>
+          <h3 class="text-surf-400 font-mono uppercase text-2xl mb-2">Public Keys</h3>
           <div class="mb-8"><%= render 'shared/bump' %></div>
 
           <div class="mb-4">
@@ -37,7 +37,7 @@
         </div>
 
         <div class="mb-16">
-          <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">Validator Node</h3>
+          <h3 class="text-surf-400 font-mono uppercase text-2xl mb-2">Validator Node</h3>
           <div class="mb-8"><%= render 'shared/bump' %></div>
 
           <div class="mb-4">
@@ -67,8 +67,8 @@
         </div>
 
         <div class="mb-16">
-          <h3 class="text-teal-400 font-mono uppercase text-2xl mb-2">
-            Full Node <span class="text-teal-400 opacity-50 font-mono lowercase text-sm mb-2">[optional]</span>
+          <h3 class="text-surf-400 font-mono uppercase text-2xl mb-2">
+            Full Node <span class="text-surf-400 opacity-50 font-mono lowercase text-sm mb-2">[optional]</span>
           </h3>
           <div class="mb-8"><%= render 'shared/bump' %></div>
 
@@ -93,7 +93,7 @@
       </div>
     </div>
 
-    <div class="bg-neutral-800 rounded-md p-4 md:px-8 md:py-16 2xl:px-16 2xl:py-24 self-start">
+    <div class="bg-neutral-800 rounded-md p-4 md:px-8 md:py-16 2xl:px-16 2xl:py-24 self-start md:sticky md:top-4 w-full md:w-auto">
       <%= f.submit "Validate node", class: "w-full mb-8" %>
       <div class="mb-8">
       <%= recaptcha_tags theme: :dark %>
@@ -101,7 +101,7 @@
       <div class="text-sm">
         <label class="flex mb-4 gap-2 items-center cursor-pointer">
           <%= f.check_box :terms_accepted, required: true %>
-          <span>I agree to the Aptos <a href="https://aptoslabs.com/terms-testnet/" class="font-bold text-teal-400">Testnet Participation Terms of Use</a>.</span>
+          <span>I agree to the Aptos <a href="https://aptoslabs.com/terms-testnet/" class="underline decoration-surf-400 decoration-1 underline-offset-4">Testnet Participation Terms of Use</a>.</span>
         </label>
       </div>
     </div>

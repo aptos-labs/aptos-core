@@ -23,6 +23,18 @@ module.exports = {
           '400': '#1bd7a4',
           '500': '#187e65',
         },
+        surf: {
+          50: '#eafff7',
+          100: '#cbffeb',
+          200: '#9cfedc',
+          300: '#5df8cc',
+          400: '#1de9b6',
+          500: '#00d0a1',
+          600: '#00a380',
+          700: '#008068',
+          800: '#005c4b',
+          900: '#002e26',
+        },
       },
       fontFamily: {
         'sans': ['apparat', ...defaultTheme.fontFamily.sans],
