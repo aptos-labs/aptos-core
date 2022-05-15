@@ -43,7 +43,7 @@ This is all the info you need to register on our community website later.
     ```
     aptos genesis set-validator-configuration \
         --keys-dir ~/$WORKSPACE --local-repository-dir ~/$WORKSPACE \
-        --username <pick a username for your node> \
+        --username <select a username for your node> \
         --validator-host <Validator Node IP / DNS address>:<Port> \
         --full-node-host <Full Node IP / DNS address>:<Port>
 
@@ -93,7 +93,7 @@ This is all the info you need to register on our community website later.
     ---
     root_key: "0x5243ca72b0766d9e9cbf2debf6153443b01a1e0e6d086c7ea206eaf6f8043956"
     users:
-      - <username you created in step 5>
+      - <username you specified in step 5>
     chain_id: 23
     ```
 
