@@ -115,7 +115,7 @@ With your development environment ready, now you can start to setup your Validat
     ```
     cargo run --release --package framework -- --package aptos-framework --output current
 
-    mkdir ~/WORKSPACE/framework
+    mkdir ~/$WORKSPACE/framework
 
     mv aptos-framework/releases/artifacts/current/build/**/bytecode_modules/*.mv ~/$WORKSPACE/framework/
     ```
