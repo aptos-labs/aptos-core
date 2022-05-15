@@ -4,7 +4,7 @@
 use crate::{
     access_path::Path,
     account_address::AccountAddress,
-    account_config::{AccountResource, BalanceResource},
+    account_config::{AccountResource, CoinStoreResource},
     account_view::AccountView,
     state_store::{state_key::StateKey, state_value::StateValue},
 };
@@ -139,11 +139,11 @@ impl TryFrom<&Vec<u8>> for AccountState {
     }
 }
 
-impl TryFrom<(&AccountResource, &BalanceResource)> for AccountState {
+impl TryFrom<(&AccountResource, &CoinStoreResource)> for AccountState {
     type Error = Error;
 
     fn try_from(
-        (account_resource, balance_resource): (&AccountResource, &BalanceResource),
+        (account_resource, balance_resource): (&AccountResource, &CoinStoreResource),
     ) -> Result<Self> {
         let mut btree_map: BTreeMap<Vec<u8>, Vec<u8>> = BTreeMap::new();
         btree_map.insert(
@@ -151,7 +151,7 @@ impl TryFrom<(&AccountResource, &BalanceResource)> for AccountState {
             bcs::to_bytes(account_resource)?,
         );
         btree_map.insert(
-            BalanceResource::resource_path(),
+            CoinStoreResource::resource_path(),
             bcs::to_bytes(balance_resource)?,
         );
 

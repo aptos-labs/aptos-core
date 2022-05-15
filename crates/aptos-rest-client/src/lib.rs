@@ -54,7 +54,7 @@ impl Client {
 
     pub async fn get_account_balance(&self, address: AccountAddress) -> Result<Response<Balance>> {
         let resp = self
-            .get_account_resource(address, "0x1::TestCoin::Balance")
+            .get_account_resource(address, "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>")
             .await?;
         resp.and_then(|resource| {
             if let Some(res) = resource {

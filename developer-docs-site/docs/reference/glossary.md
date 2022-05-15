@@ -103,8 +103,8 @@ An Aptos node is a peer entity of the Aptos network that tracks the state of the
 ## Event
 
 - An **event** is the user-facing representation of the effects of executing a transaction.
-- A transaction may be designed to emit any number of events as a list. For example, a `TestCoin` transfer emits a `SentEvent` for the sender account and a `ReceivedEvent` for the recipient account.
-- In the Aptos protocol, events provide evidence that the successful execution of a transaction resulted in a specific effect. The `ReceivedEvent` (in the above example) allows the recipient to confirm that a payment was received into their account.
+- A transaction may be designed to emit any number of events as a list. For example, a `Coin<TestCoin>` transfer emits a `WithdrawEvent` for the sender account and a `DepositEvent` for the recipient account.
+- In the Aptos protocol, events provide evidence that the successful execution of a transaction resulted in a specific effect. The `DepositEvent` (in the above example) allows the recipient to confirm that a payment was received into their account.
 - Events are persisted on the blockchain and are used to answer queries by [clients](#client).
 
 ## Expiration Time

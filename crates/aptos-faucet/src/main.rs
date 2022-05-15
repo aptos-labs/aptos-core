@@ -281,16 +281,16 @@ mod tests {
                     assert!(previous.is_none(), "should not create account twice");
                 }
                 ScriptFunctionCall::TestCoinMint {
-                    mint_addr, amount, ..
+                    dst_addr, amount, ..
                 } => {
                     // Sometimes we call CreateAccount and Mint at the same time (from our tests: this is a test method)
                     // If the account doesn't exist yet, we sleep for 100ms to let the other request finish
-                    if accounts.write().get_mut(&mint_addr).is_none() {
+                    if accounts.write().get_mut(&dst_addr).is_none() {
                         yield_now().await;
                     }
                     let mut writer = accounts.write();
                     let account = writer
-                        .get_mut(&mint_addr)
+                        .get_mut(&dst_addr)
                         .expect("account should be created");
                     account.balance += amount;
                 }

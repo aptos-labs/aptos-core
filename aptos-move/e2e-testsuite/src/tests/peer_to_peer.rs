@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::{
-    account_config::{ReceivedEvent, SentEvent},
+    account_config::{DepositEvent, WithdrawEvent},
     transaction::{ExecutionStatus, SignedTransaction, TransactionOutput, TransactionStatus},
 };
 use language_e2e_tests::{
@@ -41,20 +41,16 @@ fn single_peer_to_peer_with_event() {
             .read_account_resource(sender.account())
             .expect("sender must exist");
         let updated_sender_balance = executor
-            .read_balance_resource(sender.account())
+            .read_coin_store_resource(sender.account())
             .expect("sender balance must exist");
         let updated_receiver_balance = executor
-            .read_balance_resource(receiver.account())
+            .read_coin_store_resource(receiver.account())
             .expect("receiver balance must exist");
-        let updated_sender_events = executor.read_transfer_event(sender.account()).unwrap();
-        let updated_receiver_events = executor.read_transfer_event(receiver.account()).unwrap();
         assert_eq!(receiver_balance, updated_receiver_balance.coin());
         assert_eq!(sender_balance, updated_sender_balance.coin());
         assert_eq!(11, updated_sender.sequence_number());
-        assert_eq!(0, updated_sender_events.received_events().count(),);
-        assert_eq!(1, updated_sender_events.sent_events().count());
-        assert_eq!(1, updated_receiver_events.received_events().count());
-        assert_eq!(0, updated_receiver_events.sent_events().count());
+        assert_eq!(0, updated_sender_balance.deposit_events().count(),);
+        assert_eq!(1, updated_receiver_balance.deposit_events().count());
 
         let rec_ev_path = receiver.received_events_key().to_vec();
         let sent_ev_path = sender.sent_events_key().to_vec();
@@ -140,10 +136,10 @@ fn single_peer_to_peer_with_event() {
 //         .read_account_resource(sender.account())
 //         .expect("sender must exist");
 //     let updated_sender_balance = executor
-//         .read_balance_resource(sender.account())
+//         .read_coin_store_resource(sender.account())
 //         .expect("sender balance must exist");
 //     let updated_receiver_balance = executor
-//         .read_balance_resource(receiver.account())
+//         .read_coin_store_resource(receiver.account())
 //         .expect("receiver balance must exist");
 //     assert_eq!(receiver_balance, updated_receiver_balance.coin());
 //     assert_eq!(sender_balance, updated_sender_balance.coin());
@@ -179,22 +175,23 @@ fn few_peer_to_peer_with_event() {
 
             // check events
             for event in txn_output.events() {
-                if let Ok(payload) = SentEvent::try_from(event) {
+                if let Ok(payload) = WithdrawEvent::try_from(event) {
                     assert_eq!(transfer_amount, payload.amount());
-                    assert_eq!(receiver.address(), &payload.receiver());
-                } else if let Ok(payload) = ReceivedEvent::try_from(event) {
+                } else if let Ok(payload) = DepositEvent::try_from(event) {
+                    if payload.amount() == 0 {
+                        continue;
+                    }
                     assert_eq!(transfer_amount, payload.amount());
-                    assert_eq!(sender.address(), &payload.sender());
                 } else {
                     panic!("Unexpected Event Type")
                 }
             }
 
             let original_sender_balance = executor
-                .read_balance_resource(sender.account())
+                .read_coin_store_resource(sender.account())
                 .expect("sender balance must exist");
             let original_receiver_balance = executor
-                .read_balance_resource(receiver.account())
+                .read_coin_store_resource(receiver.account())
                 .expect("receiver balcne must exist");
             executor.apply_write_set(txn_output.write_set());
 
@@ -205,20 +202,16 @@ fn few_peer_to_peer_with_event() {
                 .read_account_resource(sender.account())
                 .expect("sender must exist");
             let updated_sender_balance = executor
-                .read_balance_resource(sender.account())
+                .read_coin_store_resource(sender.account())
                 .expect("sender balance must exist");
             let updated_receiver_balance = executor
-                .read_balance_resource(receiver.account())
+                .read_coin_store_resource(receiver.account())
                 .expect("receiver balance must exist");
-            let updated_sender_events = executor.read_transfer_event(sender.account()).unwrap();
-            let updated_receiver_events = executor.read_transfer_event(receiver.account()).unwrap();
             assert_eq!(receiver_balance, updated_receiver_balance.coin());
             assert_eq!(sender_balance, updated_sender_balance.coin());
             assert_eq!(11 + idx as u64, updated_sender.sequence_number());
-            assert_eq!(0, updated_sender_events.received_events().count());
-            assert_eq!(idx as u64 + 1, updated_sender_events.sent_events().count());
-            assert_eq!(idx as u64 + 1, updated_receiver_events.received_events().count());
-            assert_eq!(0, updated_receiver_events.sent_events().count());
+            assert_eq!(0, updated_sender_balance.deposit_events().count());
+            assert_eq!(idx as u64 + 1, updated_receiver_balance.deposit_events().count());
         }
     }
     }
@@ -341,12 +334,12 @@ pub(crate) fn check_and_apply_transfer_output(
             .read_account_resource(sender)
             .expect("sender must exist");
         let sender_balance = executor
-            .read_balance_resource(sender)
+            .read_coin_store_resource(sender)
             .expect("sender balance must exist");
         let sender_initial_balance = sender_balance.coin();
         let sender_seq_num = sender_resource.sequence_number();
         let receiver_initial_balance = executor
-            .read_balance_resource(receiver)
+            .read_coin_store_resource(receiver)
             .expect("receiver balance must exist")
             .coin();
 
@@ -361,10 +354,10 @@ pub(crate) fn check_and_apply_transfer_output(
             .read_account_resource(sender)
             .expect("sender must exist");
         let updated_sender_balance = executor
-            .read_balance_resource(sender)
+            .read_coin_store_resource(sender)
             .expect("sender balance must exist");
         let updated_receiver_balance = executor
-            .read_balance_resource(receiver)
+            .read_coin_store_resource(receiver)
             .expect("receiver balance must exist");
         assert_eq!(receiver_balance, updated_receiver_balance.coin());
         assert_eq!(sender_balance, updated_sender_balance.coin());

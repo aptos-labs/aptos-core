@@ -57,7 +57,7 @@ module AptosFramework::Reconfiguration {
         SystemAddresses::assert_core_resource(account);
         assert!(!exists<Configuration>(@CoreResources), Errors::already_published(ECONFIGURATION));
         // assert it matches `new_epoch_event_key()`, otherwise the event can't be recognized
-        assert!(GUID::get_next_creation_num(Signer::address_of(account)) == 4, Errors::invalid_state(EINVALID_GUID_FOR_EVENT));
+        assert!(GUID::get_next_creation_num(Signer::address_of(account)) == 5, Errors::invalid_state(EINVALID_GUID_FOR_EVENT));
         move_to<Configuration>(
             account,
             Configuration {

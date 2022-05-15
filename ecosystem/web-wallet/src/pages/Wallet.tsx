@@ -107,8 +107,8 @@ const submitTransaction = async ({
   const client = new AptosClient(nodeUrl)
   const payload: Types.TransactionPayload = {
     type: 'script_function_payload',
-    function: '0x1::TestCoin::transfer',
-    type_arguments: [],
+    function: '0x1::Coin::transfer',
+    type_arguments: ["0x1::TestCoin::TestCoin"],
     arguments: [toAddress, `${amount}`]
   }
   const txnRequest = await client.generateTransaction(fromAddress.address(), payload)
@@ -121,7 +121,7 @@ const getAccountBalanceFromAccountResources = (
   accountResources: Types.AccountResource[] | undefined
 ): Number => {
   if (accountResources) {
-    const accountResource = (accountResources) ? accountResources?.find((r) => r.type === '0x1::TestCoin::Balance') : undefined
+    const accountResource = (accountResources) ? accountResources?.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>') : undefined
     const tokenBalance = (accountResource) ? (accountResource.data as { coin: { value: string } }).coin.value : undefined
     return Number(tokenBalance)
   }
@@ -143,7 +143,7 @@ const Wallet = () => {
   const toast = useToast()
 
   const address = aptosAccount?.address().hex()
-  const accountResource = (accountResources) ? accountResources?.find((r) => r.type === '0x1::TestCoin::Balance') : undefined
+  const accountResource = (accountResources) ? accountResources?.find((r) => r.type === '0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>') : undefined
   const tokenBalance = (accountResource) ? (accountResource.data as { coin: { value: string } }).coin.value : undefined
   const tokenBalanceString = numeral(tokenBalance).format('0,0.0000')
   const toAddress: string | undefined | null = watch('toAddress')

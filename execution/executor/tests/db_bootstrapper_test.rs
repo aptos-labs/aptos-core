@@ -11,9 +11,10 @@ use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{aptos_root_address, BalanceResource},
+    account_config::{aptos_root_address, CoinStoreResource},
     account_view::AccountView,
     contract_event::ContractEvent,
+    event::EventHandle,
     on_chain_config,
     on_chain_config::{
         access_path_for_config, config_address, ConfigurationResource, OnChainConfig, ValidatorSet,
@@ -175,7 +176,7 @@ fn get_balance(account: &AccountAddress, db: &DbReaderWriter) -> u64 {
     let db_state_view = db.reader.latest_state_view().unwrap();
     let account_state_view = db_state_view.as_account_with_state_view(account);
     account_state_view
-        .get_balance_resource()
+        .get_coin_store_resource()
         .unwrap()
         .unwrap()
         .coin()
@@ -285,8 +286,18 @@ fn test_pre_genesis() {
                 WriteOp::Value(bcs::to_bytes(&config_resource).unwrap()),
             ),
             (
-                StateKey::AccessPath(AccessPath::new(account1, BalanceResource::resource_path())),
-                WriteOp::Value(bcs::to_bytes(&BalanceResource::new(1000)).unwrap()),
+                StateKey::AccessPath(AccessPath::new(
+                    account1,
+                    CoinStoreResource::resource_path(),
+                )),
+                WriteOp::Value(
+                    bcs::to_bytes(&CoinStoreResource::new(
+                        1000,
+                        EventHandle::random_handle(0),
+                        EventHandle::random_handle(0),
+                    ))
+                    .unwrap(),
+                ),
             ),
         ])
         .freeze()
@@ -359,8 +370,18 @@ fn test_new_genesis() {
                 WriteOp::Value(bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap()),
             ),
             (
-                StateKey::AccessPath(AccessPath::new(account1, BalanceResource::resource_path())),
-                WriteOp::Value(bcs::to_bytes(&BalanceResource::new(1_000_000)).unwrap()),
+                StateKey::AccessPath(AccessPath::new(
+                    account1,
+                    CoinStoreResource::resource_path(),
+                )),
+                WriteOp::Value(
+                    bcs::to_bytes(&CoinStoreResource::new(
+                        1_000_000,
+                        EventHandle::random_handle(0),
+                        EventHandle::random_handle(0),
+                    ))
+                    .unwrap(),
+                ),
             ),
         ])
         .freeze()

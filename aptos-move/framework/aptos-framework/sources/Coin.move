@@ -97,17 +97,22 @@ module AptosFramework::Coin {
     /// Returns the balance of `owner` for provided `CoinType`.
     public fun balance<CoinType>(owner: address): u64 acquires CoinStore {
         assert!(
-            exists<CoinStore<CoinType>>(owner),
+            is_account_registered<CoinType>(owner),
             Errors::not_published(ECOIN_STORE_NOT_PUBLISHED),
         );
         borrow_global<CoinStore<CoinType>>(owner).coin.value
     }
 
-    /// Returns `true` if the type `CoinType` is a registered coin.
-    public fun is_registered<CoinType>(): bool {
+    /// Returns `true` if the type `CoinType` is an initialized coin.
+    public fun is_coin_initialized<CoinType>(): bool {
         let type_info = TypeInfo::type_of<CoinType>();
         let coin_address = TypeInfo::account_address(&type_info);
         exists<CoinInfo<CoinType>>(coin_address)
+    }
+
+    /// Returns `true` if `account_addr` is registered to receive `CoinType`.
+    public fun is_account_registered<CoinType>(account_addr: address): bool {
+        exists<CoinStore<CoinType>>(account_addr)
     }
 
     /// Returns the name of the coin.
@@ -157,10 +162,22 @@ module AptosFramework::Coin {
         }
     }
 
+    /// Burn `coin` from the specified `account` with capability.
+    /// The capability `_cap` should be passed as a reference to `BurnCapability<CoinType>`.
+    public fun burn_from<CoinType>(
+        account_addr: address,
+        amount: u64,
+        burn_cap: &BurnCapability<CoinType>,
+    ) acquires CoinInfo, CoinStore {
+        let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
+        let coin_to_burn = extract(&mut coin_store.coin, amount);
+        burn(coin_to_burn, burn_cap);
+    }
+
     /// Deposit the coin balance into the recipient's account and emit an event.
     public fun deposit<CoinType>(account_addr: address, coin: Coin<CoinType>) acquires CoinStore {
         assert!(
-            exists<CoinStore<CoinType>>(account_addr),
+            is_account_registered<CoinType>(account_addr),
             Errors::not_published(ECOIN_STORE_NOT_PUBLISHED),
         );
 
@@ -246,13 +263,17 @@ module AptosFramework::Coin {
         Coin<CoinType> { value: amount }
     }
 
-    /// Public function to register to receive a specific `CoinType`. An account that wants to hold a coin type
+    /// Script function to register to receive a specific `CoinType`. An account that wants to hold a coin type
     /// has to explicitly registers to do so. The register creates a special `CoinStore`
     /// to hold the specified `CoinType`.
-    public fun register<CoinType>(account: &signer) acquires CoinEvents {
+    public(script) fun register<CoinType>(account: &signer) acquires CoinEvents {
+        register_internal<CoinType>(account);
+    }
+
+    public fun register_internal<CoinType>(account: &signer) acquires CoinEvents {
         let account_addr = Signer::address_of(account);
         assert!(
-            !exists<CoinStore<CoinType>>(account_addr),
+            !is_account_registered<CoinType>(account_addr),
             Errors::already_published(ECOIN_STORE_ALREADY_PUBLISHED),
         );
 
@@ -301,7 +322,7 @@ module AptosFramework::Coin {
     ): Coin<CoinType> acquires CoinStore {
         let account_addr = Signer::address_of(account);
         assert!(
-            exists<CoinStore<CoinType>>(account_addr),
+            is_account_registered<CoinType>(account_addr),
             Errors::not_published(ECOIN_STORE_NOT_PUBLISHED),
         );
         let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
@@ -463,6 +484,36 @@ module AptosFramework::Coin {
         });
     }
 
+    #[test(source = @0x1, destination = @0x2)]
+    public(script) fun test_burn_from_with_capability(
+        source: signer,
+    ) acquires CoinEvents, CoinInfo, CoinStore {
+        let source_addr = Signer::address_of(&source);
+
+        let (mint_cap, burn_cap) = initialize<FakeMoney>(
+            &source,
+            ASCII::string(b"Fake money"),
+            ASCII::string(b"FMD"),
+            1,
+            true
+        );
+        register<FakeMoney>(&source);
+
+        let coins_minted = mint<FakeMoney>(100, &mint_cap);
+        deposit(source_addr, coins_minted);
+        assert!(balance<FakeMoney>(source_addr) == 100, 0);
+        assert!(*Option::borrow(&supply<FakeMoney>()) == 100, 1);
+
+        burn_from<FakeMoney>(source_addr, 10, &burn_cap);
+        assert!(balance<FakeMoney>(source_addr) == 90, 2);
+        assert!(*Option::borrow(&supply<FakeMoney>()) == 90, 3);
+
+        move_to(&source, FakeMoneyCapabilities{
+            mint_cap,
+            burn_cap,
+        });
+    }
+
     #[test(source = @0x1)]
     #[expected_failure(abort_code = 1543)]
     public fun test_destroy_non_zero(
@@ -486,7 +537,7 @@ module AptosFramework::Coin {
     }
 
     #[test(source = @0x1)]
-    public fun test_extract(
+    public(script) fun test_extract(
         source: signer,
     ) acquires CoinEvents, CoinInfo, CoinStore {
         let source_addr = Signer::address_of(&source);
@@ -519,8 +570,8 @@ module AptosFramework::Coin {
     }
 
     #[test(source = @0x1)]
-    public fun test_is_registered(source: signer) {
-        assert!(!is_registered<FakeMoney>(), 0);
+    public fun test_is_coin_initialized(source: signer) {
+        assert!(!is_coin_initialized<FakeMoney>(), 0);
         let (mint_cap, burn_cap) = initialize<FakeMoney>(
             &source,
             ASCII::string(b"Fake money"),
@@ -528,7 +579,7 @@ module AptosFramework::Coin {
             1,
             true
         );
-        assert!(is_registered<FakeMoney>(), 1);
+        assert!(is_coin_initialized<FakeMoney>(), 1);
 
         move_to(&source, FakeMoneyCapabilities {
             mint_cap,
@@ -541,5 +592,11 @@ module AptosFramework::Coin {
         let zero = zero<FakeMoney>();
         assert!(value(&zero) == 0, 1);
         destroy_zero(zero);
+    }
+
+    #[test_only]
+    public fun mint_for_test<CoinType>(account: &signer, amount: u64) acquires CoinEvents, CoinStore {
+        register_internal<CoinType>(account);
+        deposit<CoinType>(Signer::address_of(account), Coin<CoinType> {value: amount});
     }
 }

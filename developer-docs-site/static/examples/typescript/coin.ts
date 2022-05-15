@@ -33,6 +33,7 @@ class CoinClient extends RestClient {
       ],
       arguments: [
         Buffer.from("Moon Coin", "utf-8").toString("hex"),
+        Buffer.from("MOON", "utf-8").toString("hex"),
         "18",
         false,
       ]

@@ -87,9 +87,9 @@ impl AUTransactionGen for P2PTransferGen {
                 status = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
                     location: AbortLocation::Module(ModuleId::new(
                         CORE_CODE_ADDRESS,
-                        ident_str!("TestCoin").to_owned(),
+                        ident_str!("Coin").to_owned(),
                     )),
-                    code: 8,
+                    code: 1287,
                 });
             }
             (true, false, _) => {
@@ -102,9 +102,9 @@ impl AUTransactionGen for P2PTransferGen {
                 status = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
                     location: AbortLocation::Module(ModuleId::new(
                         CORE_CODE_ADDRESS,
-                        ident_str!("TestCoin").to_owned(),
+                        ident_str!("Coin").to_owned(),
                     )),
-                    code: 8,
+                    code: 1287,
                 });
             }
             (false, _, _) => {

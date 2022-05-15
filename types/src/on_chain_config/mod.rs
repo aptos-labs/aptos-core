@@ -161,7 +161,7 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
 }
 
 pub fn new_epoch_event_key() -> EventKey {
-    EventKey::new_from_address(&config_address(), 4)
+    EventKey::new_from_address(&config_address(), 5)
 }
 
 pub fn struct_tag_for_config(config_name: Identifier) -> StructTag {

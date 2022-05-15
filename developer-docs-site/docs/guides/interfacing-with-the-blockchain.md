@@ -15,15 +15,15 @@ This guide (in concert with the [Move module tutorial][your-first-move-module]) 
 be up to date. The most recent framework can be found in the source code, [here][aptos_framework].
 
 The core functions provided to users within the Aptos Framework include:
-* Sending and receiving `TestCoin`
+* Sending and receiving `Coin<TestCoin>`
 * Creating a new account
 * Publishing a new Move module
 
 Note: this document assumes readers are already familiar with submitting transactions, as described in the [Your first transaction tutorial][your-first-transaction].
 
-## Sending and Receiving `TestCoin`
+## Sending and Receiving `Coin<TestCoin>`
 
-`TestCoin` is required for paying gas fees when submitting and executing transactions. `TestCoin` can be obtained by querying the Devnet Faucet. See the [Your first transaction tutorial][your-first-transaction] for an example.
+`Coin<TestCoin>` is required for paying gas fees when submitting and executing transactions. `Coin<TestCoin>` can be obtained by querying the Devnet Faucet. See the [Your first transaction tutorial][your-first-transaction] for an example.
 
 The payload for instructing the blockchain to perform a transfer is:
 

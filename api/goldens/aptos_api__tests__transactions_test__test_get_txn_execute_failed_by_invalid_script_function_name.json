@@ -27,10 +27,34 @@
       "address": "0xa550c18",
       "state_key_hash": "",
       "data": {
-        "type": "0x1::TestCoin::Balance",
+        "type": "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>",
         "data": {
           "coin": {
             "value": "18446744073709551614"
+          },
+          "deposit_events": {
+            "counter": "1",
+            "guid": {
+              "guid": {
+                "id": {
+                  "addr": "0xa550c18",
+                  "creation_num": "1"
+                }
+              },
+              "len_bytes": 40
+            }
+          },
+          "withdraw_events": {
+            "counter": "1",
+            "guid": {
+              "guid": {
+                "id": {
+                  "addr": "0xa550c18",
+                  "creation_num": "2"
+                }
+              },
+              "len_bytes": 40
+            }
           }
         }
       }
@@ -43,8 +67,10 @@
   "expiration_timestamp_secs": "18446744073709551615",
   "payload": {
     "type": "script_function_payload",
-    "function": "0x1::TestCoin::transfer_invalid",
-    "type_arguments": [],
+    "function": "0x1::Coin::transfer_invalid",
+    "type_arguments": [
+      "0x1::TestCoin::TestCoin"
+    ],
     "arguments": [
       "0x00000000000000000000000000000000000000000000000000000000000000dd",
       "0x0100000000000000"
@@ -53,7 +79,7 @@
   "signature": {
     "type": "ed25519_signature",
     "public_key": "0xb9c6ee1630ef3e711144a648db06bbb2284f7274cfbee53ffcee503cc1a49200",
-    "signature": "0x0f9df12ef4bffaa4f1b1aaa232d01e496a44d0e5950da21ab6a56a05dce09322e0ea0dd867fdfff2b37b1afa091bbb2335357202a76f65a60fa449f96774b40c"
+    "signature": "0xf58c8bdd32c165718e7218262026504fc6daf82b1ac9d2004cff05e9e45591c919e40c28b3d32e510aad85a90dd97e44b6adece256924089b7a52d7b34265d0e"
   },
   "events": [],
   "timestamp": "1"

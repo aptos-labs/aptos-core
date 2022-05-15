@@ -4,7 +4,7 @@
 use crate::{
     access_path::AccessPath,
     account_address::{self, AccountAddress},
-    account_config::{AccountResource, BalanceResource},
+    account_config::{AccountResource, CoinStoreResource},
     account_state::AccountState,
     block_info::{BlockInfo, Round},
     block_metadata::BlockMetadata,
@@ -658,19 +658,23 @@ impl AccountResourceGen {
 }
 
 #[derive(Arbitrary, Debug)]
-pub struct BalanceResourceGen {
+pub struct CoinStoreResourceGen {
     coin: u64,
 }
 
-impl BalanceResourceGen {
-    pub fn materialize(self) -> BalanceResource {
-        BalanceResource::new(self.coin)
+impl CoinStoreResourceGen {
+    pub fn materialize(self) -> CoinStoreResource {
+        CoinStoreResource::new(
+            self.coin,
+            EventHandle::random_handle(0),
+            EventHandle::random_handle(0),
+        )
     }
 }
 
 #[derive(Arbitrary, Debug)]
 pub struct AccountStateGen {
-    balance_resource_gen: BalanceResourceGen,
+    balance_resource_gen: CoinStoreResourceGen,
     account_resource_gen: AccountResourceGen,
 }
 

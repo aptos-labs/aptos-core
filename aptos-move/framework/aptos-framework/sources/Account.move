@@ -5,7 +5,8 @@ module AptosFramework::Account {
     use Std::Signer;
     use Std::Vector;
     use AptosFramework::ChainId;
-    use AptosFramework::TestCoin;
+    use AptosFramework::Coin;
+    use AptosFramework::TestCoin::TestCoin;
     use AptosFramework::Timestamp;
     use AptosFramework::TransactionFee;
     use AptosFramework::TransactionPublishingOption;
@@ -218,8 +219,8 @@ module AptosFramework::Account {
             Errors::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
         );
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
-        assert!(TestCoin::exists_at(transaction_sender), Errors::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
-        let balance = TestCoin::balance_of(transaction_sender);
+        assert!(Coin::is_account_registered<TestCoin>(transaction_sender), Errors::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
+        let balance = Coin::balance<TestCoin>(transaction_sender);
         assert!(balance >= max_transaction_fee, Errors::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
     }
 
@@ -326,9 +327,8 @@ module AptosFramework::Account {
         let addr = Signer::address_of(&account);
         // it's important to maintain the error code consistent with vm
         // to do failed transaction cleanup.
-        assert!(TestCoin::balance_of(addr) >= transaction_fee_amount, Errors::limit_exceeded(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
-        let coin = TestCoin::withdraw(&account, transaction_fee_amount);
-        TransactionFee::burn_fee(coin);
+        assert!(Coin::balance<TestCoin>(addr) >= transaction_fee_amount, Errors::limit_exceeded(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
+        TransactionFee::burn_fee(addr, transaction_fee_amount);
 
         let old_sequence_number = get_sequence_number(addr);
 
@@ -348,7 +348,7 @@ module AptosFramework::Account {
 
     public(script) fun create_account(auth_key: address) {
         let (signer, _) = create_account_internal(auth_key);
-        TestCoin::register(&signer);
+        Coin::register<TestCoin>(&signer);
     }
 
     /// Create the account for @AptosFramework to help module upgrades on testnet.

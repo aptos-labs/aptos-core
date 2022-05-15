@@ -248,7 +248,7 @@ impl RestClient {
     //:!:>section_5
     /// Returns the test coin balance associated with the account
     pub fn account_balance(&self, account_address: &str) -> Option<u64> {
-        self.account_resource(account_address, "0x1::TestCoin::Balance")
+        self.account_resource(account_address, "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>")
             .unwrap()["data"]["coin"]["value"]
             .as_str()
             .and_then(|s| s.parse::<u64>().ok())

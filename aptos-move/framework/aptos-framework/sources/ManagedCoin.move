@@ -120,7 +120,7 @@ module AptosFramework::ManagedCoin {
             10,
             true
         );
-        assert!(Coin::is_registered<FakeMoney>(), 0);
+        assert!(Coin::is_coin_initialized<FakeMoney>(), 0);
 
         register<FakeMoney>(&source);
         register<FakeMoney>(&destination);

@@ -10,21 +10,21 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
   const account1 = new AptosAccount();
   await faucetClient.fundAccount(account1.address(), 5000);
   let resources = await client.getAccountResources(account1.address());
-  let accountResource = resources.find((r) => r.type === "0x1::TestCoin::Balance");
+  let accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
   let balance = (accountResource.data as { coin: { value: string } }).coin.value;
   console.log(`account2 coins: ${balance}. Should be 5000!`);
 
   const account2 = new AptosAccount();
   await faucetClient.fundAccount(account2.address(), 0);
   resources = await client.getAccountResources(account2.address());
-  accountResource = resources.find((r) => r.type === "0x1::TestCoin::Balance");
+  accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
   balance = (accountResource.data as { coin: { value: string } }).coin.value;
   console.log(`account2 coins: ${balance}. Should be 0!`);
 
   const payload: Types.TransactionPayload = {
     type: "script_function_payload",
-    function: "0x1::TestCoin::transfer",
-    type_arguments: [],
+    function: "0x1::Coin::transfer",
+    type_arguments: ["0x1::TestCoin::TestCoin"],
     arguments: [account2.address().hex(), "717"],
   };
   const txnRequest = await client.generateTransaction(account1.address(), payload);
@@ -33,7 +33,7 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
   await client.waitForTransaction(transactionRes.hash);
 
   resources = await client.getAccountResources(account2.address());
-  accountResource = resources.find((r) => r.type === "0x1::TestCoin::Balance");
+  accountResource = resources.find((r) => r.type === "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>");
   balance = (accountResource.data as { coin: { value: string } }).coin.value;
   console.log(`account2 coins: ${balance}. Should be 717!`);
 })();
