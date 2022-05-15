@@ -26,6 +26,7 @@ services:
         source: ./validator-identity.yaml
         target: /opt/aptos/genesis/validator-identity.yaml
     command: ["/opt/aptos/bin/aptos-node", "-f", "/opt/aptos/etc/validator.yaml"]
+    restart: unless-stopped
     ports:
       - "6180:6180"
       - "6181:6181"
@@ -57,6 +58,7 @@ services:
         source: ./validator-full-node-identity.yaml
         target: /opt/aptos/genesis/validator-full-node-identity.yaml
     command: ["/opt/aptos/bin/aptos-node", "-f", "/opt/aptos/etc/fullnode.yaml"]
+    restart: unless-stopped
     ports:
       - "6182:6182"
       - "80:8080"
