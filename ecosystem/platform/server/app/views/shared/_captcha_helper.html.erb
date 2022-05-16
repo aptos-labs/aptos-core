@@ -1,5 +1,7 @@
 <script type="application/javascript">
     function validateRecaptcha() {
+        const recaptchav3 = document.getElementsByClassName("grecaptcha-badge")[0];
+        if (recaptchav3) return true;
         const response = grecaptcha.getResponse();
         if (response.length === 0) {
             const element = document.getElementsByClassName("g-recaptcha")[0];

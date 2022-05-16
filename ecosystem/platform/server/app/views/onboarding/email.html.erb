@@ -25,7 +25,11 @@
     </div>
 
     <div class="mb-8">
-      <%= recaptcha_tags theme: :dark %>
+      <% if @show_recaptcha_v2 %>
+        <%= recaptcha_tags theme: :dark %>
+      <% else %>
+        <%= recaptcha_v3(action: 'onboarding/email', site_key: ENV['RECAPTCHA_V3_SITE_KEY'], turbolinks: true) %>
+      <% end %>
     </div>
 
     <div class="mb-12">

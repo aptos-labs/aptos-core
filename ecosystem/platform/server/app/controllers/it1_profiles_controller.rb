@@ -27,7 +27,7 @@ class It1ProfilesController < ApplicationController
     params[:user] = current_user
     @it1_profile = It1Profile.new(params)
 
-    respond_with(@it1_profile) and return unless verify_recaptcha(model: @it1_profile)
+    return unless check_recaptcha
 
     v = NodeHelper::NodeVerifier.new(@it1_profile.validator_address, @it1_profile.validator_metrics_port,
                                      @it1_profile.validator_api_port)
@@ -56,7 +56,7 @@ class It1ProfilesController < ApplicationController
                                      it1_profile_params[:validator_metrics_port],
                                      it1_profile_params[:validator_api_port])
 
-    respond_with(@it1_profile) and return unless verify_recaptcha(model: @it1_profile)
+    return unless check_recaptcha
 
     if v.ip.ok
       @it1_profile.validator_ip = v.ip.ip
@@ -98,6 +98,17 @@ class It1ProfilesController < ApplicationController
       @it1_profile.errors.add :base, result.message unless result.valid
     end
     results
+  end
+
+  def check_recaptcha
+    recaptcha_v3_success = verify_recaptcha(action: 'it1/update', minimum_score: 0.5, secret_key: ENV['RECAPTCHA_V3_SECRET_KEY'], model: @it1_profile)
+    recaptcha_v2_success = verify_recaptcha(model: @it1_profile) unless recaptcha_v3_success
+    if !(recaptcha_v3_success || recaptcha_v2_success)
+      @show_recaptcha_v2 = true
+      respond_with(@it1_profile)
+      return false
+    end
+    return true
   end
 
   # Use callbacks to share common setup or constraints between actions.

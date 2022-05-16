@@ -96,7 +96,11 @@
     <div class="bg-neutral-800 rounded-md p-4 md:px-8 md:py-16 2xl:px-16 2xl:py-24 self-start">
       <%= f.submit "Validate node", class: "w-full mb-8" %>
       <div class="mb-8">
-      <%= recaptcha_tags theme: :dark %>
+      <% if @show_recaptcha_v2 %>
+        <%= recaptcha_tags theme: :dark %>
+      <% else %>
+        <%= recaptcha_v3(action: @recaptcha_action, site_key: ENV['RECAPTCHA_V3_SITE_KEY'], turbolinks: true) %>
+      <% end %>
       </div>
       <div class="text-sm">
         <label class="flex mb-4 gap-2 items-center cursor-pointer">
