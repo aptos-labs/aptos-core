@@ -21,7 +21,7 @@ use shadow_rs::shadow;
 use std::{
     collections::{BTreeMap, HashMap},
     env,
-    fs::File,
+    fs::OpenOptions,
     io::Write,
     path::{Path, PathBuf},
     str::FromStr,
@@ -195,7 +195,22 @@ pub fn read_from_file(path: &Path) -> CliTypedResult<Vec<u8>> {
 
 /// Write a `&[u8]` to a file
 pub fn write_to_file(path: &Path, name: &str, bytes: &[u8]) -> CliTypedResult<()> {
-    let mut file = File::create(path).map_err(|e| CliError::IO(name.to_string(), e))?;
+    write_to_file_with_opts(path, name, bytes, &mut OpenOptions::new())
+}
+
+/// Write a `&[u8]` to a file with the given options
+pub fn write_to_file_with_opts(
+    path: &Path,
+    name: &str,
+    bytes: &[u8],
+    opts: &mut OpenOptions,
+) -> CliTypedResult<()> {
+    let mut file = opts
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(path)
+        .map_err(|e| CliError::IO(name.to_string(), e))?;
     file.write_all(bytes)
         .map_err(|e| CliError::IO(name.to_string(), e))
 }

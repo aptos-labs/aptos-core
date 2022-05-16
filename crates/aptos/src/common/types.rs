@@ -6,7 +6,7 @@ use crate::{
         init::DEFAULT_REST_URL,
         utils::{
             check_if_file_exists, read_from_file, to_common_result, to_common_success_result,
-            write_to_file,
+            write_to_file, write_to_file_with_opts,
         },
     },
     genesis::git::from_yaml,
@@ -22,9 +22,12 @@ use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
 use move_deps::move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
+    fs::OpenOptions,
     path::{Path, PathBuf},
     str::FromStr,
     time::Instant,
@@ -492,6 +495,14 @@ impl SaveFile {
     /// Save to the `output_file`
     pub fn save_to_file(&self, name: &str, bytes: &[u8]) -> CliTypedResult<()> {
         write_to_file(self.output_file.as_path(), name, bytes)
+    }
+
+    /// Save to the `output_file` with restricted permissions (mode 0600)
+    pub fn save_to_file_confidential(&self, name: &str, bytes: &[u8]) -> CliTypedResult<()> {
+        let mut opts = OpenOptions::new();
+        #[cfg(unix)]
+        opts.mode(0o600);
+        write_to_file_with_opts(self.output_file.as_path(), name, bytes, &mut opts)
     }
 }
 
