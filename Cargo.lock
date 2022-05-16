@@ -1102,8 +1102,6 @@ dependencies = [
 name = "aptos-workspace-hack"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "backtrace",
  "byteorder",
  "bytes",
  "cc",
@@ -1140,7 +1138,6 @@ dependencies = [
  "reqwest",
  "rusty-fork",
  "serde 1.0.137",
- "serde_json",
  "sha-1 0.10.0",
  "standback",
  "syn 1.0.92",
@@ -2539,7 +2536,7 @@ dependencies = [
  "diesel_derives",
  "num-bigint 0.2.6",
  "num-integer",
- "num-traits 0.1.43",
+ "num-traits 0.2.15",
  "pq-sys",
  "r2d2",
  "serde_json",
