@@ -64,7 +64,11 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
         --full-node-host fn.bot.aptosdev.com:6182
     ```
 
-    This will create a YAML file in your working directory with your username, e.g. `aptosbot.yml`, it should looks like:
+    This will create a YAML file in your working directory with your username, e.g. `aptosbot.yml`
+    
+    `cat aptosbot.yml`
+    
+    it should looks like:
 
     ```
     ---
@@ -131,6 +135,8 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
     - `waypoint.txt` waypoint for genesis transaction
     - `genesis.blob` genesis binary contains all the info about framework, validatorSet and more.
 
-10. Run docker-compose: `docker-compose up`. (or `docker compose up` depends on your version)
+10. Run docker-compose: `sudo docker-compose up -d`. (or `sudo docker compose up -d` depends on your version)
+    Check the currently running CONTAINER ID `sudo docker ps -a`
+    Check the log's `sudo docker logs -f <CONTAINER ID>`
 
 Now you have completed setting up your node in test mode. You can continue to our [community](https://community.aptoslabs.com/) website for registration.
