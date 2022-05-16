@@ -11,7 +11,7 @@
       Please review the <a href="https://aptoslabs.com/terms-testnet/" class="underline">terms and conditions</a>.
       </p>
     </div>
-    <dialog id="login-dialog" class="rounded-xl border-2 border-teal-400">
+    <%= render(@login_dialog) do %>
       <form type="dialog" class="text-right">
         <button type="submit">x</button>
       </form>
@@ -32,14 +32,15 @@
           <% end %>
         </div>
       </div>
-    </dialog>
+    <% end %>
     <script type="application/javascript">
         function showLoginModal(title) {
-            document.getElementById("login-dialog").children[1].innerHTML = title;
-            document.getElementById("login-dialog").showModal();
+            const loginDialog = document.getElementById("<%= @login_dialog.id %>");
+            loginDialog.children[1].innerHTML = title;
+            loginDialog.showModal();
         }
     </script>
-    <p class=" mb-4">
+    <p class="mb-4">
       <%= render(ButtonComponent.new(size: :large, onclick: 'showLoginModal("Sign up with")', class: 'w-full mt-auto')) do %>
         Sign up for Testnet
       <% end %>

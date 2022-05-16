@@ -8,7 +8,9 @@ class WelcomeController < ApplicationController
 
   before_action :ensure_confirmed!, only: %i[it1]
 
-  def index; end
+  def index
+    @login_dialog = DialogComponent.new
+  end
 
   def it1
     redirect_to root_path unless user_signed_in?
