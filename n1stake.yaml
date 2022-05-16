@@ -1,0 +1,11 @@
+---
+account_address: edcc54eb0738a9f8b3e56b737d0b2d0f76667450f6458f3cc47387f67465f816
+consensus_key: "0xa3c9444538456d7b61af48d4df592f56881400bdc41f5339df841086af7a5668"
+account_key: "0x98af2b19683b6758b7a93159938f5272ed2b0d3e1b5c9032cb3a54b5cd6538e8"
+validator_network_key: "0x55c06b3704be1274bcf31620a7b1552d2b661fe2b54fba8732b23943899a9250"
+validator_host:
+  host: 188.40.103.121
+  port: 6180
+full_node_network_key: "0x17039e7ec77158908cf078323788079dee7e6b757068db5eb66bba7de2731b1f"
+full_node_host: ~
+stake_amount: 1
