@@ -3,6 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// Configure your import map in config/importmap.rb. Read more: https://github.com/rails/importmap-rails
+// Entry point for the build script in your package.json
+import "./controllers"
 import "@hotwired/turbo-rails"
-import "controllers"

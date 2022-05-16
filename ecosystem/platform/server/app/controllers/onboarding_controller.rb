@@ -61,7 +61,7 @@ class OnboardingController < ApplicationController
     redirect_to it1_path and return if current_user.confirmed?
     render :email, status: :unprocessable_entity and return unless verify_recaptcha(model: current_user)
 
-    email_params = params.require(:user).permit(:email, :username)
+    email_params = params.require(:user).permit(:email, :username, :terms_accepted)
     if current_user.update(email_params.merge(confirmation_token: Devise.friendly_token))
       log current_user, 'email updated'
       url = confirmation_url(current_user, confirmation_token: current_user.confirmation_token)

@@ -18,6 +18,8 @@ class User < ApplicationRecord
 
   validate_aptos_address :mainnet_address
 
+  validates :terms_accepted, acceptance: true
+
   has_many :authorizations, dependent: :destroy
   has_one :it1_profile
 

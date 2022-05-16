@@ -8,11 +8,10 @@
 
     <%= favicon_link_tag asset_path('favicon.ico') %>
 
-    <link rel="stylesheet" href="https://use.typekit.net/<%= ENV.fetch('TYPEKIT_CSS_ID') %>.css" />
-    <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+    <%= javascript_include_tag "application", "data-turbo-track": "reload", defer: true %>
     <%= render 'layouts/google_analytics' %>
-    <%= javascript_importmap_tags %>
+    <%= render 'layouts/typekit' %>
   </head>
 
   <body class="flex flex-col h-screen justify-between" data-turbo="false">
