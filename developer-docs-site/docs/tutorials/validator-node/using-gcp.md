@@ -57,7 +57,7 @@ Install pre-requisites if needed:
     source        = "github.com/aptos-labs/aptos-core.git//terraform/aptos-node/gcp?ref=testnet"
     region        = "us-central1"  # Specify the region
     zone          = "c"            # Specify the zone suffix
-    project       = "<GCP Project Name>" # Specify your GCP project name
+    project       = "<GCP Project ID>" # Specify your GCP project ID
     era           = 1              # bump era number to wipe the chain
     chain_id      = 23
     image_tag     = "testnet" # Specify the docker image tag to use
