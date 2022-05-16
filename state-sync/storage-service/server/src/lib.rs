@@ -969,6 +969,7 @@ impl StorageReader {
             .storage
             .get_first_txn_version()
             .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+        println!("FIRST TXN VERSION: {:?}", first_transaction_version);
         if let Some(first_transaction_version) = first_transaction_version {
             let transaction_range =
                 CompleteDataRange::new(first_transaction_version, latest_version)
@@ -988,6 +989,7 @@ impl StorageReader {
             .storage
             .get_first_write_set_version()
             .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+        println!("FIRST TXN OUTPUT VERSION: {:?}", first_output_version);
         if let Some(first_output_version) = first_output_version {
             let output_range = CompleteDataRange::new(first_output_version, latest_version)
                 .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
