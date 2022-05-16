@@ -27,7 +27,8 @@ Rails.application.routes.draw do
   get 'onboarding/kyc_redirect', to: 'onboarding#kyc_redirect'
   get 'onboarding/kyc_callback', to: 'onboarding#kyc_callback'
 
-  get 'onboarding/email', to: 'onboarding#email'
+  get 'onboarding/email'
+  get 'onboarding/email_success'
   post 'onboarding/email', to: 'onboarding#email_update'
 
   get 'health', to: 'health#health'

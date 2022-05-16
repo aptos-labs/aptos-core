@@ -15,6 +15,33 @@ class OnboardingController < ApplicationController
     redirect_to it1_path if current_user.confirmed?
   end
 
+  def email_success; end
+
+  def email_update
+    redirect_to it1_path and return if current_user.confirmed?
+
+    recaptcha_v3_success = verify_recaptcha(action: 'onboarding/email', minimum_score: 0.5,
+                                            secret_key: ENV.fetch('RECAPTCHA_V3_SECRET_KEY', nil), model: current_user)
+    recaptcha_v2_success = verify_recaptcha(model: current_user) unless recaptcha_v3_success
+    unless recaptcha_v3_success || recaptcha_v2_success
+      @show_recaptcha_v2 = true
+      return render :email, status: :unprocessable_entity
+    end
+
+    email_params = params.require(:user).permit(:email, :username, :terms_accepted)
+    if current_user.update(email_params.merge(confirmation_token: Devise.friendly_token))
+      log current_user, 'email updated'
+      url = confirmation_url(current_user, confirmation_token: current_user.confirmation_token)
+      SendConfirmEmailJob.perform_now({ user_id: current_user.id, template_vars: { CONFIRM_LINK: url } })
+      redirect_to onboarding_email_success_path
+    else
+      render :email, status: :unprocessable_entity
+    end
+  rescue SendEmailJobError
+    current_user.errors.add :email
+    render :email, status: :unprocessable_entity
+  end
+
   def kyc_redirect
     if current_user.kyc_exempt?
       redirect_to it1_path,
@@ -55,30 +82,6 @@ class OnboardingController < ApplicationController
       redirect_to it1_path, error: 'Error; If you completed Identity Verification,'\
                                    " it may take some time to reflect. Error: #{e}"
     end
-  end
-
-  def email_update
-    redirect_to it1_path and return if current_user.confirmed?
-
-    recaptcha_v3_success = verify_recaptcha(action: 'onboarding/email', minimum_score: 0.5, secret_key: ENV['RECAPTCHA_V3_SECRET_KEY'], model: current_user)
-    recaptcha_v2_success = verify_recaptcha(model: current_user) unless recaptcha_v3_success
-    if !(recaptcha_v3_success || recaptcha_v2_success)
-      @show_recaptcha_v2 = true
-      return render :email, status: :unprocessable_entity
-    end
-
-    email_params = params.require(:user).permit(:email, :username, :terms_accepted)
-    if current_user.update(email_params.merge(confirmation_token: Devise.friendly_token))
-      log current_user, 'email updated'
-      url = confirmation_url(current_user, confirmation_token: current_user.confirmation_token)
-      SendConfirmEmailJob.perform_now({ user_id: current_user.id, template_vars: { CONFIRM_LINK: url } })
-      render :email_success
-    else
-      render :email, status: :unprocessable_entity
-    end
-  rescue SendEmailJobError
-    current_user.errors.add :email
-    render :email, status: :unprocessable_entity
   end
 
   private

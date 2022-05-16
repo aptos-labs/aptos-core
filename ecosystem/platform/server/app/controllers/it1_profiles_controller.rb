@@ -36,7 +36,7 @@ class It1ProfilesController < ApplicationController
       @it1_profile.validator_ip = v.ip.ip
     else
       @it1_profile.errors.add :validator_address, v.ip.message
-      respond_with(@it1_profile) and return
+      respond_with(@it1_profile, status: :unprocessable_entity) and return
     end
 
     if @it1_profile.save
@@ -47,7 +47,7 @@ class It1ProfilesController < ApplicationController
         redirect_to it1_path, notice: 'AIT1 application completed successfully: your node is verified!' and return
       end
     end
-    respond_with(@it1_profile)
+    respond_with(@it1_profile, status: :unprocessable_entity)
   end
 
   # PATCH/PUT /it1_profiles/1 or /it1_profiles/1.json
@@ -62,7 +62,7 @@ class It1ProfilesController < ApplicationController
       @it1_profile.validator_ip = v.ip.ip
     else
       @it1_profile.errors.add :validator_address, v.ip.message
-      respond_with(@it1_profile) and return
+      respond_with(@it1_profile, status: :unprocessable_entity) and return
     end
 
     ip_changed = @it1_profile.validator_ip_changed?
@@ -78,7 +78,7 @@ class It1ProfilesController < ApplicationController
         redirect_to it1_path, notice: 'AIT1 node verification completed successfully!' and return
       end
     end
-    respond_with(@it1_profile)
+    respond_with(@it1_profile, status: :unprocessable_entity)
   end
 
   private
@@ -101,14 +101,15 @@ class It1ProfilesController < ApplicationController
   end
 
   def check_recaptcha
-    recaptcha_v3_success = verify_recaptcha(action: 'it1/update', minimum_score: 0.5, secret_key: ENV['RECAPTCHA_V3_SECRET_KEY'], model: @it1_profile)
+    recaptcha_v3_success = verify_recaptcha(action: 'it1/update', minimum_score: 0.5,
+                                            secret_key: ENV.fetch('RECAPTCHA_V3_SECRET_KEY', nil), model: @it1_profile)
     recaptcha_v2_success = verify_recaptcha(model: @it1_profile) unless recaptcha_v3_success
-    if !(recaptcha_v3_success || recaptcha_v2_success)
+    unless recaptcha_v3_success || recaptcha_v2_success
       @show_recaptcha_v2 = true
-      respond_with(@it1_profile)
+      respond_with(@it1_profile, status: :unprocessable_entity)
       return false
     end
-    return true
+    true
   end
 
   # Use callbacks to share common setup or constraints between actions.

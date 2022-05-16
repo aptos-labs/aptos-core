@@ -1,7 +1,7 @@
 <div class="flex flex-col lg:flex-row justify-between">
   <%= render "shared/captcha_helper" %>
 
-  <%= form_with(model: it1_profile, class: "contents", data: {turbo: false}, html: {onsubmit:"return validateRecaptcha();"}, builder: AptosFormBuilder) do |f| %>
+  <%= form_with(model: it1_profile, class: "contents", data: {turbo: !@show_recaptcha_v2}, html: {onsubmit:"return validateRecaptcha();"}, builder: AptosFormBuilder) do |f| %>
     <div>
       <% if it1_profile.errors.any? %>
         <div id="error_explanation" class="flex p-4 mb-4 bg-red-100 rounded-lg dark:bg-red-200 lg:w-96" role="alert">
@@ -99,7 +99,7 @@
       <% if @show_recaptcha_v2 %>
         <%= recaptcha_tags theme: :dark %>
       <% else %>
-        <%= recaptcha_v3(action: @recaptcha_action, site_key: ENV['RECAPTCHA_V3_SITE_KEY'], turbolinks: true) %>
+        <%= recaptcha_v3(action: 'it1/update', site_key: ENV['RECAPTCHA_V3_SITE_KEY'], turbolinks: true) %>
       <% end %>
       </div>
       <div class="text-sm">

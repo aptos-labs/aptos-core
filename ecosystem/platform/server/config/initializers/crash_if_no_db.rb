@@ -5,7 +5,8 @@
 
 # This crashes if there is no DB present, for @Christian
 # Only if this is running as a rails server
-if Rails.env.production? && !ENV.fetch('SKIP_DB_CHECK', nil) && (ActiveRecord::Base.connection.data_source_exists? :users)
+if Rails.env.production? && !ENV.fetch('SKIP_DB_CHECK',
+                                       nil) && (ActiveRecord::Base.connection.data_source_exists? :users)
   Rails.application.config.after_initialize do
     User.where(id: 1).exists?
   end
