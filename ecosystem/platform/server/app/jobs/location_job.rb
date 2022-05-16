@@ -20,7 +20,7 @@ class LocationJob < ApplicationJob
             "Error fetching IP for #{it1_profile.validator_address}: #{node_verifier.ip.message}"
     end
 
-    new_ip = node_verifier.ip.ip
+    new_ip = node_verifier.ip.ip.to_s
     if new_ip != it1_profile.validator_ip
       Rails.logger.warn "IP does not match one in profile for it1_profile ##{it1_profile.id} - "\
                         "#{it1_profile.validator_address}: was #{it1_profile.validator_ip}, got #{new_ip}"
