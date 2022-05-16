@@ -101,8 +101,11 @@ impl AptosNetDataClient {
     ) -> (Self, DataSummaryPoller) {
         let client = Self {
             data_client_config,
-            network_client,
-            peer_states: Arc::new(RwLock::new(PeerStates::new(storage_service_config))),
+            network_client: network_client.clone(),
+            peer_states: Arc::new(RwLock::new(PeerStates::new(
+                storage_service_config,
+                network_client,
+            ))),
             global_summary_cache: Arc::new(RwLock::new(GlobalDataSummary::empty())),
             response_id_generator: Arc::new(U64IdGenerator::new()),
         };

@@ -53,7 +53,7 @@ async fn test_critical_timeout() {
             .expect_continuously_stream_transaction_outputs()
             .times(1)
             .with(
-                eq(current_synced_version + 1),
+                eq(current_synced_version),
                 eq(current_synced_epoch),
                 eq(None),
             )
@@ -129,7 +129,7 @@ async fn test_data_stream_transactions() {
             .expect_continuously_stream_transactions()
             .times(1)
             .with(
-                eq(current_synced_version + 1),
+                eq(current_synced_version),
                 eq(current_synced_epoch),
                 eq(false),
                 eq(Some(target_ledger_info.clone())),
@@ -209,7 +209,7 @@ async fn test_data_stream_transaction_outputs() {
             .expect_continuously_stream_transaction_outputs()
             .times(1)
             .with(
-                eq(current_synced_version + 1),
+                eq(current_synced_version),
                 eq(current_synced_epoch),
                 eq(None),
             )
