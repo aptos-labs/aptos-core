@@ -4,7 +4,7 @@
 
 require 'rails_helper'
 
-RSpec.describe DialogComponent, type: :component do
+RSpec.describe LoginButtonComponent, type: :component do
   pending "add some examples to (or delete) #{__FILE__}"
 
   # it "renders something useful" do

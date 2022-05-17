@@ -8,8 +8,8 @@ class DialogComponent < ViewComponent::Base
 
   def initialize(**rest)
     rest[:class] = [
-      "rounded-xl border-2 border-teal-400",
-      rest[:class],
+      'rounded-xl border-2 border-teal-400',
+      rest[:class]
     ]
 
     @id = rest[:id] || Random.uuid

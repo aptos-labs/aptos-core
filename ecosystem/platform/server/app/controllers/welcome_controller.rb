@@ -9,7 +9,7 @@ class WelcomeController < ApplicationController
   before_action :ensure_confirmed!, only: %i[it1]
 
   def index
-    @login_dialog = DialogComponent.new
+    redirect_to it1_path if current_user && current_user.authorizations.where(provider: :discord).exists?
   end
 
   def it1
