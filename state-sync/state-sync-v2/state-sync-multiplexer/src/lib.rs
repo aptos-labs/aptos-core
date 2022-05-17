@@ -98,7 +98,8 @@ impl StateSyncMultiplexer {
         let activate_state_sync_v2 = node_config
             .state_sync
             .state_sync_driver
-            .enable_state_sync_v2;
+            .enable_state_sync_v2
+            || true;
         if activate_state_sync_v2 {
             // Start the state sync v2 driver
             state_sync_v2 = Some(DriverFactory::create_and_spawn_driver(
