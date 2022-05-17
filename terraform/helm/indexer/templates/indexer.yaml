@@ -29,7 +29,7 @@ spec:
         - name: DATABASE_URI
           valueFrom:
             secretKeyRef:
-              name: indexer-credentials
+              name: {{ .Release.Name }}-credentials
               key: pg_db_uri
         image: {{ .Values.indexer.image.repo }}:{{ .Values.indexer.image.tag }}
         imagePullPolicy: {{ .Values.indexer.image.pullPolicy }}

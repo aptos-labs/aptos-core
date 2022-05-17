@@ -1,5 +1,5 @@
 resource "helm_release" "indexer" {
-  name        = "indexer"
+  name        = "indexer-${local.workspace_name}"
   chart       = "${path.module}/../../helm/indexer"
   max_history = 2
   wait        = false

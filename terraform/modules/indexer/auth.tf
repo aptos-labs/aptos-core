@@ -39,7 +39,7 @@ data "aws_iam_policy_document" "indexer" {
 }
 
 resource "aws_iam_role" "indexer" {
-  name                 = "aptos-testnet-${terraform.workspace}-indexer"
+  name                 = "aptos-${local.workspace_name}-indexer"
   path                 = var.iam_path
   permissions_boundary = var.permissions_boundary_policy
   assume_role_policy   = data.aws_iam_policy_document.indexer-assume-role.json

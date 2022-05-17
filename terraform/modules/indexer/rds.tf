@@ -51,7 +51,7 @@ resource "aws_db_instance" "indexer" {
 
 resource "kubernetes_secret" "indexer_credentials" {
   metadata {
-    name      = "indexer-credentials"
+    name      = "${helm_release.indexer.name}-credentials"
     namespace = "default"
   }
 
