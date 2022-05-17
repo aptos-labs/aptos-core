@@ -24,7 +24,7 @@ source $HOME/.cargo/env
    1. For Debian or Ubuntu: `sudo apt install build-essential pkg-config openssl libssl-dev libclang-dev`.
    2. For RHEL or Centos: `sudo yum install pkgconfig openssl openssl-devel clang`.
    3. For others: please manually install `pkg-config` `openssl`, `libssl` and `libclang`.
-3. Install the `aptos` CLI tool by running the below command.  You can run this command from any directory.  The `aptos`
+2. Install the `aptos` CLI tool by running the below command.  You can run this command from any directory.  The `aptos`
    CLI tool will be installed into your `CARGO_HOME`, usually `~/.cargo`:
 ```bash
 cargo install --git https://github.com/aptos-labs/aptos-core.git aptos --tag aptos-cli-latest
