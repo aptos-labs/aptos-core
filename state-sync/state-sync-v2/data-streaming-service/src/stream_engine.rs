@@ -5,11 +5,13 @@ use crate::{
     data_notification::{
         AccountsWithProofRequest, DataClientRequest,
         DataClientRequest::{
-            AccountsWithProof, EpochEndingLedgerInfos, NumberOfAccounts,
-            TransactionOutputsWithProof, TransactionsWithProof,
+            AccountsWithProof, EpochEndingLedgerInfos, NewTransactionOutputsWithProof,
+            NewTransactionsWithProof, NumberOfAccounts, TransactionOutputsWithProof,
+            TransactionsWithProof,
         },
-        DataNotification, DataPayload, EpochEndingLedgerInfosRequest, NumberOfAccountsRequest,
-        TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
+        DataNotification, DataPayload, EpochEndingLedgerInfosRequest,
+        NewTransactionOutputsWithProofRequest, NewTransactionsWithProofRequest,
+        NumberOfAccountsRequest, TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
     },
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
@@ -275,6 +277,7 @@ impl DataStreamEngine for AccountsStreamEngine {
                 let data_notification = create_data_notification(
                     notification_id_generator,
                     client_response_payload,
+                    None,
                     self.clone().into(),
                 );
                 return Ok(Some(data_notification));
@@ -321,6 +324,9 @@ pub struct ContinuousTransactionStreamEngine {
     // True iff a request has been created to fetch an epoch ending ledger info
     pub end_of_epoch_requested: bool,
 
+    // True iff a request has been created to subscribe to data,
+    pub subscription_requested: bool,
+
     // The next version and epoch that we're waiting to send to the
     // client along the stream. All versions before this have been sent.
     pub next_stream_version_and_epoch: (Version, Epoch),
@@ -338,22 +344,32 @@ impl ContinuousTransactionStreamEngine {
     fn new(stream_request: &StreamRequest) -> Result<Self, Error> {
         match stream_request {
             StreamRequest::ContinuouslyStreamTransactions(request) => {
+                let (next_version, next_epoch) = Self::calculate_next_version_and_epoch(
+                    request.known_version,
+                    request.known_epoch,
+                )?;
                 Ok(ContinuousTransactionStreamEngine {
                     request: stream_request.clone(),
                     current_target_ledger_info: None,
                     end_of_epoch_requested: false,
-                    next_stream_version_and_epoch: (request.start_version, request.start_epoch),
-                    next_request_version_and_epoch: (request.start_version, request.start_epoch),
+                    subscription_requested: false,
+                    next_stream_version_and_epoch: (next_version, next_epoch),
+                    next_request_version_and_epoch: (next_version, next_epoch),
                     stream_is_complete: false,
                 })
             }
             StreamRequest::ContinuouslyStreamTransactionOutputs(request) => {
+                let (next_version, next_epoch) = Self::calculate_next_version_and_epoch(
+                    request.known_version,
+                    request.known_epoch,
+                )?;
                 Ok(ContinuousTransactionStreamEngine {
                     request: stream_request.clone(),
                     current_target_ledger_info: None,
                     end_of_epoch_requested: false,
-                    next_stream_version_and_epoch: (request.start_version, request.start_epoch),
-                    next_request_version_and_epoch: (request.start_version, request.start_epoch),
+                    subscription_requested: false,
+                    next_stream_version_and_epoch: (next_version, next_epoch),
+                    next_request_version_and_epoch: (next_version, next_epoch),
                     stream_is_complete: false,
                 })
             }
@@ -361,20 +377,30 @@ impl ContinuousTransactionStreamEngine {
         }
     }
 
+    fn calculate_next_version_and_epoch(
+        known_version: Version,
+        known_epoch: Epoch,
+    ) -> Result<(Version, Epoch), Error> {
+        let next_version = known_version
+            .checked_add(1)
+            .ok_or_else(|| Error::IntegerOverflow("Next version has overflown!".into()))?;
+        Ok((next_version, known_epoch))
+    }
+
     fn select_target_ledger_info(
         &self,
         advertised_data: &AdvertisedData,
-    ) -> Result<LedgerInfoWithSignatures, Error> {
+    ) -> Result<Option<LedgerInfoWithSignatures>, Error> {
         // Check if the stream has a final target ledger info
         match &self.request {
             StreamRequest::ContinuouslyStreamTransactions(request) => {
                 if let Some(target) = &request.target {
-                    return Ok(target.clone());
+                    return Ok(Some(target.clone()));
                 }
             }
             StreamRequest::ContinuouslyStreamTransactionOutputs(request) => {
                 if let Some(target) = &request.target {
-                    return Ok(target.clone());
+                    return Ok(Some(target.clone()));
                 }
             }
             request => invalid_stream_request!(request),
@@ -384,11 +410,9 @@ impl ContinuousTransactionStreamEngine {
         if let Some(highest_synced_ledger_info) = advertised_data.highest_synced_ledger_info() {
             let (next_request_version, _) = self.next_request_version_and_epoch;
             if next_request_version > highest_synced_ledger_info.ledger_info().version() {
-                Err(Error::NoDataToFetch(
-                    "We're already at the highest synced ledger info version!".into(),
-                ))
+                Ok(None) // We're already at the highest synced ledger info. There's no known target.
             } else {
-                Ok(highest_synced_ledger_info)
+                Ok(Some(highest_synced_ledger_info))
             }
         } else {
             Err(Error::DataIsUnavailable(
@@ -403,31 +427,156 @@ impl ContinuousTransactionStreamEngine {
             .expect("No current target ledger info found!")
     }
 
-    fn create_data_notification(
+    fn create_notification_for_continuous_data(
         &mut self,
-        request_end_version: Version,
+        request_start: Version,
+        request_end: Version,
         client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<DataNotification, Error> {
-        // Create a new data notification
+        // Update the stream version
+        let target_ledger_info = self.get_target_ledger_info().clone();
+        self.update_stream_version_and_epoch(request_start, request_end, &target_ledger_info)?;
+
+        // Create the data notification
         let data_notification = create_data_notification(
             notification_id_generator,
             client_response_payload,
+            Some(target_ledger_info),
             self.clone().into(),
         );
-
-        // Update the target ledger info if we've hit it
-        if request_end_version == self.get_target_ledger_info().ledger_info().version() {
-            self.current_target_ledger_info = None;
-        }
-
         Ok(data_notification)
+    }
+
+    fn create_notification_for_subscription_data(
+        &mut self,
+        known_version: Version,
+        client_response_payload: ResponsePayload,
+        notification_id_generator: Arc<U64IdGenerator>,
+    ) -> Result<DataNotification, Error> {
+        // Calculate the first version
+        let first_version = known_version
+            .checked_add(1)
+            .ok_or_else(|| Error::IntegerOverflow("First version has overflown!".into()))?;
+        let (num_versions, target_ledger_info) = match &client_response_payload {
+            ResponsePayload::NewTransactionsWithProof((
+                transactions_with_proof,
+                target_ledger_info,
+            )) => (
+                transactions_with_proof.transactions.len(),
+                target_ledger_info.clone(),
+            ),
+            ResponsePayload::NewTransactionOutputsWithProof((
+                outputs_with_proof,
+                target_ledger_info,
+            )) => (
+                outputs_with_proof.transactions_and_outputs.len(),
+                target_ledger_info.clone(),
+            ),
+            response_payload => {
+                // TODO(joshlind): eventually we want to notify the data client of the bad response
+                return Err(Error::AptosDataClientResponseIsInvalid(format!(
+                    "Expected new transactions or outputs but got: {:?}",
+                    response_payload
+                )));
+            }
+        };
+
+        // Calculate the last version
+        if num_versions == 0 {
+            // TODO(joshlind): eventually we want to notify the data client of the bad response
+            return Err(Error::AptosDataClientResponseIsInvalid(
+                "Received an empty transaction or output list!".into(),
+            ));
+        }
+        let last_version = known_version
+            .checked_add(num_versions as u64)
+            .ok_or_else(|| Error::IntegerOverflow("Last version has overflown!".into()))?;
+
+        // Update the request and stream versions
+        self.update_request_version_and_epoch(last_version, &target_ledger_info)?;
+        self.update_stream_version_and_epoch(first_version, last_version, &target_ledger_info)?;
+
+        // Create the data notification
+        let data_notification = create_data_notification(
+            notification_id_generator,
+            client_response_payload,
+            Some(target_ledger_info.clone()),
+            self.clone().into(),
+        );
+        Ok(data_notification)
+    }
+
+    fn create_subscription_request(&mut self) -> Result<DataClientRequest, Error> {
+        let (next_request_version, known_epoch) = self.next_request_version_and_epoch;
+        let known_version = next_request_version
+            .checked_sub(1)
+            .ok_or_else(|| Error::IntegerOverflow("Last version has overflown!".into()))?;
+
+        let data_client_request = match &self.request {
+            StreamRequest::ContinuouslyStreamTransactions(_) => {
+                DataClientRequest::NewTransactionsWithProof(NewTransactionsWithProofRequest {
+                    known_version,
+                    known_epoch,
+                    include_events: false,
+                })
+            }
+            StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
+                DataClientRequest::NewTransactionOutputsWithProof(
+                    NewTransactionOutputsWithProofRequest {
+                        known_version,
+                        known_epoch,
+                    },
+                )
+            }
+            request => invalid_stream_request!(request),
+        };
+        Ok(data_client_request)
+    }
+
+    fn handle_epoch_ending_response(
+        &mut self,
+        response_payload: ResponsePayload,
+    ) -> Result<(), Error> {
+        if let ResponsePayload::EpochEndingLedgerInfos(epoch_ending_ledger_infos) = response_payload
+        {
+            match &epoch_ending_ledger_infos[..] {
+                [target_ledger_info] => {
+                    info!(
+                        (LogSchema::new(LogEntry::ReceivedDataResponse)
+                            .event(LogEvent::Success)
+                            .message(&format!(
+                                "Received an epoch ending ledger info for epoch: {:?}. \
+                                        Setting new target version: {:?}",
+                                target_ledger_info.ledger_info().epoch(),
+                                target_ledger_info.ledger_info().version()
+                            )))
+                    );
+                    self.current_target_ledger_info = Some(target_ledger_info.clone());
+                    Ok(())
+                }
+                response_payload => {
+                    // TODO(joshlind): eventually we want to notify the data client of the bad response
+                    return Err(Error::AptosDataClientResponseIsInvalid(format!(
+                        "Received an incorrect number of epoch ending ledger infos. Response: {:?}",
+                        response_payload
+                    )));
+                }
+            }
+        } else {
+            // TODO(joshlind): eventually we want to notify the data client of the bad response
+            return Err(Error::AptosDataClientResponseIsInvalid(format!(
+                "Expected an epoch ending ledger response but got: {:?}",
+                response_payload
+            )));
+        }
     }
 
     fn update_stream_version_and_epoch(
         &mut self,
         request_start_version: Version,
         request_end_version: Version,
+        target_ledger_info: &LedgerInfoWithSignatures,
     ) -> Result<(), Error> {
         let (next_stream_version, mut next_stream_epoch) = self.next_stream_version_and_epoch;
         verify_client_request_indices(
@@ -435,6 +584,19 @@ impl ContinuousTransactionStreamEngine {
             request_start_version,
             request_end_version,
         );
+
+        // Update the next stream version and epoch
+        if request_end_version == target_ledger_info.ledger_info().version()
+            && target_ledger_info.ledger_info().ends_epoch()
+        {
+            next_stream_epoch = next_stream_epoch
+                .checked_add(1)
+                .ok_or_else(|| Error::IntegerOverflow("Next stream epoch has overflown!".into()))?;
+        }
+        let next_stream_version = request_end_version
+            .checked_add(1)
+            .ok_or_else(|| Error::IntegerOverflow("Next stream version has overflown!".into()))?;
+        self.next_stream_version_and_epoch = (next_stream_version, next_stream_epoch);
 
         // Check if the stream is now complete
         match &self.request {
@@ -455,18 +617,10 @@ impl ContinuousTransactionStreamEngine {
             request => invalid_stream_request!(request),
         };
 
-        // Update the next stream version and epoch
-        if request_end_version == self.get_target_ledger_info().ledger_info().version()
-            && self.get_target_ledger_info().ledger_info().ends_epoch()
-        {
-            next_stream_epoch = next_stream_epoch
-                .checked_add(1)
-                .ok_or_else(|| Error::IntegerOverflow("Next stream epoch has overflown!".into()))?;
+        // Update the current target ledger info if we've hit it
+        if request_end_version == target_ledger_info.ledger_info().version() {
+            self.current_target_ledger_info = None;
         }
-        let next_stream_version = request_end_version
-            .checked_add(1)
-            .ok_or_else(|| Error::IntegerOverflow("Next stream version has overflown!".into()))?;
-        self.next_stream_version_and_epoch = (next_stream_version, next_stream_epoch);
 
         Ok(())
     }
@@ -474,18 +628,20 @@ impl ContinuousTransactionStreamEngine {
     fn update_request_version_and_epoch(
         &mut self,
         request_end_version: Version,
+        target_ledger_info: &LedgerInfoWithSignatures,
     ) -> Result<(), Error> {
+        // Calculate the next request epoch
         let (_, mut next_request_epoch) = self.next_request_version_and_epoch;
-
-        // Update the next request version and epoch
-        if request_end_version == self.get_target_ledger_info().ledger_info().version()
-            && self.get_target_ledger_info().ledger_info().ends_epoch()
+        if request_end_version == target_ledger_info.ledger_info().version()
+            && target_ledger_info.ledger_info().ends_epoch()
         {
             // We've hit an epoch change
             next_request_epoch = next_request_epoch.checked_add(1).ok_or_else(|| {
                 Error::IntegerOverflow("Next request epoch has overflown!".into())
             })?;
         }
+
+        // Update the next request version and epoch
         let next_request_version = request_end_version
             .checked_add(1)
             .ok_or_else(|| Error::IntegerOverflow("Next request version has overflown!".into()))?;
@@ -497,13 +653,17 @@ impl ContinuousTransactionStreamEngine {
     fn update_request_tracking(
         &mut self,
         client_requests: &[DataClientRequest],
+        target_ledger_info: &LedgerInfoWithSignatures,
     ) -> Result<(), Error> {
         match &self.request {
             StreamRequest::ContinuouslyStreamTransactions(_) => {
                 for client_request in client_requests {
                     match client_request {
                         DataClientRequest::TransactionsWithProof(request) => {
-                            self.update_request_version_and_epoch(request.end_version)?;
+                            self.update_request_version_and_epoch(
+                                request.end_version,
+                                target_ledger_info,
+                            )?;
                         }
                         request => invalid_client_request!(request, self),
                     }
@@ -513,7 +673,10 @@ impl ContinuousTransactionStreamEngine {
                 for client_request in client_requests {
                     match client_request {
                         DataClientRequest::TransactionOutputsWithProof(request) => {
-                            self.update_request_version_and_epoch(request.end_version)?;
+                            self.update_request_version_and_epoch(
+                                request.end_version,
+                                target_ledger_info,
+                            )?;
                         }
                         request => invalid_client_request!(request, self),
                     }
@@ -532,75 +695,86 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
         max_number_of_requests: u64,
         global_data_summary: &GlobalDataSummary,
     ) -> Result<Vec<DataClientRequest>, Error> {
-        if self.current_target_ledger_info.is_none() && self.end_of_epoch_requested {
-            return Ok(vec![]); // We are waiting for the epoch ending ledger info
+        if self.end_of_epoch_requested || self.subscription_requested {
+            return Ok(vec![]); // We are waiting for a blocking response type
         }
 
-        // If we don't have a syncing target, select one.
+        // If we don't have a syncing target, try to select one
         let (next_request_version, next_request_epoch) = self.next_request_version_and_epoch;
         if self.current_target_ledger_info.is_none() {
-            // Select a new ledger info from the advertised data
-            let target_ledger_info =
-                self.select_target_ledger_info(&global_data_summary.advertised_data)?;
-            if target_ledger_info.ledger_info().epoch() > next_request_epoch {
-                // There was an epoch change. Request an epoch ending ledger info.
-                info!(
-                    (LogSchema::new(LogEntry::AptosDataClient)
-                        .event(LogEvent::Pending)
-                        .message(&format!(
-                            "Requested an epoch ending ledger info for epoch: {:?}",
-                            next_request_epoch
-                        )))
-                );
-                self.end_of_epoch_requested = true;
-                return Ok(vec![DataClientRequest::EpochEndingLedgerInfos(
-                    EpochEndingLedgerInfosRequest {
-                        start_epoch: next_request_epoch,
-                        end_epoch: next_request_epoch,
-                    },
-                )]);
-            } else {
-                debug!(
-                    (LogSchema::new(LogEntry::ReceivedDataResponse)
-                        .event(LogEvent::Success)
-                        .message(&format!(
-                            "Setting new target ledger info. Version: {:?}, Epoch: {:?}",
-                            target_ledger_info.ledger_info().version(),
-                            target_ledger_info.ledger_info().epoch()
-                        )))
-                );
-                self.current_target_ledger_info = Some(target_ledger_info);
+            // Try to select a new ledger info from the advertised data
+            if let Some(target_ledger_info) =
+                self.select_target_ledger_info(&global_data_summary.advertised_data)?
+            {
+                if target_ledger_info.ledger_info().epoch() > next_request_epoch {
+                    // There was an epoch change. Request an epoch ending ledger info.
+                    info!(
+                        (LogSchema::new(LogEntry::AptosDataClient)
+                            .event(LogEvent::Pending)
+                            .message(&format!(
+                                "Requested an epoch ending ledger info for epoch: {:?}",
+                                next_request_epoch
+                            )))
+                    );
+                    self.end_of_epoch_requested = true;
+                    return Ok(vec![DataClientRequest::EpochEndingLedgerInfos(
+                        EpochEndingLedgerInfosRequest {
+                            start_epoch: next_request_epoch,
+                            end_epoch: next_request_epoch,
+                        },
+                    )]);
+                } else {
+                    debug!(
+                        (LogSchema::new(LogEntry::ReceivedDataResponse)
+                            .event(LogEvent::Success)
+                            .message(&format!(
+                                "Setting new target ledger info. Version: {:?}, Epoch: {:?}",
+                                target_ledger_info.ledger_info().version(),
+                                target_ledger_info.ledger_info().epoch()
+                            )))
+                    );
+                    self.current_target_ledger_info = Some(target_ledger_info);
+                }
             }
         }
 
-        // We have a target ledger info.
-        let target_ledger_info_version = self.get_target_ledger_info().ledger_info().version();
-        if next_request_version > target_ledger_info_version {
-            return Ok(vec![]); // Wait until all target notifications have been sent.
-        }
+        // Create the next set of data client requests
+        let maybe_target_ledger_info = self.current_target_ledger_info.clone();
+        let client_requests = if let Some(target_ledger_info) = maybe_target_ledger_info {
+            // Check if we're still waiting for stream notifications to be sent
+            if next_request_version > target_ledger_info.ledger_info().version() {
+                return Ok(vec![]);
+            }
 
-        // Create the client requests
-        let optimal_chunk_sizes = match &self.request {
-            StreamRequest::ContinuouslyStreamTransactions(_) => {
-                global_data_summary
-                    .optimal_chunk_sizes
-                    .transaction_chunk_size
-            }
-            StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
-                global_data_summary
-                    .optimal_chunk_sizes
-                    .transaction_output_chunk_size
-            }
-            request => invalid_stream_request!(request),
+            // Create the client requests for the target
+            let optimal_chunk_sizes = match &self.request {
+                StreamRequest::ContinuouslyStreamTransactions(_) => {
+                    global_data_summary
+                        .optimal_chunk_sizes
+                        .transaction_chunk_size
+                }
+                StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
+                    global_data_summary
+                        .optimal_chunk_sizes
+                        .transaction_output_chunk_size
+                }
+                request => invalid_stream_request!(request),
+            };
+            let client_requests = create_data_client_requests(
+                next_request_version,
+                target_ledger_info.ledger_info().version(),
+                max_number_of_requests,
+                optimal_chunk_sizes,
+                self.clone().into(),
+            )?;
+            self.update_request_tracking(&client_requests, &target_ledger_info)?;
+            client_requests
+        } else {
+            // We don't have a target, send a single subscription request
+            let subscription_request = self.create_subscription_request()?;
+            self.subscription_requested = true;
+            vec![subscription_request]
         };
-        let client_requests = create_data_client_requests(
-            next_request_version,
-            target_ledger_info_version,
-            max_number_of_requests,
-            optimal_chunk_sizes,
-            self.clone().into(),
-        )?;
-        self.update_request_tracking(&client_requests)?;
 
         Ok(client_requests)
     }
@@ -633,55 +807,45 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
         client_response_payload: ResponsePayload,
         notification_id_generator: Arc<U64IdGenerator>,
     ) -> Result<Option<DataNotification>, Error> {
+        // We reset the pending requests to prevent malicious responses from blocking the streams
+        if self.end_of_epoch_requested {
+            self.end_of_epoch_requested = false;
+        } else if self.subscription_requested {
+            self.subscription_requested = false;
+        }
+
+        // Handle and transform the response
         match client_request {
             EpochEndingLedgerInfos(_) => {
-                if let ResponsePayload::EpochEndingLedgerInfos(epoch_ending_ledger_infos) =
-                    client_response_payload
-                {
-                    match &epoch_ending_ledger_infos[..] {
-                        [target_ledger_info] => {
-                            info!(
-                                (LogSchema::new(LogEntry::ReceivedDataResponse)
-                                    .event(LogEvent::Success)
-                                    .message(&format!(
-                                        "Received an epoch ending ledger info for epoch: {:?}. \
-                                        Setting new target version: {:?}",
-                                        target_ledger_info.ledger_info().epoch(),
-                                        target_ledger_info.ledger_info().version()
-                                    )))
-                            );
-                            self.current_target_ledger_info = Some(target_ledger_info.clone());
-                        }
-                        response_payload => {
-                            // TODO(joshlind): notify the data client of the bad response
-                            debug!(
-                                (LogSchema::new(LogEntry::ReceivedDataResponse)
-                                    .event(LogEvent::Error)
-                                    .message(&format!("Received an incorrect number of epoch ending ledger infos. Response: {:?}", response_payload))
-                                ));
-                        }
-                    }
-                } else {
-                    // TODO(joshlind): notify the data client of the bad response
-                    debug!(
-                        (LogSchema::new(LogEntry::ReceivedDataResponse)
-                            .event(LogEvent::Error)
-                            .message(&format!(
-                                "Received an invalid epoch ending ledger response: {:?}",
-                                client_response_payload
-                            )))
-                    );
-                }
-                self.end_of_epoch_requested = false;
+                self.handle_epoch_ending_response(client_response_payload)?;
                 Ok(None)
             }
+            NewTransactionsWithProof(request) => match &self.request {
+                StreamRequest::ContinuouslyStreamTransactions(_) => {
+                    let data_notification = self.create_notification_for_subscription_data(
+                        request.known_version,
+                        client_response_payload,
+                        notification_id_generator,
+                    )?;
+                    Ok(Some(data_notification))
+                }
+                request => invalid_stream_request!(request),
+            },
+            NewTransactionOutputsWithProof(request) => match &self.request {
+                StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
+                    let data_notification = self.create_notification_for_subscription_data(
+                        request.known_version,
+                        client_response_payload,
+                        notification_id_generator,
+                    )?;
+                    Ok(Some(data_notification))
+                }
+                request => invalid_stream_request!(request),
+            },
             TransactionsWithProof(request) => match &self.request {
                 StreamRequest::ContinuouslyStreamTransactions(_) => {
-                    self.update_stream_version_and_epoch(
+                    let data_notification = self.create_notification_for_continuous_data(
                         request.start_version,
-                        request.end_version,
-                    )?;
-                    let data_notification = self.create_data_notification(
                         request.end_version,
                         client_response_payload,
                         notification_id_generator,
@@ -692,11 +856,8 @@ impl DataStreamEngine for ContinuousTransactionStreamEngine {
             },
             TransactionOutputsWithProof(request) => match &self.request {
                 StreamRequest::ContinuouslyStreamTransactionOutputs(_) => {
-                    self.update_stream_version_and_epoch(
+                    let data_notification = self.create_notification_for_continuous_data(
                         request.start_version,
-                        request.end_version,
-                    )?;
-                    let data_notification = self.create_data_notification(
                         request.end_version,
                         client_response_payload,
                         notification_id_generator,
@@ -849,6 +1010,7 @@ impl DataStreamEngine for EpochEndingStreamEngine {
                 let data_notification = create_data_notification(
                     notification_id_generator,
                     client_response_payload,
+                    None,
                     self.clone().into(),
                 );
                 Ok(Some(data_notification))
@@ -1051,6 +1213,7 @@ impl DataStreamEngine for TransactionStreamEngine {
         let data_notification = create_data_notification(
             notification_id_generator,
             client_response_payload,
+            None,
             self.clone().into(),
         );
         Ok(Some(data_notification))
@@ -1199,6 +1362,7 @@ fn create_data_client_request(
 fn create_data_notification(
     notification_id_generator: Arc<U64IdGenerator>,
     client_response: ResponsePayload,
+    target_ledger_info: Option<LedgerInfoWithSignatures>,
     stream_engine: StreamEngine,
 ) -> DataNotification {
     let notification_id = notification_id_generator.next();
@@ -1211,10 +1375,33 @@ fn create_data_notification(
         ResponsePayload::EpochEndingLedgerInfos(ledger_infos) => {
             DataPayload::EpochEndingLedgerInfos(ledger_infos)
         }
+        ResponsePayload::NewTransactionsWithProof((transactions_chunk, target_ledger_info)) => {
+            match stream_engine {
+                StreamEngine::ContinuousTransactionStreamEngine(_) => {
+                    DataPayload::ContinuousTransactionsWithProof(
+                        target_ledger_info,
+                        transactions_chunk,
+                    )
+                }
+                _ => invalid_response_type!(client_response_type),
+            }
+        }
+        ResponsePayload::NewTransactionOutputsWithProof((
+            transactions_output_chunk,
+            target_ledger_info,
+        )) => match stream_engine {
+            StreamEngine::ContinuousTransactionStreamEngine(_) => {
+                DataPayload::ContinuousTransactionOutputsWithProof(
+                    target_ledger_info,
+                    transactions_output_chunk,
+                )
+            }
+            _ => invalid_response_type!(client_response_type),
+        },
         ResponsePayload::TransactionsWithProof(transactions_chunk) => match stream_engine {
-            StreamEngine::ContinuousTransactionStreamEngine(stream_engine) => {
+            StreamEngine::ContinuousTransactionStreamEngine(_) => {
                 DataPayload::ContinuousTransactionsWithProof(
-                    stream_engine.get_target_ledger_info().clone(),
+                    target_ledger_info.expect("A target ledger info is required!"),
                     transactions_chunk,
                 )
             }
@@ -1225,9 +1412,9 @@ fn create_data_notification(
         },
         ResponsePayload::TransactionOutputsWithProof(transactions_output_chunk) => {
             match stream_engine {
-                StreamEngine::ContinuousTransactionStreamEngine(stream_engine) => {
+                StreamEngine::ContinuousTransactionStreamEngine(_) => {
                     DataPayload::ContinuousTransactionOutputsWithProof(
-                        stream_engine.get_target_ledger_info().clone(),
+                        target_ledger_info.expect("A target ledger info is required!"),
                         transactions_output_chunk,
                     )
                 }
