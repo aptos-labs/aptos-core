@@ -20,12 +20,16 @@ You will need the `cargo` package manager to install the `aptos` CLI tool.  Foll
 source $HOME/.cargo/env
 ```
 ### Install the `aptos` CLI
-1. Install the `aptos` CLI tool by running the below command.  You can run this command from any directory.  The `aptos`
+1. Install dependencies before compiling:
+   1. For Debian or Ubuntu: `sudo apt install build-essential pkg-config openssl libssl-dev libclang-dev`.
+   2. For RHEL or Centos: `sudo yum install pkgconfig openssl openssl-devel clang`.
+   3. For others: please manually install `pkg-config` `openssl`, `libssl` and `libclang`.
+3. Install the `aptos` CLI tool by running the below command.  You can run this command from any directory.  The `aptos`
    CLI tool will be installed into your `CARGO_HOME`, usually `~/.cargo`:
 ```bash
 cargo install --git https://github.com/aptos-labs/aptos-core.git aptos --tag aptos-cli-latest
 ```
-2. Confirm that the `aptos` CLI tool is installed successfully by running the below command.  The terminal will display
+3. Confirm that the `aptos` CLI tool is installed successfully by running the below command.  The terminal will display
    the path to the `aptos` CLI's location.
 ```bash
 which aptos
