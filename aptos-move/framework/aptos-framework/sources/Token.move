@@ -223,7 +223,7 @@ module AptosFramework::Token {
         amount: u64,
     ) acquires TokenStore {
         let token_id = create_token_id_raw(creators_address, collection, name);
-        direct_transfer(sender, receiver, &token_id, amount);
+        direct_transfer(sender, receiver, token_id, amount);
     }
 
     public(script) fun initialize_token_script(account: &signer) {
@@ -237,7 +237,7 @@ module AptosFramework::Token {
         name: vector<u8>,
     ) acquires TokenStore {
         let token_id = create_token_id_raw(creators_address, collection, name);
-        initialize_token(account, &token_id);
+        initialize_token(account, token_id);
     }
 
     //
@@ -252,8 +252,8 @@ module AptosFramework::Token {
         let account_addr = Signer::address_of(account);
         initialize_token_store(account);
         let tokens = &mut borrow_global_mut<TokenStore>(account_addr).tokens;
-        if (!Table::contains(tokens, &token.id)) {
-            initialize_token(account, &token.id);
+        if (!Table::contains(tokens, token.id)) {
+            initialize_token(account, token.id);
         };
 
         direct_deposit(account_addr, token)
@@ -279,10 +279,10 @@ module AptosFramework::Token {
         let token_store = borrow_global_mut<TokenStore>(account_addr);
 
         assert!(
-            Table::contains(&token_store.tokens, &token.id),
+            Table::contains(&token_store.tokens, token.id),
             Errors::not_published(EBALANCE_NOT_PUBLISHED),
         );
-        let recipient_token = Table::borrow_mut(&mut token_store.tokens, &token.id);
+        let recipient_token = Table::borrow_mut(&mut token_store.tokens, token.id);
 
         merge(recipient_token, token);
     }
@@ -290,14 +290,14 @@ module AptosFramework::Token {
     public fun direct_transfer(
         sender: &signer,
         receiver: &signer,
-        token_id: &TokenId,
+        token_id: TokenId,
         amount: u64,
     ) acquires TokenStore {
         let token = withdraw_token(sender, token_id, amount);
         deposit_token(receiver, token)
     }
 
-    public fun initialize_token(account: &signer, token_id: &TokenId) acquires TokenStore {
+    public fun initialize_token(account: &signer, token_id: TokenId) acquires TokenStore {
         let account_addr = Signer::address_of(account);
         assert!(
             exists<TokenStore>(account_addr),
@@ -309,7 +309,7 @@ module AptosFramework::Token {
             !Table::contains(tokens, token_id),
             Errors::already_published(EALREADY_HAS_BALANCE),
         );
-        Table::add(tokens, token_id, Token { value : 0, id: *token_id });
+        Table::add(tokens, token_id, Token { value : 0, id: token_id });
     }
 
     public fun initialize_token_store(account: &signer) {
@@ -338,7 +338,7 @@ module AptosFramework::Token {
     /// Transfers `amount` of tokens from `from` to `to`.
     public fun transfer(
         from: &signer,
-        id: &TokenId,
+        id: TokenId,
         to: address,
         amount: u64,
     ) acquires TokenStore {
@@ -348,14 +348,14 @@ module AptosFramework::Token {
 
     public fun withdraw_token(
         account: &signer,
-        id: &TokenId,
+        id: TokenId,
         amount: u64,
     ): Token acquires TokenStore {
         let account_addr = Signer::address_of(account);
         let token_store = borrow_global_mut<TokenStore>(account_addr);
         Event::emit_event<WithdrawEvent>(
             &mut token_store.withdraw_events,
-            WithdrawEvent { id: *id, amount },
+            WithdrawEvent { id, amount },
         );
 
         withdraw_without_event_internal(account_addr, id, amount)
@@ -363,7 +363,7 @@ module AptosFramework::Token {
 
     fun withdraw_without_event_internal(
         account_addr: address,
-        id: &TokenId,
+        id: TokenId,
         amount: u64
     ): Token acquires TokenStore {
         assert!(
@@ -379,7 +379,7 @@ module AptosFramework::Token {
         let balance = &mut Table::borrow_mut(tokens, id).value;
         *balance = *balance - amount;
 
-        Token { id: *id, value: amount }
+        Token { id, value: amount }
     }
 
     //
@@ -399,17 +399,17 @@ module AptosFramework::Token {
         let collections = borrow_global_mut<Collections>(account_addr);
 
         assert!(
-            Table::contains(&collections.token_data, &token.id),
+            Table::contains(&collections.token_data, token.id),
             Errors::not_published(ETOKEN_NOT_PUBLISHED),
         );
 
         assert!(
-            Table::contains(&collections.burn_capabilities, &token.id),
+            Table::contains(&collections.burn_capabilities, token.id),
             Errors::requires_capability(ENO_BURN_CAPABILITY),
         );
-        let _cap = Table::borrow(&collections.burn_capabilities, &token.id);
+        let _cap = Table::borrow(&collections.burn_capabilities, token.id);
 
-        let token_data = Table::borrow_mut(&mut collections.token_data, &token.id);
+        let token_data = Table::borrow_mut(&mut collections.token_data, token.id);
 
         if (Option::is_some(&token_data.supply)) {
             let supply = Option::borrow_mut(&mut token_data.supply);
@@ -445,7 +445,7 @@ module AptosFramework::Token {
         let collections = &mut borrow_global_mut<Collections>(account_addr).collections;
 
         assert!(
-            !Table::contains(collections, &name),
+            !Table::contains(collections, name),
             Errors::already_published(ECOLLECTION_ALREADY_EXISTS),
         );
 
@@ -457,7 +457,7 @@ module AptosFramework::Token {
             maximum,
         };
 
-        Table::add(collections, &name, collection);
+        Table::add(collections, name, collection);
         let collection_handle =  borrow_global_mut<Collections>(account_addr);
         Event::emit_event<CreateCollectionEvent>(
             &mut collection_handle.create_collection_events,
@@ -491,15 +491,15 @@ module AptosFramework::Token {
         let token_id = create_token_id(account_addr, collection, name);
 
         assert!(
-            Table::contains(&collections.collections, &token_id.collection),
+            Table::contains(&collections.collections, token_id.collection),
             Errors::already_published(ECOLLECTION_NOT_PUBLISHED),
         );
         assert!(
-            !Table::contains(&collections.token_data, &token_id),
+            !Table::contains(&collections.token_data, token_id),
             Errors::already_published(ETOKEN_ALREADY_EXISTS),
         );
 
-        let collection = Table::borrow_mut(&mut collections.collections, &token_id.collection);
+        let collection = Table::borrow_mut(&mut collections.collections, token_id.collection);
         collection.count = collection.count + 1;
         if (Option::is_some(&collection.maximum)) {
             assert!(
@@ -512,29 +512,28 @@ module AptosFramework::Token {
 
         let token_data = TokenData {
             collection: *&token_id.collection,
-            description: description,
+            description,
             name: *&token_id.name,
             maximum,
             supply,
-            uri: uri,
+            uri,
         };
-        Table::add(&mut collections.token_data, &token_id, token_data);
-
+        Table::add(&mut collections.token_data, token_id, token_data);
         Table::add(
             &mut collections.burn_capabilities,
-            &token_id,
-            BurnCapability { token_id: *&token_id },
+            token_id,
+            BurnCapability { token_id },
         );
         Table::add(
             &mut collections.mint_capabilities,
-            &token_id,
-            MintCapability { token_id: *&token_id },
+            token_id,
+            MintCapability { token_id },
         );
 
         if (initial_balance > 0) {
             initialize_token_store(account);
-            initialize_token(account, &token_id);
-            mint(account, Signer::address_of(account), &token_id, initial_balance);
+            initialize_token(account, token_id);
+            mint(account, Signer::address_of(account), token_id, initial_balance);
         };
 
         let token_handle =  borrow_global_mut<Collections>(account_addr);
@@ -573,7 +572,7 @@ module AptosFramework::Token {
     public fun mint(
         account: &signer,
         dst_addr: address,
-        token_id: &TokenId,
+        token_id: TokenId,
         amount: u64,
     ) acquires Collections, TokenStore {
         assert!(
@@ -609,10 +608,10 @@ module AptosFramework::Token {
             };
         };
 
-        direct_deposit(dst_addr, Token { id: *token_id, value: amount });
+        direct_deposit(dst_addr, Token { id: token_id, value: amount });
     }
 
-    public fun balance_of(owner: address, id: &TokenId): u64 acquires  TokenStore {
+    public fun balance_of(owner: address, id: TokenId): u64 acquires  TokenStore {
         let token_store = borrow_global<TokenStore>(owner);
         if (Table::contains(&token_store.tokens, id)) {
             Table::borrow(&token_store.tokens, id).value
@@ -630,7 +629,7 @@ module AptosFramework::Token {
     ) acquires Collections, TokenStore {
         let token_id = create_collection_and_token(&creator, 1, 1, 1);
 
-        let token = withdraw_token(&creator, &token_id, 1);
+        let token = withdraw_token(&creator, token_id, 1);
         deposit_token(&owner, token);
     }
 
@@ -641,11 +640,11 @@ module AptosFramework::Token {
     ) acquires Collections, TokenStore {
         let token_id = create_collection_and_token(&creator, 2, 5, 5);
 
-        let token_0 = withdraw_token(&creator, &token_id, 1);
-        let token_1 = withdraw_token(&creator, &token_id, 1);
+        let token_0 = withdraw_token(&creator, token_id, 1);
+        let token_1 = withdraw_token(&creator, token_id, 1);
         deposit_token(&owner, token_0);
         deposit_token(&creator, token_1);
-        let token_2 = withdraw_token(&creator, &token_id, 1);
+        let token_2 = withdraw_token(&creator, token_id, 1);
         deposit_token(&owner, token_2);
     }
 
@@ -653,7 +652,7 @@ module AptosFramework::Token {
     #[expected_failure] // (abort_code = 9)]
     public fun test_token_maximum(creator: signer) acquires Collections, TokenStore {
         let token_id = create_collection_and_token(&creator, 2, 2, 1);
-        mint(&creator, Signer::address_of(&creator), &token_id, 1);
+        mint(&creator, Signer::address_of(&creator), token_id, 1);
     }
 
     #[test(creator = @0x1)]
@@ -679,8 +678,8 @@ module AptosFramework::Token {
         owner: signer,
     ) acquires Collections, TokenStore {
         let token_id = create_collection_and_token(&creator, 2, 2, 2);
-        direct_transfer(&creator, &owner, &token_id, 1);
-        let token = withdraw_token(&owner, &token_id, 1);
+        direct_transfer(&creator, &owner, token_id, 1);
+        let token = withdraw_token(&owner, token_id, 1);
         deposit_token(&creator, token);
     }
 

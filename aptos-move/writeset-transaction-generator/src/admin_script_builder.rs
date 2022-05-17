@@ -8,7 +8,11 @@ use aptos_types::{
     transaction::{Script, WriteSetPayload},
 };
 use handlebars::Handlebars;
-use move_deps::move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags};
+
+use move_deps::{
+    move_command_line_common::env::get_bytecode_version_from_env,
+    move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler, Flags},
+};
 use serde::Serialize;
 use std::{collections::HashMap, io::Write, path::PathBuf};
 use tempfile::NamedTempFile;
@@ -28,7 +32,9 @@ pub fn compile_script(source_file_str: String) -> Vec<u8> {
     assert!(compiled_program.len() == 1);
     match compiled_program.pop().unwrap() {
         AnnotatedCompiledUnit::Module(_) => panic!("Unexpected module when compiling script"),
-        x @ AnnotatedCompiledUnit::Script(_) => x.into_compiled_unit().serialize(),
+        x @ AnnotatedCompiledUnit::Script(_) => x
+            .into_compiled_unit()
+            .serialize(get_bytecode_version_from_env()),
     }
 }
 

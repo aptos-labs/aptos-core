@@ -26,14 +26,14 @@ module AptosFramework::TokenTransfers {
         amount: u64,
     ) acquires TokenTransfers {
         let token_id = Token::create_token_id_raw(creator, collection, name);
-        offer(&sender, receiver, &token_id, amount);
+        offer(&sender, receiver, token_id, amount);
     }
 
     // Make an entry into pending transfers and extract from gallery
     public fun offer(
         sender: &signer,
         receiver: address,
-        token_id: &TokenId,
+        token_id: TokenId,
         amount: u64,
     ) acquires TokenTransfers {
         let sender_addr = Signer::address_of(sender);
@@ -43,18 +43,18 @@ module AptosFramework::TokenTransfers {
 
         let pending_claims =
             &mut borrow_global_mut<TokenTransfers>(sender_addr).pending_claims;
-        if (!Table::contains(pending_claims, &receiver)) {
-            Table::add(pending_claims, &receiver, Table::new())
+        if (!Table::contains(pending_claims, receiver)) {
+            Table::add(pending_claims, receiver, Table::new())
         };
-        let addr_pending_claims = Table::borrow_mut(pending_claims, &receiver);
+        let addr_pending_claims = Table::borrow_mut(pending_claims, receiver);
 
         let token = Token::withdraw_token(sender, token_id, amount);
         let token_id = *Token::token_id(&token);
-        if (Table::contains(addr_pending_claims, &token_id)) {
-            let dst_token = Table::borrow_mut(addr_pending_claims, &token_id);
+        if (Table::contains(addr_pending_claims, token_id)) {
+            let dst_token = Table::borrow_mut(addr_pending_claims, token_id);
             Token::merge(dst_token, token)
         } else {
-            Table::add(addr_pending_claims, &token_id, token)
+            Table::add(addr_pending_claims, token_id, token)
         }
     }
 
@@ -66,23 +66,23 @@ module AptosFramework::TokenTransfers {
         name: vector<u8>,
     ) acquires TokenTransfers {
         let token_id = Token::create_token_id_raw(creator, collection, name);
-        claim(&receiver, sender, &token_id);
+        claim(&receiver, sender, token_id);
     }
 
     // Pull from someone else's pending transfers and insert into our gallery
     public fun claim(
         receiver: &signer,
         sender: address,
-        token_id: &TokenId,
+        token_id: TokenId,
     ) acquires TokenTransfers {
         let receiver_addr = Signer::address_of(receiver);
         let pending_claims =
             &mut borrow_global_mut<TokenTransfers>(sender).pending_claims;
-        let pending_tokens = Table::borrow_mut(pending_claims, &receiver_addr);
+        let pending_tokens = Table::borrow_mut(pending_claims, receiver_addr);
         let token = Table::remove(pending_tokens, token_id);
 
         if (Table::length(pending_tokens) == 0) {
-            let real_pending_claims = Table::remove(pending_claims, &receiver_addr);
+            let real_pending_claims = Table::remove(pending_claims, receiver_addr);
             Table::destroy_empty(real_pending_claims)
         };
 
@@ -97,23 +97,23 @@ module AptosFramework::TokenTransfers {
         name: vector<u8>,
     ) acquires TokenTransfers {
         let token_id = Token::create_token_id_raw(creator, collection, name);
-        cancel_offer(&sender, receiver, &token_id);
+        cancel_offer(&sender, receiver, token_id);
     }
 
     // Extra from our pending_claims and return to gallery
     public fun cancel_offer(
         sender: &signer,
         receiver: address,
-        token_id: &TokenId,
+        token_id: TokenId,
     ) acquires TokenTransfers {
         let sender_addr = Signer::address_of(sender);
         let pending_claims =
             &mut borrow_global_mut<TokenTransfers>(sender_addr).pending_claims;
-        let pending_tokens = Table::borrow_mut(pending_claims, &receiver);
+        let pending_tokens = Table::borrow_mut(pending_claims, receiver);
         let token = Table::remove(pending_tokens, token_id);
 
         if (Table::length(pending_tokens) == 0) {
-            let real_pending_claims = Table::remove(pending_claims, &receiver);
+            let real_pending_claims = Table::remove(pending_claims, receiver);
             Table::destroy_empty(real_pending_claims)
         };
 
@@ -126,11 +126,11 @@ module AptosFramework::TokenTransfers {
 
         let creator_addr = Signer::address_of(&creator);
         let owner_addr = Signer::address_of(&owner);
-        offer(&creator, owner_addr, &token_id, 1);
-        claim(&owner, creator_addr, &token_id);
+        offer(&creator, owner_addr, token_id, 1);
+        claim(&owner, creator_addr, token_id);
 
-        offer(&owner, creator_addr, &token_id, 1);
-        cancel_offer(&owner, creator_addr, &token_id);
+        offer(&owner, creator_addr, token_id, 1);
+        cancel_offer(&owner, creator_addr, token_id);
     }
 
     #[test(creator = @0x1, owner0 = @0x2, owner1 = @0x3)]
@@ -145,21 +145,21 @@ module AptosFramework::TokenTransfers {
         let owner0_addr = Signer::address_of(&owner0);
         let owner1_addr = Signer::address_of(&owner1);
 
-        offer(&creator, owner0_addr, &token_id, 1);
+        offer(&creator, owner0_addr, token_id, 1);
         assert!(Table::length(&borrow_global<TokenTransfers>(creator_addr).pending_claims) == 1, 1);
-        offer(&creator, owner1_addr, &token_id, 1);
+        offer(&creator, owner1_addr, token_id, 1);
         assert!(Table::length(&borrow_global<TokenTransfers>(creator_addr).pending_claims) == 2, 2);
-        claim(&owner0, creator_addr, &token_id);
+        claim(&owner0, creator_addr, token_id);
         assert!(Table::length(&borrow_global<TokenTransfers>(creator_addr).pending_claims) == 1, 3);
-        claim(&owner1, creator_addr, &token_id);
+        claim(&owner1, creator_addr, token_id);
         assert!(Table::length(&borrow_global<TokenTransfers>(creator_addr).pending_claims) == 0, 4);
 
-        offer(&owner0, owner1_addr, &token_id, 1);
-        claim(&owner1, owner0_addr, &token_id);
+        offer(&owner0, owner1_addr, token_id, 1);
+        claim(&owner1, owner0_addr, token_id);
 
-        offer(&owner1, creator_addr, &token_id, 1);
-        offer(&owner1, creator_addr, &token_id, 1);
-        claim(&creator, owner1_addr, &token_id);
+        offer(&owner1, creator_addr, token_id, 1);
+        offer(&owner1, creator_addr, token_id, 1);
+        claim(&creator, owner1_addr, token_id);
     }
 
     fun create_token(creator: &signer, amount: u64): TokenId {
