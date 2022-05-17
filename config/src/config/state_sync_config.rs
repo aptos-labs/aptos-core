@@ -187,7 +187,7 @@ impl Default for AptosDataClientConfig {
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,
             response_timeout_ms: 5000,
-            summary_poll_interval_ms: 100,
+            summary_poll_interval_ms: 200,
         }
     }
 }
