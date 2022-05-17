@@ -134,7 +134,7 @@ pub struct StateComputeResult {
     /// transaction accumulator root hash is identified as `state_id` in Consensus.
     root_hash: HashValue,
     /// Represents the roots of all the full subtrees from left to right in this accumulator
-    /// after the execution. For details, please see [`InMemoryAccumulator`](accumulator::InMemoryAccumulator).
+    /// after the execution. For details, please see [`InMemoryAccumulator`](aptos_types::proof::accumulator::InMemoryAccumulator).
     frozen_subtree_roots: Vec<HashValue>,
 
     /// The frozen subtrees roots of the parent block,

@@ -104,7 +104,7 @@ impl TrustedState {
 
     /// Verify and ratchet forward our trusted state using an [`EpochChangeProof`]
     /// (that moves us into the latest epoch), a [`LedgerInfoWithSignatures`]
-    /// inside that epoch, and an [`AccumulatorConsistencyProof`] from our current
+    /// inside that epoch, and an [`crate::proof::AccumulatorConsistencyProof`] from our current
     /// version to that last verifiable ledger info.
     ///
     /// If our current trusted state doesn't have an accumulator summary yet

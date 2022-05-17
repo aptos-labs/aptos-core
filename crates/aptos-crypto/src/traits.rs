@@ -3,8 +3,7 @@
 
 //! This module provides a generic set of traits for dealing with cryptographic primitives.
 //!
-//! For examples on how to use these traits, see the implementations of the [`ed25519`] or
-//! [`bls12381`] modules.
+//! For examples on how to use these traits, see the implementations of the [`crate::ed25519`]
 
 use crate::hash::{CryptoHash, CryptoHasher};
 use anyhow::Result;

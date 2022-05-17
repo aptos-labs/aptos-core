@@ -12,7 +12,7 @@ pub enum TargetType {
     /// The response is built relative to the target (or end of epoch).
     /// **DEPRECATED**: `TargetLedgerInfo` is only required for backward compatibility. State sync
     /// avoids sending these target types and instead uses `HighestAvailable` below. This message
-    /// will be removed on the next breaking release: https://github.com/aptos-labs/aptos-core/issues/8013
+    /// will be removed on the next breaking release: <https://github.com/aptos-labs/aptos-core/issues/8013>
     TargetLedgerInfo(LedgerInfoWithSignatures),
     /// The response is built relative to the highest available LedgerInfo (or end of epoch).
     /// The value specifies the timeout in ms to wait for an available response.

@@ -147,7 +147,7 @@ where
     }
 
     /// Appends a list of new subtrees to the existing accumulator. This is similar to
-    /// [`append`](Accumulator::append) except that the new leaves themselves are not known and
+    /// [`append`](InMemoryAccumulator::append) except that the new leaves themselves are not known and
     /// they are represented by `subtrees`. As an example, given the following accumulator that
     /// currently has 10 leaves, the frozen subtree roots and the new subtrees are annotated below.
     /// Note that in this case `subtrees[0]` represents two new leaves `A` and `B`, `subtrees[1]`

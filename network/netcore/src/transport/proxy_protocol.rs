@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! # An implementation of ProxyProtocol for HAProxy
-//! https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
+//! <https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt>
 //!
 //! ## Limitations
 //! - Only supports ProxyProtocol V2

@@ -511,7 +511,7 @@ impl SaveFile {
 pub struct RestOptions {
     /// URL to a fullnode on the network
     ///
-    /// Defaults to https://fullnode.devnet.aptoslabs.com
+    /// Defaults to <https://fullnode.devnet.aptoslabs.com>
     #[clap(long, parse(try_from_str))]
     pub url: Option<reqwest::Url>,
 }

@@ -58,7 +58,7 @@ impl From<serde_json::Error> for Error {
 }
 
 /// Client provides a client around the restful interface to GitHub API version 3. Learn more
-/// here: https://developer.github.com/v3
+/// here: <https://developer.github.com/v3>
 ///
 /// This is not intended for securely storing private data, though perhaps it could with a private
 /// repository. The tooling is intended to be used to exchange data in an authenticated fashion

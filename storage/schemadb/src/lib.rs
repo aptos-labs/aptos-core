@@ -270,7 +270,7 @@ impl DB {
     /// Open db as secondary.
     /// This allows to read the DB in another process while it's already opened for read / write in
     /// one (e.g. a Node)
-    /// https://github.com/facebook/rocksdb/blob/493f425e77043cc35ea2d89ee3c4ec0274c700cb/include/rocksdb/db.h#L176-L222
+    /// <https://github.com/facebook/rocksdb/blob/493f425e77043cc35ea2d89ee3c4ec0274c700cb/include/rocksdb/db.h#L176-L222>
     pub fn open_as_secondary<P: AsRef<Path>>(
         primary_path: P,
         secondary_path: P,
@@ -377,7 +377,7 @@ impl DB {
     /// Delete all keys in range [begin, end).
     ///
     /// `SK` has to be an explicit type parameter since
-    /// https://github.com/rust-lang/rust/issues/44721
+    /// <https://github.com/rust-lang/rust/issues/44721>
     pub fn range_delete<S, SK>(&self, begin: &SK, end: &SK) -> Result<()>
     where
         S: Schema,

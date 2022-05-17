@@ -11,7 +11,7 @@
 //! version can give us access to the JMT leaf associated with corresponding key and version
 //!
 //!
-//! //! ```text
+//! ```text
 //! |<---------key--------> |<-----value----->|
 //! |  state_key, version  |   num of nibbles |
 //! ```
