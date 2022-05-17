@@ -12,7 +12,8 @@ use crate::{
     tests::utils::{
         create_ledger_info, get_data_notification, initialize_logger, MockAptosDataClient,
         MAX_ADVERTISED_ACCOUNTS, MAX_ADVERTISED_EPOCH_END, MAX_ADVERTISED_TRANSACTION,
-        MAX_ADVERTISED_TRANSACTION_OUTPUT, MIN_ADVERTISED_ACCOUNTS, MIN_ADVERTISED_EPOCH_END,
+        MAX_ADVERTISED_TRANSACTION_OUTPUT, MAX_REAL_EPOCH_END, MAX_REAL_TRANSACTION,
+        MAX_REAL_TRANSACTION_OUTPUT, MIN_ADVERTISED_ACCOUNTS, MIN_ADVERTISED_EPOCH_END,
         MIN_ADVERTISED_TRANSACTION, MIN_ADVERTISED_TRANSACTION_OUTPUT, TOTAL_NUM_ACCOUNTS,
     },
 };
@@ -28,7 +29,7 @@ macro_rules! unexpected_payload_type {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_notifications_accounts() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request an account stream and get a data stream listener
     let mut stream_listener = streaming_client
@@ -66,7 +67,7 @@ async fn test_notifications_accounts() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_notifications_accounts_multiple_streams() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request a new account stream starting at the next expected index.
     let mut next_expected_index = 0;
@@ -110,12 +111,12 @@ async fn test_notifications_accounts_multiple_streams() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_notifications_continuous_outputs() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request a continuous output stream and get a data stream listener
     let mut stream_listener = streaming_client
         .continuously_stream_transaction_outputs(
-            MIN_ADVERTISED_TRANSACTION_OUTPUT,
+            MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
             MIN_ADVERTISED_EPOCH_END,
             None,
         )
@@ -152,7 +153,7 @@ async fn test_notifications_continuous_outputs() {
                 data_payload => unexpected_payload_type!(data_payload),
             }
         } else {
-            assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END);
+            assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END + 1);
             return assert_eq!(next_expected_version, MAX_ADVERTISED_TRANSACTION_OUTPUT + 1);
         }
     }
@@ -161,14 +162,14 @@ async fn test_notifications_continuous_outputs() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_notifications_continuous_outputs_target() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request a continuous output stream and get a data stream listener
     let target_version = MAX_ADVERTISED_TRANSACTION_OUTPUT - 551;
     let target = create_ledger_info(target_version, MAX_ADVERTISED_EPOCH_END, false);
     let mut stream_listener = streaming_client
         .continuously_stream_transaction_outputs(
-            MIN_ADVERTISED_TRANSACTION_OUTPUT,
+            MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
             MIN_ADVERTISED_EPOCH_END,
             Some(target),
         )
@@ -213,14 +214,18 @@ async fn test_notifications_continuous_outputs_target() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_notifications_continuous_outputs_multiple_streams() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
     let end_epoch = MIN_ADVERTISED_EPOCH_END + 5;
 
     // Request a continuous output stream starting at the next expected version
     let mut next_expected_version = MIN_ADVERTISED_TRANSACTION_OUTPUT;
     let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
     let mut stream_listener = streaming_client
-        .continuously_stream_transaction_outputs(next_expected_version, next_expected_epoch, None)
+        .continuously_stream_transaction_outputs(
+            next_expected_version - 1,
+            next_expected_epoch,
+            None,
+        )
         .await
         .unwrap();
 
@@ -256,7 +261,7 @@ async fn test_notifications_continuous_outputs_multiple_streams() {
                     // Fetch a new stream
                     stream_listener = streaming_client
                         .continuously_stream_transaction_outputs(
-                            next_expected_version,
+                            next_expected_version - 1,
                             next_expected_epoch,
                             None,
                         )
@@ -275,12 +280,12 @@ async fn test_notifications_continuous_outputs_multiple_streams() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_notifications_continuous_transactions() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request a continuous transaction stream and get a data stream listener
     let mut stream_listener = streaming_client
         .continuously_stream_transactions(
-            MIN_ADVERTISED_TRANSACTION,
+            MIN_ADVERTISED_TRANSACTION - 1,
             MIN_ADVERTISED_EPOCH_END,
             true,
             None,
@@ -324,7 +329,7 @@ async fn test_notifications_continuous_transactions() {
                 data_payload => unexpected_payload_type!(data_payload),
             }
         } else {
-            assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END);
+            assert_eq!(next_expected_epoch, MAX_ADVERTISED_EPOCH_END + 1);
             return assert_eq!(next_expected_version, MAX_ADVERTISED_TRANSACTION + 1);
         }
     }
@@ -333,14 +338,14 @@ async fn test_notifications_continuous_transactions() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_notifications_continuous_transactions_target() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request a continuous transaction stream and get a data stream listener
     let target_version = MAX_ADVERTISED_TRANSACTION - 101;
     let target = create_ledger_info(target_version, MAX_ADVERTISED_EPOCH_END, true);
     let mut stream_listener = streaming_client
         .continuously_stream_transactions(
-            MIN_ADVERTISED_TRANSACTION,
+            MIN_ADVERTISED_TRANSACTION - 1,
             MIN_ADVERTISED_EPOCH_END,
             true,
             Some(target),
@@ -390,7 +395,7 @@ async fn test_notifications_continuous_transactions_target() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_notifications_epoch_ending() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request an epoch ending stream and get a data stream listener
     let mut stream_listener = streaming_client
@@ -423,7 +428,7 @@ async fn test_notifications_epoch_ending() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_notifications_epoch_ending_multiple_streams() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request a new epoch ending stream starting at the next expected index.
     let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
@@ -464,9 +469,123 @@ async fn test_notifications_epoch_ending_multiple_streams() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_notifications_subscribe_outputs() {
+    // Create a new streaming client and service
+    let streaming_client = create_streaming_client_and_service_with_delay();
+
+    // Request a continuous output stream and get a data stream listener
+    let mut stream_listener = streaming_client
+        .continuously_stream_transaction_outputs(
+            MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
+            MIN_ADVERTISED_EPOCH_END,
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Read the data notifications from the stream and verify the payloads
+    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
+    let mut next_expected_version = MIN_ADVERTISED_TRANSACTION_OUTPUT;
+    loop {
+        if let Ok(data_notification) = get_data_notification(&mut stream_listener).await {
+            match data_notification.data_payload {
+                DataPayload::ContinuousTransactionOutputsWithProof(
+                    ledger_info_with_sigs,
+                    outputs_with_proofs,
+                ) => {
+                    let ledger_info = ledger_info_with_sigs.ledger_info();
+                    // Verify the epoch of the ledger info
+                    assert_eq!(ledger_info.epoch(), next_expected_epoch);
+
+                    // Verify the output start version matches the expected version
+                    let first_output_version = outputs_with_proofs.first_transaction_output_version;
+                    assert_eq!(Some(next_expected_version), first_output_version);
+
+                    let num_outputs = outputs_with_proofs.transactions_and_outputs.len() as u64;
+                    next_expected_version += num_outputs;
+
+                    // Update epochs if we've hit the epoch end
+                    let last_output_version = first_output_version.unwrap() + num_outputs - 1;
+                    if ledger_info.version() == last_output_version && ledger_info.ends_epoch() {
+                        next_expected_epoch += 1;
+                    }
+                }
+                DataPayload::EndOfStream => {
+                    assert_eq!(next_expected_epoch, MAX_REAL_EPOCH_END + 1);
+                    return assert_eq!(next_expected_version, MAX_REAL_TRANSACTION_OUTPUT + 1);
+                }
+                data_payload => unexpected_payload_type!(data_payload),
+            }
+        } else {
+            assert_eq!(next_expected_epoch, MAX_REAL_EPOCH_END + 1);
+            return assert_eq!(next_expected_version, MAX_REAL_TRANSACTION_OUTPUT + 1);
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_notifications_subscribe_transactions() {
+    // Create a new streaming client and service
+    let streaming_client = create_streaming_client_and_service_with_delay();
+
+    // Request a continuous transaction stream and get a data stream listener
+    let mut stream_listener = streaming_client
+        .continuously_stream_transactions(
+            MIN_ADVERTISED_TRANSACTION - 1,
+            MIN_ADVERTISED_EPOCH_END,
+            false,
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Read the data notifications from the stream and verify the payloads
+    let mut next_expected_epoch = MIN_ADVERTISED_EPOCH_END;
+    let mut next_expected_version = MIN_ADVERTISED_TRANSACTION;
+    loop {
+        if let Ok(data_notification) = get_data_notification(&mut stream_listener).await {
+            match data_notification.data_payload {
+                DataPayload::ContinuousTransactionsWithProof(
+                    ledger_info_with_sigs,
+                    transactions_with_proofs,
+                ) => {
+                    let ledger_info = ledger_info_with_sigs.ledger_info();
+                    // Verify the epoch of the ledger info
+                    assert_eq!(ledger_info.epoch(), next_expected_epoch);
+
+                    // Verify the transaction start version matches the expected version
+                    let first_transaction_version =
+                        transactions_with_proofs.first_transaction_version;
+                    assert_eq!(Some(next_expected_version), first_transaction_version);
+
+                    let num_transactions = transactions_with_proofs.transactions.len() as u64;
+                    next_expected_version += num_transactions;
+
+                    // Update epochs if we've hit the epoch end
+                    let last_transaction_version =
+                        first_transaction_version.unwrap() + num_transactions - 1;
+                    if ledger_info.version() == last_transaction_version && ledger_info.ends_epoch()
+                    {
+                        next_expected_epoch += 1;
+                    }
+                }
+                DataPayload::EndOfStream => {
+                    assert_eq!(next_expected_epoch, MAX_REAL_EPOCH_END + 1);
+                    return assert_eq!(next_expected_version, MAX_REAL_TRANSACTION + 1);
+                }
+                data_payload => unexpected_payload_type!(data_payload),
+            }
+        } else {
+            assert_eq!(next_expected_epoch, MAX_REAL_EPOCH_END + 1);
+            return assert_eq!(next_expected_version, MAX_REAL_TRANSACTION + 1);
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_notifications_transaction_outputs() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request a transaction output stream and get a data stream listener
     let mut stream_listener = streaming_client
@@ -502,7 +621,7 @@ async fn test_notifications_transaction_outputs() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_notifications_transactions() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request a transaction stream (with events) and get a data stream listener
     let mut stream_listener = streaming_client
@@ -542,7 +661,7 @@ async fn test_notifications_transactions() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_notifications_transactions_multiple_streams() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request a transaction stream starting at the next expected version
     let mut next_expected_version = MIN_ADVERTISED_TRANSACTION;
@@ -598,7 +717,7 @@ async fn test_notifications_transactions_multiple_streams() {
 #[tokio::test]
 async fn test_stream_accounts() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request an account stream and verify we get a data stream listener
     let result = streaming_client
@@ -622,12 +741,12 @@ async fn test_stream_accounts() {
 #[tokio::test]
 async fn test_stream_continuous_outputs() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request a continuous output stream and verify we get a data stream listener
     let result = streaming_client
         .continuously_stream_transaction_outputs(
-            MIN_ADVERTISED_TRANSACTION_OUTPUT,
+            MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
             MIN_ADVERTISED_EPOCH_END,
             None,
         )
@@ -637,7 +756,7 @@ async fn test_stream_continuous_outputs() {
     // Request a stream where data is missing (we are lower than advertised)
     let result = streaming_client
         .continuously_stream_transaction_outputs(
-            MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
+            MIN_ADVERTISED_TRANSACTION_OUTPUT - 2,
             MIN_ADVERTISED_EPOCH_END,
             None,
         )
@@ -658,12 +777,12 @@ async fn test_stream_continuous_outputs() {
 #[tokio::test]
 async fn test_stream_continuous_outputs_target() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request a continuous output stream and verify we get a data stream listener
     let result = streaming_client
         .continuously_stream_transaction_outputs(
-            MIN_ADVERTISED_TRANSACTION_OUTPUT,
+            MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
             MIN_ADVERTISED_EPOCH_END,
             Some(create_ledger_info(
                 MAX_ADVERTISED_TRANSACTION_OUTPUT,
@@ -679,7 +798,7 @@ async fn test_stream_continuous_outputs_target() {
     // where the advertised data is lagging behind the target requested by consensus.
     let result = streaming_client
         .continuously_stream_transaction_outputs(
-            MIN_ADVERTISED_TRANSACTION_OUTPUT,
+            MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
             MIN_ADVERTISED_EPOCH_END,
             Some(create_ledger_info(
                 MAX_ADVERTISED_TRANSACTION_OUTPUT + 1,
@@ -694,12 +813,12 @@ async fn test_stream_continuous_outputs_target() {
 #[tokio::test]
 async fn test_stream_continuous_transactions() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request a continuous transaction stream and verify we get a data stream listener
     let result = streaming_client
         .continuously_stream_transactions(
-            MIN_ADVERTISED_TRANSACTION,
+            MIN_ADVERTISED_TRANSACTION - 1,
             MIN_ADVERTISED_EPOCH_END,
             true,
             None,
@@ -710,7 +829,7 @@ async fn test_stream_continuous_transactions() {
     // Request a stream where data is missing (we are lower than advertised)
     let result = streaming_client
         .continuously_stream_transactions(
-            MIN_ADVERTISED_TRANSACTION - 1,
+            MIN_ADVERTISED_TRANSACTION - 2,
             MIN_ADVERTISED_EPOCH_END,
             true,
             None,
@@ -733,12 +852,12 @@ async fn test_stream_continuous_transactions() {
 #[tokio::test]
 async fn test_stream_continuous_transactions_target() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request a continuous transaction stream and verify we get a data stream listener
     let result = streaming_client
         .continuously_stream_transactions(
-            MIN_ADVERTISED_TRANSACTION,
+            MIN_ADVERTISED_TRANSACTION - 1,
             MIN_ADVERTISED_EPOCH_END,
             true,
             Some(create_ledger_info(
@@ -755,7 +874,7 @@ async fn test_stream_continuous_transactions_target() {
     // where the advertised data is lagging behind the target requested by consensus.
     let result = streaming_client
         .continuously_stream_transactions(
-            MIN_ADVERTISED_TRANSACTION,
+            MIN_ADVERTISED_TRANSACTION - 1,
             MIN_ADVERTISED_EPOCH_END,
             true,
             Some(create_ledger_info(
@@ -771,7 +890,7 @@ async fn test_stream_continuous_transactions_target() {
 #[tokio::test]
 async fn test_stream_epoch_ending() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request an epoch ending stream and verify we get a data stream listener
     let result = streaming_client
@@ -795,7 +914,7 @@ async fn test_stream_epoch_ending() {
 #[tokio::test]
 async fn test_stream_transaction_outputs() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request a transaction output stream and verify we get a data stream listener
     let result = streaming_client
@@ -831,7 +950,7 @@ async fn test_stream_transaction_outputs() {
 #[tokio::test]
 async fn test_stream_transactions() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request a transaction stream and verify we get a data stream listener
     let result = streaming_client
@@ -870,7 +989,7 @@ async fn test_stream_transactions() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_terminate_complete_stream() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request an output stream
     let mut stream_listener = streaming_client
@@ -906,7 +1025,7 @@ async fn test_terminate_complete_stream() {
 #[should_panic(expected = "SelectNextSome polled after terminated")]
 async fn test_terminate_stream() {
     // Create a new streaming client and service
-    let streaming_client = create_new_streaming_client_and_service();
+    let streaming_client = create_streaming_client_and_service();
 
     // Request an account stream
     let mut stream_listener = streaming_client
@@ -941,17 +1060,35 @@ async fn test_terminate_stream() {
     }
 }
 
-fn create_new_streaming_client_and_service() -> StreamingServiceClient {
+fn create_streaming_client_and_service() -> StreamingServiceClient {
+    create_streaming_client_with_mocks(false)
+}
+
+fn create_streaming_client_and_service_with_delay() -> StreamingServiceClient {
+    create_streaming_client_with_mocks(true)
+}
+
+fn create_streaming_client_with_mocks(
+    data_beyond_highest_advertised: bool,
+) -> StreamingServiceClient {
     initialize_logger();
 
     // Create a new streaming client and listener
     let (streaming_client, streaming_service_listener) =
         new_streaming_service_client_listener_pair();
 
+    // Create a mock data client
+    let aptos_data_client = MockAptosDataClient::new(data_beyond_highest_advertised);
+
+    // Create the data streaming service config
+    let data_streaming_service_config = DataStreamingServiceConfig {
+        max_concurrent_requests: 3,
+        ..Default::default()
+    };
+
     // Create the streaming service and connect it to the listener
-    let aptos_data_client = MockAptosDataClient::new();
     let streaming_service = DataStreamingService::new(
-        DataStreamingServiceConfig::default(),
+        data_streaming_service_config,
         aptos_data_client,
         streaming_service_listener,
     );

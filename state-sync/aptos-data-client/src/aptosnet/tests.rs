@@ -33,9 +33,9 @@ use std::{
 use storage_service_client::{StorageServiceClient, StorageServiceNetworkSender};
 use storage_service_server::network::{NetworkRequest, ResponseSender};
 use storage_service_types::{
-    CompleteDataRange, DataSummary, ProtocolMetadata, StorageServerSummary, StorageServiceError,
-    StorageServiceMessage, StorageServiceRequest, StorageServiceResponse,
-    TransactionsWithProofRequest,
+    CompleteDataRange, DataSummary, NewTransactionsWithProofRequest, ProtocolMetadata,
+    StorageServerSummary, StorageServiceError, StorageServiceMessage, StorageServiceRequest,
+    StorageServiceResponse, TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
 
 fn mock_ledger_info(version: Version) -> LedgerInfoWithSignatures {
@@ -60,7 +60,7 @@ fn mock_storage_summary(version: Version) -> StorageServerSummary {
             synced_ledger_info: Some(mock_ledger_info(version)),
             epoch_ending_ledger_infos: None,
             transactions: Some(CompleteDataRange::new(0, version).unwrap()),
-            transaction_outputs: None,
+            transaction_outputs: Some(CompleteDataRange::new(0, version).unwrap()),
             account_states: None,
         },
     }
@@ -579,6 +579,103 @@ async fn fetch_peers_max_in_flight() {
             .unwrap();
         assert_ne!(peer_to_poll_1, peer_to_poll_2);
     }
+}
+
+#[tokio::test]
+async fn prioritized_peer_request_selection() {
+    ::aptos_logger::Logger::init_for_testing();
+    let (mut mock_network, _, client, _) = MockNetwork::new(None);
+
+    // Ensure no peers can service the given request (we have no connections)
+    let server_version_request = StorageServiceRequest::GetServerProtocolVersion;
+    assert_matches!(
+        client.choose_peer_for_request(&server_version_request),
+        Err(Error::DataIsUnavailable(_))
+    );
+
+    // Add a regular peer and verify the peer is selected as the recipient
+    let regular_peer_1 = mock_network.add_peer(false);
+    assert_eq!(
+        client.choose_peer_for_request(&server_version_request),
+        Ok(regular_peer_1)
+    );
+
+    // Verify the peer is selected as the recipient for a subscription request
+    let new_transactions_request =
+        StorageServiceRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
+            known_version: 1023,
+            known_epoch: 23,
+            include_events: false,
+        });
+    assert_eq!(
+        client.choose_peer_for_request(&new_transactions_request),
+        Ok(regular_peer_1)
+    );
+
+    // Add a priority peer and verify the peer is selected as the recipient
+    let priority_peer_1 = mock_network.add_peer(true);
+    assert_eq!(
+        client.choose_peer_for_request(&new_transactions_request),
+        Ok(priority_peer_1)
+    );
+
+    // Disconnect the priority peer and verify the regular peer is now chosen
+    mock_network.disconnect_peer(priority_peer_1);
+    assert_eq!(
+        client.choose_peer_for_request(&new_transactions_request),
+        Ok(regular_peer_1)
+    );
+
+    // Connect a new priority peer and verify it is now selected
+    let priority_peer_2 = mock_network.add_peer(true);
+    assert_eq!(
+        client.choose_peer_for_request(&new_transactions_request),
+        Ok(priority_peer_2)
+    );
+
+    // Request data that is not being advertised and verify we get an error
+    let output_data_request =
+        StorageServiceRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
+            proof_version: 100,
+            start_version: 0,
+            end_version: 100,
+        });
+    assert_matches!(
+        client.choose_peer_for_request(&output_data_request),
+        Err(Error::DataIsUnavailable(_))
+    );
+
+    // Advertise the data for the regular peer and verify it is now selected
+    client.update_summary(regular_peer_1, mock_storage_summary(100));
+    assert_eq!(
+        client.choose_peer_for_request(&output_data_request),
+        Ok(regular_peer_1)
+    );
+
+    // Advertise the data for the priority peer and verify it is now selected
+    client.update_summary(priority_peer_2, mock_storage_summary(100));
+    assert_eq!(
+        client.choose_peer_for_request(&output_data_request),
+        Ok(priority_peer_2)
+    );
+
+    // Disconnect priority peer 2 and reconnect peer 1
+    mock_network.disconnect_peer(priority_peer_2);
+    mock_network.reconnect_peer(priority_peer_1);
+
+    // Request the data again and verify the regular peer is chosen
+    client.update_summary(regular_peer_1, mock_storage_summary(100));
+    assert_eq!(
+        client.choose_peer_for_request(&output_data_request),
+        Ok(regular_peer_1)
+    );
+
+    // Advertise the data for the priority peer and verify it is now selected
+    client.update_summary(priority_peer_1, mock_storage_summary(100));
+    assert_eq!(
+        client.choose_peer_for_request(&output_data_request),
+        Ok(priority_peer_1)
+    );
 }
 
 // 1. 2 peers
