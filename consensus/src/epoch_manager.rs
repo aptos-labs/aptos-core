@@ -387,7 +387,7 @@ impl EpochManager {
         info!(
             epoch = epoch_state.epoch,
             validators = epoch_state.verifier.to_string(),
-            root_block = recovery_data.root_block(),
+            root_block = %recovery_data.root_block(),
             "Starting new epoch",
         );
         let last_vote = recovery_data.last_vote();
