@@ -10,6 +10,7 @@ mod invalid_post_request_test;
 mod state_test;
 mod string_resource_test;
 mod test_context;
+mod transaction_signing_test;
 mod transactions_test;
 
 use serde_json::Value;
