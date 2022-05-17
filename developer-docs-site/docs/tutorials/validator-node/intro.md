@@ -22,10 +22,10 @@ For the AIT1, we  recommend that every node operator run both a validator node a
 In order to participate in the incentivized testnet, participants must demonstrate the ability to configure and deploy a node, as well as pass the sanctions screening requirements.
 
 Follow the below steps to participate in the Aptos Incentivized Testnet:
-- Follow the instructions to deploy both a validator node and a fullnode in the test mode.
+- Follow the instructions to deploy both a validator node and a FullNode in the test mode.
 - Navigate to the [Incentivized Testnet registration page](https://community.aptoslabs.com/) and enter information about your node (pub-keys, IP/DNS address).
 - If you are selected to run a node, follow instructions in [Connecting to Aptos Incentivized Testnet](connect-to-testnet) to join incentivized testnet.
-- Keep the node in healthy state for the entire testing period and follow operational requests as needed.
+- Keep the node in healthy state for the entire testing period and follow operational requests as needed. See [Node Liveness Criteria](../../reference/node-liveness-criteria.md) document.
 
 ## Before you proceed
 
