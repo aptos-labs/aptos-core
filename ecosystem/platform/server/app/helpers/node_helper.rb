@@ -7,6 +7,7 @@ require 'resolv'
 require 'uri'
 require 'maxmind/geoip2'
 require 'httparty'
+require 'logging/logs'
 
 # @param [String] hostname
 def normalize_hostname!(hostname)
@@ -40,6 +41,8 @@ IPResult = Struct.new(:ok, :ip, :message)
 
 module NodeHelper
   class NodeVerifier
+    include Logging::Logs
+
     # @param [String] hostname
     # @param [Integer] metrics_port
     def initialize(hostname, metrics_port, http_api_port)
@@ -91,7 +94,7 @@ module NodeHelper
     rescue Net::OpenTimeout => e
       MetricsResult.new(false, nil, "Open timeout: #{e}")
     rescue StandardError => e
-      Sentry.capture_exception(e)
+      log e.to_s
       MetricsResult.new(false, nil, "Error: #{e}")
     end
 
