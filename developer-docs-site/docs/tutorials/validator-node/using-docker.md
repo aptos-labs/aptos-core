@@ -21,11 +21,10 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
     cd ~/$WORKSPACE
     ```
 
-3. Download the validator.yaml, fullnode.yaml and docker-compose.yaml configuration files into this directory.
+3. Download the validator.yaml and docker-compose.yaml configuration files into this directory.
     ```
     wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/docker-compose.yaml
     wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/validator.yaml
-    wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/fullnode.yaml
     ```
 
 4. Generate key pairs (node owner key, consensus key and networking key) in your working directory.
@@ -36,7 +35,7 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
 
     This will create three files: `private-keys.yaml`, `validator-identity.yaml`, `validator-full-node-identity.yaml` for you. **IMPORTANT**: Backup your key files somewhere safe. These key files are important for you to establish ownership of your node, and you will use this information to claim your rewards later if eligible. Never share those keys with anyone else.
 
-5. Configure validator information, you need to setup a static IP / DNS address which can be used by the node, and make sure the network / firewalls are properly configured to accept external connections. 
+5. Configure validator information, you need to setup a static IP / DNS address which can be used by the validator node and the Fullnode, and make sure the network / firewalls are properly configured to accept external connections. (Fullnode is optional)
 
     This is all the info you need to register on our community website later.
 
@@ -120,7 +119,6 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
 
 9. To recap, in your working directory, you should have a list of files:
     - `validator.yaml` validator config file
-    - `fullnode.yaml` fullnode config file
     - `docker-compose.yaml` docker compose file to run validator and fullnode
     - `private-keys.yaml` Private keys for owner account, consensus, networking
     - `validator-identity.yaml` Private keys for setting validator identity
@@ -133,4 +131,16 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
 
 10. Run docker-compose: `docker-compose up`. (or `docker compose up` depends on your version)
 
-Now you have completed setting up your node in test mode. You can continue to our [community](https://community.aptoslabs.com/) website for registration.
+Now you have completed setting up your validator node in test mode. You can continue to our [community](https://community.aptoslabs.com/) website for registration. Additionally, you can also setup a fullnode following the instructions below.
+
+11. [Optional] Now let's setup Fullnode on a different machine. Download the `fullnode.yaml` and `docker-compose-fullnode.yaml` configuration files into the working directory of Fullnode machine.
+    ```
+    wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/docker-compose-fullnode.yaml
+    wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/aptos-node/fullnode.yaml
+    ```
+
+12. Edit `fullnode.yaml` file to update the IP address for Validator node.
+
+13. [Optional] Copy the `validator-full-node-identity.yaml`, `genesis.blob` and `waypoint.txt` files generated above into the same working directory on Fullnode machine.
+
+14. [Optional] Run docker-compose: `docker-compose up -f docker-compose-fullnode.yaml`.
