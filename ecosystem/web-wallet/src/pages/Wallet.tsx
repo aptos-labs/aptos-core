@@ -180,7 +180,7 @@ function Wallet() {
           address: toAddress,
           nodeUrl: NODE_URL,
         });
-        if (accountResponse) {
+        if (!accountResponse) {
           setLastTransactionStatus(TransferResult.UndefinedAccount);
           throw new Error(TransferResult.UndefinedAccount);
         }
