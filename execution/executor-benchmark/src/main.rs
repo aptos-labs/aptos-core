@@ -3,6 +3,7 @@
 
 use aptos_config::config::StoragePrunerConfig;
 use aptos_secure_push_metrics::MetricsPusher;
+use aptos_vm::AptosVM;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -14,8 +15,27 @@ struct Opt {
     #[structopt(long, default_value = "500")]
     block_size: usize,
 
+    #[structopt(long)]
+    concurrency_level: Option<usize>,
+
     #[structopt(subcommand)]
     cmd: Command,
+}
+
+impl Opt {
+    fn concurrency_level(&self) -> usize {
+        match self.concurrency_level {
+            None => {
+                let level = num_cpus::get();
+                println!(
+                    "\nVM concurrency level defaults to num of cpus: {}\n",
+                    level
+                );
+                level
+            }
+            Some(level) => level,
+        }
+    }
 }
 
 #[derive(Debug, StructOpt)]
@@ -66,6 +86,7 @@ fn main() {
         .thread_name(|index| format!("rayon-global-{}", index))
         .build_global()
         .expect("Failed to build rayon global thread pool.");
+    AptosVM::set_concurrency_level_once(opt.concurrency_level());
 
     match opt.cmd {
         Command::CreateDb {

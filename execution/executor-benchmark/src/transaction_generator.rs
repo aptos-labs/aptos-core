@@ -150,19 +150,18 @@ impl TransactionGenerator {
         accounts
     }
 
-    pub fn new_with_metafile<P: AsRef<Path>>(
+    pub fn new_with_existing_db<P: AsRef<Path>>(
         genesis_key: Ed25519PrivateKey,
         block_sender: mpsc::SyncSender<Vec<Transaction>>,
         db_dir: P,
+        version: Version,
     ) -> Self {
         let path = db_dir.as_ref().join(META_FILENAME);
         let mut file = File::open(&path).unwrap();
         let mut contents = vec![];
         file.read_to_end(&mut contents).unwrap();
         let test_case: TestCase = toml::from_slice(&contents).expect("Must exist.");
-        let num_accounts = match test_case {
-            TestCase::P2p(P2pTestCase { num_accounts }) => num_accounts,
-        };
+        let TestCase::P2p(P2pTestCase { num_accounts }) = test_case;
 
         let seed = [1u8; 32];
         let rng = StdRng::from_seed(seed);
@@ -173,7 +172,7 @@ impl TransactionGenerator {
             )),
             num_accounts,
             genesis_key,
-            version: 2 * num_accounts as Version,
+            version,
             rng,
             block_sender: Some(block_sender),
         }

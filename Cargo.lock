@@ -2907,6 +2907,7 @@ dependencies = [
  "executor-types",
  "indicatif",
  "jemallocator",
+ "num_cpus",
  "rand 0.8.4",
  "rayon",
  "schemadb",

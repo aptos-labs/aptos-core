@@ -37,7 +37,7 @@ pub fn run(
     println!("Initializing...");
 
     if db_dir.as_ref().exists() {
-        fs::remove_dir_all(db_dir.as_ref().join("aptosdb")).unwrap_or(());
+        panic!("data-dir exists already.");
     }
     // create if not exists
     fs::create_dir_all(db_dir.as_ref()).unwrap();
