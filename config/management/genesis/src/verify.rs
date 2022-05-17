@@ -28,7 +28,7 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
-use storage_interface::{state_view::LatestDbStateView, DbReader, DbReaderWriter};
+use storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use structopt::StructOpt;
 
 /// Prints the public information within a store
@@ -240,7 +240,7 @@ fn validator_config(
     reader: Arc<dyn DbReader>,
 ) -> Result<ValidatorConfig, Error> {
     let db_state_view = reader
-        .latest_state_view()
+        .latest_state_checkpoint_view()
         .map_err(|e| Error::UnexpectedError(format!("Can't create latest db state view {}", e)))?;
     let address = account_config::validator_set_address();
     let account_state_view = db_state_view.as_account_with_state_view(&address);

@@ -233,5 +233,18 @@
       }
     ],
     "timestamp": "1"
+  },
+  {
+    "type": "state_checkpoint_transaction",
+    "version": "3",
+    "hash": "",
+    "state_root_hash": "",
+    "event_root_hash": "",
+    "gas_used": "0",
+    "success": true,
+    "vm_status": "Executed successfully",
+    "accumulator_root_hash": "",
+    "changes": [],
+    "timestamp": "1"
   }
 ]

@@ -781,37 +781,22 @@ impl TransactionToCommitGen {
             .into_iter()
             .map(|(index, event_gen)| event_gen.materialize(index, universe))
             .collect();
-        // Account states must be materialized last, to reflect the latest account and event
-        // sequence numbers.
-        let account_states: HashMap<AccountAddress, AccountState> = self
-            .account_state_gens
-            .into_iter()
-            .map(|(index, blob_gen)| {
-                (
-                    universe.get_account_info(index).address,
-                    blob_gen.materialize(index, universe),
-                )
-            })
-            .collect();
-
-        let mut state_updates = HashMap::new();
-        for (account_address, account_state) in account_states {
-            account_state.iter().for_each(|(key, value)| {
-                state_updates.insert(
-                    StateKey::AccessPath(AccessPath::new(account_address, key.clone())),
-                    StateValue::from(value.clone()),
-                );
-            });
-        }
 
         TransactionToCommit::new(
             Transaction::UserTransaction(transaction),
             TransactionInfo::new_placeholder(self.gas_used, self.status),
-            state_updates,
+            // state updates will be dealt with in BlockGen at a state checkpoint
+            HashMap::new(), /* state updates */
             None,
             self.write_set,
             events,
         )
+    }
+
+    pub fn take_account_gens(&mut self) -> Vec<(Index, AccountStateGen)> {
+        let mut ret = Vec::new();
+        std::mem::swap(&mut ret, &mut self.account_state_gens);
+        ret
     }
 }
 
@@ -1086,9 +1071,36 @@ impl BlockGen {
         let mut txns_to_commit = Vec::new();
 
         // materialize user transactions
-        for txn_gen in self.txn_gens {
+        let mut account_gens = Vec::new();
+        for mut txn_gen in self.txn_gens {
+            account_gens.extend(txn_gen.take_account_gens().into_iter());
             txns_to_commit.push(txn_gen.materialize(universe));
         }
+
+        // add state checkpoint transaction
+        let state_updates = account_gens
+            .into_iter()
+            .flat_map(|(index, account_gen)| {
+                let address = universe.get_account_info(index).address;
+                account_gen
+                    .materialize(index, universe)
+                    .into_resource_iter()
+                    .map(move |(key, value)| {
+                        (
+                            StateKey::AccessPath(AccessPath::new(address, key)),
+                            StateValue::from(value),
+                        )
+                    })
+            })
+            .collect();
+        txns_to_commit.push(TransactionToCommit::new(
+            Transaction::StateCheckpoint,
+            TransactionInfo::new_placeholder(0, ExecutionStatus::Success),
+            state_updates,
+            None,
+            WriteSet::default(),
+            Vec::new(),
+        ));
 
         // materialize ledger info
         let ledger_info = self

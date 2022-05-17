@@ -25,7 +25,9 @@ use aptos_types::{
 use aptos_vm::data_cache::{IntoMoveResolver, RemoteStorageOwned};
 use futures::{channel::oneshot, SinkExt};
 use std::{convert::Infallible, sync::Arc};
-use storage_interface::state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateView};
+use storage_interface::state_view::{
+    DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView,
+};
 use warp::{filters::BoxedFilter, Filter, Reply};
 
 // Context holds application scope context
@@ -54,7 +56,7 @@ impl Context {
 
     pub fn move_resolver(&self) -> Result<RemoteStorageOwned<DbStateView>> {
         self.db
-            .latest_state_view()
+            .latest_state_checkpoint_view()
             .map(|state_view| state_view.into_move_resolver())
     }
 

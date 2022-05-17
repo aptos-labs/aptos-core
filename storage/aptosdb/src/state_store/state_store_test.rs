@@ -37,7 +37,7 @@ fn put_value_set(
         .put_value_sets(vec![&value_set], version, &mut cs)
         .unwrap();
     state_store.db.write_schemas(cs.batch).unwrap();
-    state_store.set_latest_version(version);
+    state_store.set_latest_state_checkpoint_version(version);
     root
 }
 
@@ -687,6 +687,6 @@ fn update_store(
             .put_value_sets(vec![&value_state_set], version, &mut cs)
             .unwrap();
         store.db.write_schemas(cs.batch).unwrap();
-        store.set_latest_version(version);
+        store.set_latest_state_checkpoint_version(version);
     }
 }

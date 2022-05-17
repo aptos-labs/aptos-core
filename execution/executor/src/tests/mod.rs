@@ -22,6 +22,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::definition::LeafCount,
     state_store::{state_key::StateKey, state_value::StateValue},
+    test_helpers::transaction_test_helpers::block,
     transaction::{
         ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
         TransactionListWithProof, TransactionOutput, TransactionPayload, TransactionStatus,
@@ -32,7 +33,7 @@ use aptos_types::{
 use aptosdb::AptosDB;
 use executor_types::{BlockExecutorTrait, ChunkExecutorTrait, ExecutedTrees, TransactionReplayer};
 use proptest::prelude::*;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, iter::once};
 use storage_interface::DbReaderWriter;
 
 mod chunk_executor_tests;
@@ -46,11 +47,12 @@ fn execute_and_commit_block(
     let id = gen_block_id(txn_index + 1);
 
     let output = executor
-        .execute_block((id, vec![txn]), parent_block_id)
+        .execute_block((id, block(vec![txn])), parent_block_id)
         .unwrap();
-    assert_eq!(output.version(), txn_index + 1);
+    let version = 2 * (txn_index + 1);
+    assert_eq!(output.version(), version);
 
-    let ledger_info = gen_ledger_info(txn_index + 1, output.root_hash(), id, txn_index + 1);
+    let ledger_info = gen_ledger_info(version, output.root_hash(), id, txn_index + 1);
     executor.commit_blocks(vec![id], ledger_info).unwrap();
     id
 }
@@ -139,14 +141,15 @@ fn test_executor_status() {
     let txn2 = encode_transfer_transaction(gen_address(0), gen_address(1), 500);
 
     let output = executor
-        .execute_block((block_id, vec![txn0, txn1, txn2]), parent_block_id)
+        .execute_block((block_id, block(vec![txn0, txn1, txn2])), parent_block_id)
         .unwrap();
 
     assert_eq!(
         &vec![
             KEEP_STATUS.clone(),
             KEEP_STATUS.clone(),
-            DISCARD_STATUS.clone()
+            DISCARD_STATUS.clone(),
+            KEEP_STATUS.clone(),
         ],
         output.compute_status()
     );
@@ -158,15 +161,15 @@ fn test_executor_one_block() {
     let parent_block_id = executor.committed_block_id();
     let block_id = gen_block_id(1);
 
-    let version = 100;
-
-    let txns = (0..version)
+    let num_user_txns = 100;
+    let txns = (0..num_user_txns)
         .map(|i| encode_mint_transaction(gen_address(i), 100))
         .collect::<Vec<_>>();
     let output = executor
-        .execute_block((block_id, txns), parent_block_id)
+        .execute_block((block_id, block(txns)), parent_block_id)
         .unwrap();
-    assert_eq!(output.version(), 100);
+    let version = num_user_txns + 1;
+    assert_eq!(output.version(), version);
     let block_root_hash = output.root_hash();
 
     let ledger_info = gen_ledger_info(version, block_root_hash, block_id, 1);
@@ -204,12 +207,12 @@ fn test_executor_two_blocks_with_failed_txns() {
         })
         .collect::<Vec<_>>();
     let _output1 = executor
-        .execute_block((block1_id, block1_txns), parent_block_id)
+        .execute_block((block1_id, block(block1_txns)), parent_block_id)
         .unwrap();
     let output2 = executor
-        .execute_block((block2_id, block2_txns), block1_id)
+        .execute_block((block2_id, block(block2_txns)), block1_id)
         .unwrap();
-    let ledger_info = gen_ledger_info(75, output2.root_hash(), block2_id, 1);
+    let ledger_info = gen_ledger_info(77, output2.root_hash(), block2_id, 1);
     executor
         .commit_blocks(vec![block1_id, block2_id], ledger_info)
         .unwrap();
@@ -224,9 +227,9 @@ fn test_executor_commit_twice() {
         .collect::<Vec<_>>();
     let block1_id = gen_block_id(1);
     let output1 = executor
-        .execute_block((block1_id, block1_txns), parent_block_id)
+        .execute_block((block1_id, block(block1_txns)), parent_block_id)
         .unwrap();
-    let ledger_info = gen_ledger_info(5, output1.root_hash(), block1_id, 1);
+    let ledger_info = gen_ledger_info(6, output1.root_hash(), block1_id, 1);
     executor
         .commit_blocks(vec![block1_id], ledger_info.clone())
         .unwrap();
@@ -250,7 +253,7 @@ fn test_executor_execute_same_block_multiple_times() {
     let mut responses = vec![];
     for _i in 0..100 {
         let output = executor
-            .execute_block((block_id, txns.clone()), parent_block_id)
+            .execute_block((block_id, block(txns.clone())), parent_block_id)
             .unwrap();
         responses.push(output);
     }
@@ -274,17 +277,14 @@ fn create_transaction_chunks(
 
     // To obtain the batches of transactions, we first execute and save all these transactions in a
     // separate DB. Then we call get_transactions to retrieve them.
-    let TestExecutor {
-        _path,
-        db: _,
-        executor,
-    } = TestExecutor::new();
+    let TestExecutor { executor, .. } = TestExecutor::new();
 
     let mut txns = vec![];
-    for i in 1..chunk_ranges.last().unwrap().end {
+    for i in 1..(chunk_ranges.last().unwrap().end - 1) {
         let txn = encode_mint_transaction(gen_address(i), 100);
         txns.push(txn);
     }
+    txns.push(Transaction::StateCheckpoint);
     let id = gen_block_id(1);
 
     let output = executor
@@ -379,6 +379,15 @@ fn apply_transaction_by_writeset(
                 ),
             )
         })
+        .chain(once((
+            Transaction::StateCheckpoint,
+            TransactionOutput::new(
+                WriteSet::default(),
+                Vec::new(),
+                0,
+                TransactionStatus::Keep(ExecutionStatus::Success),
+            ),
+        )))
         .collect();
 
     let state_view =
@@ -430,14 +439,14 @@ fn test_deleted_key_from_state_store() {
 
     let state_value1_from_db = db
         .reader
-        .get_state_value_with_proof_by_version(&dummy_state_key1, 2)
+        .get_state_value_with_proof_by_version(&dummy_state_key1, 3)
         .unwrap()
         .0
         .unwrap();
 
     let state_value2_from_db = db
         .reader
-        .get_state_value_with_proof_by_version(&dummy_state_key2, 2)
+        .get_state_value_with_proof_by_version(&dummy_state_key2, 3)
         .unwrap()
         .0
         .unwrap();
@@ -456,7 +465,7 @@ fn test_deleted_key_from_state_store() {
     // Ensure the latest version of the value in DB is None (which implies its deleted)
     assert!(db
         .reader
-        .get_state_value_with_proof_by_version(&dummy_state_key1, 3)
+        .get_state_value_with_proof_by_version(&dummy_state_key1, 5)
         .unwrap()
         .0
         .unwrap()
@@ -466,7 +475,7 @@ fn test_deleted_key_from_state_store() {
     // Ensure the key that was not touched by the transaction is not accidentally deleted
     let state_value_from_db2 = db
         .reader
-        .get_state_value_with_proof_by_version(&dummy_state_key2, 3)
+        .get_state_value_with_proof_by_version(&dummy_state_key2, 5)
         .unwrap()
         .0
         .unwrap();
@@ -475,7 +484,7 @@ fn test_deleted_key_from_state_store() {
     // Ensure the previous version of the deleted key is not accidentally deleted
     let state_value_from_db1 = db
         .reader
-        .get_state_value_with_proof_by_version(&dummy_state_key1, 2)
+        .get_state_value_with_proof_by_version(&dummy_state_key1, 3)
         .unwrap()
         .0
         .unwrap();
@@ -490,12 +499,16 @@ struct TestBlock {
 
 impl TestBlock {
     fn new(num_user_txns: u64, amount: u32, id: HashValue) -> Self {
-        TestBlock {
-            txns: (0..num_user_txns)
-                .map(|index| encode_mint_transaction(gen_address(index), u64::from(amount)))
-                .collect(),
-            id,
-        }
+        let txns = if num_user_txns == 0 {
+            Vec::new()
+        } else {
+            block(
+                (0..num_user_txns)
+                    .map(|index| encode_mint_transaction(gen_address(index), u64::from(amount)))
+                    .collect(),
+            )
+        };
+        TestBlock { txns, id }
     }
 
     fn len(&self) -> u64 {
@@ -593,7 +606,7 @@ proptest! {
         (num_user_txns, reconfig_txn_index) in (10..100u64).prop_flat_map(|num_user_txns| {
             (
                 Just(num_user_txns),
-                0..num_user_txns
+                0..num_user_txns - 1 // avoid state checkpoint right after reconfig
             )
         })) {
             let block_id = gen_block_id(1);
@@ -727,11 +740,11 @@ proptest! {
 
         let second_block_id = gen_block_id(2);
         let output2 = executor.execute_block(
-            (second_block_id, second_block_txns),
+            (second_block_id, block(second_block_txns)),
             first_block_id,
         ).unwrap();
 
-        let version = chunk_size + overlap_size + num_new_txns;
+        let version = chunk_size + overlap_size + num_new_txns + 1;
         prop_assert_eq!(output2.version(), version);
 
         let ledger_info = gen_ledger_info(version, output2.root_hash(), second_block_id, 1);

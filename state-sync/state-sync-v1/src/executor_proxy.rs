@@ -576,7 +576,7 @@ mod tests {
         // Initialize the configs and verify that the node doesn't panic
         // (even though it can't find the TestOnChainConfig on the blockchain!).
         let storage: Arc<dyn DbReader> = db.clone();
-        let synced_version = (&*storage).fetch_synced_version().unwrap();
+        let synced_version = (&*storage).fetch_latest_state_checkpoint_version().unwrap();
         event_subscription_service
             .notify_initial_configs(synced_version)
             .unwrap();
@@ -649,7 +649,7 @@ mod tests {
             .subscribe_to_reconfigurations()
             .unwrap();
         let storage: Arc<dyn DbReader> = db.clone();
-        let synced_version = (&*storage).fetch_synced_version().unwrap();
+        let synced_version = (&*storage).fetch_latest_state_checkpoint_version().unwrap();
         assert_ok!(event_subscription_service.notify_initial_configs(synced_version));
 
         if verify_initial_config {

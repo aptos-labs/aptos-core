@@ -345,10 +345,11 @@ where
         for (idx, (value_set, hash_set)) in
             itertools::zip_eq(value_sets.into_iter(), hash_sets.into_iter()).enumerate()
         {
-            assert!(
-                !value_set.is_empty(),
-                "Transactions that output empty write set should not be included.",
-            );
+            if value_set.is_empty() {
+                tree_cache.freeze();
+                continue;
+            }
+
             let version = first_version + idx as u64;
             let deduped_and_sorted_kvs = value_set
                 .into_iter()
@@ -397,8 +398,6 @@ where
         hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
         tree_cache: &mut TreeCache<R, K>,
     ) -> Result<(NodeKey, Node<K>)> {
-        assert!(!kvs.is_empty());
-
         let node = tree_cache.get_node(&node_key)?;
         Ok(match node {
             Node::Internal(internal_node) => {

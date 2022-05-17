@@ -59,8 +59,8 @@ use aptos_types::{
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
-        AccumulatorConsistencyProof, EventProof, SparseMerkleProof, StateStoreValueProof,
-        TransactionInfoListWithProof,
+        definition::LeafCount, AccumulatorConsistencyProof, EventProof, SparseMerkleProof,
+        StateStoreValueProof, TransactionInfoListWithProof,
     },
     state_proof::StateProof,
     state_store::{
@@ -593,33 +593,40 @@ impl AptosDB {
         txns_to_commit: &[TransactionToCommit],
         first_version: u64,
         cs: &mut ChangeSet,
-    ) -> Result<HashValue> {
+    ) -> Result<(HashValue, Option<Version>)> {
         let last_version = first_version + txns_to_commit.len() as u64 - 1;
 
         // Account state updates. Gather account state root hashes
-        {
+        let updated_state_version = {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["save_transactions_state"])
                 .start_timer();
 
-            let account_state_sets = txns_to_commit
+            let state_updates_vec = txns_to_commit
                 .iter()
                 .map(|txn_to_commit| txn_to_commit.state_updates())
                 .collect::<Vec<_>>();
+            // find the last version with state tree updates -- that's the latest state checkpoint
+            let latest_state_checkpoint_version = state_updates_vec
+                .iter()
+                .rposition(|updates| !updates.is_empty())
+                .map(|idx| first_version + idx as LeafCount);
 
             let node_hashes = txns_to_commit
                 .iter()
                 .map(|txn_to_commit| txn_to_commit.jf_node_hashes())
                 .collect::<Option<Vec<_>>>();
             self.state_store.merklize_value_sets(
-                account_state_sets.clone(),
+                state_updates_vec.clone(),
                 node_hashes,
                 first_version,
                 cs,
             )?;
             self.state_store
-                .put_value_sets(account_state_sets, first_version, cs)?;
-        }
+                .put_value_sets(state_updates_vec, first_version, cs)?;
+
+            latest_state_checkpoint_version
+        };
 
         // Event updates. Gather event accumulator root hashes.
         {
@@ -656,7 +663,7 @@ impl AptosDB {
                 .put_transaction_infos(first_version, &txn_infos, cs)?
         };
 
-        Ok(new_root_hash)
+        Ok((new_root_hash, updated_state_version))
     }
 
     /// Write the whole schema batch including all data necessary to mutate the ledger
@@ -1204,6 +1211,12 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
+        gauged_api("get_latest_state_checkpoint_version", || {
+            Ok(self.state_store.latest_version())
+        })
+    }
+
     fn get_accumulator_root_hash(&self, version: Version) -> Result<HashValue> {
         gauged_api("get_accumulator_root_hash", || {
             self.ledger_store.get_root_hash(version)
@@ -1303,7 +1316,7 @@ impl DbWriter for AptosDB {
             // Gather db mutations to `batch`.
             let mut cs = ChangeSet::new();
 
-            let new_root_hash =
+            let (new_root_hash, latest_state_checkpoint) =
                 self.save_transactions_impl(txns_to_commit, first_version, &mut cs)?;
 
             // If expected ledger info is provided, verify result root hash and save the ledger info.
@@ -1328,11 +1341,15 @@ impl DbWriter for AptosDB {
                 self.commit(sealed_cs)?;
             }
 
+            if let Some(latest_state_version) = latest_state_checkpoint {
+                self.state_store
+                    .set_latest_state_checkpoint_version(latest_state_version);
+            }
+
             // Only increment counter if commit succeeds and there are at least one transaction written
             // to the storage. That's also when we'd inform the pruner thread to work.
             if num_txns > 0 {
                 let last_version = first_version + num_txns - 1;
-                self.state_store.set_latest_version(last_version);
                 COMMITTED_TXNS.inc_by(num_txns);
                 LATEST_TXN_VERSION.set(last_version as i64);
                 counters

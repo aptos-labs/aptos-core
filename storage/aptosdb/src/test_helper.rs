@@ -63,7 +63,7 @@ prop_compose! {
 
                 let txn_info = TransactionInfo::new(
                     txn.transaction().hash(),
-                    state_checkpoint_hash.unwrap(),
+                    txn.write_set().hash(),
                     event_root_hash,
                     state_checkpoint_hash,
                     placeholder_txn_info.gas_used(),
@@ -515,6 +515,9 @@ pub fn verify_committed_transactions(
             txn_info.transaction_hash(),
             txn_to_commit.transaction().hash()
         );
+        if matches!(txn_to_commit.transaction(), Transaction::StateCheckpoint) {
+            continue;
+        }
 
         // Fetch and verify transaction itself.
         let txn = txn_to_commit.transaction().as_signed_user_txn().unwrap();
@@ -620,7 +623,7 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
     db.db
         .put::<StateValueSchema>(&(key, version), &state_value)
         .unwrap();
-    db.state_store.set_latest_version(version);
+    db.state_store.set_latest_state_checkpoint_version(version);
 }
 
 pub fn test_sync_transactions_impl(

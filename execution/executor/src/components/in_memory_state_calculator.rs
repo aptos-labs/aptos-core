@@ -223,8 +223,7 @@ impl InMemoryStateCalculator {
         } else {
             match txn {
                 Transaction::BlockMetadata(_) | Transaction::UserTransaction(_) => {
-                    // TODO(aldenhu): replace with: Ok((HashMap::new(), HashMap::new(), None))
-                    self.checkpoint()
+                    Ok((HashMap::new(), HashMap::new(), None))
                 }
                 Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint => {
                     self.checkpoint()

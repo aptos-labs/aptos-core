@@ -390,6 +390,11 @@ pub trait DbReader: Send + Sync {
         Ok(self.get_latest_ledger_info()?.ledger_info().version())
     }
 
+    /// Returns the latest state checkpoint version if any.
+    fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
+        unimplemented!()
+    }
+
     /// Returns the latest version and committed block timestamp
     fn get_latest_commit_metadata(&self) -> Result<(Version, u64)> {
         let ledger_info_with_sig = self.get_latest_ledger_info()?;
@@ -565,7 +570,7 @@ pub trait DbReader: Send + Sync {
 
 impl MoveStorage for &dyn DbReader {
     fn fetch_resource(&self, access_path: AccessPath) -> Result<Vec<u8>> {
-        self.fetch_resource_by_version(access_path, self.fetch_synced_version()?)
+        self.fetch_resource_by_version(access_path, self.fetch_latest_state_checkpoint_version()?)
     }
 
     fn fetch_resource_by_version(
@@ -608,6 +613,11 @@ impl MoveStorage for &dyn DbReader {
             })?
             .ok_or_else(|| format_err!("[MoveStorage] Latest transaction info not found."))?;
         Ok(synced_version)
+    }
+
+    fn fetch_latest_state_checkpoint_version(&self) -> Result<Version> {
+        self.get_latest_state_checkpoint_version()?
+            .ok_or_else(|| format_err!("[MoveStorage] Latest state checkpoint not found."))
     }
 }
 

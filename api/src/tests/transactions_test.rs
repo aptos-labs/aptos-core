@@ -121,7 +121,7 @@ async fn test_get_transactions_output_user_transaction_with_script_function_payl
     context.commit_block(&vec![txn.clone()]).await;
 
     let txns = context.get("/transactions?start=1").await;
-    assert_eq!(2, txns.as_array().unwrap().len());
+    assert_eq!(3, txns.as_array().unwrap().len());
     context.check_golden_output(txns);
 }
 
@@ -417,7 +417,7 @@ async fn test_get_transaction_by_hash() {
     let txn = context.create_user_account(&account);
     context.commit_block(&vec![txn.clone()]).await;
 
-    let txns = context.get("/transactions?start=2").await;
+    let txns = context.get("/transactions?start=2&limit=1").await;
     assert_eq!(1, txns.as_array().unwrap().len());
 
     let resp = context
@@ -469,7 +469,7 @@ async fn test_get_transaction_by_version() {
     let txn = context.create_user_account(&account);
     context.commit_block(&vec![txn.clone()]).await;
 
-    let txns = context.get("/transactions?start=2").await;
+    let txns = context.get("/transactions?start=2&limit=1").await;
     assert_eq!(1, txns.as_array().unwrap().len());
 
     let resp = context.get("/transactions/2").await;
@@ -675,7 +675,7 @@ async fn test_signing_message_with_payload(
     context.commit_mempool_txns(10).await;
 
     let ledger = context.get("/").await;
-    assert_eq!(ledger["ledger_version"].as_str().unwrap(), "2"); // one metadata + one txn
+    assert_eq!(ledger["ledger_version"].as_str().unwrap(), "3"); // metadata + user txn + state checkpoint
 }
 
 #[tokio::test]

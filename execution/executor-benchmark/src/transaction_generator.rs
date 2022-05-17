@@ -27,7 +27,7 @@ use std::{
     sync::{mpsc, Arc},
     time::Instant,
 };
-use storage_interface::{state_view::LatestDbStateView, DbReader};
+use storage_interface::{state_view::LatestDbStateCheckpointView, DbReader};
 
 const META_FILENAME: &str = "metadata.toml";
 const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
@@ -261,7 +261,7 @@ impl TransactionGenerator {
         );
         let bar = get_progress_bar(self.seed_accounts_cache.len());
         for (i, block) in self.seed_accounts_cache.chunks(block_size).enumerate() {
-            let mut transactions = Vec::with_capacity(block_size);
+            let mut transactions = Vec::with_capacity(block_size + 1);
             for (j, account) in block.iter().enumerate() {
                 let txn = create_transaction(
                     &self.genesis_key,
@@ -274,6 +274,7 @@ impl TransactionGenerator {
                 );
                 transactions.push(txn);
             }
+            transactions.push(Transaction::StateCheckpoint);
             self.version += transactions.len() as Version;
             if let Some(sender) = &self.block_sender {
                 sender.send(transactions).unwrap();
@@ -302,7 +303,7 @@ impl TransactionGenerator {
         );
         let bar = get_progress_bar(self.accounts_cache.len());
         for (_, block) in self.accounts_cache.chunks(block_size).enumerate() {
-            let mut transactions = Vec::with_capacity(block_size);
+            let mut transactions = Vec::with_capacity(block_size + 1);
             for (_, account) in block.iter().enumerate() {
                 let seed_index =
                     rand::seq::index::sample(&mut self.rng, self.seed_accounts_cache.len(), 1)
@@ -320,6 +321,7 @@ impl TransactionGenerator {
                 self.seed_accounts_cache[seed_index].sequence_number += 1;
                 transactions.push(txn);
             }
+            transactions.push(Transaction::StateCheckpoint);
             self.version += transactions.len() as Version;
             if let Some(sender) = &self.block_sender {
                 sender.send(transactions).unwrap();
@@ -350,7 +352,7 @@ impl TransactionGenerator {
         );
         let bar = get_progress_bar(total_accounts);
         for (i, block) in self.seed_accounts_cache.chunks(block_size).enumerate() {
-            let mut transactions = Vec::with_capacity(block_size);
+            let mut transactions = Vec::with_capacity(block_size + 1);
             for (j, account) in block.iter().enumerate() {
                 let txn = create_transaction(
                     &self.genesis_key,
@@ -363,6 +365,7 @@ impl TransactionGenerator {
                 );
                 transactions.push(txn);
             }
+            transactions.push(Transaction::StateCheckpoint);
             self.version += transactions.len() as Version;
 
             if let Some(sender) = &self.block_sender {
@@ -386,7 +389,7 @@ impl TransactionGenerator {
         let mut txn_block = vec![];
 
         for _i in 0..num_blocks {
-            let mut transactions = Vec::with_capacity(block_size);
+            let mut transactions = Vec::with_capacity(block_size + 1);
             for _j in 0..block_size {
                 let indices = rand::seq::index::sample(&mut self.rng, self.accounts_cache.len(), 2);
                 let sender_idx = indices.index(0);
@@ -406,6 +409,7 @@ impl TransactionGenerator {
                 transactions.push(txn);
                 self.accounts_cache[sender_idx].sequence_number += 1;
             }
+            transactions.push(Transaction::StateCheckpoint);
             self.version += transactions.len() as Version;
 
             if let Some(sender) = &self.block_sender {
@@ -427,7 +431,7 @@ impl TransactionGenerator {
         let bar = get_progress_bar(self.accounts_cache.len());
         self.accounts_cache.par_iter().for_each(|account| {
             let address = account.address;
-            let db_state_view = db.latest_state_view().unwrap();
+            let db_state_view = db.latest_state_checkpoint_view().unwrap();
             let address_account_view = db_state_view.as_account_with_state_view(&address);
             assert_eq!(
                 address_account_view

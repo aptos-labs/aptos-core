@@ -1,6 +1,6 @@
 {
   "type": "user_transaction",
-  "version": "4",
+  "version": "5",
   "hash": "",
   "state_root_hash": "",
   "event_root_hash": "",

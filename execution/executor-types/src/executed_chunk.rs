@@ -114,6 +114,24 @@ impl ExecutedChunk {
         }
     }
 
+    /// Ensure that every block committed by consensus ends with a state checkpoint. That can be
+    /// one of the two cases: 1. a reconfiguration (txns in the proposed block after the txn caused
+    /// the reconfiguration will be retried) 2. a Transaction::StateCheckpoint at the end of the
+    /// block.
+    ///
+    /// Called from `BlockExecutor`
+    pub fn ensure_ends_with_state_checkpoint(&self) -> Result<()> {
+        ensure!(
+            self.next_epoch_state.is_some()
+                || self
+                    .to_commit
+                    .last()
+                    .map_or(true, |(t, _)| matches!(t, Transaction::StateCheckpoint)),
+            "Chunk not ending with a state checkpoint.",
+        );
+        Ok(())
+    }
+
     pub fn maybe_select_chunk_ending_ledger_info(
         &self,
         verified_target_li: &LedgerInfoWithSignatures,

@@ -68,7 +68,7 @@ impl StateStore {
         *self.latest_version.lock()
     }
 
-    pub fn set_latest_version(&self, version: Version) {
+    pub fn set_latest_state_checkpoint_version(&self, version: Version) {
         *self.latest_version.lock() = Some(version)
     }
 
@@ -477,7 +477,7 @@ impl TreeWriter<StateKey> for StateStore {
     }
 
     fn finish_version(&self, version: Version) {
-        self.set_latest_version(version)
+        self.set_latest_state_checkpoint_version(version)
     }
 }
 

@@ -1023,8 +1023,7 @@ pub struct TransactionInfoV0 {
     event_root_hash: HashValue,
 
     /// The hash value summarizing all changes caused to the world state by this transaction.
-    /// Depending on the protocol configuration, it can be the root hash of an accumulator of
-    /// the write set or all updated accounts, or the global Sparse Merkle Tree root hash.
+    /// i.e. hash of the output write set.
     state_change_hash: HashValue,
 
     /// The root hash of the Sparse Merkle Tree describing the world state at the end of this
@@ -1042,9 +1041,6 @@ impl TransactionInfoV0 {
         gas_used: u64,
         status: ExecutionStatus,
     ) -> Self {
-        // TODO(aldenhu): stop expecting `state_checkpoint_hash.is_some()`
-        assert!(state_checkpoint_hash.is_some());
-
         Self {
             gas_used,
             status,

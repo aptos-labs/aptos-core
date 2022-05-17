@@ -15,7 +15,7 @@ use executor::components::in_memory_state_calculator::IntoLedgerView;
 use fail::fail_point;
 use std::sync::Arc;
 use storage_interface::{
-    state_view::LatestDbStateView, verified_state_view::VerifiedStateView, DbReader,
+    state_view::LatestDbStateCheckpointView, verified_state_view::VerifiedStateView, DbReader,
 };
 
 #[cfg(test)]
@@ -112,7 +112,7 @@ pub fn get_account_sequence_number(
             "Injected error in get_account_sequence_number"
         ))
     });
-    let db_state_view = storage.latest_state_view()?;
+    let db_state_view = storage.latest_state_checkpoint_view()?;
 
     let account_state_view = db_state_view.as_account_with_state_view(&address);
 

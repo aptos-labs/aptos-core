@@ -12,6 +12,7 @@ use aptos_types::{
     account_config::aptos_root_address,
     account_view::AccountView,
     event::EventKey,
+    test_helpers::transaction_test_helpers::block,
     transaction::{
         authenticator::AuthenticationKey, Transaction, TransactionListWithProof,
         TransactionWithProof, WriteSetPayload,
@@ -143,7 +144,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         Some(aptos_stdlib::encode_test_coin_transfer(account3, 70_000)),
     );
 
-    let block1 = vec![tx1, tx2, tx3, txn1, txn2, txn3, txn4, txn5, txn6];
+    let block1 = block(vec![tx1, tx2, tx3, txn1, txn2, txn3, txn4, txn5, txn6]);
     let block1_id = gen_block_id(1);
 
     let mut block2 = vec![];
@@ -159,6 +160,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             Some(aptos_stdlib::encode_test_coin_transfer(account3, 10_000)),
         ));
     }
+    let block2 = block(block2);
 
     let output1 = executor
         .execute_block((block1_id, block1.clone()), parent_block_id)
@@ -175,7 +177,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         _ => panic!("unexpected state change"),
     };
     let current_version = state_proof.latest_ledger_info().version();
-    assert_eq!(trusted_state.version(), 9);
+    assert_eq!(trusted_state.version(), 10);
 
     let t1 = db
         .reader
@@ -361,7 +363,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         TrustedStateChange::Version { .. }
     ));
     let current_version = state_proof.latest_ledger_info().version();
-    assert_eq!(current_version, 23);
+    assert_eq!(current_version, 25);
 
     let t7 = db
         .reader
@@ -396,7 +398,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     let transaction_list_with_proof = db
         .reader
-        .get_transactions(10, 17, current_version, false)
+        .get_transactions(11, 18, current_version, false)
         .unwrap();
     verify_transactions(&transaction_list_with_proof, &block2[..]).unwrap();
 

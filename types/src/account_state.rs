@@ -37,6 +37,10 @@ impl AccountState {
         self.0.iter()
     }
 
+    pub fn into_resource_iter(self) -> impl std::iter::Iterator<Item = (Vec<u8>, Vec<u8>)> {
+        self.0.into_iter()
+    }
+
     /// Return an iterator over the module values stored under this account
     pub fn get_modules(&self) -> impl Iterator<Item = &Vec<u8>> {
         self.0.iter().filter_map(

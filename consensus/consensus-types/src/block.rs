@@ -24,6 +24,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
+    iter::once,
 };
 
 #[path = "block_test_utils.rs"]
@@ -301,7 +302,8 @@ impl Block {
                 .unwrap_or(&Vec::new())
                 .iter()
                 .cloned()
-                .map(Transaction::UserTransaction),
+                .map(Transaction::UserTransaction)
+                .chain(once(Transaction::StateCheckpoint)),
         )
         .collect()
     }
