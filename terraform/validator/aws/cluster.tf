@@ -71,6 +71,8 @@ resource "aws_eks_node_group" "nodes" {
   subnet_ids      = [aws_subnet.private[0].id]
   tags            = local.default_tags
 
+  capacity_type = var.node_pool_capacity_type
+
   lifecycle {
     ignore_changes = [
       scaling_config[0].desired_size

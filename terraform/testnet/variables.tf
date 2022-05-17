@@ -197,3 +197,8 @@ variable "coredns_min_replicas" {
   description = "Minimal replica numbers for core dns"
   default     = 2
 }
+
+variable "node_pool_capacity_type" {
+  description = "Type of capacity associated with the EKS Node Groups"
+  default     = "ON_DEMAND"
+}

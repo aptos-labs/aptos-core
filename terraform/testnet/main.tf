@@ -40,6 +40,7 @@ module "validator" {
   k8s_admins         = var.k8s_admins
   ssh_pub_key        = var.ssh_pub_key
 
+  node_pool_capacity_type = var.node_pool_capacity_type
   max_node_pool_surge = var.enable_forge ? 2 : 1
   node_pool_sizes = var.validator_lite_mode ? {
     utilities  = var.num_utilities_instance > 0 ? var.num_utilities_instance : 3

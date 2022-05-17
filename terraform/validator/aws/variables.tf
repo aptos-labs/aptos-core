@@ -145,3 +145,8 @@ variable "workspace_name_override" {
   description = "If specified, overrides the usage of Terraform workspace for naming purposes"
   default     = ""
 }
+
+variable "node_pool_capacity_type" {
+  description = "Type of capacity associated with the EKS Node Groups"
+  default     = "ON_DEMAND"
+}
