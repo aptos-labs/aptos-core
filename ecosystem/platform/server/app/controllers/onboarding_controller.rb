@@ -52,8 +52,7 @@ class OnboardingController < ApplicationController
       redirect_to it1_path, notice: 'Identity Verification completed successfully!'
     rescue KYCCompleteJobError => e
       Sentry.capture_exception(e)
-      redirect_to it1_path, error: 'Error; If you completed Identity Verification,'\
-                                   " it may take some time to reflect. Error: #{e}"
+      redirect_to it1_path, error: 'Error; If you completed Identity Verification, it may take some time to reflect.'
     end
   end
 
