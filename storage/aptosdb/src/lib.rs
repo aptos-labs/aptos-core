@@ -73,8 +73,9 @@ use aptos_types::{
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
         TransactionOutput, TransactionOutputListWithProof, TransactionToCommit,
-        TransactionWithProof, Version, PRE_GENESIS_VERSION,
+        TransactionWithProof, Version,
     },
+    write_set::WriteSet,
 };
 use itertools::zip_eq;
 use once_cell::sync::Lazy;
@@ -458,30 +459,12 @@ impl AptosDB {
                 self.state_store.get_root_hash(ver)
             })?;
 
-        let write_sets_after_checkpoint = self.transaction_store.get_write_sets(
-            Self::state_checkpoint_next_version(checkpoint_version),
-            num_transactions,
-        )?;
-
         Ok(TreeState::new(
             num_transactions,
             frozen_subtrees,
             checkpoint_root_hash,
-            write_sets_after_checkpoint,
+            checkpoint_version,
         ))
-    }
-
-    fn state_checkpoint_next_version(checkpoint_version: Option<Version>) -> Version {
-        match checkpoint_version {
-            None => 0,
-            Some(v) => {
-                if v == PRE_GENESIS_VERSION {
-                    0
-                } else {
-                    v + 1
-                }
-            }
-        }
     }
 
     // ================================== Backup APIs ===================================
@@ -926,6 +909,21 @@ impl DbReader for AptosDB {
                 Some(start_version),
                 proof,
             ))
+        })
+    }
+
+    /// Get write sets for range [begin_version, end_version).
+    ///
+    /// Used by the executor to build in memory state after a state checkpoint.
+    /// Any missing write set in the entire range results in error.
+    fn get_write_sets(
+        &self,
+        begin_version: Version,
+        end_version: Version,
+    ) -> Result<Vec<WriteSet>> {
+        gauged_api("get_write_sets", || {
+            self.transaction_store
+                .get_write_sets(begin_version, end_version)
         })
     }
 

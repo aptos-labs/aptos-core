@@ -92,7 +92,7 @@ fn test_get_latest_tree_state() {
     let pre_genesis = db.get_latest_tree_state().unwrap();
     assert_eq!(
         pre_genesis,
-        TreeState::new_at_state_checkpoint(0, vec![], hash)
+        TreeState::new(0, vec![], hash, Some(PRE_GENESIS_VERSION))
     );
 
     // bootstrapped db (any transaction info is in)
@@ -114,7 +114,7 @@ fn test_get_latest_tree_state() {
             1,
             vec![txn_info.hash()],
             txn_info.state_checkpoint_hash().unwrap(),
-            Vec::new()
+            Some(0),
         ),
     );
 }

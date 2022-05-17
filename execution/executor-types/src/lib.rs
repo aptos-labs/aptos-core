@@ -325,7 +325,10 @@ impl ExecutedTrees {
         frozen_subtrees_in_accumulator: Vec<HashValue>,
         num_leaves_in_accumulator: u64,
     ) -> Self {
-        let state = InMemoryState::new_at_checkpoint(state_root_hash, num_leaves_in_accumulator);
+        let state = InMemoryState::new_at_checkpoint(
+            state_root_hash,
+            num_leaves_in_accumulator.checked_sub(1),
+        );
         let transaction_accumulator = Arc::new(
             InMemoryAccumulator::new(frozen_subtrees_in_accumulator, num_leaves_in_accumulator)
                 .expect("The startup info read from storage should be valid."),
@@ -354,7 +357,7 @@ impl ExecutedTrees {
         VerifiedStateView::new(
             id,
             reader.clone(),
-            persisted_view.state.checkpoint_version(),
+            persisted_view.state.checkpoint_version,
             persisted_view.state.checkpoint_root_hash(),
             self.state.current.clone(),
         )

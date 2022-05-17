@@ -79,7 +79,7 @@ impl StartupInfo {
             num_transactions: 0,
             ledger_frozen_subtree_hashes: Vec::new(),
             state_checkpoint_hash: *SPARSE_MERKLE_PLACEHOLDER_HASH,
-            write_sets_after_checkpoint: Vec::new(),
+            state_checkpoint_version: None,
         };
         let synced_tree_state = None;
 
@@ -113,12 +113,7 @@ pub struct TreeState {
     pub ledger_frozen_subtree_hashes: Vec<HashValue>,
     /// Root hash of the state checkpoint (global sparse merkle tree).
     pub state_checkpoint_hash: HashValue,
-    /// The state checkpoint can be at or before the latest version, if the latter case, this is
-    /// the write sets between the state checkpoint and the latest version. Applying this to the
-    /// state checkpoint results in a in-mem latest world state.
-    /// N.b the latest version minus `write_sets_after_checkpoint.len()` is the state checkpoint
-    /// version.
-    pub write_sets_after_checkpoint: Vec<WriteSet>,
+    pub state_checkpoint_version: Option<Version>,
 }
 
 impl TreeState {
@@ -126,13 +121,13 @@ impl TreeState {
         num_transactions: LeafCount,
         ledger_frozen_subtree_hashes: Vec<HashValue>,
         state_checkpoint_hash: HashValue,
-        write_sets_after_checkpoint: Vec<WriteSet>,
+        state_checkpoint_version: Option<Version>,
     ) -> Self {
         Self {
             num_transactions,
             ledger_frozen_subtree_hashes,
             state_checkpoint_hash,
-            write_sets_after_checkpoint,
+            state_checkpoint_version,
         }
     }
 
@@ -145,7 +140,8 @@ impl TreeState {
             num_transactions,
             ledger_frozen_subtree_hashes,
             state_checkpoint_hash: state_root_hash,
-            write_sets_after_checkpoint: Vec::new(),
+            // Doesn't consider the possibility of PRE_GENESIS exists
+            state_checkpoint_version: num_transactions.checked_sub(1),
         }
     }
 
@@ -289,6 +285,17 @@ pub trait DbReader: Send + Sync {
         limit: u64,
         ledger_version: Version,
     ) -> Result<TransactionOutputListWithProof> {
+        unimplemented!()
+    }
+
+    /// See [`AptosDB::get_write_sets`].
+    ///
+    /// [`AptosDB::get_write_sets`]: ../aptosdb/struct.AptosDB.html#method.get_write_sets
+    fn get_write_sets(
+        &self,
+        start_version: Version,
+        end_version: Version,
+    ) -> Result<Vec<WriteSet>> {
         unimplemented!()
     }
 

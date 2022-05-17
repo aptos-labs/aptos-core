@@ -116,7 +116,7 @@ impl VerifiedStateView {
         }
     }
 
-    pub fn prime_cache_by_write_set(&self, write_sets: &[&WriteSet]) -> Result<()> {
+    pub fn prime_cache_by_write_set(&self, write_sets: &[WriteSet]) -> Result<()> {
         write_sets
             .iter()
             .flat_map(|write_set| write_set.iter())
