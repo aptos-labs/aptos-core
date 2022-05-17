@@ -70,6 +70,10 @@ impl StorageServiceClient {
             StorageServiceMessage::Request(_) => Err(Error::RpcError(RpcError::InvalidRpcResponse)),
         }
     }
+
+    pub fn get_peer_metadata_storage(&self) -> Arc<PeerMetadataStorage> {
+        self.peer_metadata.clone()
+    }
 }
 
 // TODO(philiphayes): not clear yet what value this trait is providing
