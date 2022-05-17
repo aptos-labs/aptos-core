@@ -68,7 +68,10 @@ pub trait DataStreamingClient {
     ) -> Result<DataStreamListener, Error>;
 
     /// Continuously streams transaction outputs with proofs as the blockchain
-    /// grows. The stream starts at `start_version` and `start_epoch` (inclusive).
+    /// grows. The stream starts at `known_version + 1` (inclusive) and
+    /// `known_epoch`, where the `known_epoch` is expected to be the epoch
+    /// that contains `known_version + 1`, i.e., any epoch change at
+    /// `known_version` must be noted by the client.
     /// Transaction output proof versions are tied to ledger infos within the
     /// same epoch, otherwise epoch ending ledger infos will signify epoch changes.
     ///
@@ -76,15 +79,19 @@ pub trait DataStreamingClient {
     /// the target. Otherwise, it will continue indefinitely.
     async fn continuously_stream_transaction_outputs(
         &self,
-        start_version: Version,
-        start_epoch: Epoch,
+        known_version: u64,
+        known_epoch: u64,
         target: Option<LedgerInfoWithSignatures>,
     ) -> Result<DataStreamListener, Error>;
 
-    /// Continuously streams transactions with proofs as the blockchain grows.
-    /// The stream starts at `start_version` and `start_epoch` (inclusive).
-    /// Transaction proof versions are tied to ledger infos within the same
-    /// epoch, otherwise epoch ending ledger infos will signify epoch changes.
+    /// Continuously streams transactions with proofs as the blockchain
+    /// grows. The stream starts at `known_version + 1` (inclusive) and
+    /// `known_epoch`, where the `known_epoch` is expected to be the epoch
+    /// that contains `known_version + 1`, i.e., any epoch change at
+    /// `known_version` must be noted by the client.
+    /// Transaction proof versions are tied to ledger infos within the
+    /// same epoch, otherwise epoch ending ledger infos will signify epoch changes.
+    ///
     /// If `include_events` is true, events are also included in the proofs.
     ///
     /// Note: if a `target` is provided, the stream will terminate once it reaches
@@ -185,8 +192,8 @@ pub struct GetAllTransactionOutputsRequest {
 /// A client request for continuously streaming transactions with proofs
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ContinuouslyStreamTransactionsRequest {
-    pub start_version: Version,
-    pub start_epoch: Epoch,
+    pub known_version: Version,
+    pub known_epoch: Epoch,
     pub include_events: bool,
     pub target: Option<LedgerInfoWithSignatures>,
 }
@@ -194,8 +201,8 @@ pub struct ContinuouslyStreamTransactionsRequest {
 /// A client request for continuously streaming transaction outputs with proofs
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ContinuouslyStreamTransactionOutputsRequest {
-    pub start_version: Version,
-    pub start_epoch: Epoch,
+    pub known_version: Version,
+    pub known_epoch: Epoch,
     pub target: Option<LedgerInfoWithSignatures>,
 }
 
@@ -323,14 +330,14 @@ impl DataStreamingClient for StreamingServiceClient {
 
     async fn continuously_stream_transaction_outputs(
         &self,
-        start_version: u64,
-        start_epoch: u64,
+        known_version: u64,
+        known_epoch: u64,
         target: Option<LedgerInfoWithSignatures>,
     ) -> Result<DataStreamListener, Error> {
         let client_request = StreamRequest::ContinuouslyStreamTransactionOutputs(
             ContinuouslyStreamTransactionOutputsRequest {
-                start_version,
-                start_epoch,
+                known_version,
+                known_epoch,
                 target,
             },
         );
@@ -339,15 +346,15 @@ impl DataStreamingClient for StreamingServiceClient {
 
     async fn continuously_stream_transactions(
         &self,
-        start_version: u64,
-        start_epoch: u64,
+        known_version: u64,
+        known_epoch: u64,
         include_events: bool,
         target: Option<LedgerInfoWithSignatures>,
     ) -> Result<DataStreamListener, Error> {
         let client_request =
             StreamRequest::ContinuouslyStreamTransactions(ContinuouslyStreamTransactionsRequest {
-                start_version,
-                start_epoch,
+                known_version,
+                known_epoch,
                 include_events,
                 target,
             });

@@ -5,7 +5,8 @@ use crate::{
     data_notification,
     data_notification::{
         AccountsWithProofRequest, DataClientRequest, DataNotification, DataPayload,
-        EpochEndingLedgerInfosRequest, NotificationId, NumberOfAccountsRequest,
+        EpochEndingLedgerInfosRequest, NewTransactionOutputsWithProofRequest,
+        NewTransactionsWithProofRequest, NotificationId, NumberOfAccountsRequest,
         TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
     },
     error::Error,
@@ -641,6 +642,18 @@ fn sanity_check_client_response(
                 ResponsePayload::EpochEndingLedgerInfos(_)
             )
         }
+        DataClientRequest::NewTransactionOutputsWithProof(_) => {
+            matches!(
+                data_client_response.payload,
+                ResponsePayload::NewTransactionOutputsWithProof(_)
+            )
+        }
+        DataClientRequest::NewTransactionsWithProof(_) => {
+            matches!(
+                data_client_response.payload,
+                ResponsePayload::NewTransactionsWithProof(_)
+            )
+        }
         DataClientRequest::NumberOfAccounts(_) => {
             matches!(
                 data_client_response.payload,
@@ -705,6 +718,12 @@ fn spawn_request_task<T: AptosDataClient + Send + Clone + 'static>(
             DataClientRequest::EpochEndingLedgerInfos(request) => {
                 get_epoch_ending_ledger_infos(aptos_data_client, request).await
             }
+            DataClientRequest::NewTransactionsWithProof(request) => {
+                get_new_transactions_with_proof(aptos_data_client, request).await
+            }
+            DataClientRequest::NewTransactionOutputsWithProof(request) => {
+                get_new_transaction_outputs_with_proof(aptos_data_client, request).await
+            }
             DataClientRequest::NumberOfAccounts(request) => {
                 get_number_of_account_states(aptos_data_client, request).await
             }
@@ -754,6 +773,31 @@ async fn get_epoch_ending_ledger_infos<T: AptosDataClient + Send + Clone + 'stat
 ) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
     let client_response =
         aptos_data_client.get_epoch_ending_ledger_infos(request.start_epoch, request.end_epoch);
+    client_response
+        .await
+        .map(|response| response.map(ResponsePayload::from))
+}
+
+async fn get_new_transaction_outputs_with_proof<T: AptosDataClient + Send + Clone + 'static>(
+    aptos_data_client: T,
+    request: NewTransactionOutputsWithProofRequest,
+) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
+    let client_response = aptos_data_client
+        .get_new_transaction_outputs_with_proof(request.known_version, request.known_epoch);
+    client_response
+        .await
+        .map(|response| response.map(ResponsePayload::from))
+}
+
+async fn get_new_transactions_with_proof<T: AptosDataClient + Send + Clone + 'static>(
+    aptos_data_client: T,
+    request: NewTransactionsWithProofRequest,
+) -> Result<Response<ResponsePayload>, aptos_data_client::Error> {
+    let client_response = aptos_data_client.get_new_transactions_with_proof(
+        request.known_version,
+        request.known_epoch,
+        request.include_events,
+    );
     client_response
         .await
         .map(|response| response.map(ResponsePayload::from))
