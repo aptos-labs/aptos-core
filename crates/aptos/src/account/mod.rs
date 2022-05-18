@@ -5,6 +5,7 @@ use crate::common::types::{CliCommand, CliResult};
 use clap::Subcommand;
 
 pub mod create;
+pub mod fund;
 pub mod list;
 pub mod transfer;
 
@@ -13,6 +14,7 @@ pub mod transfer;
 #[derive(Debug, Subcommand)]
 pub enum AccountTool {
     Create(create::CreateAccount),
+    Fund(fund::FundAccount),
     List(list::ListAccount),
     Transfer(transfer::TransferCoins),
 }
@@ -21,6 +23,7 @@ impl AccountTool {
     pub async fn execute(self) -> CliResult {
         match self {
             AccountTool::Create(tool) => tool.execute_serialized().await,
+            AccountTool::Fund(tool) => tool.execute_serialized().await,
             AccountTool::List(tool) => tool.execute_serialized().await,
             AccountTool::Transfer(tool) => tool.execute_serialized().await,
         }

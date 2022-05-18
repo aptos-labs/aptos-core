@@ -331,3 +331,27 @@ pub fn read_line(input_name: &'static str) -> CliTypedResult<String> {
 
     Ok(input_buf)
 }
+
+/// Fund account (and possibly create it) from a faucet
+pub async fn fund_account(
+    faucet_url: Url,
+    num_coins: u64,
+    address: AccountAddress,
+) -> CliTypedResult<()> {
+    let response = reqwest::Client::new()
+        .post(format!(
+            "{}mint?amount={}&auth_key={}",
+            faucet_url, num_coins, address
+        ))
+        .send()
+        .await
+        .map_err(|err| CliError::ApiError(err.to_string()))?;
+    if response.status() == 200 {
+        Ok(())
+    } else {
+        Err(CliError::ApiError(format!(
+            "Faucet issue: {}",
+            response.status()
+        )))
+    }
+}

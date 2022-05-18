@@ -3,7 +3,7 @@
 
 use crate::{
     common::{
-        init::DEFAULT_REST_URL,
+        init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
         utils::{
             check_if_file_exists, read_from_file, to_common_result, to_common_success_result,
             write_to_file, write_to_file_with_opts, write_to_user_only_file,
@@ -740,4 +740,28 @@ pub struct ChangeSummary {
     resource: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     value: Option<String>,
+}
+
+#[derive(Debug, Parser)]
+pub struct FaucetOptions {
+    /// URL for the faucet
+    #[clap(long)]
+    faucet_url: Option<reqwest::Url>,
+}
+
+impl FaucetOptions {
+    pub fn faucet_url(&self, profile: &str) -> CliTypedResult<reqwest::Url> {
+        if let Some(ref faucet_url) = self.faucet_url {
+            Ok(faucet_url.clone())
+        } else if let Some(Some(url)) =
+            CliConfig::load_profile(profile)?.map(|profile| profile.faucet_url)
+        {
+            reqwest::Url::parse(&url)
+                .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string()))
+        } else {
+            reqwest::Url::parse(DEFAULT_FAUCET_URL).map_err(|err| {
+                CliError::UnexpectedError(format!("Failed to parse default faucet URL {}", err))
+            })
+        }
+    }
 }
