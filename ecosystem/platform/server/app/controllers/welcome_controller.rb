@@ -6,6 +6,7 @@
 class WelcomeController < ApplicationController
   layout 'it1'
 
+  before_action :ensure_discord!, only: %i[it1]
   before_action :ensure_confirmed!, only: %i[it1]
 
   def index

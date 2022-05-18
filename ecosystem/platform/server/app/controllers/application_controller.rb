@@ -27,9 +27,7 @@ class ApplicationController < ActionController::Base
     stored_location = stored_location_for(user)
     return stored_location if stored_location.present?
 
-    if !user.authorizations.where(provider: :discord).exists?
-      root_path
-    elsif user.email.nil?
+    if user.email.nil?
       onboarding_email_path
     else
       it1_path
@@ -38,6 +36,10 @@ class ApplicationController < ActionController::Base
 
   def admin_access_denied(_exception)
     head :forbidden
+  end
+
+  def ensure_discord!
+    redirect_to root_path unless current_user && current_user.authorizations.where(provider: :discord).exists?
   end
 
   def ensure_confirmed!

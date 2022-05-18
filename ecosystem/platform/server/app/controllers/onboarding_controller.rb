@@ -5,6 +5,7 @@
 
 class OnboardingController < ApplicationController
   before_action :authenticate_user!
+  before_action :ensure_discord!
   before_action :ensure_confirmed!, only: %i[kyc_redirect kyc_callback]
   before_action :set_oauth_data, except: :kyc_callback
   protect_from_forgery except: :kyc_callback
