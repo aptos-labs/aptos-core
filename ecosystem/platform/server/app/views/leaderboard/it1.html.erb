@@ -1,10 +1,27 @@
 <div class="bg-neutral-900 text-white h-full p-6 sm:p-24 2xl:px-48">
-  <h2 class="text-6xl mb-4">AIT1 Stats</h2>
+  <h2 class="text-6xl mb-4 font-display font-light">AIT1 Validator Status</h2>
   <div class="mb-8">
     <%= render 'shared/bump_hero' %>
   </div>
+  <div class="flex gap-8 mb-8">
+    <div class="flex-1 p-4 rounded-lg bg-neutral-800">
+      <h3 class="font-mono uppercase text-xl mb-4">No. of nodes</h3>
+      <div class="mb-4"><%= render 'shared/bump' %></div>
+      <p class="font-mono uppercase text-5xl font-light">100</p>
+    </div>
+    <div class="flex-1 p-4 rounded-lg bg-neutral-800">
+      <h3 class="font-mono uppercase text-xl mb-4">No. of countries</h3>
+      <div class="mb-4"><%= render 'shared/bump' %></div>
+      <p class="font-mono uppercase text-5xl font-light">43</p>
+    </div>
+    <div class="flex-1 p-4 rounded-lg bg-neutral-800">
+      <h3 class="font-mono uppercase text-xl mb-4">No. of cities</h3>
+      <div class="mb-4"><%= render 'shared/bump' %></div>
+      <p class="font-mono uppercase text-5xl font-light">58</p>
+    </div>
+  </div>
   <div class="overflow-x-auto">
-    <%= render TableComponent.new do |t| %>
+    <%= render TableComponent.new(class: 'w-full') do |t| %>
       <%= t.with_column(:rank, align: 'right') do %>
         #
       <% end %>
@@ -14,10 +31,10 @@
       <%= t.with_column(:liveness, align: 'right') do %>
         Liveness
       <% end %>
-      <%= t.with_column(:availability, align: 'right') do %>
-        Availability
+      <%= t.with_column(:participation, align: 'right') do %>
+        Participation
       <% end %>
-      <%= t.with_column(:latest_version, align: 'right') do %>
+      <%= t.with_column(:latest_reported_timestamp, align: 'right') do %>
         Last Metrics Update
       <% end %>
 
@@ -31,13 +48,13 @@
               <%= metric.validator %>
             <% end %>
             <%= tr.with_column(align: 'right') do %>
-              <%= metric.liveness %>
+              <%= number_to_percentage(metric.liveness) %>
             <% end %>
-            <%= tr.with_column(align: 'right', class: availability_color(metric.availability)) do %>
-              <%= metric.availability %>
+            <%= tr.with_column(align: 'right', class: availability_color(metric.participation)) do %>
+              <%= number_to_percentage(metric.participation) %>
             <% end %>
             <%= tr.with_column(align: 'right') do %>
-              <%= metric.latest_version %>
+              <%= Time.at(metric.latest_reported_timestamp).to_fs(:db) %>
             <% end %>
           <% end %>
         <% end %>

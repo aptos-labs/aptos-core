@@ -4,21 +4,21 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class LeaderboardController < ApplicationController
-  It1MetricKeys = %i[rank validator liveness availability latest_version].freeze
+  It1MetricKeys = %i[rank validator liveness participation latest_reported_timestamp].freeze
   It1Metric = Struct.new(*It1MetricKeys)
 
   def it1
     expires_in 1.minute, public: true
-    default_sort = [[:availability, -1], [:liveness, 1]]
+    default_sort = [[:participation, -1], [:liveness, -1]]
     @metrics = Rails.cache.fetch(:it1_leaderboard, expires_in: 1.minute) do
       response = HTTParty.get(ENV.fetch('LEADERBOARD_IT1_URL'))
       metrics = JSON.parse(response.body).map do |metric|
         It1Metric.new(
           -1,
-          metric['Validator'],
-          metric['Liveness'].to_f,
-          metric['Availability'].to_f,
-          metric['LatestVersion'].to_i
+          metric['validator'],
+          metric['liveness'].to_f,
+          metric['participation'].to_f,
+          DateTime.parse(metric['latest_reported_timestamp']).to_f
         )
       end
       metrics.sort_by! do |metric|
@@ -30,11 +30,12 @@ class LeaderboardController < ApplicationController
       metrics
     end
 
-    @sort_columns = %w[rank liveness availability latest_version]
+    @sort_columns = %w[rank liveness participation latest_reported_timestamp]
     sort = sort_params(@sort_columns)
-    sort = default_sort if sort.empty?
-    @metrics.sort_by! do |metric|
-      sort.map { |key, direction| metric[key] * direction }
+    if sort
+      @metrics.sort_by! do |metric|
+        sort.map { |key, direction| metric[key] * direction }
+      end
     end
   end
 
