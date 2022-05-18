@@ -46,6 +46,7 @@ regex-syntax = { version = "0.6.25", features = ["unicode", "unicode-age", "unic
 reqwest = { version = "0.11.10", features = ["__tls", "blocking", "cookie_crate", "cookie_store", "cookies", "default-tls", "hyper-tls", "json", "native-tls-crate", "proc-macro-hack", "serde_json", "stream", "tokio-native-tls", "tokio-util"] }
 rusty-fork = { version = "0.3.0", features = ["timeout", "wait-timeout"] }
 serde = { version = "1.0.137", features = ["alloc", "derive", "rc", "serde_derive", "std"] }
+serde_json = { version = "1.0.81", features = ["indexmap", "preserve_order", "std"] }
 sha-1 = { version = "0.10.0", features = ["std"] }
 tokio = { version = "1.18.2", features = ["bytes", "fs", "full", "io-std", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "socket2", "sync", "test-util", "time", "tokio-macros"] }
 tokio-util = { version = "0.6.10", features = ["codec", "compat", "futures-io", "io"] }
@@ -91,6 +92,7 @@ regex-syntax = { version = "0.6.25", features = ["unicode", "unicode-age", "unic
 reqwest = { version = "0.11.10", features = ["__tls", "blocking", "cookie_crate", "cookie_store", "cookies", "default-tls", "hyper-tls", "json", "native-tls-crate", "proc-macro-hack", "serde_json", "stream", "tokio-native-tls", "tokio-util"] }
 rusty-fork = { version = "0.3.0", features = ["timeout", "wait-timeout"] }
 serde = { version = "1.0.137", features = ["alloc", "derive", "rc", "serde_derive", "std"] }
+serde_json = { version = "1.0.81", features = ["indexmap", "preserve_order", "std"] }
 sha-1 = { version = "0.10.0", features = ["std"] }
 syn = { version = "1.0.95", features = ["clone-impls", "derive", "extra-traits", "fold", "full", "parsing", "printing", "proc-macro", "quote", "visit", "visit-mut"] }
 tokio = { version = "1.18.2", features = ["bytes", "fs", "full", "io-std", "io-util", "libc", "macros", "memchr", "mio", "net", "num_cpus", "once_cell", "parking_lot", "process", "rt", "rt-multi-thread", "signal", "signal-hook-registry", "socket2", "sync", "test-util", "time", "tokio-macros"] }
